@@ -2,6 +2,6 @@
 	"reason": "#8277 adds the usage rows' lamp panel: a shared panel start column in the fold and the usage markers module",
 	"date": "2026-11-20",
 	"growth": {
-		"scripts.code_lines": 60
+		"scripts.code_lines": 67
 	}
 }

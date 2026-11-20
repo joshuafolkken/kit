@@ -188,7 +188,12 @@ function lamped_parts(parts: FrameParts): FrameParts {
 	const span = panel_span(throughput)
 	const rows = usage === undefined ? span : rows_span(usage, span)
 
-	return { ...parts, throughput: lamped(throughput, span), usage: lamped(usage, span, rows) }
+	return {
+		...parts,
+		throughput: lamped(throughput, span),
+		usage: lamped(usage, span, rows),
+		usage_alone: lamped(usage, NO_PANEL),
+	}
 }
 
 // A live frame is kept within its terminal, folded as a person folded it; any other is drawn whole.

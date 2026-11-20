@@ -5,6 +5,8 @@ import { run_board_fixture } from './run-board-fixture'
 import { run_board_fold } from './run-board-fold'
 import type { BoardRow } from './run-board-layout'
 import { run_board_quota_lamps } from './run-board-quota-lamps'
+import { run_board_render } from './run-board-render'
+import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_quota } from './run-board-render-quota'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_spot } from './run-board-spot'
@@ -113,9 +115,11 @@ describe('the throughput rows’ lamp panel', () => {
 	})
 })
 
+const ROWS_TEXT = ['     CLAUDE  7d 84%', '     CODEX  —', '     GITHUB  REST 8%']
+
 // A live frame's throughput and usage sections, the usage rows as given, its rule run on to the panel's
-// start and `width` past it.
-function panel_frame(usage_rows: ReadonlyArray<string>, has_panel = true): Array<string> {
+// start and `PANEL_WIDTH` past it.
+function panel_parts(usage_rows: ReadonlyArray<string>, has_panel: boolean): FrameParts {
 	const start = width_of(texts(false)[0] ?? '') + GAP
 	const usage = run_board_render_quota.usage_part({
 		quotas: { claude: undefined, codex: undefined },
@@ -125,7 +129,8 @@ function panel_frame(usage_rows: ReadonlyArray<string>, has_panel = true): Array
 	const lines = run_board_quota_lamps
 		.provider_rows(usage_rows, has_panel)
 		.map((text) => ({ text, is_detail: false }))
-	const parts: FrameParts = {
+
+	return {
 		above: [],
 		plan: [],
 		legend: [],
@@ -135,8 +140,21 @@ function panel_frame(usage_rows: ReadonlyArray<string>, has_panel = true): Array
 		usage: usage === undefined ? undefined : { ...usage, lines },
 		rule_width: start + PANEL_WIDTH,
 	}
+}
+
+// The live frame drawn whole.
+function panel_frame(usage_rows: ReadonlyArray<string>, has_panel = true): Array<string> {
+	const parts = panel_parts(usage_rows, has_panel)
 
 	return run_board_fold.bounded(parts, {}).map((line) => stripVTControlCharacters(line))
+}
+
+// The panel frame in a pane `rows` high, wide enough for every column.
+function panel_pane(rows: number): Array<string> {
+	const parts = panel_parts(ROWS_TEXT, true)
+	const size = { rows, columns: WIDE.columns }
+
+	return run_board_fold.bounded(parts, { size }).map((line) => stripVTControlCharacters(line))
 }
 
 function lamp_starts(lines: ReadonlyArray<string>): Array<number> {
@@ -144,8 +162,6 @@ function lamp_starts(lines: ReadonlyArray<string>): Array<number> {
 		.filter((line) => line.includes(LAMP))
 		.map((line) => width_of(line.split(LAMP)[0] ?? ''))
 }
-
-const ROWS_TEXT = ['     CLAUDE  7d 84%', '     CODEX  —', '     GITHUB  REST 8%']
 
 describe('the lamp panel’s five rows (joshuafolkken/kit#8277)', () => {
 	it('runs on throughput’s two rows, the blank line and usage’s first two rows alike', () => {
@@ -177,6 +193,15 @@ describe('the lamp panel’s five rows (joshuafolkken/kit#8277)', () => {
 		expect(lines).toContain(long)
 		expect(lines).toContain(ROWS_TEXT[0])
 	})
+
+	it('gives way with the throughput rows: a pane that cuts them draws the usage rows unlit', () => {
+		const whole = panel_frame(ROWS_TEXT).length
+		const usage_only = panel_pane(whole - ROWS.length)
+
+		expect(usage_only.join('')).not.toContain('24h')
+		expect(usage_only).toContain(ROWS_TEXT[0])
+		expect(usage_only.join('')).not.toMatch(new RegExp(`[${LAMP}${LAMP_START}]`, 'u'))
+	})
 })
 
 describe('the lamp panel’s rows under the throughput rows, with no lamps', () => {
@@ -187,6 +212,32 @@ describe('the lamp panel’s rows under the throughput rows, with no lamps', () 
 		expect(lines.join('')).not.toMatch(new RegExp(`[${LAMP}${LAMP_START}]`, 'u'))
 		expect(lines[rule - 1]).toBe('')
 		for (const row of ROWS_TEXT) expect(lines).toContain(row)
+	})
+})
+
+// A whole board with throughput rows, a usage section and a lane wide enough for the panel, lamps as
+// given.
+function rendered(is_lit: boolean): Array<string> {
+	const { EMPTY_LAYOUT } = run_board_render_fixture
+	const header = run_board_render_fixture.header({
+		quotas: { claude: undefined, codex: undefined },
+		layout: { ...EMPTY_LAYOUT, active: [WIDE_LANE] },
+	})
+	const view = { header, notes: [], throughput: ROWS, has_lamps: is_lit }
+
+	return run_board_render.render(view).map((line) => stripVTControlCharacters(line))
+}
+
+describe('run_board_render.render with lamps', () => {
+	it('runs the panel on the usage section’s rows as well as the throughput rows', () => {
+		const lamped = rendered(true).filter((line) => line.includes(LAMP))
+
+		expect(lamped).toHaveLength(5)
+		expect(lamped.filter((line) => line.includes('24h') || line.includes('7d'))).toHaveLength(2)
+	})
+
+	it('draws none where the board has no lamps', () => {
+		expect(rendered(false).join('')).not.toContain(LAMP)
 	})
 })
 

@@ -87,6 +87,9 @@ interface FrameParts {
 	above: ReadonlyArray<string>
 	throughput?: DetailPart | undefined
 	usage?: DetailPart | undefined
+	// The usage section as drawn where the throughput rows give way: the lamp panel it shares with them
+	// left out (run-board-fold.ts, joshuafolkken/kit#8277); usage where none is set.
+	usage_alone?: DetailPart | undefined
 	plan: ReadonlyArray<PlanSection>
 	processes?: DetailPart | undefined
 	notes: NotesPart
@@ -268,7 +271,8 @@ function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 
 // The throughput rows and the usage gauges give way whole: their rows are no details to drop.
 function gauge_lines(parts: FrameParts, cut: Cut): Array<string> {
-	const kept = [cut.throughput ? undefined : parts.throughput, cut.usage ? undefined : parts.usage]
+	const usage = cut.throughput ? (parts.usage_alone ?? parts.usage) : parts.usage
+	const kept = [cut.throughput ? undefined : parts.throughput, cut.usage ? undefined : usage]
 
 	return kept.flatMap((part) => detail_lines(part, false))
 }
