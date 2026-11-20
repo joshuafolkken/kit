@@ -111,6 +111,16 @@ function dropped(frame: string): string {
 		.join('\n')
 }
 
-const run_board_label_pair = { MARK, TITLE_MARK, bare, dropped, pair, settled, titled, untitled }
+const run_board_label_pair = {
+	HEADING_LEAD,
+	MARK,
+	TITLE_MARK,
+	bare,
+	dropped,
+	pair,
+	settled,
+	titled,
+	untitled,
+}
 
 export { run_board_label_pair }

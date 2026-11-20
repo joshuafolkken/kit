@@ -116,6 +116,37 @@ describe('run_board_type_rows.is_typing', () => {
 	})
 })
 
+// joshuafolkken/kit#8375: the rules' lock starts once the row that types through last is done.
+describe('run_board_type_rows.done_ms', () => {
+	it('is the moment the row typing through last is done, with rows typing together', () => {
+		const short = line_of('#2', 1, 'x'.repeat(10))
+		const typing = after_base(frame_of([line_of('#1', 0)]), [
+			line_of('#1', 0),
+			short,
+			line_of('#3', 2),
+		])
+
+		expect(run_board_type_rows.done_ms(typing)).toBe(START + SECOND + (ROW.length - 1) * LETTER_MS)
+	})
+
+	it('is none before any row has typed', () => {
+		expect(run_board_type_rows.done_ms(NO_TYPING)).toBeUndefined()
+	})
+
+	it('is kept across the redraw that drops the rows typed through', () => {
+		const typing = after_base(frame_of([line_of('#1', 0)]), [line_of('#1', 0), line_of('#2', 1)])
+		const later = next(
+			typing,
+			frame_of([line_of('#1', 0), line_of('#2', 1)]),
+			START + 9 * SECOND,
+			true,
+		)
+
+		expect(later.lines).toStrictEqual([])
+		expect(run_board_type_rows.done_ms(later)).toBe(run_board_type_rows.done_ms(typing))
+	})
+})
+
 describe('run_board_type_rows — what is written', () => {
 	it('draws a row on a redraw as typed so far with the block after it, the rest of the frame as drawn', () => {
 		const typing = after_base(frame_of([]), [line_of('done:7', 1)])

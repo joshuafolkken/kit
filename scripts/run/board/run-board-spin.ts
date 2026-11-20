@@ -1,5 +1,6 @@
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { run_board_codes, type RuleCell } from './run-board-codes'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamp_spots, type Lamp, type LampMoment } from './run-board-lamp-spots'
@@ -38,15 +39,17 @@ interface Spun {
 	keyed: Array<KeyedLine>
 	sweep: Sweep | undefined
 	lamps: Array<Lamp>
+	rules: Array<RuleCell>
 }
 
-// What is written between redraws: the spinners turned, the sweep moved, the lamps blinked and the rows
-// typing.
+// What is written between redraws: the spinners turned, the sweep moved, the lamps blinked, the rules'
+// code run and the rows typing.
 interface Turning {
 	spots: ReadonlyArray<Spot>
 	typing: Typing
 	sweep?: Sweep | undefined
 	lamps?: ReadonlyArray<Lamp> | undefined
+	rules?: ReadonlyArray<RuleCell> | undefined
 }
 
 // What changed since the last turn was written: the spinner's frame, the sweep's cell, and the moment
@@ -148,6 +151,7 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
 		sweep: sweep_in(lines, starts, { rows, columns }),
 		lamps: run_board_lamp_spots.lamps_in(lines, starts, columns).filter((lamp) => lamp.row <= rows),
+		rules: run_board_codes.rule_cells(lines, starts, columns).filter((cell) => cell.row <= rows),
 	}
 }
 
@@ -163,14 +167,30 @@ function boundary_after(now_ms: number, interval_ms: number): number {
 	return now_ms - (now_ms % interval_ms) + interval_ms
 }
 
-// The next moment the spinner turns, the sweep moves or, while a row types, its next letter is due —
-// whichever comes first, so none paces the others — but never past `until_ms`.
+// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236).
+function blinking(turning: Turning): ReadonlyArray<Lamp> {
+	return turning.typing.seen === undefined ? [] : (turning.lamps ?? [])
+}
+
+// The rules run code only where the lamp panel blinks, so its gate is theirs (joshuafolkken/kit#8375).
+function coded(turning: Turning): { typing: Typing; cells: ReadonlyArray<RuleCell> } {
+	return {
+		typing: turning.typing,
+		cells: blinking(turning).length > 0 ? (turning.rules ?? []) : [],
+	}
+}
+
+// The next moment the spinner turns, the sweep moves, the rules' code steps or, while a row types, its
+// next letter is due — whichever comes first, so none paces the others — but never past `until_ms`.
 function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	const turn_ms = boundary_after(now_ms, SPINNER_INTERVAL_MS)
 	const letter_ms = turning.typing.lines.length > 0 ? boundary_after(now_ms, LETTER_MS) : Infinity
 	const sweep_ms = turning.sweep === undefined ? Infinity : boundary_after(now_ms, SWEEP_MS)
+	const { typing, cells } = coded(turning)
+	const is_coding = run_board_codes.is_coding(typing, cells, now_ms)
+	const code_ms = is_coding ? boundary_after(now_ms, run_board_codes.CODE_MS) : Infinity
 
-	return Math.min(turn_ms, letter_ms, sweep_ms, until_ms)
+	return Math.min(turn_ms, letter_ms, sweep_ms, code_ms, until_ms)
 }
 
 // The spinners turned when their frame changed, the sweep when its cell did, then the rows typing
@@ -183,11 +203,6 @@ function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 	return run_board_screen.synced(
 		`${spin}${swept}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`,
 	)
-}
-
-// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236).
-function blinking(turning: Turning): ReadonlyArray<Lamp> {
-	return turning.typing.seen === undefined ? [] : (turning.lamps ?? [])
 }
 
 // The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
@@ -211,6 +226,7 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 			lamp_moment(turning, at_ms),
 			turned.since,
 		)
+		run_board_codes.write_codes(coded(turning), ports, at_ms, turned.since?.ms)
 	})
 	ports.typing_sound?.set(run_board_type_rows.is_typing(turning.typing, at_ms))
 }
