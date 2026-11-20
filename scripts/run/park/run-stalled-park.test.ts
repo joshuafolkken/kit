@@ -30,7 +30,6 @@ describe('run_stalled_park.apply', () => {
 		expect(emit).toHaveBeenCalledWith(
 			run_event_stream.EVENT_KIND.PARK,
 			`#${ISSUE} parked (run:stalled: ${CAUSE})`,
-			expect.any(Date),
 			{},
 		)
 	})

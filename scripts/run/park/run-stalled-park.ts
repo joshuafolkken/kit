@@ -22,7 +22,7 @@ async function apply(
 
 	if (!park_write.is_labelled) return false
 
-	await run_event_stream_emit.emit(PARK, run_stalled.park_event(issue, cause), new Date(), fields)
+	await run_event_stream_emit.emit(PARK, run_stalled.park_event(issue, cause), fields)
 
 	return true
 }
