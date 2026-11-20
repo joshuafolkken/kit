@@ -31,6 +31,8 @@ const FIRST_HEADER_CELLS = [
 	'measured lanes',
 	'implement-rate lanes',
 	'held by',
+	'held by cause (a hold with several causes counts in full under each)',
+	'held behind (chain + gate; a hold naming several issues counts in full under each)',
 	'dispatch wait',
 	'lane',
 	'process',

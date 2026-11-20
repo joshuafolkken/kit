@@ -142,6 +142,55 @@ describe('lane_held_stats.table — a run:solo wait', () => {
 	})
 })
 
+// joshuafolkken/kit#8331: a watch offer's joined tag split into its causes, and the issues it waited on.
+const CHAIN_GATE = 'offer:watch:chain+gate'
+const CHAIN = 'offer:watch:chain'
+
+function waited(reason: string, minutes_before: number, waiting: Array<number>): LedgerEntry {
+	return { kind: 'held', at: minutes_before_now(minutes_before), reason, waiting }
+}
+
+function body_of(table: string): Array<string> {
+	return table.split('\n').slice(2)
+}
+
+describe('lane_held_stats.cause_table', () => {
+	it('counts a chain+gate hold in full under both chain and gate', () => {
+		const entries = [held(CHAIN_GATE, 30), held(CHAIN, 20), held(MEMORY, 15), dispatch(10)]
+
+		expect(body_of(lane_held_stats.cause_table(entries, WINDOW))).toStrictEqual([
+			'| chain | 15.0 | 7.5 | 10.0 | 2 | 0 |',
+			'| gate | 10.0 | 10.0 | 10.0 | 1 | 0 |',
+		])
+	})
+
+	it('names the overlap in its header', () => {
+		expect(lane_held_stats.cause_table([], WINDOW).split('\n', 1)[0]).toContain(
+			'a hold with several causes counts in full under each',
+		)
+	})
+})
+
+describe('lane_held_stats.blocker_table', () => {
+	it('sums each waited-on issue, the longest total first', () => {
+		const entries = [waited(CHAIN, 30, [7]), waited(CHAIN_GATE, 25, [8, 7]), dispatch(5)]
+
+		expect(body_of(lane_held_stats.blocker_table(entries, WINDOW))).toStrictEqual([
+			'| #7 | 25.0 | 12.5 | 20.0 | 2 | 0 |',
+			'| #8 | 20.0 | 20.0 | 20.0 | 1 | 0 |',
+		])
+	})
+
+	it('keeps only the ten longest issues', () => {
+		const issues = Array.from({ length: 12 }, (_, index) => index + 1)
+
+		const entries = [waited(CHAIN, 10, issues), dispatch(5)]
+		const table = lane_held_stats.blocker_table(entries, WINDOW)
+
+		expect(body_of(table)).toHaveLength(10)
+	})
+})
+
 // joshuafolkken/kit#4084: `run:board` reads the driver's memory hold off the hold still open.
 describe('lane_held_stats.open_reason', () => {
 	it('reads the reason of the last hold nothing ended', () => {

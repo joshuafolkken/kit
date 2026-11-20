@@ -315,6 +315,16 @@ The driver offers every offer interval (180 s) while it waits, so consecutive en
 ends at the dispatch or the release. A hold past an hour is a driver nobody restarted, and it reads as
 ended at the hour.
 
+Two tables follow it and read the same holds (`scripts/lane/lane-held-stats.ts`):
+
+- `held by cause` splits each `offer:watch:` tag into `chain`, `gate`, `lane` and `publication`.
+- `held behind` sums the minutes per issue a hold's `waiting` named, the longest total first, top
+  ten. `waiting` is not split by cause, so it covers `chain` and `gate` together.
+
+Overlap is counted in full: a `chain+gate` hold counts its whole time under both `chain` and
+`gate`, and a hold naming two issues counts it under each. The rows of these two tables can therefore
+sum past the free-lane time; each header says so.
+
 **The decision the table is for**: what the `Stop` hook's stall report's "ready, free lane, no dispatch" time is
 made of. `hand-back:*` rows are time spent waiting on a session, and `offer:*` rows are the backlog's
 own answer. Compare the rows from one period to the next to show the idle time shrinking.

@@ -1,3 +1,6 @@
+import { backlog_hold_codes } from '#scripts/backlog/backlog-hold-codes'
+import { backlog_wait_cause } from '#scripts/backlog/backlog-wait-cause'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_ledger, type HeldEntry, type LedgerEntry } from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -12,6 +15,11 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // dispatch — or at the release a full pool or a finished run writes.
 // A hold nothing followed is counted under `not ended`, kept out of the minutes, whose time has no end;
 // one past `MAX_HOLD_MS` is a driver nobody restarted, read as ended at the cap.
+//
+// Two more tables read the same holds (joshuafolkken/kit#8331): `held by cause` splits a watch offer's
+// `chain+gate` tag into its causes, and `held behind` sums the issues the hold named under `waiting`.
+// **A hold with several causes or issues counts in full under each**, so those rows overlap and sum past
+// the free-lane time; the header says so.
 
 const COLUMNS = [
 	'held by',
@@ -28,10 +36,18 @@ const { NOT_MEASURED } = lane_stage_stats
 // A period with no hold: the table still prints, so a reader sees zero holds rather than no table.
 const NONE_ROW = ['none', NOT_MEASURED, NOT_MEASURED, NOT_MEASURED, '0', '0']
 const { is_dispatch, is_number } = lane_stage_stats
+const { OFFER_PREFIX, REASON_SEPARATOR, WATCH_VERDICT } = backlog_hold_codes
+const WATCH_PREFIX = `${OFFER_PREFIX}${REASON_SEPARATOR}${WATCH_VERDICT}${REASON_SEPARATOR}`
+const CAUSE_HEADER = 'held by cause (a hold with several causes counts in full under each)'
+const BLOCKER_HEADER =
+	'held behind (chain + gate; a hold naming several issues counts in full under each)'
+// The blocking issues printed, the longest total first: the ones worth unblocking next.
+const BLOCKER_ROWS = 10
 
 interface Hold {
 	reason: string
 	wait_ms: number | undefined
+	waiting: ReadonlyArray<number>
 }
 
 function is_held(entry: LedgerEntry): entry is HeldEntry {
@@ -62,9 +78,11 @@ function wait_ms(held: HeldEntry, ends: ReadonlyArray<number>): number | undefin
 function holds_of(entries: ReadonlyArray<LedgerEntry>): Array<Hold> {
 	const ends = end_times(entries)
 
-	return entries
-		.filter(is_held)
-		.map((held) => ({ reason: held.reason, wait_ms: wait_ms(held, ends) }))
+	return entries.filter(is_held).map((held) => ({
+		reason: held.reason,
+		wait_ms: wait_ms(held, ends),
+		waiting: held.waiting ?? [],
+	}))
 }
 
 // Launch admission already writes its exact wait to the shared ledger; do not infer it from
@@ -72,7 +90,7 @@ function holds_of(entries: ReadonlyArray<LedgerEntry>): Array<Hold> {
 function launch_holds(entries: ReadonlyArray<LedgerEntry>): Array<Hold> {
 	return entries.flatMap((entry) =>
 		entry.kind === lane_ledger.KIND.CORE_WAIT && entry.command === LAUNCH_COMMAND
-			? { reason: LAUNCH_COMMAND, wait_ms: entry.waited_ms }
+			? { reason: LAUNCH_COMMAND, wait_ms: entry.waited_ms, waiting: [] }
 			: [],
 	)
 }
@@ -111,17 +129,54 @@ function reasons_of(holds: ReadonlyArray<Hold>): Array<string> {
 	)
 }
 
-// The period's table: `entries` is the whole ledger, filtered here to `window`.
-function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+function period_holds(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): Array<Hold> {
 	const period = lane_stats.in_window(entries, window)
-	const holds = [...holds_of(period), ...launch_holds(period)]
-	const rows = reasons_of(holds).map((reason) => reason_row(reason, holds))
+
+	return [...holds_of(period), ...launch_holds(period)]
+}
+
+// One row per distinct `reason` of `holds` under the `header` column, the first `limit` rows only.
+function render(header: string, holds: ReadonlyArray<Hold>, limit = Infinity): string {
+	const columns = [header, ...COLUMNS.slice(1)]
+	const rows = reasons_of(holds)
+		.slice(0, limit)
+		.map((reason) => reason_row(reason, holds))
 
 	return [
-		lane_stats.to_row(COLUMNS),
-		lane_stats.to_row(COLUMNS.map(() => '---')),
+		lane_stats.to_row(columns),
+		lane_stats.to_row(columns.map(() => '---')),
 		...(rows.length === 0 ? [lane_stats.to_row(NONE_ROW)] : rows),
 	].join('\n')
+}
+
+// The period's table: `entries` is the whole ledger, filtered here to `window`.
+function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+	return render(COLUMNS[0], period_holds(entries, window))
+}
+
+// A watch offer's causes (`offer:watch:chain+gate` → chain, gate); none for any other reason.
+function causes_of(reason: string): ReadonlyArray<string> {
+	if (!reason.startsWith(WATCH_PREFIX)) return []
+
+	return backlog_wait_cause.causes_of_tag(reason.slice(WATCH_PREFIX.length)) ?? []
+}
+
+// The period's holds by cause, a hold of several causes counted in full under each.
+function cause_table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+	const holds = period_holds(entries, window).flatMap((hold) =>
+		causes_of(hold.reason).map((cause) => ({ ...hold, reason: cause })),
+	)
+
+	return render(CAUSE_HEADER, holds)
+}
+
+// The period's holds by the issue they waited on, the longest total first.
+function blocker_table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
+	const holds = period_holds(entries, window).flatMap((hold) =>
+		hold.waiting.map((issue) => ({ ...hold, reason: issue_cite.plain_for('terminal', issue) })),
+	)
+
+	return render(BLOCKER_HEADER, holds, BLOCKER_ROWS)
 }
 
 function is_open_at(held: HeldEntry, now_ms: number): boolean {
@@ -136,6 +191,6 @@ function open_reason(entries: ReadonlyArray<LedgerEntry>, now_ms: number): strin
 	return last !== undefined && is_held(last) && is_open_at(last, now_ms) ? last.reason : undefined
 }
 
-const lane_held_stats = { open_reason, table }
+const lane_held_stats = { blocker_table, cause_table, open_reason, table }
 
 export { lane_held_stats }
