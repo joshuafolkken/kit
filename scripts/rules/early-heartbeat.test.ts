@@ -57,13 +57,14 @@ function with_last_report(elapsed_ms: number | undefined): void {
 }
 
 // A context with no lane mark, so the suite reads as a person's run even when it runs inside a lane
-// child — the one session kind the rule stands down for (joshuafolkken/kit#8278).
-const NOT_A_LANE_CHILD = hook_context_fixture.of(WORK_DIRECTORY, {})
+// child — the one session kind the rule stands down for (joshuafolkken/kit#8278). A lane-child case
+// marks the session with `as_lane_child` instead.
+const UNMARKED_CONTEXT = hook_context_fixture.of(WORK_DIRECTORY, {})
 
 function arm(name: string, command: string, now_ms = NOW_MS, can_record = true): boolean {
 	return early_heartbeat.decide(
 		{ name: 'Bash', input: { command } },
-		{ transcript: transcript_named(name), now_ms, context: NOT_A_LANE_CHILD },
+		{ transcript: transcript_named(name), now_ms, context: UNMARKED_CONTEXT },
 		can_record,
 	)
 }
@@ -241,7 +242,7 @@ describe('delivered_rules.delivery — the row, through the hook that carries it
 
 		const payload = payload_for(transcript_named('delivered'), EARLY_SLEEP)
 
-		expect(delivered_rules.delivery(payload, NOW_MS, NOT_A_LANE_CHILD)).toBe(
+		expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBe(
 			delivered_rules.EARLY_HEARTBEAT_REASON,
 		)
 	})
@@ -254,10 +255,10 @@ describe('delivered_rules.delivery — the row, through the hook that carries it
 
 		const payload = payload_for(transcript_named('repeat'), EARLY_SLEEP)
 
-		expect(delivered_rules.delivery(payload, NOW_MS, NOT_A_LANE_CHILD)).toBe(
+		expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBe(
 			delivered_rules.EARLY_HEARTBEAT_REASON,
 		)
-		expect(delivered_rules.delivery(payload, NOW_MS + 1, NOT_A_LANE_CHILD)).toBe(
+		expect(delivered_rules.delivery(payload, NOW_MS + 1, UNMARKED_CONTEXT)).toBe(
 			delivered_rules.EARLY_HEARTBEAT_REASON,
 		)
 	})
@@ -267,7 +268,7 @@ describe('delivered_rules.delivery — the row, through the hook that carries it
 
 		const payload = payload_for(transcript_named('explicit'), EXPLICIT_ASK)
 
-		expect(delivered_rules.delivery(payload, NOW_MS, NOT_A_LANE_CHILD)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBeUndefined()
 	})
 })
 
@@ -291,7 +292,7 @@ describe('a lane child — the Stop hook wait is the one form, and nothing refus
 
 			const payload = payload_for(transcript_named('lane-delivery'), command)
 
-			expect(delivered_rules.delivery(payload, NOW_MS, NOT_A_LANE_CHILD)).toBeUndefined()
+			expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBeUndefined()
 		},
 	)
 

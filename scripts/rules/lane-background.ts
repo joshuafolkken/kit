@@ -211,8 +211,8 @@ const LANE_BACKGROUND_STOP_REASON =
 // itself gives up. **A foreground dispatch needs no wait at all**, so the reason leads with it: a
 // `sleep 20` repeated rereads the context on every call (joshuafolkken/kit#7879). The harness refuses a
 // longer standalone `sleep`, so one already in the background is waited on by the foreground work left,
-// then short calls. `LANE_AGENT_WAIT` is that short call — the one form `early-heartbeat.ts` lets
-// through in a lane child (joshuafolkken/kit#8278).
+// then short calls. `LANE_AGENT_WAIT` is that short call; `early-heartbeat.ts` stands down in a lane
+// child, so nothing refuses it there (joshuafolkken/kit#8278).
 const LANE_AGENT_WAIT = 'sleep 20'
 const LANE_AGENT_STOP_REASON =
 	'⛔ lane agent stop: a subagent this started child (lane, hand-off or beside) launched has not ' +
