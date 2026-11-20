@@ -111,12 +111,20 @@ function dropped(frame: string): string {
 		.join('\n')
 }
 
+// What opens a section heading's line — `── `, the open `▾ `, the folded `▸ ` or a lone `─ ` — when its
+// first word is a heading lead.
+function heading_lead(line: string): string | undefined {
+	const lead = line.slice(0, line.indexOf(BLANK) + 1)
+
+	return HEADING_LEAD.test(lead) ? lead : undefined
+}
+
 const run_board_label_pair = {
-	HEADING_LEAD,
 	MARK,
 	TITLE_MARK,
 	bare,
 	dropped,
+	heading_lead,
 	pair,
 	settled,
 	titled,

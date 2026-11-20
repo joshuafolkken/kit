@@ -13,7 +13,6 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 const CSI = '\u{1B}['
 const RULE = '─'
-const BLANK = ' '
 const CODE = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
 // The lock's step; the code changes every `CHANGE_MS`.
 const CODE_MS = 50
@@ -35,15 +34,9 @@ type CellLook = 'rule' | 'code' | 'head'
 
 type CodePorts = Pick<BoardPorts, 'write' | 'write_drawn'>
 
-// What opens a section rule — `── `, the open `▾ `, the folded `▸ ` or a lone `─ ` — stays drawn as it is.
-function lead_of(line: string): string | undefined {
-	const lead = line.slice(0, line.indexOf(BLANK) + 1)
-
-	return run_board_label_pair.HEADING_LEAD.test(lead) ? lead : undefined
-}
-
+// What opens a section rule stays drawn as it is.
 function line_cells(line: string, row: number, columns: number): Array<RuleCell> {
-	const lead = lead_of(line)
+	const lead = run_board_label_pair.heading_lead(line)
 
 	if (lead === undefined) return []
 

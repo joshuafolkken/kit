@@ -141,10 +141,6 @@ function lit(open: string, line: string): string {
 	return open + resumed + DEFAULT_FOREGROUND
 }
 
-function is_rule_line(line: string): boolean {
-	return run_board_label_pair.HEADING_LEAD.test(line.slice(0, line.indexOf(' ') + 1))
-}
-
 // On a section rule's line — one opening on a heading lead — every `-`, its rule and the section icon
 // drawn as text alike, in the theme's rule paint where it has one (joshuafolkken/kit#8397); the name and
 // column titles keep the text's color.
@@ -160,7 +156,7 @@ function restyled_line(open: string, rule: Paint | undefined, line: string): str
 	const ruled = kept.split(RULE).join(DASH)
 	const text = run_board_theme_case.capitals(run_board_theme_glyphs.textual(ruled))
 
-	return lit(open, dimmed(rule, is_rule_line(kept), text))
+	return lit(open, dimmed(rule, run_board_label_pair.heading_lead(kept) !== undefined, text))
 }
 
 // joshuafolkken/kit#8207: a line drawn before is taken from the cache — most lines of a redraw, and of
