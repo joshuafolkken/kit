@@ -7,6 +7,7 @@ import { cost_audit_result } from './cost-audit-result'
 import type { TriggerRow } from './cost-audit-resume'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 import { cost_audit_sequence } from './cost-audit-sequence'
+import { cost_audit_session_count } from './cost-audit-session-count'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import {
 	cost_audit_usage,
@@ -31,7 +32,7 @@ const FILING_ROW_SEPARATOR = ', '
 const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
 // Each row's model lines follow it, indented: the same four token types in dollars.
 const KIND_TITLE =
-	'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)'
+	'By session kind (cost · sessions · cost per session, each beside the period before; this period per model: cost — input / cache read / cache write / output in dollars)'
 const LONG_OUTPUT = String(cost_audit_usage.LONG_OUTPUT_TOKENS)
 // Each phase and agent type row also counts its calls whose output passed `LONG_OUTPUT_TOKENS`
 // (joshuafolkken/kit#7045), so the period's long outputs are placed, not only totalled.
@@ -60,8 +61,9 @@ function change(row: AuditRow): string {
 
 function row_line(row: AuditRow): string {
 	const figures = `${figure_format.format_usd(row.current)} (prev ${figure_format.format_usd(row.previous)}, ${change(row)})`
+	const sessions = cost_audit_session_count.row_text(row, row.sessions)
 
-	return `  ${row.key}: ${figures}${row.is_regression ? REGRESSION_MARK : ''}`
+	return `  ${row.key}: ${figures}${sessions}${row.is_regression ? REGRESSION_MARK : ''}`
 }
 
 function sections_of(audit: Audit): Array<AuditSection> {
@@ -266,7 +268,10 @@ function trigger_per_merge(row: TriggerRow, merges: MergeCounts | undefined): st
 function trigger_line(row: TriggerRow, merges: MergeCounts | undefined): string {
 	const usd = { current: row.current.usd, previous: row.previous.usd }
 	const cost = row_line({ key: row.key, ...usd, is_regression: false })
-	const sessions = `${String(row.current.sessions)} session(s) (prev ${String(row.previous.sessions)})`
+	const sessions = cost_audit_session_count.counts_text({
+		current: row.current.sessions,
+		previous: row.previous.sessions,
+	})
 
 	return `${cost} · ${sessions}${trigger_per_merge(row, merges)}`
 }
