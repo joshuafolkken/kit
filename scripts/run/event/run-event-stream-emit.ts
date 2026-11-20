@@ -85,17 +85,18 @@ async function append_at(
 	return await append_with(target, { kind, text, at: at.toISOString() })
 }
 
+type EmitOptions = Pick<RunEvent, 'stop'> & { at?: Date }
+
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
  * every error is swallowed, because the reporting path must never fail the work it reports on.
- * `at` is the caller's instant where another record must carry the same one; `fields` the event's
+ * `at` is the caller's instant where another record must carry the same one; the rest the event's
  * structured fields beside its text — a park's ship stop.
  */
 async function emit(
 	kind: string,
 	text: string,
-	at: Date = new Date(),
-	fields: Pick<RunEvent, 'stop'> = {},
+	{ at = new Date(), ...fields }: EmitOptions = {},
 ): Promise<void> {
 	try {
 		const target = await stream_target()

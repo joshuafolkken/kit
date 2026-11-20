@@ -55,7 +55,7 @@ async function put_on_record(child: string, confirmed_at: Date): Promise<void> {
 
 	const at = dated(events, child, confirmed_at)
 
-	await run_event_stream_emit.emit(KIND.MERGE, text, at)
+	await run_event_stream_emit.emit(KIND.MERGE, text, { at })
 	await lane_ledger_write.record_merge(Number(child), at)
 }
 

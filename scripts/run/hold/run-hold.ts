@@ -196,7 +196,7 @@ function session_owner(environment: Environment = process.env): SessionOwner {
 
 // The mark a hold taken in a lane by anything but that lane's dispatched child carries; none elsewhere.
 function lane_mark(
-	directory: string = process.cwd(),
+	directory: string,
 	environment: Environment = process.env,
 ): Pick<RunHold, 'is_single_in_lane'> {
 	const is_lane = lane_paths.lane_issue_of(directory, { ...environment }) !== undefined
@@ -209,6 +209,7 @@ function lane_mark(
 // The run a claim names: none for a `halfrun` or a `backlogrun` child, `is_fullrun` for a `fullrun`,
 // and both for a `prrun`, which runs `fullrun`'s steps.
 type HoldMark = Pick<RunHold, 'is_fullrun' | 'is_prrun'>
+type CreateHoldOptions = HoldMark & { now?: Date }
 
 const FULLRUN_MARK: HoldMark = { is_fullrun: true }
 const PRRUN_MARK: HoldMark = { is_fullrun: true, is_prrun: true }
@@ -219,7 +220,7 @@ function resumed_mark(command: string): HoldMark {
 }
 
 function build_hold(issue: string, now: Date, mark: HoldMark = {}): RunHold {
-	const owner = { ...session_owner(), ...lane_mark() }
+	const owner = { ...session_owner(), ...lane_mark(process.cwd()) }
 
 	return { issue, taken_at: now.toISOString(), pid: process.pid, ...mark, ...owner }
 }
@@ -238,8 +239,7 @@ function write_hold(target: string, issue: string, now: Date = new Date()): RunH
 function create_hold(
 	target: string,
 	issue: string,
-	now: Date = new Date(),
-	mark: HoldMark = {},
+	{ now = new Date(), ...mark }: CreateHoldOptions = {},
 ): boolean {
 	return stamp_file.create_stamp(target, build_hold(issue, now, mark))
 }

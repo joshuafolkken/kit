@@ -81,7 +81,7 @@ describe('lane_dispatch.dispatch_child — the launch record the stall detector 
 		expect(emit).toHaveBeenCalledExactlyOnceWith(
 			run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 			`#${ISSUE} dispatched`,
-			expect.any(Date),
+			{ at: expect.any(Date) },
 		)
 	})
 
@@ -155,7 +155,7 @@ describe('lane_dispatch.dispatch_child — the lane state record', () => {
 		launch.mockReturnValue({ kind: 'launched', pid: PID })
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(record.mock.calls[0]?.[1]?.now).toBe(emit.mock.calls[0]?.[2])
+		expect(record.mock.calls[0]?.[1]?.now).toBe(emit.mock.calls[0]?.[2]?.at)
 	})
 
 	it('records no state when the launch started no child', async () => {

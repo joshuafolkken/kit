@@ -112,7 +112,7 @@ describe('run_merge_cli.merge_child — a child merged while its issue stayed OP
 
 		await run_merge_cli.merge_child(context())
 
-		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`, CONFIRMED_AT)
+		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`, { at: CONFIRMED_AT })
 	})
 
 	it('still parks an OPEN child no merged pull request closes', async () => {
