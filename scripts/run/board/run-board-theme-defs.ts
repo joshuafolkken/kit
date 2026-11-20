@@ -15,11 +15,14 @@ interface IntroDefinition {
 
 // The live board's effects (joshuafolkken/kit#8360): whether each row types as it appears, and whether
 // the trill sounds while it types, and whether the section rules run launch codes while it types where
-// the lamp panel shows (`run-board-codes.ts`; joshuafolkken/kit#8375).
+// the lamp panel shows (`run-board-codes.ts`; joshuafolkken/kit#8375), and whether a lamp strip fills
+// above each rule by typing progress where the rules run code (`run-board-strip.ts`; joshuafolkken/kit#8376)
+// — off in every theme for now, kept to switch back on (joshuafolkken/kit#8398).
 interface LiveDefinition {
 	types_rows: boolean
 	trill: boolean
 	codes: boolean
+	strip: boolean
 }
 
 interface ThemeDefinition {
@@ -46,7 +49,7 @@ const THEME_DEFS = {
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
-		live: { types_rows: true, trill: true, codes: true },
+		live: { types_rows: true, trill: true, codes: true, strip: false },
 	},
 	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening and live
 	// effects come with the epic's later children, so it types no opening line yet.
@@ -55,7 +58,7 @@ const THEME_DEFS = {
 		intro: { line: '', letter_ms: 0, hold_ms: 0 },
 		alert: run_board_header_trace.field_of,
 		lamps: false,
-		live: { types_rows: false, trill: false, codes: false },
+		live: { types_rows: false, trill: false, codes: false, strip: false },
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 
@@ -75,11 +78,24 @@ const THEMES = names_of(THEME_DEFS)
 
 type Theme = keyof typeof THEME_DEFS
 
+// The theme rows whose live effects a reader reads.
+type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
+
+const NO_LIVE: LiveDefinition = { types_rows: false, trill: false, codes: false, strip: false }
+
+// The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.
+function live_of(theme: Theme | undefined, defs: LiveDefs = THEME_DEFS): LiveDefinition {
+	if (theme === undefined) return NO_LIVE
+
+	return defs[theme]?.live ?? NO_LIVE
+}
+
 const run_board_theme_defs = {
 	THEMES,
 	THEME_DEFS,
+	live_of,
 	names_of,
 }
 
 export { run_board_theme_defs }
-export type { IntroDefinition, LiveDefinition, Theme, ThemeDefinition }
+export type { IntroDefinition, LiveDefinition, LiveDefs, Theme, ThemeDefinition }

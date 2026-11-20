@@ -233,7 +233,9 @@ describe('run_board_tick_draw.draw_display — the rules', () => {
 		expect(drawn_rules(theme)).toBe(0)
 	})
 
-	// joshuafolkken/kit#8376: the lamp strips come and go with the rules' code.
+	// joshuafolkken/kit#8376: the lamp strips come only with the rules' code, and only where the theme's
+	// `live.strip` switches them on — off in wargames by default (joshuafolkken/kit#8398;
+	// `run-board-tick-draw-strip.test.ts`).
 	it.each([undefined, 'matrix' as const])('keeps no lamp strip in the %s theme', (theme) => {
 		expect(drawn_in(theme).strips).toStrictEqual([])
 	})

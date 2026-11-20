@@ -1,0 +1,7 @@
+{
+	"reason": "#8398 adds the live.strip theme switch and the has_strip gate so the wargames lamp strip is off by default yet kept to switch back on",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}
