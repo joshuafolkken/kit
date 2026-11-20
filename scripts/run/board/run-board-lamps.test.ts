@@ -19,7 +19,7 @@ const MOST_PERIOD_STEPS = 18
 const ESCAPE = '\u{1B}'
 const BLINK = `${ESCAPE}[5m`
 const DIM = `${ESCAPE}[2m`
-const OUT_RED = '38;2;64;17;15'
+const OUT_RED = '38;2;128;35;29'
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -134,16 +134,16 @@ describe('run_board_lamps colors', () => {
 		expect(lamp_text(0, true) + lamp_text(1, false)).not.toContain(BLINK)
 	})
 
-	it('draws a lamp out at a quarter of its row’s color, the start placeholder too, never dim', () => {
+	it('draws a lamp out at half its row’s color, dimmed, the start placeholder too', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const start = start_of(1)
 		const out = [lamp_text(0, false), lamp_text(1, false), start]
 
-		expect(out[0]).toContain('38;2;64;54;3')
+		expect(out[0]).toContain('38;2;128;107;5')
 		expect(out[1]).toContain(OUT_RED)
 		expect(start).toContain(OUT_RED)
 		expect(stripVTControlCharacters(start)).toBe(LAMP_START)
-		expect(out.join('')).not.toContain(DIM)
+		for (const text of out) expect(text).toContain(DIM)
 	})
 
 	it('draws an out lamp in the lit named color dim where the terminal has no 24-bit color', () => {
