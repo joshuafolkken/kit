@@ -1,0 +1,4 @@
+- rf:bug-risks | low | scripts/run/board/run-board-intro.ts:98 | 2026-11-19 | #8224 | - | edge-input
+- rf:comments | low | scripts/run/board/run-board-reveal-blocks.ts:40 | 2026-11-19 | #8224 | - | stale-comment
+- rf:comments | low | scripts/run/board/run-board-reveal-blocks.ts:33 | 2026-11-19 | #8224 | - | stale-comment
+- rf:bug-risks | low | scripts/run/board/run-board-intro.ts:98 | 2026-11-19 | #8224 | - | edge-input

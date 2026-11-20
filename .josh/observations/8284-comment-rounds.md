@@ -1,0 +1,3 @@
+- rf:comments | low | tools/cost-audit/cost-audit-read.ts:170 | 2026-11-20 | #8284 | - | stale-comment
+- rf:assumptions | low | tools/cost-audit/cost-audit-read.ts:172 | 2026-11-20 | #8284 | - | other
+- rf:comments | low | tools/cost-audit/cost-audit-read.ts:170 | 2026-11-20 | #8284 | - | stale-comment

@@ -1,0 +1,4 @@
+- rf:bug-risks | low | tools/metrics/run-board-profile-main.ts:91 | 2026-11-19 | #8147 | - | edge-input
+- rf:tests | low | tools/metrics/run-board-profile-main.test.ts:88 | 2026-11-19 | #8147 | - | untested-branch
+- rf:tests | low | tools/metrics/run-board-profile-main.test.ts:66 | 2026-11-19 | #8147 | - | untested-branch
+- rf:bug-risks | low | tools/metrics/run-board-profile-main.ts:91 | 2026-11-19 | #8147 | - | edge-input

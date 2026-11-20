@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/lane/lane-child-marker.ts:38 | 2026-11-19 | #8096
+- rf:project-conventions | low | scripts/agent/claude-agent-argv.ts:50 | 2026-11-19 | #8096
