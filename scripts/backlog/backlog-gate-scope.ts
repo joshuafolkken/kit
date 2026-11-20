@@ -3,7 +3,6 @@ import type { BusyRead } from '#scripts/epic/epic-busy'
 import { epic_graph } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { working_tree } from '#scripts/init/working-tree'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
@@ -56,15 +55,11 @@ function yielded_keys(context: PoolContext, directory: string): ReadonlySet<stri
 // records name a paused holder in the wait it causes (joshuafolkken/kit#4270); they are local files.
 // A lane's recorded plan (joshuafolkken/kit#4864), else a plan comment (joshuafolkken/kit#4923), is
 // read in place of the body (joshuafolkken/kit#4937). A running lane in `read` the listing misses
-// declares its recorded plan (joshuafolkken/kit#7185). A bare file name resolves against the tracked
-// files, listed once here (joshuafolkken/kit#8273).
+// declares its recorded plan (joshuafolkken/kit#7185).
 async function gate_scope(context: PoolContext, read: BusyRead = IDLE): Promise<GateScope> {
 	const { issues } = context.opted_in
 	const directory = process.cwd()
-	const declared = backlog_overlap.with_resolved_names(
-		await backlog_plan_comment.declared_of(issues, directory),
-		working_tree.listing(['ls-files'], directory),
-	)
+	const declared = await backlog_plan_comment.declared_of(issues, directory)
 	const holders = backlog_overlap.running_numbers(read)
 
 	return {
