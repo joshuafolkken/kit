@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing, type TypingLine } from './run-board-type-rows'
 
 // joshuafolkken/kit#3495: where a frame's spinners are on screen, and the turns written between
@@ -11,7 +11,7 @@ import { run_board_type_rows, type Typing, type TypingLine } from './run-board-t
 const { REDRAW_MS, SPOT, spin_bytes, spin_to_second, spun } = run_board_spin
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
 const { NO_TYPING, type_bytes } = run_board_type_rows
-const { LETTER_MS } = run_board_intro
+const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 const { keyed } = run_board_row_key
 const ESCAPE = '\u{1B}'
 const GREEN = `${ESCAPE}[32m`

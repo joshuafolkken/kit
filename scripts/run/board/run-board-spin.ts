@@ -1,7 +1,6 @@
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
-import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamp_spots, type Lamp, type LampMoment } from './run-board-lamp-spots'
 import { run_board_row_key } from './run-board-row-key'
@@ -9,6 +8,7 @@ import { run_board_screen } from './run-board-screen'
 import { run_board_spot, type Spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
 import { run_board_sweep, type Sweep } from './run-board-sweep'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_timing } from './run-board-timing'
 import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-type-rows'
 
@@ -26,7 +26,9 @@ const REDRAW_MS = MS_PER_SECOND
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
-const { LETTER_MS } = run_board_intro
+// joshuafolkken/kit#8349: the rows type at the wargames intro's pace; joshuafolkken/kit#8360 picks it
+// per theme.
+const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 
 // The frame's lines as written, its spinners' spots, its keyed rows on screen, without their keys, the
 // sweep where the frame has room for one and its lamps (`run-board-lamp-spots.ts`).

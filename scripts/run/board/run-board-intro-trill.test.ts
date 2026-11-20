@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyReading } from './run-board-keys'
+import { run_board_theme_defs } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8250: the trill sounds while the opening line types and stops once the letters end —
 // typed through or skipped by a key — so the hold after them is silent; ports without pauses type
 // nothing and sound nothing.
 
-const { HOLD_MS, LETTER_MS, LINE, play } = run_board_intro
+const { play } = run_board_intro
+const THEME = 'wargames'
+const {
+	line: LINE,
+	letter_ms: LETTER_MS,
+	hold_ms: HOLD_MS,
+} = run_board_theme_defs.THEME_DEFS[THEME].intro
 const NO_KEYS: KeyReading = { folded: undefined }
 
 function trilling(intro_sleep: ((ms: number) => Promise<void>) | undefined): {
@@ -56,7 +63,7 @@ describe('run_board_intro.play trill', () => {
 		})
 
 		held.events = events
-		await play(ports, NO_KEYS)
+		await play(ports, NO_KEYS, THEME)
 		const letters = Array.from(LINE, () => ['write', `sleep ${String(LETTER_MS)}`]).flat()
 
 		expect(events).toStrictEqual(['on', ...letters, 'off', 'write', `sleep ${String(HOLD_MS)}`])
@@ -73,7 +80,7 @@ describe('run_board_intro.play trill', () => {
 			},
 		}
 		const { events, ports } = trilling(pending_sleep)
-		const pending = play(ports, keys)
+		const pending = play(ports, keys, THEME)
 
 		taken.on_key?.()
 		await pending
@@ -83,7 +90,7 @@ describe('run_board_intro.play trill', () => {
 	it('sounds nothing where the ports carry no pauses', async () => {
 		const { events, ports } = trilling(undefined)
 
-		await play(ports, NO_KEYS)
+		await play(ports, NO_KEYS, THEME)
 		expect(events).toStrictEqual([])
 	})
 })

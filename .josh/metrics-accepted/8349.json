@@ -1,0 +1,7 @@
+{
+	"reason": "New theme definition table (run-board-theme-defs.ts) as the single source for palette and intro; matches the 35-line estimate",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 35
+	}
+}

@@ -246,7 +246,7 @@ The board writes the terminal BEL instead in three cases: the platform has no ro
 
 A live board in a theme sounds a teletype trill while it types: the opening `SHALL WE PLAY A GAME?` and each row that appears (joshuafolkken/kit#8250, `run-board-sound-typing.ts`). It works apart from the cues:
 
-- The sound: two sine notes, B♭5 then D6, 25 ms each. One pair is 50 ms, the same as one letter (`LETTER_MS`). The WAV holds 80 pairs (4 seconds), synthesized once and cached like the cues.
+- The sound: two sine notes, B♭5 then D6, 25 ms each. One pair is 50 ms, the same as one letter (the theme row's `intro.letter_ms` in `run-board-theme-defs.ts`). The WAV holds 80 pairs (4 seconds), synthesized once and cached like the cues.
 - One player: the trill has one on/off state. While any line types it is on; once every line is typed through it is off. Rows that type at the same time do not start a second player. A player that ends while the trill is still on is started again, so a longer typing sounds without a gap.
 - Apart from the cues: no tier, transition or repeat rule reaches it. A cue on the same frame sounds over the trill and does not stop it.
 - Stops: the letters typed through or skipped by a key, every row typed through, `s` turning the sound off, and the board closing (quit, Ctrl-C) — the player is killed, so no process stays behind.
