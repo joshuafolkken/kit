@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os'
 import type { BusyRead } from '#scripts/epic/epic-busy'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { working_tree } from '#scripts/init/working-tree'
 import { PLANNED_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
@@ -146,6 +147,18 @@ describe('backlog_plan_comment.declared_of without a plan', () => {
 		const declared = await backlog_plan_comment.declared_of([issue], NO_DIRECTORY)
 
 		expect(declared.get(CANDIDATE)).toStrictEqual(new Set([SHARED]))
+	})
+})
+
+// joshuafolkken/kit#8273: a bare file name meets the full path a running lane plans.
+describe('backlog_plan_comment.declared_of — a bare file name', () => {
+	it("resolves a body's bare file name against the directory's tracked files", async () => {
+		const listing = vi.spyOn(working_tree, 'listing').mockReturnValue([SHARED, OLD_FILE])
+		const issue = { number: CANDIDATE, body: '`lane-overrun-mechanisms-cli.ts` を直す', labels: [] }
+		const declared = await backlog_plan_comment.declared_of([issue], NO_DIRECTORY)
+
+		expect(declared.get(CANDIDATE)).toStrictEqual(new Set([SHARED]))
+		expect(listing).toHaveBeenCalledExactlyOnceWith(['ls-files'], NO_DIRECTORY)
 	})
 })
 

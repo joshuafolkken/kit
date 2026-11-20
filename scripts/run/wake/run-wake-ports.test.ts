@@ -71,25 +71,36 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+// joshuafolkken/kit#8272: the completed session's pid is never the worker's own. A fixed pid that a CI
+// worker happened to run as read as a session still at work (and, through the record's owner, as the
+// supervisor itself), so pass 1 waited instead of driving. The clock and the session's start-time
+// probe are fixed too, so nothing real decides the pass.
+const COMPLETED_AT = new Date('2026-11-20T00:00:00.000Z')
+
+function completed_session_pid(): number {
+	return process.pid + 1
+}
+
 function completed_codex(): ReturnType<typeof run_wake_ports.ports_for> {
 	const ports = run_wake_ports.ports_for(context(), agent_role_profile.OPENAI_PROFILES.scheduler)
-	const now = new Date()
+	const pid = completed_session_pid()
 
 	run_carry.begin_carry(context().carry_target, INVOCATION, { provider: 'openai' })
 	ports.hand_off(SID)
-	vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid: SESSION_PID })
+	vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid })
 	ports.wake(INVOCATION, SID, MATERIAL)
 	run_wake.write_wake(
 		context().wake_target,
-		run_wake.count_wake(run_wake.fresh_wake(INVOCATION, now), now, SESSION_PID, SID),
+		run_wake.count_wake(run_wake.fresh_wake(INVOCATION, COMPLETED_AT), COMPLETED_AT, pid, SID),
 	)
 	writeFileSync(`${context().log_target}.${SID}`, '{"type":"turn.completed"}\n')
-	vi.spyOn(process_identity, 'is_same_process').mockImplementation((pid) => pid === process.pid)
+	vi.spyOn(process_identity, 'is_same_process').mockImplementation((other) => other === process.pid)
 
-	return ports
+	return { ...ports, now: () => COMPLETED_AT }
 }
 
-it('drives immediately when a Codex session completes before its first poll', async () => {
+async function run_completed_codex(): Promise<void> {
+	vi.spyOn(process_identity, 'read_start').mockReturnValue(undefined)
 	const ports = completed_codex()
 	const drive = vi.spyOn(run_wake_driver, 'drive').mockResolvedValue({ kind: 'finished' })
 	const sleep = vi.fn(async () => {
@@ -103,6 +114,16 @@ it('drives immediately when a Codex session completes before its first poll', as
 	expect(drive).toHaveBeenCalledOnce()
 	expect(sleep).not.toHaveBeenCalled()
 	expect(run_wake.read_wake(context().wake_target)).toMatchObject({ woke: 1 })
+}
+
+it('drives immediately when a Codex session completes before its first poll', async () => {
+	await run_completed_codex()
+})
+
+it('drives immediately when the worker runs as the pid a fixed session pid would name', async () => {
+	vi.spyOn(process, 'pid', 'get').mockReturnValue(SESSION_PID)
+
+	await run_completed_codex()
 })
 
 describe('the supervisor waking a judgment session', () => {

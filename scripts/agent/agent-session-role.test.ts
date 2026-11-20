@@ -84,6 +84,14 @@ describe('agent_session_role.scope_line', () => {
 		expect(line).toContain('investigator and producer subagents, never edited by this session')
 	})
 
+	// joshuafolkken/kit#8262: a consultation artifact has its own scratch route.
+	it('names the scratch route for a consultation artifact outside a worker lane', () => {
+		const line = agent_session_role.scope_line({}, linked)
+
+		expect(line).toContain('`.josh/tmp/scratch/`')
+		expect(line).toContain('`pnpm josh scratch:run <path>`')
+	})
+
 	it('keeps the worker lane line free of the filing plan', () => {
 		const line = agent_session_role.scope_line(
 			agent_session_role.env_for(agent_role_profile.WORKER),

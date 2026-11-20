@@ -13,6 +13,8 @@ const GIT_ARGUMENTS: ReadonlySet<string> = new Set([
 	'["rev-parse","--show-prefix"]',
 	'["rev-parse","--absolute-git-dir","--path-format=absolute","--git-common-dir"]',
 	'["status","--porcelain"]',
+	// The tracked files a bare name in a body resolves against (joshuafolkken/kit#8273).
+	'["ls-files","-z"]',
 	'["stash","list"]',
 	'["stash","list","--format=%gd%x00%gs"]',
 	'["--version"]',

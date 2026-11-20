@@ -1,4 +1,5 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { working_tree } from '#scripts/init/working-tree'
 import { has_any_label, PLANNED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
 import { markdown_section } from '#scripts/issue/markdown-section'
@@ -89,12 +90,19 @@ function commented_of(planned: ReadonlyArray<PlannedIssue>): ReadonlyMap<number,
 	return new Map(dated.map((issue): [number, string] => [issue.number, issue.commented_at ?? '']))
 }
 
-// What each of `issues` declares, read from `directory`'s lane plans — the scope dispatch gates on.
+// What each of `issues` declares, read from `directory`'s lane plans — the scope dispatch gates on. A
+// bare file name resolves against `directory`'s tracked files, listed once here, so every reader of
+// this scope — the gate, the paused-holder check, the named offer, `lane:plan`'s entry — weighs the
+// same paths (joshuafolkken/kit#8273).
 async function declared_of(issues: ReadonlyArray<PoolIssue>, directory: string): Promise<Declared> {
 	const planned = await bounded_pool.bounded_map(issues, READ_CONCURRENCY, with_plan)
 	const declared = backlog_overlap.declared_of(planned)
+	const resolved = backlog_overlap.with_resolved_names(
+		declared,
+		working_tree.listing(['ls-files'], directory),
+	)
 
-	return lane_plan.with_plans(declared, directory, commented_of(planned))
+	return lane_plan.with_plans(resolved, directory, commented_of(planned))
 }
 
 const backlog_plan_comment = { declared_of, plan_of, plan_paths, read_plan }
