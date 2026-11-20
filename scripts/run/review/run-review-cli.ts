@@ -54,12 +54,13 @@ const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'
 const FIXING_FLAG = '--fixing'
 const PINNED_FLAG = '--pinned'
+const CHUNK_FLAG = '--chunk'
 const LANE_PINNED_NOTE =
 	"Lane child — not waiting on test:pinned; the ship's pre-detach joins this check."
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] | --pinned | --push'
+	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] [--chunk] | --pinned | --push'
 const { INTERACTION } = review_attest.REVIEW_SLOT
 
 function now_iso(): string {
@@ -101,6 +102,9 @@ const MOVED_NOTE =
 	'Gate passed on an earlier tree — the tree moved after it (a review fix in place); re-run the gate on this tree before committing.'
 const STILL_RUNNING_NOTE =
 	'Gate still running at the open’s wait cap — no brief written; re-run `pnpm josh run:review` (in a chain, `pnpm josh run:chain <N> --from run:review`), which waits on the same gate.'
+const PENDING_EXIT_CODE = 4
+const JOIN_PENDING_NOTE =
+	'pending — the gate is still running at the join’s wait cap, which ends before the prompt cache expires; re-run the same command (in a chain, the same `pnpm josh run:chain <N> --join …`), which joins the same gate.'
 
 // A moved tree's gate passed, so its log is no failure to show.
 function settled_note(state: GateState): string | undefined {
@@ -227,9 +231,19 @@ function report_timing(timing: ReviewTiming | undefined): void {
 	process.stdout.write(`${run_review.format_timing(timing)}\n`)
 }
 
-async function run_join(is_fixing = false): Promise<number> {
+// A gate still running at the join's wait cap is neither green nor red: nothing is timed, judged or
+// read, so the join stays due and the same command joins it again (joshuafolkken/kit#8309).
+function join_pending(): number {
+	process.stdout.write(`${JOIN_PENDING_NOTE}\n`)
+
+	return PENDING_EXIT_CODE
+}
+
+async function run_join(is_fixing = false, is_chunked = false): Promise<number> {
 	const ready = await run_review_join_ready.read(is_fixing)
-	const state = await run_review_join_ready.gate_state(ready)
+	const state = await run_review_join_ready.gate_state(ready, is_chunked)
+
+	if (state === run_review.GATE_RUNNING) return join_pending()
 	const timing = run_review_steps.complete_timing({
 		gate_ended_at: gate_ended_at(settled_note(state) !== undefined),
 		review_ended_at: now_iso(),
@@ -250,6 +264,16 @@ async function run_join(is_fixing = false): Promise<number> {
 // (joshuafolkken/kit#4895).
 async function run_join_fixing(): Promise<number> {
 	return await run_join(true)
+}
+
+// `--chunk`: the session's foreground join, which `run:chain` runs, waits within the prompt cache's
+// life; the ship's own join waits the gate out (joshuafolkken/kit#8309).
+async function run_join_chunked(): Promise<number> {
+	return await run_join(false, true)
+}
+
+async function run_join_fixing_chunked(): Promise<number> {
+	return await run_join(true, true)
 }
 
 const REUSED_NOTE =
@@ -348,6 +372,8 @@ async function run_pinned(): Promise<number> {
 const LONE_MODES: ReadonlyMap<string, () => Promise<number>> = new Map([
 	[JOIN_FLAG, run_join],
 	[`${JOIN_FLAG} ${FIXING_FLAG}`, run_join_fixing],
+	[`${JOIN_FLAG} ${CHUNK_FLAG}`, run_join_chunked],
+	[`${JOIN_FLAG} ${FIXING_FLAG} ${CHUNK_FLAG}`, run_join_fixing_chunked],
 	[PINNED_FLAG, run_pinned],
 ])
 
