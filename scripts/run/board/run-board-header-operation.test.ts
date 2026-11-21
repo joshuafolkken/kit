@@ -59,7 +59,7 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 
 	it('lines the spinner up under the ⏰, the time under its digits, the icon under 💪', () => {
 		expect(header_lines_of({ operations: OPERATIONS, spinner: '⠙' })).toStrictEqual([
-			`${NAME}  ⏰ 2°10′00″  ✅  1/2 ■■■■■─────  🔄 1  ⏳ 0  💤 0`,
+			`${NAME}  ⏰ 2°10′00″  ✅  1/2 ■■■■■─────  🔄 1  💤 0`,
 			MACHINE_LINE,
 			`${NAME_BLANK}  ⠙        4″  ${GATE_TEXT}`,
 		])

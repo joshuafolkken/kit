@@ -370,6 +370,6 @@ describe('run_board_render.render header', () => {
 		const progress = lines_of(header({ layout, baseline_total: 2 }))[0] ?? ''
 
 		expect(progress).toMatch(/ {2}✅ {2}1\/3 \S+ \(\+1\)/u)
-		expect(progress).toContain('(+1)  🔄 1  ⏳ 1  💤 0')
+		expect(progress).toContain('(+1)  🔄 1  💤 0')
 	})
 })

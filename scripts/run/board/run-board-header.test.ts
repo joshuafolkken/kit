@@ -97,7 +97,7 @@ describe('run_board_header.header_lines state', () => {
 		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
 
 		expect(lines_of(board)).toStrictEqual([
-			`■ josh-board  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`■ josh-board  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  💤 0`,
 			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}${SLOT_BLANK}`,
 			NOW_BLANK,
 		])
@@ -114,7 +114,7 @@ describe('run_board_header.header_lines shape', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
-			`⏸ josh-board  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`⏸ josh-board  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  💤 0`,
 			RUNNING_CLOCK,
 			NOW_BLANK,
 		])
@@ -125,7 +125,7 @@ describe('run_board_header.header_lines shape', () => {
 		const layout = { ...RUNNING_LAYOUT, unreached: [row(2, 'waiting')] }
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
-			`▶ josh-board  ⏰ 30′00″  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
+			`▶ josh-board  ⏰ 30′00″  ✅  0/2 ${EMPTY_BAR}  🔄 1  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -166,7 +166,7 @@ describe('run_board_header.header_lines before the plan is read', () => {
 		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
 
 		expect(lines_of(board)).toStrictEqual([
-			`▶ josh-board  ⏰ 30′00″  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
+			`▶ josh-board  ⏰ 30′00″  ✅  0/- ${EMPTY_BAR}  🔄 1  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -246,8 +246,8 @@ function progress_of(settled: number, total: number): string {
 
 // joshuafolkken/kit#3473: icon, count, then bar, as the machine gauges; the done count drawn once.
 describe('run_board_header.header_lines progress', () => {
-	it('draws ✅, the count over the total, the bar, then running, waiting and parked', () => {
-		expect(progress_of(9, 12)).toBe(`✅  9/12 ${'■'.repeat(8)}${'─'.repeat(2)}  🔄 0  ⏳ 3  💤 0`)
+	it('draws ✅, the count over the total, the bar, then running and parked', () => {
+		expect(progress_of(9, 12)).toBe(`✅  9/12 ${'■'.repeat(8)}${'─'.repeat(2)}  🔄 0  💤 0`)
 	})
 
 	it('starts the bar in one column as the count gains a digit', () => {

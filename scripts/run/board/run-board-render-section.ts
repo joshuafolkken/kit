@@ -97,20 +97,25 @@ function row_count(lines: ReadonlyArray<PlanLine>): number {
 	return lines.filter((line) => line.row !== undefined && line.is_seat !== true).length
 }
 
-// A label saying how many its section holds: `⏳ queued 10`.
-function counted(label: string, count: number): string {
-	return `${label} ${String(count)}`
+// A label saying how many its section holds, `tally` after the count: `⏳ queued 10 (🔺 2)`.
+function counted(label: string, count: number, tally = ''): string {
+	return `${label} ${String(count)}${tally}`
 }
 
-function counted_head(section: PlanSection): Array<string> {
+function counted_head(section: PlanSection, tally: string): Array<string> {
 	const { label, lines } = section
 
-	return heading_lines(label === undefined ? undefined : counted(label, row_count(lines)))
+	return heading_lines(label === undefined ? undefined : counted(label, row_count(lines), tally))
 }
 
-// The sections a person folds with the key named `key`, each rule saying how many rows it holds.
-function keyed(key: SectionKey, sections: ReadonlyArray<PlanSection>): Array<PlanSection> {
-	return sections.map((section) => ({ ...section, key, head: counted_head(section) }))
+// The sections a person folds with the key named `key`, each rule saying how many rows it holds,
+// `tally` (`run_board_priority.tally_of`) after the count (joshuafolkken/kit#8511).
+function keyed(
+	key: SectionKey,
+	sections: ReadonlyArray<PlanSection>,
+	tally = '',
+): Array<PlanSection> {
+	return sections.map((section) => ({ ...section, key, head: counted_head(section, tally) }))
 }
 
 // A rule with `tail` right-aligned at its end: the rule gives up the tail's columns and one blank,
