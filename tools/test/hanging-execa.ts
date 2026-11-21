@@ -54,7 +54,7 @@ async function hang(file: string, options: SpawnOptions): Promise<SpawnResult> {
 
 async function spawn(
 	file: string,
-	arguments_list: ReadonlyArray<string> = [],
+	arguments_list: ReadonlyArray<string>,
 	options: SpawnOptions = {},
 ): Promise<SpawnResult> {
 	state.calls.push({ file, arguments_list, options })

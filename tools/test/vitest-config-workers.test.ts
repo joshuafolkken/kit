@@ -122,8 +122,8 @@ describe('vitest_config_workers.lane_count_probe.spawned_lane_count', () => {
 	it('counts the lanes the in-process reading counts', () => {
 		const checkout = checkout_beside_lanes()
 
-		expect(lane_count_probe.spawned_lane_count(checkout, {})).toBe(LANES.length)
-		expect(lane_count_probe.spawned_lane_count(checkout, {})).toBe(
+		expect(lane_count_probe.spawned_lane_count({ checkout, environment: {} })).toBe(LANES.length)
+		expect(lane_count_probe.spawned_lane_count({ checkout, environment: {} })).toBe(
 			unit_lane_count.live_lane_count({ checkout, environment: {} }),
 		)
 	})
@@ -134,7 +134,9 @@ describe('vitest_config_workers.lane_count_probe.spawned_lane_count', () => {
 	])('counts no lane when the child %s', (_case, node_options) => {
 		const environment = { NODE_OPTIONS: node_options }
 
-		expect(lane_count_probe.spawned_lane_count(checkout_beside_lanes(), environment)).toBe(0)
+		expect(
+			lane_count_probe.spawned_lane_count({ checkout: checkout_beside_lanes(), environment }),
+		).toBe(0)
 	})
 
 	it('spawns no lane count for a josh-driven run', () => {

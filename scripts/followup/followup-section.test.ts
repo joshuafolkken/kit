@@ -16,19 +16,22 @@ afterEach(() => {
 
 describe('followup_section.print_section — followup prints its governing section', () => {
 	it('prints the followup row once per session in a session that typed it', () => {
-		followup_section.print_section(ROOT, {})
+		followup_section.print_section({ root: ROOT, source: {} })
 
 		expect(run_step_section.print_once).toHaveBeenCalledExactlyOnceWith('followup', ROOT)
 	})
 
 	it('prints nothing in a followup a ship runs, whose env carries the ship marker', () => {
-		followup_section.print_section(ROOT, { ...followup_section.SHIPPED_ENVIRONMENT })
+		followup_section.print_section({
+			root: ROOT,
+			source: { ...followup_section.SHIPPED_ENVIRONMENT },
+		})
 
 		expect(run_step_section.print_once).not.toHaveBeenCalled()
 	})
 
 	it('prints the section without the ship marker, whatever else the env carries', () => {
-		followup_section.print_section(ROOT, { JOSH_SHIP_SUPERVISED: '1' })
+		followup_section.print_section({ root: ROOT, source: { JOSH_SHIP_SUPERVISED: '1' } })
 
 		expect(run_step_section.print_once).toHaveBeenCalledOnce()
 	})
@@ -37,7 +40,7 @@ describe('followup_section.print_section — followup prints its governing secti
 		vi.mocked(run_step_section.print_once).mockReturnValue(FAILURE)
 
 		expect(() => {
-			followup_section.print_section(ROOT, {})
+			followup_section.print_section({ root: ROOT, source: {} })
 		}).toThrow(followup_section.UNRESOLVED_MESSAGE)
 	})
 })

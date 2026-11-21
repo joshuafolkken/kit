@@ -204,11 +204,24 @@ function blocker_rows(overlay: Overlay, earlier: ReadonlyArray<BoardRow>): Array
 	return run_board_decision_rows.rows_of(plan, drawn)
 }
 
-function row_read(overlay: Overlay): RowRead {
-	const { plan } = overlay
-	const waits = run_board_standing_waits.by_number(children_of(plan), overlay)
+// The plan row's reading of a planned child by number, for a touched ⏳ row with no blocker.
+function held_of(children: ReadonlyArray<EpicChild>, reason_of: ReasonOf): RowRead['held_of'] {
+	const by_number = new Map(children.map((child) => [child.number, child]))
 
-	return { ...plan, titles: plan.context.titles, waits }
+	return function held(number) {
+		const child = by_number.get(number)
+
+		return child === undefined ? undefined : reason_of(child, [])
+	}
+}
+
+function row_read(overlay: Drawn): RowRead {
+	const { plan, reason_of } = overlay
+	const children = children_of(plan)
+	const waits = run_board_standing_waits.by_number(children, overlay)
+	const held = reason_of === undefined ? undefined : held_of(children, reason_of)
+
+	return { ...plan, titles: plan.context.titles, waits, held_of: held }
 }
 
 function layout_of(
