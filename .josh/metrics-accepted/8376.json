@@ -1,7 +1,0 @@
-{
-	"reason": "New feature: lamp strip module run-board-strip.ts plus progress/look_text hooks (+122 code lines) for #8376",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 122
-	}
-}

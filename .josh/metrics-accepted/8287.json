@@ -1,7 +1,0 @@
-{
-	"reason": "new josh lane:phases command (two modules plus tests) adds the code lines",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 280
-	}
-}

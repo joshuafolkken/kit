@@ -1,7 +1,0 @@
-{
-	"reason": "Resume a relaunched ship's scoped pair from the tree a stopped round 2 read, and record resumed_from on the pair lap (#7789)",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

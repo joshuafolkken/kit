@@ -1,7 +1,0 @@
-{
-	"reason": "Review fix: injectable read_estimate with the ended-run guard and its tests (#7775)",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 172
-	}
-}

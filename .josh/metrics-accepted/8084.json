@@ -1,7 +1,0 @@
-{
-	"reason": "Bug fix #8084: the retry-wait release also reads the start date, and the board clock is carried to it (+12 code lines)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

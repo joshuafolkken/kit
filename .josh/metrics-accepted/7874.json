@@ -1,7 +1,0 @@
-{
-	"reason": "New preflight ledger kind, its writer and the per-evaluation record add code lines the feature needs (#7874)",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 51
-	}
-}

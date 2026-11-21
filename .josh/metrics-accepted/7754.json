@@ -1,7 +1,0 @@
-{
-	"reason": "Negated filing phrases are now stripped before the filing words are read (#7754)",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

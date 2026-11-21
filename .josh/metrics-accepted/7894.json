@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting the activity read and the events memo out of run-board-status.ts adds each new module's own imports, exports and a one-line moment helper; no logic grew",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

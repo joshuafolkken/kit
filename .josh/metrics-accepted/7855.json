@@ -1,8 +1,0 @@
-{
-	"reason": "New epic-solo-parked module holds the run:solo gate while a parked solo issue is open (#7855); backlogrun-lanes.md 'A solo run' documents the new release conditions",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 83,
-		"ai_cost.on_demand_bytes": 109
-	}
-}

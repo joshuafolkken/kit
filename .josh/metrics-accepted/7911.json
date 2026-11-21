@@ -1,7 +1,0 @@
-{
-	"reason": "#7911 adds the supersession rule (is_superseded) so a run with unmerged children still counts toward the estimate ratio",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

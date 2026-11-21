@@ -1,8 +1,0 @@
-{
-	"reason": "#8128 adds josh run:observe (new command, state, CLI) and its two trigger lines in the lane skill docs",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 362,
-		"ai_cost.on_demand_bytes": 230
-	}
-}

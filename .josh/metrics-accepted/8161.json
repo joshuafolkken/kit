@@ -1,7 +1,0 @@
-{
-	"reason": "#8161 adds run-board-gather-record.ts: the worker-side recorder setup, start parsing and link environment that move frame recording off the live board's main thread",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 121
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan counts planned file moves on its lines axis (#8119): new lane-plan-moves module and base line reads",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 94
-	}
-}
