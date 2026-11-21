@@ -42,7 +42,12 @@ async function fake_git(arguments_: Array<string>): Promise<string> {
 }
 
 beforeEach(() => {
-	find_lane.mockResolvedValue(undefined)
+	find_lane.mockResolvedValue(
+		lane_registry.parse_block(
+			`worktree /lanes/${ISSUE}\nbranch refs/heads/${ISSUE}-lane`,
+			'/lanes',
+		),
+	)
 	list_comments.mockResolvedValue('[]')
 	parse_comments.mockResolvedValue([])
 	git_read.mockImplementation(fake_git)

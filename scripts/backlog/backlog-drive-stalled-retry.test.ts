@@ -1,4 +1,6 @@
 import type { EpicIssue } from '#scripts/epic/epic-issue'
+import { git_gh_issue_merged_pull } from '#scripts/gh/git-gh-issue-merged-pull'
+import { git_gh_pr_auto_merge } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from '#scripts/gh/git-gh-pr-snapshot'
 import { REQUIRED_CHECKS } from '#scripts/gh/git-pr-checks-eval'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
@@ -79,8 +81,14 @@ function mock_stream(events: ReadonlyArray<RunEvent>, history = events): void {
 	vi.mocked(run_event_stream_emit.all_events).mockResolvedValue(history)
 }
 
-beforeEach(() => {
+function mock_lane_branches(): void {
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_pr_auto_merge, 'pr_list_open_with_head_prefix').mockResolvedValue([])
+	vi.spyOn(git_gh_issue_merged_pull, 'pr_merged_head_of_issue').mockResolvedValue(undefined)
+}
+
+beforeEach(() => {
+	mock_lane_branches()
 	vi.spyOn(run_event_stream_emit, 'current_events')
 	vi.spyOn(run_event_stream_emit, 'all_events')
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
@@ -102,6 +110,18 @@ async function next_sweep(): Promise<void> {
 }
 
 describe('backlog_drive_stalled_retry.sweep — an adopted PR', () => {
+	it('retries the slug PR after its lane registration is removed (ac-8429)', async () => {
+		const branch = `${String(PARKED)}-legacy-implementation`
+
+		vi.mocked(git_gh_pr_auto_merge.pr_list_open_with_head_prefix).mockResolvedValue([
+			{ number: 1, head_ref: branch, has_auto_merge: false },
+		])
+		await next_sweep()
+
+		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(branch)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+	})
+
 	it('checks the registered slug PR before retrying (ac-8429)', async () => {
 		const branch = `${String(PARKED)}-legacy-implementation`
 

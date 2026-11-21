@@ -75,7 +75,16 @@ function record(name: string): void {
 
 // Every read answers the admitted case: a declared body, a clean lane branch and no pull request.
 function reset_reads(): void {
-	mocks.find_open_lane.mockReset().mockResolvedValue(undefined)
+	mocks.find_open_lane.mockReset().mockResolvedValue({
+		issue: ISSUE,
+		directory: `/lanes/${ISSUE}`,
+		branch: `${ISSUE}-lane`,
+		seat: undefined,
+		development_port: undefined,
+		preview_port: undefined,
+		output: undefined,
+		is_stranded: false,
+	})
 	mocks.issue_get_body.mockReset().mockResolvedValue(DECLARED_BODY)
 	mocks.commit_count_beyond.mockReset().mockResolvedValue(0)
 	mocks.status.mockReset().mockResolvedValue('')

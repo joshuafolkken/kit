@@ -51,7 +51,7 @@ async function resolve(issue: string, existing?: LaneInfo): Promise<LaneBranch> 
 	return { branch, start_point }
 }
 
-const lane_pr_branch = { resolve }
+const lane_pr_branch = { resolve, select_branch }
 
 export type { LaneBranch }
 export { lane_pr_branch }

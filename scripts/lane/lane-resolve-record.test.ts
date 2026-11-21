@@ -33,7 +33,12 @@ async function refusal(): Promise<string> {
 }
 
 beforeEach(() => {
-	find_lane.mockResolvedValue(undefined)
+	find_lane.mockResolvedValue(
+		lane_registry.parse_block(
+			`worktree /lanes/${ISSUE}\nbranch refs/heads/${ISSUE}-lane`,
+			'/lanes',
+		),
+	)
 	branch.mockResolvedValue(LANE)
 	head_commit.mockResolvedValue(HEAD_SHA)
 	ls_remote.mockResolvedValue(`${HEAD_SHA}\trefs/heads/${LANE}`)
