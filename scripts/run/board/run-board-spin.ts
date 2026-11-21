@@ -277,13 +277,14 @@ function lamp_moment(turning: Turning, at_ms: number): LampMoment {
 	}
 }
 
-// The turn built and written, timed as a turn where `--timing` times draws, then the lamps that changed;
+// The drops, then the turn built and written over them — a typing row drawn above the rain
+// (joshuafolkken/kit#8370) — timed as a turn where `--timing` times draws, then the lamps that changed;
 // the trill sounds on while a row is still typing, off once every row is typed through
 // (joshuafolkken/kit#8250).
 function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
 	run_board_timing.drawn(ports, 'turn', () => {
-		ports.write(turn_bytes(turning, at_ms, turned))
 		write_drop(turning, ports, at_ms, turned)
+		ports.write(turn_bytes(turning, at_ms, turned))
 		run_board_lamp_spots.write_lamps(
 			blinking(turning),
 			ports,
