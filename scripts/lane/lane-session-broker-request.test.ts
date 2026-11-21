@@ -83,7 +83,8 @@ describe('lane_session_broker — the request ship sends for its brokered review
 	it("reads ship's request for both review slots and starts both reviewers", async () => {
 		const slots = review_attest.REVIEW_SLOTS
 		const answer = await served(
-			async () => await run_ship_brokered_review.request(LANE.directory, ISSUE, '1', slots),
+			async () =>
+				await run_ship_brokered_review.request(LANE.directory, ISSUE, { round: '1' }, slots),
 		)
 
 		expect(answer).toStrictEqual(SUCCESS)
@@ -97,7 +98,7 @@ describe('lane_session_broker — the request ship sends for its brokered review
 				await run_ship_brokered_review.request(
 					LANE.directory,
 					ISSUE,
-					'1',
+					{ round: '1' },
 					review_attest.REVIEW_SLOTS,
 				),
 		)
