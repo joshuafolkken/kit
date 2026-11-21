@@ -2,7 +2,7 @@ import { lane_await } from '#scripts/lane/lane-await'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { PROCESS_ALIVE } from '#scripts/run/run-liveness'
-import { backlog_arrival_added, type EventReader } from './backlog-arrival-added'
+import { backlog_arrival_added, type EventReader, type TickReader } from './backlog-arrival-added'
 
 // What one `backlog:drive` tick reads once and shares (joshuafolkken/kit#7016): the process table every
 // in-flight child's liveness is answered from, rather than a synchronous `pgrep` per child, and the
@@ -57,10 +57,15 @@ interface TickShare {
 	begin_tick: (in_flight: ReadonlyArray<string>) => Promise<void>
 }
 
-function tick_share(
-	lanes: Liveness = liveness(),
+interface TickOptions {
+	lanes?: Liveness
+	stream?: TickReader
+}
+
+function tick_share({
+	lanes = liveness(),
 	stream = backlog_arrival_added.tick_reader(),
-): TickShare {
+}: TickOptions = {}): TickShare {
 	return {
 		is_running: lanes.is_running,
 		read: stream.read,

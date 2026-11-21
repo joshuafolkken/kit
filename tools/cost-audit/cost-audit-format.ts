@@ -5,6 +5,7 @@ import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_result } from './cost-audit-result'
 import type { TriggerRow } from './cost-audit-resume'
+import { cost_audit_review_trigger } from './cost-audit-review-trigger'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 import { cost_audit_sequence } from './cost-audit-sequence'
 import { cost_audit_session_count } from './cost-audit-session-count'
@@ -317,6 +318,9 @@ function report_lines(audit: Audit): Array<string> {
 		...rewrite_lines(audit),
 		...cause_lines(audit),
 		...resume_lines(audit),
+		...cost_audit_review_trigger.section_lines(audit.review_triggers, (row) =>
+			trigger_line(row, audit.merges),
+		),
 		...phase_lines(audit),
 		...usage_lines(audit.usage),
 		...cost_audit_result.result_lines(audit.results),

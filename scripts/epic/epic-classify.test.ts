@@ -132,7 +132,7 @@ describe('epic_classify.classify_children — the extension point', () => {
 
 	it('waits when a resolver says a closed blocker is not finished yet', () => {
 		const children = [child(1, { state: 'CLOSED' }), child(2, { blocked_by: [1] })]
-		const result = epic_classify.classify_children(children, () => publish_pending)
+		const result = epic_classify.classify_children(children, { resolve: () => publish_pending })
 
 		expect(result.runnable).toEqual([])
 		expect(numbers(result.time)).toEqual([2])
@@ -144,14 +144,14 @@ describe('epic_classify.classify_children — the extension point', () => {
 			child(2, { blocked_by: [1] }),
 			child(3, { blocked_by: [2] }),
 		]
-		const result = epic_classify.classify_children(children, () => publish_pending)
+		const result = epic_classify.classify_children(children, { resolve: () => publish_pending })
 
 		expect(numbers(result.time)).toEqual([2, 3])
 	})
 
 	it('lets a resolver declare a dependency a person has to release', () => {
 		const children = [child(1, { state: 'CLOSED' }), child(2, { blocked_by: [1] })]
-		const result = epic_classify.classify_children(children, () => 'human')
+		const result = epic_classify.classify_children(children, { resolve: () => 'human' })
 
 		expect(numbers(result.human)).toEqual([2])
 	})
@@ -168,10 +168,12 @@ describe('epic_classify.classify_children — the default resolver', () => {
 		const children = [child(1, { state: 'CLOSED' }), child(2, { blocked_by: [1] })]
 		const seen: Array<string> = []
 
-		epic_classify.classify_children(children, (blocker, blocked) => {
-			seen.push(`${String(blocker.number)}->${String(blocked.number)}`)
+		epic_classify.classify_children(children, {
+			resolve: (blocker, blocked) => {
+				seen.push(`${String(blocker.number)}->${String(blocked.number)}`)
 
-			return 'resolved'
+				return 'resolved'
+			},
 		})
 
 		expect(seen).toEqual(['1->2'])
@@ -328,7 +330,7 @@ describe('epic_classify.classify_children — the cross-repository resolver', ()
 			return 'resolved'
 		}
 
-		epic_classify.classify_children(cross_repo_children('CLOSED'), resolve)
+		epic_classify.classify_children(cross_repo_children('CLOSED'), { resolve })
 
 		expect(seen).toContain(`${REPO}->${CONSUMER}`)
 	})
@@ -336,7 +338,9 @@ describe('epic_classify.classify_children — the cross-repository resolver', ()
 	// A closed blocker across a repository is not finished until its release is published, which is
 	// what `resolve_cross_repo` answers `time` for (joshuafolkken/kit#864).
 	it("waits when the closed blocker's release has not appeared yet", () => {
-		const result = epic_classify.classify_children(cross_repo_children('CLOSED'), () => 'time')
+		const result = epic_classify.classify_children(cross_repo_children('CLOSED'), {
+			resolve: () => 'time',
+		})
 
 		expect(numbers(result.time)).toEqual([2])
 	})
@@ -357,9 +361,18 @@ function outside_key(repo = REPO): string {
 // joshuafolkken/kit#1943: a blocker no graph in this invocation tracks is weighed rather than ignored.
 // Ignored, a child waiting on another epic's open issue was offered as runnable.
 describe('epic_classify.classify_children — a blocker the epic does not track', () => {
+	it.each([{}, { running: undefined }, { running: new Set<string>() }])(
+		'keeps an outside blocker out of the default or empty running set: %j',
+		(options) => {
+			const result = epic_classify.classify_children([outside_child('OPEN')], options)
+
+			expect(numbers(result.human)).toEqual([2])
+		},
+	)
+
 	it('waits when the open blocker is something this run also runs', () => {
 		const running = new Set([outside_key(), `${REPO}#2`])
-		const result = epic_classify.classify_children([outside_child('OPEN')], undefined, running)
+		const result = epic_classify.classify_children([outside_child('OPEN')], { running })
 
 		expect(numbers(result.time)).toEqual([2])
 		expect(result.runnable).toEqual([])
@@ -387,10 +400,10 @@ describe('epic_classify.classify_children — a closed or unread blocker the epi
 	})
 
 	it('still waits for the release of a closed outside blocker in another repository', () => {
-		const result = epic_classify.classify_children(
-			[outside_child('CLOSED', CONSUMER)],
-			() => 'time',
-		)
+		const result = epic_classify.classify_children([outside_child('CLOSED', CONSUMER)], {
+			resolve: () => 'time',
+			running: new Set(),
+		})
 
 		expect(numbers(result.time)).toEqual([2])
 	})

@@ -46,7 +46,7 @@ function ports_for(is_running = false): BacklogrunPorts {
 async function run(argv: ReadonlyArray<string>, ports: BacklogrunPorts): Promise<number> {
 	josh_environment_file.load_environment_file()
 
-	return await backlogrun_cli.run(argv, ports, process.env)
+	return await backlogrun_cli.run(argv, { ports, environment: process.env })
 }
 
 beforeEach(() => {
@@ -58,10 +58,24 @@ afterEach(() => {
 	process.chdir(ORIGINAL_DIRECTORY)
 	environment_file_fixture.clear_environment_file(DIRECTORY)
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 afterAll(() => {
 	environment_file_fixture.remove_project_directory(DIRECTORY)
+})
+
+describe('backlogrun CLI default ports', () => {
+	it.each([undefined, {}, { environment: {} }])('uses live ports for %s', async (options) => {
+		const directory = vi
+			.spyOn(backlogrun_cli.LIVE_PORTS, 'repository_directory')
+			.mockResolvedValue(undefined)
+		const write = vi.spyOn(backlogrun_cli.LIVE_PORTS, 'write').mockImplementation(() => undefined)
+
+		await expect(backlogrun_cli.run([], options)).resolves.toBe(1)
+		expect(directory).toHaveBeenCalledOnce()
+		expect(write).toHaveBeenCalledWith('backlogrun: not inside a git repository')
+	})
 })
 
 describe('backlogrun CLI environment integration', () => {
