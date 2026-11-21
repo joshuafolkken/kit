@@ -59,4 +59,14 @@ describe('run_board_cue_decision.decided', () => {
 
 		expect(launch.notice?.cause).toStrictEqual({ cue: 'launch', word: 'running', issue: 1 })
 	})
+
+	// joshuafolkken/kit#8475: a notice whose cause no longer holds is said settled.
+	it('says the notice settled once its lane no longer runs', () => {
+		const [before] = frame(planned(), [])
+		const [launched, launch] = frame(before, [row(1, 'running')])
+		const [, gone] = frame(launched, [])
+
+		expect(launch.notice?.is_settled).toBe(false)
+		expect(gone.notice).toMatchObject({ cause: launch.notice?.cause, is_settled: true })
+	})
 })

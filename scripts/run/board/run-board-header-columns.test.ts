@@ -4,35 +4,17 @@ import type { BoardHeader } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-// joshuafolkken/kit#3692: the header's two lines stand in columns. The run's `⏰` and the `💓` under
-// it start in one column and end their digits in one, whatever stands before them — a repository's
-// name shorter or longer than the run's, or none — and the progress bar and the first machine gauge
-// start in one column whatever the count and the percent before them are. A column is counted as the
-// terminal draws it, an emoji two wide, never as a count of characters.
+// joshuafolkken/kit#3692: the header's lines stand in columns. The run's `⏰`, the cell under it and
+// the third line's spinner start in one column, whatever stands before them — a repository's name
+// shorter or longer than the run's, or none — and the progress bar and the first machine gauge start in
+// one column whatever the count and the percent before them are. A column is counted as the terminal
+// draws it, an emoji two wide, never as a count of characters. A running run leaves the cell under the
+// `⏰` blank: its heartbeat is said in the notice slot (joshuafolkken/kit#8475).
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_render_fixture
-const SECOND = 1000
-const HOUR = 60 * MINUTE
 const KIT = 'joshuafolkken/kit'
 const LONG = 'joshuafolkken/a-long-repository'
 const BAR_CELL = /[■─]/u
-// A run and its silence a second either side of ten hours, so one time has a digit the other lacks.
-const UNEVEN_SPANS = [
-	{
-		shorter: '💓',
-		ran: 10 * HOUR,
-		silent: 10 * HOUR - SECOND,
-		elapsed: '⏰ 10°00′00″',
-		beat: '💓  9°59′59″',
-	},
-	{
-		shorter: '⏰',
-		ran: 10 * HOUR - SECOND,
-		silent: 10 * HOUR,
-		elapsed: '⏰  9°59′59″',
-		beat: '💓 10°00′00″',
-	},
-]
 const BEATING = { last_event_ms: NOW - MINUTE, is_stopped: false }
 const BOARD_NAME = 'josh-board'
 const VERSION = 'v1.3153.0'
@@ -82,15 +64,6 @@ function start_of(line: string | undefined, text: string): number {
 	return run_board_fit.width_of(drawn.slice(0, drawn.indexOf(text)))
 }
 
-// The column the time after `icon` ends in on `line`.
-function time_end_of(line: string | undefined, icon: string): number {
-	const [drawn = ''] = new RegExp(String.raw`^.*${icon} +[\d°′″]+`, 'u').exec(line ?? '') ?? []
-
-	expect(drawn).not.toBe('')
-
-	return run_board_fit.width_of(drawn)
-}
-
 // The column the bar after `icon` starts in on `line`.
 function bar_start_of(line: string | undefined, icon: string): number {
 	const drawn = line ?? ''
@@ -104,21 +77,12 @@ function bar_start_of(line: string | undefined, icon: string): number {
 }
 
 describe('run_board_header.header_lines — the time column', () => {
-	it('draws the run’s age after its name and the 💓 under it, in one column', () => {
+	it('draws the run’s age after its name and leaves the cell under it blank while it runs', () => {
 		const [first, second] = header_of({ repo: KIT })
 
 		expect(first).toMatch(/^⏸ josh-board {2}⏰ 2°10′00″ {2}✅/u)
-		expect(second).toMatch(/^ {2}- {11}💓 {4}1′00″ {2}💪/u)
-		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
-	})
-
-	it.each(UNEVEN_SPANS)('ends the digits in one column where the $shorter is shorter', (spans) => {
-		const activity = { last_event_ms: NOW - spans.silent, is_stopped: false }
-		const [first, second] = header_of({ started_ms: NOW - spans.ran, activity })
-
-		expect(first).toContain(`  ${spans.elapsed}  `)
-		expect(second).toContain(`  ${spans.beat}  `)
-		expect(time_end_of(second, '💓')).toBe(time_end_of(first, '⏰'))
+		expect(second).toMatch(/^ {2}- +💪/u)
+		expect(second).not.toContain('💓')
 	})
 })
 
@@ -145,17 +109,14 @@ describe('run_board_header.header_lines — the time column once the run has end
 
 describe('run_board_header.header_lines — the name column', () => {
 	it.each([
-		['shorter than the board’s', KIT, /^ {2}- {11}💓/u, /^ {2}kit {9}⠙ /u],
-		['longer than the board’s', LONG, /^ {2}- {18}💓/u, /^ {2}a-long-repository {2}⠙ /u],
-		['not read yet', undefined, /^ {2}- {11}💓/u, /^ {14}⠙ /u],
-	])('keeps the times in one column with a repository name %s', (_case, repo, beat, now) => {
-		const [first, second, third] = moving_of({ repo })
+		['shorter than the board’s', KIT, /^ {2}kit {9}⠙ /u],
+		['longer than the board’s', LONG, /^ {2}a-long-repository {2}⠙ /u],
+		['not read yet', undefined, /^ {14}⠙ /u],
+	])('keeps the times in one column with a repository name %s', (_case, repo, now) => {
+		const [first, , third] = moving_of({ repo })
 
-		expect(second).toMatch(beat)
 		expect(third).toMatch(now)
-		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
 		expect(start_of(third, SPINNER)).toBe(start_of(first, '⏰'))
-		expect(time_end_of(second, '💓')).toBe(time_end_of(first, '⏰'))
 	})
 
 	it('widens the first line’s name to a longer repository name', () => {
@@ -170,7 +131,6 @@ describe('run_board_header.header_lines — the name column', () => {
 
 		expect(start_of(second, '-')).toBe(start_of(first, BOARD_NAME))
 		expect(start_of(third, 'kit')).toBe(start_of(first, BOARD_NAME))
-		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
 	})
 })
 
@@ -187,7 +147,7 @@ describe('run_board_header.header_lines — the board’s name and the kit versi
 	it('draws - where no version was recorded', () => {
 		const [, second] = header_of({ comment_link: markdown_link })
 
-		expect(second).toMatch(/^ {2}- +💓/u)
+		expect(second).toMatch(/^ {2}- +💪/u)
 	})
 
 	it('draws a single run’s name in the board’s place', () => {
@@ -199,10 +159,8 @@ describe('run_board_header.header_lines — the board’s name and the kit versi
 	it('keeps the times in one column on all three lines past a version wider than the name', () => {
 		const [first, second, third] = moving_of({ kit_version: WIDE_VERSION, repo: KIT })
 
-		expect(second?.startsWith(`  ${WIDE_VERSION}  💓`)).toBe(true)
-		expect(start_of(second, '💓')).toBe(start_of(first, '⏰'))
+		expect(second?.startsWith(`  ${WIDE_VERSION}  `)).toBe(true)
 		expect(start_of(third, SPINNER)).toBe(start_of(first, '⏰'))
-		expect(time_end_of(second, '💓')).toBe(time_end_of(first, '⏰'))
 	})
 })
 
@@ -242,8 +200,7 @@ describe('run_board_header.header_lines — with marks left out', () => {
 		const chat = header_of({ machine: machine(11), repo: KIT, form: 'chat' })
 
 		expect(chat[1]).not.toContain('💪')
-		expect(start_of(chat[1], '💓')).toBe(start_of(screen[1], '💓'))
-		expect(time_end_of(chat[1], '💓')).toBe(time_end_of(chat[0], '⏰'))
+		expect(start_of(chat[0], '⏰')).toBe(start_of(screen[0], '⏰'))
 		expect(bar_start_of(chat[1], '🧠')).toBe(bar_start_of(chat[0], '✅'))
 	})
 

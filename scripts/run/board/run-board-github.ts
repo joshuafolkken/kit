@@ -92,13 +92,16 @@ function fold_plan(state: BoardData): BoardData {
 
 	const settled = { ...state, plan_fetch: undefined }
 
-	if (answer.value === undefined) return { ...settled, failed_ms: state.attempted_ms }
+	if (answer.value === undefined) {
+		return { ...settled, failed_ms: state.attempted_ms, plan_error: answer.error }
+	}
 
 	return {
 		...settled,
 		plan: with_titles(answer.value, state),
 		fetched_ms: state.attempted_ms,
 		failed_ms: undefined,
+		plan_error: undefined,
 	}
 }
 

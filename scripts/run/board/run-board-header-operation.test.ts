@@ -8,8 +8,9 @@ import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#3757: the header's third line draws the newest operation of a child the board
 // draws as running, the same on a screen and in a chat. joshuafolkken/kit#3767: its spinner under the
-// `⏰` and `💓`, its time in their format under their digits, its kind's icon under the `💪`, and the
-// child's newest event where that is newer than its newest operation.
+// `⏰`, its time in its format under its digits, its kind's icon under the `💪`, and the
+// child's newest event where that is newer than its newest operation. joshuafolkken/kit#8475: the
+// second line leaves the cell under the `⏰` blank while the run runs.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const SECOND = 1000
@@ -19,9 +20,10 @@ const THIRD = 2
 const NAME = '▶ josh-board'
 const NAME_BLANK = ' '.repeat(NAME.length)
 const VERSION_CELL = '  -'.padEnd(NAME.length)
-const BEAT_LINE = `${VERSION_CELL}  💓    1′00″  💪 -  🧠 -  💾 -`
+const TIME_BLANK = ' '.repeat('⏰ 2°10′00″'.length + 1)
+const MACHINE_LINE = `${VERSION_CELL}  ${TIME_BLANK}  💪 -  🧠 -  💾 -  —`
 const GATE_TEXT = '🔧 #7 · Bash pnpm josh gate'
-// The third line with no spinner turning: its place blank, two columns wide as the `💓`.
+// The third line with no spinner turning: its place blank, two columns wide as the `⏰`.
 const STILL_LINE = `${NAME_BLANK}           4″  ${GATE_TEXT}`
 const OPERATIONS: SessionOperations = {
 	lanes: [
@@ -55,10 +57,10 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 		expect(third_of({ operations: OPERATIONS })).toBe(STILL_LINE)
 	})
 
-	it('lines the spinner up under the ⏰ and 💓, the time under their digits, the icon under 💪', () => {
+	it('lines the spinner up under the ⏰, the time under its digits, the icon under 💪', () => {
 		expect(header_lines_of({ operations: OPERATIONS, spinner: '⠙' })).toStrictEqual([
 			`${NAME}  ⏰ 2°10′00″  ✅  1/2 ■■■■■─────  🔄 1  ⏳ 0  💤 0`,
-			BEAT_LINE,
+			MACHINE_LINE,
 			`${NAME_BLANK}  ⠙        4″  ${GATE_TEXT}`,
 		])
 	})
