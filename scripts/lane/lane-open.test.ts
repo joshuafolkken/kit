@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_gh_pr_auto_merge } from '#scripts/gh/git-gh-pr-auto-merge'
 import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -104,6 +105,10 @@ function lanes_are(lanes: ReadonlyArray<LaneInfo>): void {
 }
 
 beforeEach(lane_seat_fixture.mock_ownership)
+
+beforeEach(() => {
+	vi.spyOn(git_gh_pr_auto_merge, 'pr_list_open_with_head_prefix').mockResolvedValue([])
+})
 
 beforeEach(() => {
 	rmSync(LANE_ROOT, { force: true, recursive: true })

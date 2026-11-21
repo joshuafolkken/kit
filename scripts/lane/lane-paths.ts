@@ -145,7 +145,6 @@ function is_lane_entry(name: string): boolean {
 }
 
 const lane_paths = {
-	LANE_BRANCH_SUFFIX,
 	LANE_ROOT_KEY,
 	SEAT_LOCK_DIR,
 	checkout_of,
