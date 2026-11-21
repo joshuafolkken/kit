@@ -128,23 +128,24 @@ function claude_reviewer(): void {
 	})
 }
 
+function expect_review_call(prompt: unknown, round: '1' | '2'): void {
+	expect(argv_mock).toHaveBeenCalledWith(
+		prompt,
+		Number(round),
+		LANE.directory,
+		expect.objectContaining({ JOSH_AGENT_PROVIDER: OPENAI_PROFILE.provider }),
+	)
+}
+
 it('derives the reviewer command and checkout from the registered lane', async () => {
 	expect(await request_review(LANE, ROUND_ONE)).toStrictEqual(SUCCESS)
-	expect(argv_mock).toHaveBeenCalledWith(
-		expect.stringContaining('review:attest'),
-		Number(ROUND_ONE.round),
-		LANE.directory,
-	)
+	expect_review_call(expect.stringContaining('review:attest'), ROUND_ONE.round)
 	expect(launch_mock.mock.calls[0]?.[0]).toMatchObject({ cwd: LANE.directory })
 })
 
 it('keeps the second review round read-only', async () => {
 	expect(await request_review(LANE, ROUND_TWO)).toStrictEqual(SUCCESS)
-	expect(argv_mock).toHaveBeenCalledWith(
-		expect.stringContaining('Do not edit any file.'),
-		Number(ROUND_TWO.round),
-		LANE.directory,
-	)
+	expect_review_call(expect.stringContaining('Do not edit any file.'), ROUND_TWO.round)
 })
 
 it('does not overwrite a symlink target when publishing a request', async () => {
@@ -341,11 +342,7 @@ describe('lane_session_broker — a parked issue and a finished request', () => 
 	it('ends the reviewer prompt with the review invocation the liveness pattern matches', async () => {
 		await request_review(LANE, ROUND_ONE)
 
-		expect(argv_mock).toHaveBeenCalledWith(
-			expect.stringMatching(/the reviewer of lane #2654$/u),
-			Number(ROUND_ONE.round),
-			LANE.directory,
-		)
+		expect_review_call(expect.stringMatching(/the reviewer of lane #2654$/u), ROUND_ONE.round)
 	})
 
 	it('starts neither a reviewer nor a relaunch for a parked issue', async () => {
