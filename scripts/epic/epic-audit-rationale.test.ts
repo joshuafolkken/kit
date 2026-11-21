@@ -53,6 +53,14 @@ function findings_of(input: {
 		.map((finding) => `${finding.level}: ${finding.message}`)
 }
 
+// A child the native blocked-by relations hold behind `blockers`, in this repository.
+function blocked_by(number: number, ...blockers: ReadonlyArray<number>): AuditChild {
+	return {
+		...child(number),
+		blocked_by: blockers.map((blocker) => ({ repo: REPO, number: blocker })),
+	}
+}
+
 // The declared order `#101 -> #102` between two open, local children — the shape every case below
 // varies one property of.
 function default_pairs(): Array<OrderPair> {
@@ -142,6 +150,51 @@ describe('find_unjustified_orders — what it will not judge', () => {
 		const comments = new Map([[FIRST_KEY, []]])
 
 		expect(findings_of({ pairs: default_pairs(), comments })).toStrictEqual([])
+	})
+})
+
+// #8479 on 2026-11-21: `#8513 -> #8514` lived only in the native blocked-by, with no reason recorded,
+// and the audit reported 0 errors because it read the body's `## Dependencies` alone.
+function native_pairs(): Array<OrderPair> {
+	return pairs_of([], [child(8513), blocked_by(8514, 8513)])
+}
+
+describe('find_unjustified_orders — a native blocked-by the body does not declare', () => {
+	it('reports it as an error, naming the triage command that removes it', () => {
+		const [finding] = findings_of({ pairs: native_pairs() })
+
+		expect(finding).toContain('error:')
+		expect(finding).toContain('#8513 -> #8514')
+		expect(finding).toContain('josh backlog:triage --apply 8514 --unblock 8513')
+		expect(finding).toContain('path-overlap check')
+	})
+
+	it('is silent when the epic Decisions section records its reason', () => {
+		const decisions = '## Decisions\n\n#8514 waits on #8513 because it reads its output.'
+
+		expect(findings_of({ pairs: native_pairs(), decisions })).toStrictEqual([])
+	})
+
+	it('is silent when a comment on the blocked end records its reason', () => {
+		const comments = new Map([
+			[`${REPO}#8513`, []],
+			[`${REPO}#8514`, ['Placed after #8513 because it reads its output.']],
+		])
+
+		expect(findings_of({ pairs: native_pairs(), comments })).toStrictEqual([])
+	})
+
+	// An unread child is absent from `children` (`epic_fetch` reports it as unreadable instead).
+	it('says nothing about a relation whose blocker could not be read', () => {
+		const pairs = pairs_of([], [blocked_by(8514, 8513)])
+
+		expect(findings_of({ pairs })).toStrictEqual([])
+	})
+
+	it('reports an order both declared and native once', () => {
+		const pairs = pairs_of([link(101, 102)], [child(101), blocked_by(102, 101)])
+
+		expect(findings_of({ pairs })).toHaveLength(1)
 	})
 })
 

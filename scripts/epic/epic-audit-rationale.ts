@@ -56,7 +56,19 @@ function is_open_local(child: AuditChild, current_repo: string): boolean {
 	return child.state !== 'CLOSED' && child.repo === current_repo
 }
 
-// The declared orders this check can speak about, resolved to children. A link naming something the
+// Every order between children: the body's `## Dependencies`, then the native blocked-by relations
+// it does not declare. An order recorded only natively serializes `backlogrun #E` just as a declared
+// one does, so reading the body alone let one pass with 0 errors (#8531). An order in both places is
+// taken once. A child whose relations could not be read is not in `children`, so it is left out.
+function order_links(
+	links: ReadonlyArray<DependencyLink>,
+	children: ReadonlyArray<AuditChild>,
+	epic_repo: string,
+): Array<DependencyLink> {
+	return [...links, ...epic_graph.undeclared_relations(links, children, epic_repo)]
+}
+
+// The orders this check can speak about, resolved to children. A link naming something the
 // epic does not track is left to `epic:next`'s own graph anomalies, which is where a declaration
 // that names a stranger is already reported.
 function order_pairs(
@@ -65,7 +77,7 @@ function order_pairs(
 	epic_repo: string,
 	current_repo: string,
 ): Array<OrderPair> {
-	return links.flatMap((link) => {
+	return order_links(links, children, epic_repo).flatMap((link) => {
 		const blocker = find_child(children, { repo: epic_repo, number: link.blocker })
 		const blocked = find_child(children, { repo: epic_repo, number: link.blocked })
 
@@ -155,12 +167,17 @@ function unjustified_message(pair: OrderPair, current_repo: string): string {
 	const blocker = epic_graph.format_reference(pair.blocker, current_repo)
 	const blocked = epic_graph.format_reference(pair.blocked, current_repo)
 
+	const blocker_number = String(pair.blocker.number)
+	const blocked_number = String(pair.blocked.number)
+
 	return (
-		`The declared order ${blocker} -> ${blocked} has no recorded reason — neither the epic's ` +
+		`The order ${blocker} -> ${blocked} has no recorded reason — neither the epic's ` +
 		'`## Decisions` or `## Split rationale` section nor a comment on either issue mentions the ' +
-		`other. Remove it with \`josh epic --remove <E> ${String(pair.blocker.number)} ` +
-		`${String(pair.blocked.number)}\`, or record why with \`--decision-file\`, whose text has to ` +
-		'name both issues for this check to find it.'
+		`other. Remove it with \`josh epic --remove <E> ${blocker_number} ${blocked_number}\` ` +
+		`or \`josh backlog:triage --apply ${blocked_number} --unblock ${blocker_number} ` +
+		'--reason "<why>"` (a native blocked-by), or record why with `--decision-file`, whose text ' +
+		'has to name both issues for this check to find it. Two issues that only touch the same ' +
+		'files need no order — the path-overlap check already keeps them apart.'
 	)
 }
 
