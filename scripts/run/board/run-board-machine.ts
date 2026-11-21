@@ -20,7 +20,9 @@ import { run_board_labels, type Paint } from './run-board-labels'
 const { GAUGE_SHADES, HEADER_ICONS, bar_of, painted } = run_board_labels
 const PERCENT = 100
 const PERCENT_WIDTH = '100%'.length
-const RATE_WIDTH = '3.1M/s'.length
+// Each gauge's bar, half the board's other gauges: the header's first line also holds the clocks
+// (joshuafolkken/kit#8478).
+const BAR_WIDTH = 5
 // Below this a rate keeps one decimal, so `0.4M/s` is not drawn as `0M/s`.
 const RATE_DECIMAL_BELOW = 10
 // The header's gap between its parts, the gauges' as well.
@@ -78,7 +80,7 @@ function percent_text(value: number): string {
 function rate_text(value: number): string {
 	const figure = value < RATE_DECIMAL_BELOW ? value.toFixed(1) : String(Math.round(value))
 
-	return `${figure}M/s`.padStart(RATE_WIDTH)
+	return `${figure}M/s`
 }
 
 const SPECS = {
@@ -158,40 +160,35 @@ function alert_of(spec: GaugeSpec, value: number, pressure: number | undefined):
 	return verdict ?? threshold_alert(value, spec)
 }
 
-// One gauge's reading: its value, the width its figure is right-aligned to where that is wider than
-// the figure's own, and the kernel's pressure verdict where the gauge takes one.
+// One gauge's reading: its value and the kernel's pressure verdict where the gauge takes one.
 interface Reading {
 	value: number | undefined
-	width: number
 	pressure?: number | undefined
 }
 
-// Icon, figure, then bar: the figure is what a person reads, and its fixed
-// width keeps every bar starting in one column. The bar stops full past `spec.full`; the figure still
-// says how far past, and takes the warning colors only, so a quiet machine's figures stay the terminal's
-// own.
+// Icon, figure, then bar: the figure is what a person reads. The bar stops full past `spec.full`; the
+// figure still says how far past, and takes the warning colors only, so a quiet machine's figures stay
+// the terminal's own.
 function gauge(spec: GaugeSpec, reading: Reading): string | undefined {
-	const { value, width } = reading
+	const { value } = reading
 
 	if (value === undefined) return undefined
 
 	const alert = alert_of(spec, value, reading.pressure)
 	const warning = alert === 'normal' ? undefined : GAUGE_SHADES[alert]
-	const bar = bar_of(value, spec.full, undefined, warning ?? spec.normal)
+	const bar = bar_of(value, spec.full, BAR_WIDTH, warning ?? spec.normal)
 
-	return `${spec.icon} ${painted(warning, spec.format(value).padStart(width))} ${bar}`
+	return `${spec.icon} ${painted(warning, spec.format(value))} ${bar}`
 }
 
-// `undefined` when not one gauge could be read, so the header draws no line at all. `width` is the
-// header's figure column: a figure narrower than it is right-aligned to it, so the first gauge's bar
-// starts under the progress bar whichever gauge that is.
-function line_of(gauges: MachineGauges | undefined, width = 0): string | undefined {
+// `undefined` when not one gauge could be read, so the header draws no line at all.
+function line_of(gauges: MachineGauges | undefined): string | undefined {
 	if (gauges === undefined) return undefined
 
 	const parts = [
-		gauge(SPECS.cpu, { value: gauges.cpu_percent, width }),
-		gauge(SPECS.memory, { value: gauges.memory_percent, width, pressure: gauges.memory_pressure }),
-		gauge(SPECS.swap, { value: gauges.swap_mb_per_s, width }),
+		gauge(SPECS.cpu, { value: gauges.cpu_percent }),
+		gauge(SPECS.memory, { value: gauges.memory_percent, pressure: gauges.memory_pressure }),
+		gauge(SPECS.swap, { value: gauges.swap_mb_per_s }),
 	].filter((part) => part !== undefined)
 
 	return parts.length === 0 ? undefined : parts.join(GAP)
@@ -202,7 +199,6 @@ const run_board_machine = {
 	GAP,
 	MEMORY_RED,
 	MEMORY_YELLOW,
-	PERCENT_WIDTH,
 	SWAP_RED_MB_PER_S,
 	SWAP_YELLOW_MB_PER_S,
 	gauges_of,

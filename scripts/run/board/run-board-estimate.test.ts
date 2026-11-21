@@ -258,26 +258,21 @@ describe('run_board_estimate.is_finish_drawn', () => {
 	})
 })
 
-describe('run_board_estimate.part_of', () => {
-	it('draws the local finish time after 🎯', () => {
-		const active = [running(1, 'implement', 5)]
-		const finish = run_board_labels.minute_of(NOW + 25 * MINUTE)
+// joshuafolkken/kit#8478: no `~` — the 🎯 says the time is an estimate.
+describe('run_board_estimate.stamp_of', () => {
+	it('draws the local finish time after 🎯 on the same day', () => {
+		const finish = NOW + 25 * MINUTE
 
-		expect(run_board_estimate.part_of(read({ active }))).toBe(`🎯 ~${finish}`)
-	})
-
-	it('draws the day too for a finish on another day', () => {
-		const active = [running(1, 'implement', 0)]
-		const finish = run_board_labels.day_minute_of(NOW + 30 * HOUR)
-
-		expect(run_board_estimate.part_of(read({ active }, { lane_totals: [30 * HOUR] }))).toBe(
-			`🎯 ~${finish}`,
+		expect(run_board_estimate.stamp_of(NOW, finish)).toBe(
+			`🎯 ${run_board_labels.minute_of(finish)}`,
 		)
 	})
 
-	it('draws nothing for an ended run', () => {
-		const active = [running(1, 'implement', 5)]
+	it('draws the day too for a finish on another day', () => {
+		const finish = NOW + 30 * HOUR
 
-		expect(run_board_estimate.part_of(read({ active }, { ended_ms: NOW }))).toBeUndefined()
+		expect(run_board_estimate.stamp_of(NOW, finish)).toBe(
+			`🎯 ${run_board_labels.day_minute_of(finish)}`,
+		)
 	})
 })

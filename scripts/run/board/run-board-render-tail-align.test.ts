@@ -8,7 +8,8 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#7994: a running row's tail draws its finish before its newest activity, the finish's
 // stamp left-aligned and its drift right-aligned across the frame, so the activity, the held check and
-// the pull request's checks start in one column on every running row.
+// the pull request's checks start in one column on every running row. joshuafolkken/kit#8478: the stamp
+// draws no `~`.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 // Median 40′: the 5′ lane is on time, the 25′ one `+5′`, the 42′ one `+120′`, the 170′ one a day on.
@@ -78,7 +79,7 @@ describe('run_board_render.render — a running row’s finish before its activi
 	it('draws the finish, then the newest activity', () => {
 		const lines = frame([running(5)])
 
-		expect(line_of(lines, 5)).toMatch(/🎯 ~\S+ {2}🔧 1′00″$/u)
+		expect(line_of(lines, 5)).toMatch(/🎯 \d{2}:\d{2} {2}🔧 1′00″$/u)
 	})
 
 	it('starts every activity in one column over mixed drifts, a day and a row with no finish', () => {
@@ -86,7 +87,7 @@ describe('run_board_render.render — a running row’s finish before its activi
 		const lines = frame([running(5), running(25), running(42), running(170), earlier])
 
 		expect(columns_of(lines, [5, 25, 42, 170, 7], OPERATED).size).toBe(1)
-		expect(line_of(lines, 170)).toMatch(/🎯 ~\d{2}-\d{2} \d{2}:\d{2}/u)
+		expect(line_of(lines, 170)).toMatch(/🎯 \d{2}-\d{2} \d{2}:\d{2}/u)
 	})
 
 	it('ends `+5′` and `+120′` in one column', () => {
@@ -114,7 +115,7 @@ describe('run_board_render.render — what a running row draws after its finish'
 		const lines = frame([quiet, running(42)], { operations: operated([LANE_BASE + 42]) })
 		const line = line_of(lines, 5)
 
-		expect(line).toMatch(/🎯 ~\d{2}:\d{2}$/u)
+		expect(line).toMatch(/🎯 \d{2}:\d{2}$/u)
 		expect(line).toBe(line.trimEnd())
 	})
 

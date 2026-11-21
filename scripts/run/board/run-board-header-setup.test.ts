@@ -5,6 +5,7 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_activity, type RunActivity } from './run-board-activity'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_spot } from './run-board-spot'
 
@@ -12,6 +13,8 @@ import { run_board_spot } from './run-board-spot'
 // the mark stands still; the spinner turns on the third line, before the stage's time and icon.
 // joshuafolkken/kit#3749: the stage stands on the third line, its time under the second column, whenever the run
 // is at one. joshuafolkken/kit#8514: the progress is on the lanes rule (`lanes_tail`) in every state.
+// joshuafolkken/kit#8478: the time circuits — the first line holds the finish, what is left and the
+// machine; the third line's spinner and age stand in one fixed cell after the start clock.
 
 const SECOND = 1000
 const STARTED = Date.parse('2026-10-12T09:00:00.000Z')
@@ -22,13 +25,23 @@ const OPENING = run_event_setup.opening_lane('278')
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 const STALE_MS = 40 * MS_PER_MINUTE
 const STAGE_AGE_MS = 151 * SECOND
-// The third line's repository under the board's name, padded to it, then the gap before its words.
+// The third line's repository under the board's name, padded to it, then the start clock and the gap
+// before its time cell.
 const NOW_INDENT = '  app-kit'.padEnd('▶ josh-board'.length + 2)
-const NOW_PREFIX = /^ +app-kit +/u
-// joshuafolkken/kit#8514: the first line ends on the run's age; the progress is on the lanes rule.
-const WORKING_TITLE = '▶ josh-board  ⏰ 10″'
+const THIRD_HEAD = `${NOW_INDENT}🚀 ${run_board_labels.minute_of(STARTED)}  `
+const NOW_PREFIX = /^ +app-kit +🚀 \d{2}:\d{2} {2}/u
+// The time cell's digits after the spinner's column: their width does not move past an hour.
+const AGE_WIDTH = 8
+// No finish is estimated (no lane totals) and no gauge is read.
+const WORKING_TITLE = '▶ josh-board  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -'
 const PROGRESS_0_OF_1 = /^✅ 0\/1 /u
-const JUDGING_LINE = '⠋  2′31″  🤔 waiting on judgment — 1 waiting'
+
+// The third line's time cell: the spinner's column, then the age right-aligned to its digits.
+function cell(age: string, spinner = SPINNER): string {
+	return `${spinner}${age.padStart(AGE_WIDTH)}`
+}
+
+const JUDGING_LINE = `${cell('2′31″')}  🤔 waiting on judgment — 1 waiting`
 
 function row(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
@@ -144,8 +157,8 @@ describe('run_board_header.header_lines before the first child launches', () => 
 
 		expect(first).toBe(WORKING_TITLE)
 		expect(progress_of(header())).toMatch(/^✅ 0\/- /u)
-		expect(second).toMatch(/^ {2}- +💪 /u)
-		expect(third).toBe(`${NOW_INDENT}⠋   0″  🚀 starting session`)
+		expect(second).toMatch(/^ {2}- +🕒 \d{2}:\d{2} {2}\+ +10″/u)
+		expect(third).toBe(`${THIRD_HEAD}${cell('0″')}  🚀 starting session`)
 	})
 
 	it('draws the still mark of a working run where the frame has no spinner', () => {
@@ -157,7 +170,7 @@ describe('run_board_header.header_lines before the first child launches', () => 
 
 		expect(title_of(board)).toBe(WORKING_TITLE)
 		expect(progress_of(board)).toMatch(PROGRESS_0_OF_1)
-		expect(now_of(board)).toBe('⠋   0″  🤝 handing off — 1 waiting')
+		expect(now_of(board)).toBe(`${cell('0″')}  🤝 handing off — 1 waiting`)
 	})
 
 	it('keeps the first two lines where they are whatever the stage’s length', () => {
@@ -174,7 +187,7 @@ describe('run_board_header.header_lines before the first child launches', () => 
 
 		expect(title_of(board)).not.toContain('❗')
 		expect(lines_of(board)[1]).toMatch(/ {2}❗ stale /u)
-		expect(now_of(board)).toBe('⠋   0″  🚀 starting session')
+		expect(now_of(board)).toBe(`${cell('0″')}  🚀 starting session`)
 	})
 })
 
@@ -189,7 +202,7 @@ describe('run_board_header.header_lines beside the stage', () => {
 	it('writes no reason where the plan is not read yet', () => {
 		const activity = standing(STAGE.STARTING, STAGE_AGE_MS)
 
-		expect(now_of(header({ activity }))).toBe('⠋  2′31″  🚀 starting session')
+		expect(now_of(header({ activity }))).toBe(`${cell('2′31″')}  🚀 starting session`)
 	})
 
 	// A chat is no terminal, so it draws no spinner: its place stands blank.
@@ -197,14 +210,15 @@ describe('run_board_header.header_lines beside the stage', () => {
 		const board = planned(ONE_PLANNED, standing(STAGE.JUDGING, STAGE_AGE_MS))
 		const chat = { ...board, form: 'chat', spinner: undefined } as const
 
-		expect(lines_of(chat)[2]).toBe(`${NOW_INDENT}${JUDGING_LINE.replace(SPINNER, ' ')}`)
+		expect(lines_of(chat)[2]).toBe(`${THIRD_HEAD}${JUDGING_LINE.replace(SPINNER, ' ')}`)
 	})
 
+	// joshuafolkken/kit#8478: the cell keeps its width and the spinner its column past an hour.
 	it('writes the hours once the stage has stood for one', () => {
 		const hour = 60 * MS_PER_MINUTE
 		const board = planned(ONE_PLANNED, standing(STAGE.JUDGING, hour + STAGE_AGE_MS))
 
-		expect(now_of(board)).toBe('⠋  1°02′31″  🤔 waiting on judgment — 1 waiting')
+		expect(now_of(board)).toBe('⠋1°02′31″  🤔 waiting on judgment — 1 waiting')
 	})
 })
 
@@ -214,7 +228,7 @@ describe('run_board_header.header_lines once a child has launched', () => {
 
 		expect(title_of(board)).toBe(WORKING_TITLE)
 		expect(progress_of(board)).toMatch(PROGRESS_0_OF_1)
-		expect(now_of(board)).toBe(`⠋${' '.repeat(7)}🔄 1 running`)
+		expect(now_of(board)).toBe(`${cell('')}  🔄 1 running`)
 	})
 
 	it('turns the spinner and writes the stage while a lane opens for a later child', () => {
@@ -222,14 +236,14 @@ describe('run_board_header.header_lines once a child has launched', () => {
 
 		expect(title_of(board)).toBe(WORKING_TITLE)
 		expect(progress_of(board)).toMatch(/^✅ 1\/2 /u)
-		expect(now_of(board)).toBe('⠋   1″  🚪 opening lane #278 — 1 waiting')
+		expect(now_of(board)).toBe(`${cell('1″')}  🚪 opening lane #278 — 1 waiting`)
 	})
 
 	it('turns the spinner and writes the stage while a judgment session runs', () => {
 		const board = planned(NEXT_OPENING, standing(STAGE.SESSION, 72 * SECOND))
 
 		expect(title_of(board)).toMatch(/^▶ josh-board /u)
-		expect(now_of(board)).toBe('⠋  1′12″  💭 judgment session running — 1 waiting')
+		expect(now_of(board)).toBe(`${cell('1′12″')}  💭 judgment session running — 1 waiting`)
 	})
 
 	it('stands idle between children, and writes how long it has watched and why', () => {
@@ -237,7 +251,7 @@ describe('run_board_header.header_lines once a child has launched', () => {
 
 		expect(title_of(board)).toMatch(/^⏸ josh-board /u)
 		expect(progress_of(board)).toMatch(/^✅ 1\/2 /u)
-		expect(now_of(board)).toBe('2′31″  🔭 watching — 1 waiting')
+		expect(now_of(board)).toBe(`${cell('2′31″', ' ')}  🔭 watching — 1 waiting`)
 	})
 })
 
@@ -271,14 +285,14 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 
 		expect(title_of(board)).toMatch(/^■ josh-board /u)
 		expect(progress_of(board)).toMatch(PROGRESS_0_OF_1)
-		expect(now_of(board)).toBe('1″  🔚 #278 merged')
+		expect(now_of(board)).toBe(`${cell('1″', ' ')}  🔚 #278 merged`)
 	})
 
 	it('draws a plan left only to people as waiting on a person', () => {
 		const board = planned(PEOPLE, merged(SECOND))
 
 		expect(title_of(board)).toMatch(/^✋ josh-board/u)
-		expect(now_of(board)).toBe('1″  🔭 watching — 1 waiting on a person')
+		expect(now_of(board)).toBe(`${cell('1″', ' ')}  🔭 watching — 1 waiting on a person`)
 	})
 
 	// joshuafolkken/kit#4099: a child parked on a decision waits on a person as an untouched one does.
@@ -287,7 +301,7 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		const board = planned(asked, merged(SECOND))
 
 		expect(title_of(board)).toMatch(/^✋ josh-board/u)
-		expect(now_of(board)).toBe('1″  🔭 watching — 2 waiting on a person')
+		expect(now_of(board)).toBe(`${cell('1″', ' ')}  🔭 watching — 2 waiting on a person`)
 	})
 
 	it('draws a run at a stage as working, though all its plan has left waits on a person', () => {

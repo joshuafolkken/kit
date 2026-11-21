@@ -7,9 +7,8 @@ import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#4044: the estimated finish stands on the first line, the `⏰`/`💓` columns unmoved;
-// a frame with no estimate draws neither it nor its legend. joshuafolkken/kit#8514: the tallies and the
-// bar it once followed moved to the lanes rule, so it stands right after the run's age, over the `💪`.
-// joshuafolkken/kit#7770: it draws the local finish time, from the lanes' dispatch-to-merge totals.
+// a frame with no estimate draws no legend. joshuafolkken/kit#7770: it draws the local finish time, from
+// the lanes' dispatch-to-merge totals.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const LEGEND = '🎯 estimated finish'
@@ -51,9 +50,13 @@ function lines_with(extra: Partial<BoardHeader> = {}): Array<string> {
 	)
 }
 
-// `🎯 ~HH:MM` for a finish `minutes` from now.
+// joshuafolkken/kit#8478: the finish heads the clock column, over now and the start, `--:--` where none
+// is estimated, and no `~` — the 🎯 says it is an estimate.
+const UNKNOWN_FINISH = '🎯 --:--'
+
+// `🎯 HH:MM` for a finish `minutes` from now.
 function estimate_at(minutes: number): string {
-	return `🎯 ~${run_board_labels.minute_of(NOW + minutes * MINUTE)}`
+	return `🎯 ${run_board_labels.minute_of(NOW + minutes * MINUTE)}`
 }
 
 // The column `text` starts in on `line`.
@@ -66,18 +69,18 @@ function start_of(line: string | undefined, text: string): number {
 }
 
 describe('run_board_header.header_lines estimated finish', () => {
-	it('draws 🎯 ~HH:MM last on the first line, right after the run’s age', () => {
+	it('draws 🎯 HH:MM at the head of the clock column, then what is left', () => {
 		const [first] = lines_with()
 
 		// 15′ left of the running child, then 20′ for the waiting one on the one lane.
-		expect(first).toMatch(new RegExp(String.raw`⏰ \S+ {2}${estimate_at(35)}$`, 'u'))
+		expect(first).toContain(`${estimate_at(35)}  -  35′00″`)
 	})
 
-	// The machine line before a gauge is read leads with 💪, where a chat's leads with 🧠.
-	it('keeps the 🎯/💪 columns aligned', () => {
-		const [first, second] = lines_with()
+	it('keeps the 🎯/🕒/🚀 column aligned', () => {
+		const [first, second, third] = lines_with()
 
-		expect(start_of(first, '🎯')).toBe(start_of(second, '💪'))
+		expect(start_of(first, '🎯')).toBe(start_of(second, '🕒'))
+		expect(start_of(second, '🕒')).toBe(start_of(third, '🚀'))
 	})
 
 	// joshuafolkken/kit#4319: a 🔗 child waits for its blocker however many lanes are free.
@@ -94,18 +97,18 @@ describe('run_board_header.header_lines estimated finish', () => {
 		expect(first).toContain(estimate_at(40))
 	})
 
-	it('draws no 🎯 without a lane total', () => {
-		expect(lines_with({ lane_totals: [] })[0]).not.toContain('🎯')
+	it('draws the finish unknown without a lane total', () => {
+		expect(lines_with({ lane_totals: [] })[0]).toContain(UNKNOWN_FINISH)
 	})
 
-	it('draws no 🎯 before the plan is read', () => {
-		expect(lines_with({ plan_fetched_ms: undefined })[0]).not.toContain('🎯')
+	it('draws the finish unknown before the plan is read', () => {
+		expect(lines_with({ plan_fetched_ms: undefined })[0]).toContain(UNKNOWN_FINISH)
 	})
 
-	it('draws no 🎯 or its legend for a stopped run', () => {
+	it('draws the finish unknown and no legend for a stopped run', () => {
 		const lines = lines_with({ activity: { ...BEATING, is_stopped: true } })
 
-		expect(lines[0]).not.toContain('🎯')
+		expect(lines[0]).toContain(UNKNOWN_FINISH)
 		expect(lines.join('\n')).not.toContain(LEGEND)
 	})
 })

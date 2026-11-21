@@ -2,7 +2,6 @@ import { styleText } from 'node:util'
 import { lane_offline_spans, type Outage } from '#scripts/lane/lane-offline-spans'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { RunActivity } from './run-board-activity'
-import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import type { RunMark } from './run-board-header-names'
 import { run_board_labels } from './run-board-labels'
@@ -12,11 +11,16 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 
-// The header's time cells (`run-board-header.ts`): the run's age over the minute an ended run ended over
-// the third line's spinner and age, and the stale coloring a row's newest activity takes
+// The header's time cells (`run-board-header.ts`): what the run has left over its age over the third
+// line's spinner and age, and the stale coloring a row's newest activity takes
 // (`run-board-render-tail.ts`).
 
-const { HEADER_ICONS, minute_of, span_of } = run_board_labels
+const { span_of } = run_board_labels
+// A time cell: its sign — or the spinner — then its span.
+const SIGN_WIDTH = 1
+const SPAN_WIDTH = 8
+const UNKNOWN_SPAN = '--′--″'
+const ENDED_TIME = '—'
 const { cell_of } = run_board_render_slot
 const { padded } = run_board_fresh
 const { SECONDS_MARK, TICK } = run_board_spot
@@ -86,12 +90,11 @@ function is_offline(header: OutageHeader): boolean {
 	return offline_age(header) !== undefined
 }
 
-// The minute an ended run ended, under the run's age. Blank while the run runs: its heartbeat and an
-// outage are said in the notice slot (`run-board-standing.ts`, joshuafolkken/kit#8475).
-function ended_part(header: TimeHeader): string {
-	const { ended_ms } = header
+// What the run has left: none once it ended, `--′--″` where no finish is estimated.
+function remaining_of(header: TimeHeader, left_ms: number | undefined): string {
+	if (header.ended_ms !== undefined) return span_of(0)
 
-	return ended_ms === undefined ? '' : `${HEADER_ICONS.ended} ${minute_of(ended_ms)}`
+	return left_ms === undefined ? UNKNOWN_SPAN : span_of(left_ms)
 }
 
 // An age in the `⏰`'s format, blank where there is none to draw — no event gave it a time.
@@ -116,21 +119,23 @@ function is_swept(header: TimeHeader, mark: RunMark): boolean {
 	return header.spinner !== undefined && mark !== 'stopped' && header.ended_ms === undefined
 }
 
-// The third line's time: the spinner in the `⏰`'s column — turning only while the run
-// works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
-// the line says is fresh, its `″` the sweep's placeholder where the run is swept.
+// The third line's time: the spinner in the signs' column — turning only while the run works, so a
+// watch stands blank, and kept however long the time grows — then its age, emphasized while what the
+// line says is fresh, its `″` the sweep's placeholder where the run is swept. An ended run draws `—`.
 function now_time(
 	header: TimeHeader,
 	mark: RunMark,
 	now: NowLine | undefined,
 	width: number,
 ): string {
+	if (header.ended_ms !== undefined) return ENDED_TIME.padStart(SIGN_WIDTH + width)
+	if (now === undefined) return ''
 	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
-	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
-	const span = span_or_blank(now?.age_ms)
+	const span = span_or_blank(now.age_ms)
 	const age = is_swept(header, mark) ? span.split(SECONDS_MARK).join(TICK) : span
+	const fresh = aged_fresh(age, fresh_age(now, header), header)
 
-	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
+	return `${cell_of(spinner, SIGN_WIDTH)}${padded(age, width, fresh)}`
 }
 
 // What the third line says, emphasized while it is fresh. Where the board types rows its words are keyed
@@ -142,16 +147,23 @@ function now_text(now: NowLine, header: TimeHeader): string {
 	return `${now.icon} ${run_board_row_key.keyed(section, now.text, words)}`
 }
 
-// A run's age over the minute an ended run ended over the third line's age: the shorter lengths are
-// right-aligned to the longer, so the digits stand in one column when only one has passed ten hours.
-function time_parts(header: TimeHeader, mark: RunMark, now: NowLine | undefined): Array<string> {
+// What the run has left (`left_ms`, `undefined` where nothing is estimated) after `-`, over how long it
+// has run after `+`, over the third line's age: one sign and eight digits each, so the column never
+// moves as a time grows (joshuafolkken/kit#8478), all three wider together past ten hours. An ended
+// run's age stops at its end.
+function time_parts(
+	header: TimeHeader,
+	mark: RunMark,
+	now: NowLine | undefined,
+	left_ms: number | undefined,
+): Array<string> {
 	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
-	const age = span_or_blank(now?.age_ms)
-	const width = Math.max(elapsed.length, age.length)
+	const remaining = remaining_of(header, left_ms)
+	const width = Math.max(SPAN_WIDTH, elapsed.length, remaining.length)
 
 	return [
-		`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`,
-		ended_part(header),
+		`-${remaining.padStart(width)}`,
+		`+${elapsed.padStart(width)}`,
 		now_time(header, mark, now, width),
 	]
 }

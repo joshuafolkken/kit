@@ -19,7 +19,6 @@ import type { UsualTimes } from './run-board-usual'
 
 const { HEADER_ICONS, WORDS, day_minute_of, minute_of } = run_board_labels
 const LEGEND = `${HEADER_ICONS.estimate} ${WORDS.estimate}`
-const ESTIMATE_MARK = '~'
 // A row whose finish nothing measures.
 const UNKNOWN = `${HEADER_ICONS.estimate} —`
 const FINISH_STATES: ReadonlySet<ItemState> = new Set(['running', 'parked'])
@@ -176,16 +175,10 @@ function finish_of(now_ms: number, finish_ms: number): string {
 	return is_today ? minute_of(finish_ms) : day_minute_of(finish_ms)
 }
 
-// `🎯 ~14:32`, `🎯 ~10-19 02:05` on another day.
+// `🎯 14:32`, `🎯 10-19 02:05` on another day — no `~`, the 🎯 says it is an estimate
+// (joshuafolkken/kit#8478).
 function stamp_of(now_ms: number, finish_ms: number): string {
-	return `${HEADER_ICONS.estimate} ${ESTIMATE_MARK}${finish_of(now_ms, finish_ms)}`
-}
-
-// The run's finish stamp, `undefined` for an ended run or nothing to estimate.
-function part_of(read: EstimateRead): string | undefined {
-	const left = read.ended_ms === undefined ? left_ms(read) : undefined
-
-	return left === undefined ? undefined : stamp_of(read.now_ms, read.now_ms + left)
+	return `${HEADER_ICONS.estimate} ${finish_of(now_ms, finish_ms)}`
 }
 
 const run_board_estimate = {
@@ -193,7 +186,6 @@ const run_board_estimate = {
 	UNKNOWN,
 	is_finish_drawn,
 	left_ms,
-	part_of,
 	phase_spent,
 	row_finish,
 	stamp_of,

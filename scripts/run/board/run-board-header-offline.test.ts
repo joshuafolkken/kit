@@ -79,11 +79,12 @@ describe('run_board_header.header_lines -- offline', () => {
 })
 
 describe('run_board_header.header_lines -- an outage not drawn', () => {
-	it('keeps an ended run’s end mark over an outage left open', () => {
-		const line = beat_line(board(SEEN, { ended_ms: NOW - SECOND }))
+	// joshuafolkken/kit#8478: an ended run's third time cell is `—`, the finish its end.
+	it('keeps an ended run’s end over an outage left open', () => {
+		const lines = plain_lines(board(SEEN, { ended_ms: NOW - SECOND }))
 
-		expect(line).toContain('🔚')
-		expect(line).not.toContain(OFFLINE_MARK)
+		expect(lines[2]).toMatch(/🚀 \d{2}:\d{2} +— {2}/u)
+		expect(lines.join('\n')).not.toContain(OFFLINE_MARK)
 	})
 
 	it('draws no 📴 over an outage its sampler no longer sees, or a stopped run', () => {
