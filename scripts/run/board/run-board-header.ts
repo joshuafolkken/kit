@@ -32,14 +32,15 @@ import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
 
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
-// and how far through the plan it is. Every time comes from a record (the carry's start, the stream's
-// events); nothing here guesses one, but the estimated finish after the progress bar, which is drawn `~`
+// and how far through the plan it is (`lanes_tail`, the lanes rule's end, joshuafolkken/kit#8514). Every
+// time comes from a record (the carry's start, the stream's events); nothing here guesses one, but the
+// estimated finish after the run's age, which is drawn `~`
 // as the estimate it is (`run-board-estimate.ts`). Two lines of symbols rather than sentences: the `⏰`
 // that moves every second is the proof the board is live, so no `updated` line is drawn. **Always three
 // lines, the first two in three columns**: the run's mark and the board's name over the kit version over
-// the repository (`run-board-header-names.ts`), the run's age, then the progress over the machine the
-// run is on and the notice slot (`run-board-header-notice.ts`) — so the first line reads as how far the
-// run is and the second as what it runs on and what holds, a slow run apart from a stuck one. The third
+// the repository (`run-board-header-names.ts`), the run's age, then the estimated finish over the machine
+// the run is on and the notice slot (`run-board-header-notice.ts`) — so the first line reads as how long
+// the run has gone and the second as what it runs on and what holds, a slow run apart from a stuck one. The third
 // says what the run is doing now (`run-board-now.ts`): the spinner, its time and its kind's icon under
 // the second and third columns' icons and digits, so the mark itself never turns. All three are written
 // the same while the run works and while it waits, so a wait is read off the mark, the notice slot and the

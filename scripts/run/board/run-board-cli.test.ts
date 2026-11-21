@@ -84,7 +84,7 @@ describe('run_board_cli.run', () => {
 
 	// joshuafolkken/kit#7089: the header's issue counts open their lists, its name the repository.
 	it('links the issue counts and the repository’s name into the plan’s repository', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_cli.run(['--once'], { ...ports, link: bracketed, read_issue_count })
 
@@ -123,13 +123,13 @@ describe('run_board_cli.run --chat', () => {
 
 	// joshuafolkken/kit#7089: the header's repository links come out as their plain text.
 	it('writes the issue counts and the repository’s name with no link', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_cli.run(['--chat'], { ...ports, link: hyperlink, read_issue_count })
 
-		const [first, , third] = (frames[0] ?? '').split('\n', 3)
+		const third = (frames[0] ?? '').split('\n', 3).at(-1)
 
-		expect(first).toMatch(/📮 87\/6,912$/u)
+		expect(frames[0]).toMatch(/ lanes .*📮 87\/6,912$/mu)
 		expect(third).toMatch(/^ {2}kit\b/u)
 	})
 
@@ -276,12 +276,12 @@ describe('run_board_cli.run plan read', () => {
 	})
 
 	it('draws the plan in one plain frame, with no spinner', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_cli.run(['--once'], ports)
 
 		expect(frames).toHaveLength(1)
-		expect(frames[0]).toMatch(/✅ +\d+\/\d+/u)
+		expect(frames[0]).toMatch(/✅ \d+\/\d+/u)
 		expect(frames[0]).not.toMatch(SPINNING)
 	})
 })
