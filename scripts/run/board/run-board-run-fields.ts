@@ -26,10 +26,9 @@ type RunFields = Pick<
 function sources_of(
 	repository: string,
 	lanes: ReadonlyArray<LaneInfo>,
-	read: Pick<SpanHere, 'span' | 'root' | 'transcript'>,
+	read: Pick<RunSpan, 'span' | 'root' | 'transcript'>,
 ): OperationSources {
 	const root = process.cwd()
-	const single = read.root ?? read.span
 	const children = lanes.map((lane) => ({
 		issue: lane.issue,
 		log: lane.output,
@@ -37,7 +36,7 @@ function sources_of(
 	}))
 
 	return {
-		lanes: [...children, ...(single === undefined ? [] : run_board_single.sources_of(single))],
+		lanes: [...children, ...run_board_single.sources_of(read.root ?? read.span)],
 		owner: { log: read.transcript, root },
 		judgment: { log: run_wake.wake_log_path(repository), root },
 	}
