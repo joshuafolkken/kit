@@ -1,7 +1,0 @@
-{
-	"reason": "overview.md item 3 now names its scope (stdout/Telegram only, posted-comment prose excluded) so the rule reads unambiguously (#7697)",
-	"date": "2026-11-17",
-	"growth": {
-		"ai_cost.on_demand_bytes": 88
-	}
-}

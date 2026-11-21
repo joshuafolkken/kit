@@ -1,7 +1,0 @@
-{
-	"reason": "Starting the unused members check beside the lint needs a child launcher (spawn_unused_members, run_child), the CLI's file arguments and failed_ahead split out of scoped_outcome for max-statements",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 32
-	}
-}

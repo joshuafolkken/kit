@@ -1,12 +1,12 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, type default as fs } from 'node:fs'
 import path from 'node:path'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_board_sound_synth, type Note } from './run-board-sound-synth'
+import type { Note } from './run-board-sound-synth'
 import { run_board_sound_wav } from './run-board-sound-wav'
 
-// joshuafolkken/kit#7944: synthesized PCM is saved once as a WAV file named by a digest of its bytes.
+// Synthesized PCM is saved once under a digest of its definition and implementation.
 
 const { SAMPLE_RATE, HEADER_BYTES, cached_wav, wav_of } = run_board_sound_wav
 
@@ -41,6 +41,7 @@ const create_directory = temporary_directory()
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.doUnmock('node:fs')
 })
 
 describe('run_board_sound_wav.wav_of', () => {
@@ -107,13 +108,35 @@ describe('run_board_sound_wav.cached_wav', () => {
 		expect(changed).toBeDefined()
 		expect(changed).not.toBe(original)
 	})
+})
 
-	it('names the same notes differently when the synthesized samples change', () => {
+describe('run_board_sound_wav persistent cache', () => {
+	it('skips synthesis when a fresh module reuses persistent audio (ac-68d0a7ed)', async () => {
+		const directory = create_directory(DIRECTORY_PREFIX)
+		const first = cached_wav('chime', NOTES, directory)
+
+		vi.resetModules()
+		const fresh = await import('./run-board-sound-wav')
+		const synth = await import('./run-board-sound-synth')
+		const samples = vi.spyOn(synth.run_board_sound_synth, 'samples_of')
+		const second = fresh.run_board_sound_wav.cached_wav('chime', NOTES, directory)
+
+		expect(second).toBe(first)
+		expect(samples).not.toHaveBeenCalled()
+	})
+
+	it('names the same notes differently when the synthesis source changes (ac-68d0a7ed)', async () => {
+		const directory = create_directory(DIRECTORY_PREFIX)
 		const original = cached_wav('chime', NOTES, directory)
 
-		vi.spyOn(run_board_sound_synth, 'samples_of').mockReturnValue(SAMPLES)
+		vi.resetModules()
+		vi.doMock('node:fs', async (import_original) => ({
+			...(await import_original<typeof fs>()),
+			readFileSync: () => Buffer.from('changed synthesis implementation'),
+		}))
+		const fresh = await import('./run-board-sound-wav')
 
-		const reshaped = cached_wav('chime', NOTES, directory)
+		const reshaped = fresh.run_board_sound_wav.cached_wav('chime', NOTES, directory)
 
 		expect(reshaped).toBeDefined()
 		expect(reshaped).not.toBe(original)

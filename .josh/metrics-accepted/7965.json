@@ -1,7 +1,0 @@
-{
-	"reason": "test:related ledger rows gain tree/base/exit_code/failed/caller (#7965): the schema fields, the caller module, its run:chain and ship-stage hand-off, and the timeline label",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 122
-	}
-}

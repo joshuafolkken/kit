@@ -1,7 +1,0 @@
-{
-	"reason": "the board re-queues a child released on an authentication failure or re-added after it left the lanes (#8028): a 6-line requeue predicate",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

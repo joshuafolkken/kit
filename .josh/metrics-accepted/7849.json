@@ -1,7 +1,0 @@
-{
-	"reason": "parked rows with a linked reason now keep their tail: one new condition line in has_short_reason (#7849)",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

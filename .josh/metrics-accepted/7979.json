@@ -1,7 +1,0 @@
-{
-	"reason": "New symbol-level selection prototype (test-symbol-facts.ts, test-symbol-users.ts) and their tests, kept for #7980 per AC5",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 420
-	}
-}

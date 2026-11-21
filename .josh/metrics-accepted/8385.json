@@ -1,7 +1,0 @@
-{
-	"reason": "Extracting the record helpers into their own module adds its imports, destructured bindings and export object; no logic was added (#8385)",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

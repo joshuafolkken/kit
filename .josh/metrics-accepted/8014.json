@@ -1,7 +1,0 @@
-{
-	"reason": "auth-failure hold sentence and its cause threaded through the empty-seat read (#8014)",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

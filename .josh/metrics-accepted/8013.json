@@ -1,7 +1,0 @@
-{
-	"reason": "The auth-failure hold wording on the run:board usage row (#8013) adds the cause field and its words",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

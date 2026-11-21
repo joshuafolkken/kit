@@ -1,7 +1,0 @@
-{
-	"reason": "q2 now checks a kept file's removed declarations against live modules (#7725); one helper line net",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

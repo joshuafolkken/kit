@@ -225,19 +225,24 @@ function opened(open: Open, segment: string): Open {
 	}
 }
 
-function textual(frame: string): string {
+// Share the escape walk with renderers that must restore the line's existing bold and dim.
+function mapped(frame: string, draw: (text: string, open: Open) => string): string {
 	const [head = '', ...escaped] = frame.split(ESC)
-	const drawn = [glyphs_as_text(head, PLAIN)]
+	const drawn = [draw(head, PLAIN)]
 	let open = PLAIN
 
 	for (const segment of escaped) {
 		open = opened(open, segment)
-		drawn.push(glyphs_as_text(segment, open))
+		drawn.push(draw(segment, open))
 	}
 
 	return drawn.join(ESC)
 }
 
-const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, textual }
+function textual(frame: string): string {
+	return mapped(frame, glyphs_as_text)
+}
+
+const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, mapped, textual }
 
 export { run_board_theme_glyphs }

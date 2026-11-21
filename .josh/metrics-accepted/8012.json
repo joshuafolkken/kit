@@ -1,7 +1,0 @@
-{
-	"reason": "New hold-cause read (cause_of, held_cause, usage_cause) the issue asks for; +26 code lines",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 26
-	}
-}

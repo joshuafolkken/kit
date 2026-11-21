@@ -1,7 +1,0 @@
-{
-	"reason": "New sound setting load/save on the board store, the feature #7950 asks for",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}
