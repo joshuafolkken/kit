@@ -1,64 +1,48 @@
-import { has_label_name, NEEDS_HUMAN_REVIEW_LABEL } from '#scripts/issue/issue-labels'
+import type { EpicChild } from '#scripts/epic/epic-graph'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { lane_review_stop } from '#scripts/lane/lane-review-stop'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_board_labels } from './run-board-labels'
-import type { BoardPlan, RowReason } from './run-board-layout-types'
+import type { BoardPlan, ReviewStop, RowReason } from './run-board-layout-types'
 
-// joshuafolkken/kit#8527: a review stop (`run:hold --human-review-stop`, then `needs-human-review`)
-// holds its lane's changes uncommitted under `in-progress` until a person reviews them. Its 🙋 row —
-// the run's own or a blocker outside the run — says so, with the lane the changes are in and how long
-// ago it stopped where its lane state record says when. The board only reads the label; it never
-// applies or removes it.
+// joshuafolkken/kit#8527: an issue held at a review stop (`lane-review-stop.ts`) keeps its lane's
+// changes uncommitted under `in-progress` until a person reviews them. Its 🙋 row — the run's own or a
+// blocker outside the run — says so, with the lane the changes are in and how long ago it stopped. The
+// board only reads the label; it never applies or removes it.
 
-function is_review(labels: ReadonlyArray<string> | undefined): boolean {
-	return labels !== undefined && has_label_name(labels, NEEDS_HUMAN_REVIEW_LABEL)
-}
+// Each stopped lane of the repository, by issue: when it stopped and its directory under the lane
+// root `lane:open` uses (`JOSH_LANE_ROOT`, else `.kit-lanes` beside `main_root`, the main work tree).
+function stops_here(
+	records: ReadonlyArray<LaneStateRecord>,
+	main_root: string,
+): ReadonlyMap<number, ReviewStop> {
+	const root = lane_paths.lane_root(main_root)
+	const stops = [...lane_review_stop.stops_of(records)]
 
-// The lane directory beside the repository, as `lane_paths` names it: `.kit-lanes/<N>` for `kit`.
-function lane_of(number: number, repo: string): string {
-	const name = repo.split('/').at(-1) ?? repo
-	const root = lane_paths.default_lane_root(name)
-
-	return lane_paths.lane_directory(root, String(number))
-}
-
-function since_note(stopped_ms: number | undefined, now_ms: number): string {
-	if (stopped_ms === undefined) return ''
-
-	return ` (stopped ${run_board_labels.span_of(now_ms - stopped_ms)} ago)`
-}
-
-// What a person does for a review stop: review the changes its lane holds.
-function reason_of(number: number, plan: BoardPlan): RowReason {
-	const lane = lane_of(number, plan.context.repo)
-	const since = since_note(plan.review_stops?.get(number), plan.now_ms ?? Date.now())
-
-	return { tail: `→ review the uncommitted changes in ${lane}${since}` }
-}
-
-// The review stop's reason for a row whose labels carry `needs-human-review`, else none.
-function labelled_reason(
-	number: number,
-	labels: ReadonlyArray<string>,
-	plan: BoardPlan,
-): RowReason | undefined {
-	return is_review(labels) ? reason_of(number, plan) : undefined
-}
-
-// A lane stopped where its record was last changed to a held state: `run:hold --human-review-stop`
-// writes `human-review`, and a lane a person labelled by hand after `lane:pause` stays `paused`.
-const STOPPED_STATES: ReadonlySet<LaneStateRecord['state']> = new Set(['human-review', 'paused'])
-
-// When each stopped lane stopped, by issue, from every lane record the board already read — an
-// earlier run's lane or one only a blocker names among them.
-function stops_of(records: ReadonlyArray<LaneStateRecord>): ReadonlyMap<number, number> {
 	return new Map(
-		records
-			.filter((record) => STOPPED_STATES.has(record.state))
-			.map((record) => [Number(record.issue), Date.parse(record.changed_at)]),
+		stops.map(([number, stopped_ms]) => [
+			number,
+			{ stopped_ms, directory: lane_paths.lane_directory(root, String(number)) },
+		]),
 	)
 }
 
-const run_board_review_stop = { labelled_reason, reason_of, stops_of }
+function is_stopped(child: Pick<EpicChild, 'labels' | 'number'>, plan: BoardPlan): boolean {
+	return lane_review_stop.is_review_stop(child.number, child.labels, plan.review_stops)
+}
+
+// What a person does for a review stop: review the changes its lane holds; none for any other row.
+function reason_of(
+	child: Pick<EpicChild, 'labels' | 'number'>,
+	plan: BoardPlan,
+): RowReason | undefined {
+	const stop = plan.review_stops?.get(child.number)
+	if (stop === undefined || !is_stopped(child, plan)) return undefined
+	const since = run_board_labels.span_of((plan.now_ms ?? Date.now()) - stop.stopped_ms)
+
+	return { tail: `→ review the uncommitted changes in ${stop.directory} (stopped ${since} ago)` }
+}
+
+const run_board_review_stop = { is_stopped, reason_of, stops_here }
 
 export { run_board_review_stop }

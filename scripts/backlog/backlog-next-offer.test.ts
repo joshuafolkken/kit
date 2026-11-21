@@ -14,6 +14,7 @@ import {
 } from '#scripts/issue/issue-labels'
 import type { OfferRecord } from '#scripts/lane/lane-ledger-schema-offer'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -35,6 +36,12 @@ function recorded(): Array<OfferRecord> {
 	return vi.mocked(lane_ledger_write.record_offer).mock.calls.map(([offer]) => offer)
 }
 
+function stopped_record(number: number): LaneStateRecord {
+	const at = '2026-11-21T09:00:00Z'
+
+	return { issue: String(number), state: 'human-review', changed_at: at, changed_by: 'run:hold' }
+}
+
 function epic_backlog(labels: ReadonlyArray<string>, untriaged: ReadonlyArray<number> = []): void {
 	backlog_fixture.stub_backlog({
 		opted_in: [opted_in_epic()],
@@ -50,6 +57,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(console, 'warn').mockImplementation(streams.error)
 	vi.spyOn(lane_ledger_write, 'record_offer').mockResolvedValue()
+	vi.spyOn(lane_state, 'read_records').mockResolvedValue([])
 	streams.reset()
 })
 
@@ -123,6 +131,27 @@ describe('backlog:next — the offer record beside an untriaged candidate', () =
 	})
 })
 
+// joshuafolkken/kit#8527: a review stop is `needs-human-review` on an issue whose lane stopped; the
+// label alone stands before the run.
+describe('backlog:next — the offer record of a review stop', () => {
+	it('records a person for the in-progress child held at a review stop', async () => {
+		vi.spyOn(lane_state, 'read_records').mockResolvedValue([stopped_record(CHILD)])
+		epic_backlog([IN_PROGRESS_LABEL, NEEDS_HUMAN_REVIEW_LABEL])
+
+		await backlog_next.run([])
+
+		expect(recorded()).toMatchObject([{ excluded: [{ issue: CHILD, reason: 'person' }] }])
+	})
+
+	it('records no person for a child labelled before its run, its lane not stopped', async () => {
+		epic_backlog([IN_PROGRESS_LABEL, NEEDS_HUMAN_REVIEW_LABEL])
+
+		await backlog_next.run([])
+
+		expect(recorded()[0]?.excluded).not.toContainEqual({ issue: CHILD, reason: 'person' })
+	})
+})
+
 describe('backlog:next — the offer record of an answer that starts nothing', () => {
 	// `wait` is the token `backlog:offer` reads as its `watch`.
 	it('records wait with the in-progress child it waited on', async () => {
@@ -133,14 +162,6 @@ describe('backlog:next — the offer record of an answer that starts nothing', (
 		expect(recorded()).toMatchObject([
 			{ verdict: 'wait', seen: [EPIC_NUMBER], excluded: [{ issue: CHILD, reason: 'wait' }] },
 		])
-	})
-
-	it('records a person for the in-progress child held at a review stop', async () => {
-		epic_backlog([IN_PROGRESS_LABEL, NEEDS_HUMAN_REVIEW_LABEL])
-
-		await backlog_next.run([])
-
-		expect(recorded()).toMatchObject([{ excluded: [{ issue: CHILD, reason: 'person' }] }])
 	})
 
 	it('records none for a backlog nobody opted into', async () => {

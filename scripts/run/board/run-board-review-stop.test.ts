@@ -1,15 +1,18 @@
+import path from 'node:path'
 import { NEEDS_HUMAN_REVIEW_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
-import { describe, expect, it } from 'vitest'
-import type { BoardPlan } from './run-board-layout-types'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { BoardPlan, ReviewStop } from './run-board-layout-types'
 import { run_board_review_stop } from './run-board-review-stop'
 
 const REPO = 'joshuafolkken/kit'
+const REPOSITORY = '/work/kit'
+const LANE_ROOT = '/lanes'
 const STOPPED = 5272
 const OTHER = 7491
 const STOPPED_MS = Date.parse('2026-11-21T09:00:00Z')
 const NOW_MS = Date.parse('2026-11-21T10:30:00Z')
-const LANE_TAIL = '→ review the uncommitted changes in .kit-lanes/5272'
+const DIRECTORY = '/work/.kit-lanes/5272'
 
 function record_of(issue: number, state: LaneStateRecord['state']): LaneStateRecord {
 	const at = new Date(STOPPED_MS).toISOString()
@@ -17,7 +20,7 @@ function record_of(issue: number, state: LaneStateRecord['state']): LaneStateRec
 	return { issue: String(issue), state, launched_at: at, changed_at: at, changed_by: 'lane:pause' }
 }
 
-function plan_of(review_stops?: ReadonlyMap<number, number>): BoardPlan {
+function plan_of(review_stops?: ReadonlyMap<number, ReviewStop>): BoardPlan {
 	return {
 		waves: { waves: [], unreached: [] },
 		tracked: new Map(),
@@ -28,40 +31,46 @@ function plan_of(review_stops?: ReadonlyMap<number, number>): BoardPlan {
 	}
 }
 
+const STOPS = new Map([[STOPPED, { stopped_ms: STOPPED_MS, directory: DIRECTORY }]])
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
+describe('run_board_review_stop.stops_here', () => {
+	it('keeps each stopped lane with its directory under the lane root beside the repository', () => {
+		vi.stubEnv('JOSH_LANE_ROOT', '')
+		const records = [record_of(STOPPED, 'human-review'), record_of(OTHER, 'running')]
+
+		expect(run_board_review_stop.stops_here(records, REPOSITORY)).toStrictEqual(STOPS)
+	})
+
+	it('names the directory under the configured lane root', () => {
+		vi.stubEnv('JOSH_LANE_ROOT', LANE_ROOT)
+		const stops = run_board_review_stop.stops_here([record_of(STOPPED, 'paused')], REPOSITORY)
+
+		expect(stops.get(STOPPED)?.directory).toBe(path.join(LANE_ROOT, String(STOPPED)))
+	})
+})
+
 describe('run_board_review_stop.reason_of', () => {
 	it('names the lane holding the changes and how long ago it stopped', () => {
-		const plan = plan_of(new Map([[STOPPED, STOPPED_MS]]))
+		const child = { number: STOPPED, labels: [NEEDS_HUMAN_REVIEW_LABEL] }
 
-		expect(run_board_review_stop.reason_of(STOPPED, plan).tail).toBe(
-			`${LANE_TAIL} (stopped 1°30′00″ ago)`,
+		expect(run_board_review_stop.reason_of(child, plan_of(STOPS))?.tail).toBe(
+			`→ review the uncommitted changes in ${DIRECTORY} (stopped 1°30′00″ ago)`,
 		)
 	})
 
-	it('names the lane alone when no lane record says when it stopped', () => {
-		expect(run_board_review_stop.reason_of(STOPPED, plan_of()).tail).toBe(LANE_TAIL)
+	it('says nothing for the label alone, as it stands before the run', () => {
+		const child = { number: STOPPED, labels: [NEEDS_HUMAN_REVIEW_LABEL] }
+
+		expect(run_board_review_stop.reason_of(child, plan_of())).toBeUndefined()
 	})
-})
 
-describe('run_board_review_stop.labelled_reason', () => {
-	it('reads a review stop from its labels only', () => {
-		const plan = plan_of()
+	it('says nothing for a stopped lane without the label', () => {
+		const child = { number: STOPPED, labels: [RUN_LANE_LABEL] }
 
-		expect(
-			run_board_review_stop.labelled_reason(STOPPED, [NEEDS_HUMAN_REVIEW_LABEL], plan)?.tail,
-		).toBe(LANE_TAIL)
-		expect(run_board_review_stop.labelled_reason(STOPPED, [RUN_LANE_LABEL], plan)).toBeUndefined()
+		expect(run_board_review_stop.reason_of(child, plan_of(STOPS))).toBeUndefined()
 	})
-})
-
-describe('run_board_review_stop.stops_of', () => {
-	it.each(['human-review', 'paused'] as const)(
-		'keeps a %s lane with the time its record last changed, and no running lane',
-		(state) => {
-			const records = [record_of(STOPPED, state), record_of(OTHER, 'running')]
-
-			expect(run_board_review_stop.stops_of(records)).toStrictEqual(
-				new Map([[STOPPED, STOPPED_MS]]),
-			)
-		},
-	)
 })

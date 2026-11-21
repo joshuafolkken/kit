@@ -1,5 +1,5 @@
 import { issue_human_stops } from '#scripts/issue/issue-human-stops'
-import { NEEDS_DECISION_LABEL, NEEDS_HUMAN_REVIEW_LABEL } from '#scripts/issue/issue-labels'
+import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_human } from './run-board-human'
 
@@ -31,11 +31,6 @@ describe('run_board_human.human_labels', () => {
 describe('run_board_human.is_human', () => {
 	it('reads needs-decision as waiting on a person', () => {
 		expect(run_board_human.is_human([NEEDS_DECISION_LABEL])).toBe(true)
-	})
-
-	it('reads a review stop as waiting on a person, drawn nowhere else', () => {
-		expect(run_board_human.is_human([NEEDS_HUMAN_REVIEW_LABEL])).toBe(true)
-		expect(run_board_human.DRAWN_ELSEWHERE.has(NEEDS_HUMAN_REVIEW_LABEL)).toBe(false)
 	})
 
 	it.each([...run_board_human.DRAWN_ELSEWHERE.keys()])('leaves %s to its own drawing', (label) => {

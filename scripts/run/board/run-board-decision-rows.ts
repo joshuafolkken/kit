@@ -9,8 +9,7 @@ import { run_board_review_stop } from './run-board-review-stop'
 // draws as a person's row gains the children it holds; one outside the run's scope gets a row of its
 // own. The children it holds stay waiting rows, drawn as any other blocked row.
 
-function need_reason(blocker: DecisionBlocker, plan: BoardPlan): RowReason {
-	if (blocker.need === 'review') return run_board_review_stop.reason_of(blocker.number, plan)
+function need_reason(blocker: DecisionBlocker): RowReason {
 	if (blocker.need === 'publish') return { tail: '→ publish' }
 	if (blocker.need === 'take') return { tail: '→ take into a run' }
 	const detail = blocker.detail === undefined ? '' : ` (${blocker.detail})`
@@ -19,13 +18,15 @@ function need_reason(blocker: DecisionBlocker, plan: BoardPlan): RowReason {
 }
 
 // An open pull request is what a person merges, whatever else the blocker waits on; a merge wait keeps
-// its 🔏 and says to find the pull request when the listing pairs none.
+// its 🔏 and says to find the pull request when the listing pairs none. A review stop says to review
+// its lane's changes (joshuafolkken/kit#8527).
 function action_of(blocker: DecisionBlocker, plan: BoardPlan): RowReason {
 	const prs = plan.human_merge_prs
 	if (blocker.need === 'merge') return run_board_human_merge.pr_reason(blocker.number, prs)
 	const pr = prs?.get(blocker.number)
+	if (pr !== undefined) return run_board_human_merge.merge_reason(pr)
 
-	return pr === undefined ? need_reason(blocker, plan) : run_board_human_merge.merge_reason(pr)
+	return run_board_review_stop.reason_of(blocker, plan) ?? need_reason(blocker)
 }
 
 function blocks_note(blocks: ReadonlyArray<number>): string {

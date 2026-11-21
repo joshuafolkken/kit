@@ -19,6 +19,7 @@ import type { FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
+import type { ReviewStop } from './run-board-layout-types'
 import { run_board_ledger_window } from './run-board-ledger-window'
 import type { SessionOperations } from './run-board-operation-read'
 import type { ProcessRoots } from './run-board-process-groups'
@@ -60,8 +61,9 @@ interface LocalRead {
 	// The open lanes as their lane state records sort them — this run's, an earlier run's and the ones
 	// with no record — with what each is doing (`run-board-lane-state.ts`).
 	lane_states: BoardLanes
-	// When each paused or review-stopped lane stopped, by issue (`run-board-review-stop.ts`).
-	review_stops?: ReadonlyMap<number, number> | undefined
+	// Each paused or review-stopped lane, by issue: when it stopped and its directory
+	// (`run-board-review-stop.ts`).
+	review_stops?: ReadonlyMap<number, ReviewStop> | undefined
 	// The session a stopped run is resumed from; `undefined` otherwise.
 	resume: string | undefined
 	// The run is carried but nothing drives it — its owner and its supervisor are both gone
@@ -169,18 +171,25 @@ function unfinished_here(
 	}
 }
 
+// Where a run's local records are: `repository` the common git directory its records are keyed on,
+// `main` the main work tree the lane root sits beside (`lane_paths.lane_root`).
+interface RepositoryRoots {
+	repository: string
+	main: string
+}
+
 // Every lane record, read once for the lanes' states and the closes still unfinished.
 function lanes_here(
 	lanes: ReadonlyArray<LaneInfo>,
-	repository: string,
+	roots: RepositoryRoots,
 	events: ReadonlyArray<RunEvent>,
 	started_ms: number,
 ): Pick<LocalRead, 'lane_states' | 'review_stops' | 'closing' | 'stuck'> {
-	const records = run_board_records.read_records(repository)
+	const records = run_board_records.read_records(roots.repository)
 
 	return {
 		lane_states: sorted_here(lanes, records, events, started_ms),
-		review_stops: run_board_review_stop.stops_of(records),
+		review_stops: run_board_review_stop.stops_here(records, roots.main),
 		...unfinished_here(records),
 	}
 }
@@ -285,18 +294,18 @@ async function run_read(
 ): Promise<LocalRead> {
 	const { span, root, carry } = read
 	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
-	const lane_read = lanes_here(lanes, repository, events, span.started_ms)
+	const roots = { repository, main: await main_root() }
+	const lane_read = lanes_here(lanes, roots, events, span.started_ms)
 	const [root_fields, span_events, room, records] = await Promise.all([
 		read_roots(span, root, events),
 		read_span_events(events, span, table, carry),
 		read_room(lanes, lane_read.lane_states, table),
 		read_records(repository, events),
 	])
-	const fields = run_board_run_fields.fields_of(repository, read, lanes, events)
 
 	return {
 		...span_fields(span, root_fields),
-		...fields,
+		...run_board_run_fields.fields_of(repository, read, lanes, events),
 		...span_events,
 		...lane_read,
 		...room,

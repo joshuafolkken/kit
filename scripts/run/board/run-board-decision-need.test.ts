@@ -1,8 +1,6 @@
 import {
-	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_MERGE_LABEL,
-	NEEDS_HUMAN_REVIEW_LABEL,
 	RUN_LANE_LABEL,
 } from '#scripts/issue/issue-labels'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
@@ -25,7 +23,6 @@ describe('run_board_decision.blocker_of need (joshuafolkken/kit#8026)', () => {
 		['merge', [NEEDS_HUMAN_MERGE_LABEL, NEEDS_DECISION_LABEL], PENDING_BODY],
 		['publish', [NEEDS_DECISION_LABEL], PENDING_BODY],
 		['decide', [NEEDS_DECISION_LABEL], ''],
-		['review', [IN_PROGRESS_LABEL, NEEDS_HUMAN_REVIEW_LABEL], ''],
 		['take', [RUN_LANE_LABEL], ''],
 	] as const)('reads the need %s', (need, labels, body) => {
 		expect(run_board_decision.blocker_of(node_of(labels, body), [WAITING]).need).toBe(need)

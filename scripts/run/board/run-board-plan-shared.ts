@@ -91,7 +91,7 @@ const blocker_schema = z.object({
 	number: z.number(),
 	title: z.string(),
 	labels: names,
-	need: z.enum(['decide', 'merge', 'publish', 'review', 'take']),
+	need: z.enum(['decide', 'merge', 'publish', 'take']),
 	detail: z.string().optional(),
 	blocks: z.array(z.number()).readonly(),
 })
