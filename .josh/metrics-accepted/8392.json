@@ -2,6 +2,6 @@
 	"reason": "Retain equal local reads and idle maps using the existing strict value comparator; three code lines implement both reference checks.",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 3
+		"scripts.code_lines": 10
 	}
 }
