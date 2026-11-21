@@ -40,6 +40,21 @@ describe('run_board_github.gather_github over a failed plan read', () => {
 		expect(state.plan_error).toBe(REASON)
 	})
 
+	it('keeps the first failure’s time over repeated failed plan reads', async () => {
+		const first_ms = START - 1
+		const gather = gather_of([], 'settled')
+		const read_plan = vi.fn(async () => {
+			throw new Error(REASON)
+		})
+		const failed: BoardState = { ...FRESH_STATE, failed_ms: first_ms }
+		const state = await gather_github(failed, {
+			...gather,
+			ports: { ...gather.ports, read_plan },
+		})
+
+		expect(state.failed_ms).toBe(first_ms)
+	})
+
 	it('clears the kept reason once a plan read lands', async () => {
 		const failed: BoardState = { ...FRESH_STATE, plan_error: REASON }
 		const state = await gather_github(failed, gather_of([plan_titled('a')], 'settled'))

@@ -11,7 +11,7 @@ import { run_board_standing, type StandingHeader } from './run-board-standing'
 // one, then what holds over frames (`run-board-standing.ts`), else the last notice the board picked —
 // its cue's icon, what sounded it, when, `×2` where it sounded again — faint once its cause no longer
 // holds (joshuafolkken/kit#8475). Every frame draws the slot; `--once`, `--chat` and Telegram read no
-// switch and draw none of it.
+// switch and draw the slot without it.
 
 const { STATE_ICONS, minute_of } = run_board_labels
 const SOUND_ON = '🔊'
@@ -76,22 +76,21 @@ function text_of(notice: Notice, link: BoardLinks['link']): string {
 	return `${words}${repeat}`
 }
 
-// The last notice's words, faint once settled, `—` before the first.
-function notice_words(fields: NoticeFields): string {
+// The last notice's words, faint once settled, `—` before the first; typed by its plain words, so
+// settling only fades it and does not type it again.
+function notice_words(fields: NoticeFields): readonly [string, string] {
 	const { notice } = fields
 
-	if (notice === undefined) return NONE
+	if (notice === undefined) return [NONE, NONE]
 
 	const text = text_of(notice, fields.link)
 
-	return notice.is_settled === true ? run_board_faint.faint(text) : text
+	return [notice.is_settled === true ? run_board_faint.faint(text) : text, text]
 }
 
 // What the slot says, and the words it is typed by.
 function words_of(fields: NoticeFields): readonly [string, string] {
-	const words = notice_words(fields)
-
-	return run_board_standing.slot_of(fields) ?? [words, words]
+	return run_board_standing.slot_of(fields) ?? notice_words(fields)
 }
 
 // 🔊 or 🔇 where the board reads the switch, then the slot. Where the board types rows the words carry

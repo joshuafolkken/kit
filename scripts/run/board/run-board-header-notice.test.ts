@@ -141,6 +141,14 @@ describe('run_board_header_notice.part_of keyed', () => {
 		)
 	})
 
+	it('keeps a notice’s key as it settles, so fading it does not type it again', () => {
+		const settled = { ...STOP_NOTICE, is_settled: true }
+
+		expect(key_of({ ...keyed, is_sound_on: true, notice: settled })).toBe(
+			key_of({ ...keyed, is_sound_on: true }),
+		)
+	})
+
 	it('keys nothing where the board types no rows', () => {
 		const plain = part_of({ ...keyed, is_keyed: undefined, is_sound_on: true })
 

@@ -92,8 +92,12 @@ function fold_plan(state: BoardData): BoardData {
 
 	const settled = { ...state, plan_fetch: undefined }
 
+	// A run of failures keeps the first one's time, so a plan that never lands ages past the retry
+	// window and the slot points at the findings (joshuafolkken/kit#8475).
 	if (answer.value === undefined) {
-		return { ...settled, failed_ms: state.attempted_ms, plan_error: answer.error }
+		const failed_ms = state.failed_ms ?? state.attempted_ms
+
+		return { ...settled, failed_ms, plan_error: answer.error }
 	}
 
 	return {
