@@ -79,10 +79,10 @@ describe('run_board_sound_typing.typing_sound letters end, switched apart', () =
 
 		test.sound.set(true, LEFT_MS)
 		test.sound.stop()
+		expect(vi.getTimerCount()).toBe(0)
 		vi.advanceTimersByTime(LEFT_MS)
 
 		expect(test.kill).toHaveBeenCalledOnce()
-		expect(vi.getTimerCount()).toBe(0)
 	})
 
 	it('sounds an on given no end until it is switched off', () => {
