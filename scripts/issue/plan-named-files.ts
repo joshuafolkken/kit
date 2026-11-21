@@ -20,7 +20,7 @@ function named_files(plan: string): ReadonlyArray<string> {
 	const rows = plan_consumers_section.fixed_rows(plan)
 	const fixed = rows.flatMap((row) => [...backlog_overlap.declared_paths(row)])
 	const paths = [...new Set([...lane_plan_auto.paths_of(plan), ...fixed])].filter(
-		(path) => !path.endsWith('/') && !test_declared_logic.is_test_file(path),
+		(path) => backlog_overlap.is_file_claim(path) && !test_declared_logic.is_test_file(path),
 	)
 
 	return paths.filter((path) => !is_restated_basename(path, paths))

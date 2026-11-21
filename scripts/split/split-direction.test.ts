@@ -178,6 +178,13 @@ describe('split_direction.references', () => {
 		expect(split_direction.references(body, child)).toEqual([])
 	})
 
+	// joshuafolkken/kit#8529: a declared glob stays a pattern, never a file whose module the kept criteria name.
+	it('reads no module from a glob claim', () => {
+		const glob = 'scripts/split/split-direction*.ts'
+
+		expect(split_direction.references(kept_body(`\`${glob}\` が緑`), `\`${glob}\``)).toEqual([])
+	})
+
 	it('reads a command from the words of a command line', () => {
 		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(undefined)
 		const body = kept_body('`pnpm josh run:entry 5953 --to halfrun` が節を印字する')

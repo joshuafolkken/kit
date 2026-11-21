@@ -352,6 +352,16 @@ describe('lane_plan_size.oversize on a re-plan that adds files to a narrow recor
 			measured: 9,
 		})
 	})
+
+	// joshuafolkken/kit#8529: a glob a plan keeps as a pattern passed no hunk it matches, as a directory did.
+	it('still answers hunks for a re-plan that claims them by a glob', () => {
+		const plan = plan_of([held, TEST_FILE, 'scripts/lane/file-*.ts'])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			measured: 9,
+		})
+	})
 })
 
 describe('lane_plan_size.refusal_text', () => {
