@@ -181,6 +181,20 @@ describe('run_board_rain_drop.drop_bytes — a pouring step', () => {
 		expect([...step.keys()].toSorted(by_text)).toEqual(changed.toSorted(by_text))
 		for (const [key, text] of now) if (step.has(key)) expect(step.get(key)).toBe(text)
 	})
+
+	it('draws a falling drop at the head the pour sped it to', () => {
+		const sped = poured(blank_screen(20, 8), [{ from_ms: 1000, to_ms: 1200 }], 1000)
+		// The idle drop falls in the last column, the poured ones in the first; its head is on row 5.
+		const keys = [...written_cells(drop_bytes(sped, 1200, undefined, share_of(0.999, 0))).keys()]
+
+		expect(keys.filter((key) => key.endsWith(';8')).toSorted(by_text)).toEqual([
+			'1;8',
+			'2;8',
+			'3;8',
+			'4;8',
+			'5;8',
+		])
+	})
 })
 
 describe('run_board_rain_drop.poured — the spans carried across redraws', () => {
