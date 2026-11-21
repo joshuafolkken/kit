@@ -296,7 +296,7 @@ Under the cost per merge, `lane-child density` gives the lane children's tool ca
 
 - a prompt's `trigger: <word>` line places the run under that word (`scripts/review/review-prompt-level.ts`);
 - a run without one is placed by its prompt — the interaction brief's path under `interaction`, the paired review's wording under `paired`, a `reviewer-verification` unit under `round-2`, else `initial` — and a second run of the same pass in the same Issue under `retry (unknown cause)`;
-- a run outside a lane checkout is `unknown`, and every run of an Issue the lane ledger records no merge of is `unmerged`, whatever its trigger;
+- a run outside a lane checkout keeps a written trigger and is otherwise `unknown`, having no Issue to order it by; every run of an Issue the lane ledger records no merge of is `unmerged`, whatever its trigger;
 - when the ledger cannot be read, the `unmerged` row is left out and a line says so.
 
 Before the closing line, `Lane children by phase` gives the lane children's cost and four token kinds for the current period by the stage `lane_breakdown` places each request in, the implementation split into read, edit, check and review-fix; it is not marked for regressions.

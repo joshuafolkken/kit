@@ -111,6 +111,12 @@ describe('cost_audit_review_trigger — a run placed by its prompt and order', (
 		expect(count_of([run({ issue: undefined })], UNKNOWN)).toBe(1)
 	})
 
+	it('keeps a written trigger on a run outside a lane', () => {
+		const prompt = `trigger: round-2 — ${MAIN_PROMPT}`
+
+		expect(count_of([run({ issue: undefined, prompt })], 'round-2')).toBe(1)
+	})
+
 	it('puts every run of an unmerged Issue under unmerged, whatever its trigger', () => {
 		const written = run({ issue: OPEN, prompt: `trigger: paired — ${MAIN_PROMPT}` })
 

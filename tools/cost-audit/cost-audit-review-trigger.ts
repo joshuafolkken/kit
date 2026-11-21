@@ -9,8 +9,8 @@ import type { TriggerRow, TriggerTotal } from './cost-audit-resume'
 // words. A run from before that line existed is placed by its prompt: the interaction brief's path or
 // the paired review's wording names its pass, a round-2 agent its round, else the first round. A second
 // run of the same pass in the same Issue is a retry whose cause the prompt does not say. A run outside
-// a lane is `unknown`, and an Issue the lane ledger never merged is `unmerged` whatever its trigger;
-// both are still counted.
+// a lane keeps a written trigger and is otherwise `unknown`, having no Issue to order it by; every run
+// of an Issue the lane ledger never merged is `unmerged` whatever its trigger. Both are still counted.
 
 const ROUND_TWO_AGENT = 'reviewer-verification'
 const REVIEWER_AGENTS: ReadonlySet<string> = new Set(['reviewer', ROUND_TWO_AGENT])
@@ -75,11 +75,11 @@ function inferred(session: AuditSession): ReviewTrigger {
 	return prompt_pass(session.prompt ?? '') ?? round
 }
 
-// A lane run's trigger; a second run of one pass in one Issue with no `trigger:` line is a retry.
 function is_unmerged(issue: number, merged_issues: ReadonlySet<number> | undefined): boolean {
 	return merged_issues !== undefined && !merged_issues.has(issue)
 }
 
+// A lane run's trigger; a second run of one pass in one Issue with no `trigger:` line is a retry.
 function lane_trigger(session: AuditSession, issue: number, context: PlaceContext): string {
 	if (is_unmerged(issue, context.merged_issues)) return UNMERGED
 
