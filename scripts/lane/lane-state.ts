@@ -287,6 +287,37 @@ async function record_adopted(
 	return await settled(async () => await adopted_outcome(change, options))
 }
 
+function transfer_held(issue: string, directory: string, now: Date): RecordOutcome {
+	const previous = read_record(directory, issue)
+	const run = current_run(directory)
+
+	if (previous === undefined || run === undefined) {
+		return { kind: 'skipped', reason: 'no record or run' }
+	}
+
+	const record = { ...previous, run, adopted_at: now.toISOString() }
+
+	write_record(directory, record)
+
+	return { kind: 'written', record }
+}
+
+/**
+ * Hand the lane's record to the current run, leaving its state as it is: a run that adopts a lane its
+ * ended owner left behind counts it as its own (joshuafolkken/kit#8455).
+ */
+async function record_transfer(issue: string, options: StateOptions = {}): Promise<RecordOutcome> {
+	return await settled(async () => {
+		const directory = await resolve_directory(options.directory)
+
+		if (directory === undefined) return NO_DIRECTORY
+
+		const now = options.now ?? new Date()
+
+		return locked(directory, issue, () => transfer_held(issue, directory, now))
+	})
+}
+
 /** Each of `issues`' records, by issue; an issue with none is left out. */
 async function read_states(
 	issues: ReadonlyArray<string>,
@@ -328,6 +359,7 @@ const lane_state = {
 	record_adopted,
 	record_change,
 	record_stuck,
+	record_transfer,
 	recorded_issues,
 	state_path,
 }

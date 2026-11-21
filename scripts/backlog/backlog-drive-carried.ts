@@ -11,7 +11,7 @@ import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 // The open lanes an earlier invocation dispatched that still claim their issue: `in-progress`, and not
 // stopped for a person's review. Their unit may have died across the hand-off, so the drive collects
 // them; a lane parked or held for review is a person's and is left alone.
-// A paused lane is resumed only when its owning run has ended: an ended record matches its
+// A lane is adopted — and a paused one resumed — only when its owning run has ended: an ended record matches its
 // `started_at`, or the current carry holds a different `started_at` (a later run). A supervisor
 // hand-off keeps `started_at` and swaps only the owner pid, so a person's `lane:pause` inside the
 // same run survives it. With no readable carry, a dead owner pid decides.
@@ -43,17 +43,23 @@ function is_ended(run: LaneRun, directory: string): boolean {
 	return is_owner_dead(run)
 }
 
-async function resume_stopped(issue: string, directory: string): Promise<void> {
-	const record = await lane_state.read_state(issue, directory)
-
-	if (record?.state !== 'paused' || record.run === undefined || !is_ended(record.run, directory)) {
-		return
-	}
-
+async function resume(issue: string): Promise<void> {
 	const result = await josh_command.josh_run([RESUME_COMMAND, issue], true)
 
 	console.error(result.out)
 	josh_command.require_success(result, RESUME_COMMAND)
+}
+
+// A lane whose run has ended becomes this run's own (joshuafolkken/kit#8455); a paused one is resumed
+// too. A lane another live run owns is left as that run's.
+async function adopt_stopped(issue: string, directory: string): Promise<void> {
+	const record = await lane_state.read_state(issue, directory)
+
+	if (record?.run === undefined || !is_ended(record.run, directory)) return
+
+	await lane_state.record_transfer(issue, { directory })
+
+	if (record.state === 'paused') await resume(issue)
 }
 
 async function resume_carried(issues: ReadonlyArray<string>): Promise<void> {
@@ -63,7 +69,7 @@ async function resume_carried(issues: ReadonlyArray<string>): Promise<void> {
 
 	await Promise.all(
 		issues.map(async (issue) => {
-			await resume_stopped(issue, directory)
+			await adopt_stopped(issue, directory)
 		}),
 	)
 }

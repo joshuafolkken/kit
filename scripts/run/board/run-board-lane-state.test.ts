@@ -43,6 +43,17 @@ function lanes_of(
 	})
 }
 
+// joshuafolkken/kit#8455: a lane this run took over from an ended run is drawn as its own.
+describe('run_board_lane_state.lanes_of — a lane handed over', () => {
+	it('sorts a lane handed over to this run as its own, marked adopted', () => {
+		const record = { ...record_of('running'), launched_at: EARLIER_RUN, adopted_at: LAUNCHED }
+		const lanes = lanes_of([record])
+
+		expect(lanes.own.get(NUMBER)).toMatchObject({ state: 'running', is_adopted: true })
+		expect(lanes.earlier.size).toBe(0)
+	})
+})
+
 describe('run_board_lane_state.lanes_of — whose lane it is', () => {
 	it('sorts a lane an earlier run launched as earlier, whatever its stream says in this run', () => {
 		const events = [event_of(1, LATER, KIND.CUT), event_of(2, LATER, KIND.RESUME)]
@@ -56,6 +67,7 @@ describe('run_board_lane_state.lanes_of — whose lane it is', () => {
 		const lanes = lanes_of([record_of('running')])
 
 		expect(lanes.own.get(NUMBER)).toMatchObject({ state: 'running', lane: `lane ${ISSUE}` })
+		expect(lanes.own.get(NUMBER)).not.toHaveProperty('is_adopted')
 		expect(lanes.earlier.size).toBe(0)
 	})
 
