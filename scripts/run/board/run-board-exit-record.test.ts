@@ -10,6 +10,8 @@ import {
 const STARTED_MS = Date.parse('2026-11-20T12:00:00.000Z')
 const UPTIME_MS = 90_000
 const PID = 4242
+const HALF_WRITTEN = 'snapshot half written'
+const WATCHED_AT = '2026-11-20T12:01:30.000Z'
 const FAILURE = 1
 const SIGHUP_CODE = 129
 const SIGINT_CODE = 130
@@ -96,7 +98,7 @@ describe('run_board_exit_record tick', () => {
 	it('records a redraw that throws with its stack, time and uptime, and throws it on', async () => {
 		const board = fixture()
 		const guard = watching(board)
-		const reason = 'snapshot half written'
+		const reason = HALF_WRITTEN
 		const failure = new Error(reason)
 
 		await expect(
@@ -109,10 +111,74 @@ describe('run_board_exit_record tick', () => {
 			kind: 'tick',
 			reason,
 			stack: failure.stack,
-			at: '2026-11-20T12:01:30.000Z',
+			at: WATCHED_AT,
 			uptime_ms: UPTIME_MS,
 			pid: PID,
+			count: undefined,
+			last_at: undefined,
 		})
+	})
+})
+
+// joshuafolkken/kit#8381: a failed redraw the board survives is kept, the same one counted up.
+describe('run_board_exit_record failed, the same failure', () => {
+	it('keeps one record, counting it up to its last time', () => {
+		const board = fixture()
+		const guard = watching(board)
+		const failure = new Error(HALF_WRITTEN)
+
+		guard.failed(failure)
+		board.clock.now_ms += UPTIME_MS
+		guard.failed(failure)
+
+		expect(board.files.text?.split('\n').filter(Boolean)).toHaveLength(1)
+		expect(recorded(board)).toMatchObject({
+			kind: 'redraw',
+			reason: HALF_WRITTEN,
+			at: WATCHED_AT,
+			last_at: '2026-11-20T12:03:00.000Z',
+			count: 2,
+		})
+	})
+})
+
+describe('run_board_exit_record failed, other records', () => {
+	it('replaces the record with another failure', () => {
+		const board = fixture()
+		const guard = watching(board)
+
+		guard.failed(new Error('first'))
+		guard.failed(new Error('second'))
+
+		expect(recorded(board)).toMatchObject({ kind: 'redraw', reason: 'second', count: 1 })
+	})
+
+	it('gives way to an exit, and writes nothing after one', () => {
+		const board = fixture()
+		const guard = watching(board)
+
+		guard.failed(new Error('first'))
+		board.process.emit('SIGHUP', 'SIGHUP')
+		guard.failed(new Error('after'))
+
+		expect(recorded(board)).toMatchObject({ kind: 'signal', reason: 'SIGHUP' })
+	})
+
+	it('says on the next launch how many times the redraw failed', () => {
+		const earlier = fixture()
+		const guard = watching(earlier)
+
+		const lost = new Error('lost')
+
+		guard.failed(lost)
+		guard.failed(lost)
+		const next = fixture(earlier.files.text)
+
+		run_board_exit_record.start(next.ports)
+
+		expect(next.errors).toStrictEqual([
+			`run:board: the last live board's redraw failed 2 time(s) (lost), from ${WATCHED_AT} to ${WATCHED_AT}`,
+		])
 	})
 })
 
