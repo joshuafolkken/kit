@@ -13,6 +13,10 @@ vi.mock('#scripts/git/git-branch', () => ({
 	git_branch: { current: vi.fn().mockResolvedValue('6986-lane') },
 }))
 vi.mock('./run-ship-preflight-reuse', () => ({ run_ship_preflight_reuse: { run: reuse_mock } }))
+// joshuafolkken/kit#8542: the stage asks the prepared children ahead of the reuse; none here.
+vi.mock('./run-ship-prepared-children', () => ({
+	run_ship_prepared_children: { PRECONDITION: 'prepared', problems: vi.fn().mockResolvedValue([]) },
+}))
 
 const { run_ship_preflight } = await import('./run-ship-preflight')
 
