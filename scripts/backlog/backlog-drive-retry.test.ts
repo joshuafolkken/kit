@@ -45,7 +45,7 @@ it('retries a parked native dependent through the existing command (ac-846abec4)
 	expect(run_event_stream_emit.current_events).toHaveBeenCalledWith(true)
 	expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
 		['run:add', String(PARKED), '--retry'],
-		true,
+		{ should_forward_stderr: true },
 	)
 })
 
@@ -181,7 +181,7 @@ it('goes on retrying the round after a protected dependent (ac-a55c13d2)', async
 
 	expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
 		['run:add', String(SIBLING), '--retry'],
-		true,
+		{ should_forward_stderr: true },
 	)
 })
 

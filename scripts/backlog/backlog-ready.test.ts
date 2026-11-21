@@ -274,11 +274,11 @@ describe('backlog_ready.print_offer_hint', () => {
 
 // joshuafolkken/kit#2503: the arrival probe reads the pool bounded, with stderr piped; the pick-up read
 // is unchanged.
-describe('backlog_ready.read_backlog_next', () => {
-	const TIMEOUT_MS = 30_000
-	const BACKLOG_NEXT = 'backlog:next'
-	const ANSWER = { code: 0, out: '2445' }
+const TIMEOUT_MS = 30_000
+const BACKLOG_NEXT = 'backlog:next'
+const ANSWER = { code: 0, out: '2445' }
 
+describe('backlog_ready.read_backlog_next', () => {
 	beforeEach(() => {
 		vi.spyOn(run_headless, 'current_carry').mockResolvedValue(undefined)
 	})
@@ -287,16 +287,24 @@ describe('backlog_ready.read_backlog_next', () => {
 		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue(ANSWER)
 
 		await expect(backlog_ready.read_backlog_next(TIMEOUT_MS)).resolves.toEqual(ANSWER)
-		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], false, TIMEOUT_MS)
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], {
+			should_forward_stderr: false,
+			timeout_ms: TIMEOUT_MS,
+		})
 	})
 
 	it('keeps the pick-up read unbounded, with stderr forwarded', async () => {
 		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue(ANSWER)
 
 		await expect(backlog_ready.ready_issues()).resolves.toEqual(['2445'])
-		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], true, undefined)
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT], {
+			should_forward_stderr: true,
+			timeout_ms: undefined,
+		})
 	})
+})
 
+describe('backlog_ready.read_backlog_next — invocation exclusions', () => {
 	// joshuafolkken/kit#4349: the stream is the repository's log, so an earlier run's merge is no exclusion.
 	it("excludes only this invocation's merged children", async () => {
 		const merge = run_event_stream.EVENT_KIND.MERGE
@@ -312,6 +320,9 @@ describe('backlog_ready.read_backlog_next', () => {
 
 		await backlog_ready.read_backlog_next(TIMEOUT_MS)
 
-		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT, '--exclude', '2445'], false, TIMEOUT_MS)
+		expect(run).toHaveBeenCalledWith([BACKLOG_NEXT, '--exclude', '2445'], {
+			should_forward_stderr: false,
+			timeout_ms: TIMEOUT_MS,
+		})
 	})
 })

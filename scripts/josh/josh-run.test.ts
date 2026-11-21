@@ -40,6 +40,52 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, DISPATCH, '17'], PIPED)
 	})
 
+	it('keeps defaults when optional values are explicitly undefined', async () => {
+		stub(OK, ' output ')
+
+		const result = await josh_command.josh_run([BUDGET], {
+			should_forward_stderr: undefined,
+			timeout_ms: undefined,
+			environment: undefined,
+		})
+
+		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], PIPED)
+		expect(result).toStrictEqual({ code: OK, out: 'output', err: '' })
+	})
+})
+
+describe('josh_command.josh_run — explicit options', () => {
+	it('keeps stderr piped when forwarding is explicitly disabled', async () => {
+		stub(FALLBACK_EXIT, ' output ', ' reason ')
+
+		const result = await josh_command.josh_run([BUDGET], { should_forward_stderr: false })
+
+		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], PIPED)
+		expect(result).toStrictEqual({ code: FALLBACK_EXIT, out: 'output', err: 'reason' })
+	})
+
+	it('applies forwarding, timeout and additional environment together', async () => {
+		const timeout_ms = 30_000
+		const environment = { EXTRA: 'kept' }
+
+		stub(OK, ' output ', ' warning ')
+
+		const result = await josh_command.josh_run([BUDGET], {
+			should_forward_stderr: true,
+			timeout_ms,
+			environment,
+		})
+
+		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], {
+			...FORWARDED,
+			timeout: timeout_ms,
+			env: environment,
+		})
+		expect(result).toStrictEqual({ code: OK, out: 'output', err: 'warning' })
+	})
+})
+
+describe('josh_command.josh_run — failures and forwarding', () => {
 	it('reads a missing exit code as a failure rather than a success', async () => {
 		stub(undefined, '')
 
@@ -53,7 +99,7 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 
 		stub(FALLBACK_EXIT, '', ` ${reason} \n`)
 
-		const result = await josh_command.josh_run([BUDGET], true)
+		const result = await josh_command.josh_run([BUDGET], { should_forward_stderr: true })
 
 		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], FORWARDED)
 		expect(result.err).toBe(reason)
@@ -64,7 +110,7 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 
 		stub(undefined, '')
 
-		const result = await josh_command.josh_run([BUDGET], false, timeout_ms)
+		const result = await josh_command.josh_run([BUDGET], { timeout_ms })
 
 		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], {
 			...PIPED,
@@ -82,7 +128,7 @@ describe('josh_command.josh_run — the environment', () => {
 		stub(OK, '')
 
 		await run_startup.within(place, async () => {
-			await josh_command.josh_run([BUDGET], false, undefined, { EXTRA: 'kept' })
+			await josh_command.josh_run([BUDGET], { environment: { EXTRA: 'kept' } })
 			await josh_command.josh_run_at([BUDGET], '/lane')
 		})
 
@@ -101,7 +147,7 @@ describe('josh_command.josh_run — the environment', () => {
 
 		stub(OK, '')
 
-		await josh_command.josh_run([BUDGET], false, undefined, environment)
+		await josh_command.josh_run([BUDGET], { environment })
 
 		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], {
 			...PIPED,

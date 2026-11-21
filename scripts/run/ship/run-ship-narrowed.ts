@@ -140,12 +140,10 @@ function named_phases(
 
 	return checks.map(
 		(check) => async () =>
-			await josh_command.josh_run(
-				[check.script, ...files],
+			await josh_command.josh_run([check.script, ...files], {
 				should_forward_stderr,
-				undefined,
-				run_ship_lap.caller_environment(),
-			),
+				environment: run_ship_lap.caller_environment(),
+			}),
 	)
 }
 

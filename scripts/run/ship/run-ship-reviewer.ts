@@ -70,7 +70,10 @@ function paths(slot?: ReviewSlot): { brief: string; findings: string; log: strin
 // round's short checks need not queue behind other lanes' heavy ones (joshuafolkken/kit#5819). The gate
 // a round opens runs in the background and drops the mark at its launch (`run-review-steps.ts`).
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr, undefined, PRIORITY_ENVIRONMENT)
+	return await josh_command.josh_run(argv, {
+		should_forward_stderr,
+		environment: PRIORITY_ENVIRONMENT,
+	})
 }
 
 function note(text: string): void {

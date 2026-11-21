@@ -208,7 +208,9 @@ describe('lane_launch_cli.launch_lane — a lane a park kept open', () => {
 
 		await lane_launch_cli.launch_lane({ issue: ISSUE, stash: STASH[1] })
 
-		expect(josh_run_mock).toHaveBeenCalledWith([POP, STASH[1], '--dir', KEPT_DIR], true)
+		expect(josh_run_mock).toHaveBeenCalledWith([POP, STASH[1], '--dir', KEPT_DIR], {
+			should_forward_stderr: true,
+		})
 	})
 
 	// A failed install leaves a live lane no child was ever dispatched into, so no output is recorded.
