@@ -103,13 +103,13 @@ describe('run_board_row_sections.faint_keys_of', () => {
 		expect(known_of(keyed, []).has(run_board_header_parts.plan_key(keyed) ?? '')).toBe(true)
 	})
 
-	it('holds the decision, queued and waiting rows and the progress line while the plan is saved', () => {
+	it('holds the faint rows, the queued epic lines and the progress line while the plan is saved', () => {
 		const saved = header({ layout: LAYOUT, plan_saved_ms: 1, is_keyed: true })
 		const rows = [...keys_of(LAYOUT)].filter((key) => FAINT.test(key))
 
 		expect(rows).toHaveLength(5)
 		expect(faint_keys_of(saved)).toStrictEqual(
-			new Set([...rows, run_board_header_parts.plan_key(saved)]),
+			new Set([...rows, 'epic:9', run_board_header_parts.plan_key(saved)]),
 		)
 	})
 

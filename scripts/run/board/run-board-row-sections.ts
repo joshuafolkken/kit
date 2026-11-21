@@ -90,8 +90,9 @@ function faint_keys_of(header: BoardHeader): Set<string> | undefined {
 		drawn.map((row) => run_board_row_key.key_of(section, row.number)),
 	)
 	const plan = run_board_header_parts.plan_key(header)
+	const epics = epic_keys_of(layout)
 
-	return new Set(plan === undefined ? keys : [...keys, plan])
+	return new Set(plan === undefined ? [...keys, ...epics] : [...keys, ...epics, plan])
 }
 
 const run_board_row_sections = { done_rows, faint_keys_of, keys_of, known_of }
