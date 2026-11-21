@@ -49,6 +49,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		results: NO_RESULTS,
 		sequences: { runs: [], retries: [] },
 		resumes: { triggers: [], review_fix: row(REVIEW_FIX_PHASE, 0, 0) },
+		review_triggers: { rows: [], is_merge_known: true },
 		...overrides,
 	}
 }
