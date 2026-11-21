@@ -137,7 +137,8 @@ interface BoardHeader
 	// Whether each issue row leads its text with its key (`run-board-row-key.ts`) — only where the board
 	// types the rows that appear, so every other frame is drawn as it was.
 	is_keyed?: boolean | undefined
-	// The theme the frame is drawn in, whose alert display ends the first line (`run-board-theme-defs.ts`).
+	// The theme the frame is drawn in, whose alert display ends the throughput rule
+	// (`run-board-theme-defs.ts`).
 	theme?: Theme | undefined
 	form: BoardForm
 	// The repository the plan was read for, as `owner/repo`; `undefined` before a plan is read.
@@ -291,7 +292,8 @@ function saved_part(header: BoardHeader): string | undefined {
 		: `${SAVED_ICON} ${run_board_length.span_of(header.now_ms - plan_saved_ms)}`
 }
 
-// The alert level a themed screen ends the progress line on, drawn as the theme's row says.
+// The alert level a themed screen draws at the right end of the throughput rule (joshuafolkken/kit#8513),
+// drawn as the theme's row says.
 function alert_part(header: BoardHeader): string | undefined {
 	if (header.theme === undefined || header.form !== 'screen') return undefined
 
@@ -300,14 +302,13 @@ function alert_part(header: BoardHeader): string | undefined {
 	)
 }
 
-// The run's progress, then a plan read in flight, then the alert level; a failing read is said in the
-// notice slot (`run-board-standing.ts`).
+// The run's progress, then a plan read in flight; a failing read is said in the notice slot
+// (`run-board-standing.ts`).
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
 		loading_part(header),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
-		alert_part(header),
 		saved_part(header),
 	]
 
@@ -416,6 +417,7 @@ function now_icon(header: BoardHeader): string | undefined {
 }
 
 const run_board_header = {
+	alert_part,
 	counts_of,
 	estimate_legend,
 	header_lines,

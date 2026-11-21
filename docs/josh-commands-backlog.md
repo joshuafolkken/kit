@@ -864,6 +864,7 @@ pnpm josh epic:audit 858
 | Order contradiction  | **error** | Acceptance criteria name another child with nothing ordering them (warning once either closes, or cross-repo). |
 | Unresolved reference | warning   | A body cites an issue that does not exist or is already closed.                                                |
 | Nested epic          | warning   | A task-list row points at another epic.                                                                        |
+| Epic blocker         | warning   | An open order's blocker is an epic, so it waits on every child — re-point it at the child it needs.            |
 | Orphan child         | warning   | An issue names this epic as parent but the task list does not track it.                                        |
 | Orphan search        | **error** | The open-backlog search could not be read — re-run the audit.                                                  |
 | Unjustified order    | **error** | The body or a native blocked-by orders two open children and nothing records why.                              |

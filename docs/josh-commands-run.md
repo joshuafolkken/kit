@@ -788,21 +788,21 @@ It runs `git -y`, `followup` and `run:tail` in order, under one header per step.
 
 The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run, forwarded to `run:tail` after the closed issue.
 
-A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate. A pass is reused on an unchanged tree, base, title and body.
+A `preflight` stage first asks every pull-request precondition, so a stop lands before review and gate. A pass is reused on an unchanged tree, base, title and body, except `prepared-children`, which publishes the lane's children; one unplanned refuses.
 
-A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …`. A `--review` ship still runs its `test:pinned` there; the supervised preflight and gate still run.
+A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …`. A `--review` ship still runs `test:pinned` there; the supervised preflight and gate run.
 
 Over a green gate, a clean main move is not merged before the push (`… not merged again; …`): PR CI on the merge ref catches a combined break. A conflicting or unreadable one is merged and gated.
 
-A followup red after a main move is merged, gated and pushed in the followup, printing `followup: the default branch moved …`; only a red there stops.
+A followup red after a main move is merged, gated and pushed there, printing `followup: the default branch moved …`; only a red there stops.
 
-One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
+One precondition is `unplanned`: a branch-diff code file the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**`; a branch with no or a yielded plan record passes.
 
-In scope, run the `lane:plan` command the stop prints (every path) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
+In scope, run the `lane:plan` command the stop prints (every path) and comment the reason on the Issue — on `yield` another lane holds the file: follow its printed instruction; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
 
-`check:related`, `run:review --join` and a lane child's `review:record` print the same notice ahead of the ship, so a file a fix added is planned first.
+`check:related`, `run:review --join` and a lane child's `review:record` print the same notice ahead of the ship, so a file a fix adds is planned first.
 
-A re-run resumes: a per-issue stage record, honored only where git state corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
+A re-run resumes: a per-issue stage record, honored only where git state agrees, skips finished stages; each stage is logged as a `ship-stage` trace event.
 
 A lane child always ships with `--review`, after its in-implement round 1. The `review` stage reuses a round 1 attested on this branch whose tree held, or moved only where round 2 reads, and ends `skipped` (`done` when an owed interaction review then runs); any other round 1 is reviewed again. A gate stage that reuses a green record ends `skipped` too.
 

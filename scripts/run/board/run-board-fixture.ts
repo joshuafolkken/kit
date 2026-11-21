@@ -18,6 +18,7 @@ import { run_board_lane_state } from './run-board-lane-state'
 import type { BoardLayout, BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts, BoardState, DataPorts } from './run-board-state'
+import type { ThroughputRow } from './run-board-throughput'
 import { run_board_tick_draw, type Redraw } from './run-board-tick-draw'
 
 // What the `run:board` redraw suites share: the ports a test drives the board
@@ -35,6 +36,17 @@ const LOCAL: LocalRead = {
 	lane_states: run_board_lane_state.NO_LANES,
 	resume: undefined,
 	is_stranded: false,
+}
+// A throughput row with nothing done — what a frame needs for its throughput rule, which a themed
+// screen ends on its alert level (joshuafolkken/kit#8513).
+const IDLE_ROW: ThroughputRow = {
+	label: '24h',
+	cells: [],
+	active_ms: 0,
+	done: 0,
+	per_hour: undefined,
+	peak: undefined,
+	now: undefined,
 }
 const STOPPED = new Error('stopped')
 // A machine with nothing swapped and half its memory free.
@@ -227,6 +239,7 @@ function first_frame(frames: ReadonlyArray<string>): number {
 
 const run_board_fixture = {
 	FIRST_ROUND,
+	IDLE_ROW,
 	LOCAL,
 	SPINNING,
 	START,

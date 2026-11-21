@@ -44,7 +44,7 @@ interface ThemeDefinition {
 	rule: { dash: Paint; text: Paint }
 	idle: Paint
 	intro: IntroDefinition
-	// The alert field a screen's first line ends on, drawn from the level every theme shares
+	// The alert field a screen's throughput rule ends on, drawn from the level every theme shares
 	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
 	alert: (level: number) => string
 	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
