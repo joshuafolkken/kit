@@ -137,7 +137,7 @@ function header_drawn({ is_on, state = planned(), rows }: SoundDraw): SoundDrawn
 describe('run_board_tick_draw.draw_display sound mark', () => {
 	it('draws 🔊 and — at the end of the second line while the sound is on, none on the first', () => {
 		expect(header_drawn({ is_on: true }).lines).toStrictEqual([
-			'⏸ josh-board  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
+			'⏸ josh-board  ⏰ 0″  ✅  0/- ──────────  🔄 0  💤 0',
 			'  -                  💪 -  🧠 -  💾 -  🔊 —',
 			'  kit',
 		])

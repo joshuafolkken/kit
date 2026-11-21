@@ -18,7 +18,7 @@ function first_of(extra: Partial<BoardHeader>): string {
 describe('run_board_header.header_lines issue count', () => {
 	it('ends the first line on the open and closed counts', () => {
 		expect(first_of({ repo: REPO, issue_count: COUNT })).toBe(
-			`⏸ josh-board  ⏰ 2°10′00″  ✅  0/0 ──────────  🔄 0  ⏳ 0  💤 0  ${CHIP}`,
+			`⏸ josh-board  ⏰ 2°10′00″  ✅  0/0 ──────────  🔄 0  💤 0  ${CHIP}`,
 		)
 	})
 

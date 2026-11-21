@@ -48,7 +48,7 @@ describe('run_board_render.render with a saved plan', () => {
 	it('draws the plan figures of the header faint and the running count as it is', () => {
 		const progress = line_with(saved, '🕘')
 
-		expect(progress).toMatch(/«⏳ [^»]*»/u)
+		expect(progress).toMatch(/«✅ [^»]*»/u)
 		expect(progress).toMatch(/(?<!«)🔄 \d/u)
 	})
 

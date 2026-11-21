@@ -98,7 +98,7 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 		const lines = await frame_after({ closed: new Map(), is_whole: true })
 
 		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
-		expect(lines[0]).toContain('⏳ 1  💤 0')
+		expect(lines[0]).toContain('✅  0/1')
 	})
 })
 

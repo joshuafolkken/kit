@@ -60,6 +60,8 @@ interface PlanSection extends Foldable {
 	lines: ReadonlyArray<PlanLine>
 	fold?: ((cut: ReadonlyArray<PlanLine>) => string) | undefined
 	key?: SectionKey | undefined
+	// The priorities among its rows after its count, ` (🔺 2)`, open or folded (joshuafolkken/kit#8511).
+	tally?: string | undefined
 }
 
 // The newest notes shown, and how many older ones are already past the section's limit.
