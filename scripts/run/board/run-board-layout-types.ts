@@ -122,6 +122,9 @@ interface RowRead extends PauseRead {
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
 	// Each planned child's standing blockers, which a touched stalled row waits on in place of its retry.
 	waits?: ReadonlyMap<number, ReadonlyArray<string>> | undefined
+	// What holds a planned child the plan row's reading names (`ReasonOf`), which a touched ⏳ row with
+	// no blocker draws in place of its free-lane retry (joshuafolkken/kit#8497).
+	held_of?: ((number: number) => RowReason | undefined) | undefined
 }
 
 interface Overlay {

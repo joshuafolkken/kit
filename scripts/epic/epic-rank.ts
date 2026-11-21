@@ -1,7 +1,7 @@
 import { defect_rate } from '#scripts/issue/defect-rate'
 import { expected_effect_lint } from '#scripts/issue/expected-effect-lint'
 import { issue_priority } from '#scripts/issue/issue-priority'
-import { issue_rank } from '#scripts/issue/issue-rank'
+import { issue_rank, type DependencyRow } from '#scripts/issue/issue-rank'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { epic_graph, type EpicChild } from './epic-graph'
 
@@ -11,34 +11,33 @@ import { epic_graph, type EpicChild } from './epic-graph'
 
 const CLOSED = 'CLOSED'
 
-// How many open issues of the pool wait on each child, directly or down a chain. Only the pool is
-// counted: it is every issue the caller may run, and an issue outside it is not one this ranking can
-// start sooner.
-function dependents_of(pool: ReadonlyArray<EpicChild>): ReadonlyMap<string, number> {
-	return issue_rank.count_dependents(
-		pool
-			.filter((child) => child.state !== CLOSED)
-			.map((child) => ({
-				key: epic_graph.key_of(child),
-				blockers: child.blocked_by.map((blocker) => epic_graph.blocker_key(blocker)),
-			})),
-	)
+// The open issues of the pool as dependency rows, for how many wait on each child, directly or down a
+// chain, and the highest priority among them. Only the pool is counted: it is every issue the caller
+// may run, and an issue outside it is not one this ranking can start sooner.
+function dependency_rows(pool: ReadonlyArray<EpicChild>): Array<DependencyRow> {
+	return pool
+		.filter((child) => child.state !== CLOSED)
+		.map((child) => ({
+			key: epic_graph.key_of(child),
+			labels: child.labels,
+			blockers: child.blocked_by.map((blocker) => epic_graph.blocker_key(blocker)),
+		}))
 }
 
 function rank(
 	children: ReadonlyArray<EpicChild>,
 	pool: ReadonlyArray<EpicChild>,
 ): Array<EpicChild> {
-	const dependents = dependents_of(pool)
+	const rank_of = issue_rank.dependency_ranks(dependency_rows(pool))
 
 	return issue_rank.rank(children, (child) => ({
+		...rank_of(epic_graph.key_of(child)),
 		is_resumable: child.is_resumable,
 		is_defect: defect_rate.is_defect({ body: child.body ?? '', labels: child.labels }),
 		is_last: issue_priority.is_last(child.body),
 		labels: child.labels,
 		lost_minutes: issue_priority.lost_minutes(child.body),
 		gain_minutes: expected_effect_lint.weekly_minutes(child.body),
-		dependents: dependents.get(epic_graph.key_of(child)) ?? 0,
 		estimated_lines: size_estimate.declared_size(child.body ?? '')?.lines,
 	}))
 }

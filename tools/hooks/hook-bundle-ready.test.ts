@@ -290,7 +290,7 @@ describe('launch', () => {
 		})
 
 		silence_stderr()
-		await launch(probe_launch(), out_directory, builds_of(rebuild))
+		await launch(probe_launch(), { out_directory, builds: builds_of(rebuild) })
 
 		expect(rebuild).toHaveBeenCalledWith(out_directory)
 		expect(Reflect.get(globalThis, PROBE_KEY)).toEqual(['first', 'second'])
@@ -302,16 +302,21 @@ describe('launch', () => {
 
 		write_stale_build(out_directory)
 		silence_stderr()
-		await launch(probe_launch(), out_directory, builds)
+		await launch(probe_launch(), { out_directory, builds })
 
 		expect(builds.rebuild).not.toHaveBeenCalled()
 		expect(Reflect.get(globalThis, PROBE_KEY)).toEqual(['first', 'second'])
 	})
+})
 
+describe('launch without a buildable bundle', () => {
 	it('runs the josh command from source when the bundles cannot be rebuilt', async () => {
 		silence_stderr()
 		vi.mocked(spawnSync).mockReturnValue(spawn_result(REFUSED))
-		await launch(probe_launch(), create_out_directory(), builds_of(failing_rebuild))
+		await launch(probe_launch(), {
+			out_directory: create_out_directory(),
+			builds: builds_of(failing_rebuild),
+		})
 
 		expect(spawnSync).toHaveBeenCalledWith(
 			path.join(PACKAGE_ROOT, 'node_modules', '.bin', 'tsx'),

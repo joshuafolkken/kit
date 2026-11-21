@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { lane_capacity, type LaneAnswer } from '#scripts/lane/lane-capacity'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunActivity } from './run-board-activity'
 import { run_board_labels } from './run-board-labels'
@@ -27,6 +28,7 @@ const STAGE_SESSIONS: Readonly<Partial<Record<string, 'owner' | 'judgment'>>> = 
 }
 
 interface NowRead {
+	lane_capacity?: LaneAnswer | undefined
 	now_ms: number
 	// Set once the run has ended: the newest event's age stops there.
 	ended_ms: number | undefined
@@ -207,10 +209,30 @@ function quiet_line(read: NowRead): TimedLine | undefined {
 	return { icon: STATE_ICONS.running, since_ms: undefined, text: running_of(read.running) }
 }
 
+function is_seat_waiting(read: NowRead): boolean {
+	const idle_stages: ReadonlyArray<string | undefined> = [
+		undefined,
+		STAGE.HANDING_OFF,
+		STAGE.WATCHING,
+	]
+
+	return idle_stages.includes(read.activity.setup) && (read.waiting ?? 0) > read.people
+}
+
+function seat_wait(read: NowRead): TimedLine | undefined {
+	const seats = lane_capacity.seat_text(read.lane_capacity)
+
+	if (seats === undefined || !is_seat_waiting(read)) return undefined
+
+	return { icon: run_board_labels.LANES_ICON, since_ms: undefined, text: `waiting for ${seats}` }
+}
+
 function timed_line(read: NowRead): TimedLine | undefined {
 	const { is_stopped, setup } = read.activity
 
 	if (is_stopped) return latest_line(read)
+	const waiting = seat_wait(read)
+	if (waiting !== undefined) return waiting
 	if (setup !== undefined) return stage_line(read, setup)
 
 	return child_line(read) ?? quiet_line(read)

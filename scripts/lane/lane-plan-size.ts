@@ -433,7 +433,8 @@ function over_text(issue: number, over: Oversize): string {
 
 function refusal_text(issue: number, over: Oversize): string {
 	const text = over_text(issue, over)
-	const guide = over.guide ?? split_assess.guide_for(lane_stage_budget.BUDGET_MINUTES.implement)
+	const { implement } = lane_stage_budget.BUDGET_MINUTES
+	const guide = over.guide ?? split_assess.guide_for(implement, undefined)
 
 	return `${text} ${split_assess.policy_text(guide)}`
 }

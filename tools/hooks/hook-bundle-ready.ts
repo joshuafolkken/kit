@@ -170,10 +170,15 @@ function run_from_source(josh_command: string, hook_arguments: ReadonlyArray<str
 	process.exitCode = status ?? FALLBACK_FAILED_EXIT
 }
 
+// Where the bundles live and how a missing or stale one is rebuilt.
+interface LaunchSetup {
+	out_directory?: string | undefined
+	builds?: BundleBuilds | undefined
+}
+
 async function launch(
 	request: HookLaunch,
-	out_directory: string = OUT_DIR,
-	builds: BundleBuilds = DEFAULT_BUILDS,
+	{ out_directory = OUT_DIR, builds = DEFAULT_BUILDS }: LaunchSetup = {},
 ): Promise<void> {
 	const bundle = path.join(out_directory, `${request.hook_name}.js`)
 

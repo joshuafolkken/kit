@@ -53,3 +53,27 @@ describe('epic_rank.rank', () => {
 		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([2, 1])
 	})
 })
+
+// joshuafolkken/kit#8541: a child blocking an open priority:high child ranks in the high class; one
+// blocking a closed priority:high child does not.
+function ranked_beside_urgent(state: EpicChild['state']): Array<number> {
+	const urgent: EpicChild = {
+		...child(2),
+		state,
+		labels: ['priority:high'],
+		blocked_by: [{ number: 3, repo: REPO }],
+	}
+	const children = [child(1), child(3)]
+
+	return epic_rank.rank(children, [...children, urgent]).map((entry) => entry.number)
+}
+
+describe('epic_rank.rank blocked priority class', () => {
+	it('lifts the blocker of an open priority:high child into the high class', () => {
+		expect(ranked_beside_urgent('OPEN')).toStrictEqual([3, 1])
+	})
+
+	it('does not lift the blocker of a closed priority:high child (ac-a55d5ed8)', () => {
+		expect(ranked_beside_urgent('CLOSED')).toStrictEqual([1, 3])
+	})
+})

@@ -95,8 +95,8 @@ function trill_of(
 	if (typing === undefined || !live.trill) return undefined
 
 	return {
-		set: (is_on) => {
-			typing.set(is_on && (keys.sound?.() ?? true))
+		set: (is_on, left_ms) => {
+			typing.set(is_on && (keys.sound?.() ?? true), left_ms)
 		},
 		stop: typing.stop,
 	}
@@ -269,6 +269,6 @@ async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Faile
 	}
 }
 
-const run_board_live = { live_of, watch }
+const run_board_live = { live_of, trill_of, watch }
 
 export { run_board_live }

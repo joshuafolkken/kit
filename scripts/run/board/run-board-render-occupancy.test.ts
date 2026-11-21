@@ -17,6 +17,17 @@ const LIMIT = 24
 const NARROW = 70
 // A `── ` head's second leading rule, which a live `▾ ` head does not draw (joshuafolkken/kit#8257).
 const CHAT_RULE_SHIFT = 1
+
+it('draws seat exhaustion with one execution place occupied (ac-7a16922e)', () => {
+	const board = header({
+		occupied_count: 1,
+		lane_limit: 6,
+		lane_capacity: { free: 0, bound: 'seats', seated: 9 },
+	})
+	const [section] = lanes_section([LINE], undefined, board)
+
+	expect(bare(section?.label ?? '')).toBe('🧵 seats 9/9')
+})
 const ROW = {
 	number: 5465,
 	title: 'A long lane title that must fit the terminal',

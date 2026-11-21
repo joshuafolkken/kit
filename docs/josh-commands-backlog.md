@@ -864,7 +864,7 @@ pnpm josh epic:audit 858
 | Nested epic          | warning   | A task-list row points at another epic.                                                                        |
 | Orphan child         | warning   | An issue names this epic as parent but the task list does not track it.                                        |
 | Orphan search        | **error** | The open-backlog search could not be read — re-run the audit.                                                  |
-| Unjustified order    | **error** | The body declares an order between two open children and nothing records why.                                  |
+| Unjustified order    | **error** | The body or a native blocked-by orders two open children and nothing records why.                              |
 
 An open-backlog search that stopped before the end (only the newest 500 issues, or 50 bodies, were covered) is a warning. Cycle and declaration checks are reused from `epic:next`. A forward reference the other child already depends on is not reported, and a pair is demoted to a warning only when the closed state is confirmed (any state but `CLOSED` normalizes to `OPEN`).
 
@@ -963,7 +963,7 @@ Any other untriaged candidate is held alone, named on stderr. The triaged candid
 
 **Mechanism deferral**: new mechanisms go to the back among ranking ties only while the defect rate is above its baseline. Defects lead by a ranking key below.
 
-**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, verification-path defect, defect, resumable work (stash, pause comment or open PR), lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high` (both also inherited from blocked issues), verification-path defect, defect, resumable work (stash, pause comment or open PR), lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
 Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
