@@ -71,6 +71,7 @@ describe('lane_plan_size.oversize on paths that floor nothing', () => {
 	it.each([
 		['test files', ['scripts/issue/issue-kind-cli.test.ts', 'scripts/issue/kind.test.ts']],
 		['directory claims', ['scripts/issue/new/', 'scripts/issue/other/']],
+		['glob claims', ['scripts/issue/new-*.ts', 'scripts/issue/other-*.ts']],
 	])('does not count new %s', (_kind, added) => {
 		expect(oversize_of([...BASE, ...added])).toBeUndefined()
 	})
