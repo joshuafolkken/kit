@@ -1,23 +1,20 @@
-import { stripVTControlCharacters, styleText } from 'node:util'
+import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-// joshuafolkken/kit#3784: the header's `💓` digits, and its third line's time and words, are emphasized
-// for about three seconds after they update — on a live screen only.
+// joshuafolkken/kit#3784: the header's third line's time and words are emphasized for about three
+// seconds after they update — on a live screen only.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, header } = run_board_render_fixture
+const { EMPTY_LAYOUT, NOW, header } = run_board_render_fixture
 const { paint } = run_board_fresh
 const SECOND = 1000
 const INVERSE = 'inverse'
 const BOLD_COLOR = 'bold-color'
 const SPINNER = '⠙'
 const SAID = '#278 merged'
-// A span of seconds right-aligned under the run's `2°10′00″`.
-const SECONDS_PAD = ' '.repeat(6)
-const RESET_BEAT = `💓 ${SECONDS_PAD}0″`
 const RUNNING_LAYOUT: BoardLayout = {
 	...EMPTY_LAYOUT,
 	active: [
@@ -53,29 +50,20 @@ function said(age_ms: number): string {
 	return run_board_header.header_lines(header({ activity, spinner: SPINNER }))[2] ?? ''
 }
 
-describe('run_board_header.header_lines fresh heartbeat', () => {
+// joshuafolkken/kit#8475: the second line draws no heartbeat, so a fresh event changes none of it.
+describe('run_board_header.header_lines fresh event', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs()
 	})
 
-	it('fades the reset heartbeat through the three stages, then draws it plain', () => {
+	it('draws the second line as it stands whatever the newest event’s age', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(beating(0)[1]).toContain(`💓 ${SECONDS_PAD}${paint('0″', INVERSE)}`)
-		expect(beating(SECOND)[1]).toContain(`💓 ${SECONDS_PAD}${paint('1″', BOLD_COLOR)}`)
-		expect(beating(2 * SECOND)[1]).toContain(`💓 ${SECONDS_PAD}${paint('2″', 'bold')}`)
-		expect(beating(3 * SECOND)[1]).toContain(`💓 ${SECONDS_PAD}3″`)
+		expect(beating(0)[1]).toBe(beating(3 * SECOND)[1])
+		expect(beating(0)[1]).not.toContain('💓')
 	})
 
-	it('keeps the stale colors, and draws no emphasis in a chat or with no spinner', () => {
-		vi.stubEnv('FORCE_COLOR', '1')
-
-		expect(beating(20 * MINUTE)[1]).toContain(styleText('yellow', '💓   20′00″'))
-		expect(beating(0, { form: 'chat' })[1]).toContain(RESET_BEAT)
-		expect(beating(0, { spinner: undefined })[1]).toContain(RESET_BEAT)
-	})
-
-	it('keeps every column where it stands while the heartbeat is emphasized', () => {
+	it('keeps every column where it stands while an event is fresh', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const plain = beating(0, { spinner: undefined }).map((line) => stripVTControlCharacters(line))
 		const fresh = beating(0).map((line) => stripVTControlCharacters(line))

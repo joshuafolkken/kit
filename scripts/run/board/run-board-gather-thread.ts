@@ -3,6 +3,7 @@ import { bundle_flag } from '#scripts/build/bundle-flag'
 import { launch_timing, type TimedPhase } from '#scripts/lane/launch-timing'
 import { run_board_data } from './run-board-data'
 import { run_board_display, type BoardDisplay, type Carried } from './run-board-display'
+import { run_board_fetch } from './run-board-fetch'
 import {
 	run_board_gather,
 	type GatherPorts,
@@ -36,6 +37,7 @@ const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
 const WORKER_PHASE = 'worker: first answer'
 const { assemble_display } = run_board_display
 const { layout_for } = run_board_tick
+const { reason_of } = run_board_fetch
 
 // One round as the worker hands it over: the reads off this machine but the run's own, the GitHub,
 // roster and snapshot data folded over them (`run-board-data.ts`), and the frame assembled over the
@@ -141,13 +143,6 @@ function post_of(board: BoardState, read: GatherState, data: BoardData, now_ms: 
 
 function is_post(value: unknown): value is GatherPost {
 	return typeof value === 'object' && value !== null && 'read' in value
-}
-
-// What a failure is said as: the first line of its message.
-function reason_of(error: unknown): string {
-	const message = error instanceof Error ? error.message : String(error)
-
-	return message.split('\n', 1)[0] ?? ''
 }
 
 function failed_of(error: unknown): FailedPost {
@@ -318,9 +313,12 @@ function seed_of(latest: BoardGather | undefined): Seed | undefined {
 	return data === undefined ? undefined : { data, carried: latest?.display?.carried }
 }
 
-// A failed read keeps the last round on screen, said failed and why until the next answers.
+// A failed read keeps the last round on screen, said failed since its first failure and why until the
+// next answers, so the board can say how stale it has gone (joshuafolkken/kit#8475).
 function said_failed(thread: Thread, reason: string, now: () => number): void {
-	settle(thread, { ...(thread.latest ?? EMPTY_READ), read_failed_ms: now(), read_error: reason })
+	const read_failed_ms = thread.latest?.read_failed_ms ?? now()
+
+	settle(thread, { ...(thread.latest ?? EMPTY_READ), read_failed_ms, read_error: reason })
 }
 
 // A worker that threw or exited is started again on the next redraw.
