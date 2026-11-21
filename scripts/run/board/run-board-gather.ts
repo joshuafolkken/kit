@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { lane_await } from '#scripts/lane/lane-await'
@@ -109,8 +110,10 @@ async function read_at(
 	ports: GatherPorts,
 	at: SnapshotAt,
 ): Promise<GatherState> {
-	const local = await ports.read_local(at.table)
-	const idle_since = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], at.now_ms)
+	const fresh = await ports.read_local(at.table)
+	const local = isDeepStrictEqual(state.local, fresh) ? state.local : fresh
+	const idle = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], at.now_ms)
+	const idle_since = isDeepStrictEqual(state.idle_since, idle) ? state.idle_since : idle
 
 	return { ...state, local, read_ms: at.now_ms, idle_since }
 }
@@ -193,7 +196,7 @@ async function resample(
 // Handed the round's state as soon as its lane read lands, ahead of the usages (joshuafolkken/kit#8134).
 type OnLocal = (read: GatherState) => void
 
-// A round whose lane read was not due hands nothing early.
+// Only the first read or changed lane data is handed early; read timestamps alone draw no new frame.
 async function reread_handed(
 	state: GatherState,
 	ports: GatherPorts,
@@ -201,8 +204,15 @@ async function reread_handed(
 	on_local: OnLocal | undefined,
 ): Promise<{ read: GatherState; snapshot: Snapshot }> {
 	const reread_result = await reread(state, ports, snapshot)
+	const { read } = reread_result
 
-	if (reread_result.read.read_ms !== state.read_ms) on_local?.(reread_result.read)
+	if (
+		state.read_ms === undefined ||
+		read.local !== state.local ||
+		read.idle_since !== state.idle_since
+	) {
+		on_local?.(read)
+	}
 
 	return reread_result
 }
