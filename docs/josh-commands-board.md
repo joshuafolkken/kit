@@ -226,6 +226,13 @@ On a terminal it draws on the alternate screen, so redraws never grow the scroll
 
 **Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
 
+The live board writes why it ended to `.josh/tmp/run-board-exit.json` in the checkout.
+
+- Kinds: `tick` (a redraw threw), `uncaught`, `rejection`, `signal` (SIGHUP or SIGTERM) and `stdout` (a stdout `error`, such as a closed pipe). The first reason wins; Ctrl+C writes nothing.
+- Fields: the kind, the message, the stack, the time, the uptime and the pid.
+- The next live board prints it as one `run:board: the last live board exited abnormally …` line on stderr before it enters its screen, then removes the file.
+- An uncaught failure or a stdout error exits 1; SIGHUP exits 129.
+
 A running `fullrun #N`, `halfrun #N` or `prrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane.
 
 A stop-marked `halfrun` or `prrun` hold keeps its row, led by `✅`, no phase; its time is fixed from start to stop. A backlogrun launched or ended after the stop is drawn instead; a resume draws it running again.
