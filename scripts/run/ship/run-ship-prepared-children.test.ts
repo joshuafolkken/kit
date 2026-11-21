@@ -66,7 +66,7 @@ describe('run_ship_prepared_children.problems — a child the lane filed', () =>
 		row(CHILD, prepared(LANE), [PLANNED])
 
 		expect(await run_ship_prepared_children.problems()).toStrictEqual([])
-		expect(publish_mock).toHaveBeenCalledExactlyOnceWith(EPIC, REPO)
+		expect(publish_mock).toHaveBeenCalledExactlyOnceWith(EPIC, REPO, expect.any(Function))
 	})
 
 	it('refuses an unplanned child with the plan and publish commands, publishing nothing', async () => {
@@ -98,7 +98,24 @@ describe('run_ship_prepared_children.problems — a child the lane filed', () =>
 		listing_mock.mockResolvedValue([])
 
 		expect(await run_ship_prepared_children.problems()).toStrictEqual([])
-		expect(publish_mock).toHaveBeenCalledExactlyOnceWith(LANE, REPO)
+		expect(publish_mock).toHaveBeenCalledExactlyOnceWith(LANE, REPO, expect.any(Function))
+	})
+})
+
+// The unplanned sibling `OTHER` was filed outside the lane: the publish neither validates nor
+// publishes it, so it neither withholds this ship nor is published by it.
+describe('run_ship_prepared_children.problems — the batch it publishes', () => {
+	it('selects only the children the lane filed from the epic it publishes', async () => {
+		row(CHILD, prepared(LANE), [PLANNED])
+		await run_ship_prepared_children.problems()
+		const is_selected = publish_mock.mock.calls[0]?.[2] ?? (() => false)
+		const selected = [CHILD, OTHER, LANE].filter((number) => {
+			const found = rows.get(number)
+
+			return found !== undefined && is_selected(found)
+		})
+
+		expect(selected).toStrictEqual([CHILD])
 	})
 })
 

@@ -69,9 +69,17 @@ async function plan_refusals(filed: ReadonlyArray<Filed>): Promise<Array<string>
 	return refusals.filter((refusal) => refusal !== undefined)
 }
 
-async function publish_problem(epic: number, repo: string): Promise<string | undefined> {
+// Only the children this lane filed are validated and published: a sibling another lane left prepared
+// in the same epic neither withholds this ship nor is published by it.
+async function publish_problem(
+	epic: number,
+	repo: string,
+	filed: ReadonlyArray<Filed>,
+): Promise<string | undefined> {
+	const own = new Set(filed.filter((entry) => entry.epic === epic).map(({ child }) => child))
+
 	try {
-		await issue_publication.publish(epic, repo)
+		await issue_publication.publish(epic, repo, (child) => own.has(child.number))
 
 		return undefined
 	} catch (error) {
@@ -82,7 +90,9 @@ async function publish_problem(epic: number, repo: string): Promise<string | und
 // Every epic is published once, with `issue:file --publish`'s own validation.
 async function published(filed: ReadonlyArray<Filed>, repo: string): Promise<Array<string>> {
 	const epics = [...new Set(filed.map(({ epic }) => epic))]
-	const withheld = await Promise.all(epics.map(async (epic) => await publish_problem(epic, repo)))
+	const withheld = await Promise.all(
+		epics.map(async (epic) => await publish_problem(epic, repo, filed)),
+	)
 
 	return withheld.filter((problem) => problem !== undefined)
 }
