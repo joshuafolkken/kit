@@ -109,6 +109,21 @@ describe('lane_resolve.resolve on the resolution count', () => {
 	})
 })
 
+// joshuafolkken/kit#8494: the post-conflict review trigger reads the list the count is taken from.
+describe('lane_resolve.resolutions', () => {
+	it('lists only the trusted resolution comments', async () => {
+		const trusted = comment(lane_resolve.RESOLUTION_HEADING, true)
+
+		parse_comments.mockResolvedValue([trusted, comment(lane_resolve.RESOLUTION_HEADING, false)])
+		expect(await lane_resolve.resolutions(ISSUE)).toStrictEqual([trusted])
+	})
+
+	it('answers undefined when the comment thread cannot be read', async () => {
+		parse_comments.mockResolvedValue(undefined)
+		expect(await lane_resolve.resolutions(ISSUE)).toBeUndefined()
+	})
+})
+
 describe('lane_resolve.resolve on a merge', () => {
 	it('answers conflict with every path when no hunks overlap, leaving the merge in progress', async () => {
 		merge.mockResolvedValue({ kind: 'conflict', files: [ADJACENT] })

@@ -71,6 +71,7 @@ const UNMARKED = {
 	keyed: [],
 	sweep: undefined,
 	lamps: [],
+	traces: [],
 	rules: [],
 	strips: [],
 }

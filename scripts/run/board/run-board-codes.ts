@@ -21,7 +21,7 @@ const CHANGE_MS = 100
 // The steps after the typing within which every cell is back to the rule, whatever the board's width.
 const SCATTER_STEPS = 20
 // The code and the rule it turns back into, in the rule's dim paint (joshuafolkken/kit#8397).
-const CODE_PAINT: Paint = run_board_theme_defs.THEME_DEFS.wargames.rule
+const CODE_PAINT: Paint = run_board_theme_defs.THEME_DEFS.wargames.rule.dash
 
 // A rule's `─` on screen.
 interface RuleCell {
