@@ -11,7 +11,7 @@ import { review_round2, type RoundTwoAnswer } from '#scripts/review/review-round
 import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_final_review } from './run-ship-final-review'
 import { run_ship_review } from './run-ship-review'
-import { run_ship_review_checkpoint } from './run-ship-review-checkpoint'
+import { run_ship_review_checkpoint, type RetryPhase } from './run-ship-review-checkpoint'
 import { run_ship_review_reason } from './run-ship-review-reason'
 import { run_ship_review_record } from './run-ship-review-record'
 import { run_ship_reviewer } from './run-ship-reviewer'
@@ -240,6 +240,18 @@ function round_one_provider(
 	return reviewed_together(round_one_opens(slots, unpinned_ok), prompt_of, issue, ROUND_ONE)
 }
 
+// The provider step: a stale round's launches name the stale rerun, else the retry the checkpoint
+// reruns the step under, if any (joshuafolkken/kit#8492).
+function round_one_phase(
+	issue: string,
+	slots: ReadonlyArray<ReviewSlot>,
+	unpinned_ok: ReadonlyArray<string>,
+	is_stale: boolean,
+): RetryPhase {
+	return async (retry) =>
+		await run_phases(round_one_provider(issue, slots, unpinned_ok, is_stale ? STALE : retry))
+}
+
 // A recorded round 1 attested on this branch, its tree held or moved only where round 2 reads: the
 // stage is skipped, and the event stream says why (joshuafolkken/kit#5296).
 async function reused_round(issue: string, reused: ReuseAnswer): Promise<StepResult> {
@@ -264,13 +276,12 @@ async function round_one_stage(
 	// A stale record narrows nothing: the next round reads the whole change under the new specification,
 	// and its launches name the stale rerun (joshuafolkken/kit#8379).
 	if (is_stale) review_reviewed_tree.discard()
-	const provider = round_one_provider(issue, slots, unpinned_ok, is_stale ? STALE : undefined)
 	const ran = await run_ship_review_checkpoint.run(
 		issue,
 		`one-${slots.join('-')}`,
 		[
 			['scoped', tagged_phase(CAUSE.CHECK, scoped_pair)],
-			['provider', async () => await run_phases(provider)],
+			['provider', round_one_phase(issue, slots, unpinned_ok, is_stale)],
 			['gate', tagged_phase(CAUSE.CHECK, async () => await join_gate(slots))],
 			['attest', attest_phase],
 			['record', async () => await code_round_one_record(issue, slots)],

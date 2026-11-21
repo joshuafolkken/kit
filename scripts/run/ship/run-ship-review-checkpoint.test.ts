@@ -4,6 +4,7 @@ import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_attest } from '#scripts/review/review-attest'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { run_ship_review_checkpoint, type NamedPhase } from './run-ship-review-checkpoint'
 
@@ -18,6 +19,7 @@ const SOURCE = 'source.ts'
 const TREE: GateTree = { base: 'base', files: { [SOURCE]: 'digest' } }
 const PASS = { code: 0, out: 'passed' }
 const FAIL = { code: 1, out: 'failed' }
+const { ATTEST } = review_prompt_level.RETRY
 const phases = NAMES.map(() => vi.fn(async () => PASS))
 
 async function run(is_stale = false): ReturnType<typeof run_ship_review_checkpoint.run> {
@@ -126,3 +128,32 @@ it.each(['missing', 'mismatch'] as const)(
 		expect(phases.at(-1)).toHaveBeenCalledOnce()
 	},
 )
+
+// joshuafolkken/kit#8492: the steps an attestation reruns are told why, so the reviewers say so.
+it.each(['missing', 'mismatch'] as const)(
+	'passes attest-retry to each step it reruns after an attestation is %s',
+	async (status) => {
+		phases[3]?.mockResolvedValueOnce(FAIL)
+		await run()
+		vi.mocked(review_attest.check_here).mockResolvedValue({ status })
+		await run()
+		const rerun = phases.slice(1, -1)
+
+		for (const phase of rerun) expect(phase).toHaveBeenLastCalledWith(ATTEST)
+	},
+)
+
+it('passes no retry when the attestation holds, rerunning only the unfinished step', async () => {
+	phases[3]?.mockResolvedValueOnce(FAIL)
+	await run()
+	await run()
+	expect(phases[1]).toHaveBeenCalledOnce()
+	expect(phases[3]).toHaveBeenLastCalledWith(undefined)
+})
+
+it('passes no retry to the provider of a stale rerun', async () => {
+	vi.mocked(review_attest.check_here).mockResolvedValue({ status: 'missing' })
+	await run(true)
+	expect(phases[1]).toHaveBeenLastCalledWith(undefined)
+	expect(review_attest.check_here).not.toHaveBeenCalled()
+})
