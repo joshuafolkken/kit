@@ -5,6 +5,7 @@ import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
 import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs } from './run-board-theme-defs'
+import { run_board_type_glow } from './run-board-type-glow'
 import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#8003: a live board in a theme types each issue row that appears after its base frame
@@ -114,15 +115,45 @@ function typed_text(line: TypingLine, now_ms: number): string {
 	return `${run_board_typing.typed(line.text, part)}${under_of(line, now_ms)}`
 }
 
-// The row as typed — or, where the rows decode, resolved (joshuafolkken/kit#8356) — by `now_ms`, its
-// colors kept and its spinners at their frame of that moment; whole, without the block, once through.
-function shown(line: TypingLine, now_ms: number, is_decoding: boolean | undefined): string {
-	const text =
-		is_decoding === true
-			? run_board_decode.decoded(line.text, columns_at(line, now_ms))
-			: typed_text(line, now_ms)
+// Whether the row glows where the rows decode (`run-board-type-glow.ts`; joshuafolkken/kit#8370).
+function is_glowing(line: TypingLine, is_decoding: boolean | undefined): boolean {
+	return is_decoding === true && run_board_type_glow.glows(line.key)
+}
 
-	return run_board_spot.drawn(text, run_board_labels.spinner_of(now_ms))
+// The glowing row as it glows by `now_ms`, the saved line it types over right of the block.
+function glowing_text(line: TypingLine, now_ms: number): string {
+	const at = {
+		prefix_columns: line.prefix_columns,
+		columns: columns_at(line, now_ms),
+		since_typed_ms: now_ms - typed_at(line),
+	}
+
+	return `${run_board_type_glow.glowed(line.text, at)}${under_of(line, now_ms)}`
+}
+
+// The row as typed — or, where the rows decode, resolved (joshuafolkken/kit#8356) unless it glows — by
+// `now_ms`, its colors kept; whole, without the block, once through.
+function text_of(line: TypingLine, now_ms: number, is_decoding: boolean | undefined): string {
+	if (is_glowing(line, is_decoding)) return glowing_text(line, now_ms)
+	if (is_decoding === true) return run_board_decode.decoded(line.text, columns_at(line, now_ms))
+
+	return typed_text(line, now_ms)
+}
+
+// The row as `text_of` draws it, its spinners at their frame of that moment.
+function shown(line: TypingLine, now_ms: number, is_decoding: boolean | undefined): string {
+	return run_board_spot.drawn(
+		text_of(line, now_ms, is_decoding),
+		run_board_labels.spinner_of(now_ms),
+	)
+}
+
+// Whether the row is still drawn as it types on this frame: until typed through, or while a glowing row
+// still glows after it.
+function is_drawn(line: TypingLine, now_ms: number, is_decoding: boolean | undefined): boolean {
+	if (!is_typed(line, now_ms)) return true
+
+	return is_glowing(line, is_decoding) && run_board_type_glow.is_lit(now_ms - typed_at(line))
 }
 
 // Where the row starts on this frame: now over its saved line on the frame the live plan lands on, now
@@ -143,7 +174,7 @@ function start_of(
 	return typed === undefined ? undefined : { start_ms: typed.start_ms, under: typed.under }
 }
 
-// The row as it types on this frame; none for a row not typing or typed through.
+// The row as it types on this frame, typed through or not; none for a row not typing.
 function typing_of(
 	line: KeyedLine,
 	last: Typing,
@@ -152,11 +183,7 @@ function typing_of(
 ): TypingLine | undefined {
 	const start = start_of(line, last, landing, now_ms)
 
-	if (start === undefined) return undefined
-
-	const typed = { ...line, ...start }
-
-	return is_typed(typed, now_ms) ? undefined : typed
+	return start === undefined ? undefined : { ...line, ...start }
 }
 
 // The faint lines of a frame drawn from a saved plan, by key; none on a live frame.
@@ -191,6 +218,7 @@ function next(typing: Typing, frame: TypingFrame, now_ms: number, is_on: boolean
 	const lines = frame.keyed
 		.map((line) => typing_of(line, typing, landing, now_ms))
 		.filter((line) => line !== undefined)
+		.filter((line) => is_drawn(line, now_ms, is_decoding))
 
 	return { seen: frame.known, lines, done_ms: done_ms(typing), saved, is_decoding }
 }
