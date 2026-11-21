@@ -7,6 +7,7 @@ import { run_board_layout, type BoardPlan } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_row_key } from './run-board-row-key'
+import { run_board_spot } from './run-board-spot'
 import { run_board_theme } from './run-board-theme'
 
 // joshuafolkken/kit#4137: a running batch starts each row once a lane and its paths are free, never
@@ -182,7 +183,11 @@ describe('run_board_render.render a title mark', () => {
 // there moves nothing else.
 function wargames_lines(overrides: Parameters<typeof header>[0]): Array<string> {
 	const view = { header: header({ layout: EMPTY_LAYOUT, theme: 'wargames', ...overrides }) }
-	const drawn = run_board_render.render({ ...view, notes: [] }).join('\n')
+	// A live frame draws its clocks' colons lit (joshuafolkken/kit#8476).
+	const drawn = run_board_spot.drawn(
+		run_board_render.render({ ...view, notes: [] }).join('\n'),
+		run_board_spot.SPOT,
+	)
 
 	return stripVTControlCharacters(untitled(run_board_theme.marked('wargames', drawn))).split('\n')
 }

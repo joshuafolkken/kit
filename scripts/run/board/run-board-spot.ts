@@ -12,6 +12,8 @@ const TICK = '\u{E003}'
 const LAMP_START = '\u{E004}'
 const LAMP = '\u{E005}'
 const TRACE = '\u{E006}'
+// A header clock's colon, blinking every half second on a live board (joshuafolkken/kit#8476).
+const COLON = '\u{E007}'
 const SECONDS_MARK = '″'
 const LAMP_MARK = '■'
 // eslint-disable-next-line no-control-regex -- the color escapes a spot keeps are control characters
@@ -43,9 +45,12 @@ function drawn(line: string, frame: string): string {
 		.join(LAMP_MARK)
 		.split(TRACE)
 		.join('T')
+		.split(COLON)
+		.join(':')
 }
 
 const run_board_spot = {
+	COLON,
 	LAMP,
 	LAMP_MARK,
 	LAMP_START,

@@ -21,8 +21,9 @@ import { run_board_theme_defs } from './run-board-theme-defs'
 const { FIRST_ROUND, LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const { THEME_DEFS } = run_board_theme_defs
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
-// Enough waits for a few live frames, their spinners turned between them.
-const SLEEPS = 40
+// Enough waits for a few live frames, their spinners turned and their clocks' colons blinked between
+// them (joshuafolkken/kit#8476).
+const SLEEPS = 60
 // The reads before the launch: the plan arrives on one of them, and a frame before it sounds nothing.
 const QUIET_READS = 3
 

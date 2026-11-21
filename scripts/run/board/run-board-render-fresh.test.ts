@@ -6,6 +6,7 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#3784: an issue row's part that just changed — the phase it entered, the time it
 // started counting, the finish time it ended at — is emphasized for about three seconds, as the
@@ -81,6 +82,11 @@ describe('run_board_render.render fresh rows', () => {
 		const plain = chat.map((line) => stripVTControlCharacters(line))
 
 		expect(row_of(chat, 'Issue 1')).not.toContain(paint('0″', 'inverse'))
-		expect(raw_lines().map((line) => stripVTControlCharacters(line))).toStrictEqual(plain)
+		// A live frame draws its clocks' colons lit (joshuafolkken/kit#8476).
+		const live = raw_lines().map((line) =>
+			stripVTControlCharacters(run_board_spot.drawn(line, run_board_spot.SPOT)),
+		)
+
+		expect(live).toStrictEqual(plain)
 	})
 })
