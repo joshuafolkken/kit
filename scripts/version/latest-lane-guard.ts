@@ -20,7 +20,12 @@ const REFUSAL_EXIT_CODE = 1
 
 // The path test that needs no git, so it is safe in a synchronous CLI: `lane_issue_of` reads the
 // lane number off the directory name rather than parsing `git worktree list`.
-function is_lane(cwd: string = process.cwd(), environment: LaneEnvironment = process.env): boolean {
+interface LaneScope {
+	cwd?: string | undefined
+	environment?: LaneEnvironment | undefined
+}
+
+function is_lane({ cwd = process.cwd(), environment = process.env }: LaneScope = {}): boolean {
 	return lane_paths.lane_issue_of(cwd, environment) !== undefined
 }
 

@@ -49,7 +49,7 @@ function current_state(context: HookContext = hook_context.from_process()): Pare
 			await run_headless.driving_carry(context.env, context.ancestry),
 		verdict: (): CostVerdict =>
 			implementation_cut_verdict.reused_verdict(
-				() => cost_cli.session_verdict(context.cwd, context.env),
+				() => cost_cli.session_verdict({ cwd: context.cwd, environment: context.env }),
 				context.cwd,
 			),
 	}

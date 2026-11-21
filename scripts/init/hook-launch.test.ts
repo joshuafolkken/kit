@@ -36,15 +36,13 @@ function command_containing(fragment: string): string {
 	return found
 }
 
-type CheckoutOptions = Parameters<typeof hook_command_bootstrap.run_in_temporary_checkout>[3]
+type CheckoutOptions = Parameters<typeof hook_command_bootstrap.run_in_temporary_checkout>[1]
 
 function probe_from_subdirectory(root: string, options: CheckoutOptions): string {
-	const result = hook_command_bootstrap.run_in_temporary_checkout(
-		`cd "${root}" && ${ROOT_PROBE}`,
-		false,
-		true,
-		options,
-	)
+	const result = hook_command_bootstrap.run_in_temporary_checkout(`cd "${root}" && ${ROOT_PROBE}`, {
+		...options,
+		is_nested: true,
+	})
 
 	return result.stdout.trim()
 }

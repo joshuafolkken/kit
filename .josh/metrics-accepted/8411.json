@@ -1,0 +1,7 @@
+{
+	"reason": "unicorn 80 prefer-options-parameter migration: 24 signatures gain options-object types and destructuring (+48 code lines); no new logic",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 48
+	}
+}
