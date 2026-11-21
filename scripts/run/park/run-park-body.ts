@@ -1,4 +1,6 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
+import { run_park_fold } from './run-park-fold'
+import { run_park_permission } from './run-park-permission'
 
 // The `run:park` body schema (joshuafolkken/kit#6669): numbered options under the options heading,
 // each with its tier and the permission taking it needs, and one recommendation line naming the
@@ -62,19 +64,17 @@ const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
 // The tier no parent takes, even on a person's behalf: trust settings, third parties, destructive acts.
 const PERSON_TIER = 'C'
-// The permission a parent adopts with no person and no action of its own.
-const AUTO_PERMISSION = 'なし'
-// An option needing the parent's own action (filing, closing, editing an Issue): adopting it is not
-// taking it, so the lane must not resume before the parent has (joshuafolkken/kit#7001).
-const PARENT_PERMISSION = '親'
+const { AUTO_PERMISSION, PARENT_PERMISSION, FILING_COMMAND, CLOSE_COMMAND, FOLD_COMMAND } =
+	run_park_permission
 const PARENT_ACTION_NOTE = ' · 親の操作'
+const PARENT_COMMANDS = [FILING_COMMAND, CLOSE_COMMAND, FOLD_COMMAND] as const
 
 const FORMAT = [
 	'Park body schema:',
 	OPTIONS_HEADING,
 	'1. <option>',
 	TIER_LINE,
-	'   - 必要な権限: なし | 親 | owner コメント | epic 編集 | 信頼設定 | 人',
+	...run_park_permission.schema_lines(),
 	'2. <option>',
 	TIER_LINE,
 	'   - 必要な権限: …',
@@ -190,13 +190,32 @@ function approval_problem(approval: ParkApproval | undefined, name: string): str
 	return missing === undefined ? undefined : `${name} has no "${missing[1]}" line`
 }
 
+function is_parent_action(option: ParkOption | undefined): boolean {
+	return option?.permission?.startsWith(PARENT_PERMISSION) === true
+}
+
+function names_command(option: ParkOption | undefined, command: string): boolean {
+	return option?.permission?.includes(command) === true
+}
+
+// A filing or closing option written as anything but the parent's: adopting it would requeue with
+// nothing filed or closed.
+function command_problem(option: ParkOption, name: string): string | undefined {
+	if (is_parent_action(option)) return undefined
+	const command = PARENT_COMMANDS.find((candidate) => names_command(option, candidate))
+
+	if (command === undefined) return undefined
+
+	return `${name} names ${command}, which a child cannot run; write "- 必要な権限: ${PARENT_PERMISSION}（${command} …）"`
+}
+
 function option_problem(option: ParkOption): string | undefined {
 	const name = `option ${String(option.number)}`
 
 	if (option.tier === undefined) return `${name} has no "- 層: A|B|C" line`
 	if (option.permission === undefined) return `${name} has no "- 必要な権限: …" line`
 
-	return approval_problem(option.approval, name)
+	return command_problem(option, name) ?? approval_problem(option.approval, name)
 }
 
 function is_listed(park: ParkBody, number: number | undefined): boolean {
@@ -213,13 +232,34 @@ function pick_problem(park: ParkBody): string | undefined {
 	return `${PICK_HEADING} names option ${String(park.pick.number)}, which ${OPTIONS_HEADING} does not list`
 }
 
-// The first missing piece of the schema, in one line; `undefined` for a body that meets it.
-function problem_of(body: string): string | undefined {
-	const park = parse(body)
-
+// The first missing piece of the schema's structure, in one line; `undefined` for a body that meets it.
+function shape_problem(park: ParkBody): string | undefined {
 	if (park.options.length === 0) return `${OPTIONS_HEADING} lists no numbered option`
 
 	return park.options.map((option) => option_problem(option)).find(Boolean) ?? pick_problem(park)
+}
+
+function permission_problem(park: ParkBody): string | undefined {
+	return park.options
+		.map((option) =>
+			run_park_permission.problem_of(`option ${String(option.number)}`, option.permission ?? ''),
+		)
+		.find(Boolean)
+}
+
+// The first problem of a body, structure first, then a permission off the vocabulary
+// (joshuafolkken/kit#7818): what `run:park` refuses and an adopt refuses to take. `undefined` for none.
+function problem_of(body: string): string | undefined {
+	const park = parse(body)
+
+	return shape_problem(park) ?? permission_problem(park)
+}
+
+// Whether `body` meets the schema's structure — a park, even one whose permission `problem_of` names.
+// A reader picks the latest park by this, so a newer park off the vocabulary is refused, never read past
+// to an older one (joshuafolkken/kit#7818).
+function is_park(body: string): boolean {
+	return shape_problem(parse(body)) === undefined
 }
 
 // The option the recommendation names; `undefined` for no recommendation or a body off the schema.
@@ -230,13 +270,11 @@ function picked_option(body: string): ParkOption | undefined {
 	return park.options.find((candidate) => candidate.number === number)
 }
 
-function is_parent_action(option: ParkOption | undefined): boolean {
-	return option?.permission?.startsWith(PARENT_PERMISSION) === true
-}
-
-// The recommended option and its tier, or no recommendation; `undefined` for a body off the schema.
+// The recommended option and its tier, or no recommendation; `undefined` for a body off the schema's
+// structure. A park written before the permission vocabulary (joshuafolkken/kit#7818) still reads as a
+// stop on the board, though `problem_of` names its permission.
 function summary_of(body: string): string | undefined {
-	if (problem_of(body) !== undefined) return undefined
+	if (!is_park(body)) return undefined
 	const option = picked_option(body)
 
 	if (option === undefined) return NO_PICK_WORD
@@ -248,6 +286,52 @@ function summary_of(body: string): string | undefined {
 // Whether option `number` needs the parent's own action before the lane may resume.
 function parent_action(body: string, number: number): boolean {
 	return is_parent_action(parse(body).options.find((candidate) => candidate.number === number))
+}
+
+function option_at(body: string, number: number): ParkOption | undefined {
+	return parse(body).options.find((candidate) => candidate.number === number)
+}
+
+function parent_command(body: string, number: number, command: string): boolean {
+	const option = option_at(body, number)
+
+	return is_parent_action(option) && names_command(option, command)
+}
+
+// The permission option `number` carries, as written on its permission line; `undefined` for none.
+function permission_of_option(body: string, number: number): string | undefined {
+	return option_at(body, number)?.permission
+}
+
+// Whether option `number` is the parent's filing of an Issue the child then waits on.
+function filing_action(body: string, number: number): boolean {
+	return parent_command(body, number, FILING_COMMAND)
+}
+
+// Whether option `number` closes the Issue without implementing (joshuafolkken/kit#7805).
+function close_action(body: string, number: number): boolean {
+	return parent_command(body, number, CLOSE_COMMAND)
+}
+
+// Whether option `number` ships this Issue in another Issue's pull request (joshuafolkken/kit#7985).
+function fold_action(body: string, number: number): boolean {
+	return parent_command(body, number, FOLD_COMMAND)
+}
+
+// The Issue a fold option names after `--into`; `undefined` for no fold option or one naming none.
+function fold_target(body: string, number: number): string | undefined {
+	if (!fold_action(body, number)) return undefined
+
+	return run_park_fold.into_of(permission_of_option(body, number))
+}
+
+// Whether adopting option `number` needs `--done`: a parent action the adopt does not take itself.
+// A closing or folding option is taken by the adopt; one that also files still needs the filed Issue named.
+function done_needed(body: string, number: number): boolean {
+	if (filing_action(body, number)) return true
+	const is_taken = close_action(body, number) || fold_action(body, number)
+
+	return parent_action(body, number) && !is_taken
 }
 
 function is_parents(option: ParkOption): boolean {
@@ -336,8 +420,15 @@ const run_park_body = {
 	adoptable_pick,
 	approval_range,
 	auto_pick,
+	close_action,
 	default_pick,
+	done_needed,
+	filing_action,
+	fold_action,
+	fold_target,
+	is_park,
 	parent_action,
+	permission_of: permission_of_option,
 	problem_of,
 	summary_of,
 }

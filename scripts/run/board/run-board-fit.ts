@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import string_width from 'string-width'
 import { run_board_labels } from './run-board-labels'
+import { run_board_row_key } from './run-board-row-key'
 
 // A live `run:board` frame kept within the terminal. A frame taller than the pane scrolls the
 // alternate screen as it is written, and the header — the lines that say whether the run moves and
@@ -15,7 +16,9 @@ import { run_board_labels } from './run-board-labels'
 // screen, not as one.
 
 const { WORDS } = run_board_labels
-const INDENT = '  '
+// The column every section's row starts at (joshuafolkken/kit#8257).
+const ROW_INDENT_WIDTH = 5
+const ROW_INDENT = ' '.repeat(ROW_INDENT_WIDTH)
 
 interface TerminalSize {
 	rows: number
@@ -64,6 +67,8 @@ interface NotesPart extends Foldable {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<string>
 	hidden: number
+	// The line counting the hidden notes, as the rows' sections count theirs: `💬 15 more`.
+	more?: ((hidden: number) => string) | undefined
 }
 
 // A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once;
@@ -82,6 +87,9 @@ interface FrameParts {
 	above: ReadonlyArray<string>
 	throughput?: DetailPart | undefined
 	usage?: DetailPart | undefined
+	// The usage section as drawn where the throughput rows give way: the lamp panel it shares with them
+	// left out (run-board-fold.ts, joshuafolkken/kit#8277); usage where none is set.
+	usage_alone?: DetailPart | undefined
 	plan: ReadonlyArray<PlanSection>
 	processes?: DetailPart | undefined
 	notes: NotesPart
@@ -90,7 +98,7 @@ interface FrameParts {
 	thanks?: ReadonlyArray<string> | undefined
 	legend: ReadonlyArray<string>
 	footer: ReadonlyArray<string>
-	// The column every rule runs on to: where the lane rows' titles end; none where no lane row is drawn.
+	// The column every rule runs on to: where a lane row's full title ends (`run-board-rule-width.ts`).
 	rule_width?: number | undefined
 }
 
@@ -135,14 +143,14 @@ function measured(plain: string): number {
 	return PRINTABLE_ASCII.test(plain) ? plain.length : string_width(plain)
 }
 
-// The columns a line takes on screen: its color escapes take none, an emoji two.
+// The columns a line takes on screen: its color escapes and its row's key take none, an emoji two.
 function width_of(line: string): number {
 	const known = widths.get(line)
 
 	if (known !== undefined) return known
 	if (widths.size >= WIDTHS_KEPT) widths.clear()
 
-	const width = measured(stripVTControlCharacters(line))
+	const width = measured(stripVTControlCharacters(run_board_row_key.without_key(line)))
 
 	widths.set(line, width)
 
@@ -157,8 +165,12 @@ function heights(lines: ReadonlyArray<string>, columns: number): number {
 	return lines.reduce((sum, line) => sum + height_of(line, columns), 0)
 }
 
-function more_lines(hidden: number): Array<string> {
-	return hidden > 0 ? [`${INDENT}${WORDS.more} ${String(hidden)}`] : []
+function plain_more(hidden: number): string {
+	return `${ROW_INDENT}${WORDS.more} ${String(hidden)}`
+}
+
+function more_lines(hidden: number, line_of = plain_more): Array<string> {
+	return hidden > 0 ? [line_of(hidden)] : []
 }
 
 // A section that ends on an epic whose children were all cut ends on its last row instead.
@@ -217,7 +229,7 @@ function notes_lines(notes: NotesPart, cut: number): Array<string> {
 
 	if (kept.length === 0) return []
 
-	return [...notes.head, ...kept, ...more_lines(notes.hidden + cut)]
+	return [...notes.head, ...kept, ...more_lines(notes.hidden + cut, notes.more)]
 }
 
 function sections_lines(
@@ -259,7 +271,8 @@ function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 
 // The throughput rows and the usage gauges give way whole: their rows are no details to drop.
 function gauge_lines(parts: FrameParts, cut: Cut): Array<string> {
-	const kept = [cut.throughput ? undefined : parts.throughput, cut.usage ? undefined : parts.usage]
+	const usage = cut.throughput ? (parts.usage_alone ?? parts.usage) : parts.usage
+	const kept = [cut.throughput ? undefined : parts.throughput, cut.usage ? undefined : usage]
 
 	return kept.flatMap((part) => detail_lines(part, false))
 }
@@ -390,7 +403,7 @@ function fit(parts: FrameParts, size: TerminalSize): Array<string> {
 	return clamped(fitting ?? frames.at(-1) ?? [], size)
 }
 
-const run_board_fit = { fit, height_of, whole, width_of }
+const run_board_fit = { ROW_INDENT, fit, height_of, whole, width_of }
 
 export { run_board_fit }
 export type {

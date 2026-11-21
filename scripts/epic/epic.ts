@@ -5,7 +5,9 @@
  */
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_add, type AddChildrenInput } from './epic-add'
+import { epic_body } from './epic-body'
 import { epic_cli, epic_cli_untrack, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
+import type { ChainRead } from './epic-cli-chain'
 import { epic_decide } from './epic-decide'
 import { epic_notify } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
@@ -14,11 +16,12 @@ import { epic_run } from './epic-run'
 import { epic_split_reach } from './epic-split-reach'
 import { epic_untrack } from './epic-untrack'
 
-const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
+const FLAGS =
+	'[--ordered | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
-	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
+	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...] [--decision-file <path|->]',
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
 	'       josh epic --untrack <E> <N1> <N2> ...',
@@ -39,6 +42,13 @@ async function is_split_stranded(children: ReadonlyArray<number>): Promise<boole
 	return refusal !== undefined
 }
 
+// Whether the `--chain` declarations were refused, the reason printed — before anything is written.
+function is_chain_refused(parsed: ChainRead): boolean {
+	if (parsed.chain_refusal !== undefined) console.error(`✖ ${parsed.chain_refusal}`)
+
+	return parsed.chain_refusal !== undefined
+}
+
 async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_promote_arguments(argv)
 
@@ -48,13 +58,17 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	if (await is_split_stranded(parsed.children)) return FAILURE_EXIT_CODE
+	if (is_chain_refused(parsed) || (await is_split_stranded(parsed.children))) {
+		return FAILURE_EXIT_CODE
+	}
 
 	const exit_code = await epic_run.promote_epic({
 		epic_number: parsed.epic_number,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
+		chains: parsed.chains,
+		order_reasons: parsed.order_reasons,
 		origin: parsed.origin,
 		title: parsed.title,
 	})
@@ -62,6 +76,17 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	await epic_notify.announce(parsed, epic_notify.promoted_number(exit_code, parsed.epic_number))
 
 	return exit_code
+}
+
+// The decision file's text, then the `--chain` orders with their `--order-reason`s — the one record an
+// insertion writes, so an added order's reason lands in `## Decisions` and on its children.
+function to_add_decision(parsed: AddArguments): string | undefined {
+	const parts = [
+		epic_cli.read_decision(parsed.decision_path),
+		epic_body.format_added_order(parsed.chains, parsed.order_reasons ?? []),
+	].filter((part) => part !== undefined)
+
+	return parts.length === 0 ? undefined : parts.join('\n\n')
 }
 
 // The parsed insertion as the writer's input: the decision file becomes the decision itself, read here
@@ -75,14 +100,26 @@ function to_add_input(parsed: AddArguments): AddChildrenInput {
 		children: parsed.children,
 		position: parsed.position,
 		is_order_only: parsed.is_order_only,
-		decision: epic_cli.read_decision(parsed.decision_path),
+		chains: parsed.chains,
+		decision: to_add_decision(parsed),
 	}
+}
+
+// The insertion itself, on either path, once its `--chain` declarations have been read.
+async function add_parsed(parsed: AddArguments): Promise<number> {
+	if (is_chain_refused(parsed)) return FAILURE_EXIT_CODE
+
+	return await epic_add.add_children(to_add_input(parsed))
 }
 
 // A qualified target — `owner/repo#N`. Naming this repository it is the same insertion written
 // longer, so it is performed; naming another it is refused with the command to run there, because
 // this command reads and writes only the repository it runs from.
 async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number> {
+	// A refused `--chain` is reported here, before either answer: a suggestion built without it would be
+	// a different instruction from the one typed.
+	if (is_chain_refused(found.local)) return FAILURE_EXIT_CODE
+
 	const local = epic_cli.resolve_local_add(found, await git_gh_command.repo_get_name_with_owner())
 
 	if (local !== undefined) return await epic_add.add_children(to_add_input(local))
@@ -127,7 +164,7 @@ async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (parsed === undefined) return await refuse_addition(argv)
 
-	return await epic_add.add_children(to_add_input(parsed))
+	return await add_parsed(parsed)
 }
 
 // Deleting a declared order. No position and no `--ordered`: the path itself says which orders go,
@@ -197,13 +234,17 @@ async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 		return { kind: 'refused' }
 	}
 
-	if (await is_split_stranded(parsed.children)) return { kind: 'refused' }
+	if (is_chain_refused(parsed) || (await is_split_stranded(parsed.children))) {
+		return { kind: 'refused' }
+	}
 
 	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
+		chains: parsed.chains,
+		order_reasons: parsed.order_reasons,
 		origin: parsed.origin,
 	})
 

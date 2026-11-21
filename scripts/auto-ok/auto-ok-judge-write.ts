@@ -2,10 +2,12 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_auto_ok, type AutoOkDecision } from '#scripts/issue/issue-auto-ok'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { AUTO_OK_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_run_verdict, type RunLabelFlags } from '#scripts/issue/issue-run-verdict'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { z } from 'zod'
 import { auto_ok_judge } from './auto-ok-judge'
 
@@ -28,6 +30,7 @@ const UNREADABLE = 'the issue could not be read'
 const CLOSED_STATE = 'CLOSED'
 // The judgement comment is already posted, so the listing will not offer the issue again.
 const RETRY_HINT = 're-run `pnpm josh auto-ok:judge --apply <N>` to finish it'
+const JUDGEMENT_NEEDED_PROBLEM = `the body declares a person's judgement is needed; once the judgement is recorded, rewrite the declaration to \`${issue_body_keys.line('judgement', 'not_needed')}\` and the next listing reads the issue again`
 
 const issue_schema = z.object({
 	state: z.string().nullish(),
@@ -64,9 +67,18 @@ function settled_of(read: IssueRead): string | undefined {
 		: undefined
 }
 
-async function record(issue: string, decision: AutoOkDecision, body: string): Promise<number> {
+// The comment carries `comment_reason`, which may be in the session language; standard output keeps
+// the English `decision` (joshuafolkken/kit#7707).
+async function record(
+	issue: string,
+	decision: AutoOkDecision,
+	body: string,
+	comment_reason: string,
+): Promise<number> {
+	const commented = { ...decision, reason: comment_reason }
+
 	try {
-		await git_gh_command.issue_comment(issue, auto_ok_judge.comment_of(decision, body))
+		await git_gh_command.issue_comment(issue, auto_ok_judge.comment_of(commented, body))
 	} catch {
 		console.error(`could not comment the judgement on ${session_cite.issue(issue)}`)
 
@@ -78,10 +90,31 @@ async function record(issue: string, decision: AutoOkDecision, body: string): Pr
 	return SUCCESS_EXIT_CODE
 }
 
+// The applied judgement's reason; the `solo-run answers:` line `comment_with_answers` adds stays English.
+function applied_reason(run_label: string, answers: RunLabelFlags, is_japanese: boolean): string {
+	const reason = is_japanese
+		? `backlogrun が判定: 除外条件に当たらず、人の判断も要らない（${run_label}）`
+		: `judged by backlogrun: no exclusion holds and no person's judgement is needed (${run_label})`
+
+	return issue_run_verdict.comment_with_answers(reason, answers)
+}
+
 function refused(issue: string, problem: string): number {
 	console.error(`${session_cite.issue(issue)}: ${problem}`)
 
 	return FAILURE_EXIT_CODE
+}
+
+// Why the issue cannot be opted in as it reads now: the mechanical exclusions, then the body's
+// declaration that a person's judgement is needed — the reading a filing is judged by
+// (joshuafolkken/kit#7856).
+function refusal_of(read: IssueRead): string | undefined {
+	const exclusion =
+		issue_auto_ok.exclusion_of(read.labels) ?? issue_auto_ok.user_constraint_of(read.body)
+
+	if (exclusion !== undefined) return issue_auto_ok.line_of(exclusion)
+
+	return issue_auto_ok.declares_judgement_needed(read.body) ? JUDGEMENT_NEEDED_PROBLEM : undefined
 }
 
 async function apply_to(
@@ -90,19 +123,16 @@ async function apply_to(
 	read: IssueRead,
 	answers: RunLabelFlags,
 ): Promise<number> {
-	const exclusion =
-		issue_auto_ok.exclusion_of(read.labels) ?? issue_auto_ok.user_constraint_of(read.body)
+	const refusal = refusal_of(read)
 
-	if (exclusion !== undefined) return refused(issue, issue_auto_ok.line_of(exclusion))
+	if (refusal !== undefined) return refused(issue, refusal)
 
-	const reason = issue_run_verdict.comment_with_answers(
-		`judged by backlogrun: no exclusion holds and no person's judgement is needed (${run_label})`,
-		answers,
-	)
+	const { lang } = session_language.resolve_session_lang()
+	const reason = applied_reason(run_label, answers, false)
+	const comment_reason = applied_reason(run_label, answers, session_language.is_japanese(lang))
+	const recorded = await record(issue, { is_applied: true, reason }, read.body, comment_reason)
 
-	if ((await record(issue, { is_applied: true, reason }, read.body)) !== SUCCESS_EXIT_CODE) {
-		return FAILURE_EXIT_CODE
-	}
+	if (recorded !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
 
 	const problem = await issue_run_verdict.apply_labels(issue, [run_label, AUTO_OK_LABEL])
 
@@ -133,7 +163,7 @@ async function decline(issue: string, reason: string): Promise<number> {
 
 	if (read === undefined) return refused(issue, UNREADABLE)
 
-	return await record(issue, { is_applied: false, reason }, read.body)
+	return await record(issue, { is_applied: false, reason }, read.body, reason)
 }
 
 const auto_ok_judge_write = { apply, decline }

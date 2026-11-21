@@ -20,7 +20,9 @@ Floor (also the unmeasured fallback):
 Past **the cap (1.5 × guide)** or the bar (2 × budget): split or say why.
 Merged lanes' median actual / declared ratios per axis, apart from speed; unmeasured: 2.
 First `lane:plan` answers `split` past declared files × files ratio (files, hunks), bar (lines);
-`--single`, a re-plan or a dispatched lane → `size warning` (`lane-plan-size.ts`).
+a lane child past the cap; `--single`, a re-plan or an edited lane → `size warning`.
+
+Past the lane target (judged last) that default flips to split; one Issue needs reason kind `分けられない` / `分けない方が良い` / `全体が遅くなる` — `scripts/issue/size-estimate-target.ts`.
 
 ## The same two questions decide the filing-time fold
 
@@ -44,14 +46,16 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 
 ## Over the guide before the gate
 
-**Size is judged before dispatch: at filing (`issue:file`) and at `lane:plan` only.
-A dispatched lane is never split: it is finished to the end, and never splits, spills or stops for size.**
+**Size is judged before the first edit** (`lane-tree-edit.ts`). **After it a lane is never split,
+spilled or stopped for size**, nor for review-finding work.
 
-**Trigger: a dispatched lane's first `lane:plan` is past its bar.** It answers `clear` with one
-`size warning` and nothing on the ledger; a re-plan, `run:cut` and `run:chain` print none. Go on implementing.
+**Trigger: `lane:plan` on the investigation's `### Files to edit` answers `split`** → separable part:
+`issue:file --route split --found-during <N>`; else `--single "<why>"`.
+
+**Trigger: a later `lane:plan` is past its bar** → one `size warning`; go on.
 
 - An independent new requirement found in the lane → file it as an observation, without `--route split`.
-  `issue:file --route split --found-during <N>` from lane `#N` is refused.
+  After the first edit, `issue:file --route split --found-during <N>` from lane `#N` is refused.
 - At the merge, a diff past the cap on either axis is recorded as a pre-split miss with its declared and
   actual size (`scripts/lane/lane-size-record.ts`). `pnpm josh lane:stats --period <days>` counts and lists the misses;
   use them to tune the pre-dispatch assessment.
@@ -86,6 +90,7 @@ It is created unpublished. Record every child's plan with `issue:plan --planned 
 create/promote the epic and register its native dependencies, then run
 `pnpm josh issue:file --publish <E>` to validate the batch and publish its prepared children.
 Retry the same epic after a partial failure; never recreate its prepared children.
+A mid-run split child the lane waits on → `prerequisite.md` (`run:pause` refuses it unplanned).
 
 Over the bar before dispatch → a split-only unit answers question 1 (`scripts/backlog/backlog-drive-split-unit.ts`).
 
@@ -95,7 +100,7 @@ Over the bar before dispatch → a split-only unit answers question 1 (`scripts/
 on the Issue, without asking.
 
 - **`#N` is a request, a discussion, or a container → promote it.**
-  `pnpm josh epic --promote <N> <N1> <N2> ... [--ordered]`. The body is appended to, never replaced.
+  `pnpm josh epic --promote <N> <N1> <N2> ... [--chain "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...]` — one `--chain` per child's real prerequisite, each with its reason; `--ordered` only when every child waits on the one before. The body is appended to, never replaced.
 - **`#N` is itself one of the deliverables → keep `#N` as a child and create a new epic** — e.g. a bug
   report that needs three fixes.
 

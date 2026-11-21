@@ -92,6 +92,7 @@ type Lifecycle = Pick<
 	| 'yields'
 	| 'hold'
 	| 'idle'
+	| 'shortfall'
 	| 'paused'
 	| 'merge'
 	| 'offer'
@@ -118,6 +119,7 @@ function lifecycle(): Lifecycle {
 		yields: empty_issues,
 		hold: ignored,
 		idle: ignored,
+		shortfall: ignored,
 		paused: ignored,
 		merge: unexpected,
 		offer: unexpected,

@@ -120,6 +120,24 @@ describe('run_board_tick.tick empty lane seats', () => {
 	})
 })
 
+// joshuafolkken/kit#8014: the local read's usage-limit cause reaches the seat line.
+describe('run_board_tick.tick an authentication-failure hold on the empty seats', () => {
+	it('names the re-login for a usage-limit hold an authentication failure caused', async () => {
+		const local = {
+			...SEATED,
+			events: [],
+			launch_hold: 'usage-limit',
+			usage_cause: 'auth' as const,
+		}
+		const { ports, frames } = harness(local, [long_plan(0)])
+
+		await tick(FRESH_STATE, ports)
+
+		expect(frames.at(-1)).toContain('claude auth login')
+		expect(frames.at(-1)).not.toContain('usage limit')
+	})
+})
+
 describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
@@ -175,6 +193,24 @@ describe('run_board_tick.tick kit version', () => {
 	})
 })
 
+// joshuafolkken/kit#7770: the measured lane totals the local read carries reach the header's estimate.
+describe('run_board_tick.tick lane totals', () => {
+	it.each([
+		{ lane_totals: [30 * 60_000], is_drawn: true },
+		{ lane_totals: undefined, is_drawn: false },
+	])(
+		'draws the finish time $is_drawn with totals $lane_totals',
+		async ({ lane_totals, is_drawn }) => {
+			const local = { ...LOCAL, events: [LAUNCH], lane_totals, lane_limit: 2 }
+			const { ports, frames } = harness(local, [long_plan(1)])
+
+			await tick(FRESH_STATE, ports)
+
+			expect(lines_of(frames.at(-1))[0]?.includes('🎯')).toBe(is_drawn)
+		},
+	)
+})
+
 // joshuafolkken/kit#3757: the operations the local read carries reach the header's third line.
 describe('run_board_tick.tick with a session’s operation', () => {
 	it('draws the running child’s newest operation on the third line', async () => {
@@ -206,7 +242,7 @@ describe('run_board_tick.tick in a short terminal', () => {
 
 		expect(lines[0]).toMatch(/josh-board/u)
 		expect(rows).toBeLessThanOrEqual(SHORT.rows)
-		expect(lines).toContainEqual(expect.stringMatching(/^ {2}more \d+$/u))
+		expect(lines).toContainEqual(expect.stringMatching(/^ {5}more \d+$/u))
 	})
 })
 
@@ -224,7 +260,7 @@ describe('run_board_tick.tick park titles', () => {
 		const lines = await loading([PARK])
 
 		expect(park_reason_lines(lines)).toStrictEqual([
-			expect.stringMatching(/💤 +1 .* {2}waiting on #7$/u),
+			expect.stringMatching(/💤 +1 .* {2}waiting on #7 🎯 —$/u),
 		])
 	})
 
@@ -238,7 +274,7 @@ describe('run_board_tick.tick park titles', () => {
 		const lines = lines_of(frames.at(-1))
 
 		expect(park_reason_lines(lines)).toStrictEqual([
-			expect.stringMatching(/💤 +1 {7}Lead the lanes {2,}waiting on #7$/u),
+			expect.stringMatching(/💤 +1 {7}Lead the lanes {2,}waiting on #7 🎯 —$/u),
 		])
 	})
 })

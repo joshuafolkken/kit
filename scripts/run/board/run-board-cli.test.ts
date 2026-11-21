@@ -1,19 +1,33 @@
 import { stripVTControlCharacters } from 'node:util'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture, type Harness } from './run-board-fixture'
 import type { IssueCount } from './run-board-issue-count'
 import type { BoardPlan } from './run-board-layout'
 import type { BoardPorts } from './run-board-state'
+import { run_board_theme_defs } from './run-board-theme-defs'
+import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
-const { LOCAL, SPINNING, START, STOPPED, harness, plan_titled } = run_board_fixture
+const { LOCAL, SPINNING, START, STOPPED, first_frame, harness, plan_titled } = run_board_fixture
+
+// A theme colors every write where color is on (`FORCE_COLOR` in the gate's environment), so the
+// screen's control bytes are compared with color off.
+beforeEach(() => {
+	vi.stubEnv('FORCE_COLOR', '0')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ josh-board'
+const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
+const TYPING_CURSOR = run_board_typing.CURSOR
 const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
@@ -79,6 +93,18 @@ describe('run_board_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#7952: only the live board, which reads the `s` key, says its sound state.
+describe('run_board_cli.run sound mark', () => {
+	it.each([['--once'], ['--chat']])('draws no sound mark for %s', async (argv) => {
+		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+		await run_board_cli.run([argv], ports)
+
+		expect(frames[0]).toContain('josh-board')
+		expect(frames[0]).not.toMatch(/[🔊🔇]/u)
+	})
+})
+
 // joshuafolkken/kit#3456: the answer to a progress question in a `backlogrun` — one frame a chat shows
 // as it is, recorded as the report it is.
 describe('run_board_cli.run --chat', () => {
@@ -133,12 +159,70 @@ describe('run_board_cli.run screen', () => {
 		await expect(run_board_cli.run([], ports)).rejects.toBe(STOPPED)
 		expect(frames[0]).toBe(ENTER)
 		expect(frames.slice(1, -1).map((frame) => frame.split(RUN_MARK, 1)[0])).toStrictEqual([
-			`${ESCAPE}[H${ESCAPE}[J`,
-			`${ESCAPE}[H${ESCAPE}[J`,
+			`${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`,
+			`${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`,
 		])
 		expect(frames.at(-1)).toBe(LEAVE)
 		leaves[0]?.()
 		expect(frames.filter((frame) => frame === LEAVE)).toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#7927: a live board types its line after entering the screen, before the first
+// frame; a single frame, the chat's or a pipe's, types none. joshuafolkken/kit#8029: only a board in a
+// theme types it — `run-board-cli-theme.test.ts` holds the board in none.
+const THEMED = ['--theme', 'wargames']
+// joshuafolkken/kit#7988: the theme draws the board's text in capitals.
+const THEMED_RUN_MARK = RUN_MARK.toUpperCase()
+
+async function no_pause(): Promise<void> {
+	await Promise.resolve()
+}
+
+describe('run_board_cli.run intro', () => {
+	it('types the line between entering the screen and the first frame', async () => {
+		const { ports, frames } = harness(undefined, [])
+
+		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
+			STOPPED,
+		)
+		const first = first_frame(frames)
+
+		expect(frames[0]).toBe(ENTER)
+		expect(stripVTControlCharacters(frames[first - 2] ?? '')).toBe(`\r${INTRO_LINE}`)
+	})
+
+	// joshuafolkken/kit#8000: whatever beat the intro last wrote — a cursor left by a skipped line too —
+	// the first frame wipes from the top before it draws.
+	it('wipes the typed line, cursor and all, before the first frame draws', async () => {
+		const { ports, frames } = harness(undefined, [])
+
+		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
+			STOPPED,
+		)
+		const typed = frames.slice(1, first_frame(frames))
+
+		expect(typed.some((frame) => frame.includes(TYPING_CURSOR))).toBe(true)
+		expect(typed.join('')).not.toContain(THEMED_RUN_MARK)
+	})
+
+	it('types no line for --once, --chat or a pipe', async () => {
+		const runs = [['--once'], ['--chat']].map(async (argv) => {
+			const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+			await run_board_cli.run([...THEMED, ...argv], { ...ports, intro_sleep: ports.sleep })
+
+			return frames.join('')
+		})
+		const pipe = harness(LOCAL, [plan_titled('a')])
+		const piped = { ...pipe.ports, is_tty: false, intro_sleep: pipe.ports.sleep }
+
+		await run_board_cli.run(THEMED, piped)
+		expect([...(await Promise.all(runs)), pipe.frames.join('')].join('')).not.toContain(INTRO_LINE)
+	})
+
+	it('types the line on the live board the run and backlogrun draw', () => {
+		expect(run_board_cli.LIVE_PORTS.intro_sleep).toBeTypeOf('function')
 	})
 })
 
@@ -202,9 +286,11 @@ describe('run_board_cli.run plan read', () => {
 })
 
 // joshuafolkken/kit#3495: a live board redraws on each second and only turns its spinners in between.
-const HOME = `${ESCAPE}[H${ESCAPE}[J`
-// eslint-disable-next-line no-control-regex -- a turn is made of control characters
-const TURN = /^(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.\u{1B}\[0m)+$/u
+// joshuafolkken/kit#8125: each frame and each turn in synchronized output.
+const HOME = `${ESCAPE}[?2026h${ESCAPE}[H`
+const TURN =
+	// eslint-disable-next-line no-control-regex -- a turn is made of control characters
+	/^\u{1B}\[\?2026h(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.\u{1B}\[0m)+\u{1B}\[\?2026l$/u
 const PACED_MS = 2000
 
 // Ports whose sleeps move the clock, stopping the board once `PACED_MS` have passed, and every write

@@ -61,6 +61,9 @@ interface Recheck {
 // What the cache knows of a hunk: a verdict, one to recheck against a few tests, or nothing.
 type Known = RedProbe | Recheck | undefined
 
+// Why a hunk's verdict was not held: none stored, or the key that no longer reads the same.
+type MissReason = 'unregistered' | 'change' | 'test_contents' | 'basis'
+
 // A `green` hunk as the cache records it: its file, its base lines and the lines it held.
 interface GreenHunk {
 	file: string
@@ -194,16 +197,65 @@ function is_same_code(freshness: Freshness): boolean {
 	return freshness.is_same_change || freshness.is_pruned
 }
 
+// The key a verdict missed on once neither its tree-wide digest nor its basis held it: the basis where
+// one was stored, since it is the key read last, else the tree-wide one.
+function basis_miss(entry: StoredVerdict, tree_wide: MissReason): MissReason {
+	return entry.basis === undefined ? tree_wide : 'basis'
+}
+
+function other_miss(
+	entry: StoredVerdict,
+	freshness: Freshness,
+	basis: string | undefined,
+): MissReason | undefined {
+	if (freshness.is_unchanged || is_based(entry, basis)) return undefined
+
+	return basis_miss(entry, 'test_contents')
+}
+
+function red_miss(
+	entry: StoredVerdict,
+	freshness: Freshness,
+	digests: ReadonlyMap<string, string>,
+	basis: string | undefined,
+): MissReason | undefined {
+	if (!is_same_code(freshness) && !is_based(entry, basis)) return basis_miss(entry, 'change')
+
+	return holds_tests(entry.tests, freshness, digests) ? undefined : 'test_contents'
+}
+
+// The first key that stopped a stored verdict holding; `undefined` while it holds.
+function stored_miss(
+	entry: StoredVerdict,
+	freshness: Freshness,
+	digests: ReadonlyMap<string, string>,
+	basis: string | undefined,
+): MissReason | undefined {
+	if (entry.verdict === 'red') return red_miss(entry, freshness, digests, basis)
+
+	return other_miss(entry, freshness, basis)
+}
+
+// Why the cache did not hold a hunk's verdict (joshuafolkken/kit#7804): none stored, or the key that
+// stopped it holding; `undefined` while it holds. The same reading `fresh_verdict` holds a verdict by.
+function miss_of(
+	entry: StoredVerdict | undefined,
+	freshness: Freshness,
+	digests: ReadonlyMap<string, string>,
+	basis?: string,
+): MissReason | undefined {
+	if (entry === undefined) return 'unregistered'
+
+	return stored_miss(entry, freshness, digests, basis)
+}
+
 function holds(
 	entry: StoredVerdict,
 	freshness: Freshness,
 	digests: ReadonlyMap<string, string>,
 	basis: string | undefined,
 ): boolean {
-	if (entry.verdict !== 'red') return freshness.is_unchanged || is_based(entry, basis)
-	const is_same = is_same_code(freshness) || is_based(entry, basis)
-
-	return is_same && holds_tests(entry.tests, freshness, digests)
+	return stored_miss(entry, freshness, digests, basis) === undefined
 }
 
 // The stored verdict while what it rests on is unchanged: the code change and the failed test files for
@@ -360,6 +412,7 @@ const test_pinned_cache_logic = {
 	greens_of,
 	hunk_key,
 	is_recheck,
+	miss_of,
 	recheck_of,
 	rechecked,
 	red_basis,
@@ -369,5 +422,5 @@ const test_pinned_cache_logic = {
 	test_set_of,
 }
 
-export type { Basis, Freshness, GreenHunk, Known, Recheck, StoredVerdict, VerdictCache }
+export type { Basis, Freshness, GreenHunk, Known, MissReason, Recheck, StoredVerdict, VerdictCache }
 export { test_pinned_cache_logic }

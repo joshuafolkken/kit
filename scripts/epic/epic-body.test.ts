@@ -118,6 +118,106 @@ describe('epic_body.build_dependency_pairs', () => {
 	})
 })
 
+// #103 waits on #101 and #102, which are independent — the join `--ordered` cannot spell.
+const JOIN = [
+	[101, 103],
+	[102, 103],
+]
+
+function build_join(): string {
+	return epic_body.build_epic_body({
+		children: CHILDREN,
+		rationale: RATIONALE,
+		is_ordered: false,
+		chains: JOIN,
+	})
+}
+
+describe('epic_body — declared chains', () => {
+	it('writes one chain line per declared chain', () => {
+		expect(epic_parse.parse_dependency_chains(build_join())).toStrictEqual(JOIN)
+	})
+
+	it('records the same links as blocked-by pairs that the body declares', () => {
+		const pairs = epic_body.build_dependency_pairs(CHILDREN, false, JOIN)
+
+		expect(pairs).toStrictEqual(epic_parse.parse_dependency_links(build_join()))
+	})
+
+	it('records a link two chains share once', () => {
+		const pairs = epic_body.build_dependency_pairs(CHILDREN, false, [
+			[101, 102],
+			[101, 102, 103],
+		])
+
+		expect(pairs).toStrictEqual([
+			{ blocker: 101, blocked: 102 },
+			{ blocker: 102, blocked: 103 },
+		])
+	})
+
+	it('names each chain under the declared order, attributed to --chain', () => {
+		const body = build_join()
+
+		expect(body).toContain('`#101 -> #103`, declared by `josh epic --chain`')
+		expect(body).toContain('`#102 -> #103`, declared by `josh epic --chain`')
+		expect(body).not.toContain(UNORDERED_DEPENDENCIES)
+	})
+})
+
+const SPLIT_POINTER = 'see `## Split rationale` above'
+
+function build_reasoned(reasoned: ReadonlyArray<ReadonlyArray<number>>): string {
+	return epic_body.build_epic_body({
+		children: CHILDREN,
+		rationale: RATIONALE,
+		is_ordered: false,
+		chains: JOIN,
+		order_reasons: reasoned.map((chain) => ({ chain, reason: `uses #${String(chain[0])}` })),
+	})
+}
+
+describe('epic_body — per-chain order reasons', () => {
+	it('writes each given reason under its chain and no pointer when every chain has one', () => {
+		const body = build_reasoned(JOIN)
+
+		expect(body).toContain(
+			'`#101 -> #103`, declared by `josh epic --chain` when this epic was created.\n- Reasoning: uses #101',
+		)
+		expect(body).toContain('- Reasoning: uses #102')
+		expect(body).not.toContain(SPLIT_POINTER)
+	})
+
+	it('writes no pointer in place of a missing reason — only the chain order line', () => {
+		const body = build_reasoned([[101, 103]])
+
+		expect(body).toContain('- Reasoning: uses #101')
+		expect(body).toMatch(
+			/`#102 -> #103`, declared by `josh epic --chain` when this epic was created\.\n(?!- Reasoning)/u,
+		)
+		expect(body).not.toContain(SPLIT_POINTER)
+		expect(body.match(/- Reasoning:/gu)).toHaveLength(1)
+	})
+
+	it('declares no extra order from a reason line', () => {
+		expect(epic_parse.parse_dependency_chains(build_reasoned(JOIN))).toStrictEqual(JOIN)
+	})
+})
+
+describe('epic_body.format_added_order', () => {
+	it('records each chain an insertion declared with its reason', () => {
+		const reasons = [{ chain: [101, 103], reason: 'uses #101' }]
+
+		expect(epic_body.format_added_order([[101, 103]], reasons)).toBe(
+			'- Order: `#101 -> #103`, declared by `josh epic --add --chain` when these children were added.\n- Reasoning: uses #101',
+		)
+	})
+
+	it('records nothing when the insertion declared no chain', () => {
+		expect(epic_body.format_added_order([], [])).toBeUndefined()
+	})
+})
+
 describe('epic_body.format_run_command', () => {
 	it('names the epic once its number is known', () => {
 		expect(epic_body.format_run_command(EPIC_NUMBER)).toBe(

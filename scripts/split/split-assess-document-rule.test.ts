@@ -31,7 +31,7 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(document).toContain(`## ${split_assess.NOTICE_SECTION}`)
-		expect(document).toContain('A dispatched lane is never split')
+		expect(document).toContain('**After it a lane is never split')
 		expect(document).toContain('file it as an observation, without `--route split`')
 		expect(document).toContain('a diff past the cap on either axis is recorded as a pre-split miss')
 		// joshuafolkken/kit#7579: an extraction into a new file was declared once and measured twice.
@@ -43,12 +43,14 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 		expect(document).not.toContain('Stop implementation before')
 	})
 
-	// joshuafolkken/kit#7011: size is judged before implementation only, stated in this one place.
+	// joshuafolkken/kit#7011, joshuafolkken/kit#7729: size is judged before the first edit only, stated
+	// in this one place, on the investigation's edit list.
 	it('states once that a started implementation never splits or stops for size', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
-		expect(document).toContain('at filing (`issue:file`) and at `lane:plan`')
-		expect(document).toContain('never splits, spills or stops for size')
+		expect(document).toContain('**Size is judged before the first edit**')
+		expect(document).toContain('never split,\nspilled or stopped for size')
+		expect(document).toContain("`lane:plan` on the investigation's `### Files to edit`")
 	})
 
 	it('tells a backlogrun child to finish rather than split itself', () => {
@@ -87,11 +89,12 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 	})
 
 	// joshuafolkken/kit#6647, joshuafolkken/kit#6602: `--single` waives every axis; a re-plan only warns.
+	// joshuafolkken/kit#7729: a lane child splits past the cap before its first edit.
 	it('points one deliverable past any axis at --single and a re-plan at a warning', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(document).toContain(
-			'`--single`, a re-plan or a dispatched lane → `size warning` (`lane-plan-size.ts`)',
+			'a lane child past the cap; `--single`, a re-plan or an edited lane → `size warning`',
 		)
 	})
 })

@@ -4,7 +4,9 @@ import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_command } from '#scripts/git/git-command'
+import { git_diff_reads } from '#scripts/git/git-diff-reads'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -82,6 +84,8 @@ const record_check = vi.fn<typeof review_record.check>()
 // The digest is read off the session's real transcript; no case carries one unless it says so
 // once (joshuafolkken/kit#5040).
 const own_digest = vi.fn<typeof run_cut_digest.own_digest>().mockReturnValue(undefined)
+// The checkout every case runs in; a case can make one read of it fail without a `vi` call of its own.
+const worktree_directory = vi.fn<typeof run_cut.worktree_directory>().mockResolvedValue(REPOSITORY)
 // The section a verdict is followed by is `run_step_section`'s own print; spied so `verdict()` still
 // reads the token, and so a case can pin which section followed it (joshuafolkken/kit#5953).
 const print_section = vi.fn<typeof run_step_section.print_once>().mockReturnValue(0)
@@ -100,6 +104,14 @@ function attach_run_spies(): void {
 	vi.spyOn(run_event_stream_emit, 'emit').mockImplementation(emit)
 	vi.spyOn(run_event_stream_emit, 'current_events').mockResolvedValue([])
 	vi.spyOn(run_event_stream_emit, 'all_events').mockResolvedValue([])
+}
+
+// A clean lane branch reads its Issue body and diff for the no-diff close (joshuafolkken/kit#7821);
+// no case reaches the network or the real tree for it unless it says so.
+function attach_conclude_spies(): void {
+	vi.spyOn(git_gh_issue_read, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(git_diff_reads, 'diff_main_names').mockResolvedValue('')
+	vi.spyOn(git_diff_reads, 'untracked_names').mockResolvedValue('')
 }
 
 function attach_review_spies(): void {
@@ -172,13 +184,14 @@ function install(): void {
 	// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 	attach_run_spies()
+	attach_conclude_spies()
 	attach_review_spies()
 	write_handoffs()
 
 	beforeEach(() => {
 		vi.clearAllMocks()
 		run_cut.end_cut(target())
-		vi.spyOn(run_cut, 'worktree_directory').mockResolvedValue(REPOSITORY)
+		vi.spyOn(run_cut, 'worktree_directory').mockImplementation(worktree_directory)
 		state.mockResolvedValue({ branch: BRANCH, is_dirty: true, is_held: true })
 		default_branch.mockResolvedValue(DEFAULT_BRANCH)
 		find_open_lane.mockResolvedValue(lane())
@@ -221,6 +234,7 @@ const run_cut_cli_fixture = {
 	is_attested_on,
 	record_check,
 	own_digest,
+	worktree_directory,
 	print_section,
 	emit,
 	verdict,

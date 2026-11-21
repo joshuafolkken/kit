@@ -1,0 +1,3 @@
+- rf:bug-risks | low | tools/cost-audit/cost-audit-cli.ts:186 | 2026-11-20 | #8383 | false-positive | other
+- rf:performance | low | tools/cost-audit/cost-audit-cli.ts:183 | 2026-11-20 | #8383 | false-positive | other
+- rf:performance | low | tools/cost-audit/cost-audit-cli.ts:183 | 2026-11-20 | #8383

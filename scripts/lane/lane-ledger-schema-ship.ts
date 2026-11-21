@@ -58,7 +58,18 @@ const stop_schema = z.object({
 // One `josh run:chain` on `issue`, done or stopped: `at` is its end and `elapsed_ms` its length, so the
 // next run's start ends the wait after a stop. `stage` names where it stopped and `reason` why — the
 // stage exited non-zero (`exit`) or exited 0 on a notice that holds the run (`hold`) — both absent on a
-// run that finished. `join` marks the half after the review (joshuafolkken/kit#7024).
+// run that finished. `join` marks the half after the review (joshuafolkken/kit#7024). `stages` is each
+// stage that ran, the stopped one included, with its start and length; absent on a line written before
+// it was recorded (joshuafolkken/kit#7736). `exit_code` is the stopped stage's exit code (0 on a hold) and
+// `refusal` the kind of a procedural stop the run named (`metrics-growth`, `scoped-not-green`), which
+// tells those reruns from a real failure on the line (joshuafolkken/kit#7926); both absent on a
+// finished run and on a line written before they were recorded.
+const CHAIN_REFUSALS = ['metrics-growth', 'scoped-not-green'] as const
+const chain_stage_schema = z.object({
+	name: z.string(),
+	at: z.string(),
+	elapsed_ms: z.number(),
+})
 const chain_schema = z.object({
 	kind: z.literal(KIND.CHAIN),
 	at: z.string(),
@@ -67,6 +78,18 @@ const chain_schema = z.object({
 	join: z.boolean(),
 	stage: z.string().optional(),
 	reason: z.enum(['exit', 'hold']).optional(),
+	exit_code: z.number().optional(),
+	refusal: z.enum(CHAIN_REFUSALS).optional(),
+	stages: z.array(chain_stage_schema).optional(),
+})
+// One `josh run:chain` stage on `issue`, appended as it ends so a run killed or stopped part way still
+// leaves the stages it finished (joshuafolkken/kit#8286): `at` is the stage's end, as on a `stage` line,
+// so its start is `at` less `elapsed_ms`, and `result` is `stopped` on the stage the run stopped at
+// (non-zero exit or a hold).
+const chain_stage_entry_schema = chain_stage_schema.extend({
+	kind: z.literal(KIND.CHAIN_STAGE),
+	issue: z.number(),
+	result: z.enum(['passed', 'stopped']),
 })
 // The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
 // so a preflight `unplanned` stop after it is told apart in `lane:stats` (joshuafolkken/kit#5203).
@@ -75,6 +98,17 @@ const unplanned_notice_schema = z.object({
 	at: z.string(),
 	issue: z.number(),
 	files: z.array(z.string()),
+})
+// One evaluation of `josh ship`'s preflight on `issue`, passed or stopped (`run-ship-preflight.ts`):
+// `evaluated` names the precondition kinds it asked and `unmet` the ones it found unmet, empty on a
+// pass, so each kind's stops are read against its evaluations (joshuafolkken/kit#7874). A reused
+// verdict asked nothing and writes none; a stop's `preconditions` stays as it was.
+const preflight_schema = z.object({
+	kind: z.literal(KIND.PREFLIGHT),
+	at: z.string(),
+	issue: z.number(),
+	evaluated: z.array(z.string()),
+	unmet: z.array(z.string()),
 })
 // One inner step of a `josh ship` stage on `issue` — the overlap wait inside `sync`, the scoped pair
 // inside `gate` — so `lane:breakdown` names what a stage spent its time on (joshuafolkken/kit#5294).
@@ -87,6 +121,25 @@ const unplanned_notice_schema = z.object({
 // `named` counts the files the pair was narrowed to, and `unsplit` is the reason the import graph could
 // not split a merge (`test-related-synced.ts`), both absent where neither happened — read by
 // `lane:stats --pairs` (joshuafolkken/kit#6189), written by the ship (joshuafolkken/kit#6196).
+// `breakdown` counts what each condition added to a pair named after a merge, before duplicates are
+// dropped (`run-ship-synced-scope.ts`, joshuafolkken/kit#7788), and on every named pair the files each
+// check was handed and the unchecked own edits a merge's names took in (joshuafolkken/kit#7846) —
+// absent on a pair that named nothing.
+const scope_breakdown_schema = z
+	.object({
+		both: z.number(),
+		unsplit: z.number(),
+		read_by_tests: z.number(),
+		shared: z.number(),
+		lint_meeting: z.number(),
+		own_edits: z.number(),
+		lint_named: z.number(),
+		test_named: z.number(),
+	})
+	.partial()
+
+// `resumed_from` says whether a scoped pair lap started from the tree a stopped round 2 read
+// (`round-2-fix`) or not (`none`) — `run-ship-narrowed.ts` (joshuafolkken/kit#7789).
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -101,6 +154,8 @@ const ship_lap_schema = z.object({
 	is_reused: z.boolean().optional(),
 	named: z.number().optional(),
 	unsplit: z.string().optional(),
+	breakdown: scope_breakdown_schema.optional(),
+	resumed_from: z.enum(['round-2-fix', 'none']).optional(),
 })
 
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's
@@ -120,17 +175,34 @@ const size_schema = z.object({
 
 type ChainEntry = z.infer<typeof chain_schema>
 type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
+type ChainStageEntry = z.infer<typeof chain_stage_schema>
+type ChainStageLedgerRecord = Omit<z.infer<typeof chain_stage_entry_schema>, 'kind'>
+type ChainRefusal = NonNullable<ChainEntry['refusal']>
+type PreflightEntry = z.infer<typeof preflight_schema>
+type PreflightLedgerRecord = Omit<PreflightEntry, 'kind' | 'at'>
 type UnpinnedStop = z.infer<typeof unpinned_stop_schema>
 type UnpinnedPath = UnpinnedStop['path']
 
 const lane_ledger_schema_ship = {
 	chain_schema,
+	chain_stage_entry_schema,
 	early_push_schema,
+	preflight_schema,
 	ship_lap_schema,
 	size_schema,
 	stop_schema,
 	unplanned_notice_schema,
 }
 
-export type { ChainEntry, ChainRecord, UnpinnedPath, UnpinnedStop }
+export type {
+	ChainEntry,
+	ChainRecord,
+	ChainRefusal,
+	ChainStageEntry,
+	ChainStageLedgerRecord,
+	PreflightEntry,
+	PreflightLedgerRecord,
+	UnpinnedPath,
+	UnpinnedStop,
+}
 export { lane_ledger_schema_ship }

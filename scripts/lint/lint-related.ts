@@ -6,7 +6,6 @@ import { document_checks } from '#scripts/document/document-checks'
 import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
-import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
@@ -18,6 +17,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { eslint_daemon_calls } from './eslint-daemon-calls'
 import { lint_parallel, type LintRunTiming } from './lint-parallel'
 import { lint_related_fix } from './lint-related-fix'
+import { lint_related_record, type LintStages } from './lint-related-record'
 import { lint_related_scope } from './lint-related-scope'
 
 // `josh lint:related` — the lint check an implementation loop runs between edits.
@@ -74,7 +74,6 @@ function document_check_exit_code(scope: ChangedFileScope, root: string): number
 interface LintOutcome {
 	stage: string
 	exit_code: number
-	notice?: string | undefined
 }
 
 const UNMOVED: LintOutcome = { stage: 'unmoved', exit_code: 0 }
@@ -82,6 +81,37 @@ const VERDICT_RECORD = tree_verdict.record_path('lint-related')
 
 function is_failed(outcome: LintOutcome): boolean {
 	return outcome.exit_code !== 0
+}
+
+// The first of the lint and the structural checks to fail, or undefined when both are green.
+async function failed_ahead(
+	scope: ChangedFileScope,
+	structural: Promise<number>,
+	stages: LintStages,
+): Promise<LintOutcome | undefined> {
+	const lint = {
+		stage: 'lint',
+		exit_code: await lint_related_record.timed(stages, 'lint_ms', async () => {
+			return await lint_exit_code(scope)
+		}),
+	}
+
+	return [lint, { stage: 'structural', exit_code: await structural }].find((outcome) =>
+		is_failed(outcome),
+	)
+}
+
+async function documents_outcome(
+	scope: ChangedFileScope,
+	root: string,
+	stages: LintStages,
+): Promise<LintOutcome> {
+	return {
+		stage: 'documents',
+		exit_code: await lint_related_record.timed(stages, 'documents_ms', async () =>
+			document_check_exit_code(scope, root),
+		),
+	}
 }
 
 // The lint result folded together with the fast document checks: the
@@ -94,31 +124,41 @@ function is_failed(outcome: LintOutcome): boolean {
 // below then vouches for. The structural checks (`structural-checks.ts`) run beside the lint rather
 // than after it, so their whole-program scan costs no wall clock the lint has not already spent.
 //
-// The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
-// reported here for the namespaces the changed files declare or import directly
+// The gate's `exports` check is reported after them on the same terms: a namespace member nothing
+// reads is reported here for the namespaces the changed files declare or import directly
 // (joshuafolkken/kit#4645, joshuafolkken/kit#4649), rather than at ship's pre-detach gate. The
-// fallback scans the whole program, a superset as the lint's is.
+// fallback scans the whole program, a superset as the lint's is. It starts beside the lint, as the
+// structural checks do, in a child whose report is printed only once everything before it is green
+// (joshuafolkken/kit#7829).
 //
 // The outcome names the stage that failed first, which the verdict line names (joshuafolkken/kit#5162).
-async function scoped_outcome(scope: ChangedFileScope, root: string): Promise<LintOutcome> {
-	const structural = structural_checks.run_structural(scope, root)
-	const lint = { stage: 'lint', exit_code: await lint_exit_code(scope) }
-	const failed = [lint, { stage: 'structural', exit_code: await structural }].find((outcome) =>
-		is_failed(outcome),
-	)
+// Each stage's time goes to `stages` (`lint-related-record.ts`); the structural checks and the unused
+// members child are timed on their own promises, since they overlap the lint.
+async function scoped_outcome(
+	scope: ChangedFileScope,
+	root: string,
+	stages: LintStages,
+): Promise<LintOutcome> {
+	const structural = lint_related_record.timed(stages, 'structural_ms', async () => {
+		return await structural_checks.run_structural(scope, root)
+	})
+	const unused = lint_related_record.timed(stages, 'unused_members_ms', async () => {
+		return await unused_members_check.spawn_unused_members(
+			root,
+			scope.mode === 'all' ? undefined : scope.files,
+		)
+	})
+	const failed = await failed_ahead(scope, structural, stages)
+	const unused_run = await unused
 
 	if (failed !== undefined) return failed
 	// The linters' buffered output ends without a newline; keep the checks' own lines apart from it.
 	process.stdout.write('\n')
-	const documents = { stage: 'documents', exit_code: document_check_exit_code(scope, root) }
+	const documents = await documents_outcome(scope, root, stages)
 	if (is_failed(documents)) return documents
+	process.stdout.write(`${unused_run.output}\n`)
 
-	const files = scope.mode === 'all' ? undefined : scope.files
-
-	return {
-		stage: 'unused members',
-		exit_code: await unused_members_check.run_unused_members(root, files),
-	}
+	return { stage: 'unused members', exit_code: unused_run.exit_code }
 }
 
 // **A bare run reads only what moved since its last green run** (`since-green.ts`), against the tree
@@ -179,20 +219,6 @@ async function resolve_lint_scope(
 	})
 }
 
-// In kit, a metrics total grown past the merge-base is reported after the lint and changes no exit
-// code (`metrics-totals.ts`). The totals are a whole-repository pass, so only a green bare run pays
-// for it: a red lint is edited again anyway, and a run narrowed by file arguments is a spot check.
-async function outcome_with_notice(
-	command_arguments: ReadonlyArray<string>,
-	scope: ChangedFileScope,
-	root: string,
-): Promise<LintOutcome> {
-	const outcome = await scoped_outcome(scope, root)
-	if (is_failed(outcome) || command_arguments.length > 0) return outcome
-
-	return { ...outcome, notice: await metrics_totals.growth_notice(root) }
-}
-
 // **Nothing moved since the last green run lints nothing** (joshuafolkken/kit#4593), as
 // `josh test:related` runs no test.
 function report_unmoved(): LintOutcome {
@@ -203,34 +229,48 @@ function report_unmoved(): LintOutcome {
 	return UNMOVED
 }
 
+// A residual the typed fix pass reported fails a run whose untyped lint passed: the gate's whole-tree
+// lint is typed and reports it too (`lint-related-fix.ts`, joshuafolkken/kit#7825).
+function with_fix_pass(outcome: LintOutcome, fix_exit_code: number): LintOutcome {
+	if (fix_exit_code === 0 || is_failed(outcome)) return outcome
+
+	return { stage: 'autofix', exit_code: fix_exit_code }
+}
+
+// One run's root, the gate tree it read before it ran and the stage times it collects.
+interface LintRun {
+	root: string
+	before: GateTree | undefined
+	stages: LintStages
+}
+
 async function checked_outcome(
 	command_arguments: ReadonlyArray<string>,
-	root: string,
 	moved: ReadonlyArray<string> | undefined,
-	before: GateTree | undefined,
+	run: LintRun,
 ): Promise<{ outcome: LintOutcome; before: GateTree | undefined }> {
+	const { root, before, stages } = run
 	if (moved?.length === 0) return { outcome: report_unmoved(), before }
 
 	const scope = await resolve_lint_scope(command_arguments, root, moved)
-	const verified = await lint_related_fix.prepare(command_arguments, scope, root)
-	const outcome = await outcome_with_notice(command_arguments, scope, root)
+	const { before: verified, fix_exit_code } = await lint_related_record.timed(
+		stages,
+		'fix_ms',
+		async () => await lint_related_fix.prepare(command_arguments, scope, root),
+	)
+	const outcome = await scoped_outcome(scope, root, stages)
 
-	return {
-		outcome,
-		before: verified,
-	}
+	return { outcome: with_fix_pass(outcome, fix_exit_code), before: verified }
 }
 
 // The run's last line names the stage that failed, or says it passed; the console is the only copy of
-// the output, so there is no log notice (`verification-tail.ts`). The metrics notice, on a line of its
-// own as a linter's buffered output need not end with a newline, rides above it, so a reused verdict
-// (`tree-verdict.ts`) still carries what `josh check:related` repeats.
+// the output, so there is no log notice (`verification-tail.ts`). The metrics totals are not measured
+// here: `josh run:review`'s open and the gate stop on them (`metrics-totals.ts`, joshuafolkken/kit#7823).
 function verdict_tail(outcome: LintOutcome): string {
 	const failed = is_failed(outcome) ? [outcome.stage] : []
 	const verdict = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, failed)
-	const notice = outcome.notice === undefined ? '' : `\n${outcome.notice}\n`
 
-	return `${notice}\n${verification_tail.format_tail({ failures: '', verdict })}`
+	return `\n${verification_tail.format_tail({ failures: '', verdict })}`
 }
 
 // **A green run leaves a record of the tree it was green on**, so
@@ -240,16 +280,10 @@ function verdict_tail(outcome: LintOutcome): string {
 // the old base would refuse `josh gate` while every re-run kept linting nothing.
 async function fresh_exit_code(
 	command_arguments: ReadonlyArray<string>,
-	root: string,
-	before: GateTree | undefined,
+	run: LintRun,
 ): Promise<number> {
-	const moved = await read_since_green(before)
-	const { outcome, before: verified } = await checked_outcome(
-		command_arguments,
-		root,
-		moved,
-		before,
-	)
+	const moved = await read_since_green(run.before)
+	const { outcome, before: verified } = await checked_outcome(command_arguments, moved, run)
 	const { exit_code } = outcome
 	const tail = verdict_tail(outcome)
 	const entry = { before: verified, exit_code, tail }
@@ -265,14 +299,28 @@ async function fresh_exit_code(
 }
 
 // A bare run on a tree this check already answered for prints that answer and runs nothing.
-async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
+async function verdict_exit_code(
+	command_arguments: ReadonlyArray<string>,
+	stages: LintStages,
+): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const before = await scoped_green.read_before(command_arguments)
 	const kept = tree_verdict.read(before, VERDICT_RECORD)
 
 	if (kept !== undefined) return tree_verdict.replay(kept, VERDICT_RECORD)
 
-	return await fresh_exit_code(command_arguments, root, before)
+	return await fresh_exit_code(command_arguments, { root, before, stages })
+}
+
+// Every run, a replayed one included, leaves one ledger row (`lint-related-record.ts`).
+async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const started = performance.now()
+	const stages: LintStages = {}
+	const exit_code = await verdict_exit_code(command_arguments, stages)
+
+	await lint_related_record.record_run(stages, { started, exit_code })
+
+	return exit_code
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

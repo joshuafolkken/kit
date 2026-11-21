@@ -30,7 +30,7 @@ const prepare_mock = vi.hoisted(() => vi.fn<(issue: string, rows: string) => Pro
 const reuse_mock = vi.hoisted(() => vi.fn(async (_k: unknown, ask: () => unknown) => await ask()))
 
 vi.mock('#scripts/git/git-preflight', () => ({
-	git_preflight: { problems_of: problems_mock },
+	git_preflight: { PRECONDITION: {}, problems_of: problems_mock },
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: paths_mock },
@@ -51,6 +51,9 @@ vi.mock('#scripts/review/removed-tests-check', () => ({
 	removed_tests_check: { body_refusal: removed_mock },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
+vi.mock('./run-ship-behind-default', () => ({
+	run_ship_behind_default: { is_merge_ahead: vi.fn().mockResolvedValue(false) },
+}))
 vi.mock('./run-ship-preflight-reuse', () => ({ run_ship_preflight_reuse: { run: reuse_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
 vi.mock('./run-ship-planned', () => ({
@@ -72,7 +75,6 @@ const TITLE = 'Front-load the ship checks #2946'
 const RUNTIME_PATHS = ['scripts/run/ship/run-ship-cli.ts']
 const NO_BODY = { title: TITLE, body_path: undefined }
 const READY = { code: OK, out: 'ready' }
-const SCOPED_RED = { code: FAILED, out: 'lint:related red' }
 const DOCS_PATHS = ['docs/josh-commands.md']
 const CLASSIFICATION = 'Choose one release classification before opening the PR'
 const CLASSIFICATION_UNMET = { kind: 'classification', problem: CLASSIFICATION }
@@ -252,24 +254,6 @@ describe('run_ship_preflight.stage — a precondition that cannot be read', () =
 
 		expect(result.out).toContain(GIT_FAILURE)
 		expect(result.out).toContain(run_ship_preflight.EVIDENCE_PROBLEM)
-	})
-})
-
-describe('run_ship_preflight.stage — the scoped pair once the preconditions hold', () => {
-	it('runs the scoped pair and passes when it is green', async () => {
-		const result = await run_ship_preflight.stage(NO_BODY)
-
-		expect(scoped_mock).toHaveBeenCalledOnce()
-		expect(result).toStrictEqual(READY)
-	})
-
-	it('stops on a red scoped check, its output forwarded and the scoped pair named', async () => {
-		scoped_mock.mockResolvedValue(SCOPED_RED)
-
-		expect(await run_ship_preflight.stage(NO_BODY)).toStrictEqual({
-			...SCOPED_RED,
-			preconditions: ['scoped'],
-		})
 	})
 })
 

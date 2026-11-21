@@ -5,18 +5,25 @@ import { direct_importers } from './direct-importers'
 import { lockfile_changed_packages } from './lockfile-changed-packages'
 import { package_version_only } from './package-version-only'
 import { pure_files_entries } from './pure-files-entries'
+import { test_document_readers } from './test-document-readers'
 import { related_scope, type ScopeRequest } from './test-related-scope'
 import { whole_suite_files } from './whole-suite-files'
 
 // The readings that let a moved whole-suite file narrow — each compares the file at the change base
-// with the working tree — kept out of `test-related-scope.ts`, which stays pure.
+// with the working tree — and the test files naming a changed non-code file's path
+// (`test-document-readers.ts`), kept out of `test-related-scope.ts`, which stays pure. Kept beside the
+// cap (joshuafolkken/kit#7976): a narrowed seed set leaves the cap's near layers its own tests rather
+// than the whole suite's.
 
 interface Sides {
 	before: string
 	after: string
 }
 
-type Narrowing = Pick<ScopeRequest, 'lockfile_importers' | 'pure_entries' | 'version_only'>
+type Narrowing = Pick<
+	ScopeRequest,
+	'lockfile_importers' | 'pure_entries' | 'searched_readers' | 'version_only'
+>
 
 const { WHOLE_SUITE_FILES } = whole_suite_files
 
@@ -90,11 +97,16 @@ async function read_lockfile_importers(
 	return importers.some((file) => WHOLE_SUITE_FILES.has(file)) ? undefined : importers
 }
 
+function documents_of(changed: ReadonlyArray<string> | undefined): Array<string> {
+	return (changed ?? []).filter((file) => !related_scope.is_relatable(file))
+}
+
 async function read(root: string, changed: ReadonlyArray<string> | undefined): Promise<Narrowing> {
 	return {
 		pure_entries: await read_pure_entries(root, changed),
 		version_only: await read_version_only(root, changed),
 		lockfile_importers: await read_lockfile_importers(root, changed),
+		searched_readers: await test_document_readers.readers_of(root, documents_of(changed)),
 	}
 }
 

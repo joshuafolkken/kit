@@ -54,7 +54,7 @@ async function row_of(issue: number, local: LocalRead, plan: BoardPlan): Promise
 
 	// Another row's condition column can name the issue, and a line with no title ends at its number.
 	const locator = new RegExp(
-		String.raw`^ {4}\S+ .{${String(CONDITION_WIDTH)}} ${String(issue)}(?: |$)`,
+		String.raw`^ {5}\S+ .{${String(CONDITION_WIDTH)}} ${String(issue)}(?: |$)`,
 		'u',
 	)
 
@@ -66,7 +66,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 
 	// joshuafolkken/kit#5518: the untriaged row holds only itself.
 	it('draws ✋ on the untriaged row alone, the judged row beside it held by nothing', async () => {
-		expect(await row_of(UNTRIAGED, LOCAL, POOL)).toMatch(/^ {4}✋ {13}3727$/u)
+		expect(await row_of(UNTRIAGED, LOCAL, POOL)).toMatch(/^ {5}✋ {13}3727$/u)
 		expect(await row_of(HELD, LOCAL, POOL)).not.toMatch(/✋/u)
 	})
 
@@ -74,7 +74,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		const full = { ...LOCAL, free_lanes: NO_LANE_LEFT }
 		const plan = plan_of([child(HELD)])
 
-		expect(await row_of(HELD, full, plan)).toMatch(/^ {4}🧵 {13}3714$/u)
+		expect(await row_of(HELD, full, plan)).toMatch(/^ {5}🧵 {13}3714$/u)
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/🧵/u)
 	})
 
@@ -92,7 +92,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		const named = { ...LOCAL, lanes: [String(OPENING)], carry }
 		const plan = plan_of([child(OPENING), child(HELD)])
 
-		expect(await row_of(HELD, named, plan)).toMatch(/^ {4}📋 3720 {8}3714$/u)
+		expect(await row_of(HELD, named, plan)).toMatch(/^ {5}📋 3720 {8}3714$/u)
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/📋/u)
 	})
 
@@ -100,7 +100,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		const opening = { ...LOCAL, events: [OPENING_EVENT] }
 		const plan = plan_of([child(OPENING)])
 
-		expect(await row_of(OPENING, opening, plan)).toMatch(/^ {4}🚪 (?:\d+′)?\d+″ +3720$/u)
+		expect(await row_of(OPENING, opening, plan)).toMatch(/^ {5}🚪 (?:\d+′)?\d+″ +3720$/u)
 		expect(await row_of(OPENING, { ...opening, is_stranded: true }, plan)).not.toMatch(/🚪/u)
 	})
 })
@@ -111,7 +111,16 @@ describe('run_board_tick.tick — a usage-limit hold', () => {
 		const held = { ...LOCAL, usage_reset_ms: START + HOUR_MS }
 		const plan = plan_of([child(HELD)])
 
-		expect(await row_of(HELD, held, plan)).toMatch(/^ {4}🪫 \d{2}-\d{2} \d{2}:\d{2} +3714$/u)
+		expect(await row_of(HELD, held, plan)).toMatch(/^ {5}🪫 \d{2}-\d{2} \d{2}:\d{2} +3714$/u)
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/🪫/u)
+	})
+
+	// joshuafolkken/kit#8015: the hold's cause reaches the row, so an authentication failure is not 🪫.
+	it('draws the authentication-failure mark where the hold the local read carries is one', async () => {
+		const held = { ...LOCAL, usage_reset_ms: START + HOUR_MS, usage_cause: 'auth' as const }
+		const row = await row_of(HELD, held, plan_of([child(HELD)]))
+
+		expect(row).toMatch(/^ {5}🔑 \d{2}-\d{2} \d{2}:\d{2} +3714$/u)
+		expect(row).not.toMatch(/🪫/u)
 	})
 })

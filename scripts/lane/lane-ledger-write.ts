@@ -9,6 +9,7 @@ import type {
 	HeldRecord,
 	LaneStateChangeRecord,
 	LedgerEntry,
+	LintRelatedRecord,
 	OverlapRecord,
 	PushMissRecord,
 	RoundOneRecord,
@@ -24,8 +25,9 @@ import type {
 	UnitFileRecord,
 	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
+import type { EstimateRecord } from './lane-ledger-schema-estimate'
 import type { OfferRecord } from './lane-ledger-schema-offer'
-import type { ChainRecord } from './lane-ledger-schema-ship'
+import type { ChainRecord, PreflightLedgerRecord } from './lane-ledger-schema-ship'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
@@ -143,6 +145,10 @@ async function record_dispatch(issue: number, path?: string): Promise<void> {
 	await record({ kind: KIND.DISPATCH, at: now_iso(), issue }, path)
 }
 
+async function record_estimate(estimate: EstimateRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.ESTIMATE, at: now_iso(), ...estimate }, path)
+}
+
 async function record_stage(stage: StageRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.STAGE, at: now_iso(), ...stage }, path)
 }
@@ -209,6 +215,10 @@ async function record_test_related(run: TestRelatedRecord, path?: string): Promi
 	await record({ kind: KIND.TEST_RELATED, at: now_iso(), ...run }, path)
 }
 
+async function record_lint_related(run: LintRelatedRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.LINT_RELATED, at: now_iso(), ...run }, path)
+}
+
 async function record_test_pinned(run: TestPinnedRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.TEST_PINNED, at: now_iso(), ...run }, path)
 }
@@ -250,6 +260,10 @@ async function record_unplanned_notice(
 	await record({ kind: KIND.UNPLANNED_NOTICE, at: now_iso(), ...notice }, path)
 }
 
+async function record_preflight(preflight: PreflightLedgerRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.PREFLIGHT, at: now_iso(), ...preflight }, path)
+}
+
 const lane_ledger_write = {
 	CI_WAIT_STAGE,
 	CODERABBIT_RATE_LIMIT_STAGE,
@@ -264,12 +278,14 @@ const lane_ledger_write = {
 	record_chain,
 	record_core_wait,
 	record_dispatch,
+	record_estimate,
 	record_gate,
 	record_held,
 	record_lane_state,
 	record_released,
 	record_merge,
 	record_overlap,
+	record_preflight,
 	record_offer,
 	record_offerable,
 	record_push_miss,
@@ -280,6 +296,7 @@ const lane_ledger_write = {
 	record_size,
 	record_split_filed,
 	record_split_notice,
+	record_lint_related,
 	record_stage,
 	record_stop,
 	record_test_pinned,

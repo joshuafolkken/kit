@@ -34,8 +34,8 @@ const scratch = make_directory('pre-detach-reuse-')
 const read_tree = vi.spyOn(review_tree, 'read_changed_tree')
 const read_base = vi.spyOn(change_base, 'resolved_through_merge')
 const read_git = vi.spyOn(git_spawn, 'read')
-const { EXPORTS_LABEL, TYPE_CHECK_LABEL } = gate_labels
-const LABELS = [TYPE_CHECK_LABEL, EXPORTS_LABEL, 'cspell']
+const { EXPORTS_LABEL, SPELL_CHECK_LABEL, TYPE_CHECK_LABEL } = gate_labels
+const LABELS = [TYPE_CHECK_LABEL, EXPORTS_LABEL, SPELL_CHECK_LABEL]
 const SOURCE = 'scripts/a.ts'
 const FILES = { [SOURCE]: 'digest-a' }
 const BASE = 'base-a'
@@ -82,11 +82,8 @@ beforeEach(() => {
 })
 
 describe('run_ship_pre_detach.checks — the gate stage after it', () => {
-	it('reuses the type check and the unused-export check on an unchanged tree', async () => {
-		await expect(gate_reuses(await pre_detach('green-'))).resolves.toStrictEqual([
-			TYPE_CHECK_LABEL,
-			EXPORTS_LABEL,
-		])
+	it('reuses the type check, the unused-export check and cspell on an unchanged tree', async () => {
+		await expect(gate_reuses(await pre_detach('green-'))).resolves.toStrictEqual(LABELS)
 	})
 
 	it('runs them again once a changed source moved', async () => {
@@ -98,7 +95,19 @@ describe('run_ship_pre_detach.checks — the gate stage after it', () => {
 	it('runs the check the pre-detach step failed', async () => {
 		answer(new Map([['josh exports:unused', FAILED]]))
 
-		await expect(gate_reuses(await pre_detach('red-'))).resolves.toStrictEqual([TYPE_CHECK_LABEL])
+		await expect(gate_reuses(await pre_detach('red-'))).resolves.toStrictEqual([
+			TYPE_CHECK_LABEL,
+			SPELL_CHECK_LABEL,
+		])
+	})
+
+	it('runs cspell again when the pre-detach step failed it', async () => {
+		answer(new Map([['josh cspell:dot', FAILED]]))
+
+		await expect(gate_reuses(await pre_detach('red-spell-'))).resolves.toStrictEqual([
+			TYPE_CHECK_LABEL,
+			EXPORTS_LABEL,
+		])
 	})
 
 	it('runs every check when the tree moved while the pre-detach step ran', async () => {

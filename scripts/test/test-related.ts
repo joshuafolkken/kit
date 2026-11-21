@@ -9,17 +9,18 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { direct_importers } from './direct-importers'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
-import { test_related_cap, type CappedImporters } from './test-related-cap'
+import { test_related_cap } from './test-related-cap'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record } from './test-related-record'
 import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
-import { test_related_reuse } from './test-related-reuse'
+import { test_related_reuse, type TestReuse } from './test-related-reuse'
 import { test_related_run } from './test-related-run'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import { test_related_select } from './test-related-select'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
 import { test_related_verdict } from './test-related-verdict'
-import { test_related_whole } from './test-related-whole'
+import { unit_worker_share } from './unit-worker-share'
 import { whole_suite_narrowing } from './whole-suite-narrowing'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
@@ -103,13 +104,8 @@ async function explicit_change(
 	return { changed: [...named, ...since_map], map, since_map }
 }
 
-// **The whole-suite leg never narrows by a green a bare run recorded past a file every test imports**:
-// that green vouches only for the file's direct importers (joshuafolkken/kit#5122), so while this
-// branch changes one, the gate's unit leg reads the whole branch change.
-async function is_green_narrowable(is_whole: boolean): Promise<boolean> {
-	if (!is_whole) return true
-
-	return direct_importers.every_test_imports_of((await branch_change()) ?? []).length === 0
+function red_marked(change: ChangeReading, failed: ReadonlyArray<string>): ChangeReading {
+	return failed.length === 0 ? change : { ...change, is_red_rerun: true }
 }
 
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
@@ -122,12 +118,9 @@ async function is_green_narrowable(is_whole: boolean): Promise<boolean> {
 async function since_green_change(
 	root: string,
 	map: ReadMap | undefined,
-	is_whole: boolean,
 	red: RedReading | undefined,
 ): Promise<ChangeReading | FallbackReason> {
-	const reading = (await is_green_narrowable(is_whole))
-		? await test_related_red.narrowing(red)
-		: { fallback: since_green.FALLBACK.HUB }
+	const reading = await test_related_red.narrowing(red)
 
 	if ('fallback' in reading) return reading.fallback
 
@@ -147,16 +140,15 @@ async function since_green_change(
 
 	process.stdout.write(`${test_related_red.describe(reading)}\n`)
 
-	return test_related_moved.moved_reading(change, parts, branch, split)
+	return red_marked(test_related_moved.moved_reading(change, parts, branch, split), failed)
 }
 
 async function whole_change(
 	root: string,
 	map: ReadMap | undefined,
-	is_whole: boolean,
 	red: RedReading | undefined,
 ): Promise<ChangeReading> {
-	const since = await since_green_change(root, map, is_whole, red)
+	const since = await since_green_change(root, map, red)
 
 	if (typeof since !== 'string') return since
 
@@ -174,7 +166,6 @@ function explicit_files(root: string, command_arguments: ReadonlyArray<string>):
 async function read_change(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
-	is_whole: boolean,
 	red: RedReading | undefined,
 ): Promise<ChangeReading> {
 	const map = test_read_map.read_map(root)
@@ -182,7 +173,7 @@ async function read_change(
 
 	return explicit.length > 0
 		? await explicit_change(root, explicit, map)
-		: await whole_change(root, map, is_whole, red)
+		: await whole_change(root, map, red)
 }
 
 // **The changed non-code files the map's tree held and that did not already differ from it** — the
@@ -226,14 +217,8 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 	)
 }
 
-// A file every test imports, or one past the reach cap, narrows to its direct importers (`capped`)
-// unless the run keeps the whole suite: the gate's unit leg outside a lane, and the gate's reuse of
-// it, pass `test_related_cap.NO_CAP` (`test_related_whole.is_whole_suite_kept`).
-async function scope_of(
-	root: string,
-	change: ChangeReading,
-	capped: CappedImporters,
-): Promise<RelatedScope> {
+// What the change reaches; `test-related-select.ts` then caps the test files it runs.
+async function scope_of(root: string, change: ChangeReading): Promise<RelatedScope> {
 	const recorded = await recorded_files(change)
 	const naming = naming_moved(root, change)
 	const narrowing = await whole_suite_narrowing.read(root, change.changed)
@@ -244,31 +229,40 @@ async function scope_of(
 		...narrowing,
 		recorded,
 		naming_moved: naming,
-		every_test_importers: capped.importers,
 		is_present: existsSync,
 	})
 }
 
-// The summary line names the hub the ledger records: the widest capped file of the run's own change.
-function report_capped(capped: CappedImporters, change: ChangeReading): void {
-	test_related_cap.report_over_cap(capped, test_related_record.own_of(change))
-}
+type Selected = Pick<
+	RelatedInput,
+	'scope' | 'deferred' | 'reach' | 'select_elapsed_ms' | 'select_method'
+>
 
-// The test selection's own time — the import graph and the importer index (joshuafolkken/kit#7248) —
-// recorded apart from vitest's so the ledger shows what selecting costs.
-async function capped_of(
+// **The run's test files, capped** (joshuafolkken/kit#7976) — in every checkout, the gate's unit leg
+// on main included: the whole suite is CI's (joshuafolkken/kit#7977). The selection's own time
+// — the import graph and the importer index (joshuafolkken/kit#7248) — is recorded apart from vitest's.
+// The summary line names the hub the ledger records: the widest file of the run's own change.
+async function selected_of(
 	root: string,
 	change: ChangeReading,
-	is_whole: boolean,
-): Promise<{ capped: CappedImporters; select_elapsed_ms: number }> {
-	const files = change.is_unmoved === true ? [] : (change.changed ?? [])
+	scope: RelatedScope,
+): Promise<Selected> {
+	if (scope.mode === 'none') return { scope }
 	const started_ms = performance.now()
-	const capped = await test_related_cap.capped_importers(root, files, is_whole)
+	const named = test_related_record.named_of(change)
+	const selection = await test_related_select.select(root, scope, named)
 	const select_elapsed_ms = performance.now() - started_ms
+	const { deferred, reach, method } = selection
 
-	report_capped(capped, change)
+	test_related_cap.report_deferred(selection, test_related_record.own_of(change))
 
-	return { capped, select_elapsed_ms }
+	return {
+		scope: test_related_select.scope_of(root, scope, selection),
+		deferred,
+		reach,
+		select_elapsed_ms,
+		select_method: method,
+	}
 }
 
 // **Whether a set of changed files can reach any test**, answered by the decision this command
@@ -283,86 +277,80 @@ async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promis
 
 	if (change.map === undefined) return true
 
-	const scope = await scope_of(root, change, test_related_cap.NO_CAP)
+	const scope = await scope_of(root, change)
 
 	return scope.mode !== 'none'
 }
 
-async function resolve_change(
-	root: string,
-	change: ChangeReading,
-	capped: CappedImporters,
-): Promise<RelatedScope> {
+async function resolve_change(root: string, change: ChangeReading): Promise<RelatedScope> {
 	const { UNMOVED_REASON } = related_scope
 
 	if (change.is_unmoved === true) return { mode: 'none', files: [], reason: UNMOVED_REASON }
 
-	return await scope_of(root, change, capped)
+	return await scope_of(root, change)
 }
 
-function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
-	return red?.owed ?? []
+// What the last red run left owed, and whether it narrowed this run (joshuafolkken/kit#7786).
+function red_fields(
+	red: RedReading | undefined,
+	change: ChangeReading,
+): Pick<RelatedInput, 'owed' | 'red_rerun'> {
+	return { owed: red?.owed ?? [], red_rerun: change.is_red_rerun === true }
 }
 
-// What the cap narrowed and what it left whole, for the ledger row (joshuafolkken/kit#7639).
-function cap_record({
-	over_cap,
-	full_reach,
-}: CappedImporters): Pick<RelatedInput, 'over_cap' | 'full_reach'> {
-	return { over_cap, full_reach }
+// **The tree reuse compares against is not the tree a green is recorded on** (joshuafolkken/kit#8288):
+// a scoped run or one after a red records nothing, yet each test whose closed inputs still hash as
+// recorded is as proven there as in a bare run. A standing red record's failed files run again
+// regardless — read whether or not this run narrows by that record.
+async function read_reuse(
+	root: string,
+	resolved: RelatedScope,
+	compared: GateTree | undefined,
+): Promise<TestReuse> {
+	const reuse = await test_related_reuse.read(root, resolved, compared)
+
+	return test_related_reuse.keeping(root, reuse, test_related_red.recorded_failures())
 }
 
+// `before`: the tree a green may be recorded on; `compared`: the tree reuse compares against.
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
-	is_whole: boolean,
 	before: GateTree | undefined,
+	compared: GateTree | undefined,
 ): Promise<RelatedInput> {
 	const red = await test_related_red.read_red(before)
-	const change = await read_change(root, command_arguments, is_whole, red)
-	const { capped, select_elapsed_ms } = await capped_of(root, change, is_whole)
+	const change = await read_change(root, command_arguments, red)
 	const { changed, synced = [], since_map = [], branch } = change
-	const scope = await resolve_change(root, change, capped)
-	const reuse = await test_related_reuse.read(root, scope, red === undefined ? before : undefined)
+	const resolved = await resolve_change(root, change)
+	const selected = await selected_of(root, change, resolved)
+	const reuse = await read_reuse(root, resolved, compared)
 
 	return {
-		scope,
 		root,
 		changed,
 		synced,
 		since_map,
 		branch,
-		owed: owed_of(red),
+		...red_fields(red, change),
 		reuse,
-		...cap_record(capped),
-		select_elapsed_ms,
+		...selected,
 	}
 }
 
-function is_narrowed_argument(
-	root: string,
-	argument: string,
-	over_cap: ReadonlyArray<string>,
-): boolean {
-	if (direct_importers.is_every_test_import(root, argument)) return true
-
-	return over_cap.includes(path.relative(root, path.resolve(argument)))
-}
-
-// A non-code argument is resolved through the map, and a file every test imports or one past the reach
-// cap through its importers, rather than handed to vitest, so only the other code arguments can be
-// ones vitest was not given.
+// A non-code argument is resolved through the map, and a file every test imports through the whole
+// suite's selection, rather than handed to vitest, so only the other code arguments can be ones vitest
+// was not given.
 function report_unhanded(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
 	input: RelatedInput,
 ): void {
-	const over_cap = input.over_cap ?? []
-
 	changed_file_scope.report_unusable_arguments(
 		command_arguments.filter(
 			(argument) =>
-				related_scope.is_relatable(argument) && !is_narrowed_argument(root, argument, over_cap),
+				related_scope.is_relatable(argument) &&
+				!direct_importers.is_every_test_import(root, argument),
 		),
 		input.scope,
 		related_scope.COMMAND_LABEL,
@@ -386,28 +374,32 @@ async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 // A green run records the tree it was green on, a red one the files it failed on
 // (`test-related-red.ts`), so the run after a fix reads only those and what moved.
 async function run_fresh(
-	given: ReadonlyArray<string>,
+	command_arguments: ReadonlyArray<string>,
 	tree: GateTree | undefined,
 ): Promise<number> {
-	const { KEEP_WHOLE_SUITE_FLAG } = gate_labels
-	const command_arguments = given.filter((argument) => argument !== KEEP_WHOLE_SUITE_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const before = command_arguments.length === 0 ? tree : undefined
-	const is_whole = test_related_whole.is_whole_suite_kept(given, root)
-	const input = await read_run_input(root, command_arguments, is_whole, before)
+	const scoping = unit_worker_share.without_worker_flags(command_arguments)
+	const before = scoping.length === 0 ? tree : undefined
+	const input = await read_run_input(root, command_arguments, before, tree)
 	// The branch change by half and base, for the ledger alone (joshuafolkken/kit#6982).
 	const branch_parts = await read_or_undefined(changed_paths.read_changed_parts)
 
 	report_unhanded(root, command_arguments, input)
 
-	return await test_related_run.run_and_vouch({ ...input, branch_parts }, command_arguments, before)
+	return await test_related_run.run_and_vouch(
+		{ ...input, branch_parts, tree: before },
+		command_arguments,
+		before,
+	)
 }
 
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
-	return await test_related_verdict.run(given, async (before) =>
-		given.includes(test_related_touched.TOUCHED_FLAG)
-			? await run_touched(given)
-			: await run_fresh(given, before),
+	return await test_related_verdict.run(
+		unit_worker_share.without_worker_flags(given),
+		async (before) =>
+			given.includes(test_related_touched.TOUCHED_FLAG)
+				? await run_touched(given)
+				: await run_fresh(given, before),
 	)
 }
 

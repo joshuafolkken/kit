@@ -47,7 +47,9 @@ function run_part(mark: RunMark, fields: NameFields): string {
 	const { glyph, color } = RUN_MARKS[mark]
 	const name = fields.run_name ?? linked(BOARD_NAME, KIT_URL, fields.comment_link)
 
-	return styleText(color, `${glyph} ${name}`)
+	const named = `${glyph} ${name}`
+
+	return styleText(color, named)
 }
 
 // A cell under the run's name, past the mark's columns.

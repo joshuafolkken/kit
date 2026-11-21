@@ -1,5 +1,12 @@
+import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
+import { backlog_interrupt } from '#scripts/backlog/backlog-interrupt'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import {
+	BUG_LABEL,
+	INTERRUPT_ROUTE_LABEL,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_classify } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -96,6 +103,50 @@ describe('epic_lane_offer.offer_for_repo — nothing untriaged', () => {
 
 	it('does not gate the single-child form', async () => {
 		const offer = await epic_lane_offer.offer_for_repo([pool([child(FIRST, [])])], request(false))
+
+		expect(offer.children.map((entry) => entry.number)).toEqual([FIRST])
+	})
+})
+
+// joshuafolkken/kit#7860: an interrupt defect outside the pool awaiting a decision holds these lanes
+// as it holds `backlog:next`.
+const INTERRUPT = 839
+
+function serve_interrupt(): void {
+	const row = {
+		...auto_ok_fixture.issue(INTERRUPT, CREATED_EARLIER, [
+			BUG_LABEL,
+			INTERRUPT_ROUTE_LABEL,
+			RUN_SOLO_LABEL,
+		]),
+		body: 'Every run fails the Security Audit in `.github/workflows/`.',
+	}
+
+	issue_list.mockImplementation(async (label) =>
+		listing_outcome(label === INTERRUPT_ROUTE_LABEL ? JSON.stringify([row]) : '[]'),
+	)
+}
+
+describe('epic_lane_offer.offer_for_repo — an interrupt awaiting a decision', () => {
+	it('offers nothing and names the interrupt as awaiting a decision', async () => {
+		serve_interrupt()
+		const offer = await epic_lane_offer.offer_for_repo(
+			[pool([child(FIRST, [RUN_LANE_LABEL])])],
+			request(),
+		)
+
+		expect(offer.children).toEqual([])
+		expect(offer.verdict).toBe('wait')
+		expect(offer.notice).toContain(`issues/${String(INTERRUPT)}`)
+		expect(backlog_interrupt.is_decision_wait(offer.notice)).toBe(true)
+	})
+
+	it('does not hold the single-child form', async () => {
+		serve_interrupt()
+		const offer = await epic_lane_offer.offer_for_repo(
+			[pool([child(FIRST, [RUN_LANE_LABEL])])],
+			request(false),
+		)
 
 		expect(offer.children.map((entry) => entry.number)).toEqual([FIRST])
 	})

@@ -1,4 +1,9 @@
+import { derive_check } from '#scripts/document/derive-check'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import type { ChainRefusal, ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
+import { lane_ledger_write_chain_stage } from '#scripts/lane/lane-ledger-write-chain-stage'
+import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
+import { test_related_caller } from '#scripts/test/test-related-caller'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -15,15 +20,22 @@ const COMMAND = 'pnpm josh run:chain'
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
+const PREFLIGHT_CHECK = 'preflight:check'
+const EXPORTS_UNUSED = 'exports:unused'
+const GUARD_TESTS = 'guard-tests'
 const RUN_REVIEW = 'run:review'
+const [DERIVE_CHECK = ''] = derive_check.DERIVE_CHECK_ARGV
 
 type NextAction = (issue: string) => string
 
 // A notice a stage that exited 0 still stops on, with the action after it, read after the stage ends
-// for the issue the run is on; `undefined` lets the run go on.
+// for the issue the run is on; `undefined` lets the run go on. `refusal` names a procedural stop's
+// kind for the ledger line (joshuafolkken/kit#7926).
 interface HoldStop {
 	notice: string
 	next: NextAction
+	refusal?: ChainRefusal
 }
 
 type StageHold = (issue: string) => Promise<HoldStop | undefined>
@@ -41,6 +53,18 @@ interface ChainStop {
 	code: number
 	next: NextAction
 	notice?: string
+	refusal?: ChainRefusal
+}
+
+// A run's stop, absent when every stage ran, and each stage it ran with its start and length.
+interface ChainRun {
+	stop?: ChainStop
+	stages: ReadonlyArray<ChainStageEntry>
+}
+
+interface TimedStage {
+	entry: ChainStageEntry
+	stop: ChainStop | undefined
 }
 
 type StageRunner = (argv: ReadonlyArray<string>) => Promise<JoshResult>
@@ -62,21 +86,75 @@ const MERGE_STAGE: ChainStage = {
 		`settle what \`${MAIN_MERGE}\` refused (\`chain-rule.md\` → "Orchestration facts single-sourced here"), ${rerun(issue)}`,
 }
 
-// `review_args` — `--unpinned-ok "<reason>"` and `--accept-metrics "<reason>"` as given — goes to
-// `run:review` alone; empty when absent.
-function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
+// A hand edit to a generated page stops here, before the review, rather than at the ship's pre-detach,
+// which runs the same check (joshuafolkken/kit#7728). Kit alone derives pages from its command map.
+const DERIVE_CHECK_STAGE: ChainStage = {
+	name: DERIVE_CHECK,
+	argv: derive_check.DERIVE_CHECK_ARGV,
+	next: (issue) =>
+		`move each named page's hand edit into its source, run \`${derive_check.DERIVE_COMMAND}\`, ${rerun(issue, DERIVE_CHECK)}`,
+}
+
+// Ship's acceptance-map refusal asked of the draft before the review, so a criterion with no row stops
+// here rather than at ship's preflight (joshuafolkken/kit#7727).
+const ACCEPTANCE_STAGE: ChainStage = {
+	name: ACCEPTANCE_CHECK,
+	argv: [ACCEPTANCE_CHECK],
+	next: (issue) =>
+		`write a row for each criterion it names in the ship body draft's \`## 受け入れ条件の対応\`, ${rerun(issue, ACCEPTANCE_CHECK)}`,
+}
+
+// Ship's preflight judgments that need no PR, asked through the ship's own calls before the review, so
+// a classification, live-evidence, removed-tests or unplanned refusal stops here, named by its kind
+// (joshuafolkken/kit#7773). The type check, `cspell:dot` and the scoped pair are `check:related`'s.
+const PREFLIGHT_STAGE: ChainStage = {
+	name: PREFLIGHT_CHECK,
+	argv: [PREFLIGHT_CHECK],
+	next: (issue) =>
+		`settle each named precondition as ship's preflight would (an \`unplanned\` file: widen \`lane:plan\` or revert it), ${rerun(issue, PREFLIGHT_CHECK)}`,
+}
+
+// The pre-detach checks `check:related` does not run: `exports:unused` and the guard tests, with the
+// ship's own argv (`run-ship-pre-detach.ts`), so they stop here rather than at the pre-detach.
+function pre_detach_stages(): ReadonlyArray<ChainStage> {
 	return [
 		{
-			name: SELFCHECK,
-			argv: [SELFCHECK],
-			next: (issue) =>
-				`fix each hit (\`prompts/review.md\` → "Before round 1 — the implementer's self-check"), ${rerun(issue)}; on a hit that is no defect, ${rerun(issue, CHECK_RELATED)}`,
+			name: EXPORTS_UNUSED,
+			argv: run_ship_pre_detach.exports_argv(),
+			next: (issue) => `fix each unused export it names, ${rerun(issue, EXPORTS_UNUSED)}`,
 		},
+		{
+			name: GUARD_TESTS,
+			argv: run_ship_pre_detach.guard_test_argv(process.cwd()),
+			next: (issue) => `fix the red guard test, ${rerun(issue, GUARD_TESTS)}`,
+		},
+	]
+}
+
+const SELFCHECK_STAGE: ChainStage = {
+	name: SELFCHECK,
+	argv: [SELFCHECK],
+	next: (issue) =>
+		`fix each hit (\`prompts/review.md\` → "Before round 1 — the implementer's self-check"), ${rerun(issue)}; on a hit that is no defect, ${rerun(issue, CHECK_RELATED)}`,
+}
+
+// `review_args` — `--unpinned-ok "<reason>"` and `--accept-metrics "<reason>"` as given — goes to
+// `run:review` alone; empty when absent. `is_kit` adds the generated-page check.
+function review_stages(
+	review_args: ReadonlyArray<string>,
+	is_kit: boolean,
+): ReadonlyArray<ChainStage> {
+	return [
+		SELFCHECK_STAGE,
 		{
 			name: CHECK_RELATED,
 			argv: [CHECK_RELATED],
 			next: (issue) => `fix the red check, ${rerun(issue, CHECK_RELATED)}`,
 		},
+		...(is_kit ? [DERIVE_CHECK_STAGE] : []),
+		ACCEPTANCE_STAGE,
+		PREFLIGHT_STAGE,
+		...pre_detach_stages(),
 		{
 			name: RUN_REVIEW,
 			argv: [RUN_REVIEW, ...review_args],
@@ -86,8 +164,11 @@ function review_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainS
 	]
 }
 
-function main_line_stages(review_args: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
-	return [MERGE_STAGE, ...review_stages(review_args)]
+function main_line_stages(
+	review_args: ReadonlyArray<string>,
+	is_kit: boolean,
+): ReadonlyArray<ChainStage> {
+	return [MERGE_STAGE, ...review_stages(review_args, is_kit)]
 }
 
 // The stages from `from` on; `undefined` when no stage has that name.
@@ -101,8 +182,13 @@ function stages_from(
 	return index === -1 ? undefined : stages.slice(index)
 }
 
+// The stage names its command to a `test:related` it starts, for the ledger row
+// (joshuafolkken/kit#7965) — the command alone, not its arguments.
 async function josh_stage(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, true)
+	const [command = ''] = argv
+	const caller = test_related_caller.environment(`run:chain ${command}`)
+
+	return await josh_command.josh_run(argv, true, undefined, caller)
 }
 
 async function held(stage: ChainStage, issue: string): Promise<ChainStop | undefined> {
@@ -112,13 +198,15 @@ async function held(stage: ChainStage, issue: string): Promise<ChainStop | undef
 	return stop === undefined ? undefined : { stage, code: SUCCESS_EXIT_CODE, ...stop }
 }
 
-// The stage's stdout is printed as it ends; stderr is forwarded as it is written.
+// The stage's stdout is printed as it ends; stderr is forwarded as it is written. A stage with no argv
+// runs no command: its hold is the check.
 async function run_stage(
 	stage: ChainStage,
 	issue: string,
 	print: Print,
 	run: StageRunner,
 ): Promise<ChainStop | undefined> {
+	if (stage.argv.length === 0) return await held(stage, issue)
 	const result = await run(stage.argv)
 
 	if (result.out !== '') print(result.out)
@@ -127,20 +215,55 @@ async function run_stage(
 	return await held(stage, issue)
 }
 
+// One stage run and timed from its start through its hold, its `chain-stage` ledger line appended as it
+// ends, so a run killed or stopped part way still leaves the stages it finished (joshuafolkken/kit#8286).
+async function timed_stage(
+	stage: ChainStage,
+	issue: string,
+	print: Print,
+	run: StageRunner,
+): Promise<TimedStage> {
+	const started_ms = Date.now()
+	const stop = await run_stage(stage, issue, print, run)
+	const ended_ms = Date.now()
+	const entry = {
+		name: stage.name,
+		at: new Date(started_ms).toISOString(),
+		elapsed_ms: ended_ms - started_ms,
+	}
+	const result = stop === undefined ? 'passed' : 'stopped'
+	// Dated at its end, as it is appended, so a long stage never stops the ledger tail's backward scan.
+	const at = new Date(ended_ms).toISOString()
+
+	await lane_ledger_write_chain_stage.record_chain_stage({
+		issue: Number(issue),
+		...entry,
+		at,
+		result,
+	})
+
+	return { entry, stop }
+}
+
+// Each stage that ran, the stopped one included, so the run's `chain` line shows where a long run
+// spent its time (joshuafolkken/kit#7736).
 async function run_stages(
 	stages: ReadonlyArray<ChainStage>,
 	issue: string,
 	print: Print,
 	run: StageRunner = josh_stage,
-): Promise<ChainStop | undefined> {
+): Promise<ChainRun> {
+	const timed: Array<ChainStageEntry> = []
+
 	for (const stage of stages) {
 		// eslint-disable-next-line no-await-in-loop -- each stage runs on the tree the earlier ones left
-		const stop = await run_stage(stage, issue, print, run)
+		const { entry, stop } = await timed_stage(stage, issue, print, run)
 
-		if (stop !== undefined) return stop
+		timed.push(entry)
+		if (stop !== undefined) return { stop, stages: timed }
 	}
 
-	return undefined
+	return { stages: timed }
 }
 
 // The reports open with the invocation as typed (`run:chain <N>`), not an Issue citation.
@@ -166,4 +289,4 @@ const run_chain = {
 }
 
 export { run_chain }
-export type { ChainStage, ChainStop, HoldStop, StageHold, StageRunner }
+export type { ChainRun, ChainStage, ChainStop, HoldStop, StageHold, StageRunner }

@@ -1,4 +1,6 @@
 #!/usr/bin/env tsx
+import { mkdirSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
 	agent_provider,
@@ -21,7 +23,7 @@ import { run_hold_block } from '#scripts/run/hold/run-hold-block'
 import { execa } from 'execa'
 import { run_handoff_args, type WorkflowHandoff } from './run-handoff-args'
 import { run_handoff_final } from './run-handoff-final'
-import { run_handoff_launch, type BuiltArgv } from './run-handoff-launch'
+import { run_handoff_launch, type BuiltArgv, type HandoffChild } from './run-handoff-launch'
 import { run_handoff_retrospective } from './run-handoff-retrospective'
 
 // `josh run:handoff <keyword> [N|new ...] --brief-file <path>` — hand a workflow keyword typed in a
@@ -36,6 +38,8 @@ const FAILURE_EXIT_CODE = 1
 const AGENT_FLAG = '--agent'
 const LONE_FLAGS: ReadonlySet<string> = new Set(['--stop', '--restart'])
 const ISSUE_TOKEN = /#(\d+)/u
+// The line `kickoff new …` — `kickoff #N` plans an existing Issue instead.
+const KICKOFF_NEW_LINE = /^kickoff\s+new(?:\s|$)/u
 const USAGE =
 	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> | retrospective | backlogrun [...]'
 // `josh backlogrun --agent` names a provider by its CLI.
@@ -53,6 +57,7 @@ interface HandoffPorts {
 	read_text: (target: string) => string | undefined
 	launch: (request: LaunchRequest) => LaunchResult
 	launch_attached: (request: LaunchRequest) => Promise<AttachedLaunchResult>
+	make_directory: (target: string) => void
 	backlogrun: (argv: ReadonlyArray<string>) => Promise<number>
 	// Whether the carry record under this git directory marks the retrospective as run.
 	is_retrospective_done: (git_directory: string) => boolean
@@ -71,6 +76,8 @@ interface Started {
 	built: BuiltArgv
 	request: LaunchRequest
 	log: string
+	// The child's own scratch directory, relative to the checkout, which its prompt names.
+	scratch: string
 	git_directory: string
 }
 
@@ -110,6 +117,9 @@ const LIVE_PORTS: HandoffPorts = {
 	launch: (request) => detached_launch.launch(request, note_to_stderr),
 	launch_attached: async (request) =>
 		await detached_launch.launch_attached(request, note_to_stderr),
+	make_directory: (target) => {
+		mkdirSync(target, { recursive: true })
+	},
 	backlogrun: josh_backlogrun,
 	is_retrospective_done: (git_directory) =>
 		run_carry.retrospective_done_of(run_carry.read_carry(run_carry.carry_path(git_directory))),
@@ -135,9 +145,7 @@ function started_line({ handoff, built }: Started): string {
 	return `run:handoff: \`${handoff.line}\` → ${provider} ${model} / ${effort} (${built.profile.role})`
 }
 
-function result_lines(log: string): ReadonlyArray<string> {
-	const message = run_handoff_final.final_message(log)
-
+function result_lines(message: string | undefined): ReadonlyArray<string> {
 	if (message === undefined) return ['final message: none — read the log']
 
 	const urls = run_handoff_final.github_urls(message)
@@ -153,12 +161,37 @@ function closed_retrospective(started: Started, ports: HandoffPorts): number {
 	return refuse('the retrospective unit ended without run:carry --retrospective', ports)
 }
 
-function waited_exit(started: Started, exit_code: number | null, ports: HandoffPorts): number {
+// A `kickoff new` child can end cleanly without filing — a cut-off `issue:file` — so its success is the
+// created Issue's URL in its final message, which its prompt asks for (`run-handoff-launch.ts`).
+function filed_kickoff(started: Started, message: string | undefined, ports: HandoffPorts): number {
+	if (run_handoff_final.names_issue(message)) return SUCCESS_EXIT_CODE
+
+	return refuse(
+		[
+			'kickoff new ended without a created Issue URL — nothing is confirmed filed;',
+			`read the log: ${started.log}`,
+			'A cut-off issue:file may still have created it: before filing again, search for it with',
+			'`gh issue list --search "<title>" --state all`.',
+		].join('\n'),
+		ports,
+	)
+}
+
+function waited_exit(
+	started: Started,
+	exit_code: number | null,
+	message: string | undefined,
+	ports: HandoffPorts,
+): number {
 	if (started.handoff.keyword === run_handoff_args.RETROSPECTIVE_KEYWORD) {
 		return closed_retrospective(started, ports)
 	}
 
-	return exit_code === SUCCESS_EXIT_CODE ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	if (exit_code !== SUCCESS_EXIT_CODE) return FAILURE_EXIT_CODE
+
+	return KICKOFF_NEW_LINE.test(started.handoff.line)
+		? filed_kickoff(started, message, ports)
+		: SUCCESS_EXIT_CODE
 }
 
 async function waited(started: Started, ports: HandoffPorts): Promise<number> {
@@ -166,13 +199,13 @@ async function waited(started: Started, ports: HandoffPorts): Promise<number> {
 
 	if (result.kind === 'failed') return refuse(`could not start: ${result.note}`, ports)
 
-	const lines = result_lines(ports.read_text(started.log) ?? '')
+	const message = run_handoff_final.final_message(ports.read_text(started.log) ?? '')
 
-	for (const line of lines) ports.write(line)
+	for (const line of result_lines(message)) ports.write(line)
 
 	ports.write(`exit: ${String(result.exit_code)}`)
 
-	return waited_exit(started, result.exit_code, ports)
+	return waited_exit(started, result.exit_code, message, ports)
 }
 
 // The issue the child's `run:entry` claims under: the line's first `#N`, else an unnumbered run.
@@ -207,25 +240,33 @@ async function launched(started: Started, ports: HandoffPorts): Promise<number> 
 
 	if (note !== undefined) return refuse(note, ports)
 
+	ports.make_directory(path.join(ports.cwd, started.scratch))
 	ports.write(started_line(started))
 	ports.write(`log: ${started.log}`)
 
 	return is_waited ? await waited(started, ports) : detached(started, ports)
 }
 
+function child_of(input: StartInput, scratch: string, cwd: string): HandoffChild {
+	const { handoff, provider, brief } = input
+	const prompt = run_handoff_launch.prompt_of(handoff, brief, scratch)
+
+	return { prompt, role: run_handoff_launch.role_of(handoff.keyword), provider, cwd }
+}
+
+// One start time names both the log and the scratch directory, so each child's pair reads together.
 function started_of(input: StartInput, ports: HandoffPorts): StartResult {
-	const { handoff, provider, brief, git_directory } = input
-	const prompt = run_handoff_launch.prompt_of(handoff, brief)
-	const role = run_handoff_launch.role_of(handoff.keyword)
-	const child = { prompt, role, provider, cwd: ports.cwd }
-	const built = run_handoff_launch.argv_of(child, ports.environment)
+	const { handoff, git_directory } = input
+	const now = ports.now()
+	const scratch = run_handoff_launch.scratch_directory(handoff.keyword, now)
+	const built = run_handoff_launch.argv_of(child_of(input, scratch, ports.cwd), ports.environment)
 
 	if (built.kind === 'rejected') return { kind: 'refused', note: `could not start: ${built.note}` }
 
-	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, ports.now())
+	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, now)
 	const request = run_handoff_launch.request_of(built, ports.cwd, log)
 
-	return { kind: 'started', started: { handoff, built, request, log, git_directory } }
+	return { kind: 'started', started: { handoff, built, request, log, scratch, git_directory } }
 }
 
 // A brief file is read as written; none means the generated retrospective brief, whose close names

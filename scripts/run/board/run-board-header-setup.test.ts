@@ -3,9 +3,10 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_activity, type RunActivity } from './run-board-activity'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardLayout, BoardRow } from './run-board-layout'
-import { run_board_status, type RunActivity } from './run-board-status'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#3696: the header while the run is at a stage of its own. joshuafolkken/kit#3767:
 // the mark stands still; the spinner turns on the third line, before the stage's time and icon.
@@ -84,8 +85,11 @@ function planned(layout: BoardLayout, activity: RunActivity): BoardHeader {
 	return header({ layout, activity, plan_fetched_ms: NOW })
 }
 
+// The header as written, the sweep's placeholder (joshuafolkken/kit#8240) drawn back.
 function lines_of(board: BoardHeader): Array<string> {
-	return run_board_header.header_lines(board).map((line) => stripVTControlCharacters(line))
+	return run_board_header
+		.header_lines(board)
+		.map((line) => run_board_spot.drawn(stripVTControlCharacters(line), SPINNER))
 }
 
 function title_of(board: BoardHeader): string {
@@ -105,7 +109,7 @@ function staged(...stages: ReadonlyArray<string>): RunActivity {
 		at: new Date(STARTED + index * SECOND).toISOString(),
 	}))
 
-	return run_board_status.activity_of(events, false)
+	return run_board_activity.activity_of(events, false)
 }
 
 describe('run_board_header.header_lines idle before the drain flush', () => {

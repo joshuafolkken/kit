@@ -22,18 +22,19 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		// A `--halfrun-stop` / `--human-review-stop` / `--prrun-stop` sends the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'[<issue> [--fullrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | --adopt <issue>',
+			'[<issue> [--fullrun | --prrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | --adopt <issue>',
 			'automation',
 			['files'],
 		],
 		usage: {
 			examples: [
 				{ arguments: '1091', note: 'claim for issue 1091' },
-				{ arguments: '1091 --fullrun', note: 'claim as `fullrun #1091` (what `run:entry` runs)' },
+				{ arguments: '1091 --fullrun', note: 'claim as `fullrun #1091`' },
 				{ arguments: '--adopt 1091', note: "hand a `new` run's hold to the issue it filed" },
 			],
 			flags: [
 				{ names: ['--fullrun'], description: "marks the record as `fullrun #N`'s." },
+				{ names: ['--prrun'], description: "marks it as `prrun #N`'s, also read as a `fullrun`." },
 				{
 					names: ['--adopt <issue>'],
 					description:
@@ -175,6 +176,8 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/cut/run-cut-cli.ts',
 		description: 'Cut a lane child before the gate and resume a fresh process',
 		category: 'AI tools',
+		// `--deliverable` closes the Issue through `backlog_triage_close`, whose lane release notifies.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: ['[--resume] <issue> [--impl] [--handoff <path>]', 'automation', ['files']],
 		usage: {
 			examples: [
@@ -182,6 +185,10 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--impl 1839 --handoff .josh/tmp/handoff-1839.json',
 					note: 'cut mid-implementation, carrying the instruction',
+				},
+				{
+					arguments: '1839 --deliverable <comment-url>',
+					note: 'close a no-diff investigation lane as completed',
 				},
 				{ arguments: '--resume 1839', note: "a fresh process's entry check" },
 				{ arguments: '--end', note: 'clear the record' },
@@ -194,14 +201,15 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'<issue> --body-file <path> | <issue> --clear | <issue> --escalate <reason>',
+			'<issue> --body-file <path> --outcome <next action> | <issue> --clear | <issue> --escalate <reason>',
 			'automation',
 			['files', 'network'],
 		],
 		usage: {
 			examples: [
 				{
-					arguments: '1839 --body-file .josh/tmp/park-1839.md',
+					arguments:
+						'1839 --body-file .josh/tmp/park-1839.md --outcome "pnpm josh lane:launch 1839"',
 					note: 'options, tiers and a recommendation; then needs-decision, the record, run:release',
 				},
 				{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },

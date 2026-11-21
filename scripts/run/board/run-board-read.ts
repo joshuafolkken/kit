@@ -5,17 +5,20 @@ import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
+import type { LaneStateRecord } from '#scripts/lane/lane-state'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
-import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_tail } from '#scripts/run/event/run-event-tail'
-import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
+import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_wake } from '#scripts/run/wake/run-wake'
-import { run_board_found, type FoundOf } from './run-board-found'
+import { run_board_events_memo } from './run-board-events-memo'
+import type { FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
+import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
+import { run_board_ledger_window } from './run-board-ledger-window'
 import {
 	run_board_operation_read,
 	type OperationSources,
@@ -23,10 +26,12 @@ import {
 } from './run-board-operation-read'
 import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
+import { run_board_read_local } from './run-board-read-local'
+import { run_board_records } from './run-board-records'
 import { run_board_scope } from './run-board-scope'
-import { run_board_single, type EndedRoot, type RootRun } from './run-board-single'
-import { run_board_span, type BoardSpan } from './run-board-span'
-import { run_board_span_read } from './run-board-span-read'
+import type { EndedRoot, RootRun } from './run-board-single'
+import type { BoardSpan } from './run-board-span'
+import { run_board_span_read, type SpanHere } from './run-board-span-read'
 import { run_board_throughput, type ThroughputRow } from './run-board-throughput'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
 
@@ -46,6 +51,8 @@ interface LocalRead {
 	root?: RootRun | undefined
 	// The root checkout's single runs a merge ended inside the run, drawn in `✅ done`.
 	ended_roots?: ReadonlyArray<EndedRoot> | undefined
+	// The board's own single run, where a stop ended it (joshuafolkken/kit#7710).
+	stopped_single?: EndedRoot | undefined
 	// What the run was asked to do, from its invocation.
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
@@ -83,11 +90,15 @@ interface LocalRead {
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
+	// How long lanes took from dispatch to merge, from the same ledger.
+	lane_totals?: LaneTotals | undefined
 	// The reset a Claude usage limit holds the running run's launches until (`run-merge-usage-limit.ts`);
 	// `undefined` once it has passed, where none was recorded, or where no run is carried.
 	usage_reset_ms?: number | undefined
 	// How many children that limit stopped and still holds (joshuafolkken/kit#5395).
 	usage_parked?: number | undefined
+	// What the hold resuming last is for — an authentication failure or a limit (joshuafolkken/kit#8012).
+	usage_cause?: HoldCause | undefined
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
 	// open hold is `backlog-drive-memory.ts`'s.
 	is_memory_held?: boolean | undefined
@@ -111,6 +122,7 @@ interface LocalRead {
 // `git` subprocess the redraw would wait on (joshuafolkken/kit#4263). A failed resolve is forgotten,
 // so a `git` that timed out once is asked again on the next redraw rather than failing every one.
 const main_roots = stamped_memo.create<Promise<string>>()
+const { timing } = launch_timing
 
 async function main_root(): Promise<string> {
 	try {
@@ -174,13 +186,13 @@ function unfinished_here(
 }
 
 // Every lane record, read once for the lanes' states and the closes still unfinished.
-async function lanes_here(
+function lanes_here(
 	lanes: ReadonlyArray<LaneInfo>,
 	repository: string,
 	events: ReadonlyArray<RunEvent>,
 	started_ms: number,
-): Promise<Pick<LocalRead, 'lane_states' | 'closing' | 'stuck'>> {
-	const records = await lane_state.read_records(repository)
+): Pick<LocalRead, 'lane_states' | 'closing' | 'stuck'> {
+	const records = run_board_records.read_records(repository)
 
 	return {
 		lane_states: sorted_here(lanes, records, events, started_ms),
@@ -219,16 +231,20 @@ async function lane_room_of(
 	}
 }
 
-// The repository's lane ledger, read once for the usual times and the driver's open hold.
+// The repository's lane ledger, read once — its recent window (joshuafolkken/kit#7932) — for the usual
+// times, the lane totals and the driver's open hold — the usual times net of the host's stops on
+// `events` (joshuafolkken/kit#7905).
 function ledger_here(
 	repository: string,
-): Pick<LocalRead, 'usual' | 'is_memory_held' | 'launch_hold'> {
-	const entries = lane_ledger.read_entries(lane_ledger.target_of(repository))
+	events: ReadonlyArray<RunEvent>,
+): Pick<LocalRead, 'usual' | 'lane_totals' | 'is_memory_held' | 'launch_hold'> {
 	const now_ms = Date.now()
+	const entries = run_board_ledger_window.entries_of(lane_ledger.target_of(repository), now_ms)
 	const launch_hold = lane_held_stats.open_reason(entries, now_ms)
 
 	return {
-		usual: run_board_usual.usual_of(entries, now_ms),
+		usual: run_board_usual.usual_of(entries, now_ms, run_board_events_memo.host_gaps(events)),
+		lane_totals: run_board_lane_totals.totals_of(entries, now_ms),
 		is_memory_held: launch_hold === backlog_drive_memory.HOLD_REASON,
 		launch_hold,
 	}
@@ -237,113 +253,119 @@ function ledger_here(
 // The repository's own records: its lane ledger, and the kit version its supervisor recorded.
 function records_here(
 	repository: string,
+	events: ReadonlyArray<RunEvent>,
 ): ReturnType<typeof ledger_here> & Pick<LocalRead, 'kit_version'> {
 	return {
-		...ledger_here(repository),
+		...ledger_here(repository, events),
 		kit_version: run_wake.read_wake(run_wake.wake_path(repository))?.kit_version,
 	}
 }
 
-// The reset a usage limit holds the running run's launches until, read off the events `backlog:drive`
-// reads it off (`run_event_stream_emit.current_events`): the carried invocation's, so an ended run's
-// stop holds no row the driver would launch — and how many children it stopped.
-function usage_reset_here(
+async function main_lanes(): Promise<Array<LaneInfo>> {
+	return await lane_registry.list_lanes(await main_root())
+}
+
+// Each read `read_local` awaits, timed for `run:board --timing`; a module's read is looked up at the
+// call, so a test's spy on it is the one called.
+const read_repository = timing(
+	'local: repository',
+	async () => await run_carry.repository_directory(),
+)
+const read_span = timing(
+	'local: span',
+	async (repository: string | undefined, table?: TableRead) =>
+		await run_board_span_read.span_here(repository, table),
+)
+const read_lanes = timing('local: lanes', main_lanes)
+const read_room = timing('local: room', lane_room_of)
+const read_records = timing(
+	'local: ledger',
+	async (repository: string, events: ReadonlyArray<RunEvent>) => records_here(repository, events),
+)
+const { read_roots, read_span_events, span_fields } = run_board_read_local
+
+type RunSpan = SpanHere & { span: BoardSpan }
+type RunFields = Pick<
+	LocalRead,
+	| keyof Omit<SpanHere, 'span' | 'root' | 'transcript'>
+	| 'scope'
+	| 'throughput'
+	| 'lanes'
+	| 'operations'
+>
+
+// The fields read off the span's record and the run's stream, with no subprocess.
+function run_fields(
+	repository: string,
+	read: RunSpan,
+	lanes: ReadonlyArray<LaneInfo>,
 	events: ReadonlyArray<RunEvent>,
-	carry: RunCarry | undefined,
-): Pick<LocalRead, 'usage_reset_ms' | 'usage_parked'> {
-	if (carry === undefined) return { usage_reset_ms: undefined }
-	const scope = run_event_scope.scope_of({ kind: 'carried', carry })
-	const scoped = run_event_scope.scoped_events(events, scope) ?? []
-	const now_ms = Date.now()
+): RunFields {
+	const { span, transcript, carry, resume, roots, is_stranded, is_session_active } = read
 
 	return {
-		usage_reset_ms: run_merge_usage_limit.held_until(scoped, now_ms),
-		usage_parked: run_merge_usage_limit.held_count(scoped, now_ms),
-	}
-}
-
-// The run's own events, what its done rows say after their time with each open investigation's
-// session asked of `table`, and the usage limit its record's invocation is held by.
-async function span_events_here(
-	events: ReadonlyArray<RunEvent>,
-	span: BoardSpan,
-	table: TableRead | undefined,
-	carry: RunCarry | undefined,
-): Promise<Pick<LocalRead, 'events' | 'found' | 'usage_reset_ms' | 'usage_parked'>> {
-	const spanned = run_board_single.events_of(span, run_board_span.events_of(events, span))
-	// An overrun session outlives the run that launched it, so its notes and filings are read past the
-	// run's end too (joshuafolkken/kit#4818); the next run starts a span of its own.
-	const since = run_board_span.events_of(events, { ...span, ended_ms: undefined })
-
-	return {
-		events: spanned,
-		found: run_board_found.found_of(since, await run_board_found.live_in(table)),
-		...usage_reset_here(events, carry),
-	}
-}
-
-type RootFields = Pick<LocalRead, 'root' | 'ended_roots'>
-
-// The span's own fields, with the root checkout's single runs beside it.
-function span_fields(
-	span: BoardSpan,
-	root: RootFields,
-): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name'> & RootFields {
-	const run_name = run_board_single.name_of(span.invocation)
-	const times = {
-		...root,
-		started_ms: span.started_ms,
-		ended_ms: span.ended_ms,
-		...(run_name !== undefined && { run_name }),
-	}
-
-	if (span.scheduler_provider === undefined) return times
-
-	return { ...times, scheduler_provider: span.scheduler_provider === 'openai' ? 'codex' : 'claude' }
-}
-
-// The root checkout's single run beside the span, and its runs a merge ended inside it.
-async function roots_here(
-	span: BoardSpan,
-	root: BoardSpan | undefined,
-	events: ReadonlyArray<RunEvent>,
-): Promise<RootFields> {
-	const ended_roots = await run_board_single.ended_here(span)
-
-	return root === undefined
-		? { ended_roots }
-		: { root: run_board_single.root_of(root, events), ended_roots }
-}
-
-// `undefined` when no run has started here. The lane count reads `table`, the redraw's process
-// snapshot, so it agrees with the usage columns.
-async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
-	const repository = await run_carry.repository_directory()
-	const { span, root, resume, transcript, roots, carry, is_stranded, is_session_active } =
-		await run_board_span_read.span_here(repository, table)
-
-	if (repository === undefined || span === undefined) return undefined
-
-	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
-	const lanes = await lane_registry.list_lanes(await main_root())
-	const lane_read = await lanes_here(lanes, repository, events, span.started_ms)
-
-	return {
-		...span_fields(span, await roots_here(span, root, events)),
 		scope: run_board_scope.scope_of(span.invocation, carry?.added),
-		...(await span_events_here(events, span, table, carry)),
 		throughput: run_board_throughput.rows_of(events, Date.now()),
 		lanes: lanes.map((lane) => lane.issue),
-		...lane_read,
 		resume,
 		roots,
 		carry,
 		is_stranded,
 		is_session_active,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
-		...(await lane_room_of(lanes, lane_read.lane_states, table)),
-		...records_here(repository),
 	}
+}
+
+// The run's reads past its span. The roots, the run's events and the lane room read none of each
+// other's results, so their subprocesses run together; the synchronous ledger read runs while they
+// are in flight (joshuafolkken/kit#7931).
+async function run_read(
+	repository: string,
+	read: RunSpan,
+	lanes: ReadonlyArray<LaneInfo>,
+	table: TableRead | undefined,
+): Promise<LocalRead> {
+	const { span, root, carry } = read
+	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
+	const lane_read = lanes_here(lanes, repository, events, span.started_ms)
+	const [root_fields, span_events, room, records] = await Promise.all([
+		read_roots(span, root, events),
+		read_span_events(events, span, table, carry),
+		read_room(lanes, lane_read.lane_states, table),
+		read_records(repository, events),
+	])
+	const fields = run_fields(repository, read, lanes, events)
+
+	return {
+		...span_fields(span, root_fields),
+		...fields,
+		...span_events,
+		...lane_read,
+		...room,
+		...records,
+	}
+}
+
+// The lanes, or why they could not be read: a read with no run never uses them, so their failure is
+// thrown only where a run reads them.
+async function lanes_or_failure(): Promise<Array<LaneInfo> | Error> {
+	try {
+		return await read_lanes()
+	} catch (error) {
+		return error instanceof Error ? error : new Error(String(error))
+	}
+}
+
+// `undefined` when no run has started here. The lane count reads `table`, the redraw's process
+// snapshot, so it agrees with the usage columns. The lanes are read beside the span.
+async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
+	const repository = await read_repository()
+	const [read, lanes] = await Promise.all([read_span(repository, table), lanes_or_failure()])
+
+	if (repository === undefined || read.span === undefined) return undefined
+	if (lanes instanceof Error) throw lanes
+
+	return await run_read(repository, { ...read, span: read.span }, lanes, table)
 }
 
 const run_board_read = { read_local }

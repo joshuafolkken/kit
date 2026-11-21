@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { QuotaReading, Quotas } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 
@@ -29,7 +30,9 @@ function window_of(
 function rows_of(view: Partial<QuotaView>): Array<string> {
 	const part = usage_part({ now_ms: NOW_MS, ...view })
 
-	return (part?.lines ?? []).map((line) => stripVTControlCharacters(line.text))
+	return (part?.lines ?? []).map((line) =>
+		run_board_label_pair.bare(stripVTControlCharacters(line.text)),
+	)
 }
 
 function raw_row(observation: QuotaReading, now_ms: number): string {
@@ -57,8 +60,8 @@ function expect_percent_columns(row: string, used: number): void {
 	const last_percent = row.lastIndexOf(`${String(used)}%`)
 	const last_column = run_board_fit.width_of(row.slice(0, last_percent))
 
-	expect(column_at(row, `${String(used)}%`) + String(used).length).toBe(22)
-	expect(last_column + String(used).length).toBe(71)
+	expect(column_at(row, `${String(used)}%`) + String(used).length).toBe(25)
+	expect(last_column + String(used).length).toBe(74)
 }
 
 describe('run_board_render_quota twenty-step bars', () => {
@@ -114,8 +117,8 @@ describe('run_board_render_quota scheduler', () => {
 			const [first = '', second = ''] = rows_of(view)
 			const plain = rows_of({ quotas: QUOTAS }).find((row) => row.includes(name)) ?? ''
 
-			expect(first).toMatch(new RegExp(`^  🤖 ${name} `, 'u'))
-			expect(second).toMatch(/^ {5}(Claude|Codex) /u)
+			expect(first).toMatch(new RegExp(`^ {5}🤖 ${name} `, 'u'))
+			expect(second).toMatch(/^ {8}(Claude|Codex) /u)
 			expect(second).not.toContain('🤖')
 			expect(column_at(first, value)).toBe(column_at(plain, value))
 			expect(column_at(first, weekly)).toBe(column_at(plain, weekly))
@@ -138,9 +141,11 @@ describe('run_board_render_quota.usage_part', () => {
 		expect(part?.label).toBe('⛽ usage')
 		expect(part?.summary).toBe('Claude 42/68 · Codex 45')
 		expect(claude).toMatch(
-			/^ {2}Claude {8}5h {2}42% ■■■■■■■■────┊─────── {10}14:00 {6}7d {2}68% ■■■■■■■■■■■┊■■────── {6}Sun 12:00$/u,
+			/^ {5}Claude {8}5h {2}42% ■■■■■■■■────┊─────── {10}14:00 {6}7d {2}68% ■■■■■■■■■■■┊■■────── {6}Sun 12:00$/u,
 		)
-		expect(codex).toBe(`  Codex${' '.repeat(9)}7d  45% ┊■■■■■■■■───────────${' '.repeat(10)}11/08`)
+		expect(codex).toBe(
+			`     Codex${' '.repeat(9)}7d  45% ┊■■■■■■■■───────────${' '.repeat(10)}11/08`,
+		)
 		expect(column_at(codex, '45%')).toBe(column_at(claude, '42%'))
 		expect(`${claude}\n${codex}`).not.toContain('↻')
 	})
@@ -149,9 +154,9 @@ describe('run_board_render_quota.usage_part', () => {
 		const quotas = { claude: undefined, codex: reading([window_of(THIRTY_DAYS, 7, HOUR_MS)]) }
 		const [claude, codex = ''] = rows_of({ quotas })
 
-		expect(claude).toBe('  Claude    —')
-		expect(codex).toMatch(/^ {2}Codex {8}30d {3}7% \S{20} {10}13:00$/u)
-		expect(column_at(codex, '7%')).toBe(21)
+		expect(claude).toBe(`     Claude${' '.repeat(9)}—`)
+		expect(codex).toMatch(/^ {5}Codex {8}30d {3}7% \S{20} {10}13:00$/u)
+		expect(column_at(codex, '7%')).toBe(24)
 	})
 
 	it('draws a window whose reset has passed as empty, its reset rolled on a window', () => {
@@ -170,7 +175,7 @@ describe('run_board_render_quota.usage_part tasks left', () => {
 		const [claude = ''] = rows_of({ quotas })
 
 		expect(claude).toMatch(
-			/^ {2}Claude {8}5h {2}42% ■■■■■■■■────┊─────── {3}≈9 {5}14:00 {6}7d {2}68% ■■■■■■■■■■■┊■■────── {3}≈5 Sun 12:00$/u,
+			/^ {5}Claude {8}5h {2}42% ■■■■■■■■────┊─────── {3}≈9 {5}14:00 {6}7d {2}68% ■■■■■■■■■■■┊■■────── {3}≈5 Sun 12:00$/u,
 		)
 		expect(usage_part({ quotas, now_ms: NOW_MS })?.summary).toBe('Claude 42/68 ≈9/5 · Codex 45')
 	})
@@ -182,7 +187,7 @@ describe('run_board_render_quota.usage_part tasks left', () => {
 		const part = usage_part({ quotas, now_ms: NOW_MS })
 
 		expect(claude).toMatch(
-			/^ {2}Claude {8}5h {2}42% \S{20} {10}13:00 {6}7d {2}68% \S{20} {3}≈4 {5}13:00$/u,
+			/^ {5}Claude {8}5h {2}42% \S{20} {10}13:00 {6}7d {2}68% \S{20} {3}≈4 {5}13:00$/u,
 		)
 		expect(part?.summary).toBe('Claude 42/68 ≈—/4 · Codex 45')
 	})
@@ -247,7 +252,7 @@ describe('run_board_render_quota.usage_part missing and hold', () => {
 		const rows = rows_of({ quotas })
 
 		for (const row of rows) {
-			expect(row).toMatch(/^ {2}(Claude|Codex) +—$/u)
+			expect(row).toMatch(/^ {5}(Claude|Codex) +—$/u)
 			expect(row).not.toMatch(/0%|ago|unknown/u)
 		}
 
@@ -258,7 +263,7 @@ describe('run_board_render_quota.usage_part missing and hold', () => {
 		const hold = { reset_ms: NOW_MS + 2 * HOUR_MS, parked: 3 }
 		const [claude, codex] = rows_of({ quotas: QUOTAS, hold })
 
-		expect(claude).toBe('  Claude    🛑 limit · resumes ↻ 14:00 · 3 parked')
+		expect(claude).toBe('     Claude    🛑 limit · resumes ↻ 14:00 · 3 parked')
 		expect(codex).toContain('45%')
 	})
 })

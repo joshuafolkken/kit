@@ -26,6 +26,7 @@ const ROUND_ONE = 'review round 1'
 const ROUND_TWO = 'review round 2'
 const IMPLEMENT_LEAD = 'implement: '
 const REVIEW_FIX = 'review-fix'
+const REVIEW_FIX_PHASE = `${IMPLEMENT_LEAD}${REVIEW_FIX}`
 const AGENT_LEAD = 'subagent: '
 // A request that issued none of the calls below edits or thinks — the remainder `lane:breakdown`
 // names `editing & thinking`.
@@ -99,7 +100,7 @@ function implement_phase(placed: Placed, at_ms: number): string {
 
 // Between ship stages a request after the review is the fix of a stopped ship; any other is the stage's.
 function between_phase(placed: Placed, at_ms: number): string {
-	return is_fix(placed, at_ms) ? `${IMPLEMENT_LEAD}${REVIEW_FIX}` : lane_breakdown.BETWEEN_STAGE
+	return is_fix(placed, at_ms) ? REVIEW_FIX_PHASE : lane_breakdown.BETWEEN_STAGE
 }
 
 function review_round(stage: string): string {
@@ -165,17 +166,23 @@ interface PhaseInput {
 	breakdowns: ReadonlyMap<number, Breakdown>
 }
 
-function add_session(rows: RecordGroups, input: PhaseInput, session: AuditSession): void {
+// Each of a lane session's requests with its phase; a session with no issue places none.
+function placed_phases(input: PhaseInput, session: AuditSession): Array<[UsageRecord, string]> {
 	const { issue } = session
 
-	if (issue === undefined) return
+	if (issue === undefined) return []
 
 	const breakdown = input.breakdowns.get(issue)
 	const from_ms = review_from_ms(input.reviews, issue)
 
-	for (const record of session.records) {
-		add_record(rows, phase_of({ session, record, breakdown, review_from_ms: from_ms }), record)
-	}
+	return session.records.map((record) => [
+		record,
+		phase_of({ session, record, breakdown, review_from_ms: from_ms }),
+	])
+}
+
+function add_session(rows: RecordGroups, input: PhaseInput, session: AuditSession): void {
+	for (const [record, phase] of placed_phases(input, session)) add_record(rows, phase, record)
 }
 
 function sorted(groups: RecordGroups): Array<PhaseRow> {
@@ -214,7 +221,16 @@ function agent_rows_of(sessions: ReadonlyArray<AuditSession>): Array<PhaseRow> {
 	return sorted(rows)
 }
 
-const cost_audit_phase = { PLAN, ROUND_ONE, ROUND_TWO, UNATTRIBUTED, agent_rows_of, rows_of }
+const cost_audit_phase = {
+	PLAN,
+	REVIEW_FIX_PHASE,
+	ROUND_ONE,
+	ROUND_TWO,
+	UNATTRIBUTED,
+	agent_rows_of,
+	placed_phases,
+	rows_of,
+}
 
-export type { PhaseRow, PhaseTokens }
+export type { PhaseInput, PhaseRow, PhaseTokens }
 export { cost_audit_phase }

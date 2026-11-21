@@ -285,7 +285,8 @@ function is_egress(command: string): boolean {
 const EGRESS_REASON =
 	'⛔ egress: no external network send, inline interpreter execution, direct `gh` write, push ' +
 	'without explicit `origin`, or credential/environment print. Use named scripts and `pnpm josh` ' +
-	'write routes; otherwise ask the user to run it (`SECURITY.md` → "Secrets"). ' +
+	'write routes (a scratch script: `pnpm josh scratch:run <path>`); otherwise ask the user to run ' +
+	'it (`SECURITY.md` → "Secrets"). ' +
 	'This rule fires on every occurrence.'
 
 const ROW = {

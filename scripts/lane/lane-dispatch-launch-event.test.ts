@@ -4,6 +4,7 @@ import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { run_board_estimate_record } from '#scripts/run/board/run-board-estimate-record'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -61,6 +62,11 @@ beforeEach(() => {
 	emit.mockResolvedValue(undefined)
 })
 
+// The dispatch's estimate write stays off the real board read (joshuafolkken/kit#7775).
+beforeEach(() => {
+	vi.spyOn(run_board_estimate_record, 'record').mockResolvedValue()
+})
+
 afterEach(() => {
 	vi.unstubAllEnvs()
 })
@@ -75,7 +81,7 @@ describe('lane_dispatch.dispatch_child — the launch record the stall detector 
 		expect(emit).toHaveBeenCalledExactlyOnceWith(
 			run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 			`#${ISSUE} dispatched`,
-			expect.any(Date),
+			{ at: expect.any(Date) },
 		)
 	})
 
@@ -109,6 +115,15 @@ describe('lane_dispatch.dispatch_child — the dispatch the implementation is ti
 
 		expect(record).not.toHaveBeenCalled()
 	})
+
+	// joshuafolkken/kit#7775: the run's finish estimate is recorded with each started child.
+	it('records the run estimate once the child has started', async () => {
+		vi.spyOn(lane_ledger_write, 'record_dispatch').mockResolvedValue()
+		launch.mockReturnValue({ kind: 'launched', pid: PID })
+		await lane_dispatch.dispatch_child(ISSUE)
+
+		expect(run_board_estimate_record.record).toHaveBeenCalledExactlyOnceWith(Number(ISSUE))
+	})
 })
 
 // joshuafolkken/kit#4268: the lane's state record takes the start as a launch, named by the command that
@@ -140,7 +155,7 @@ describe('lane_dispatch.dispatch_child — the lane state record', () => {
 		launch.mockReturnValue({ kind: 'launched', pid: PID })
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(record.mock.calls[0]?.[1]?.now).toBe(emit.mock.calls[0]?.[2])
+		expect(record.mock.calls[0]?.[1]?.now).toBe(emit.mock.calls[0]?.[2]?.at)
 	})
 
 	it('records no state when the launch started no child', async () => {

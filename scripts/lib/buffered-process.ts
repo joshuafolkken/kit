@@ -135,6 +135,7 @@ const buffered_process = {
 	child_environment,
 	is_process_failed,
 	run_buffered_direct,
+	run_buffered_launch,
 	run_buffered_process,
 }
 

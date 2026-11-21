@@ -15,6 +15,7 @@ import { issue_file_cli } from './issue-file-cli'
 import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_number_shape } from './issue-number-shape'
 import { issue_spill, type SpillSubject } from './issue-spill'
+import { premise_judge } from './premise-judge'
 import { session_cite } from './session-cite'
 
 // `josh issue:spill <N> --estimate "<files> / <lines>" [--reason "<reason>"]` — move #N's unchecked acceptance criteria into
@@ -163,7 +164,9 @@ async function file_follow_up(
 	const body_file = path.join(directory, 'body.md')
 
 	try {
-		await writeFile(body_file, issue_spill.follow_up_body(issue, request.sizing))
+		const body = await premise_judge.carried(String(issue.issue_number), issue.body)
+
+		await writeFile(body_file, issue_spill.follow_up_body({ ...issue, body }, request.sizing))
 
 		const filed = github_issue_url.parse(
 			await issue_file_cli.file_issue(filing_argv(issue, request, body_file)),
@@ -221,7 +224,7 @@ async function place(issue: SpillIssue, follow_up: number): Promise<number> {
 	const exit_code = await placed(issue, follow_up)
 
 	console.info(
-		`Prepared ${session_cite.issue(follow_up)} stays unpublished: record its plan with issue:plan --planned --no-notify, then run pnpm josh issue:file --publish <E> after placement succeeds.`,
+		`Prepared ${session_cite.issue(follow_up)} stays unpublished: record its plan with issue:plan --planned --no-notify, then publish it after placement succeeds — mid-run, pnpm josh run:pause <M> --for <N> publishes it; otherwise run pnpm josh issue:file --publish <E>.`,
 	)
 
 	if (exit_code !== SUCCESS_EXIT_CODE) {

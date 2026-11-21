@@ -184,7 +184,9 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    Refuse a split child's plain `--found-during <N>` when a code span in `#N`'s `## 期待結果` / `## 受け入れ条件` names its declared file's module: use a prerequisite and `josh run:split <N> --prerequisite <P>`. An unreadable body refuses nothing.
 3. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem, including a `- 優先度:` declaration that names no basis or sits below its floor (`issue-template.md`); a typed `--label priority:*` skips this judgement.
    A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor, and so do `- 原因の損失:` lines summing to 30 minutes or more (`josh issue:priority <N>` re-applies it after a recurrence); `- 原因のレーン:` only ranks, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
-   A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
+   A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste.
+   Each `- 前提:` command runs as `lane:plan` runs it; one whose last line is not a number is refused, naming `lane:value cell` (also `issue:body`).
+   A failed or unmet premise passes; `- 計測宣言:` is not run. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
    A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) is refused the same way.
    One projected past twice the implement stage budget at the measured rate is refused unless it declares `- 分割しない理由: <理由>`, whatever its route.
@@ -198,10 +200,11 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    - A `ref` candidate the body only cites, with no matching title, is shown and holds nothing.
    - An open issue with the same normalized `- 計測宣言:` refuses the filing whatever `--distinct` names, printing its number; join it with `pnpm josh issue:comment <N>`. Another command or bound, a closed issue and `- 計測宣言なし:` pass.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
-9. Create with all labels and print the URL. A local `--route interrupt --blocks-finder` filing records its finder as blocked by it; failures warn with the retry command, skipped records say why.
+9. Create with all labels and print the URL. A `--route interrupt --blocks-finder` filing, in any repository, records its finder as blocked by it; failures warn with the retry command, skipped records say why.
    Local `原因の park: #<N>` lines record stops through the shared epic recorder. Foreign filings skip them. Failures warn and continue; repair dependencies without refiling. Post-create failures leave exit 0.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
+    A directly filed, unpublished `--route split` child runs it with `--apply`; left unplaced, it prints `✖` with how to create and publish its epic, and exits 1 — already filed, so do not refile. `issue:spill` and `--batch` place their own.
 
 A refusal in steps 1–7 files nothing and exits 1, and a filing that files nothing is never counted toward the cap. No delivered rule refuses the call ahead of the filing cap, WIP cap and fold steps.
 
@@ -297,7 +300,7 @@ pnpm josh issue:comment 2304 --body "a short note"           # inline, for a bod
 
 It accepts a PR as well as an issue and prints the comment URL.
 
-結論の記録は [board の `--outcome`・`--evidence-url`](josh-commands-board.md) を参照。
+To record a conclusion, see [the board's `--outcome` and `--evidence-url`](josh-commands-board.md).
 
 The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared with `notify` / `followup`; `--body` and `--body-file` at once is refused. The `raw-field-body` row of `pnpm josh rule:list` refuses the `-f body=@…` misfire before it runs, so the literal `@<path>` cannot reach GitHub.
 
@@ -338,15 +341,31 @@ pnpm josh issue:plan 4134 --body-file .josh/tmp/plan.md --title "Add issue:plan"
 - `--title <title>` — replace the issue title first.
 - `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning; send the `planning` Telegram (change items, `Next:`).
 - `--no-notify` — with `--planned`, skip the `planning` Telegram.
-- `--repo <owner/name>` — write to that repository's issue.
+- `--repo <owner/name>` — write to that repository's issue; with `--planned` from another repository's checkout, apply `plan:unverified` instead of `run:planned`.
 
 <!-- /usage -->
 
 A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
 
+Before any write, the plan's files are counted against the estimate in force (the plan's `- 規模見積もり:` line, else the issue body's):
+
+- Counted: backticked paths outside `### 影響を受ける既存の利用者`, plus the files of its `— 直す` entries, each once; tests and directories are not (`scripts/issue/plan-named-files.ts`).
+- More files than the estimate declares writes nothing, prints the count, the files and the estimate, and exits `1`. Add the corrected `- 規模見積もり:` line to the plan and re-run.
+- A corrected estimate past the guide is no split by itself: split only when the parts merge separately (`.claude/skills/workflow-commands/split-assessment.md` → "The question"), else add `- 分割しない理由:`.
+- With no estimate, the count prints and the plan is recorded. A plan's estimate line replaces the issue body's when the plan is recorded.
+- Work a review finding adds later is outside this check.
+
+`--planned` judges the size estimate with `issue:file`'s guide, cap and size bar (`scripts/issue/plan-size-check.ts`). The plan's `- 規模見積もり:` and `- 分割しない理由:` lines win; otherwise the issue body's are used. An unexcused estimate past them leaves the plan posted without `run:planned`, prints the refusal and the split assessment's steps, and exits `1`.
+
+`--planned` with a `--repo` other than the working checkout's repository (`scripts/issue/issue-plan-target.ts`):
+
+- It applies `plan:unverified` instead of `run:planned`, sends no Telegram, and prints the re-plan command. An unreadable checkout counts as another repository.
+- `plan:unverified` withholds `auto-ok`; `backlog:next` / `backlogrun` skip the issue.
+- `--planned` from the target's checkout removes `plan:unverified` and applies `run:planned`.
+
 When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split, `4` premise). On `wait` (`1`), re-run the printed command, not `issue:plan`.
 
-Run both with Bash `timeout` 600000: a bounded wait blocks up to 9 minutes (`docs/josh-commands-lane.md` → "`josh lane:plan`").
+Run both with Bash `timeout` 600000: a bounded wait blocks up to 4.5 minutes per ask (`docs/josh-commands-lane.md` → "`josh lane:plan`").
 
 A plan naming no path prints `pnpm josh lane:plan <N> <path>...` for the child to finish (`scripts/lane/lane-plan-auto.ts`). Outside a lane child, `kickoff`'s plan records no lane plan.
 
@@ -392,7 +411,7 @@ pnpm josh issue:premise-unmet 7249 --evidence-file .josh/tmp/premise-unmet.md   
 
 <!-- /usage -->
 
-See `issue-comments.md` → "When a declared close condition holds".
+A body declaring `- 人の判断: 要` is refused with nothing written: park it for a person to close. See `issue-comments.md` → "When a declared close condition holds".
 
 ### `josh issue:already-done`
 
@@ -512,6 +531,25 @@ pnpm josh issue:release-class 6636 other-change
 Writes `- リリース分類: <label>` at the end of the `## 背景` declaration block, or the body's end without that section. Earlier declaration lines are dropped, so a repeat changes nothing. Only `enhancement` and `other-change` are accepted; a bug, breaking change or ignored release is declared by its label.
 
 Run it when `josh ship` or `josh git` stops for a missing release classification. A lane with a non-defect Issue (`種別: 非不具合`) and no `enhancement`, `bug` or `breaking-change` label writes `other-change` as a Tier A choice and goes on without parking.
+
+### `josh issue:kind`
+
+<!-- usage: issue:kind -->
+
+Switch an issue between bug and non-bug: the body's kind declarations, then its bug/enhancement labels.
+
+```bash
+pnpm josh issue:kind 6636 bug --origin "#<PR>"
+pnpm josh issue:kind 6636 non-bug --purpose improvement
+pnpm josh issue:kind 6636 non-bug --release-class other-change
+```
+
+<!-- /usage -->
+
+- `bug` writes `- 種別: 不具合` and `- 原因: <value>`, dropping `目的:` / `リリース分類:`; `non-bug` writes `- 種別: 非不具合` with `目的:` or `リリース分類: other-change`, dropping `原因:`.
+- Old lines in either language go; the new ones close the `## 背景` block, as in `josh issue:release-class`. Then `bug` / `enhancement` follow the body; `breaking-change` is left alone.
+- The new body is checked as `josh issue:lint` does; on a problem nothing is written — add the section (`## 再現` for `原因: 不明（…）`) with `josh issue:body`, then re-run.
+- A repeat writes nothing; a run that failed on a label write is finished by re-running it. On an `in-progress` Issue it warns that the commit-time regression-test requirement changed.
 
 ### `josh defect:origin`
 
@@ -674,21 +712,25 @@ Create an epic issue from its child issue numbers.
 
 ```bash
 pnpm josh epic "Epic: split the parser work" 101 102 103
-pnpm josh epic "Epic: staged rollout" 101 102 --ordered
+pnpm josh epic "Epic: staged rollout" A B --ordered --order-reason "#A -> #B: B ships the flag A adds"
+pnpm josh epic "Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: …" --order-reason "#B -> #C: …"   # a join
+pnpm josh epic "Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: #B calls the parser #A adds"                           # why B waits on A
 pnpm josh epic "Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md
-pnpm josh epic --promote 858 101 102 103                                     # turn an existing issue into an epic
-pnpm josh epic --add 893 894                                                 # track #894, declaring no order for it
-pnpm josh epic --add 893 894 --before 891                                    # #894 must finish before #891
-pnpm josh epic --add 893 894 --after 890                                     # #894 starts once #890 is done
-pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                # …and record why, in one call
-pnpm josh epic --reconcile 2184                                              # rewrite the body to match the recorded blocked-by, and record any order the body declared
+pnpm josh epic --promote 858 101 102 103                                                                                           # turn an existing issue into an epic
+pnpm josh epic --add 893 894                                                                                                       # track #894, declaring no order for it
+pnpm josh epic --add 893 894 --before 891                                                                                          # #894 must finish before #891
+pnpm josh epic --add 893 894 --after 890                                                                                           # #894 starts once #890 is done
+pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                      # …and record why, in one call
+pnpm josh epic --reconcile 2184                                                                                                    # rewrite the body to match the recorded blocked-by, and record any order the body declared
 pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
-pnpm josh epic --untrack 893 894                                             # remove a child row and its connected orders
+pnpm josh epic --untrack 893 894                                                                                                   # remove a child row and its connected orders
 ```
 
 **Options:**
 
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
+- `--chain "#A -> #B"` — repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.
+- `--order-reason "#A -> #B: <reason>"` — repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain` or `--ordered`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.
 - `--rationale-file <path|->` — split rationale prose, written under `.josh/tmp/` (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
 - `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.
@@ -708,13 +750,19 @@ It satisfies all four mechanical requirements by construction: `epic` label, tas
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
-Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
+Appends the epic's sections to the issue's body, taking the same `--ordered` / `--chain` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
 
 #### `josh epic --add` — insert children into an existing epic
 
 Writes all three places an epic's order lives — the task list, the `## Dependencies` arrow declaration, and the native `blocked-by` relations — from one input, so they cannot disagree.
 
 Nothing is written unless all three places will agree. `#M` must be a child of the epic; a position naming an issue being placed, or a hub the declaration cannot position within, is refused. A cross-repository target is refused with the bare-number command to run.
+
+`--chain` declares joins and branches while adding: it may name the added issues and existing children, and is written beside the chains already declared.
+
+Each `--chain` needs its `--order-reason`, written with the `--decision-file` text as the insertion's `## Decisions` record and child comment.
+
+A number outside those, a cycle through any chain, or use with a positioning flag is refused before anything is written.
 
 #### `josh epic --reconcile` — bring the declaration and the recorded relations back into agreement
 
@@ -855,7 +903,7 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Uses **Ranking** below: priority, resumable work, verification-path defects, then blockers.
+Read-only. Uses **Ranking** below: priority, verification-path defects, defects, resumable work, then blockers.
 Ties use creation time ascending, then number ascending. Skips `epic`, `in-progress`, `needs-decision` and candidates whose `blockedBy` is open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
 or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` (or `#<issue> を閉じる PR のマージ後 <K> マージ`) is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read` — `the pull request closing #<issue>` in place of `#<PR>` for the issue form.
 
@@ -913,9 +961,9 @@ Read-only, except for the mechanical triage of the triage gate below. stdout is 
 
 Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
-**Defect priority**: defects always go to the front of the runnable numbers among ranking ties. New mechanisms go to the back only while the defect rate is above its baseline.
+**Mechanism deferral**: new mechanisms go to the back among ranking ties only while the defect rate is above its baseline. Defects lead by a ranking key below.
 
-**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, resumable work (owned stash, pause comment or linked open PR), verification-path defect, lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, verification-path defect, defect, resumable work (stash, pause comment or open PR), lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
 Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
@@ -938,6 +986,7 @@ pnpm josh backlog:plan --waves          # the run order, wave by wave
 
 - `--exclude <N>` — same exclusion as `backlog:next`.
 - `--waves` — print the order the run takes, wave by wave, assuming each wave merges before the next. Read-only.
+- `--pending-publication` — list each pending-publication issue that blocks an open issue, then every pending issue with its missing steps (epic placement, plan record, publish), instead of the plan. Read-only.
 
 <!-- /usage -->
 
@@ -977,21 +1026,39 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 - `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label (`auto-ok:judge --apply`).
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
-- `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
+- `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `owner/repo#M` names one elsewhere, no epic. `--blocked-by` restores it. A failed write is named, exit 1.
 - `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
-- `--done <text>` — what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.
+- `--done <text>` — what the parent did for an option whose `必要な権限` is `親` (e.g. `親（Issue 本文の編集）`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.
+- `--done "filed #<M>"` — for a `親` option naming `issue:file`: the open Issue it filed (else refused with the `issue:file … --route interrupt --found-during <N> --blocks-finder` line). The child is blocked by `#M`, not requeued; `#M`'s merge re-dispatches it.
 
 <!-- /usage -->
 
 The parent follows `--pass`'s stdout command; diagnostics go to stderr. Apply prints
 `triage #N — <label> · blocked by #M`; without `--clear`, the park stays.
 
+`--blocked-by <M>` and `--done "filed #<M>"` share `run:pause`'s judgement (`prepared-prerequisite.ts`):
+a prepared (unpublished) `#M` with no recorded plan is refused before any write, exit 1, naming
+`issue:plan <M> … --planned --no-notify`. A planned prepared `#M` has the epic listing it published
+after the wait is recorded (`· published #E`); a withheld publish names its reason and
+`issue:file --publish <E>`, exit 0.
+
 The pass reads local `needs-decision`, `run:stalled` and remaining judgments once per issue.
 Foreign-repository and excluded children are not read. With none left it prints `backlog:plan --waves`.
 
 `--adopt` reads the latest trusted park comment on `run:park`'s schema; any listed option but tier C
 is adoptable. An option whose `必要な権限` starts with `親` is carried out first, then adopted with
-`--done <what was done>`. Recovery guidance prints only when a read is due.
+`--done <what was done>`; one naming `issue:file` is adopted with `--done "filed #<M>"` and waits on `#M`.
+`親（issue:close）` needs no `--done`; the adopt closes it, lane returned.
+`親（lane:fold <N> --into #<M>）` needs no `--done`; the adopt runs `lane:fold` into `#M`, not requeued — one naming no `--into` is refused before any write.
+A park body naming `issue:file`, `issue:close` or `lane:fold` under any other permission is refused. Recovery guidance prints only when a read is due.
+
+A lane park records its tree (`- Tree: <HEAD> · changes <n>`). If the latest park and the one before
+the last `--adopt` share it, the option was never taken: `--adopt` parks `run:stalled` (`park loop`, no
+auto-retry) instead of requeuing. A park with no tree line requeues. The yield cap misses this loop: it
+counts yields to a held lane in a time window, and park → adopt → relaunch is no yield.
+
+A lane a person already withdrew (`lane:withdraw`, not a yield) is neither requeued nor parked:
+`--adopt` records the decision, clears the park and prints `lane withdrawn · not requeued`.
 
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,
@@ -1085,6 +1152,8 @@ A measurement declaration with no sample yet waits, not a lane (`sample conditio
 Merged causes use guarded `run:add --retry` for dependents; each offer, for cleared `followup` parks.
 
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
+A watch with a child still running, a lane free and an `exhausted` or `parked` answer — no issue ready to start below the lane limit — sends one `💺` Telegram instead: `no issue ready to start: <free> lane(s) free, <running> running.`
+It is not repeated while the shortfall lasts; the next child launch ends the episode, so the next shortfall sends again. Every lane taken sends nothing. `JOSH_NOTIFY=off` silences both.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are in [Labels and run states](./labels-and-run-states.md).
 
@@ -1170,9 +1239,39 @@ The self-check's "Prose matches the code" (`prompts/review.md`) as a search. Fro
 
 It drops the ones an added line still writes (an added `.md` heading, for a heading) and the commands the registry still holds.
 
+From code it also takes a `const`'s changed literal (`value`) and a removed `--flag` no code still writes (`flag`): `scripts/review/prose-stale-values.ts`.
+
 It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
 
 Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
+
+### `josh acceptance:check`
+
+<!-- usage: acceptance:check -->
+
+Check the ship body draft's acceptance map before the review: a criterion with no row stops it, a pending row passes.
+
+```bash
+pnpm josh acceptance:check   # → `acceptance:check: pass`, or ship's acceptance-map refusal naming each criterion with no row (exit 1)
+```
+
+<!-- /usage -->
+
+`josh ship`'s acceptance-map refusal (`acceptance_map_check.body_refusal`), asked of the body the next ship delivers — the ship body draft, else the open PR's — with a pending row counted as a row. `run:chain` runs it before `run:review`, so a criterion with no row stops there, not at ship's preflight. No body yet passes: ship writes every row.
+
+### `josh preflight:check`
+
+<!-- usage: preflight:check -->
+
+Ask ship's preflight judgments that need no PR — classification, live-evidence, removed-tests, unplanned — before the review.
+
+```bash
+pnpm josh preflight:check   # → `preflight:check: pass`, or each unmet ship precondition named by its kind (exit 1)
+```
+
+<!-- /usage -->
+
+Ship's preflight judgments read off the Issue, the ship body draft and the tree (`run_ship_preflight.chain_problems`, the calls ship's preflight makes). `run:chain` runs it after `acceptance:check`, then `exports:unused` and the guard tests with the pre-detach's argv; the type check, `cspell:dot` and the scoped pair are `check:related`'s. An `unplanned` file passes once `lane:plan` lists it.
 
 ### `josh review:selfcheck`
 

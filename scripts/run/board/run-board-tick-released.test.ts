@@ -91,6 +91,18 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 		expect(row).not.toContain('📅')
 	})
 
+	// joshuafolkken/kit#8084: re-queued after its park, it waits on its start time by the board's clock
+	// rather than drawing as a ⏳ retry a free lane starts.
+	it('draws a child re-queued after its park waiting on its start time', async () => {
+		const retry = event_of(3, '2026-10-07T04:25:00.000Z', 'add', 'retry')
+		const local = { ...LOCAL_PARKED, events: [...LOCAL_PARKED.events, retry] }
+		const lines = await frame_with(RELEASED_LABELS, local)
+		const row = row_of(lines)
+
+		expect(row).toContain(`📅 ${run_board_labels.day_minute_of(FUTURE_MS)}`)
+		expect(lines.join('\n')).not.toContain('next free lane')
+	})
+
 	// joshuafolkken/kit#4099: drawn 🙋 and counted as remaining, as it still waits on a decision.
 	it('keeps a child still carrying needs-decision on a decision and counted as remaining', async () => {
 		const lines = await frame_with([...RELEASED_LABELS, 'needs-decision'])

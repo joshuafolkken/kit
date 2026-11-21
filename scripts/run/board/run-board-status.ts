@@ -1,26 +1,24 @@
 import type { AgentResult } from '#scripts/agent/agent-event'
 import type { IssueOutcome } from '#scripts/issue/issue-outcome'
+import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import type { Span } from '#scripts/lane/lane-spans'
-import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
-import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_board_checks } from './run-board-checks'
+import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_closed, type ClosedIssue, type ListingRead } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_ending_states } from './run-board-ending-states'
+import { run_board_events_memo, type EventsMemo } from './run-board-events-memo'
 import { run_board_idle, type IdleSince } from './run-board-idle'
-import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import type { BoardLanes } from './run-board-lane-state'
 import { run_board_lane_stop } from './run-board-lane-stop'
 import { run_board_lane_time } from './run-board-lane-time'
 import { run_board_phase, type Phase } from './run-board-phase'
 import { run_board_settle } from './run-board-settle'
-import { run_board_setup, type SetupRead } from './run-board-setup'
 
 // What each issue of a run is doing now, read from the run's own event stream and what each open lane's
-// record says (`run-board-lane-state.ts`).
+// record says (`run-board-lane-state.ts`); the run as a whole is `run-board-activity.ts`'s.
 // Local reads only — no `gh` call — so `run:board` can redraw it every few seconds; the plan these
 // statuses are laid over is the slow GitHub half, and so is what a child that left the open listing,
 // or is drawn stopped, answers when read closed.
@@ -52,8 +50,12 @@ interface ItemStatus {
 	// GitHub read is weighed against.
 	launched_ms?: number | undefined
 	ended_ms?: number | undefined
-	// The lane time the event that ended the child recorded (joshuafolkken/kit#4481), where it carries one.
+	// The lane time the event that ended the child recorded (joshuafolkken/kit#4481), where it carries one,
+	// and the host's stops it took out (joshuafolkken/kit#7866) — none on an ending written before that.
 	elapsed_ms?: number | undefined
+	excluded_ms?: number | undefined
+	// The host's stops on the stream (`lane-host-gaps.ts`), taken out of the row's time.
+	gaps?: ReadonlyArray<LaneSpan> | undefined
 	// The seat-free lane label (`lane <N>`) of a running child, when it holds one — the running test reads
 	// it; the board does not draw it.
 	lane?: string | undefined
@@ -72,33 +74,8 @@ interface ItemStatus {
 	result?: AgentResult | undefined
 	// When a running lane's transcript was last written — the latest an idle lane can have stopped.
 	written_ms?: number | undefined
-}
-
-interface LatestEvent {
-	text: string
-	at_ms: number
-}
-
-// The run as a whole, read off the same stream. The setup half is `run-board-setup.ts`'s, absent
-// where a stream carries no stage.
-interface RunActivity extends Partial<SetupRead> {
-	// Runtime evidence for the stage, independent of its retained description.
-	is_setup_working?: boolean | undefined
-	last_event_ms: number | undefined
-	// The newest thing the run did — its newest position, or its newest event where it has none yet —
-	// in the event's own words, and when.
-	latest?: LatestEvent | undefined
-	// When the run last did anything of its own — its newest position or stage, whichever is newer. A
-	// stage that has ended still counts: what follows it is counted from its end, not from before it.
-	idle_ms?: number | undefined
-	// Each child's newest `lane-phase` or `ship-stage`, by issue (`run-board-lane-event.ts`).
-	lane_events?: ReadonlyMap<number, LaneEvent> | undefined
-	// Each child's newest `pr-checks`, by issue (`run-board-checks.ts`).
-	pr_checks?: ReadonlyMap<number, PrChecks> | undefined
-	// The newest session's start until its first lane opened (`run-board-first-lane.ts`).
-	first_lane_ms?: number | undefined
-	// The run's last position is a `stop` that names no child — the run itself ended.
-	is_stopped: boolean
+	// A running open lane of this run's not yet read idle for the re-confirm window: not confirmed stopped.
+	is_live?: boolean | undefined
 }
 
 const KIND = run_event_stream.EVENT_KIND
@@ -114,6 +91,9 @@ const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'paused', '
 // person may close its issue after the stop; only a closed read settles it again, so one still open
 // keeps waiting whatever its labels say (joshuafolkken/kit#3958).
 const WAITING_STATES: ReadonlySet<ItemState> = new Set(['parked', 'human'])
+// What only a closed read settles: those, and a child waiting on its retry, which a person may close
+// before it runs again — kept off the lanes once closed (joshuafolkken/kit#7900).
+const CLOSE_WAITING_STATES: ReadonlySet<ItemState> = new Set([...WAITING_STATES, 'waiting'])
 
 const { relaunch_of, settled_as } = run_board_settle
 
@@ -203,9 +183,20 @@ function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus
 	return attempt === undefined ? phased(previous, event) : replayed(previous, attempt, event)
 }
 
+// A child handed back to the queue waits for its next launch: a retry, a child released on an
+// authentication failure, and one a person re-added once it left the lanes — a re-add of a running child
+// leaves it running, and one the stream never launched draws no row. Waiting, it takes no lane ending
+// from before its next launch (joshuafolkken/kit#8028).
+function is_requeue(previous: ItemStatus | undefined, event: RunEvent): boolean {
+	if (run_event_retry.is_retry(event)) return true
+	if (event.kind === KIND.USAGE_LIMIT) return run_merge_usage_limit.cause_of(event) === 'auth'
+
+	return event.kind === KIND.ADD && previous !== undefined && previous.state !== 'running'
+}
+
 // One event folded into the status of the child it names; an event the board does not track keeps it.
 function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
-	if (run_event_retry.is_retry(event)) return settled_as(previous, 'waiting')
+	if (is_requeue(previous, event)) return settled_as(previous, 'waiting')
 	if (LAUNCH_KINDS.has(event.kind)) return launched(previous, event)
 
 	const ending = run_board_ending_states.STATES[event.kind]
@@ -237,37 +228,23 @@ function fold_events(
 	return statuses
 }
 
-// joshuafolkken/kit#4267: the board redraws every second but rereads the stream every few, and a read
-// hands over a new `events` array, so a fold keyed on the array is folded once per read, not per redraw.
-type EventsMemo<Value> = WeakMap<ReadonlyArray<RunEvent>, Value>
-
-function remembered<Value>(
-	memo: EventsMemo<Value>,
-	events: ReadonlyArray<RunEvent>,
-	fold: (events: ReadonlyArray<RunEvent>) => Value,
-): Value {
-	const kept = memo.get(events)
-
-	if (kept !== undefined) return kept
-
-	const value = fold(events)
-
-	memo.set(events, value)
-
-	return value
-}
-
+const { remembered } = run_board_events_memo
 const FOLDED: EventsMemo<ReadonlyMap<number, ItemStatus>> = new WeakMap()
 const SPANS: EventsMemo<ReadonlyMap<number | undefined, ReadonlyArray<Span>>> = new WeakMap()
 
 // A child the stream never saw launched keeps no spans, so its row is timed from its lane record.
 function with_spans(statuses: Map<number, ItemStatus>, events: ReadonlyArray<RunEvent>): void {
 	const spans = remembered(SPANS, events, run_board_lane_time.spans_of)
+	const gaps = run_board_events_memo.host_gaps(events)
 
 	for (const [issue, status] of statuses) {
 		const issue_spans = spans.get(issue)
 
-		if (issue_spans !== undefined) statuses.set(issue, { ...status, spans: issue_spans })
+		statuses.set(issue, {
+			...status,
+			...(gaps.length > 0 && { gaps }),
+			...(issue_spans !== undefined && { spans: issue_spans }),
+		})
 	}
 }
 
@@ -331,11 +308,9 @@ function is_read_after_launch(status: ItemStatus, read: OpenRead): boolean {
 
 // A running child's labels, read after its launch, settle it (`run-board-lane-stop.ts`).
 function labelled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	const stop = is_read_after_launch(status, read)
-		? run_board_lane_stop.label_stop(read.labels.get(issue))
-		: undefined
+	const labels = is_read_after_launch(status, read) ? read.labels.get(issue) : undefined
 
-	return stop === undefined ? status : run_board_lane_stop.label_settled(status, stop)
+	return run_board_lane_stop.labels_settled(status, labels)
 }
 
 // A close dated before the launch is an earlier life of the issue, not how this run's child ended.
@@ -368,7 +343,7 @@ function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatu
 	return from_closed ?? labelled(issue, status, read)
 }
 
-// The closed read is kept for the run, so a waiting child (parked or human) a person reopened since is
+// The closed read is kept for the run, so a waiting child (parked, human or retry) a person reopened since is
 // told apart by a listing read after the close holding it again. Once a listing has landed, that — not
 // the launch — dates the close, so a closed child never waits in 🙋 decision (joshuafolkken/kit#6535,
 // joshuafolkken/kit#6891).
@@ -383,7 +358,7 @@ function waiting_settled(issue: number, status: ItemStatus, read: OpenRead): Ite
 }
 
 function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	if (WAITING_STATES.has(status.state)) return waiting_settled(issue, status, read)
+	if (CLOSE_WAITING_STATES.has(status.state)) return waiting_settled(issue, status, read)
 
 	return UNSETTLED_STATES.has(status.state) ? unsettled(issue, status, read) : status
 }
@@ -410,54 +385,8 @@ function settle_closed(
 	)
 }
 
-function is_run_stop(event: RunEvent | undefined): boolean {
-	return event?.kind === KIND.STOP && run_event_scope.issue_named(event) === undefined
-}
-
-function latest_of(event: RunEvent | undefined): LatestEvent | undefined {
-	return event === undefined ? undefined : { text: event.text, at_ms: moment(event) }
-}
-
-function is_own(event: RunEvent): boolean {
-	return event.kind === KIND.SETUP || !run_event_stream.TRACE_KINDS.has(event.kind)
-}
-
-// A stream of traces alone has done nothing of its own yet, so its newest event stands in.
-function idle_of(events: ReadonlyArray<RunEvent>): number | undefined {
-	const own = events.findLast((event) => is_own(event)) ?? events.at(-1)
-
-	return own === undefined ? undefined : moment(own)
-}
-
-function stream_activity(events: ReadonlyArray<RunEvent>): RunActivity {
-	const last = events.at(-1)
-	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
-
-	return {
-		...run_board_setup.read(events),
-		last_event_ms: last === undefined ? undefined : moment(last),
-		latest: latest_of(position ?? last),
-		idle_ms: idle_of(events),
-		lane_events: run_board_lane_event.newest_of(events),
-		pr_checks: run_board_checks.newest_of(events),
-		first_lane_ms: run_event_setup.first_lane_ms(events),
-		is_stopped: is_run_stop(position),
-	}
-}
-
-const ACTIVITIES: EventsMemo<RunActivity> = new WeakMap()
-
-// `is_ended` is a run `run:carry --end` closed: its record says it stopped, whatever its last event
-// was.
-function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActivity {
-	const activity = remembered(ACTIVITIES, events, stream_activity)
-
-	return is_ended ? { ...activity, is_stopped: true } : activity
-}
-
 const run_board_status = {
-	WAITING_STATES,
-	activity_of,
+	CLOSE_WAITING_STATES,
 	fold_events,
 	settle_closed,
 	since_launch,
@@ -465,4 +394,4 @@ const run_board_status = {
 }
 
 export { run_board_status }
-export type { ItemState, ItemStatus, LatestEvent, OpenRead, RunActivity }
+export type { ItemState, ItemStatus, OpenRead }

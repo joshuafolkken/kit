@@ -68,7 +68,26 @@ describe('run_board_render_lead.lead_of', () => {
 	it('blanks the progress column of a stopped row', () => {
 		expect(lead(lane('stopped')).startsWith(' '.repeat(3))).toBe(true)
 	})
+})
 
+// joshuafolkken/kit#7710: a single run a stop ended — the 🏠 row, or its own board's — leads with ✅
+// and draws no phase icon; a lane's stopped row keeps its blanks.
+describe('run_board_render_lead.lead_of — a stopped single run', () => {
+	it('draws ✅ and no phase icon on a stopped single run’s row', () => {
+		const row = lane('stopped')
+		const root = header({ layout: { ...EMPTY_LAYOUT, root: { name: 'halfrun', row } } })
+		const own = header({ ...board(row), run_name: 'halfrun', ended_ms: NOW })
+
+		for (const view of [root, own]) {
+			const text = stripVTControlCharacters(lead_of(row, view))
+
+			expect(text.startsWith('✅    ')).toBe(true)
+			expect(width(text)).toBe(USAGE_START - 1)
+		}
+	})
+})
+
+describe('run_board_render_lead.lead_of — columns', () => {
 	it('ends every lead where the usage cells start less one blank', () => {
 		const leads = [lead(lane()), lead(lane(), [wait()]), lead(lane('stopped'))]
 
@@ -77,6 +96,25 @@ describe('run_board_render_lead.lead_of', () => {
 			USAGE_START - 1,
 			USAGE_START - 1,
 		])
+	})
+
+	// joshuafolkken/kit#7866: a lane row draws its time net of the host's sleep, without the bracket,
+	// so its usage cells still start where the processes rows' do.
+	it('draws a lane row’s time net of a sleep, in the same columns', () => {
+		const row = lane()
+		const gaps = [{ from_ms: NOW - 15 * MINUTE, to_ms: NOW - 5 * MINUTE }]
+		const text = lead({ ...row, status: { ...row.status, state: row.state, gaps } })
+
+		expect(text).toBe(`${SPINNER}  🚦    2′00″   10′00″`)
+		expect(width(text)).toBe(USAGE_START - 1)
+	})
+
+	// joshuafolkken/kit#8257: the spinner and two blanks put the icon where every section's row starts.
+	it('stands the phase icon in the shared row indent’s column', () => {
+		const text = lead(lane())
+		const before = text.slice(0, text.indexOf('🚦'))
+
+		expect(width(before)).toBe(run_board_fit.ROW_INDENT.length)
 	})
 
 	it('starts the run’s time at the column the rule’s ⏰ stands over', () => {

@@ -66,10 +66,14 @@ const epic_issue_schema = z.object({
 // cross a repository, and a reader that keeps only the number resolves it
 // against the blocked child's own repository — a different issue, or none. Optional because a
 // caller that only wants numbers must not be made to fail on a response shape it never reads.
+//
+// `closed_at` is when a closed blocker closed, so a park can tell the blocker triage recorded on it,
+// closed after the park, from one long closed (`backlog-drive-stalled-retry.ts`).
 const blocking_issue_schema = z.object({
 	number: z.number(),
 	state: z.string().optional(),
 	repository_url: z.string().optional(),
+	closed_at: z.string().nullish(),
 })
 
 // The blocker relations arrive as a connection — `{ nodes, totalCount }` — not a bare array.
@@ -166,6 +170,13 @@ type EpicIssueData = z.infer<typeof epic_issue_schema>
 type OpenIssueData = z.infer<typeof open_issue_schema>
 type RestCommentData = z.infer<typeof rest_comment_schema>
 
+// A listing of every open issue plus whether it was cut. Carried together because the rows alone cannot
+// say whether what is missing from them is absent or merely past the cap.
+interface OpenListing {
+	rows: ReadonlyArray<OpenIssueData>
+	is_capped: boolean
+}
+
 export {
 	author_fields_schema,
 	package_name_schema,
@@ -183,4 +194,11 @@ export {
 	blocking_issue_schema,
 	blocked_by_schema,
 }
-export type { RollupItemData, EpicChildData, EpicIssueData, OpenIssueData, RestCommentData }
+export type {
+	RollupItemData,
+	EpicChildData,
+	EpicIssueData,
+	OpenIssueData,
+	OpenListing,
+	RestCommentData,
+}

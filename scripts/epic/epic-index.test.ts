@@ -73,6 +73,23 @@ describe('epic_index.build_epic_index', () => {
 	})
 })
 
+// joshuafolkken/kit#8174: a pending child's publication step asks for any epic listing it.
+describe('epic_index.first_epics', () => {
+	it('keeps the first epic in listing order that names the child', () => {
+		expect(epic_index.first_epics(both_epics_tracking_the_child()).get(CHILD)).toBe(OPTED_IN_EPIC)
+	})
+
+	it('maps a child whatever epic lists it, opted in or not', () => {
+		const first = epic_index.first_epics(tracking_of([[OTHER_EPIC, GRANDCHILD]]))
+
+		expect(first.get(GRANDCHILD)).toBe(OTHER_EPIC)
+	})
+
+	it('leaves an issue no epic lists out of the first epics', () => {
+		expect(epic_index.first_epics(both_epics_tracking_the_child()).has(UNTRACKED_CHILD)).toBe(false)
+	})
+})
+
 describe('epic_index.withheld_children', () => {
 	// The regression: the opted-in epic came first, so collapsing to one winner dropped it, the child
 	// read as tracked by nobody who would offer it, and the standalone half offered it as well.
@@ -160,5 +177,47 @@ describe('epic_index.reachable_epic_numbers', () => {
 		])
 
 		expect([...reached].filter((number) => number === NESTED_EPIC)).toStrictEqual([NESTED_EPIC])
+	})
+})
+
+const LIMIT = 10
+
+function row(number: number, labels: ReadonlyArray<string>, body = ''): OpenIssueData {
+	return { ...issue(number, CREATED_AT, [...labels]), body }
+}
+
+const WHOLE = [
+	row(OTHER_EPIC, [EPIC_LABEL], CHILD_ROW),
+	row(CHILD, [AUTO_OK_LABEL]),
+	row(OPTED_IN_EPIC, [AUTO_OK_LABEL, EPIC_LABEL], task_row(UNTRACKED_CHILD)),
+]
+
+// joshuafolkken/kit#8220: a whole open listing answers the epics without the `epic` label listing.
+describe('epic_index.epics_of_listing', () => {
+	it('picks the epic rows in listing order, each with its task list', () => {
+		expect(epic_index.epics_of_listing({ rows: WHOLE, is_capped: false }, LIMIT)).toStrictEqual({
+			cutoff: 'none',
+			epics: [
+				{ number: OTHER_EPIC, body: CHILD_ROW },
+				{ number: OPTED_IN_EPIC, body: task_row(UNTRACKED_CHILD) },
+			],
+		})
+	})
+
+	it.each([
+		['capped', { rows: WHOLE, is_capped: true }, LIMIT],
+		['at the row limit', { rows: WHOLE, is_capped: false }, WHOLE.length],
+		[
+			'missing a row label',
+			{ rows: [{ ...row(CHILD, []), labels: undefined }], is_capped: false },
+			LIMIT,
+		],
+		[
+			'missing a row body',
+			{ rows: [issue(OTHER_EPIC, CREATED_AT, [EPIC_LABEL])], is_capped: false },
+			LIMIT,
+		],
+	])('answers nothing for a listing %s', (_case, listing, limit) => {
+		expect(epic_index.epics_of_listing(listing, limit)).toBeUndefined()
 	})
 })

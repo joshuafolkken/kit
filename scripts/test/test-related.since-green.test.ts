@@ -10,7 +10,7 @@ import { test_read_map } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 import { test_related } from './test-related'
 import { test_related_record } from './test-related-record'
-import { test_related_synced } from './test-related-synced'
+import { test_related_synced, type SyncedSplit } from './test-related-synced'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4393: a ship retry re-ran every test the whole branch diff reaches. A bare run now
@@ -25,8 +25,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	},
 }))
 vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
-// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+// The selection walks no import graph here; what it selects is `test-related-select.test.ts`.
 vi.mock('./test-pinned-reach')
+vi.mock('./test-related-select', async () => await import('./test-related-select-fixture'))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -66,9 +67,9 @@ const APPROVALS = path.join('.josh', 'metrics-accepted')
 const PRUNED_TREE = new Error('bad object')
 const NOT_A_REPOSITORY = new Error('not a git repository')
 
-function map_with(
-	readers: Record<string, Array<string>>,
-): ReturnType<typeof test_read_map.read_map> {
+type ReadMap = ReturnType<typeof test_read_map.read_map>
+
+function map_with(readers: Record<string, Array<string>>): ReadMap {
 	return {
 		version: test_read_map.MAP_VERSION,
 		commit: MAP_TREE,
@@ -338,8 +339,10 @@ describe('test_related.run_related_tests — a metrics approval file this branch
 
 // joshuafolkken/kit#4912: a sync brought in ~430 files, and every test importing a synced module ran
 // again, though main's CI had run them against it.
+const UNMET: Pick<SyncedSplit, 'meeting' | 'touching'> = { meeting: [], touching: [] }
+
 function split_into(left: Array<string>, shared: Array<string>): void {
-	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared, meeting: [] })
+	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared, ...UNMET })
 }
 
 describe('test_related.run_related_tests — a code module a main sync brought in', () => {

@@ -122,6 +122,48 @@ describe('epic_cli.is_promotion', () => {
 	})
 })
 
+describe('epic_cli — --chain', () => {
+	const JOIN_LINES = ['#101 -> #103', '#102 -> #103']
+	const JOIN_ARGS = [
+		...JOIN_LINES.flatMap((line) => ['--chain', line]),
+		...JOIN_LINES.flatMap((line) => ['--order-reason', `${line}: a reason`]),
+	]
+	const JOIN = [
+		[101, 103],
+		[102, 103],
+	]
+
+	it('takes repeated --chain on a creation', () => {
+		const parsed = epic_cli.parse_create_arguments([TITLE, CHILD, '102', '103', ...JOIN_ARGS])
+
+		expect(parsed?.chains).toStrictEqual(JOIN)
+		expect(parsed?.chain_refusal).toBeUndefined()
+	})
+
+	it('takes repeated --chain on a promotion', () => {
+		const parsed = epic_cli.parse_promote_arguments([
+			PROMOTE,
+			EPIC,
+			CHILD,
+			'102',
+			'103',
+			...JOIN_ARGS,
+		])
+
+		expect(parsed?.chains).toStrictEqual(JOIN)
+	})
+
+	it('carries the refusal of a chain naming a non-child', () => {
+		const parsed = epic_cli.parse_create_arguments([TITLE, CHILD, '--chain', '#101 -> #999'])
+
+		expect(parsed?.chain_refusal).toMatch(/#999/u)
+	})
+
+	it('declares no chain when the flag is absent', () => {
+		expect(epic_cli.parse_create_arguments([TITLE, CHILD])?.chains).toStrictEqual([])
+	})
+})
+
 describe('epic_cli.parse_promote_arguments', () => {
 	it('takes the epic first and the children after it', () => {
 		const parsed = epic_cli.parse_promote_arguments([PROMOTE, EPIC, CHILD, '102'])

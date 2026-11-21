@@ -60,3 +60,20 @@ describe('run_board_read.read_local — the usage limit in force', () => {
 		await expect(run_board_read.read_local()).resolves.toMatchObject({ usage_reset_ms: undefined })
 	})
 })
+
+// joshuafolkken/kit#8012: the read names what the hold is for, so a lapsed login is not shown as a limit.
+describe('run_board_read.read_local — the cause of the hold', () => {
+	it('reads an authentication failure’s hold as auth', async () => {
+		const auth = { ...STOP, text: STOP.text.replace('usage limit', 'authentication failure') }
+
+		arrange_stop(CARRIED, RESET_MS - 1, auth)
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ usage_cause: 'auth' })
+	})
+
+	it('reads a usage limit’s hold as limit', async () => {
+		arrange_stop(CARRIED, RESET_MS - 1)
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ usage_cause: 'limit' })
+	})
+})

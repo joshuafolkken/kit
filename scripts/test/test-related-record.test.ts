@@ -5,9 +5,11 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { test_related_caller } from './test-related-caller'
 import { test_related_cap } from './test-related-cap'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope } from './test-related-scope'
+import type { Selection } from './test-related-select'
 import { unit_count_file } from './unit-count-file'
 
 // joshuafolkken/kit#4465: what one `josh test:related` run leaves in the lane ledger.
@@ -20,6 +22,16 @@ const READER_TEST = 'scripts/reader.test.ts'
 const TEST_FILES = 7
 const ELAPSED_MS = 1234.6
 const LANE_ISSUE = 5532
+const DEFERRED = 4
+// A main merge reaching wider than the lane's own file, past the cap.
+const WIDE_SYNC = {
+	deferred: DEFERRED,
+	reach: [
+		{ file: SYNCED_CHANGE, count: 300 },
+		{ file: SINCE_MAP_CHANGE, count: 250 },
+		{ file: OWN_CHANGE, count: 200 },
+	],
+}
 
 const make_directory = temporary_directory('suite')
 const scratch = make_directory('test-related-record-test-')
@@ -48,6 +60,8 @@ function count_target(): string {
 
 describe('test_related_record.record_of', () => {
 	it('splits the input into the change, the main sync part, the since-map part and the readers', () => {
+		vi.stubEnv(test_related_caller.CALLER_ENVIRONMENT, '')
+
 		const record = test_related_record.record_of(related_input(), {
 			elapsed_ms: ELAPSED_MS,
 			test_files: TEST_FILES,
@@ -60,17 +74,9 @@ describe('test_related_record.record_of', () => {
 			since_map: 1,
 			readers: 1,
 			test_files: TEST_FILES,
+			caller: 'manual',
 			elapsed_ms: Math.round(ELAPSED_MS),
 		})
-	})
-
-	it('leaves the test file count out when vitest reported none', () => {
-		const record = test_related_record.record_of(related_input(), {
-			elapsed_ms: 0,
-			test_files: undefined,
-		})
-
-		expect(record).not.toHaveProperty('test_files')
 	})
 })
 
@@ -132,76 +138,70 @@ describe('test_related_record.record_of — the test selection time', () => {
 	})
 })
 
-// joshuafolkken/kit#5532: a changed file whose reach passed the cap is counted, an uncapped run is not.
-describe('test_related_record.record_of — the reach cap', () => {
-	it('counts the over-cap files, and leaves the count out of a run that was not capped', () => {
-		const capped = { ...related_input(), over_cap: ['src/a.ts', 'src/b.ts'] }
-		const result = { elapsed_ms: 0, test_files: undefined }
+// joshuafolkken/kit#7980: whether the tests were chosen by declaration users or by the import graph.
+describe('test_related_record.record_of — the selection method', () => {
+	const result = { elapsed_ms: 0, test_files: undefined }
 
-		expect(test_related_record.record_of(capped, result).over_cap).toBe(2)
-		expect(test_related_record.record_of(related_input(), result)).not.toHaveProperty('over_cap')
+	it('records the method the selection used', () => {
+		const input = { ...related_input(), select_method: 'symbol' as const }
+
+		expect(test_related_record.record_of(input, result).select_method).toBe('symbol')
 	})
 
-	// joshuafolkken/kit#5699: the first over-cap file, the widest reach, is recorded as the hub.
-	it('records the first over-cap file as the hub, and none where nothing was capped', () => {
-		const capped = { ...related_input(), over_cap: [OWN_CHANGE, 'src/b.ts'] }
-		const uncapped = { ...related_input(), over_cap: [] }
-		const result = { elapsed_ms: 0, test_files: undefined }
+	it('leaves the method out where the run selected nothing', () => {
+		expect(test_related_record.record_of(related_input(), result)).not.toHaveProperty(
+			'select_method',
+		)
+	})
+})
 
-		expect(test_related_record.record_of(capped, result).over_cap_hub).toBe(OWN_CHANGE)
-		expect(test_related_record.record_of(uncapped, result)).not.toHaveProperty('over_cap_hub')
+// joshuafolkken/kit#7976: what the cap deferred to CI is counted, a run that kept the whole suite is not.
+describe('test_related_record.record_of — the tests deferred past the cap', () => {
+	const result = { elapsed_ms: 0, test_files: undefined }
+
+	it('counts the deferred tests, zero included, and leaves the count out of a whole-suite run', () => {
+		const capped = { ...related_input(), deferred: DEFERRED }
+		const uncapped = { ...related_input(), deferred: 0 }
+
+		expect(test_related_record.record_of(capped, result).deferred).toBe(DEFERRED)
+		expect(test_related_record.record_of(uncapped, result).deferred).toBe(0)
+		expect(test_related_record.record_of(related_input(), result)).not.toHaveProperty('deferred')
 	})
 
 	// joshuafolkken/kit#5756: a file a main merge or the map's tree brought in is no hub of the lane's run.
 	it('picks the hub from the branch own change over a wider file main brought in', () => {
-		const input: RunInput = {
-			...related_input(),
-			branch: [OWN_CHANGE],
-			over_cap: [SYNCED_CHANGE, SINCE_MAP_CHANGE, OWN_CHANGE],
-		}
-		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+		const input: RunInput = { ...related_input(), branch: [OWN_CHANGE], ...WIDE_SYNC }
+		const record = test_related_record.record_of(input, result)
 
-		expect(record).toMatchObject({ over_cap: 3, over_cap_hub: OWN_CHANGE })
+		expect(record).toMatchObject({ deferred: DEFERRED, over_cap_hub: OWN_CHANGE })
 	})
 
-	it('counts the over-cap files yet names no hub when none of them is the branch own change', () => {
-		const input: RunInput = {
-			...related_input(),
-			branch: [OWN_CHANGE],
-			over_cap: [SYNCED_CHANGE, SINCE_MAP_CHANGE],
-		}
-		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+	it('names no hub where nothing was deferred, none is own or none passes the cap alone', () => {
+		const none = { ...related_input(), branch: [OWN_CHANGE], ...WIDE_SYNC, deferred: 0 }
+		const foreign = { ...related_input(), branch: [READER_TEST], ...WIDE_SYNC }
+		const under = { ...none, deferred: DEFERRED, reach: [{ file: OWN_CHANGE, count: 150 }] }
 
-		expect(record.over_cap).toBe(2)
-		expect(record).not.toHaveProperty('over_cap_hub')
-	})
-})
-
-// joshuafolkken/kit#7639: the files the cap left at their whole reach, each with that reach.
-describe('test_related_record.record_of — files kept at full reach', () => {
-	it('records the files kept at full reach, and leaves the field out when there are none', () => {
-		const kept = { ...related_input(), full_reach: [{ file: SYNCED_CHANGE, count: 2 }] }
-		const result = { elapsed_ms: 0, test_files: undefined }
-		const none = test_related_record.record_of({ ...related_input(), full_reach: [] }, result)
-
-		expect(test_related_record.record_of(kept, result).full_reach).toEqual([
-			{ file: SYNCED_CHANGE, reached: 2 },
-		])
-		expect(none).not.toHaveProperty('full_reach')
+		expect(test_related_record.record_of(none, result)).not.toHaveProperty('over_cap_hub')
+		expect(test_related_record.record_of(foreign, result)).not.toHaveProperty('over_cap_hub')
+		expect(test_related_record.record_of(under, result)).not.toHaveProperty('over_cap_hub')
 	})
 })
 
 // joshuafolkken/kit#6187: the record carries the count and the hub the run's summary line printed.
 describe('test_related_record.record_of — the summary line of the same run', () => {
 	it('records the count and the hub the summary line of the same run names', () => {
-		const over_cap = [SYNCED_CHANGE, SINCE_MAP_CHANGE, OWN_CHANGE]
-		const input: RunInput = { ...related_input(), branch: [OWN_CHANGE], over_cap }
+		const input: RunInput = { ...related_input(), branch: [OWN_CHANGE], ...WIDE_SYNC }
 		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
-		const capped = { importers: new Map(over_cap.map((file) => [file, [READER_TEST]])), over_cap }
-		const line = test_related_cap.over_cap_line(capped, test_related_record.own_of(input))
+		const selection: Selection = {
+			tests: [READER_TEST],
+			deferred: DEFERRED,
+			reach: WIDE_SYNC.reach,
+			method: 'import',
+		}
+		const line = test_related_cap.deferred_line(selection, test_related_record.own_of(input))
 
-		expect(line).toContain(`${String(record.over_cap)} over cap`)
-		expect(line).toContain(`hub ${String(record.over_cap_hub)} —`)
+		expect(line).toContain(`${String(record.deferred)} deferred to CI`)
+		expect(line).toContain(`hub ${String(record.over_cap_hub)}`)
 	})
 })
 

@@ -1,7 +1,10 @@
 import { agent_worker_profile, type SettingsResult } from '#scripts/agent/agent-worker-profile'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
+import { session_language } from '#scripts/josh/session-language'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_escalate } from './run-park-escalate'
+import { run_stalled } from './run-stalled'
 import { run_stalled_park } from './run-stalled-park'
 
 // joshuafolkken/kit#7356: a worker declares that its Issue needs a stronger josh.worker profile.
@@ -74,5 +77,49 @@ describe('run_park_escalate.park', () => {
 		vi.mocked(run_stalled_park.apply).mockResolvedValue(false)
 
 		await expect(run_park_escalate.park(ARGV, DIRECTORY, USAGE)).resolves.toBeUndefined()
+	})
+})
+
+const JAPANESE_PROSE = 'より強い josh.worker プロファイル'
+
+async function parked_with(lang: string): Promise<ReadonlyArray<unknown>> {
+	vi.stubEnv(session_language.ENV_KEY, lang)
+	await run_park_escalate.park(ARGV, DIRECTORY, USAGE)
+
+	return vi.mocked(run_stalled_park.apply).mock.calls[0] ?? []
+}
+
+describe('run_park_escalate.park comment language', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it.each([
+		['ja', JAPANESE_PROSE],
+		['', JAPANESE_PROSE],
+		['en', run_stalled.ESCALATION_REQUESTED.why],
+	])('writes the prose in the %j session language', async (lang, prose) => {
+		const [, comment] = await parked_with(lang)
+
+		expect(comment).toContain(prose)
+	})
+
+	it.each(['ja', 'en'])('keeps the matched parts unchanged under %j', async (lang) => {
+		const [issue, comment, cause] = await parked_with(lang)
+
+		expect(issue).toBe(ISSUE)
+		expect(comment).toContain(`\`${RUN_STALLED_LABEL}\``)
+		expect(comment).toContain(`- Reason: ${REASON}`)
+		expect(comment).toContain(`pnpm josh run:add ${ISSUE} --retry`)
+		expect(cause).toBe(`escalation requested: ${REASON}`)
+		expect(run_stalled.class_of(String(cause))).toBe(run_stalled.ESCALATION_REQUESTED.short)
+	})
+
+	it.each(['ja', 'en'])('marks the first action for the board under %j (#7852)', async (lang) => {
+		const [, comment] = await parked_with(lang)
+
+		expect(issue_outcome.next_of(String(comment))).toBe(
+			run_stalled.next_action(ISSUE, run_stalled.ESCALATION_REQUESTED.why),
+		)
 	})
 })

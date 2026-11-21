@@ -15,6 +15,7 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
 import { pre_gate_cut } from '#scripts/rules/pre-gate-cut'
+import { queued_notice } from '#scripts/rules/queued-notice'
 import { stop_decision } from '#scripts/rules/stop-decision'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { tail_commands } from '#scripts/rules/tail-commands'
@@ -113,10 +114,11 @@ function session_lang(): string {
 // Which session this is — a headless parent, a lane child, a kit-launched agent, the `backlogrun`
 // parent — the facts that say whether a person is there to answer.
 async function session_role_facts(): Promise<
-	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'lane_child'>
+	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'lane_child' | 'started_child'>
 > {
 	return {
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
+		started_child: run_headless.is_started_child(process.env),
 		headless_agent: agent_headless.is_headless(),
 		backlog_parent: await run_headless.is_backlog_parent(),
 	}
@@ -145,6 +147,7 @@ async function build_context(
 		background_pending: lane_background.pending_background_ids(tail).length > 0,
 		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
 		command_pending: lane_background.pending_command_ids(tail).length > 0,
+		notice_queued: queued_notice.queued_notice_ids(tail).length > 0,
 		handed_off: lane_handoff.is_handed_off(process.cwd()),
 		session_lang: session_lang(),
 	}

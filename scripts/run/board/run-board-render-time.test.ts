@@ -1,3 +1,5 @@
+import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -8,7 +10,7 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // width the column takes across the run's own rows.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header } = run_board_render_fixture
-const { time_of, time_width } = run_board_render_time
+const { stops_width, time_of, time_width } = run_board_render_time
 const HOUR = 60 * MINUTE
 
 function row(state: ItemState, status?: Omit<ItemStatus, 'state'>): BoardRow {
@@ -50,7 +52,110 @@ describe('run_board_render_time.time_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7866: the host's stops come out of a row's time and are drawn beside it.
+const SLEEP = { from_ms: NOW - 40 * MINUTE, to_ms: NOW - 10 * MINUTE }
+const NET_OF_SLEEP = '30′00″ (+30′00″)'
+const AN_HOUR = '1°00′00″'
+
+describe('run_board_render_time.time_of -- the host slept inside the lane', () => {
+	it('draws a running row net of the sleep, the sleep in brackets', () => {
+		const running = row('running', { started_ms: NOW - HOUR, gaps: [SLEEP] })
+
+		expect(time_of(running, NOW)).toBe(NET_OF_SLEEP)
+	})
+
+	it('draws a settled row as it drew while running (#4463)', () => {
+		const running = row('running', { started_ms: NOW - HOUR, gaps: [SLEEP] })
+		const merged = row('merged', {
+			started_ms: NOW - HOUR,
+			ended_ms: NOW,
+			elapsed_ms: 30 * MINUTE,
+			excluded_ms: 30 * MINUTE,
+		})
+
+		expect(time_of(merged, NOW + HOUR)).toBe(time_of(running, NOW))
+	})
+
+	it('draws a sleep outside the lane as no exclusion', () => {
+		const before = { from_ms: NOW - 3 * HOUR, to_ms: NOW - 2 * HOUR }
+		const running = row('running', { started_ms: NOW - HOUR, gaps: [before] })
+
+		expect(time_of(running, NOW)).toBe(AN_HOUR)
+	})
+})
+
+// joshuafolkken/kit#7867: an outage joins the sleeps, one still open closing at the row's end. Its
+// `offline-tick` sightings each minute to a minute ago keep it open to now.
+function event_at(kind: string, ms: number, elapsed_ms?: number): RunEvent {
+	return { pos: ms, at: new Date(ms).toISOString(), kind, text: kind, elapsed_ms }
+}
+
+const DOWN_MINUTES = 35
+
+const STOPS = lane_host_gaps.gaps_of([
+	event_at('offline', NOW - DOWN_MINUTES * MINUTE),
+	...Array.from({ length: DOWN_MINUTES - 1 }, (_, index) =>
+		event_at('offline-tick', NOW - (DOWN_MINUTES - 1 - index) * MINUTE),
+	),
+	event_at('sleep', NOW - 30 * MINUTE, 10 * MINUTE),
+])
+
+describe('run_board_render_time.time_of -- the network went down inside the lane', () => {
+	it('draws a running row net of the sleep and the outage, overlap counted once', () => {
+		const running = row('running', { started_ms: NOW - HOUR, gaps: STOPS })
+
+		expect(time_of(running, NOW)).toBe('20′00″ (+40′00″)')
+	})
+
+	it('closes an outage still open at a settled row end', () => {
+		const merged = row('merged', {
+			started_ms: NOW - HOUR,
+			ended_ms: NOW - 20 * MINUTE,
+			gaps: STOPS,
+		})
+
+		expect(time_of(merged, NOW)).toBe('20′00″ (+20′00″)')
+	})
+})
+
+describe('run_board_render_time.time_of -- an ending recorded before the exclusion', () => {
+	it('takes the sleep out of an ending recorded before the exclusion', () => {
+		const merged = row('merged', {
+			started_ms: NOW - HOUR,
+			ended_ms: NOW,
+			elapsed_ms: HOUR,
+			gaps: [SLEEP],
+		})
+
+		expect(time_of(merged, NOW)).toBe(NET_OF_SLEEP)
+	})
+
+	it('leaves in an older ending a sleep that fell while the child was off its lane', () => {
+		const launches = [
+			{ from_ms: NOW - HOUR, end_ms: NOW - 45 * MINUTE },
+			{ from_ms: NOW - 30 * MINUTE, end_ms: undefined },
+		]
+		const off_lane = { from_ms: NOW - 40 * MINUTE, to_ms: NOW - 35 * MINUTE }
+		const merged = row('merged', {
+			started_ms: NOW - HOUR,
+			ended_ms: NOW,
+			spans: launches,
+			elapsed_ms: 45 * MINUTE,
+			gaps: [off_lane],
+		})
+
+		expect(time_of(merged, NOW)).toBe('45′00″')
+	})
+})
+
 describe('run_board_render_time.time_width', () => {
+	// joshuafolkken/kit#7992: the bracketed stops follow the column, so it is as wide as the net time.
+	it('is as wide as a bracketed row’s net time, not its brackets', () => {
+		const active = [row('running', { started_ms: NOW - HOUR, gaps: [SLEEP] })]
+
+		expect(time_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe('30′00″'.length)
+	})
+
 	it('is the widest time among the run’s own rows', () => {
 		const active = [
 			row('running', { started_ms: NOW - MINUTE }),
@@ -58,11 +163,29 @@ describe('run_board_render_time.time_width', () => {
 			row('parked'),
 		]
 
-		expect(time_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe('1°00′00″'.length)
+		expect(time_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe(AN_HOUR.length)
 	})
 
 	it('is zero with no layout or no timed row', () => {
 		expect(time_width(header({ layout: undefined }))).toBe(0)
 		expect(time_width(header())).toBe(0)
+	})
+})
+
+describe('run_board_render_time.stops_width', () => {
+	it('is as wide as the widest bracketed stops, one blank before them', () => {
+		const active = [
+			row('running', { started_ms: NOW - HOUR, gaps: [SLEEP] }),
+			row('merged', { started_ms: STARTED, ended_ms: STARTED + HOUR }),
+		]
+
+		expect(stops_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe(' (+30′00″)'.length)
+	})
+
+	it('is zero where no row has stops', () => {
+		const active = [row('merged', { started_ms: STARTED, ended_ms: STARTED + HOUR })]
+
+		expect(stops_width(header({ layout: { ...EMPTY_LAYOUT, active } }))).toBe(0)
+		expect(stops_width(header())).toBe(0)
 	})
 })

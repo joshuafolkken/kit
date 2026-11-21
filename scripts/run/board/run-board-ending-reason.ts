@@ -2,6 +2,7 @@ import { has_label_name, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { lane_withdraw } from '#scripts/lane/lane-withdraw'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stalled } from '#scripts/run/park/run-stalled'
+import { run_board_lane_stop } from './run-board-lane-stop'
 import type { BoardRow, RowRead, RowReason } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
 import { run_board_render_title } from './run-board-render-title'
@@ -68,17 +69,20 @@ function reason_of(event: RunEvent): string | undefined {
 interface EndingRecord {
 	reason?: string
 	elapsed_ms?: number
+	excluded_ms?: number
 }
 
 // What an ending event records for its row: the reason it gives and the lane time its writer recorded
-// (joshuafolkken/kit#4481), each only where the event carries it.
+// (joshuafolkken/kit#4481) with the host's stops it took out (joshuafolkken/kit#7866), each only where
+// the event carries it.
 function recorded_of(event: RunEvent): EndingRecord {
 	const reason = reason_of(event)
-	const { elapsed_ms } = event
+	const { elapsed_ms, excluded_ms } = event
 
 	return {
 		...(reason !== undefined && { reason }),
 		...(elapsed_ms !== undefined && { elapsed_ms }),
+		...(excluded_ms !== undefined && { excluded_ms }),
 	}
 }
 
@@ -117,20 +121,66 @@ function tail_of(status: ItemStatus): string | undefined {
 	return status.outcome?.summary ?? ending
 }
 
+// joshuafolkken/kit#7750: a missing `in-progress` is named as the fact it is; a running row only notes it.
+function unlabelled_tail(status: ItemStatus): string {
+	const fact = run_board_lane_stop.UNLABELLED_REASON
+
+	return status.state === 'running' ? fact : `stopped · ${fact}`
+}
+
 // joshuafolkken/kit#6577: what stopped a lane, or the ship of a child still working, by the command its
 // record or labels name (`run-board-lane-stop.ts`).
 function stop_reason_of(status: ItemStatus): RowReason | undefined {
-	if (status.stop_reason === undefined) return undefined
+	const reason = status.stop_reason
+	if (reason === undefined) return undefined
+	if (reason === run_board_lane_stop.UNLABELLED_REASON) return { tail: unlabelled_tail(status) }
 
 	const subject = status.state === 'running' ? 'ship stopped' : 'stopped'
 
-	return { tail: `${subject} by ${status.stop_reason}` }
+	return { tail: `${subject} by ${reason}` }
 }
 
 function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
 	const reason = stop_reason_of(status)
 
 	return reason === undefined ? {} : { reason }
+}
+
+// joshuafolkken/kit#7901: a ⏳ lane row no ending reason names says why it waits and what starts it.
+// Its blockers follow its title (`🔗`), so the tail names only the move that clears them: an upstream
+// Issue's close (`owner/repo#N`), a blocker's merge here, both where both hold it, else the next free
+// lane a retry starts in.
+const WAITING_TAILS = {
+	free: 'retry · → next free lane',
+	blocker: '→ starts on blocker merge',
+	upstream: '→ starts on upstream close',
+	both: '→ starts on merge + close',
+}
+
+function blocked_tail(waits: ReadonlyArray<string>): string {
+	const upstream_count = waits.filter((wait) => wait.includes('#')).length
+
+	if (upstream_count === 0) return WAITING_TAILS.blocker
+
+	return upstream_count === waits.length ? WAITING_TAILS.upstream : WAITING_TAILS.both
+}
+
+function waiting_reason(waits: ReadonlyArray<string> = []): RowReason {
+	return { tail: waits.length === 0 ? WAITING_TAILS.free : blocked_tail(waits) }
+}
+
+// A row no reason was recorded for: a ⏳ wait's next move, a stall's resume, else what stopped it.
+function unrecorded_reason(
+	number: number,
+	status: ItemStatus,
+	read: RowRead,
+	waits: ReadonlyArray<string> | undefined,
+): Pick<BoardRow, 'reason'> {
+	if (status.state === 'waiting') return { reason: waiting_reason(waits) }
+
+	return is_stalled(status, read.labels.get(number))
+		? { reason: stalled_reason(number, read, waits) }
+		: stop_row_reason(status)
 }
 
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
@@ -142,17 +192,13 @@ function ending_row_reason(
 	const reason = tail_of(status)
 	const waits = read.waits?.get(number)
 
-	if (reason !== undefined) {
-		const tail = park_row_reason(number, reason, read.is_backlog_live === true, waits)
+	if (reason === undefined) return unrecorded_reason(number, status, read, waits)
 
-		return {
-			reason: { tail, ...(status.outcome !== undefined && { evidence_url: status.outcome.url }) },
-		}
+	const tail = park_row_reason(number, reason, read.is_backlog_live === true, waits)
+
+	return {
+		reason: { tail, ...(status.outcome !== undefined && { evidence_url: status.outcome.url }) },
 	}
-
-	return is_stalled(status, read.labels.get(number))
-		? { reason: stalled_reason(number, read, waits) }
-		: stop_row_reason(status)
 }
 
 function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
@@ -163,6 +209,7 @@ function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<Boa
 }
 
 const run_board_ending_reason = {
+	WAITING_TAILS,
 	park_reason,
 	park_row_reason,
 	reason_of,

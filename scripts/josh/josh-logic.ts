@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { core_budget } from '#scripts/gate/core-budget'
 import { hook_lap } from '#scripts/hooks/hook-lap'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
@@ -185,6 +186,7 @@ async function run_script_entry(
 	const target = josh_in_process.in_process_target(script, PACKAGE_DIR, import.meta.url)
 
 	josh_environment_file.apply_node_flags(entry.tsx_arguments ?? [])
+	launch_timing.set_dispatched_ms(performance.now())
 
 	return await josh_in_process.run_in_process(target, script_arguments)
 }
@@ -240,7 +242,8 @@ function declared(value: number | (() => number) | undefined): number | undefine
 }
 
 // Every command passes here, so reserving declared weight covers direct calls as well as gates.
-// A parent's reservation mark prevents nested commands from claiming the same cores twice.
+// A parent's reservation mark prevents nested commands from claiming the same cores twice. How long the
+// reservation waited is handed to the command through `launch-timing.ts` (joshuafolkken/kit#7827).
 async function dispatch_entry(
 	command: string,
 	entry: CommandEntry,
@@ -249,10 +252,15 @@ async function dispatch_entry(
 	const weight = declared(entry.core_weight)
 
 	if (weight === undefined) return await run_entry(entry, subcommand_arguments)
+	const asked = performance.now()
 
 	return await core_budget.with_command_reservation(
 		weight,
-		async () => await run_entry(entry, subcommand_arguments),
+		async () => {
+			launch_timing.set_core_wait_ms(performance.now() - asked)
+
+			return await run_entry(entry, subcommand_arguments)
+		},
 		{ memory_mb: declared(entry.memory_mb), command, is_unit: entry.is_unit_claim },
 	)
 }

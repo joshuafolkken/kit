@@ -27,6 +27,10 @@ const FAILURE_EXIT_CODE = 1
 // no index and no cache; add one when the number makes it necessary, not before.
 const BACKLOG_LIMIT = 200
 const APPLY_FLAG = '--apply'
+
+// `report` prints only; `apply` also writes the settled placement; `place` is `apply` for an unpublished
+// split child, which fails when nothing places it (`epic-bundle-apply.ts`).
+type BundleMode = 'report' | 'apply' | 'place'
 const USAGE = 'Usage: josh epic:bundle <issue-number> [--apply]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the backlog cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
@@ -218,7 +222,7 @@ async function report_decision(
 	subject: BacklogIssue,
 	backlog: FetchedBacklog,
 	repo: string,
-	is_apply: boolean,
+	mode: BundleMode,
 ): Promise<number> {
 	const others = backlog.issues.filter((issue) => issue.number !== subject.number)
 	const is_established = epic_bundle_gaps.is_membership_established(backlog.epic_cutoff)
@@ -229,13 +233,14 @@ async function report_decision(
 	const report = format_decision(decision, subject, others, is_established)
 
 	console.info(issue_citation.linkify(report, repo))
-	if (!is_apply) return SUCCESS_EXIT_CODE
+	if (mode === 'report') return SUCCESS_EXIT_CODE
 
 	return await epic_bundle_apply.apply_decision({
 		decision,
 		subject,
 		members: epic_bundle_format.members_of(decision, others),
 		is_membership_established: is_established,
+		is_placement_required: mode === 'place',
 	})
 }
 
@@ -245,13 +250,13 @@ async function report_widened(
 	subject: BacklogIssue,
 	backlog: FetchedBacklog,
 	repo: string,
-	is_apply: boolean,
+	mode: BundleMode,
 ): Promise<number> {
 	const widened = await widen_with_referenced(subject, backlog)
 
 	warn_about_gaps(widened)
 
-	return await report_decision(subject, widened, repo, is_apply)
+	return await report_decision(subject, widened, repo, mode)
 }
 
 // The subject from the listing, or read on its own when the listing does not show it. A just-filed
@@ -270,7 +275,11 @@ async function find_subject(
 }
 
 // The recommendation for one issue, from the open backlog around it.
-async function report_for(issue_number: number, repo: string, is_apply = false): Promise<number> {
+async function report_for(
+	issue_number: number,
+	repo: string,
+	mode: BundleMode = 'report',
+): Promise<number> {
 	const backlog = await read_backlog(repo)
 
 	if (!backlog.is_readable) {
@@ -289,7 +298,7 @@ async function report_for(issue_number: number, repo: string, is_apply = false):
 		return FAILURE_EXIT_CODE
 	}
 
-	return await report_widened(subject, backlog, repo, is_apply)
+	return await report_widened(subject, backlog, repo, mode)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -315,7 +324,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await report_for(issue_number, repo, argv.includes(APPLY_FLAG))
+	return await report_for(issue_number, repo, argv.includes(APPLY_FLAG) ? 'apply' : 'report')
 }
 
 const epic_bundle_cli = {
@@ -334,3 +343,4 @@ const epic_bundle_cli = {
 }
 
 export { epic_bundle_cli }
+export type { BundleMode }

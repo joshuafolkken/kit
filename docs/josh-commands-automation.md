@@ -352,7 +352,7 @@ Run by the distributed `ci.yml` between its E2E attempts.
 
 <!-- usage: test:reach -->
 
-Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone.
+Print how many test files a change to each file selects — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone.
 
 ```bash
 pnpm josh test:reach scripts/lane/lane-ledger.ts           # a reach count to measure before and after a change
@@ -664,11 +664,12 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 **Options:**
 
-- `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️. Do not send `completion` or `warning` by hand — `josh followup` sends them.
+- `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️; only `josh followup` sends `completion` / `warning`.
 - `--body` / `--body=$'…'` — inline body; use `--body=$'…'` when it starts with `-`.
 - `--body-file` — read the body from a file written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
-- `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
-- `--recommended` / `--alternative` — the choices appended under `JOSH_SESSION_LANG` headings; `--recommended` is required for `confirmation`, `--alternative` is repeatable.
+- `--repo-name` / `--issue-url` / `--pr-url` — header repository in that order, else the cwd; `--issue-url` also gives the issue title.
+- `--recommended` / `--alternative` — choices under `JOSH_SESSION_LANG` headings; `confirmation` requires `--recommended`; `--alternative` repeats.
+- `--reason` — human-stop key for the confirmation ledger; default `needs-decision`.
 
 <!-- /usage -->
 
@@ -1103,7 +1104,8 @@ pnpm josh split:recover 6212 https://github.com/joshuafolkken/kit/issues/6326
 Write every artifact the command map derives — usage spans and catalog — and print page bytes against their ceilings.
 
 ```bash
-pnpm josh command:derive   # after adding, renaming or describing a command
+pnpm josh command:derive           # after adding, renaming or describing a command
+pnpm josh command:derive --check   # name each hand-edited generated page and exit non-zero, writing nothing
 ```
 
 <!-- /usage -->
@@ -1191,10 +1193,10 @@ pnpm josh pre-push-unit
 The result is reused when [`josh gate`](josh-commands.md#josh-gate) recorded that exact, clean tree green.
 
 ```bash
-JOSH_PRE_PUSH_FORCE=1 git push   # run the suite even on a tree recorded green
+JOSH_PRE_PUSH_FORCE=1 git push   # run the whole suite, even on a tree recorded green
 ```
 
-With `JOSH_PRE_PUSH_RELATED=1`, a push the record does not cover runs `josh test:related` instead of the whole suite — `josh ship` sets it when it pushes its sync merge onto an open pull request ahead of the gate. That push reuses the `test:related` green record when it covers the same clean tree and base.
+A push the record does not cover runs `josh test:related` — capped, the rest deferred to CI's whole suite — or reuses its green record when that covers the same clean tree and base. Only `JOSH_PRE_PUSH_FORCE=1`, `--force` or arguments forwarded to vitest run the whole suite.
 
 **Output:** on reuse, prints that the tree is already green.
 
@@ -1215,10 +1217,10 @@ pnpm josh reserved-run 1 --memory 3000 -- <command>   # hold 3,000 MB beside the
 
 The budget is [`josh gate`](josh-commands.md#josh-gate)'s; the pre-push install and audit use it.
 
-- `<weight> [--memory <MB>] -- <command...>`: the cores, optionally the memory, then the command.
+- `<weight> [--memory <MB>] -- <command...>`: the cores (a number of at least `1`, fractional allowed, e.g. `1.7`), optionally the memory, then the command.
 - Memory: `--memory`, else the wrapped tool's `MEMORY_MB` times its `--concurrency` / `--maxWorkers`, `sh -c` read too (`scripts/gate/command-memory.ts`); a command it does not know reserves none.
 - Claims a place before the command starts and waits while the budget is full, as a gate check does; the place is released when the command exits, and its exit code is forwarded.
-- A missing separator, a non-integer weight, a malformed `--memory`, or no command is a usage error (exit `1`).
+- A missing separator, a weight that is not a finite number of at least one core, a malformed `--memory`, or no command is a usage error (exit `1`).
 - A lane child launching `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`, `sh -c`), or eslint above `--concurrency 1`, meets the `lane-direct-tool` row of `pnpm josh rule:list`; an interactive session outside a lane does not.
 - The row rewrites a one-command line behind this command at the gate's weight, and refuses any other line, pointing at `josh lint:related` / `test:related` / `cspell:dot`.
 - The command runs in the directory it was typed in (pnpm's `INIT_CWD`), not the package root.

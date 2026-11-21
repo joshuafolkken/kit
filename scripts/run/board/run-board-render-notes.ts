@@ -6,6 +6,7 @@ import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-l
 import type { BoardNote } from './run-board-notes'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
 
 // The findings section of `run:board`, under the 🙋 decision rows, and the part of the legend that
 // names its symbols. A finding is read to the minute, and the legend names only the kinds the section
@@ -16,6 +17,7 @@ const NOTE_LIMIT = 6
 const { ROW_INDENT } = run_board_render_section
 const { columns_cut } = run_board_render_title
 const { width_of } = run_board_fit
+const { keyed } = run_board_row_key
 const GAP = '  '
 const NUMBER_PLACEHOLDER = '{n}'
 // An `owner/repo#N` reference written out in a text.
@@ -35,19 +37,12 @@ interface NotesView {
 	link: Link
 	repo?: string | undefined
 	columns?: number | undefined
+	is_keyed?: boolean | undefined
 }
 
 interface NotesBody {
 	lines: Array<string>
 	hidden: number
-}
-
-// One line the section can draw, with what it is kept by and the icon it leads with.
-interface NoteItem {
-	rank: number
-	at_ms: number
-	line: string
-	icon: string
 }
 
 interface ItemsView {
@@ -56,6 +51,9 @@ interface ItemsView {
 	link: Link
 	repo: string | undefined
 	columns?: number | undefined
+	is_keyed?: boolean | undefined
+	// The widest Issue number the section's notes carry, every number column padded to it.
+	issue_width?: number | undefined
 }
 
 // The icons the legend can name, in its order, each with its word — a filed kind's the rows' own
@@ -108,30 +106,45 @@ function fitted_line(head: string, note: BoardNote, view: ItemsView): string {
 	return `${head}${columns_cut(text, Math.max(1, columns - width_of(head)))}`
 }
 
+// joshuafolkken/kit#8117: the event a note came from — never its drawn text, which the legend, the
+// pane's width and the link change — so a note is typed once, the frame it first shows in.
+function id_of(note: BoardNote): string {
+	return `${note.kind}:${note.issue ?? ''}:${String(note.at_ms)}`
+}
+
+// A note's Issue number padded to the section's widest, blanks where it carries none, so every note's
+// text starts in one column (joshuafolkken/kit#8257); none where no note carries one.
+function issue_column(note: BoardNote, view: ItemsView): string | undefined {
+	const width = view.issue_width ?? 0
+
+	if (width === 0) return undefined
+
+	const issue = note.issue ?? ''
+
+	return `${issue === '' ? '' : view.link(issue)}${' '.repeat(Math.max(0, width - issue.length))}`
+}
+
+// The widest Issue number among `notes`.
+function issue_width_of(notes: ReadonlyArray<BoardNote>): number {
+	return Math.max(0, ...notes.map((note) => note.issue?.length ?? 0))
+}
+
 // Where the legend names the symbols a note leads with its icon alone; where no legend is drawn it
-// keeps the kind's word. Its icon stands in the plan rows' icon column.
+// keeps the kind's word. Its icon stands in the plan rows' icon column; a keyed line's indent is drawn
+// whole, before its key.
 function note_text(note: BoardNote, view: ItemsView): string {
-	const { has_legend, link } = view
-	const kind = has_legend ? undefined : WORDS[note.kind]
-	const issue = note.issue === undefined ? undefined : link(note.issue)
-	const lead = [note_icon(note), minute_of(note.at_ms), issue, kind]
+	const kind = view.has_legend ? undefined : WORDS[note.kind]
+	const lead = [note_icon(note), minute_of(note.at_ms), issue_column(note, view), kind]
 		.filter((part) => part !== undefined)
 		.join(' ')
+	const section = view.is_keyed === true ? 'note' : undefined
+	const head = keyed(section, id_of(note), lead + GAP)
 
-	return fitted_line(`${ROW_INDENT}${lead}${GAP}`, note, view)
+	return fitted_line(`${ROW_INDENT}${head}`, note, view)
 }
 
 function rank_index(rank: Rank): number {
 	return RANK_ORDER.indexOf(rank)
-}
-
-function note_item(note: BoardNote, view: ItemsView): NoteItem {
-	return {
-		rank: rank_index(note.kind),
-		at_ms: note.at_ms,
-		line: note_text(note, view),
-		icon: note_icon(note),
-	}
 }
 
 // A filed Issue the plan draws a row for (`listed`, the rows' numbers) would name its title twice, so
@@ -148,15 +161,13 @@ function rest_of(notes: ReadonlyArray<BoardNote>, listed: ReadonlySet<number>): 
 	return notes.filter((note) => !is_listed(note, listed))
 }
 
-function by_rank(left: NoteItem, right: NoteItem): number {
-	return left.rank - right.rank || right.at_ms - left.at_ms
+function by_rank(left: BoardNote, right: BoardNote): number {
+	return rank_index(left.kind) - rank_index(right.kind) || right.at_ms - left.at_ms
 }
 
-// Every line the section can draw, in the order it keeps them: by rank, then newest first.
-function items_of(notes: ReadonlyArray<BoardNote>, view: ItemsView): Array<NoteItem> {
-	return rest_of(notes, view.listed)
-		.map((note) => note_item(note, view))
-		.toSorted(by_rank)
+// Every note the section can draw, in the order it keeps them: by rank, then newest first.
+function ranked_of(notes: ReadonlyArray<BoardNote>, listed: ReadonlySet<number>): Array<BoardNote> {
+	return rest_of(notes, listed).toSorted(by_rank)
 }
 
 // The first few by rank, so the section never pushes the plan off the screen, and how many more there
@@ -164,13 +175,17 @@ function items_of(notes: ReadonlyArray<BoardNote>, view: ItemsView): Array<NoteI
 // gives way first. Their numbers go through the board's
 // `header.link`, so they open their GitHub issue as the plan's rows do.
 function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody {
-	const { layout, link, repo, columns } = view
+	const { layout, link, repo, columns, is_keyed } = view
 	const has_legend = layout !== undefined
 	const listed = listed_of(has_legend ? run_board_layout.rows_of(layout) : [])
-	const items = items_of(notes, { listed, has_legend, link, repo, columns })
-	const lines = items.slice(0, NOTE_LIMIT).map((item) => item.line)
+	const ranked = ranked_of(notes, listed)
+	const shown = ranked.slice(0, NOTE_LIMIT)
+	// Measured over the drawn notes alone, so a hidden note's number never widens the column.
+	const issue_width = issue_width_of(shown)
+	const item_view = { listed, has_legend, link, repo, columns, is_keyed, issue_width }
+	const lines = shown.map((note) => note_text(note, item_view))
 
-	return { lines, hidden: items.length - lines.length }
+	return { lines, hidden: ranked.length - lines.length }
 }
 
 // The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
@@ -178,10 +193,10 @@ function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody
 function notes_part(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesPart {
 	const body = note_lines(notes, view)
 	const label = view.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
-	const { counted, heading_lines } = run_board_render_section
+	const { counted, heading_lines, more_line } = run_board_render_section
 	const head = heading_lines(counted(label, body.lines.length + body.hidden))
 
-	return { head, label, ...body }
+	return { head, label, ...body, more: (hidden) => more_line(NOTE_ICONS.note, hidden) }
 }
 
 // Each kind a drawn line leads with — one the rows' legend already names (`named`) is not named twice.
@@ -191,16 +206,14 @@ function notes_legend(
 	named: ReadonlySet<string>,
 	rows: ReadonlyArray<BoardRow>,
 ): Array<string> {
-	const view = { listed: listed_of(rows), has_legend: true, link: same, repo: undefined }
-	const shown = items_of(notes, view).slice(0, NOTE_LIMIT)
-
-	const drawn = new Set(shown.map((item) => item.icon))
+	const shown = ranked_of(notes, listed_of(rows)).slice(0, NOTE_LIMIT)
+	const drawn = new Set(shown.map((note) => note_icon(note)))
 
 	return NOTE_LEGEND.filter(([icon]) => drawn.has(icon) && !named.has(icon)).map(
 		([icon, word]) => `${icon} ${WORDS[word]}`,
 	)
 }
 
-const run_board_render_notes = { NOTE_LIMIT, notes_legend, notes_part }
+const run_board_render_notes = { NOTE_LIMIT, id_of, notes_legend, notes_part }
 
 export { run_board_render_notes, type NotesView }

@@ -17,6 +17,7 @@ import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	BUG_LABEL,
+	INTERRUPT_ROUTE_LABEL,
 	NOT_BEFORE_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
@@ -51,7 +52,7 @@ interface ChildInput {
 	state?: string
 	labels?: ReadonlyArray<string>
 	blocked_by?: ReadonlyArray<number>
-	// The body the defect priority classifies the child by.
+	// The body the ranking's defect key and the mechanism deferral classify the child by.
 	body?: string
 	// Who filed the child. Left out, the owner did, so the author-trust check asks no network.
 	author_association?: string
@@ -86,6 +87,10 @@ interface BacklogInput {
 	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer.
 	// Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
+	// The open `route:interrupt` issues, opted in or not. Left out, none is open.
+	interrupts?: ReadonlyArray<OpenIssueData>
+	// The open `run:solo` issues, which hold the gate while one carries a park label (#7855).
+	solo?: ReadonlyArray<OpenIssueData>
 	// The open issues carrying `not-before`, whether opted in or not. Left out, none does.
 	not_before?: ReadonlyArray<{ number: number; body?: string }>
 	// The `in-progress` holders no process is running for, each with a lane on this machine — a stale
@@ -229,7 +234,8 @@ function stub_environment(): void {
 	)
 }
 
-// The two reads the defect priority adds: the rate, and each candidate's body — beside the implement
+// The two reads the mechanism deferral adds: the rate, and, above the baseline, each candidate's body
+// the listing did not carry — beside the implement
 // rate the size note projects by.
 function stub_defect_priority(input: BacklogInput): void {
 	const bodies = new Map((input.children ?? []).map((child) => [String(child.number), child.body]))
@@ -244,6 +250,18 @@ function stub_defect_priority(input: BacklogInput): void {
 	vi.spyOn(git_gh_command, 'issue_get_body').mockImplementation(async (number) =>
 		bodies.get(number),
 	)
+}
+
+// The per-repository listing: the open interrupts, the open `run:solo` issues, or the `in-progress`
+// holders.
+function in_repo_rows(input: BacklogInput, label: string): ReadonlyArray<OpenIssueData> {
+	const listed = new Map([
+		[INTERRUPT_ROUTE_LABEL, input.interrupts],
+		[RUN_SOLO_LABEL, input.solo],
+	])
+	const rows = listed.has(label) ? listed.get(label) : input.in_progress
+
+	return rows ?? []
 }
 
 // The three label listings: the opted-in rows, the epics, and the `in-progress` holders the
@@ -262,8 +280,8 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 				: auto_ok_fixture.epic_listing(epics),
 		),
 	)
-	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockResolvedValue(
-		listing_outcome(JSON.stringify(input.in_progress ?? [])),
+	vi.spyOn(git_gh_command, 'issue_list_by_label_in_repo').mockImplementation(async (label) =>
+		listing_outcome(JSON.stringify(in_repo_rows(input, label))),
 	)
 
 	const stale = new Set((input.stale ?? []).map(String))

@@ -335,8 +335,12 @@ async function issue_add_label(
 // (`git-followup-cleanup.ts`) reports a failure by name with the command that finishes it by hand —
 // a `false` swallowed here would reach that guard as a success and the step would be reported as
 // done.
-async function issue_remove_label(issue_number: string, label: string): Promise<void> {
-	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number)
+async function issue_remove_label(
+	issue_number: string,
+	label: string,
+	repo?: string,
+): Promise<void> {
+	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number, repo)
 
 	await write_api({
 		path: `${labels_path}/${encodeURIComponent(label)}`,
@@ -348,13 +352,17 @@ async function issue_remove_label(issue_number: string, label: string): Promise<
 // may find the label already off. A failed DELETE is confirmed against the labels the issue carries,
 // the read `issue_apply_label` confirms an addition with, so an absent label answers `true` and a
 // failure that left the label on answers `false`.
-async function issue_clear_label(issue_number: string, label: string): Promise<boolean> {
+async function issue_clear_label(
+	issue_number: string,
+	label: string,
+	repo?: string,
+): Promise<boolean> {
 	try {
-		await issue_remove_label(issue_number, label)
+		await issue_remove_label(issue_number, label, repo)
 
 		return true
 	} catch (error) {
-		const names = await read_label_names(issue_number)
+		const names = await read_label_names(issue_number, repo)
 
 		if (names?.includes(label) === false) return true
 		error_text.trace_swallowed('git_gh_issue_write.issue_clear_label', error)
@@ -376,9 +384,9 @@ async function issue_clear_label(issue_number: string, label: string): Promise<b
 // A resolution that does not produce a usable id throws rather than returning something to send:
 // `jq` prints an empty line for a field it cannot reach, and `Number('')` is `0`, which is a value
 // the endpoint would happily be given.
-async function read_issue_id(issue_number: string): Promise<number> {
+async function read_issue_id(issue_number: string, repo?: string): Promise<number> {
 	const raw = await git_gh_exec.exec_gh_api({
-		path: git_gh_api_path.issue_api_path(issue_number),
+		path: git_gh_api_path.issue_api_path(issue_number, repo),
 		jq_filter: ID_FILTER,
 	})
 	const issue_id = Number(raw.trim())
@@ -392,13 +400,20 @@ async function read_issue_id(issue_number: string): Promise<number> {
 
 // Applied after creation, never as part of it: the relation is a nicety and the Issue is not, so a
 // failure here costs only the relation. It does not depend on the gh CLI's version — the
-// dependencies endpoint is REST, which `gh api` proxies.
-async function issue_add_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
+// dependencies endpoint is REST, which `gh api` proxies. `blocker_repo` (`owner/repo`) names a blocker
+// in another repository — an upstream Issue the interrupt filed there (joshuafolkken/kit#7695) — and
+// `repo` the blocked Issue's, since that filing points `GH_REPO` at the upstream target.
+async function issue_add_blocked_by(
+	issue_number: string,
+	blocker: string,
+	blocker_repo?: string,
+	repo?: string,
+): Promise<boolean> {
 	return await did_write_succeed(async () => {
-		const issue_id = await read_issue_id(blocker)
+		const issue_id = await read_issue_id(blocker, blocker_repo)
 
 		await write_api({
-			path: git_gh_api_path.blocked_by_api_path(issue_number),
+			path: git_gh_api_path.blocked_by_api_path(issue_number, repo),
 			body: JSON.stringify({ issue_id }),
 		})
 	})
@@ -408,9 +423,13 @@ async function issue_add_blocked_by(issue_number: string, blocker: string): Prom
 // and `#M` has to drop `#B -> #M`, or the epic would declare one order and record two.
 // The id goes in the path here rather than in a body, and the endpoint is
 // idempotent — deleting a relation that is not there answers 200.
-async function issue_remove_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
+async function issue_remove_blocked_by(
+	issue_number: string,
+	blocker: string,
+	blocker_repo?: string,
+): Promise<boolean> {
 	return await did_write_succeed(async () => {
-		const issue_id = await read_issue_id(blocker)
+		const issue_id = await read_issue_id(blocker, blocker_repo)
 		const relations_path = git_gh_api_path.blocked_by_api_path(issue_number)
 
 		await write_api({

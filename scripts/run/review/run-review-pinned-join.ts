@@ -149,6 +149,23 @@ async function settle_elsewhere(root: string): Promise<void> {
 	run_review_pinned_steps.clear(root)
 }
 
+// **The fixed tree's one check** (joshuafolkken/kit#8271): starts the check on the current tree unless
+// one was launched on it already, after settling one on another tree. The recheck before the ship
+// launches it, and the ship's pre-detach then reads that same answer through `answer_on_tree` rather
+// than running a `josh test:pinned` of its own. A tree git could not read starts nothing, so the caller
+// runs its own check as before.
+async function launch_on_tree(root: string = PROJECT_ROOT, reason?: string): Promise<void> {
+	try {
+		const tree = await run_review_pinned_tree.key()
+		if (run_review_pinned_steps.launched_tree(root) === tree) return
+
+		await settle_elsewhere(root)
+		run_review_pinned_steps.launch(root, reason, tree)
+	} catch (error) {
+		error_text.trace_swallowed('run_review_pinned_join.launch_on_tree', error)
+	}
+}
+
 // The answer of the check launched on this very tree, waited for; `undefined` when none was, or it left
 // none, so the caller runs its own.
 async function answer_on_tree(root: string = PROJECT_ROOT): Promise<PinnedSummary | undefined> {
@@ -209,6 +226,7 @@ async function settled_on_tree(
 const run_review_pinned_join = {
 	answer_on_tree,
 	finished_on_tree,
+	launch_on_tree,
 	restart_if_moved,
 	settled_on_tree,
 	wait_for_join,

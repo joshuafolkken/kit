@@ -165,6 +165,11 @@ const EVENT_KIND = {
 	// is the dedup marker for the one idle Telegram. A trace: a drain's retrospective is read off the
 	// position beneath it, so the marker must not stand over it.
 	IDLE_NOTICE: 'idle-notice',
+	// `backlog:drive` reached a watch with a child still running and a lane free — the issues ready to start
+	// ran out before the lane limit did (joshuafolkken/kit#8332). Emitted once per shortfall episode
+	// (`emit_once_since_with`, reset by `CHILD_LAUNCH`), it is the dedup marker for the one shortfall
+	// Telegram. A trace, as `IDLE_NOTICE` is.
+	SHORTFALL_NOTICE: 'shortfall-notice',
 	// A person paused or resumed a lane child (`lane:pause` / `lane:resume`), so who halted a lane and
 	// when is on the stream rather than only in a shell history (joshuafolkken/kit#4268). A trace: it
 	// says what a lane's processes were told, not where the run is.
@@ -185,6 +190,13 @@ const EVENT_KIND = {
 	// ran late by more than a few intervals. `at` is the wake and `elapsed_ms` how long the sleep
 	// lasted; every lane's net time takes it out (`lane-sleep.ts`). A trace.
 	SLEEP: 'sleep',
+	// The host's network went down or came back (joshuafolkken/kit#7867): the load sampler's per-tick
+	// reachability probe changed its answer, each written once. Every later tick still down writes an
+	// `offline-tick`, so an outage reads back (`lane-offline-spans.ts`) ending at its `online` or a tick
+	// past its last sighting, the interval every lane's net time takes out. Traces.
+	OFFLINE: 'offline',
+	OFFLINE_TICK: 'offline-tick',
+	ONLINE: 'online',
 	// A lane's `lane:plan` blocking on a holder of its files (joshuafolkken/kit#6140): `#<N> start #<M>`
 	// as one ask begins to wait, `#<N> end #<M>` as it ends, so `lane:breakdown` counts
 	// the wait under its own row rather than the stage it fell in (`lane-plan-wait-event.ts`). A trace.
@@ -214,12 +226,16 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
 	EVENT_KIND.IDLE_NOTICE,
+	EVENT_KIND.SHORTFALL_NOTICE,
 	EVENT_KIND.LANE_STATE,
 	EVENT_KIND.PAUSED_NOTICE,
 	EVENT_KIND.MEASURED,
 	EVENT_KIND.SAMPLE_WAIT,
 	EVENT_KIND.RELAUNCH_FAILED,
 	EVENT_KIND.SLEEP,
+	EVENT_KIND.OFFLINE,
+	EVENT_KIND.OFFLINE_TICK,
+	EVENT_KIND.ONLINE,
 	EVENT_KIND.PLAN_WAIT,
 	EVENT_KIND.RATE_LIMIT,
 ])
@@ -245,8 +261,11 @@ const event_schema = z.object({
 	text: z.string(),
 	// The child's time on a lane, recorded once by the writer of an ending (joshuafolkken/kit#4481), so a
 	// reader never has to find its launch again. An event written before it has none. A `sleep` event
-	// carries the sleep's length here.
+	// carries the sleep's length here. An ending's time is net of the host's stops (`lane-host-gaps.ts`).
 	elapsed_ms: z.number().optional(),
+	// The host's stops an ending took out of `elapsed_ms` (joshuafolkken/kit#7866); none on an ending
+	// written before it, whose `elapsed_ms` still holds them.
+	excluded_ms: z.number().optional(),
 	// The ship stop a park was taken at — its stage and `Cause` class (joshuafolkken/kit#6864) — so a
 	// reader re-dispatching the park reads them without parsing text. Free strings: an event a later
 	// version wrote with a new class still parses. A park written before it, or no ship's, has none —

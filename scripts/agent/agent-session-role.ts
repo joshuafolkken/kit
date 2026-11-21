@@ -1,3 +1,4 @@
+import { github_link } from '#scripts/discovery/github-link'
 import { agent_profile_schema, type AgentRole } from './agent-profile-schema'
 
 // The role an agent session kit launched was launched in — the fact that tells a ship reviewer apart
@@ -36,10 +37,33 @@ function is_launched(source: EnvironmentSource = process.env): boolean {
 	return (source[KEY] ?? '') !== ''
 }
 
-function scope_line(source: EnvironmentSource = process.env): string {
-	return can_implement(source)
-		? 'Session scope: implementation lane; implementation is permitted by the launcher role.'
-		: 'Session scope: consultation and operations only; filing only on the user’s explicit instruction; hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
+const WORKER_LINE =
+	'Session scope: implementation lane; implementation is permitted by the launcher role.'
+const CONSULTATION_PREFIX = 'Session scope: consultation and operations only; '
+const LINKED_REQUEST =
+	'answer an imperative request with investigation, a plan and a filing plan; filing only on the user’s explicit instruction, and a filing instruction (「起票」, “file an issue”) is `kickoff new` — hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`; '
+// joshuafolkken/kit#7756: without GitHub nothing can be filed, so a filing plan could not be carried out.
+const UNLINKED_REQUEST =
+	'GitHub is not linked (gh, its sign-in or a GitHub origin is missing), so answer an imperative request with investigation and a plan only, without a filing plan; '
+// joshuafolkken/kit#7759: a no-filing request is carried out, but through subagents, never by this session.
+const NO_FILING_REQUEST =
+	'a no-filing request (「起票せずに」) is carried out through the investigator and producer subagents, never edited by this session; '
+// joshuafolkken/kit#8262: a consultation artifact (an image, a diagram) has its own scratch route.
+const SCRATCH_ARTIFACT =
+	'a scratch artifact is written under `.josh/tmp/scratch/` and its script run with `pnpm josh scratch:run <path>`; '
+const CONSULTATION_SUFFIX =
+	'otherwise hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
+
+// `is_linked` is read only outside a worker lane, the one scope whose line depends on it.
+function scope_line(
+	source: EnvironmentSource = process.env,
+	is_linked: () => boolean = github_link.is_linked,
+): string {
+	if (can_implement(source)) return WORKER_LINE
+
+	const request = is_linked() ? LINKED_REQUEST : UNLINKED_REQUEST
+
+	return `${CONSULTATION_PREFIX}${request}${NO_FILING_REQUEST}${SCRATCH_ARTIFACT}${CONSULTATION_SUFFIX}`
 }
 
 const agent_session_role = {

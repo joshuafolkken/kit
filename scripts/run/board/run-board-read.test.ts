@@ -3,7 +3,7 @@ import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
-import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
+import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
@@ -11,6 +11,7 @@ import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_ledger_window } from './run-board-ledger-window'
 import { run_board_operation_read } from './run-board-operation-read'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
@@ -58,28 +59,6 @@ const UNRECORDED = {
 	is_session_active: false,
 	kit_version: undefined,
 }
-const STUCK_PID = 20_611
-const STUCK_REASON = 'owned by root'
-
-// joshuafolkken/kit#4300: a process a close could not end is named on the board with why, until a
-// retried close ends its lane.
-describe('run_board_read.read_local — the processes a close could not end', () => {
-	it('reads them off the records of the lanes not yet ended', async () => {
-		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		const stuck = [{ pid: STUCK_PID, reason: STUCK_REASON }]
-		const record = { issue: '3433', changed_at: STARTED_AT, changed_by: 'lane:open', stuck }
-
-		vi.spyOn(lane_state, 'read_records').mockResolvedValue([
-			{ ...record, state: 'open' },
-			{ ...record, issue: '3434', state: 'ended', stuck: [{ pid: 1, reason: 'gone' }] },
-		])
-
-		await expect(run_board_read.read_local()).resolves.toMatchObject({
-			closing: new Set(['3433']),
-			stuck: new Map([[STUCK_PID, STUCK_REASON]]),
-		})
-	})
-})
 
 // joshuafolkken/kit#4206: the declared order a queued row waits on is read off the running run's record.
 describe('run_board_read.read_local — the run’s record', () => {
@@ -139,6 +118,7 @@ describe('run_board_read.read_local', () => {
 			idle_lanes: [],
 			...LANE_ROOM,
 			usual: new Map(),
+			lane_totals: [],
 			is_memory_held: false,
 			launch_hold: undefined,
 			usage_reset_ms: undefined,
@@ -169,12 +149,12 @@ describe('run_board_read.read_local usual times', () => {
 			stage: 'round-2',
 			elapsed_ms: MINUTE_MS,
 		}
-		const read = vi.spyOn(lane_ledger, 'read_entries').mockReturnValue([stage])
+		const read = vi.spyOn(run_board_ledger_window, 'entries_of').mockReturnValue([stage])
 
 		await expect(run_board_read.read_local()).resolves.toMatchObject({
 			usual: new Map([['round_two', MINUTE_MS]]),
 		})
-		expect(read).toHaveBeenCalledWith(lane_ledger.target_of(REPOSITORY))
+		expect(read).toHaveBeenCalledWith(lane_ledger.target_of(REPOSITORY), expect.any(Number))
 	})
 })
 
@@ -184,7 +164,7 @@ describe('run_board_read.read_local memory hold', () => {
 
 	function arrange_ledger(entries: ReadonlyArray<LedgerEntry>): void {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		vi.spyOn(lane_ledger, 'read_entries').mockReturnValue(entries)
+		vi.spyOn(run_board_ledger_window, 'entries_of').mockReturnValue(entries)
 		// Inside the hold's cap, so the open hold is not read as a driver killed while held.
 		vi.spyOn(Date, 'now').mockReturnValue(Date.parse(INSIDE.at))
 	}

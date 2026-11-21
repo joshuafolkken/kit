@@ -2,8 +2,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { BUNDLED_COMMAND_DIRECTORY, josh_in_process } from '#scripts/josh/josh-in-process'
+import { run_board_worker_entry } from '#scripts/run/board/run-board-worker-entry'
 import { build } from 'esbuild'
 import { build_inputs, place_build, source_recorder } from './build-hooks'
+import { bundle_flag } from './bundle-flag'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { source_location, SOURCE_LOCATION_DEFINE } from './source-location'
 
@@ -24,6 +26,14 @@ function bundled_scripts(): Array<string> {
 	return [...new Set(scripts)]
 }
 
+// Entries a bundled command starts itself rather than the dispatcher: the live board's worker thread
+// (`run-board-worker-entry.ts`), so a board built into `dist/` never starts tsx for it.
+const THREAD_SCRIPTS = [run_board_worker_entry.WORKER_SCRIPT]
+
+function built_scripts(): Array<string> {
+	return [...bundled_scripts(), ...THREAD_SCRIPTS]
+}
+
 function entry_point(script: string): { in: string; out: string } {
 	const out = path.basename(josh_in_process.bundled_script_path(PACKAGE_DIR, script), '.js')
 
@@ -36,7 +46,7 @@ async function build_commands(out_directory: string = OUT_DIR): Promise<string> 
 	const sources = build_inputs(fileURLToPath(import.meta.url))
 	const { outputFiles: files } = await build({
 		absWorkingDir: PACKAGE_DIR,
-		entryPoints: bundled_scripts().map((script) => entry_point(script)),
+		entryPoints: built_scripts().map((script) => entry_point(script)),
 		outdir: out_directory,
 		bundle: true,
 		splitting: true,
@@ -44,7 +54,7 @@ async function build_commands(out_directory: string = OUT_DIR): Promise<string> 
 		format: 'esm',
 		target: 'node22',
 		packages: 'external',
-		define: SOURCE_LOCATION_DEFINE,
+		define: { ...SOURCE_LOCATION_DEFINE, ...bundle_flag.BUNDLED_DEFINE },
 		write: false,
 		plugins: [source_recorder(sources, source_location(out_directory))],
 	})
@@ -58,4 +68,4 @@ async function build_commands(out_directory: string = OUT_DIR): Promise<string> 
 	return out_directory
 }
 
-export { build_commands, bundled_scripts, OUT_DIR }
+export { build_commands, built_scripts, bundled_scripts, OUT_DIR }

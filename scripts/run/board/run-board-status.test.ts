@@ -12,7 +12,7 @@ import type { Phase } from './run-board-phase'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
 // joshuafolkken/kit#3430: what each child of a run is doing, read off the event stream and the open
-// lanes — no GitHub read. The run's own activity is `run-board-status-activity.test.ts`.
+// lanes — no GitHub read. The run's own activity is `run-board-activity.test.ts`.
 
 const KIND = run_event_stream.EVENT_KIND
 const T0 = '2026-10-08T09:00:00.000Z'
@@ -111,7 +111,24 @@ describe('run_board_status.statuses_of withdrawn', () => {
 			reason: 'superseded',
 		})
 	})
+})
 
+// joshuafolkken/kit#7983: the #7945 order — a park, then the person's withdrawal of it.
+describe('run_board_status.statuses_of withdrawn after a park', () => {
+	it('reads a parked child a person then withdrew as withdrawn, without the park outcome', () => {
+		const events = [
+			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
+			event_at(2, T1, KIND.PARK, '#3409 parked (needs-decision)'),
+			event_at(3, T2, KIND.WITHDRAW, '#3409 withdrawn by a person: ships with #3415'),
+		]
+		const status = run_board_status.statuses_of(events, NO_LANES).get(3409)
+
+		expect(status).toMatchObject({ state: 'withdrawn', reason: 'ships with #3415' })
+		expect(status).not.toHaveProperty('outcome')
+	})
+})
+
+describe('run_board_status.statuses_of park reasons', () => {
 	// joshuafolkken/kit#4045: the park that ended a child keeps its reason; a bare one keeps none.
 	it('keeps the reason of the park that ended a child, and none for a bare park', () => {
 		const events = [
@@ -306,13 +323,13 @@ describe('run_board_status.settle_closed with the listing’s labels', () => {
 		expect(settled.get(3409)?.state).toBe(state)
 	})
 
-	it('keeps the launch time of a stopped child, names its release and draws no end', () => {
+	it('keeps the launch time of a stopped child, names its missing label and draws no end', () => {
 		const settled = run_board_status.settle_closed(RUNNING, read_labelled(['bug']))
 
 		expect(settled.get(3409)).toStrictEqual({
 			state: 'stopped',
 			started_ms: Date.parse(T0),
-			stop_reason: 'run:release',
+			stop_reason: 'no in-progress label',
 		})
 	})
 

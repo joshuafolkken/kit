@@ -192,6 +192,8 @@ Dependencies are re-installed against the lock the popped stash brought in. A th
 
 Launches reserve 470 MB, one lane's share of the measured claude RSS peak (its subagents run inside it), waiting for free memory without a timeout bypass. The child retains the claim. `run:board` shows the wait; `lane:stats` lists it as `lane:launch` under held-by.
 
+Below held-by, `held by cause` splits a `chain+gate` watch into its causes and `held behind` ranks the issues a hold waited on. Both count an overlapping hold in full under each row (`docs/maintainers/lane-limit-measurement.md` → "Why a free lane stayed empty").
+
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
 #### `josh lane:sample` / `josh lane:stats`
@@ -242,7 +244,16 @@ none does, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scope
 name of each `over_cap_hub` those lanes' `test-related` runs recorded.
 
 `--over <minutes>`: per merged lane over that many net min, longest first, net/wait minutes, ledger chain,
-stages past budget (`implement 58.8/9`), top stage, its `--sinks` open Issues (`lane-over.ts`). A cause table follows
+stages past budget (`implement 58.8/9`), estimate, top stage, its `--sinks` open Issues (`lane-over.ts`).
+
+`estimate`: implement time against `lane:why`'s projection of the merge's recorded `- 規模見積もり:`, at the
+rate of the 3 days before the lane's first dispatch, as
+`60.8 min ×0.71 to size`. `lane:why` measures the rate up to now, so its projection for the same lane can differ.
+
+Past 1 at the printed two digits is `over estimate`; up to 1 is `to size`; no size or rate is `no estimate`, on
+neither side. The line under the rows counts each side (`lane-over-estimate.ts`).
+
+A cause table follows
 (`lane-over-causes.ts`): per over-cap `hub` and `ci job`, lanes, minutes over, open Issues; `filing candidates:`
 lists unnamed.
 
@@ -261,20 +272,22 @@ the reason the import-graph split failed (its detail after `: ` dropped) and by 
 each with its runs and total minutes (`lane-pairs.ts`), from the `named` and `unsplit` fields of the ship lap and the
 hub of the `test:related` record.
 
-A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
+Laps overlap their stages; rows do not add up. The time between ship stages is split by park
 only, not by Bash kind, since a transcript call names no lane.
 
-Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
+The implement stage is broken down from lane transcripts up to each lane's first `josh ship`
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check, gate or open
 `run:chain`) and `review-fix` from a review on, each call's span from the prior call's end, less `lane:pause` time.
 
+`implement turn split` (`lane-implement-tool-split.ts`): sub-stage medians of `tool` (overlaps once) and `model turn`.
+
 `implement read` (`lane-implement-read.ts`) splits `read` by lane medians: `tool` run time, `thinking` before calls,
-distinct `files read`, and those an investigator cited by `path:line`. `implement read by call`
-(`lane-implement-read-calls.ts`) splits its tool time by kind, the ten largest totals first.
+`files read`, and those an investigator cited. `implement read by call`
+(`lane-implement-read-calls.ts`) splits its tool time by kind, ten largest first.
 
 The `stage turns` table (`lane-turn-stats.ts`) groups period-dispatched lanes' calls by ledger interval:
 `implement` until the first ship stage (open until then), the shortest stage holding a call, or `between stages`.
-Rows show median calls and measured lanes; lanes without calls appear under `no transcript`, outside the calls median.
+Rows show median calls and measured lanes; lanes without calls show as `no transcript`, outside the median.
 `stops per lane (median)` counts in-period stops by `reason` (`conflict` as `sync`) over all dispatched lanes,
 including zero-stop and transcript-missing lanes; no dispatched lanes means `not measured`.
 
@@ -282,16 +295,30 @@ Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
 left to the `coderabbit-wait` row (`followup-ci-path.ts`).
 
-Under the stop table, the failed-check table (`lane-stop-check-stats.ts`) counts followup `check` stops per failed CI check
-(stops, wait total and maximum, not resumed), and the longest-stop table lists the ten longest stops with issue, `stopped at` and causes.
+Under the stop table: `human wait` per `issue-human-stops.ts` stop (`lane-human-wait-stats.ts`); failed-check, followup `check`
+stops per failed CI check (`lane-stop-check-stats.ts`); longest-stop, the ten longest stops with issue, `stopped at` and causes.
 
 Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
 runs with no `cpu_ms` left out. It only reports: a core weight is changed in its own Issue, from this table.
 
+The `catch rate` table and `candidates:`: `lane-catch-rate-stats.ts`.
+
 Under the size table, the implement-rate table (`lane-implement-rate.ts`) prints the median `implement` minutes per 100
 actual non-test lines over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
 issue to the last `size` measured before the merge, lanes with no size, no interval or zero lines left out.
+
+The row's last two columns, `estimate ratio first` and `estimate ratio median`, measure the run board's finish estimate
+(`lane-estimate-ratio.ts`). Each lane dispatch writes one `estimate` ledger row with the finish `run:board` then
+estimated, none when nothing is estimated (`run-board-estimate-record.ts`).
+
+A run ends at the last merge of the merged children its rows name; an unmerged child (parked, closed or skipped) does
+not hold the end back. The ledger does not tell a child still in a lane from one that left the run, so a run counts
+only once a later run has written an `estimate` row after the run's last row.
+
+Each row's ratio is the time actually left over the time estimated left; the columns take the
+median over the period's ended runs of the first row's ratio and of each run's median. A run with no merged child is
+left out; with no ended run the columns print `—`.
 
 Procedure and columns for measuring a lane limit: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
@@ -335,7 +362,7 @@ pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --s
 
 <!-- usage: lane:net -->
 
-Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's sleeps and the ship's followup.
+Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's stops (sleeps and network outages) and the ship's followup.
 
 ```bash
 pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
@@ -380,11 +407,14 @@ Tool cumulative time is separate: parallel calls overlap and must not be added t
 
 Historical ship boundaries use completed ledger/archive intervals and surviving unfinished-stage events. The board stream has bounded retention. For parallel stages, latest start owns each instant; earlier stages resume when it ends. Without either record, a missing stage cannot be reconstructed.
 
-`--timeline` prints the lane one line an event, oldest first: start (UTC), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
+`--timeline` prints the lane one line an event, oldest first: start (UTC, to the second), end (blank for a point), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
 
-- `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
+Ship lines carry their attempt: `ship #2 sync`. An attempt opens at a ship preflight or pre-detach checks that follow neither: the detached half's preflight and an infrastructure retry stay in their attempt; a `--review` re-ship, skipping the preflight, opens one at its pre-detach checks. The count reads the ledger, so it survives event-stream rotation (`lane-timeline-steps.ts`).
+
+- `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, host stop — a sleep or network outage).
 - `[driver]` — the followup's CI wait.
-- `[event]` — a main merge-in (the ship's `merge` lap), a split or `unplanned` notice, a split, a ship launch, a review round.
+- `[event]` — a main merge-in (the ship's `merge` lap), a split or `unplanned` notice, a split, a ship launch, a review round, and the ledger's verdict of each review round (`review round 1 (reused)`).
+- `[step]` — a timed step inside a stage, outside the net sum. From the ledger: each ship stage's own laps (the foreground `sync › conflict probe` among them), each `run:chain`, `test:related` and `test:pinned`, and the CI and CodeRabbit waits. From the transcripts: each `lint:related` and each review pass (`round 1`, `interaction`).
 
 A ship stop closes the ship stage open at it. A blocking `lane:plan` wait on a holder is its own `lane:plan wait (#<M>)` row, cut out of the stage it fell in (`lane-plan-wait-event.ts`).
 
@@ -411,6 +441,36 @@ Each ship stage lists its inner steps under it, longest first: the `ship-lap` ro
 
 A stretch between ship stages that a park fell in is named after the park instead: `pause for #<M>` or `park (<reason>)`, net of its wait, and what the lane redid up to its next park — `(re-plan, ship ×2 re-run)`, a ship counted again where a stage starts twice (`lane-breakdown-pause.ts`).
 
+#### `josh lane:phases`
+
+<!-- usage: lane:phases -->
+
+Print the lanes' median minutes and sample count by phase, across Issues or a date range.
+
+```bash
+pnpm josh lane:phases 101 102 103                             # the phases of the named lanes
+pnpm josh lane:phases --since 2026-11-19 --until 2026-11-20   # the lanes merged in a period
+```
+
+**Options:**
+
+- `--since` — reads the lanes merged on or after this date (ISO) instead of named Issues.
+- `--until` — with `--since`, leaves out the lanes merged at or after this instant (ISO; a bare date is its midnight UTC).
+
+<!-- /usage -->
+
+Prints, for the named lanes or the lanes merged in the period, each phase's median minutes and its sample count. A lane lacking a phase's bounding records is left out of that phase's samples, not counted as zero; a lane whose dispatch before its first run was not read gives no sample at all (`lane-phases.ts`).
+
+The bounds, per lane:
+
+- prep & investigation — the last dispatch before the first `run:chain` to the lane's first implementation marker (`plan` / `lane-phase … implement` run event, as `lane:breakdown` reads it);
+- implement — that marker to the first `run:chain`'s start;
+- local checks — every `run:chain` stage but the review stages and `ship`, summed;
+- review — the review stages summed, plus the first review round's wait: the last pre-review `run:chain`'s end to the first `--join` run's start;
+- push → merge — the first `ship` chain stage's start to the last merge, and apart under it the `ci-wait` stages inside that span.
+
+A period is read with the ledger's window read (`lane_ledger_tail.read_since`), so the ledger older than `--since` is never held in memory; named Issues read the ledger and its archive.
+
 #### `josh lane:why`
 
 <!-- usage: lane:why -->
@@ -423,7 +483,7 @@ pnpm josh lane:why 6050   # the cause table an overrun investigation joins by ha
 
 <!-- /usage -->
 
-One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`: a lane's 25 minutes as plan 3, implement 9, ship 8 and followup 5, the followup outside the net time), longest first, no model run.
+One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`: a lane's 25 minutes as plan 3, implement 9, ship 8 and followup 5, the followup outside the net time), longest first, no model run. The budgets are targets, not measured medians; `run:board` draws a lane's measured finish instead.
 
 The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last and the lane branch's longest CI job and that job's longest step (`ci:timing`, the branch's latest commit), a ship row the lane's stop reasons and its `test:related` cap overrun.
 
@@ -453,7 +513,7 @@ A lane child runs it once its work summary settles, before the first edit, namin
 
 `plan:scaffold` prints the same input's size. `lane:plan` saves it for the split bar without lowering the body declaration.
 
-Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single` keeps an indivisible contract together.
+Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single "<reason>"` keeps an indivisible contract together.
 
 A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
 
@@ -469,8 +529,8 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 A lane dispatched before its holder, with commits, waits instead, keeping its seat (`scripts/lane/lane-plan-wait.ts`):
 
 - It waits when the holder's estimated time left (3-day median lane less its elapsed time) is at most its own worked time, capped at 30 minutes.
-- The first such ask records that deadline on the plan; `lane:plan` then blocks, re-reading holders each minute, up to 9 minutes per ask.
-- It answers `clear` once the holder's lane ends, `yield` past the deadline, or `wait` when the 9 minutes run out first: ask again.
+- The first such ask records that deadline on the plan; `lane:plan` then blocks, re-reading holders each minute, up to 4.5 minutes per ask — the ship wait's chunk, under the five-minute prompt-cache TTL.
+- It answers `clear` once the holder's lane ends, `yield` past the deadline, or `wait` when the ask's time runs out first: ask again.
 
 `--probe` answers the same check and writes nothing. A lane child's `run:entry` runs it once, before the issue report, on the paths dispatch gated on; on a clash it gives the lane back as above and exits 2.
 
@@ -478,13 +538,15 @@ A `run:planned` candidate's plan comment (the latest trusted one carrying `### �
 
 A first plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
 
-Hunks over twice declared files or declared lines × recent ratio over 200 also split. Splits log their reason; hunks exclude planned files.
+Hunks outside planned files over 2× declared files, or declared lines × recent ratio (min 160 per new file) over 200, also split; logged.
 
 A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-related-cap.ts`) also splits, as `split (hub)` naming it; with no dependency graph none reads as a hub. Related: [#6180](https://github.com/joshuafolkken/kit/issues/6180) splits the hubs themselves.
 
-A `--single` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply.
+A `--single "<reason>"` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply. The reason goes on the ledger's split notice and as an Issue comment; a bare `--single` prints the usage, exit 1.
 
-A dispatched lane's plan (its child mark names the issue) never answers `split`: its first plan past any axis prints one `size warning`, notes nothing on the ledger, and its re-plans print none.
+A dispatched lane's plan (its child mark names the issue) before its first edit — its tree still at its base (`scripts/lane/lane-tree-edit.ts`) — is judged on each plan: past the cap (1.5 × the guide, `scripts/split/split-cap.ts`) it answers `split`, unless `--single`; past its declaration within the cap it prints a `size warning` and notes the measure on the ledger.
+
+After its first edit it never answers `split`: its first plan past any axis prints one `size warning`, notes nothing on the ledger, and its re-plans print none.
 
 A first plan re-runs each `- 前提:` line of its issue's trusted body (`scripts/lane/lane-plan-premise.ts`), printing `premise: <declaration> measured <value>` on stderr. One that does not hold, or an untrusted body, answers `premise`, exit 4, unrecorded: park the lane. No premise line runs nothing; a re-plan never re-runs them.
 

@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -43,7 +43,7 @@ async function records_and_prints_once(): Promise<void> {
 	const report = vi.fn<(line: string) => void>()
 	const seen: Array<ReturnType<typeof core_budget.budget_waits>> = []
 	const sleep = vi.fn(async () => {
-		seen.push(core_budget.budget_waits(probe.directory, 1))
+		seen.push(core_budget.budget_waits({ directory: probe.directory, now: 1 }))
 		if (seen.length > 1) free_blocker()
 	})
 	const options = {
@@ -119,7 +119,9 @@ async function waits_for_swap_recovery(): Promise<void> {
 			),
 		}),
 		sleep: async () => {
-			expect(core_budget.budget_waits(probe.directory, clock.now)[0]?.reason).toBe('pressure')
+			const waits = core_budget.budget_waits({ directory: probe.directory, now: clock.now })
+
+			expect(waits[0]?.reason).toBe('pressure')
 			clock.now += WAIT_CAP_MS
 			clock.polls += 1
 		},
@@ -165,8 +167,41 @@ async function prints_nothing_solo(): Promise<void> {
 	})
 
 	expect(report).not.toHaveBeenCalled()
-	expect(core_budget.budget_waits(probe.directory, 1)).toStrictEqual([])
+	expect(core_budget.budget_waits({ directory: probe.directory, now: 1 })).toStrictEqual([])
 }
+
+// joshuafolkken/kit#8131: `run:board` hands its round's snapshot as the start reader, so a claim's
+// liveness spawns no `ps` of its own.
+const RECORDED_START = 'Thu Nov 19 05:00:00 2026'
+
+function waits_read_through(read: (pid: number) => string | undefined): Array<unknown> {
+	write_blocker({ weight: 1, process_start: RECORDED_START, command: 'lint', wait_reason: 'cores' })
+
+	return core_budget.budget_waits({ directory: probe.directory, now: 1, read })
+}
+
+function reads_starts_through_the_reader(): void {
+	const fallback = vi.spyOn(process_identity, 'read_start')
+	const read = vi.fn<(pid: number) => string | undefined>().mockReturnValue(RECORDED_START)
+
+	expect(waits_read_through(read)).toHaveLength(1)
+	expect(read).toHaveBeenCalledWith(process.pid)
+	expect(fallback).not.toHaveBeenCalled()
+	fallback.mockRestore()
+}
+
+function sweeps_a_claim_the_reader_dates_otherwise(): void {
+	expect(waits_read_through(() => 'Thu Nov 19 06:00:00 2026')).toStrictEqual([])
+	expect(existsSync(path.join(probe.directory, BLOCKER))).toBe(false)
+}
+
+describe('core_budget.budget_waits — a given start reader', () => {
+	it('checks each claim through the reader, not the default one', reads_starts_through_the_reader)
+	it(
+		'sweeps a claim whose start the reader answers differently',
+		sweeps_a_claim_the_reader_dates_otherwise,
+	)
+})
 
 // joshuafolkken/kit#4382: an admitted claim that waited records how long, so a lane's time splits
 // into work and waiting.

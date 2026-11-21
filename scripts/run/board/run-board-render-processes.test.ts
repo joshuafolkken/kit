@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit, type DetailPart } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render_fixture } from './run-board-render-fixture'
-import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_processes } from './run-board-render-processes'
 import type { UsageFigure } from './run-board-usage'
 
@@ -11,9 +11,15 @@ import type { UsageFigure } from './run-board-usage'
 
 const { processes_part } = run_board_render_processes
 const { GB, board_usage, header } = run_board_render_fixture
-const { USAGE_START } = run_board_render_lead
-const GROUP_INDENT = 4
-const DETAIL_INDENT = 6
+const { bare } = run_board_label_pair
+// Groups stand at the shared row indent, parts two further in (joshuafolkken/kit#8257).
+const GROUP_INDENT = run_board_fit.ROW_INDENT.length
+const DETAIL_INDENT = GROUP_INDENT + 2
+// The cells' column: the indent, the 22-column label and its blank — two right of the lane rows'
+// cells, which the user accepted (joshuafolkken/kit#8257).
+const CELLS_START = 28
+// The CPU figure's columns at the cells' start: `49.0`, ` 2.8`.
+const CPU_WIDTH = 4
 const SPINNER = '⠋'
 const RULE_START = '── 💻 processes '
 
@@ -39,18 +45,32 @@ const LEFTOVER: ProcessGroups['leftover'] = {
 	entries: [{ name: 'node', instances: 2, figure: figure(0.4, 0.3, 0.1) }],
 }
 
+// The part as a frame with no theme draws it, its labels' marks dropped (`run-board-label-pair.ts`).
 function part_of(groups: Partial<ProcessGroups>, spinner?: string): DetailPart | undefined {
 	const usages = board_usage(new Map(), groups)
+	const part = processes_part(header({ spinner, usages }))
 
-	return processes_part(header({ spinner, usages }))
+	if (part === undefined) return undefined
+
+	return {
+		...part,
+		head: part.head.map((line) => bare(line)),
+		lines: part.lines.map((line) => ({ ...line, text: bare(line.text) })),
+	}
 }
 
 function texts(part: DetailPart | undefined): Array<string> {
 	return part?.lines.map((line) => line.text.trimEnd()) ?? []
 }
 
+// The row's label: what stands before the cells' column — every icon drawn here two columns wide is
+// two code units, so the column is the code unit.
 function label_of(text: string): string {
-	return text.trim().split(/ {2,}/u, 1)[0] ?? ''
+	return text.slice(0, CELLS_START).trim()
+}
+
+function name_start(text: string, name: string): number {
+	return run_board_fit.width_of(text.slice(0, text.indexOf(name)))
 }
 
 function cells_start(text: string): number {
@@ -73,7 +93,7 @@ describe('run_board_render_processes.processes_part on a terminal', () => {
 		const lines = part_of({ backlogrun: BACKLOGRUN, apps: APPS }, SPINNER)?.lines ?? []
 
 		expect(lines.map((line) => [label_of(line.text), line.is_detail])).toStrictEqual([
-			['▶ backlogrun', false],
+			['▶  backlogrun', false],
 			['🧭 supervisor', true],
 			['🎬 parent', true],
 			['🧵 lanes ×3', true],
@@ -91,8 +111,9 @@ describe('run_board_render_processes.processes_part on a terminal', () => {
 })
 
 describe('run_board_render_processes.processes_part columns', () => {
-	// joshuafolkken/kit#4292: groups stand at indent 4, parts at 6, cells at USAGE_START whatever the names.
-	it('indents groups by 4 and parts by 6, and starts the cells at USAGE_START', () => {
+	// joshuafolkken/kit#4292, joshuafolkken/kit#8257: groups stand at the row indent, parts two further
+	// in, cells in one column whatever the names.
+	it('indents groups by the row indent and parts two further, and starts the cells in one column', () => {
 		const name = 'A Rather Long Application Name'
 		const long: ProcessGroups['apps'] = {
 			total: figure(0.5, 1, 0.1),
@@ -102,10 +123,23 @@ describe('run_board_render_processes.processes_part columns', () => {
 
 		for (const line of lines) {
 			expect(line.text.search(/\S/u)).toBe(line.is_detail ? DETAIL_INDENT : GROUP_INDENT)
-			expect(line.text.slice(USAGE_START - 1, USAGE_START)).toBe(' ')
+			expect(line.text.slice(CELLS_START - 1, CELLS_START)).toBe(' ')
 		}
 
 		expect(new Set(lines.map((line) => cells_start(line.text))).size).toBe(1)
+	})
+
+	it('starts the backlogrun and apps names in one column, the cells where they were', () => {
+		const lines = texts(part_of({ backlogrun: BACKLOGRUN, apps: APPS }, SPINNER))
+		const backlogrun = lines.find((line) => line.includes('backlogrun')) ?? ''
+		const apps = lines.find((line) => line.includes('apps')) ?? ''
+
+		expect(name_start(backlogrun, 'backlogrun')).toBe(name_start(apps, 'apps'))
+
+		for (const line of [backlogrun, apps]) {
+			expect(line.slice(CELLS_START - 1, CELLS_START)).toBe(' ')
+			expect(line.slice(CELLS_START, CELLS_START + CPU_WIDTH).trim()).toMatch(/^\d+\.\d$/u)
+		}
 	})
 })
 
@@ -147,14 +181,14 @@ describe('run_board_render_processes.processes_part off a terminal', () => {
 
 		expect(part?.head[1]?.startsWith(RULE_START)).toBe(true)
 		expect(texts(part)).toStrictEqual([
-			'  ▶ backlogrun 49.0%/4.0G/3.3G · 🌐 apps 31.0%/18.8G/12.4G: Google Chrome ×2 2.0%/8.9G/8.1G, ' +
+			'     ▶  backlogrun 49.0%/4.0G/3.3G · 🌐 apps 31.0%/18.8G/12.4G: Google Chrome ×2 2.0%/8.9G/8.1G, ' +
 				'WindowServer 5.0%/0.6G/0.2G · 👻 leftover 4.0%/0.3G/0.1G: node ×2 4.0%/0.3G/0.1G',
 		])
 	})
 
 	it('draws a group with no parts as its figures alone', () => {
 		expect(texts(part_of({}))).toStrictEqual([
-			'  ▶ backlogrun 0.0%/0.0G/0.0G · 🌐 apps 0.0%/0.0G/0.0G',
+			'     ▶  backlogrun 0.0%/0.0G/0.0G · 🌐 apps 0.0%/0.0G/0.0G',
 		])
 	})
 })

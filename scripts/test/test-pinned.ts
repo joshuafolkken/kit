@@ -4,8 +4,14 @@ import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
+import { test_pinned_branches } from './test-pinned-branches'
 import { test_pinned_cache, type LoadedCache, type Reached } from './test-pinned-cache'
-import { test_pinned_cache_logic, type Known, type Recheck } from './test-pinned-cache-logic'
+import {
+	test_pinned_cache_logic,
+	type Known,
+	type MissReason,
+	type Recheck,
+} from './test-pinned-cache-logic'
 import { test_pinned_carry } from './test-pinned-carry'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_functions } from './test-pinned-functions'
@@ -48,6 +54,8 @@ interface RunOptions {
 	max_hunks: number
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
+	is_reasoned?: boolean
+	tree_hash?: string | undefined
 	rewired?: number
 	over_cap?: number
 	origin?: PinnedOrigin | undefined
@@ -58,6 +66,7 @@ interface RunOptions {
 interface ProbeRun {
 	hunks: ReadonlyArray<Hunk>
 	known: ReadonlyArray<Known>
+	misses: ReadonlyArray<MissReason | undefined>
 	counts: ReadonlyMap<string, number>
 	cache: LoadedCache
 	keys: ReadonlyArray<string>
@@ -96,10 +105,13 @@ function recheck_of(known: Known): Recheck | undefined {
 	return test_pinned_cache_logic.is_recheck(known) ? known : undefined
 }
 
-// The hunks no held verdict covers, each with its recheck where the cache named one.
-function probes_of(hunks: ReadonlyArray<Hunk>, known: ReadonlyArray<Known>): Array<Probe> {
-	return hunks
-		.map((hunk, index) => ({ hunk, index, recheck: recheck_of(known[index]) }))
+// The hunks no held verdict covers, each with its recheck where the cache named one and why the cache
+// did not hold it (joshuafolkken/kit#7806).
+function probes_of(probing: Pick<ProbeRun, 'hunks' | 'known' | 'misses'>): Array<Probe> {
+	const { known, misses } = probing
+
+	return probing.hunks
+		.map((hunk, index) => ({ hunk, index, recheck: recheck_of(known[index]), miss: misses[index] }))
 		.filter((probe) => held_of(known[probe.index]) === undefined)
 }
 
@@ -134,6 +146,8 @@ function check_options(held: number, options: RunOptions): CheckOptions {
 		rewired: options.rewired ?? 0,
 		over_cap: options.over_cap ?? 0,
 		is_first_unpinned: options.is_first_unpinned === true,
+		is_reasoned: options.is_reasoned === true,
+		tree_hash: options.tree_hash,
 		origin: options.origin,
 	}
 }
@@ -153,7 +167,7 @@ async function verdicts_on(paths: ReadonlyArray<string>, probing: ProbeRun): Pro
 	const verdicts = probing.known.map((entry) => held_of(entry))
 	const reached = reached_of(verdicts)
 	const probes = await with_spawned(
-		by_reach(probes_of(probing.hunks, probing.known), probing.counts),
+		by_reach(probes_of(probing), probing.counts),
 		probing.cache.reach,
 	)
 	const writer = test_pinned_cache.writer({ ...probing.cache, hunks: probing.hunks }, probing.keys)
@@ -197,6 +211,25 @@ function over_cap_of(over_cap: ReadonlyArray<Hunk>): Pick<HunkOutcome, 'over_cap
 	return over_cap.length === 0 ? {} : { over_cap }
 }
 
+// Why the cache did not hold each key, read only for the keys it did not hold: a held key's miss is
+// `undefined` without reading its basis again (joshuafolkken/kit#7806).
+async function open_misses(
+	cache: LoadedCache,
+	read: { keys: ReadonlyArray<string>; files: ReadonlyArray<string>; known: ReadonlyArray<Known> },
+): Promise<Array<MissReason | undefined>> {
+	const { keys, files, known } = read
+	const open = keys
+		.map((_key, index) => index)
+		.filter((index) => held_of(known[index]) === undefined)
+	const reasons = await test_pinned_cache.misses(
+		cache,
+		open.map((index) => keys[index] ?? ''),
+		open.map((index) => files[index] ?? ''),
+	)
+
+	return keys.map((_key, index) => reasons[open.indexOf(index)])
+}
+
 // A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's verdict is
 // stored again, so a rerun on the same tree starts no vitest. `is_cached_only` runs no probe: only the
 // verdicts the cache holds are read, and nothing is written.
@@ -207,11 +240,8 @@ async function checked_outcome(
 ): Promise<HunkOutcome> {
 	const { hunks, cache } = read
 	const keys = test_pinned_carry.keys(cache, hunks)
-	const known = await test_pinned_cache.known(
-		cache,
-		keys,
-		hunks.map((hunk) => hunk.file),
-	)
+	const files = hunks.map((hunk) => hunk.file)
+	const known = await test_pinned_cache.known(cache, keys, files)
 
 	if (options.is_cached_only) {
 		return outcome_of(
@@ -220,7 +250,8 @@ async function checked_outcome(
 		)
 	}
 
-	const { verdicts, staged } = await verdicts_on(paths, { ...read, known, keys, options })
+	const misses = await open_misses(cache, { keys, files, known })
+	const { verdicts, staged } = await verdicts_on(paths, { ...read, known, misses, keys, options })
 
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }
 }
@@ -285,10 +316,14 @@ async function runtime_hunks(hunks: ReadonlyArray<Hunk>): Promise<ProbeRead> {
 	return { ...test_pinned_emit.probed_of(api, grouped, contents), unparsed: [] }
 }
 
+// The changed branches' arm probes come last, so a cap leaves them unchecked before a revert.
 async function read_probes(base: string, targets: ReadonlyArray<string>): Promise<ProbeRead> {
-	const stubs = await stub_hunks_of(await added_scripts(base, targets))
-	const changed = await runtime_hunks(await read_hunks(base, targets))
-	const hunks = [...changed.hunks, ...stubs.hunks]
+	const added = await added_scripts(base, targets)
+	const stubs = await stub_hunks_of(added)
+	const diffed = await read_hunks(base, targets)
+	const changed = await runtime_hunks(diffed)
+	const branches = await test_pinned_branches.read(changed.hunks, added)
+	const hunks = [...changed.hunks, ...stubs.hunks, ...branches]
 
 	return { hunks, unparsed: stubs.unparsed, rewired: changed.rewired }
 }
@@ -329,7 +364,11 @@ async function report(options: RunOptions): Promise<PinnedReport> {
 
 	const root = process.cwd()
 	const result = await test_pinned_snapshot.with_snapshot(async (snapshot) => ({
-		...(await report_on(base, { ...options, cache_file: snapshot.cache_file }, has_runner)),
+		...(await report_on(
+			base,
+			{ ...options, cache_file: snapshot.cache_file, tree_hash: snapshot.tree_hash },
+			has_runner,
+		)),
 		tree_hash: snapshot.tree_hash,
 	}))
 
@@ -340,13 +379,14 @@ async function report(options: RunOptions): Promise<PinnedReport> {
 // is shared: changed hunks first, then the added files' functions. Without Vitest (a consumer that has
 // none) no probe runs, so every one is unchecked rather than unpinned. `is_first_unpinned` starts no
 // probe once one is unpinned (joshuafolkken/kit#5153): the hunks left are reported `cut`. `origin` is
-// what started the run, for its ledger row.
+// what started the run and `is_reasoned` whether an `--unpinned-ok` reason did, for its ledger row.
 async function run(
 	max_hunks: number,
 	is_first_unpinned = false,
 	origin?: PinnedOrigin,
+	is_reasoned = false,
 ): Promise<PinnedReport> {
-	return await report({ max_hunks, is_cached_only: false, is_first_unpinned, origin })
+	return await report({ max_hunks, is_cached_only: false, is_first_unpinned, is_reasoned, origin })
 }
 
 // The unpinned hunks the cache already answers for this tree, probing nothing (joshuafolkken/kit#4936):

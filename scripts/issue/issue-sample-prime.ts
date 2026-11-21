@@ -4,13 +4,14 @@ import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
 import { read_pull_by_etag } from '#scripts/gh/git-gh-pr-read'
 import { git_gh_pr_too_large } from '#scripts/gh/git-gh-pr-too-large'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
-import { lane_ledger, type MergeEntry } from '#scripts/lane/lane-ledger'
+import { lane_ledger, type LedgerEntry, type MergeEntry } from '#scripts/lane/lane-ledger'
 import { issue_closing_pr } from './issue-closing-pr'
 import { issue_observation_prime } from './issue-observation-prime'
 import {
 	issue_sample_gate,
 	type Condition,
 	type MergeSample,
+	type MergesSince,
 	type PullRead,
 } from './issue-sample-gate'
 
@@ -78,15 +79,20 @@ const DEFAULT_PORTS: PrimePorts = {
 	ledger_path: lane_ledger.target,
 }
 
-// The ledger's merges, read on each judgement so a merge recorded since the prime counts; an absent
-// ledger records none.
-function merges_of(path: string | undefined): () => ReadonlyArray<MergeSample> {
-	return function merges(): ReadonlyArray<MergeSample> {
-		if (path === undefined) return []
+function is_merge(entry: LedgerEntry): entry is MergeEntry {
+	return entry.kind === lane_ledger.KIND.MERGE
+}
 
-		return lane_ledger
-			.read_entries(path)
-			.filter((entry): entry is MergeEntry => entry.kind === lane_ledger.KIND.MERGE)
+// joshuafolkken/kit#8133: one store for the process, so a later prime keeps the windows read.
+const merge_windows = lane_ledger.window_store({ is_kept: is_merge })
+
+// joshuafolkken/kit#8057: the ledger's merges at or after `since_ms`, read on each judgement so a merge
+// recorded since the prime counts; the whole ledger is never read. The board judges each waiting issue
+// on every redraw while a run appends to the ledger every few seconds, so only the appended bytes are
+// parsed again (joshuafolkken/kit#8133). An absent or unreadable ledger records none.
+function merges_of(path: string | undefined): MergesSince {
+	return function merges(since_ms: number): ReadonlyArray<MergeSample> {
+		return path === undefined ? [] : merge_windows.read(path, since_ms).filter(is_merge)
 	}
 }
 

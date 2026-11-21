@@ -2,15 +2,20 @@ import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import type { Breakdown } from '#scripts/lane/lane-breakdown'
 import { guard_friction } from '#tools/retrospective/guard-friction'
+import { cost_audit_cause, type CauseRow } from './cost-audit-cause'
 import { cost_audit_density, type Density } from './cost-audit-density'
+import { cost_audit_kind } from './cost-audit-kind'
 import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_result, type ResultBreakdown } from './cost-audit-result'
+import { cost_audit_resume, type TriggerRow } from './cost-audit-resume'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_sequence, type Sequences } from './cost-audit-sequence'
+import { cost_audit_session_count, type SessionCounts } from './cost-audit-session-count'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import { cost_audit_tool } from './cost-audit-tool'
 import { cost_audit_usage, type UsageBreakdown } from './cost-audit-usage'
+import { cost_audit_wait, type WaitTable } from './cost-audit-wait'
 
 // The aggregation half of `josh cost:audit`: one period's cost broken down by session kind, tool
 // category and guard, set beside the period before it, with every row that grew past the regression
@@ -46,6 +51,8 @@ interface AuditRow {
 	is_regression: boolean
 	// The current period's spend per model, on the session-kind rows (joshuafolkken/kit#6913).
 	models?: ReadonlyArray<ModelSpend>
+	// Each period's session count, on the session-kind rows (joshuafolkken/kit#8329).
+	sessions?: SessionCounts
 }
 
 interface LaneDensity {
@@ -62,7 +69,10 @@ interface Audit {
 	kinds: ReadonlyArray<AuditRow>
 	tools: ReadonlyArray<AuditRow>
 	guards: ReadonlyArray<AuditRow>
-	rewrites: { current: Rewrites; previous: Rewrites }
+	// The current period's after-wait rewrites by kind, phase and preceding call (kit#8308).
+	rewrites: { current: Rewrites; previous: Rewrites; waits: ReadonlyArray<WaitTable> }
+	// The cache write by cause, each row set beside the period before (joshuafolkken/kit#7877).
+	write_causes: ReadonlyArray<CauseRow>
 	// The current period's lane requests by phase (joshuafolkken/kit#5936).
 	phases: ReadonlyArray<PhaseRow>
 	// The current period's lane delegated units by agent type (joshuafolkken/kit#5971).
@@ -73,6 +83,14 @@ interface Audit {
 	results: ResultBreakdown
 	// The current period's Bash command runs and refusal retries (joshuafolkken/kit#7138).
 	sequences: Sequences
+	// The resume sessions by trigger, each period's (joshuafolkken/kit#8311).
+	resumes: ResumeBreakdown
+}
+
+interface ResumeBreakdown {
+	triggers: ReadonlyArray<TriggerRow>
+	// The resume sessions' dollars inside the `implement: review-fix` phase.
+	review_fix: AuditRow
 }
 
 interface AuditInput {
@@ -82,6 +100,8 @@ interface AuditInput {
 	merges: MergeCounts | undefined
 	// Each lane's stages by its Issue, for the phase table; absent, every lane request is unattributed.
 	breakdowns?: ReadonlyMap<number, Breakdown>
+	// The Issues the lane ledger records a merge of; absent, the ledger could not be read.
+	merged_issues?: ReadonlySet<number> | undefined
 }
 
 interface PeriodCost {
@@ -181,6 +201,33 @@ function rewrites_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWin
 	return cost_audit_rewrite.rewrites_in(sessions, (at_ms) => is_inside(at_ms, window))
 }
 
+function rewrites(
+	input: AuditInput,
+	current: AuditWindow,
+	previous: AuditWindow,
+): Audit['rewrites'] {
+	return {
+		current: rewrites_inside(input.sessions, current),
+		previous: rewrites_inside(input.sessions, previous),
+		waits: cost_audit_wait.waits_of({
+			sessions: input.sessions,
+			breakdowns: input.breakdowns ?? new Map<number, Breakdown>(),
+			is_counted: (at_ms) => is_inside(at_ms, current),
+		}),
+	}
+}
+
+function write_causes(
+	sessions: ReadonlyArray<AuditSession>,
+	current: AuditWindow,
+	previous: AuditWindow,
+): Array<CauseRow> {
+	return cost_audit_cause.causes_in(sessions, {
+		current: (at_ms) => is_inside(at_ms, current),
+		previous: (at_ms) => is_inside(at_ms, previous),
+	})
+}
+
 function records_by_kind(sessions: ReadonlyArray<AuditSession>): Map<string, Array<UsageRecord>> {
 	const records = new Map<string, Array<UsageRecord>>()
 
@@ -191,17 +238,22 @@ function records_by_kind(sessions: ReadonlyArray<AuditSession>): Map<string, Arr
 	return records
 }
 
-// The kind rows, each carrying its current-period requests' spend per model and token type.
+// The kind rows, each carrying its current-period requests' spend per model and token type, and each
+// period's session count.
 function kind_rows(
-	current: PeriodCost,
-	previous: PeriodCost,
-	cut: ReadonlyArray<AuditSession>,
+	input: AuditInput,
+	costs: { current: PeriodCost; previous: PeriodCost },
+	windows: { current: AuditWindow; previous: AuditWindow },
 ): Array<AuditRow> {
+	const cut = inside(input.sessions, windows.current)
 	const records = records_by_kind(cut)
+	const current = cost_audit_session_count.counts_by_kind(cut)
+	const previous = cost_audit_session_count.counts_by_kind(inside(input.sessions, windows.previous))
 
-	return rows_of(current.kinds, previous.kinds).map((kind) => ({
+	return rows_of(costs.current.kinds, costs.previous.kinds).map((kind) => ({
 		...kind,
 		models: cost_audit_spend.spend_of(records.get(kind.key) ?? []),
+		sessions: { current: current.get(kind.key) ?? 0, previous: previous.get(kind.key) ?? 0 },
 	}))
 }
 
@@ -215,14 +267,44 @@ function phases_inside(input: AuditInput, window: AuditWindow): Array<PhaseRow> 
 	})
 }
 
+function resume_review_fix(input: AuditInput, window: AuditWindow): number {
+	const resumed = input.sessions.filter((session) => session.kind === cost_audit_kind.RESUME)
+	const rows = cost_audit_phase.rows_of({
+		sessions: inside(resumed, window),
+		reviews: input.sessions,
+		breakdowns: input.breakdowns ?? new Map<number, Breakdown>(),
+	})
+
+	return rows.find((one) => one.key === cost_audit_phase.REVIEW_FIX_PHASE)?.usd ?? 0
+}
+
+function resumes(input: AuditInput, current: AuditWindow, previous: AuditWindow): ResumeBreakdown {
+	return {
+		triggers: cost_audit_resume.rows_of(
+			inside(input.sessions, current),
+			inside(input.sessions, previous),
+		),
+		review_fix: row(
+			cost_audit_phase.REVIEW_FIX_PHASE,
+			resume_review_fix(input, current),
+			resume_review_fix(input, previous),
+		),
+	}
+}
+
+// The lane-child density of the requests made inside `window`.
+function density_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWindow): Density {
+	return cost_audit_density.density_of(inside(sessions, window))
+}
+
 function lane_density(
 	sessions: ReadonlyArray<AuditSession>,
 	current: AuditWindow,
 	previous: AuditWindow,
 ): LaneDensity {
 	return {
-		current: cost_audit_density.density_of(inside(sessions, current)),
-		previous: cost_audit_density.density_of(inside(sessions, previous)),
+		current: density_inside(sessions, current),
+		previous: density_inside(sessions, previous),
 	}
 }
 
@@ -254,13 +336,16 @@ function audit(input: AuditInput): Audit {
 		total: row('total', current.total, previous.total),
 		merges: input.merges,
 		per_merge: per_merge(current, previous, input.merges),
-		kinds: kind_rows(current, previous, inside(input.sessions, current_window)),
+		kinds: kind_rows(
+			input,
+			{ current, previous },
+			{ current: current_window, previous: previous_window },
+		),
 		tools: rows_of(current.tools, previous.tools),
 		guards: rows_of(current.guards, previous.guards),
-		rewrites: {
-			current: rewrites_inside(input.sessions, current_window),
-			previous: rewrites_inside(input.sessions, previous_window),
-		},
+		rewrites: rewrites(input, current_window, previous_window),
+		write_causes: write_causes(input.sessions, current_window, previous_window),
+		resumes: resumes(input, current_window, previous_window),
 	}
 }
 
@@ -269,7 +354,7 @@ function since_ms(days: number, now_ms: number): number {
 	return windows_of(days, now_ms)[1].start_ms
 }
 
-const cost_audit = { DEFAULT_PERIOD_DAYS, MS_PER_DAY, audit, since_ms, windows_of }
+const cost_audit = { DEFAULT_PERIOD_DAYS, MS_PER_DAY, audit, density_inside, since_ms, windows_of }
 
-export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts }
+export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts, ResumeBreakdown }
 export { cost_audit }

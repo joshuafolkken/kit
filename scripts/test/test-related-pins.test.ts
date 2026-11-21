@@ -2,15 +2,22 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { direct_importers } from './direct-importers'
 import { test_pinned_logic } from './test-pinned-logic'
-import type { ReachedCount } from './test-pinned-reach'
-import { test_related_cap } from './test-related-cap'
+import type { ReachedTests } from './test-pinned-reach'
 import { test_related_pins } from './test-related-pins'
+import type { RelatedScope } from './test-related-scope'
+import { test_related_select } from './test-related-select'
 
 // joshuafolkken/kit#5642: a change to the josh command registry always runs the registry tests, even when
-// the cap narrows its reach to the direct importers.
+// the cap cuts its reach (joshuafolkken/kit#7976).
 
 const { REGISTRY_TESTS } = test_related_pins
+const { MAX_TEST_FILES } = test_pinned_logic
+const OUTER_TESTS = Array.from(
+	{ length: MAX_TEST_FILES },
+	(_, index) => `scripts/outer/outer-${String(index).padStart(3, '0')}.test.ts`,
+)
 const COMMAND_TABLE = 'scripts/josh/josh-commands-development.ts'
 const COMMAND_TABLE_TEST = 'scripts/josh/josh-commands-development.test.ts'
 const PACKAGE_FILE = 'package.json'
@@ -18,6 +25,7 @@ const FIXTURE_FILES: Readonly<Record<string, string>> = {
 	[PACKAGE_FILE]: JSON.stringify({ imports: {} }),
 	[COMMAND_TABLE]: 'export const commands = 1\n',
 	[COMMAND_TABLE_TEST]: "import { commands } from './josh-commands-development'\n",
+	...Object.fromEntries([...REGISTRY_TESTS, ...OUTER_TESTS].map((test) => [test, ''])),
 }
 
 async function open_fixture(): Promise<FixtureWorkspace> {
@@ -37,8 +45,13 @@ async function open_fixture(): Promise<FixtureWorkspace> {
 	return fixture
 }
 
-async function past_the_cap(files: ReadonlyArray<string>): Promise<Array<ReachedCount>> {
-	return files.map((file) => ({ file, count: test_pinned_logic.MAX_TEST_FILES + 1 }))
+// Each file reaching the cap's worth of outer tests, absolute under `root`.
+function past_the_cap(
+	root: string,
+): (files: ReadonlyArray<string>) => Promise<Array<ReachedTests>> {
+	const tests = OUTER_TESTS.map((test) => path.join(root, test))
+
+	return async (files) => files.map((file) => ({ file, tests }))
 }
 
 describe('test_related_pins.is_registry_source', () => {
@@ -81,7 +94,7 @@ describe('test_related_pins.pinned_tests', () => {
 	})
 })
 
-describe('test_related_cap.capped_importers with a registry file past the cap', () => {
+describe('test_related_select.select with a registry file reaching past the cap', () => {
 	let fixture: FixtureWorkspace
 
 	beforeEach(async () => {
@@ -93,15 +106,28 @@ describe('test_related_cap.capped_importers with a registry file past the cap', 
 		await git_fixture_workspace.close_workspace(fixture)
 	})
 
-	it('narrows to the direct importers and the pinned registry tests', async () => {
-		const capped = await test_related_cap.capped_importers(
-			fixture.workspace,
-			[COMMAND_TABLE],
-			false,
-			past_the_cap,
-		)
+	it('runs the direct importers and the pinned registry tests before the outer reach', async () => {
+		const root = fixture.workspace
+		const scope: RelatedScope = {
+			mode: 'related',
+			files: [path.join(root, COMMAND_TABLE)],
+			reason: '',
+		}
+		const selection = await test_related_select.select(root, scope, [COMMAND_TABLE], {
+			symbols: async () => undefined,
+			reach: past_the_cap(root),
+			importers: direct_importers.importers_of,
+			all_tests: async () => [],
+		})
 
-		expect(capped.over_cap).toEqual([COMMAND_TABLE])
-		expect(capped.importers.get(COMMAND_TABLE)).toEqual([COMMAND_TABLE_TEST, ...REGISTRY_TESTS])
+		const [logic, command_map, in_process] = REGISTRY_TESTS
+
+		expect(selection.tests.slice(0, 1 + REGISTRY_TESTS.length)).toEqual([
+			command_map,
+			COMMAND_TABLE_TEST,
+			in_process,
+			logic,
+		])
+		expect(selection.deferred).toBe(1 + REGISTRY_TESTS.length)
 	})
 })

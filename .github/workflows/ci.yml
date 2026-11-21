@@ -38,7 +38,6 @@ jobs:
     permissions:
       contents: read
     outputs:
-      runtime: ${{ steps.scope.outputs.runtime }}
       publish: ${{ steps.scope.outputs.publish }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -594,10 +593,12 @@ jobs:
   # to about two minutes; past that the longest single file, not the shard count, sets the floor.
   # Only kit shards: the distributed template runs the unit suite inside its single `checks` job,
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
+  # No `change-scope` skip: a documentation-only change still runs the whole suite, because hundreds
+  # of tests read the docs and prompts, and `Checks` requires this result (joshuafolkken/kit#7975).
   unit:
     name: Unit Tests (${{ matrix.shard }}/6)
-    needs: [reuse-pr-checks, change-scope]
-    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' && needs.change-scope.outputs.runtime == 'true' }}
+    needs: [reuse-pr-checks]
+    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -672,7 +673,6 @@ jobs:
           UNIT_RESULT: ${{ needs.unit.result }}
           NODE_RESULT: ${{ needs.node-compat.result }}
           SCOPE_RESULT: ${{ needs.change-scope.result }}
-          RUNTIME_CHANGED: ${{ needs.change-scope.outputs.runtime }}
         run: |
           readonly SUCCESS='success'
           echo "Reuse PR Checks: ${REUSE_RESULT}"
@@ -688,9 +688,6 @@ jobs:
             exit 1
           fi
           if [ "${STATIC_RESULT}" = "${SUCCESS}" ] && [ "${UNIT_RESULT}" = "${SUCCESS}" ]; then
-            exit 0
-          fi
-          if [ "${STATIC_RESULT}" = "${SUCCESS}" ] && [ "${UNIT_RESULT}" = 'skipped' ] && [ "${RUNTIME_CHANGED}" = 'false' ]; then
             exit 0
           fi
           if [ "${REUSE_RESULT}" = 'true' ] && [ "${STATIC_RESULT}" = 'skipped' ] && \
@@ -766,7 +763,7 @@ jobs:
           persist-credentials: false
 
       - name: Run security audit
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: --lockfile=pnpm-lock.yaml
 

@@ -1,8 +1,10 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import type { TableRead } from '#scripts/lane/lane-process-table'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { vi } from 'vitest'
 import type { ClosedAnswer } from './run-board-closed'
+import { run_board_display } from './run-board-display'
 import {
 	run_board_gather,
 	type Gatherer,
@@ -10,11 +12,13 @@ import {
 	type GatherRead,
 	type GatherState,
 } from './run-board-gather'
+import { run_board_gather_thread, type RoundState } from './run-board-gather-thread'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_state } from './run-board-lane-state'
-import type { BoardPlan } from './run-board-layout'
+import type { BoardLayout, BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
-import type { BoardPorts } from './run-board-state'
+import type { BoardPorts, BoardState, DataPorts } from './run-board-state'
+import { run_board_tick_draw, type Redraw } from './run-board-tick-draw'
 
 // What the `run:board` redraw suites share: the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
@@ -74,6 +78,25 @@ function plan_titled(title: string): BoardPlan {
 		context: { repo: 'joshuafolkken/kit', titles: new Map([[1, title]]), open_numbers: undefined },
 		labels: new Map(),
 	}
+}
+
+// `count` events of the run's stream, all at START, that draw no row of their own.
+function ticks(count: number): Array<RunEvent> {
+	const at = new Date(START).toISOString()
+
+	return Array.from({ length: count }, (_, pos) => ({ pos, at, kind: 'tick', text: 'x' }))
+}
+
+// The frame `local` assembles over `run_layout`, drawn — what one live redraw does in its two steps.
+function drawn_from(
+	state: BoardState,
+	local: LocalRead,
+	redraw: Redraw,
+	run_layout: BoardLayout,
+): BoardState {
+	const display = run_board_display.assemble_display(state, local, redraw.now_ms, run_layout)
+
+	return run_board_tick_draw.draw_display(state, display, redraw)
 }
 
 // A `sleep` that lets one redraw through, then stops the loop the way an interrupt would.
@@ -185,8 +208,37 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 // The plan read's loading spinner after its ⏳, not the waiting count the same line draws after its own
 // ⏳.
 const SPINNING = /⏳ [^\d-]/u
+// A worker's state before its first round (`run-board-gather-thread.ts`).
+const FIRST_ROUND: RoundState = run_board_gather_thread.first_round()
 
-const run_board_fixture = { LOCAL, SPINNING, START, STOPPED, WORDS, harness, plan_titled }
+// The ports a worker round reads through: the harness's reads off this machine and off GitHub.
+function round_ports(board: Harness): GatherPorts & DataPorts {
+	return { ...board.gathering, read_plan: board.read_plan, read_closed: board.read_closed }
+}
+
+// joshuafolkken/kit#8224: the first frame is revealed a block at a time, its first write the wipe
+// from the top.
+const WIPE = '\u{1B}[H\u{1B}[J'
+
+// The index of the first frame's first write.
+function first_frame(frames: ReadonlyArray<string>): number {
+	return frames.findIndex((frame) => frame.startsWith(WIPE))
+}
+
+const run_board_fixture = {
+	FIRST_ROUND,
+	LOCAL,
+	SPINNING,
+	START,
+	STOPPED,
+	WORDS,
+	drawn_from,
+	first_frame,
+	harness,
+	plan_titled,
+	round_ports,
+	ticks,
+}
 
 export { run_board_fixture }
 export type { Harness }

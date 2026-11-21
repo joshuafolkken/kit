@@ -1,14 +1,19 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { GateTree } from '#scripts/gate/gate-tree'
+import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import type { ChangedParts } from '#scripts/git/changed-paths'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { ReachedCount } from './test-pinned-reach'
+import { test_related_caller } from './test-related-caller'
 import { test_related_cap } from './test-related-cap'
 import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
+import type { SelectMethod } from './test-related-select'
+import { test_related_summary } from './test-related-summary'
 import { unit_count_file } from './unit-count-file'
 
 // What one `josh test:related` run leaves in the lane ledger (joshuafolkken/kit#4465): how much of its
@@ -36,20 +41,38 @@ interface RunInput {
 	branch?: ReadonlyArray<string> | undefined
 	// The name the run is recorded under when it is not the scope's own — `touched` for a `--touched` run.
 	kind?: string
-	// The changed files past the reach cap, narrowed to their direct importers, widest reach first
-	// (`test-related-cap.ts`).
-	over_cap?: ReadonlyArray<string>
-	// The files past the cap it left at their whole reach, each with that reach (joshuafolkken/kit#7639).
-	full_reach?: ReadonlyArray<ReachedCount> | undefined
+	// How many test files the cap deferred to CI (`test-related-select.ts`, joshuafolkken/kit#7976);
+	// absent where the run kept the whole suite.
+	deferred?: number
+	// Every changed code file the selection read, each with the test files it reaches (joshuafolkken/kit#7735).
+	reach?: ReadonlyArray<ReachedCount> | undefined
 	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
 	branch_parts?: ChangedParts | undefined
 	// How long selecting the tests took — the import graph and the importer index (joshuafolkken/kit#7248).
 	select_elapsed_ms?: number
+	// How the tests past the changed ones were chosen (`test-related-select.ts`, joshuafolkken/kit#7980).
+	select_method?: SelectMethod
+	// Whether a bare run read only its last red run's failed files and what moved since
+	// (`test-related-red.ts`, joshuafolkken/kit#7786); `undefined` for a `--touched` run.
+	red_rerun?: boolean
+	// The changed-file map a bare run started on and its base — the reading the green record is written
+	// from (`gate-tree.ts`) — for the ledger's tree key; `undefined` where the run read none.
+	tree?: GateTree | undefined
 }
+
+const STAGE_FIELDS = ['rebuild_ms', 'core_wait_ms', 'vitest_ms'] as const
+
+// How long each stage around the selection took (joshuafolkken/kit#7828) — a stage that did not run
+// is absent.
+type StageTimes = Partial<Record<(typeof STAGE_FIELDS)[number], number | undefined>>
 
 interface RunResult {
 	elapsed_ms: number
 	test_files: number | undefined
+	stages?: StageTimes
+	exit_code?: number
+	// The test files a red run failed on, where its log named them all (`test-related-red.ts`).
+	failed?: ReadonlyArray<string>
 }
 
 function set_count_target(target: string | undefined): void {
@@ -110,16 +133,25 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 	return { trigger_files: input.scope.files.map((file) => path.relative(input.root, file)) }
 }
 
-// **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
-// the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
-// neither a main sync nor the map's tree joined.
-function own_of(
-	input: Pick<RunInput, 'changed' | 'branch'> & Partial<Pick<RunInput, 'synced' | 'since_map'>>,
-): ReadonlyArray<string> {
-	const { changed = [], branch, synced = [], since_map = [] } = input
+type ChangeParts = Pick<RunInput, 'changed'> & Partial<Pick<RunInput, 'synced' | 'since_map'>>
+
+// **What the run named itself**: the change neither a main sync nor the map's tree joined — the
+// selection's input (joshuafolkken/kit#8090), a red run's failed test included.
+function named_of(input: ChangeParts): ReadonlyArray<string> {
+	const { changed = [], synced = [], since_map = [] } = input
 	const joined = new Set([...synced, ...since_map])
 
-	return changed.filter((file) => branch?.includes(file) ?? !joined.has(file))
+	return changed.filter((file) => !joined.has(file))
+}
+
+// **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
+// the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
+// the run named itself.
+function own_of(input: ChangeParts & Pick<RunInput, 'branch'>): ReadonlyArray<string> {
+	const { changed = [], branch } = input
+	const named = named_of(input)
+
+	return changed.filter((file) => branch?.includes(file) ?? named.includes(file))
 }
 
 // The input split into its counted parts, each file in one. A synced non-code file is in `since_map`
@@ -152,27 +184,39 @@ function select_record(select_elapsed_ms: number | undefined): Partial<TestRelat
 	return select_elapsed_ms === undefined ? {} : { select_elapsed_ms: Math.round(select_elapsed_ms) }
 }
 
-// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699) — the one the run's
-// summary line names (`test_related_cap.hub_of`).
-function over_cap_record(
-	over_cap: ReadonlyArray<string> | undefined,
-	own: ReadonlyArray<string>,
-): Pick<TestRelatedRecord, 'over_cap' | 'over_cap_hub'> {
-	if (over_cap === undefined) return {}
-	const hub = test_related_cap.hub_of(over_cap, own)
-	const count = { over_cap: over_cap.length }
+function stage_record(stages: StageTimes = {}): StageTimes {
+	const record: StageTimes = {}
 
-	return hub === undefined ? count : { ...count, over_cap_hub: hub }
+	for (const field of STAGE_FIELDS) {
+		const ms = stages[field]
+
+		if (ms !== undefined) record[field] = Math.round(ms)
+	}
+
+	return record
 }
 
-// The files that kept their whole reach past the cap — what widened a run the cap narrowed little
-// (joshuafolkken/kit#7639) — none written when there were none.
-function full_reach_record(
-	full_reach: ReadonlyArray<ReachedCount> | undefined,
-): Pick<TestRelatedRecord, 'full_reach'> {
-	if (full_reach === undefined || full_reach.length === 0) return {}
+// How many test files the cap deferred to CI, and the hub of the run's own change that put it there
+// (joshuafolkken/kit#5699) — the one the run's summary line names (`test_related_cap.hub_of`).
+function deferred_record(
+	input: Pick<RunInput, 'deferred' | 'reach'>,
+	own: ReadonlyArray<string>,
+): Pick<TestRelatedRecord, 'deferred' | 'over_cap_hub'> {
+	const { deferred, reach = [] } = input
+	if (deferred === undefined) return {}
+	const hub = test_related_cap.hub_of({ deferred, reach }, own)
 
-	return { full_reach: full_reach.map(({ file, count }) => ({ file, reached: count })) }
+	return hub === undefined ? { deferred } : { deferred, over_cap_hub: hub }
+}
+
+// The changed file that added the most test files and that number — the run's closing line names it
+// (`test-related-summary.ts`) — none written where no reach was read.
+function widest_record(
+	reach: ReadonlyArray<ReachedCount> | undefined,
+): Pick<TestRelatedRecord, 'widest_file' | 'widest_tests'> {
+	const widest = test_related_summary.widest_of(reach)
+
+	return widest === undefined ? {} : { widest_file: widest.file, widest_tests: widest.count }
 }
 
 // joshuafolkken/kit#6982: a run whose `changed` swelled to ~1,500 left nothing that told an untracked
@@ -195,6 +239,25 @@ function branch_parts_record(
 	}
 }
 
+// One key per changed-file map, so two rows tell whether they ran on the same tree (joshuafolkken/kit#7965).
+function tree_record(tree: GateTree | undefined): Pick<TestRelatedRecord, 'tree' | 'base'> {
+	if (tree === undefined) return {}
+	const key = input_fingerprint.of_entries(
+		Object.entries(tree.files).map(([file, digest]) => `${file}\0${digest}`),
+	)
+
+	return tree.base === undefined ? { tree: key } : { tree: key, base: tree.base }
+}
+
+function outcome_record(result: RunResult): Pick<TestRelatedRecord, 'exit_code' | 'failed'> {
+	const { exit_code, failed = [] } = result
+
+	return {
+		...(exit_code !== undefined && { exit_code }),
+		...(failed.length > 0 && { failed: [...failed] }),
+	}
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
@@ -206,9 +269,15 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		since_map: since_map.length,
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
-		...over_cap_record(input.over_cap, own),
-		...full_reach_record(input.full_reach),
+		...deferred_record(input, own),
+		...widest_record(input.reach),
 		...select_record(input.select_elapsed_ms),
+		...(input.select_method !== undefined && { select_method: input.select_method }),
+		...(input.red_rerun !== undefined && { red_rerun: input.red_rerun }),
+		...stage_record(result.stages),
+		...tree_record(input.tree),
+		...outcome_record(result),
+		caller: test_related_caller.read(),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 
@@ -223,7 +292,7 @@ async function record_run(input: RunInput, result: RunResult, ledger?: string): 
 	await lane_ledger_write.record_test_related({ ...record_of(input, result), issue }, ledger)
 }
 
-const test_related_record = { own_of, record_of, record_run, with_test_count }
+const test_related_record = { named_of, own_of, record_of, record_run, with_test_count }
 
-export type { RunInput, RunResult }
+export type { RunInput, RunResult, StageTimes }
 export { test_related_record }

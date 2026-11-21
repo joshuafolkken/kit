@@ -30,14 +30,19 @@ interface Fake {
 	ports: HandoffPorts
 	lines: Array<string>
 	requests: Array<LaunchRequest>
+	directories: Array<string>
 	backlogrun: ReturnType<typeof vi.fn>
 }
 
 function fake(overrides: Partial<HandoffPorts> = {}): Fake {
 	const lines: Array<string> = []
 	const requests: Array<LaunchRequest> = []
+	const directories: Array<string> = []
 	const backlogrun = vi.fn(async () => 0)
 	const ports: HandoffPorts = {
+		make_directory: (target) => {
+			directories.push(target)
+		},
 		environment: CLAUDE_SESSION,
 		cwd: '/repo',
 		now: () => 1,
@@ -62,7 +67,7 @@ function fake(overrides: Partial<HandoffPorts> = {}): Fake {
 		...overrides,
 	}
 
-	return { ports, lines, requests, backlogrun }
+	return { ports, lines, requests, directories, backlogrun }
 }
 
 const NO_REPOSITORY: string | undefined = undefined
@@ -110,6 +115,35 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+// joshuafolkken/kit#7857: a `kickoff new` child that ends cleanly without filing is a failed hand-off.
+describe('run_handoff_cli.run kickoff filing check', () => {
+	it.each([
+		{ why: 'no URL', result: 'Waiting for the background check.' },
+		{ why: 'only a pull request URL', result: 'See https://github.com/o/r/pull/9' },
+	])('fails a kickoff new whose final message names $why', async ({ result }) => {
+		const { ports, lines } = fake({
+			read_text: () => JSON.stringify({ type: 'result', result }),
+		})
+		const code = await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE], ports)
+		const refusal = lines.find((line) => line.startsWith('run:handoff: kickoff new'))
+		const log = lines.find((line) => line.startsWith('log: '))?.slice('log: '.length)
+
+		expect(code).toBe(1)
+		expect(refusal).toContain(`read the log: ${String(log)}`)
+		expect(refusal).toContain('gh issue list --search')
+	})
+
+	it('keeps a kickoff #N that names no URL a success', async () => {
+		const { ports } = fake({
+			read_text: () => JSON.stringify({ type: 'result', result: 'Planned.' }),
+		})
+
+		await expect(
+			run_handoff_cli.run(['kickoff', '5', BRIEF_FLAG, BRIEF_FILE], ports),
+		).resolves.toBe(0)
+	})
+})
+
 describe('run_handoff_cli.run', () => {
 	it('waits for kickoff and prints its final message and the URLs it created', async () => {
 		const { ports, lines, requests } = fake()
@@ -146,6 +180,30 @@ describe('run_handoff_cli.run', () => {
 
 		expect(code).toBe(0)
 		expect(requests).toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#7811: concurrent children in one checkout each write under their own directory.
+describe('run_handoff_cli.run scratch directory', () => {
+	it('makes the child’s scratch directory before the start and names it in the prompt', async () => {
+		const { ports, requests, directories } = fake({ now: () => 9 })
+
+		await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE], ports)
+
+		expect(directories).toEqual(['/repo/.josh/tmp/handoff-kickoff-9'])
+		expect(JSON.stringify(requests[0]?.argv)).toContain('.josh/tmp/handoff-kickoff-9/')
+	})
+
+	it('names the scratch directory and the log for one read of the start time', async () => {
+		const times = [3, 4]
+		const { ports, lines, directories } = fake({ now: () => times.shift() ?? 0 })
+
+		await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE], ports)
+
+		expect(directories).toEqual(['/repo/.josh/tmp/handoff-kickoff-3'])
+		expect(lines).toEqual(
+			expect.arrayContaining([expect.stringMatching(/^log: .*-kickoff-3\.log$/u)]),
+		)
 	})
 })
 
@@ -258,12 +316,12 @@ describe('run_handoff_cli.run lane boundary', () => {
 
 describe('run_handoff_cli.run refusals', () => {
 	it.each(REFUSALS)('refuses $why without starting a child', async ({ why, argv, overrides }) => {
-		const { ports, lines, requests } = fake(overrides)
+		const { ports, lines, requests, directories } = fake(overrides)
 
 		expect(await run_handoff_cli.run(argv, ports)).toBe(1)
 		expect(lines.at(-1)).toMatch(/^run:handoff: /u)
 		expect(lines.some((line) => line.startsWith('log: '))).toBe(why === FAILED_START)
-		expect(requests).toEqual([])
+		expect([requests, directories.length]).toEqual([[], why === FAILED_START ? 1 : 0])
 	})
 
 	// joshuafolkken/kit#6743: the usage a bad argument prints names the retrospective keyword too.

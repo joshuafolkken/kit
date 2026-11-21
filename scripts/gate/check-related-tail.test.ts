@@ -5,7 +5,6 @@ import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
-import { metrics_totals } from './metrics-totals'
 
 const make_directory = temporary_directory('suite')
 const scratch = make_directory('check-related-tail-test-')
@@ -13,7 +12,6 @@ const LOG_TARGET = path.join(scratch, 'check-related.log')
 const [LINT_COMMAND, TEST_COMMAND] = check_related.CHECKS
 const LINT_OUTPUT = 'lint output'
 const LINT_PASSED = `${status_icons.PASS_ICON} ${lint_related_scope.COMMAND_LABEL} passed`
-const GROWTH_NOTICE = `${metrics_totals.NOTICE_HEADING}\njosh metrics: 1 total(s) grew`
 const FULL_OUTPUT_LINE = `full output: ${LOG_TARGET}`
 
 function report_lines(results: ReadonlyArray<CheckResult>): Array<string> {
@@ -42,45 +40,10 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-// joshuafolkken/kit#4939: the notice sat inside the lint section, cut off by a tail of the output.
-describe('check_related.report_results metrics growth notice', () => {
-	it('repeats the lint section notice just above the log notice and the verdict line', () => {
-		const lines = report_with_lint_output(`${LINT_OUTPUT}\n\n${GROWTH_NOTICE}\n`)
-
-		expect(lines.slice(-5)).toStrictEqual([
-			...GROWTH_NOTICE.split('\n'),
-			'',
-			FULL_OUTPUT_LINE,
-			`${status_icons.PASS_ICON} check:related passed — ${check_related.METRICS_STOP}`,
-		])
-	})
-
-	// joshuafolkken/kit#5162: lint:related now closes its own section with a verdict line.
-	it('leaves the lint section verdict out of the repeated notice', () => {
-		const lines = report_with_lint_output(`${LINT_OUTPUT}\n\n${GROWTH_NOTICE}\n${LINT_PASSED}\n`)
-
-		expect(lines.slice(-5, -2)).toStrictEqual([...GROWTH_NOTICE.split('\n'), ''])
-	})
-
-	// joshuafolkken/kit#4987: a tail of the last lines read `passed` alone, and the ship stopped on it.
-	// joshuafolkken/kit#6023: run:review's open is now the stop, the pre-detach its backstop.
-	it('names the run:review stop and the accept form on the verdict line itself', () => {
-		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
-
-		expect(verdict).toContain('`josh run:review`')
-		expect(verdict).toContain('pre-detach')
-		expect(verdict).toContain('pnpm josh metrics --accept')
-	})
-
-	// The pre-detach re-records a total the branch approval names, so it does not stop on that one.
-	it('leaves out of the ship stop a total the branch approval already names', () => {
-		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
-
-		expect(verdict).toContain('unless the branch approval already names the total')
-	})
-
-	it('adds nothing above the log notice when the lint section carries no notice', () => {
-		const lines = report_with_lint_output(LINT_OUTPUT)
+// joshuafolkken/kit#7823: lint:related no longer measures the metrics totals, so nothing is repeated.
+describe('check_related.report_results green tail', () => {
+	it('adds nothing above the log notice and the verdict line', () => {
+		const lines = report_with_lint_output(`${LINT_OUTPUT}\n${LINT_PASSED}\n`)
 
 		expect(lines.slice(-4)).toStrictEqual([
 			`${check_related.CHECKS.at(-1) ?? ''} output`,
@@ -88,15 +51,6 @@ describe('check_related.report_results metrics growth notice', () => {
 			FULL_OUTPUT_LINE,
 			`${status_icons.PASS_ICON} check:related passed`,
 		])
-	})
-})
-
-// joshuafolkken/kit#5157: a lane read the notice as a failure and ran check:related again after the accept.
-describe('check_related.report_results metrics accept', () => {
-	it('tells the reader the accept needs no check:related re-run', () => {
-		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
-
-		expect(verdict).toContain('the accept needs no `check:related` re-run')
 	})
 })
 

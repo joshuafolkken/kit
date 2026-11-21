@@ -4,7 +4,7 @@ import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { SUMMARY_FIELDS } from '#scripts/gh/git-gh-issue'
-import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
+import { open_issue_schema, type OpenIssueData, type OpenListing } from '#scripts/git/git-schemas'
 import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
@@ -278,7 +278,13 @@ type TrackingRead =
 	| { kind: 'read'; index: ReadonlyMap<number, ReadonlyArray<number>>; cutoff: ScanCutoff }
 	| { kind: 'epics_unreadable' }
 
-async function read_open_epics(): Promise<FetchedEpics | undefined> {
+// A whole open listing the caller already read answers the epics without a second read
+// (joshuafolkken/kit#8220); a cut one, or none, falls back to the `epic` label listing.
+async function read_open_epics(open: OpenListing | undefined): Promise<FetchedEpics | undefined> {
+	const shared = open === undefined ? undefined : epic_index.epics_of_listing(open, LISTING_LIMIT)
+
+	if (shared !== undefined) return shared
+
 	try {
 		return await epic_index.fetch_epics(LISTING_LIMIT)
 	} catch {
@@ -296,9 +302,9 @@ async function read_open_epics(): Promise<FetchedEpics | undefined> {
 // string. The opted-in listing already refuses that through `read_json_listing`; this one refuses it
 // here, and both gaps land on the same message because both mean the same thing: the tracking is
 // unknown, so no answer is given.
-async function fetch_tracking(count: number): Promise<TrackingRead> {
+async function fetch_tracking(count: number, open?: OpenListing): Promise<TrackingRead> {
 	if (count === 0) return { kind: 'read', index: new Map(), cutoff: NO_CUTOFF }
-	const open_epics = await read_open_epics()
+	const open_epics = await read_open_epics(open)
 	if (open_epics === undefined) return { kind: 'epics_unreadable' }
 
 	return {

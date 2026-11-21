@@ -1,15 +1,8 @@
-import { run_board_earlier } from './run-board-earlier'
-import {
-	run_board_fit,
-	type FrameParts,
-	type PlanLine,
-	type PlanSection,
-	type TerminalSize,
-	type YieldStage,
-} from './run-board-fit'
+import { run_board_faint } from './run-board-faint'
+import type { FrameParts, PlanLine, PlanSection, TerminalSize, YieldStage } from './run-board-fit'
 import { run_board_fold, type FrameBounds } from './run-board-fold'
-import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import {
 	run_board_layout,
@@ -19,23 +12,22 @@ import {
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
-import { run_board_priority } from './run-board-priority'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
-import { run_board_render_found } from './run-board-render-found'
-import { run_board_render_icon } from './run-board-render-icon'
-import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
+import { run_board_render_lanes } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_none } from './run-board-render-none'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_processes } from './run-board-render-processes'
 import { run_board_render_quota } from './run-board-render-quota'
+import { run_board_render_row, type RowFrame } from './run-board-render-row'
 import { run_board_render_section } from './run-board-render-section'
-import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_render_time } from './run-board-render-time'
-import { run_board_render_title, type RowCut, type RowFit } from './run-board-render-title'
-import { run_board_row_yield } from './run-board-row-yield'
+import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
+import { run_board_row_sections } from './run-board-row-sections'
+import { run_board_rule_width } from './run-board-rule-width'
 import type { Thanks } from './run-board-thanks-csv'
 import type { ThroughputRow } from './run-board-throughput'
 
@@ -46,24 +38,17 @@ import type { ThroughputRow } from './run-board-throughput'
 // at the foot names the symbols, so a row carries only what differs between rows. Every word is
 // English whatever the session language: one set of words reads the same on every board.
 
-const { FILED_KIND_ICONS, KIND_BLANK, STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
-const { time_of, time_width } = run_board_render_time
-const { state_icon } = run_board_render_icon
+const { STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
+const { pair, titled } = run_board_label_pair
+const { stops_width, time_width } = run_board_render_time
 const { NOTE_LIMIT } = run_board_render_notes
-const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
-const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
-const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, fitted_limit, row_overrun, title_of } =
-	run_board_render_title
-const { width_of } = run_board_fit
-const { padded } = run_board_fresh
-const { condition_of, tail_of, waits_of } = run_board_render_condition
+const { lane_cells_of, lanes_section } = run_board_render_lanes
+const { indent_of } = run_board_render_lead
+const { TITLE_LIMIT, WHOLE, title_of } = run_board_render_title
+const { width_for } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, kept_section, keyed, plan_section } = run_board_render_section
-const GAP = '  '
-// The fewest columns a done row's end is cut to before its title gives them up: its minutes and a cut
-// start of what follows.
-const FOUND_FLOOR = 8
-const FILED_LEAD = `${run_board_labels.FILED_RUN_MARK} `
+const { GAP, row_line, shared_overrun } = run_board_render_row
 const BRANCH = `${ROW_INDENT}   ├ `
 const LAST_BRANCH = `${ROW_INDENT}   └ `
 const { bounded } = run_board_fold
@@ -78,194 +63,8 @@ interface BoardView extends FrameBounds {
 	link?: Link | undefined
 	// The 📈 throughput rows; none draws no section.
 	throughput?: ReadonlyArray<ThroughputRow> | undefined
-}
-
-// What every row of one frame is drawn with: the header, how wide the time column is, so a
-// `2°05′30″` and a `42″` end in the same column, and the lane cells after a row's lead where its
-// section draws them.
-interface RowFrame {
-	header: BoardHeader
-	time_width: number
-	cells?: LaneCells | undefined
-	// The columns a row's title is cut to: the title column's, or fewer where a row gives some up.
-	title_limit: number
-	// The columns cut off the end of a row's reason, where its title alone could not give up enough.
-	reason_cut: number
-	// The pane's width where the frame is kept within one.
-	columns: number | undefined
-	// The issues the run filed, whose rows lead their title with ✚.
-	filed: ReadonlySet<number>
-	// The columns a lane row that draws a tail gives up with every other such row.
-	shared?: number | undefined
-	// The queued, waiting and done sections draw a condition column after the icon
-	// (joshuafolkken/kit#4288, #4292).
-	is_conditioned?: boolean | undefined
-	// The lanes section draws each row's lead — progress, phase and times — before its cells
-	// (`run-board-render-lead.ts`).
-	is_lane_row?: boolean | undefined
-	// A done row whose title gives up the columns draws what was filed during it whole.
-	is_end_kept?: boolean | undefined
-}
-
-// A row drawn before the plan is read has no title yet, and says so.
-function row_title(row: BoardRow, header: BoardHeader): string | undefined {
-	if (row.title !== undefined || run_board_header.is_plan_read(header)) return row.title
-
-	return ELLIPSIS
-}
-
-// A row the run filed leads its title with ✚ (joshuafolkken/kit#4099), cut by as many columns, so every
-// column after it stays where an unmarked row has it.
-function title_text(row: BoardRow, frame: RowFrame): string {
-	const title = row_title(row, frame.header)
-
-	if (!frame.filed.has(row.number)) return title_of(title, frame.title_limit)
-
-	return `${FILED_LEAD}${title_of(title, frame.title_limit - FILED_LEAD.length)}`
-}
-
-// The title padded to the title column and the time to the time column — blanks where a row has none —
-// so the times form one column, and what follows them starts in one column on every row but a waiting
-// one, whose title is not padded. A lane row draws its time in its lead.
-function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
-	const title = title_text(row, frame)
-
-	if (row.state === 'waiting') return [title]
-	if (frame.is_lane_row === true) return [title.padEnd(frame.title_limit)]
-
-	const time = time_of(row, frame.header.now_ms) ?? ''
-	const fresh = running_fresh(row, time, row.status?.started_ms, frame.header)
-
-	return [title.padEnd(frame.title_limit), padded(time, frame.time_width, fresh)]
-}
-
-function joined(parts: ReadonlyArray<string | undefined>): string {
-	return parts.filter((part) => part !== undefined && part !== '').join(GAP)
-}
-
-// A lane row's lead, else the icon and, in a section that draws one, the condition column after it.
-function icon_text(row: BoardRow, frame: RowFrame): string {
-	const { header } = frame
-
-	if (frame.is_lane_row === true) return lane_lead_of(row, header)
-
-	const icon = running_fresh(row, state_icon(row), row.status?.phase_ms, header)
-
-	return frame.is_conditioned === true ? `${icon} ${condition_of(row, header)}` : icon
-}
-
-// The priority and the release kind's icons between the number — and its lane cells, where drawn —
-// and the title, one space either side; a row with no title ends at its kind, so what follows keeps
-// its usual gap.
-function lead_of(row: BoardRow, frame: RowFrame, title: string): string {
-	const { header } = frame
-	const kind = row.kind === undefined ? KIND_BLANK : FILED_KIND_ICONS[row.kind]
-	const number = number_text(row, frame.cells, header.link)
-	const lead = `${icon_text(row, frame)} ${number} ${run_board_priority.cell_of(row)} ${kind}`
-
-	return title === '' ? lead : `${lead} ${title}`
-}
-
-// A row up to its tail — the columns that stay where they are on every row. A waiting row has no time
-// to line up, so it ends at its title and what it waits on follows two blanks on.
-function head_text(row: BoardRow, frame: RowFrame): string {
-	const [title = '', time] = timed_parts(row, frame)
-	const lead = lead_of(row, frame, title)
-
-	if (row.state === 'waiting') return lead
-
-	return joined([lead, time])
-}
-
-// What a row draws after its title: its tail, an earlier run's row's led by 🧳 — so an earlier run's row
-// draws one even where its tail is empty.
-function drawn_tail(row: BoardRow, frame: RowFrame): Array<string> {
-	return run_board_earlier.earlier_marked(row, run_board_render_tail.tail_of(row, frame.header))
-}
-
-// A row up to what was filed during it: its head, then what it draws after its title.
-function tailed_head(row: BoardRow, frame: RowFrame): string {
-	return joined([head_text(row, frame), ...drawn_tail(row, frame)])
-}
-
-// The columns the pane leaves after `head` and its gap, where the frame is kept within one and the
-// row's end is not kept whole.
-function room_after(indent: string, head: string, frame: RowFrame): number | undefined {
-	if (frame.columns === undefined || frame.is_end_kept === true) return undefined
-
-	return frame.columns - width_of(`${indent}${head}${GAP}`)
-}
-
-// Every row carries its state's icon, or the icon of what it waits on; a running row ends on its tail
-// (`run-board-render-tail.ts`), a done row on what was filed during it (`run-board-render-found.ts`),
-// and a row with nothing after its padded columns ends where its text does.
-function row_text(indent: string, row: BoardRow, frame: RowFrame): string {
-	const { header, reason_cut } = frame
-	const head = tailed_head(row, frame)
-	const found = run_board_render_found.found_fitted(room_after(indent, head, frame), row, header)
-	const notes = [waits_of(row, header, frame.is_conditioned), tail_of(row, reason_cut, header)]
-
-	return `${indent}${joined([head, found, ...notes]).trimEnd()}`
-}
-
-// A pane narrower than a done row's head leaves its end too few columns to say anything in, so there
-// the title gives up the columns instead, as before joshuafolkken/kit#4922.
-function is_found_squeezed(indent: string, row: BoardRow, frame: RowFrame): boolean {
-	if (run_board_render_found.found_text(row, frame.header) === '') return false
-
-	return (room_after(indent, tailed_head(row, frame), frame) ?? FOUND_FLOOR) < FOUND_FLOOR
-}
-
-// A row drawn whole or cut, after its indent; a row that keeps its line keeps its end whole too, its
-// title giving up the columns.
-function row_draw(
-	indent: string,
-	row: BoardRow,
-	frame: RowFrame,
-	fit: RowFit,
-): (cut: RowCut) => string {
-	const is_end_kept = fit.is_line_kept === true
-
-	return (cut) => row_text(indent, row, { ...frame, ...cut, is_end_kept })
-}
-
-// A row drawn with lane cells keeps its head on one line, its title giving up their columns where the
-// pane is narrow. A row that draws a tail keeps its whole line, giving up the columns its section's
-// rows give up together (joshuafolkken/kit#4226). A done row keeps its title's width and cuts the end of
-// what was filed during it instead (`run-board-render-found.ts` found_fitted), unless that end is
-// squeezed out.
-function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
-	const is_tailed = drawn_tail(row, frame).length > 0
-
-	return {
-		is_line_kept: is_tailed || is_found_squeezed(indent, row, frame),
-		lead: frame.filed.has(row.number) ? FILED_LEAD.length : 0,
-		head: (cut) => `${indent}${head_text(row, { ...frame, ...cut })}`,
-		is_head_kept: frame.is_lane_row === true,
-		shared: is_tailed ? frame.shared : undefined,
-	}
-}
-
-// A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
-function row_line(indent: string, row: BoardRow, frame: RowFrame, stage?: YieldStage): PlanLine {
-	const fit = row_fit(indent, row, frame)
-	const text = fitted(row, frame.columns, row_draw(indent, row, frame, fit), fit)
-
-	return { text, row: run_board_row_yield.yield_of(row, stage) }
-}
-
-// The most columns a lane row that draws a tail runs past the pane, which every such row gives up, so
-// their titles end in one column and the tails after them start in one.
-function shared_overrun(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number {
-	const overruns = rows.map((row) => {
-		const fit = row_fit(indent_of(row), row, frame)
-
-		return fit.is_line_kept === true
-			? row_overrun(row, frame.columns, row_draw(indent_of(row), row, frame, fit), fit)
-			: 0
-	})
-
-	return Math.max(0, ...overruns)
+	// Whether the throughput rows end on the lamp panel (`run-board-lamps.ts`).
+	has_lamps?: boolean | undefined
 }
 
 function bare(text: string): PlanLine {
@@ -290,9 +89,10 @@ function epic_lines(
 	)
 	const title = title_of(entry.title)
 	const number = frame.header.link(String(entry.epic))
-	const epic = title === '' ? number : `${number}${GAP}${title}`
+	const epic = title === '' ? `📁 ${number}` : `📁 ${number}${GAP}${titled(title)}`
+	const section = frame.header.is_keyed === true ? 'epic' : undefined
 
-	return [bare(`${ROW_INDENT}📁 ${epic}`), ...children]
+	return [bare(`${ROW_INDENT}${run_board_row_key.keyed(section, entry.epic, epic)}`), ...children]
 }
 
 function entry_lines(entry: QueuedEntry, frame: RowFrame): Array<PlanLine> {
@@ -313,6 +113,16 @@ function rows_section(
 	)
 }
 
+// The plan's rows drawn faint while the plan is a saved one (joshuafolkken/kit#8219).
+function planned(header: BoardHeader, sections: Array<PlanSection>): Array<PlanSection> {
+	if (header.plan_saved_ms === undefined) return sections
+
+	return sections.map((section) => ({
+		...section,
+		lines: section.lines.map((line) => ({ ...line, text: run_board_faint.faint(line.text) })),
+	}))
+}
+
 function frame_of(
 	header: BoardHeader,
 	notes: ReadonlyArray<BoardNote>,
@@ -321,6 +131,7 @@ function frame_of(
 	return {
 		header,
 		time_width: time_width(header),
+		stops_width: stops_width(header),
 		...WHOLE,
 		columns: size?.columns,
 		filed: run_board_notes.filed_numbers(notes),
@@ -330,52 +141,38 @@ function frame_of(
 // The rows not yet started under one heading, in the order they are offered: a running batch starts
 // each once a lane and its paths are free, never wave by wave (joshuafolkken/kit#4137); kept at none.
 function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
-	const lines = layout.queued.flatMap((entry) =>
-		entry_lines(entry, { ...frame, is_conditioned: true }),
-	)
+	const lines = layout.queued.flatMap((entry) => entry_lines(entry, frame))
 
-	return [kept_section(`${STATE_ICONS.waiting} ${WORDS.queued}`, lines)]
-}
-
-// The column the lane rows' titles end in as drawn, cut as `fitted` cuts them, where every rule ends
-// (joshuafolkken/kit#5520), kept within the pane; none without a lane row.
-function rule_width(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number | undefined {
-	const ends = rows.map((row) => {
-		const fit = row_fit(indent_of(row), row, frame)
-		const draw = row_draw(indent_of(row), row, frame, fit)
-		const title_limit = fitted_limit(row, frame.columns, draw, fit) ?? TITLE_LIMIT
-
-		return width_of(`${indent_of(row)}${head_text(row, { ...frame, title_limit })}`)
-	})
-
-	if (ends.length === 0) return undefined
-
-	return Math.min(Math.max(...ends), frame.columns ?? Infinity)
+	return [kept_section(pair(STATE_ICONS.waiting, WORDS.queued), lines)]
 }
 
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
 // ones waiting on a person's decision — a child parked on one and an untouched plan row alike
 // (joshuafolkken/kit#4099).
-function active_sections(
-	layout: BoardLayout,
-	frame: RowFrame,
-): Pick<FrameParts, 'plan' | 'rule_width'> {
+function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
 	const people = run_board_layout.people_of(layout)
 	const lead = run_board_layout.lanes_drawn(layout)
-	const decision = `${STATE_ICONS.human} ${WORDS.decision}`
+	const decision = pair(STATE_ICONS.human, WORDS.decision)
 	const cells = lane_cells_of(frame.header, lead)
 	const lane_frame = { ...frame, cells, is_lane_row: true }
 	const shared = shared_overrun(lead, lane_frame)
 	const lanes = lanes_section(
-		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared })),
+		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared, section: 'lanes' })),
 		cells,
 		frame.header,
 		frame.columns,
 	)
 
-	const plan = [...lanes, ...rows_section(decision, people, frame)]
+	const decided = rows_section(decision, people, { ...frame, section: 'decision' })
 
-	return { plan, rule_width: rule_width(lead, { ...lane_frame, shared }) }
+	return [...lanes, ...planned(frame.header, decided)]
+}
+
+// The 🔗 rows waiting on an issue the run has not reached.
+function waiting_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+	const waiting = pair(WAITS_ICON, WORDS.waiting)
+
+	return rows_section(waiting, layout.unreached, { ...frame, section: 'waiting' }, 'waiting')
 }
 
 // The plan's rest under the findings, the 🔗 waiting rows giving way before them.
@@ -385,20 +182,24 @@ function plan_parts(
 	size: TerminalSize | undefined,
 ): Pick<FrameParts, 'below' | 'plan' | 'rule_width'> {
 	const { layout } = header
-
-	if (layout === undefined) return { plan: [] }
-
 	const frame = frame_of(header, notes, size)
-	const conditioned = { ...frame, is_conditioned: true }
-	const done = layout.active.filter((row) => run_board_layout.is_finished(row.state))
-	const waiting = `${WAITS_ICON} ${WORDS.waiting}`
+	const rule_width = run_board_rule_width.rule_width(frame)
+
+	if (layout === undefined) return { plan: [], rule_width }
+
+	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
+	const done = run_board_row_sections.done_rows(layout)
+	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
 
 	return {
-		...active_sections(layout, frame),
+		plan: active_sections(layout, frame),
+		rule_width,
 		below: [
-			...keyed('queued', queued_section(layout, frame)),
-			...keyed('waiting', rows_section(waiting, layout.unreached, conditioned, 'waiting')),
-			...done_section(done, (row) => row_line(ROW_INDENT, row, conditioned)),
+			...keyed('queued', planned(header, queued)),
+			...keyed('waiting', planned(header, waiting_section(layout, conditioned))),
+			...done_section(done, (row) =>
+				row_line(ROW_INDENT, row, { ...conditioned, section: 'done' }),
+			),
 		],
 	}
 }
@@ -408,8 +209,12 @@ function render(view: BoardView): Array<string> {
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
-		throughput: run_board_render_throughput.throughput_part(view.throughput),
-		usage: run_board_render_quota.usage_part({ ...header, hold: header.quota_hold }),
+		throughput: run_board_render_throughput.throughput_part(view.throughput, view.has_lamps),
+		usage: run_board_render_quota.usage_part({
+			...header,
+			hold: header.quota_hold,
+			has_lamps: view.has_lamps,
+		}),
 		...plan_parts(header, notes, view.size),
 		processes: run_board_render_processes.processes_part(header),
 		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),
@@ -418,7 +223,7 @@ function render(view: BoardView): Array<string> {
 		footer: view.footer ?? [],
 	}
 
-	return bounded(parts, view)
+	return run_board_label_pair.settled(bounded(parts, view), header)
 }
 
 const run_board_render = {

@@ -93,7 +93,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'developer',
 			['files'],
 		],
-		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		core_weight: core_weights.CORE_WEIGHTS.metrics,
 		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
 		usage: {
@@ -256,7 +256,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '' },
 				NARROWED,
-				{ arguments: '--touched', note: 'diff tests, same-named tests and direct test importers' },
+				{
+					arguments: '--touched',
+					note: 'diff, same-named and importing tests, added/removed listers',
+				},
 				{ arguments: '--silent', note: FORWARDED_TO_VITEST },
 			],
 		},

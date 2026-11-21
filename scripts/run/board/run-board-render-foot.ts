@@ -5,7 +5,7 @@ import { run_board_layout } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render_drawn } from './run-board-render-drawn'
-import { run_board_render_icon } from './run-board-render-icon'
+import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_legend } from './run-board-render-legend'
 import { run_board_render_thanks } from './run-board-render-thanks'
 import { run_board_render_waits } from './run-board-render-waits'
@@ -32,7 +32,7 @@ function legend_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Array<
 
 	const rows = run_board_layout.drawn_rows(layout)
 	const leads = new Set([
-		...rows.map((row) => run_board_render_icon.state_icon(row)),
+		...rows.map((row) => run_board_render_lead.icon_of(row, header)),
 		...run_board_earlier.marks_of(rows),
 	])
 	const drawn = run_board_render_drawn.drawn_of(header, rows, leads)

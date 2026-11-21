@@ -7,6 +7,7 @@ const USER_HOME = '/user-home'
 const CUSTOM_DIRECTORY = '/custom-claude'
 const FILE_NAME = 'usage.json'
 const BOARD_FILE_NAME = 'board.json'
+const SOUNDS_DIRECTORY = 'sounds'
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -38,4 +39,10 @@ it('keeps the board fold state under a custom Claude configuration directory', (
 	vi.stubEnv('CLAUDE_CONFIG_DIR', CUSTOM_DIRECTORY)
 
 	expect(usage_state_path.board()).toBe(path.join(CUSTOM_DIRECTORY, 'josh', BOARD_FILE_NAME))
+})
+
+it('keeps the cached board sounds in a directory beside the usage state', () => {
+	vi.stubEnv('CLAUDE_CONFIG_DIR', CUSTOM_DIRECTORY)
+
+	expect(usage_state_path.sounds()).toBe(path.join(CUSTOM_DIRECTORY, 'josh', SOUNDS_DIRECTORY))
 })

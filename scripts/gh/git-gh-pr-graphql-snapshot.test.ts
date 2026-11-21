@@ -88,10 +88,7 @@ function contexts_page(nodes: ReadonlyArray<GraphqlNode>, end_cursor?: string): 
 
 const PASSING_NODES = [check_run_node(SONAR_QUBE, 'COMPLETED', 'SUCCESS')]
 
-function graphql_pull(
-	overrides: GraphqlNode = {},
-	page = contexts_page(PASSING_NODES),
-): GraphqlNode {
+function graphql_pull(overrides: GraphqlNode, page = contexts_page(PASSING_NODES)): GraphqlNode {
 	const required = { requiredStatusChecks: [{ context: SONAR_QUBE }] }
 
 	return {
@@ -217,7 +214,7 @@ beforeEach(() => {
 
 describe('pr_get_state_snapshot — one GraphQL query', () => {
 	it('reads a cold snapshot without one REST core request', async () => {
-		stub_graphql({ [SNAPSHOT_QUERY]: snapshot_answer(graphql_pull()) })
+		stub_graphql({ [SNAPSHOT_QUERY]: snapshot_answer(graphql_pull({})) })
 
 		const snapshot = parse_pr_state_snapshot(await pr_get_state_snapshot(PR_BRANCH))
 

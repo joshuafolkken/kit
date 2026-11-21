@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/backlog/backlog-gate-scope.ts:64 | 2026-11-20 | #8273 | fixed | naming-callers
+- rf:tests | low | scripts/backlog/backlog-gate-scope.test.ts:34 | 2026-11-20 | #8273 | fixed | other
+- rf:none | none | - | 2026-11-20 | #8273

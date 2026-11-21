@@ -1,14 +1,16 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_read } from './cost-audit-read'
 
 const { prompt_line, request_line, record, session } = cost_audit_fixture
 
 const FULLRUN_PROMPT = 'fullrun #1'
+const OUTAGE_PROMPT = lane_child_invocation.outage_resume_invocation('1')
 const LANE = '/p/-dev--kit-lanes-5936'
 const MAIN_FILE = {
 	session_id: 's1',
@@ -57,6 +59,40 @@ describe('cost_audit_read.session_of — one transcript read into a session', ()
 	})
 })
 
+// joshuafolkken/kit#8311: why a resume session was started, read off its user prompts.
+const OUTAGE_RESUME = ['resume', 'API outage']
+const FULLRUN = ['fullrun', undefined]
+
+function kind_and_trigger(lines: ReadonlyArray<string>): Array<string | undefined> {
+	const read = cost_audit_read.session_of(lines.join('\n'), false, true)
+
+	return [read.kind, read.trigger]
+}
+
+describe('cost_audit_read.session_of — the trigger of a resume session', () => {
+	it('gives a resume session its trigger and a run session none', () => {
+		expect(kind_and_trigger([prompt_line(0, OUTAGE_PROMPT)])).toStrictEqual(OUTAGE_RESUME)
+		expect(kind_and_trigger([prompt_line(0, FULLRUN_PROMPT)])).toStrictEqual(FULLRUN)
+	})
+
+	// The outage relaunch resumes the stopped session, so its prompt follows the opening fullrun one.
+	it('reads an outage prompt after the opening fullrun prompt as an outage resume', () => {
+		const relaunched = [
+			prompt_line(0, FULLRUN_PROMPT),
+			request_line(1, 'r1', 1, [GREP]),
+			prompt_line(2, OUTAGE_PROMPT),
+		]
+
+		expect(kind_and_trigger(relaunched)).toStrictEqual(OUTAGE_RESUME)
+	})
+
+	it('keeps the opening prompt the kind when a later prompt names no outage', () => {
+		const later = [prompt_line(0, FULLRUN_PROMPT), prompt_line(1, 'carry on')]
+
+		expect(kind_and_trigger(later)).toStrictEqual(FULLRUN)
+	})
+})
+
 // joshuafolkken/kit#5936: the phase table reads each lane transcript's stages by its Issue.
 describe('cost_audit_read.issue_of — the lane a transcript was written under', () => {
 	const lanes = [LANE, '/p/-dev--kit-lanes-12']
@@ -71,6 +107,14 @@ describe('cost_audit_read.issue_of — the lane a transcript was written under',
 		expect(cost_audit_read.issue_of(MAIN_FILE.path, lanes)).toBeUndefined()
 	})
 })
+
+// The store listing `files`, newest first, under the one lane `LANE`.
+function stub_lane_files(files: Array<SessionFile>): void {
+	vi.spyOn(cost_transcript, 'session_cwd').mockReturnValue('/dev/kit')
+	vi.spyOn(cost_transcript, 'transcript_directories').mockReturnValue([])
+	vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue(files)
+	vi.spyOn(cost_transcript, 'lane_transcript_directories').mockReturnValue([LANE])
+}
 
 describe('cost_audit_read.load — each session carries its lane', () => {
 	afterEach(() => {
@@ -92,6 +136,24 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 			[undefined, false],
 			[5936, true],
 		])
+	})
+
+	// joshuafolkken/kit#8311: a cut resume is placed by the lane's session before it once all are read.
+	it("places a lane's cut resume by the lane session read before it", () => {
+		const first = { ...MAIN_FILE, session_id: 's2', path: `${LANE}/s2.jsonl`, modified_ms: 1 }
+		const second = { ...first, session_id: 's3', path: `${LANE}/s3.jsonl`, modified_ms: 2 }
+		const cut = { name: 'Bash', input: { command: 'pnpm josh run:cut 5936' } }
+		const texts = new Map([
+			[first.path, [prompt_line(0, FULLRUN_PROMPT), request_line(1, 'r1', 1, [cut])].join('\n')],
+			[second.path, prompt_line(2, lane_child_invocation.resume_invocation('5936'))],
+		])
+
+		stub_lane_files([second, first])
+		vi.spyOn(cost_transcript, 'read_raw').mockImplementation((file) => texts.get(file.path) ?? '')
+
+		const triggers = cost_audit_read.load('/dev/kit', 0).map((one) => one.trigger)
+
+		expect(triggers).toStrictEqual([undefined, 'pre-gate cut'])
 	})
 })
 
@@ -142,6 +204,40 @@ describe('cost_audit_read.load — a delegated unit carries its agent type', () 
 		const types = cost_audit_read.load('/dev/kit', 0).map((one) => one.agent_type)
 
 		expect(types).toStrictEqual([undefined, 'investigator'])
+	})
+})
+
+// joshuafolkken/kit#8284: `--density` opens the lane children's own transcripts alone.
+const LANE_FILE = { ...MAIN_FILE, session_id: 's2', path: `${LANE}/s2.jsonl`, modified_ms: 5 }
+const STORE = [
+	LANE_FILE,
+	{ ...LANE_FILE, session_id: 's3', path: `${LANE}/s3.jsonl`, modified_ms: 1 },
+	{ ...LANE_FILE, path: `${LANE}/s2/a.jsonl`, is_delegated: true, depth: 1 },
+	{ ...MAIN_FILE, modified_ms: 5 },
+]
+
+// The store stubbed to `STORE` under the one lane `LANE`, answering the spy every file read goes through.
+function stub_store(): MockInstance<typeof cost_transcript.read_raw> {
+	vi.spyOn(cost_transcript, 'session_cwd').mockReturnValue('/dev/kit')
+	vi.spyOn(cost_transcript, 'transcript_directories').mockReturnValue([])
+	vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue(STORE)
+	vi.spyOn(cost_transcript, 'lane_transcript_directories').mockReturnValue([LANE])
+
+	return vi.spyOn(cost_transcript, 'read_raw').mockReturnValue(prompt_line(0, FULLRUN_PROMPT))
+}
+
+describe('cost_audit_read.load_lane_children — only lane children are opened', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('opens no main checkout, delegated unit or pre-since transcript', () => {
+		const read = stub_store()
+		const sessions = cost_audit_read.load_lane_children('/dev/kit', 3)
+		const lane_file = LANE_FILE
+
+		expect(read.mock.calls.map(([file]) => file.path)).toStrictEqual([lane_file.path])
+		expect(sessions.map((one) => [one.issue, one.is_lane])).toStrictEqual([[5936, true]])
 	})
 })
 

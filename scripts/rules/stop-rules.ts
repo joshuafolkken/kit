@@ -2,8 +2,10 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { concise_reply } from './concise-reply'
+import { deferral_owner } from './deferral-owner'
 import { filing_offer } from './filing-offer'
 import { lane_background } from './lane-background'
+import { reply_close } from './reply-close'
 import { reply_language } from './reply-language'
 import { stop_decision, type StopDecision } from './stop-decision'
 
@@ -85,6 +87,9 @@ interface StopContext {
 	headless_refusals: number
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
+	// This session is a child kit started headless — a lane, hand-off or beside child —
+	// `run_headless.is_started_child`. Nothing re-invokes it once its turn ends.
+	started_child: boolean
 	// A background task this run launched — a command or a subagent — has not finished —
 	// `lane_background.pending_background_ids` over the transcript tail.
 	background_pending: boolean
@@ -94,6 +99,9 @@ interface StopContext {
 	// A backgrounded command this run launched has not finished — `lane_background.pending_command_ids`.
 	// Apart from `agent_pending`, since the two are waited on differently.
 	command_pending: boolean
+	// A background task's completion notice is queued on the tail but not yet delivered —
+	// `queued_notice.queued_notice_ids`. Its delivery resumes this session at once.
+	notice_queued: boolean
 	// This lane child handed its region to a running detached ship — `lane_handoff.is_handed_off`.
 	// The supervisor notifies on its own outcome, so nobody waits on this stop.
 	handed_off: boolean
@@ -254,17 +262,20 @@ function needs_filing(context: StopContext): boolean {
 // **A running background subagent stands both hold rules down**. Its completion
 // notice re-invokes the session, so the turn-end is a wait on the run's own work, not on a person — a
 // notify there says "nothing needed" and dilutes the ones that do. A backgrounded command does not
-// count: a dev server never ends, and a stop behind it would leave a person silently waiting. A lane
-// child never reaches this with a task running: `needs_background_wait` answers it first.
+// count: a dev server never ends, and a stop behind it would leave a person silently waiting. A started
+// child (lane, hand-off or beside) never reaches this with a task running: `needs_background_wait` answers it first.
 //
 // **A lane handed to the detached ship stands them down too**: the hold now
 // belongs to the supervisor driving the merge, and the person hears from that supervisor's own notify.
 //
 // **Another run's hold stands them down as well**: the pause and the claim are that run's.
+//
+// **So does a completion notice queued but not yet delivered** (joshuafolkken/kit#7749): its delivery
+// resumes the session a moment after this stop, which is no pause.
 function is_held_idle(context: StopContext): boolean {
 	if (context.hold_issue === undefined || !context.hold_owned) return false
 
-	return !context.agent_pending && !context.handed_off
+	return !context.agent_pending && !context.handed_off && !context.notice_queued
 }
 
 // **A stop that answers the person's question is no pause** (joshuafolkken/kit#3961): they are reading
@@ -283,20 +294,53 @@ function needs_decision(context: StopContext): boolean {
 	return needs_notify(context) && stop_decision.decision_of(context.message) === undefined
 }
 
+// **A reply with no close line is sent back once** — `reply-close.ts`. An unattended session's reply
+// has no person closing the session, and a held stop's decision refusal already asks for the close.
+function is_close_exempt(context: StopContext): boolean {
+	return is_unattended(context) || needs_decision(context)
+}
+
+function close_reason(context: StopContext): string | undefined {
+	if (is_close_exempt(context)) return undefined
+
+	return reply_close.reason_of(context.message, context.prompt, context.session_lang)
+}
+
+// The rules that read the reply's prose: its language, then its length, then its close. The
+// loop-breaker lets a rewrite stop unchecked, so a language or length refusal asks for the close too.
+function prose_reason(context: StopContext): string | undefined {
+	const reason = language_reason(context) ?? concise_reason(context)
+	if (reason === undefined) return close_reason(context)
+	const { message, prompt, session_lang } = context
+
+	return is_close_exempt(context)
+		? reason
+		: `${reason}${reply_close.note_of(message, prompt, session_lang)}`
+}
+
 function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
 
-// The rules that read the reply and need the model: the filing offer, then the language, then the
-// length. **A headless agent's reply has no reader**: its text lands in a stream-json log, so
+// **A deferral with no owner is sent back in every session** (joshuafolkken/kit#8296): unlike the filing
+// offer, a consultation session must name the owner or a filing draft too — `deferral-owner.ts`.
+function deferral_reason(context: StopContext): string | undefined {
+	return deferral_owner.needs_owner(context.message, context.session_owner)
+		? deferral_owner.REASON
+		: undefined
+}
+
+// The rules that read the reply and need the model: the filing offer, the unowned deferral, then the
+// language, then the length. **A headless agent's reply has no reader**: its text lands in a stream-json log, so
 // correcting its language costs a turn and reaches nobody. A drifted reply
 // refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
 // session-language note to every refusal, so the turn it continues is written in the session language.
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
-	if (context.headless_agent) return undefined
+	const deferral = deferral_reason(context)
+	if (deferral !== undefined || context.headless_agent) return deferral
 
-	return language_reason(context) ?? concise_reason(context)
+	return prose_reason(context)
 }
 
 // Sent back once; past the loop-breaker the run has said nothing is awaited, and nothing is sent.
@@ -321,9 +365,11 @@ function count_headless_refusals(tail: string): number {
 
 // **A lane child with a task still running is sent back to wait, not to notify**.
 // Its turn-end kills the task, so the notify the hold rules would ask for announces a stop that loses
-// the work; the #2606 child obeyed exactly that and its gate died at `exit code 143`.
+// the work; the #2606 child obeyed exactly that and its gate died at `exit code 143`. **Any started
+// child is held the same way** (joshuafolkken/kit#7858): a `run:handoff` child is no lane child, yet
+// nothing re-invokes it either, so its turn-end leaves the work unfinished.
 function needs_background_wait(context: StopContext): boolean {
-	return context.lane_child && context.background_pending
+	return (context.lane_child || context.started_child) && context.background_pending
 }
 
 // **Only subagents left take their own wait**: their notice comes in when a tool call ends, while a

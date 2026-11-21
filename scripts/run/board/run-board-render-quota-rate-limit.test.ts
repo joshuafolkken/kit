@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import type { Quotas } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 import type { GithubRateLimit } from './run-board-render-quota-github'
@@ -36,7 +37,9 @@ afterEach(() => {
 
 function part_of(view: Partial<QuotaView>): { rows: Array<string>; summary: string } {
 	const part = usage_part({ quotas: QUOTAS, now_ms: NOW_MS, ...view })
-	const rows = (part?.lines ?? []).map((line) => stripVTControlCharacters(line.text))
+	const rows = (part?.lines ?? []).map((line) =>
+		run_board_label_pair.bare(stripVTControlCharacters(line.text)),
+	)
 
 	return { rows, summary: part?.summary ?? '' }
 }
@@ -56,7 +59,7 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 
 		expect(rows).toHaveLength(3)
 		expect(rows[2]).toBe(
-			`  GitHub      REST  38% ${'■'.repeat(8)}─┊${'─'.repeat(10)} 3123     12:33`,
+			`     GitHub      REST  38% ${'■'.repeat(8)}─┊${'─'.repeat(10)} 3123     12:33`,
 		)
 	})
 
@@ -64,7 +67,7 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 		const { rows } = part_of({ rate_limit: REST_ONLY, scheduler_provider: 'claude' })
 
 		expect(rows[2]?.indexOf('GitHub')).toBe(rows[1]?.indexOf('Codex'))
-		expect(rows[2]).toMatch(/^ {5}GitHub {3}REST {2}38% \S{20} 3123 {5}12:33$/u)
+		expect(rows[2]).toMatch(/^ {8}GitHub {3}REST {2}38% \S{20} 3123 {5}12:33$/u)
 	})
 
 	it('puts the pace mark where the clock is through the hour-long window', () => {
@@ -86,7 +89,7 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 
 	it('draws the allowance unspent, its whole limit left and without a reset once its reset has passed', () => {
 		expect(part_of({ rate_limit: PASSED }).rows[2]).toBe(
-			`  GitHub      REST   0% ┊${'─'.repeat(19)} 5000`,
+			`     GitHub      REST   0% ┊${'─'.repeat(19)} 5000`,
 		)
 	})
 })
@@ -104,7 +107,7 @@ describe('run_board_render_quota.usage_part rate limit row beside 7d-only rows',
 		const reading = { windows: [week], taken_ms: NOW_MS }
 		const { rows } = part_of({ quotas: { claude: reading, codex: reading }, rate_limit: REST_ONLY })
 
-		expect(rows.map((row) => row.indexOf('%'))).toStrictEqual([22, 22, 22])
+		expect(rows.map((row) => row.indexOf('%'))).toStrictEqual([25, 25, 25])
 		expect(rows.join('\n')).not.toMatch(/ {2}—|1h/u)
 	})
 })
@@ -131,9 +134,9 @@ describe('run_board_render_quota.usage_part column alignment', () => {
 		const ends = cells.map((texts, index) => texts.map((text) => end_of(rows[index] ?? '', text)))
 
 		expect(ends).toStrictEqual([
-			[18, 23, 49, 59],
-			[18, 23, 49, 59],
-			[18, 23, 49, 59],
+			[21, 26, 52, 62],
+			[21, 26, 52, 62],
+			[21, 26, 52, 62],
 		])
 		expect(rows[1]).toMatch(/Fri 12:00 60′$/u)
 	})
@@ -149,6 +152,29 @@ describe('run_board_render_quota.usage_part column alignment', () => {
 		expect([end_of(github, 'REST'), end_of(github, '38%')]).toStrictEqual([
 			end_of(claude, '7d'),
 			end_of(claude, '46%'),
+		])
+	})
+})
+
+function start_of(row: string, text: string): number {
+	return run_board_fit.width_of(row.slice(0, row.indexOf(text)))
+}
+
+// joshuafolkken/kit#8257: 🤖 stands at the row indent, the names three columns on, and a provider read
+// as nothing draws its — at the window column's right end.
+describe('run_board_render_quota.usage_part row indent', () => {
+	it('starts 🤖 at column 5 and the names at 8, an unread Codex — ending with 7d and REST', () => {
+		const week = { minutes: 10_080, used_percent: 46, resets_ms: NOW_MS + 24 * HOUR_MS }
+		const quotas = { claude: { windows: [week], taken_ms: NOW_MS }, codex: undefined }
+		const { rows } = part_of({ quotas, rate_limit: REST_ONLY, scheduler_provider: 'claude' })
+		const [claude = '', codex = '', github = ''] = rows
+		const names = [start_of(claude, 'Claude'), start_of(codex, 'Codex'), start_of(github, 'GitHub')]
+
+		expect(start_of(claude, '🤖')).toBe(run_board_fit.ROW_INDENT.length)
+		expect(names).toStrictEqual([8, 8, 8])
+		expect([end_of(codex, '—'), end_of(github, 'REST')]).toStrictEqual([
+			end_of(claude, '7d'),
+			end_of(claude, '7d'),
 		])
 	})
 })

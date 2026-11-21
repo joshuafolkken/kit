@@ -1,36 +1,97 @@
-import { isDeepStrictEqual } from 'node:util'
 import { Worker, type WorkerOptions } from 'node:worker_threads'
-import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
+import { bundle_flag } from '#scripts/build/bundle-flag'
+import { launch_timing, type TimedPhase } from '#scripts/lane/launch-timing'
+import { run_board_data } from './run-board-data'
+import { run_board_display, type BoardDisplay, type Carried } from './run-board-display'
 import {
 	run_board_gather,
-	type Gatherer,
 	type GatherPorts,
 	type GatherRead,
 	type GatherState,
 } from './run-board-gather'
-import type { LocalRead } from './run-board-read'
+import { run_board_gather_record, type RecordSetup } from './run-board-gather-record'
+import { run_board_round_change, type RoundInputs } from './run-board-round-change'
+import {
+	run_board_state,
+	type BoardData,
+	type BoardGather,
+	type BoardPorts,
+	type BoardState,
+	type DataPorts,
+	type DataPost,
+} from './run-board-state'
+import { run_board_tick } from './run-board-tick'
+import { run_board_worker_entry, type WorkerLaunch } from './run-board-worker-entry'
+import { run_board_worker_limits } from './run-board-worker-limits'
 
 // The live board's side of its worker thread (`run-board-gather-worker.ts`): the worker takes the
-// reads off this machine and hands each round over; a redraw draws the last one it handed, so no read
-// stops the board's spinner. A round that throws is handed over as failed, and the worker reads again
-// next round; a worker that dies is said on the board, and started again on the next redraw — there is
-// no other place the reads are taken.
+// reads off this machine, steps the GitHub, roster and snapshot data over them, and hands each round
+// over; a redraw draws the last one it handed, so no read stops the board's spinner. A round that
+// throws is handed over as failed, and the worker reads again next round; a worker that dies is said on
+// the board, and started again on the next redraw from the data it last handed — there is no other
+// place the reads are taken.
 
-const WORKER_URL = new URL('run-board-gather-worker.ts', import.meta.url)
+const { launch_of } = run_board_worker_entry
 const EMPTY_READ = run_board_gather.read_of(run_board_gather.FRESH_GATHER)
+const WORKER_PHASE = 'worker: first answer'
+const { assemble_display } = run_board_display
+const { layout_for } = run_board_tick
 
-// The run's read as the worker hands it over. A stream read again unchanged is not handed over — the
-// board keeps its own array, so the folds it keyed on that array are not folded again.
-interface LocalPost {
-	value: LocalRead | undefined
-	is_same_events?: boolean | undefined
+// One round as the worker hands it over: the reads off this machine but the run's own, the GitHub,
+// roster and snapshot data folded over them (`run-board-data.ts`), and the frame assembled over the
+// run's read (`run-board-display.ts`) — none before a run starts — so the board draws without the
+// run's read, whatever its size (joshuafolkken/kit#8160). The phases the worker timed ride along, so
+// `run:board --timing` reads them on the board's own thread. A round with no new frame hands over its
+// reads alone, with no `display` key: the board keeps drawing the last frame over them
+// (joshuafolkken/kit#8330).
+interface GatherPost {
+	read: GatherRead & { local: undefined }
+	display?: BoardDisplay | undefined
+	data?: DataPost | undefined
+	phases?: ReadonlyArray<TimedPhase> | undefined
 }
 
-// One round as the worker hands it over: the run's read only when it was read again, so the board
-// does not copy the whole stream every second.
-interface GatherPost {
-	read: Omit<GatherRead, 'local'>
-	local?: LocalPost | undefined
+// What the worker keeps between rounds: its reads off this machine, the data folded over them, and the
+// board the last frame was assembled over, which carries the sound it decided and the baseline it
+// counted to the next.
+interface RoundState {
+	gather: GatherState
+	data: BoardData
+	board: BoardState
+	// What the last round's end handed over was assembled from (`run-board-round-change.ts`).
+	handed?: RoundInputs | undefined
+}
+
+// What a worker is started again from: the data and the carried sound the last one handed over.
+interface Seed {
+	data: DataPost
+	carried: Carried | undefined
+}
+
+// What a round reads with, and where it hands its posts.
+interface RoundIo {
+	ports: GatherPorts & DataPorts
+	post: (value: GatherPost | FailedPost) => void
+}
+
+type RoundPorts = RoundIo['ports']
+
+// Within a round: the board the last hand-over assembled over, and the data the early hand-overs stepped.
+interface RoundKept {
+	board: BoardState
+	early: Promise<BoardData>
+}
+
+// A frame assembled on the worker and the board it leaves for the next.
+interface Assembled {
+	display: BoardDisplay | undefined
+	board: BoardState
+}
+
+// One hand-over and the board it leaves for the next.
+interface Handed {
+	post: GatherPost
+	board: BoardState
 }
 
 // A round whose reads threw, handed over with why; the worker reads again next round.
@@ -44,26 +105,38 @@ interface GatherWorker {
 	unref: () => void
 }
 
-type Spawn = () => GatherWorker
+// Starts a worker from the data and the carried sound the last one handed over, if any.
+type Spawn = (seed: Seed | undefined) => GatherWorker
 
 interface Thread {
 	worker: GatherWorker | undefined
-	latest: GatherRead | undefined
-	waiting: Array<(read: GatherRead) => void>
+	latest: BoardGather | undefined
+	waiting: Array<(read: BoardGather) => void>
 }
 
-function local_post(before: LocalRead | undefined, after: LocalRead | undefined): LocalPost {
-	if (before === undefined || after === undefined) return { value: after }
-	if (!isDeepStrictEqual(before.events, after.events)) return { value: after }
+// The frame over `data` on the board the last frame left, as `run-board-tick.ts` assembles one over the
+// read it holds; with no run, no frame.
+function assembled(board: BoardState, data: BoardData, now_ms: number): Assembled {
+	const state: BoardState = { ...run_board_data.view_for(board, data), ...data }
+	const { local } = state
 
-	return { value: { ...after, events: [] }, is_same_events: true }
+	if (local === undefined) return { board: state, display: undefined }
+
+	const display = assemble_display(state, local, now_ms, layout_for(state, local, now_ms))
+
+	return { board: { ...state, ...display.carried }, display }
 }
 
-function post_of(before: GatherState, after: GatherState): GatherPost {
-	const { local, ...read } = run_board_gather.read_of(after)
-	const is_reread = after.read_ms !== before.read_ms
+// The reads handed over: the run's read stays on the worker.
+function reads_of(read: GatherState): GatherPost['read'] {
+	return { ...run_board_gather.read_of(read), local: undefined }
+}
 
-	return { read, local: is_reread ? local_post(before.local, local) : undefined }
+// One hand-over of `read` and the data stepped over it, its frame assembled at `now_ms`.
+function post_of(board: BoardState, read: GatherState, data: BoardData, now_ms: number): Handed {
+	const { display, board: next } = assembled(board, data, now_ms)
+
+	return { post: { read: reads_of(read), display, data: run_board_data.posted(data) }, board: next }
 }
 
 function is_post(value: unknown): value is GatherPost {
@@ -81,22 +154,117 @@ function failed_of(error: unknown): FailedPost {
 	return { failed: reason_of(error) }
 }
 
+// The data stepped over a read at the worker's `background` pace: the GitHub reads it launches are
+// folded in on a later step, after they land.
+async function step_over(
+	data: BoardData,
+	read: GatherState,
+	ports: RoundPorts,
+): Promise<BoardData> {
+	return await run_board_data.step(data, run_board_gather.read_of(read), {
+		ports,
+		now_ms: ports.now(),
+		pace: 'background',
+	})
+}
+
+// The hand-over of `read` and the data stepped over it, the board its frame leaves kept for the next.
+function hand_over(kept: RoundKept, read: GatherState, data: BoardData, io: RoundIo): GatherPost {
+	const { post, board } = post_of(kept.board, read, data, io.ports.now())
+
+	kept.board = board
+
+	return post
+}
+
+// The run's read handed over as soon as it lands, with the data stepped over it, so the board's first
+// frame draws the plan the last board kept; a step that throws is said failed, and the round goes on.
+async function post_early(
+	early: Promise<BoardData>,
+	kept: RoundKept,
+	read: GatherState,
+	io: RoundIo,
+): Promise<BoardData> {
+	const data = await early
+
+	try {
+		const stepped = await step_over(data, read, io.ports)
+
+		io.post(hand_over(kept, read, stepped, io))
+
+		return stepped
+	} catch (error) {
+		io.post(failed_of(error))
+
+		return data
+	}
+}
+
+// The round's end — its reads, the data stepped over them and what a frame over them is assembled
+// from — handed over with the round's phases: its frame, or its reads alone when the frame would be the
+// one `last` handed over.
+function end_round(
+	last: RoundInputs | undefined,
+	kept: RoundKept,
+	ended: Pick<RoundState, 'gather' | 'data'> & { handed: RoundInputs },
+	io: RoundIo,
+): RoundState {
+	const post = run_board_round_change.is_unchanged(last, ended.handed, kept.board)
+		? { read: reads_of(ended.gather) }
+		: hand_over(kept, ended.gather, ended.data, io)
+
+	io.post({ ...post, phases: launch_timing.phases() })
+
+	return { ...ended, board: kept.board }
+}
+
+// The run's read is handed over as soon as it lands (joshuafolkken/kit#8134), and the round's end
+// hands its frame over again (`end_round`).
+async function posted_round(state: RoundState, io: RoundIo): Promise<RoundState> {
+	const kept: RoundKept = { board: state.board, early: Promise.resolve(state.data) }
+	const next = await run_board_gather.gather(state.gather, io.ports, 'background', (read) => {
+		kept.early = post_early(kept.early, kept, read, io)
+	})
+	const data = await step_over(await kept.early, next, io.ports)
+	const handed = run_board_round_change.inputs_of(data, io.ports.now())
+
+	return end_round(state.handed, kept, { gather: next, data, handed }, io)
+}
+
+function is_data_post(value: unknown): value is DataPost {
+	return typeof value === 'object' && value !== null && 'in_flight' in value
+}
+
+function is_seed(value: unknown): value is Seed {
+	return typeof value === 'object' && value !== null && 'data' in value && is_data_post(value.data)
+}
+
+// A worker's state before its first round: the data and the sound the last worker handed over, when it
+// is started again, so the board keeps its plan rows, thanks, allowances and baseline, and sounds no
+// cue twice. The reads that worker had in flight died with it, so each is asked again at once.
+function first_round(seed?: unknown): RoundState {
+	const { FRESH_GATHER } = run_board_gather
+	const { FRESH_STATE, FRESH_DATA } = run_board_state
+
+	if (!is_seed(seed)) return { gather: FRESH_GATHER, data: FRESH_DATA, board: FRESH_STATE }
+
+	const data = run_board_data.received(run_board_data.relaunched(seed.data), EMPTY_READ)
+
+	return { gather: FRESH_GATHER, data, board: { ...FRESH_STATE, ...data, ...seed.carried } }
+}
+
 // One round on the worker: the reads handed over, or why they threw — the state kept for the next.
 async function gather_round(
-	state: GatherState,
-	ports: GatherPorts,
-	post: (value: GatherPost | FailedPost) => void,
-): Promise<GatherState> {
+	state: RoundState,
+	ports: RoundPorts,
+	post: RoundIo['post'],
+): Promise<RoundState> {
 	try {
-		const next = await run_board_gather.gather(state, ports, 'background')
-
-		post(post_of(state, next))
-
-		return next
+		return await posted_round(state, { ports, post })
 	} catch (error) {
 		post(failed_of(error))
 
-		return state
+		return { ...state, handed: undefined }
 	}
 }
 
@@ -104,25 +272,50 @@ function is_failed(value: unknown): value is FailedPost {
 	return typeof value === 'object' && value !== null && 'failed' in value
 }
 
-function settle(thread: Thread, read: GatherRead): void {
+function settle(thread: Thread, read: BoardGather): void {
 	thread.latest = read
 
 	for (const resolve of thread.waiting.splice(0)) resolve(read)
 }
 
-function local_of(thread: Thread, post: LocalPost): LocalRead | undefined {
-	const { value, is_same_events } = post
-	const kept = thread.latest?.local
-
-	if (is_same_events !== true || value === undefined || kept === undefined) return value
-
-	return { ...value, events: kept.events }
+// A post with no data — none stepped yet this round — keeps the last data handed over.
+function data_of(thread: Thread, post: GatherPost): DataPost | undefined {
+	return post.data ?? thread.latest?.data
 }
 
-function receive(thread: Thread, post: GatherPost): void {
-	const local = post.local === undefined ? thread.latest?.local : local_of(thread, post.local)
+// A cue no redraw has sounded yet rides on to the next frame, so the round's end handed over before a
+// redraw does not drop the cue its early hand-over decided.
+function display_of(thread: Thread, display: BoardDisplay | undefined): BoardDisplay | undefined {
+	if (display === undefined) return undefined
 
-	settle(thread, { ...post.read, local, read_failed_ms: undefined, read_error: undefined })
+	return { ...display, cue: display.cue ?? thread.latest?.display?.cue }
+}
+
+// A post with no frame keeps the last one, drawn over the post's reads.
+function receive(thread: Thread, post: GatherPost): void {
+	const { phases = [] } = post
+
+	for (const phase of phases) launch_timing.mark(phase.name, phase.ms)
+	const data = data_of(thread, post)
+	const display = 'display' in post ? display_of(thread, post.display) : thread.latest?.display
+
+	settle(thread, { ...post.read, data, display, read_failed_ms: undefined, read_error: undefined })
+}
+
+// A frame's cue is sounded once: the redraw that takes it leaves the frame without it.
+function take_cue(thread: Thread): void {
+	const { latest } = thread
+
+	if (latest?.display?.cue === undefined) return
+
+	thread.latest = { ...latest, display: { ...latest.display, cue: undefined } }
+}
+
+// What a worker started again starts from: the data and the sound the last one handed over.
+function seed_of(latest: BoardGather | undefined): Seed | undefined {
+	const data = latest?.data
+
+	return data === undefined ? undefined : { data, carried: latest?.display?.carried }
 }
 
 // A failed read keeps the last round on screen, said failed and why until the next answers.
@@ -138,8 +331,13 @@ function fail(thread: Thread, worker: GatherWorker, reason: string, now: () => n
 	said_failed(thread, reason, now)
 }
 
+// The first answer is timed from the spawn: the worker's start, its module load and its first read
+// handed over — the early lane read when it lands first, else the round's end.
 function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
+	const spawned_ms = now()
+
 	worker.on('message', (value) => {
+		launch_timing.mark(WORKER_PHASE, now() - spawned_ms)
 		if (is_post(value)) receive(thread, value)
 		else if (is_failed(value)) said_failed(thread, value.failed, now)
 	})
@@ -152,7 +350,7 @@ function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
 }
 
 function start(thread: Thread, spawn: Spawn, now: () => number): GatherWorker {
-	const worker = spawn()
+	const worker = spawn(seed_of(thread.latest))
 
 	listen(thread, worker, now)
 	// The board's own loop keeps the process; the worker never holds it open past the board.
@@ -161,7 +359,7 @@ function start(thread: Thread, spawn: Spawn, now: () => number): GatherWorker {
 	return worker
 }
 
-async function latest_of(thread: Thread): Promise<GatherRead> {
+async function latest_of(thread: Thread): Promise<BoardGather> {
 	if (thread.latest !== undefined) return thread.latest
 
 	return await new Promise((resolve) => {
@@ -169,32 +367,82 @@ async function latest_of(thread: Thread): Promise<GatherRead> {
 	})
 }
 
-function worker_options(exec_argv: ReadonlyArray<string>): WorkerOptions {
-	return { execArgv: ts_entry_loader.loader_argv(exec_argv) }
+function worker_options(launch: WorkerLaunch): WorkerOptions {
+	return { execArgv: launch.exec_argv, resourceLimits: run_board_worker_limits.WORKER_LIMITS }
 }
 
-function spawn_worker(): GatherWorker {
-	return new Worker(WORKER_URL, worker_options(process.execArgv))
+// What a worker is started with: the data and the carried sound the last one handed over, and what it
+// records its frames with.
+interface WorkerSeed {
+	seed: Seed | undefined
+	setup: RecordSetup
 }
 
-// The first redraw waits for the worker's first round; every later one draws the last round handed.
-function worker_gatherer(spawn: Spawn = spawn_worker, now: () => number = Date.now): Gatherer {
+// Starts each worker with the board's record setup (`run-board-gather-record.ts`).
+function spawner(setup: RecordSetup): Spawn {
+	return (seed) => {
+		const worker_data: WorkerSeed = { seed, setup }
+		const launch = launch_of(bundle_flag.is_bundled(), process.execArgv)
+
+		return new Worker(launch.url, {
+			...worker_options(launch),
+			env: run_board_gather_record.worker_environment(setup),
+			workerData: worker_data,
+		})
+	}
+}
+
+// The last round a board on this run handed over (`run-board-saved-state.ts`), none on another run.
+type SavedRead = () => Promise<BoardGather | undefined>
+
+function keep(thread: Thread, read: BoardGather | undefined): void {
+	thread.latest ??= read
+}
+
+// The first redraw draws the round the last board on this run saved, and the worker starts from its
+// data (joshuafolkken/kit#8219); with none saved, the first redraw waits for the worker's first round.
+// Every later redraw draws the last round handed.
+function worker_gatherer(
+	spawn: Spawn,
+	now: () => number = Date.now,
+	saved?: SavedRead,
+): BoardPorts['gather'] {
 	const thread: Thread = { worker: undefined, latest: undefined, waiting: [] }
+	let unread = saved
 
 	return async () => {
-		thread.worker ??= start(thread, spawn, now)
+		const first = unread
 
-		return await latest_of(thread)
+		unread = undefined
+		// Read before the first worker starts, so the worker starts from its data; with none there is no
+		// wait, so the worker is started at once.
+		if (first !== undefined) keep(thread, await first())
+		thread.worker ??= start(thread, spawn, now)
+		const read = await latest_of(thread)
+
+		take_cue(thread)
+
+		return read
 	}
 }
 
 const run_board_gather_thread = {
-	WORKER_URL,
+	first_round,
 	gather_round,
 	post_of,
+	spawner,
 	worker_gatherer,
 	worker_options,
 }
 
 export { run_board_gather_thread }
-export type { FailedPost, GatherPost, GatherWorker }
+export type {
+	FailedPost,
+	GatherPost,
+	GatherWorker,
+	Handed,
+	RoundState,
+	SavedRead,
+	Seed,
+	WorkerSeed,
+}

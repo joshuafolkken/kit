@@ -173,7 +173,7 @@ function breakdown_of(sessions: ReadonlyArray<AuditSession>, is_inside: IsInside
 	}
 }
 
-const cost_audit_usage = { LONG_OUTPUT_TOKENS, breakdown_of, long_calls_of }
+const cost_audit_usage = { LONG_OUTPUT_TOKENS, breakdown_of, cache_write_of, long_calls_of }
 
 export type { AgentRuns, CacheWrite, FirstContext, LongOutput, UsageBreakdown }
 export { cost_audit_usage }

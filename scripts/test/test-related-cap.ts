@@ -3,60 +3,28 @@ import path from 'node:path'
 import { direct_importers } from './direct-importers'
 import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_logic } from './test-pinned-logic'
-import { test_pinned_reach, type ReachedCount } from './test-pinned-reach'
-import { test_related_imports } from './test-related-imports'
-import { test_related_pins } from './test-related-pins'
+import type { ReachedCount } from './test-pinned-reach'
 import { related_scope } from './test-related-scope'
+import type { Selection } from './test-related-select'
+import { test_symbol_read } from './test-symbol-read'
 
-// **A change whose imports reach more than `test_pinned_logic.MAX_TEST_FILES` test files runs only the
-// tests importing its widest files directly when their imports are unchanged** (#7453, #5532, #5702), as a file every test imports does
-// (`direct-importers.ts`): the tests past them stay unchecked here, for `josh gate`'s whole suite and
-// CI to run. `--keep-whole-suite` (the gate's unit leg) lifts the cap outside a lane
-// (`test-related-whole.ts`), and so does a missing graph.
+// **A run never hands vitest more than `test_pinned_logic.MAX_TEST_FILES` test files**
+// (`test-related-select.ts`, joshuafolkken/kit#7976): the rest are deferred to CI. This module names
+// the files that put a change past the cap — the hubs `lane:plan` splits off before an edit, and the
+// one the summary line and the ledger name after a run.
 
 type CountReader = (files: ReadonlyArray<string>) => Promise<Array<ReachedCount> | undefined>
 
-// The changed files that narrow to their direct importers, each with those importers, and the ones of
-// them the cap narrowed — widest reach first, so the first is the hub that put the run past the cap
-// (joshuafolkken/kit#5699). `full_reach` holds the files past the cap it left whole, each with its reach
-// — imports changed or unread, or no test importing them directly (joshuafolkken/kit#7639).
-interface CappedImporters {
-	importers: ReadonlyMap<string, ReadonlyArray<string>>
-	over_cap: ReadonlyArray<string>
-	full_reach?: ReadonlyArray<ReachedCount> | undefined
-}
+// The code files the cap is read for: in the tree, not a test, and not one every test imports — a
+// change of tests alone builds no graph.
+function candidates_of(root: string, files: ReadonlyArray<string>): Array<string> {
+	const shared = new Set(direct_importers.every_test_imports_of(files))
 
-const NO_CAP: CappedImporters = { importers: new Map(), over_cap: [], full_reach: [] }
-
-function reach_sum(counts: ReadonlyArray<ReachedCount>): number {
-	return counts.reduce((sum, reached) => sum + reached.count, 0)
-}
-
-// Widest reach first, until the reach of the files left whole sums within the cap: past the cap is the
-// change, not one file — a spread of files each under it runs as wide as one hub (joshuafolkken/kit#5702).
-function over_cap_of(
-	counts: ReadonlyArray<ReachedCount>,
-	max_tests = test_pinned_logic.MAX_TEST_FILES,
-): Array<string> {
-	const widest = counts.toSorted((first, second) => second.count - first.count)
-	const fits = widest.findIndex((_, index) => reach_sum(widest.slice(index)) <= max_tests)
-	const narrowed = fits === -1 ? widest : widest.slice(0, fits)
-
-	return narrowed.map((reached) => reached.file)
-}
-
-// The code files the cap is read for: in the tree, not a test, and not narrowed already — a change of
-// tests alone builds no graph.
-function candidates_of(
-	root: string,
-	files: ReadonlyArray<string>,
-	narrowed: ReadonlyMap<string, unknown>,
-): Array<string> {
 	return files.filter(
 		(file) =>
 			related_scope.is_relatable(file) &&
 			!test_declared_logic.is_test_file(file) &&
-			!narrowed.has(file) &&
+			!shared.has(file) &&
 			existsSync(path.join(root, file)),
 	)
 }
@@ -73,126 +41,59 @@ async function relative_counts(
 	return (counts ?? []).map((reached) => ({ ...reached, file: path.relative(root, reached.file) }))
 }
 
-// A file past the cap that no test imports directly keeps its whole reach: narrowed, it would run no
-// test at all. A registry file narrows to its direct importers and the pinned registry tests
-// (`test-related-pins.ts`).
-async function direct_of(
-	root: string,
-	over_cap: ReadonlyArray<string>,
-): Promise<Array<[string, Array<string>]>> {
-	const stable = await test_related_imports.stable_files(root, over_cap)
-	const importers = await direct_importers.importers_of(root, stable)
-	const narrowed = [...importers].filter(([, tests]) => tests.length > 0)
-
-	return narrowed.map(([file, tests]) => [file, test_related_pins.with_pins(file, tests)])
-}
-
-// The files past the cap the run left at their whole reach, widest first — those of `counts` the cap
-// picked that `narrowed` does not hold.
-function full_reach_of(
-	counts: ReadonlyArray<ReachedCount>,
-	narrowed: ReadonlyArray<string>,
-): Array<ReachedCount> {
-	const picked = over_cap_of(counts)
-
-	return counts
-		.filter((reached) => picked.includes(reached.file) && !narrowed.includes(reached.file))
-		.toSorted((first, second) => second.count - first.count)
-}
-
-// The files every test imports, and the other code files of `files` whose reach is read.
-async function split_of(
-	root: string,
-	files: ReadonlyArray<string>,
-): Promise<[Map<string, Array<string>>, Array<string>]> {
-	const shared = direct_importers.every_test_imports_of(files)
-	const stable = await test_related_imports.stable_files(root, shared)
-	const every_test = await direct_importers.every_test_importers(root, stable)
-
-	return [every_test, candidates_of(root, files, every_test)]
-}
-
-// `files` are repository-root-relative, as the change was read. `is_whole` keeps the whole suite:
-// nothing narrows, and no graph is built.
-async function capped_importers(
-	root: string,
-	files: ReadonlyArray<string>,
-	is_whole: boolean,
-	read_counts: CountReader = test_pinned_reach.reached_test_counts,
-): Promise<CappedImporters> {
-	if (is_whole) return NO_CAP
-	const [every_test, candidates] = await split_of(root, files)
-	const counts = await relative_counts(root, candidates, read_counts)
-	const capped = await direct_of(root, over_cap_of(counts))
-	const narrowed = capped.map(([file]) => file)
-
-	return {
-		importers: new Map([...every_test, ...capped]),
-		over_cap: narrowed,
-		full_reach: full_reach_of(counts, narrowed),
-	}
+// **A hub is a file whose own reach passes the cap**, not the widest of a spread that only sums past
+// it — the tests a whole-file change selects by symbol (joshuafolkken/kit#7980, joshuafolkken/kit#8092).
+function over_cap(counts: ReadonlyArray<ReachedCount>): Array<ReachedCount> {
+	return counts.filter((reached) => reached.count > test_pinned_logic.MAX_TEST_FILES)
 }
 
 // The hubs among `files`, read before any edit so `lane:plan` can split them off
-// (joshuafolkken/kit#6543): each file whose own reach passes the cap — a narrowed one or one no test
-// imports directly, which keeps its whole reach — not the widest of a spread that only sums past it.
-// None without a graph.
+// (joshuafolkken/kit#6543). None without a graph.
 async function hubs_of(
 	root: string,
 	files: ReadonlyArray<string>,
-	read_counts: CountReader = test_pinned_reach.reached_test_counts,
+	read_counts: CountReader = test_symbol_read.reached_counts,
 ): Promise<ReadonlyArray<string>> {
-	const [, candidates] = await split_of(root, files)
-	const counts = await relative_counts(root, candidates, read_counts)
+	const counts = await relative_counts(root, candidates_of(root, files), read_counts)
 
-	return counts.flatMap((reached) => over_cap_of([reached]))
+	return over_cap(counts).map((reached) => reached.file)
 }
 
-// The test files the capped files run instead of their reach — their direct importers and a registry's
-// pinned tests, counted once.
-function capped_test_count(capped: CappedImporters): number {
-	const tests = capped.over_cap.flatMap((file) => capped.importers.get(file) ?? [])
+// **The hub is the widest hub of the run's own change** (joshuafolkken/kit#5756): a main merge and
+// the map's tree are in the reach too, and a file the lane never edited is no hub of its run. The
+// summary line and the lane ledger both name it, so `josh lane:why` reads the hub the run printed
+// (joshuafolkken/kit#6187). None where the cap cut nothing or no own file passes it alone.
+function hub_of(
+	selection: Pick<Selection, 'deferred' | 'reach'>,
+	own: ReadonlyArray<string>,
+): string | undefined {
+	if (selection.deferred === 0) return undefined
 
-	return new Set(tests).size
+	return over_cap(selection.reach.filter((reached) => own.includes(reached.file)))
+		.toSorted((first, second) => second.count - first.count)
+		.at(0)?.file
 }
 
-// **The hub is the widest capped file of the run's own change** (joshuafolkken/kit#5756): the cap reads
-// the whole input, a main merge and the map's tree among it, and a file the lane never edited is no hub
-// of its run. The summary line and the lane ledger both name it, so `josh lane:why` reads the hub the
-// run printed (joshuafolkken/kit#6187).
-function hub_of(over_cap: ReadonlyArray<string>, own: ReadonlyArray<string>): string | undefined {
-	return over_cap.find((file) => own.includes(file))
-}
-
-// The summary line of a capped run, none where the cap narrowed nothing: the hub, and how many test
-// files ran in place of the reach (joshuafolkken/kit#5699).
-function over_cap_line(capped: CappedImporters, own: ReadonlyArray<string>): string | undefined {
-	const { over_cap } = capped
-	if (over_cap.length === 0) return undefined
+// The summary line of a run the cap cut, none where it cut nothing: how many test files ran, how many
+// were deferred to CI, and the hub.
+function deferred_line(selection: Selection, own: ReadonlyArray<string>): string | undefined {
+	const { deferred, tests } = selection
+	if (deferred === 0) return undefined
 	const { COMMAND_LABEL } = related_scope
 	const cap = String(test_pinned_logic.MAX_TEST_FILES)
-	const ran = String(capped_test_count(capped))
-	const hub = hub_of(over_cap, own)
+	const hub = hub_of(selection, own)
 	const hub_part = hub === undefined ? '' : `, hub ${hub}`
 
-	return `${COMMAND_LABEL}: ${String(over_cap.length)} over cap (${cap} test files)${hub_part} — ${ran} test files run, the rest unchecked: ${over_cap.join(', ')}`
+	return `${COMMAND_LABEL}: ${String(tests.length)} test files run, ${String(deferred)} deferred to CI past the cap (${cap} test files)${hub_part}`
 }
 
-function report_over_cap(capped: CappedImporters, own: ReadonlyArray<string>): void {
-	const line = over_cap_line(capped, own)
+function report_deferred(selection: Selection, own: ReadonlyArray<string>): void {
+	const line = deferred_line(selection, own)
 
 	if (line !== undefined) process.stdout.write(`${line}\n`)
 }
 
-const test_related_cap = {
-	NO_CAP,
-	capped_importers,
-	hub_of,
-	hubs_of,
-	over_cap_line,
-	over_cap_of,
-	report_over_cap,
-}
+const test_related_cap = { deferred_line, hub_of, hubs_of, report_deferred }
 
-export type { CappedImporters, CountReader }
+export type { CountReader }
 export { test_related_cap }

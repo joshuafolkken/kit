@@ -33,7 +33,8 @@ const COMMAND_SEPARATOR = '--'
 const WEIGHT_INDEX = 0
 const FAIL_EXIT_CODE = 1
 // A reservation claims at least one core; a zero or negative weight would subtract from the ledger's
-// cumulative sum and let a later reservation admit past the budget the ledger exists to hold.
+// cumulative sum and let a later reservation admit past the budget the ledger exists to hold. Above it
+// a weight may be fractional — lint's ledger weight is a tenth of a core (`core-weights.ts`).
 const MIN_WEIGHT = 1
 
 const MEMORY_FLAG = '--memory'
@@ -57,6 +58,11 @@ function is_integer_from(value: number, floor: number): boolean {
 	return Number.isSafeInteger(value) && value >= floor
 }
 
+// A core weight: any finite number of at least one core, fractional or whole.
+function is_weight(value: number): boolean {
+	return Number.isFinite(value) && value >= MIN_WEIGHT
+}
+
 // The options between the weight and the separator: none, or `--memory <MB>` with a positive integer.
 // `undefined` is a usage error.
 function parse_memory(
@@ -71,7 +77,7 @@ function parse_memory(
 }
 
 // `<weight> [--memory <MB>] -- <command> [args...]`. `undefined` is a usage error: a missing
-// separator, a weight that is not an integer of at least one core, a malformed `--memory`, or nothing
+// separator, a weight that is not a number of at least one core, a malformed `--memory`, or nothing
 // to run.
 function parse_arguments(argv: ReadonlyArray<string>): ReservedCommand | undefined {
 	const NOT_FOUND = -1
@@ -80,7 +86,7 @@ function parse_arguments(argv: ReadonlyArray<string>): ReservedCommand | undefin
 	const memory = parse_memory(argv.slice(WEIGHT_INDEX + 1, Math.max(separator, 0)))
 	const command = argv.slice(separator + 1)
 
-	if (separator === NOT_FOUND || !is_integer_from(weight, MIN_WEIGHT)) return undefined
+	if (separator === NOT_FOUND || !is_weight(weight)) return undefined
 
 	return memory !== undefined && command.length > 0 ? { weight, ...memory, command } : undefined
 }

@@ -170,15 +170,6 @@ async function importers_of(
 	return new Map(files.map((file) => [file, importers_among(file, tests, reader)]))
 }
 
-// `importers_of` for the `files` every test imports; any other file is left out, for vitest to walk
-// its graph.
-async function every_test_importers(
-	root: string,
-	files: ReadonlyArray<string>,
-): Promise<Map<string, Array<string>>> {
-	return await importers_of(root, every_test_imports_of(files))
-}
-
 // The package a bare specifier names — `name` or `@scope/name`, its subpath dropped — or `undefined`
 // for a relative, `#` alias or `node:` specifier.
 function package_of(specifier: string): string | undefined {
@@ -212,7 +203,6 @@ async function package_importers(
 }
 
 const direct_importers = {
-	every_test_importers,
 	package_importers,
 	every_test_imports_of,
 	importers_of,
@@ -222,6 +212,7 @@ const direct_importers = {
 	resolve_specifier,
 	source_reader,
 	specifiers_of,
+	work_tree_files,
 }
 
 export type { ImportMap, SourceReader }

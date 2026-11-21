@@ -9,7 +9,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_memo } from '#scripts/gh/git-gh-issue-memo'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
-import { has_label_name, PLANNED_LABEL } from './issue-labels'
+import { has_label_name, PLAN_UNVERIFIED_LABEL } from './issue-labels'
 import { issue_number_shape } from './issue-number-shape'
 import { issue_publication_state } from './issue-publication-state'
 import { session_cite } from './session-cite'
@@ -37,16 +37,27 @@ function has_unrecorded_dependencies(prepared: PreparedChild, epic: EpicChild): 
 	)
 }
 
+// Why a pending child's plan does not yet allow publication, or `undefined` when it is recorded. A
+// plan from another repository's checkout is posted but held until re-planned in the target's
+// checkout (joshuafolkken/kit#7733).
+function missing_plan_of(child: PreparedChild['child']): string | undefined {
+	if (has_label_name(child.labels, PLAN_UNVERIFIED_LABEL)) {
+		return `needs its plan re-recorded from a ${child.repo} checkout`
+	}
+
+	const is_planned = child.state === 'OPEN' && issue_publication_state.has_plan_record(child.labels)
+
+	return is_planned ? undefined : 'needs its recorded plan'
+}
+
 function validate_child(prepared: PreparedChild, epic: EpicChild): void {
 	const { child } = prepared
 	if (!issue_publication_state.is_pending(child.body)) return
 
 	const cited = session_cite.issue(child.number)
-	const is_planned = child.state === 'OPEN' && has_label_name(child.labels, PLANNED_LABEL)
+	const missing_plan = missing_plan_of(child)
 
-	if (!is_planned) {
-		throw new Error(`Publication withheld: ${cited} needs its recorded plan`)
-	}
+	if (missing_plan !== undefined) throw new Error(`Publication withheld: ${cited} ${missing_plan}`)
 
 	if (has_unrecorded_dependencies(prepared, epic)) {
 		throw new Error(`Publication withheld: ${cited} has unrecorded dependencies`)
@@ -139,6 +150,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 }
 
-const issue_publication = { publish, run }
+const issue_publication = { publish, run, missing_plan_of }
 
 export { issue_publication }

@@ -8,8 +8,8 @@ import { run_board_render_checks } from './run-board-render-checks'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_tail } from './run-board-render-tail'
 
-// joshuafolkken/kit#3770: a row in followup ends on its pull request's checks in place of its newest
-// activity; a count of none is left out, a failure red and a rate limit yellow.
+// joshuafolkken/kit#3770: a row in followup ends, after its finish (#7994), on its pull request's checks
+// in place of its newest activity; a count of none is left out, a failure red and a rate limit yellow.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const CHECKS: PrChecks = { pr: 3765, pass: 6, pending: 2, fail: 0, coderabbit: 'running' }
@@ -71,13 +71,13 @@ describe('run_board_render_checks.checks_part', () => {
 
 describe('run_board_render_tail.tail_of in followup', () => {
 	it('ends a followup row on its checks', () => {
-		expect(run_board_render_tail.tail_of(running('followup'), board())[0]).toBe(DRAWN)
+		expect(run_board_render_tail.tail_of(running('followup'), board())[1]).toBe(DRAWN)
 	})
 
 	it('leaves a row in any other phase on its newest activity', () => {
 		const row = running('review')
 
-		expect(run_board_render_tail.tail_of(row, board())[0]).toBe('')
+		expect(run_board_render_tail.tail_of(row, board())[1]).toBe('')
 		expect(run_board_render_tail.checks_of(row, board())).toBeUndefined()
 	})
 })

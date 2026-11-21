@@ -1,4 +1,5 @@
 import type { LedgerEntry } from '#scripts/lane/lane-ledger'
+import type { LaneSpan } from '#scripts/lane/lane-net-time'
 import { lane_stage_stats } from '#scripts/lane/lane-stage-stats'
 import { lane_stats } from '#scripts/lane/lane-stats'
 import { run_board_phase, type Phase } from './run-board-phase'
@@ -27,18 +28,37 @@ const PHASE_STAGES: ReadonlyArray<readonly [string, Phase | undefined]> = [
 	...Object.entries(run_board_phase.SHIP_PHASES),
 ]
 
+function recent_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): Array<LedgerEntry> {
+	return lane_stats.in_window(entries, lane_stats.window_of(PERIOD_DAYS, now_ms))
+}
+
 // Per stage, so a run's first lanes — dispatched, no stage recorded yet — still draw every phase.
 function medians_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	now_ms: number,
+	gaps: ReadonlyArray<LaneSpan>,
 ): ReadonlyMap<string, number> {
-	const recent = lane_stats.in_window(entries, lane_stats.window_of(PERIOD_DAYS, now_ms))
-
-	return new Map([...lane_stage_stats.medians(entries), ...lane_stage_stats.medians(recent)])
+	return new Map([
+		...lane_stage_stats.medians(entries, gaps),
+		...lane_stage_stats.medians(recent_of(entries, now_ms), gaps),
+	])
 }
 
-function compute_usual(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTimes {
-	const medians = medians_of(entries, now_ms)
+// Whether the window alone measures every phase's stage, so none falls back to the whole ledger and
+// `entries` need cover only the window (joshuafolkken/kit#7932). The host's stops only shorten a span,
+// never drop one, so they cannot change which stages are measured.
+function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {
+	const recent = lane_stage_stats.medians(recent_of(entries, now_ms))
+
+	return PHASE_STAGES.every(([stage, phase]) => phase === undefined || recent.has(stage))
+}
+
+function compute_usual(
+	entries: ReadonlyArray<LedgerEntry>,
+	now_ms: number,
+	gaps: ReadonlyArray<LaneSpan>,
+): UsualTimes {
+	const medians = medians_of(entries, now_ms, gaps)
 
 	return new Map(
 		PHASE_STAGES.flatMap(([stage, phase]) => {
@@ -51,22 +71,37 @@ function compute_usual(entries: ReadonlyArray<LedgerEntry>, now_ms: number): Usu
 
 // The last ledger's usual times: `lane_ledger.read_entries` hands back the same array while the file
 // is unchanged, so a board round over it aggregates nothing again (joshuafolkken/kit#7012). The recent
-// window then trails `now_ms` only until the next append — the sampler's, within a minute.
-const usual_memo = new WeakMap<ReadonlyArray<LedgerEntry>, UsualTimes>()
+// window then trails `now_ms` only until the next append — the sampler's, within a minute. A new host
+// stop in `gaps` aggregates again too.
+const usual_memo = new WeakMap<
+	ReadonlyArray<LedgerEntry>,
+	{ gaps_key: string; usual: UsualTimes }
+>()
 
-function usual_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTimes {
+function gaps_key_of(gaps: ReadonlyArray<LaneSpan>): string {
+	return gaps.map((gap) => `${String(gap.from_ms)}-${String(gap.to_ms)}`).join(',')
+}
+
+// Each phase's usual time, the wall-clock implementation net of `gaps`, the host's stops; a recorded
+// stage is monotonic time that already pauses through them (joshuafolkken/kit#7905).
+function usual_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	now_ms: number,
+	gaps: ReadonlyArray<LaneSpan> = [],
+): UsualTimes {
+	const gaps_key = gaps_key_of(gaps)
 	const known = usual_memo.get(entries)
 
-	if (known !== undefined) return known
+	if (known?.gaps_key === gaps_key) return known.usual
 
-	const usual = compute_usual(entries, now_ms)
+	const usual = compute_usual(entries, now_ms, gaps)
 
-	usual_memo.set(entries, usual)
+	usual_memo.set(entries, { gaps_key, usual })
 
 	return usual
 }
 
-const run_board_usual = { usual_of }
+const run_board_usual = { PERIOD_DAYS, covers, usual_of }
 
 export { run_board_usual }
 export type { UsualTimes }

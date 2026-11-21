@@ -10,14 +10,16 @@
   4. **Record the plan** — written to a file in the session language (`JOSH_SESSION_LANG`, default
      `ja`), then `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --title "<title>" --planned`, which
      records it, applies `run:planned` and sends the `planning` Telegram (`docs/josh-commands-backlog.md`
-     → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`.
+     → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`; from
+     another repository's checkout that applies `plan:unverified` instead, until re-planned in the target.
      Before writing the plan, run `pnpm josh plan:consumers <identifier...>` on what it adds or changes
-     and finish the `### 影響を受ける既存の利用者` draft it prints.
+     and finish the `### 影響を受ける既存の利用者` draft it prints. Refused for naming more files than the
+     estimate → `docs/josh-commands-backlog.md` → "`josh issue:plan`".
   5. Report the plan, the Telegram's last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>`, then **stop** (do not implement).
 
   **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
   children as in `kickoff new`, then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
-  ... --title "<title>" --notify [--ordered] [--rationale-file .josh/tmp/rationale.md]` (when `#N` is a request, a discussion
+  ... --title "<title>" --notify [--chain "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...] [--rationale-file .josh/tmp/rationale.md]` (when `#N` is a request, a discussion
   or a container) — `--title` renames it to the step-2 title — or keep `#N` as a child of a new epic
   made with `pnpm josh epic … --notify`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
   record the reasoning on the Issue. Record each prepared child's plan with `issue:plan --planned --no-notify`,
@@ -37,7 +39,8 @@ epic` writes only the repository it runs in, and the promote arm stops when that
 checked out here. A third-party owner is Tier C: stop rather than file.
 
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
-  deliverable takes the **single-issue path**, several the **multi-issue split path**.
+  deliverable takes the **single-issue path**, several the **multi-issue split path**. A `run:handoff`
+  child → the directory its prompt names (`prompts/collaboration-workflow/shell-body.md` → "安全な書き方").
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
     "<title>" --body-file .josh/tmp/body.md --over-cap` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —
@@ -49,8 +52,8 @@ checked out here. A third-party owner is Tier C: stop rather than file.
     per `issue-scout.md`). A split filed into another repository gives every child body the `## Origin`
     backlink, the epic the same link as prose (never a checkbox row, which disables its auto-close), and
     the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
-    every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... --notify [--ordered]
-    [--rationale-file .josh/tmp/rationale.md] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
+    every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... --notify [--chain
+    "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...] [--rationale-file .josh/tmp/rationale.md] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
     with `pnpm josh epic:check <E>`. (3) Record every child's plan with
     `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --planned --no-notify`, then
     `pnpm josh issue:file --publish <E>`. Split children remain unpublished until this command
@@ -62,8 +65,8 @@ checked out here. A third-party owner is Tier C: stop rather than file.
   **The epic itself is never implemented** — `backlogrun` runs its *children*, and it closes itself
   once every child is closed, whichever josh path closes the last one. Children with no required order take `None — the children are
   independent; any execution order works.` under `Dependencies`. **Only when the execution order
-  matters** (`execution-waves.md` → "When a wave may be declared") pass `--ordered`, which treats the
-  argument order as the dependency order.
+  matters** (`execution-waves.md` → "When a wave may be declared") declare each child's prerequisites
+  with `--chain`, `--ordered` only for a true series (`.claude/skills/epic-commands/SKILL.md` → "Creating an epic").
 
   Without `josh`: `issue-template.md` → "複数 Issue に分割するときの epic Issue".
 

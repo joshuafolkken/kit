@@ -5,7 +5,7 @@ import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_read_map, type ReadMap } from '#scripts/test/test-read-map'
-import { test_related_synced } from '#scripts/test/test-related-synced'
+import { test_related_synced, type SyncedSplit } from '#scripts/test/test-related-synced'
 import { whole_suite_files } from '#scripts/test/whole-suite-files'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_synced_scope } from './run-ship-synced-scope'
@@ -49,6 +49,11 @@ function synced_parts(
 	return { changed, synced }
 }
 
+// A split leaving the synced code out, meeting the branch at what each part names.
+function meets_at(parts: Partial<SyncedSplit> = {}): SyncedSplit {
+	return { left: [SYNCED_CODE], shared: [], meeting: [], touching: [], ...parts }
+}
+
 async function settle(tree: GateTree, scripts: ReadonlyArray<string>): Promise<string | undefined> {
 	const reading = await run_ship_synced_scope.read_sync(tree, scripts)
 
@@ -61,7 +66,7 @@ beforeEach(() => {
 	readers.mockReset().mockReturnValue([])
 	read_parts.mockReset().mockResolvedValue(synced_parts([SYNCED_CODE, SYNCED_DOC]))
 	read_branch.mockReset().mockResolvedValue([OWN])
-	split.mockReset().mockResolvedValue({ left: [SYNCED_CODE], shared: [], meeting: [] })
+	split.mockReset().mockResolvedValue(meets_at())
 	record.mockReset().mockReturnValue(undefined)
 })
 
@@ -106,7 +111,7 @@ describe('run_ship_synced_scope.settle — where the merge meets the branch', ()
 	})
 
 	it('runs the pair when a test reaches both a synced module and the branch', async () => {
-		split.mockResolvedValue({ left: [SYNCED_CODE], shared: [SHARED_TEST], meeting: [] })
+		split.mockResolvedValue(meets_at({ shared: [SHARED_TEST], meeting: [SHARED_TEST] }))
 
 		expect(await settle(TREE, PAIR)).toBeUndefined()
 	})
@@ -114,7 +119,7 @@ describe('run_ship_synced_scope.settle — where the merge meets the branch', ()
 	it('runs the pair when the import graph could not split a synced module', async () => {
 		const { FAILURE } = test_related_synced
 
-		split.mockResolvedValue({ left: [], shared: [], meeting: [], failure: FAILURE.NO_GRAPH })
+		split.mockResolvedValue(meets_at({ left: [], failure: FAILURE.NO_GRAPH }))
 
 		expect(await settle(TREE, PAIR)).toBeUndefined()
 	})
@@ -127,7 +132,9 @@ describe('run_ship_synced_scope.read_sync — a merge the import graph could not
 	it.each([FAILURE.NO_GRAPH, FAILURE.UNRESOLVED, FAILURE.OWN_UNREAD, FAILURE.THREW])(
 		'names nothing and says why when %s',
 		async (failure) => {
-			split.mockResolvedValue({ left: [], shared: [SHARED_TEST], meeting: [OWN], failure })
+			split.mockResolvedValue(
+				meets_at({ left: [], shared: [SHARED_TEST], meeting: [OWN], touching: [OWN], failure }),
+			)
 
 			const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
 
@@ -140,7 +147,7 @@ describe('run_ship_synced_scope.read_sync — a merge the import graph could not
 
 	it('still settles a failed split over a merge that brought in no code', async () => {
 		read_parts.mockResolvedValue(synced_parts([SYNCED_DOC]))
-		split.mockResolvedValue({ left: [], shared: [], meeting: [], failure: FAILURE.NOTHING_VOUCHED })
+		split.mockResolvedValue(meets_at({ left: [], failure: FAILURE.NOTHING_VOUCHED }))
 
 		expect(await settle(TREE, [LINT])).toBeDefined()
 	})
@@ -183,14 +190,14 @@ describe('run_ship_synced_scope.settle — what only one check reads', () => {
 		expect(await settle(TREE, [LINT])).toBeUndefined()
 	})
 
-	it('runs lint:related when a file between reaches both a synced module and the branch', async () => {
-		split.mockResolvedValue({ left: [SYNCED_CODE], shared: [], meeting: [OWN] })
+	it('runs lint:related when a file imports both a synced module and the branch', async () => {
+		split.mockResolvedValue(meets_at({ meeting: [OWN], touching: [OWN] }))
 
 		expect(await settle(TREE, [LINT])).toBeUndefined()
 	})
 
 	it('still settles test:related over code only lint reads between the two', async () => {
-		split.mockResolvedValue({ left: [SYNCED_CODE], shared: [], meeting: [OWN] })
+		split.mockResolvedValue(meets_at({ meeting: [OWN], touching: [OWN] }))
 		read_parts.mockResolvedValue(synced_parts([SYNCED_CODE]))
 
 		expect(await settle(TREE, [TEST])).toBeDefined()
@@ -206,16 +213,84 @@ describe('run_ship_synced_scope.settle — what only one check reads', () => {
 
 // joshuafolkken/kit#6197: the shared tests sit inside the meeting, and one ship logged 119 for 68.
 describe('run_ship_synced_scope.read_sync — a file the split names twice', () => {
-	it('names a shared test that also sits in the meeting once', async () => {
-		split.mockResolvedValue({
-			left: [SYNCED_CODE],
-			shared: [SHARED_TEST],
-			meeting: [SHARED_TEST, OWN],
-		})
+	it('names a shared test that also imports both sides once', async () => {
+		split.mockResolvedValue(
+			meets_at({
+				shared: [SHARED_TEST],
+				meeting: [SHARED_TEST, OWN],
+				touching: [SHARED_TEST, OWN],
+			}),
+		)
 
 		const reading = await run_ship_synced_scope.read_sync(TREE, [LINT])
 
 		expect(reading?.overlap).toStrictEqual([SHARED_TEST, OWN])
+	})
+})
+
+// joshuafolkken/kit#7788: lint read the whole meeting, 882 of 885 files named over a 25-file branch.
+describe('run_ship_synced_scope.read_sync — what each condition names', () => {
+	const BETWEEN = 'scripts/between.ts'
+
+	it('leaves out of lint a file reaching both only through others (ac-284352d5)', async () => {
+		split.mockResolvedValue(meets_at({ meeting: [BETWEEN, SHARED_TEST, OWN], touching: [OWN] }))
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, [LINT])
+
+		expect(reading?.overlap).toStrictEqual([OWN])
+	})
+
+	it('keeps a file where the two changes meet in one function type (ac-5662ce60)', async () => {
+		split.mockResolvedValue(meets_at({ meeting: [OWN], touching: [OWN] }))
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.overlap).toContain(OWN)
+		expect(await settle(TREE, PAIR)).toBeUndefined()
+	})
+
+	it('counts what each condition named, before duplicates are dropped (ac-10542962)', async () => {
+		read_parts.mockResolvedValue(synced_parts([OWN, SYNCED_CODE, COMPONENT, SYNCED_DOC]))
+		readers.mockReturnValue([SHARED_TEST])
+		split.mockResolvedValue(
+			meets_at({ shared: [SHARED_TEST], meeting: [SHARED_TEST, OWN], touching: [OWN] }),
+		)
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.breakdown).toStrictEqual({
+			both: 1,
+			unsplit: 1,
+			read_by_tests: 1,
+			shared: 1,
+			lint_meeting: 1,
+			own_edits: 0,
+		})
+		expect(run_ship_synced_scope.breakdown_text(reading?.breakdown)).toBe(
+			' — both 1, unsplit 1, read_by_tests 1, shared 1, lint_meeting 1, own_edits 0',
+		)
+	})
+})
+
+// joshuafolkken/kit#7846: own edits joined into the names left `named` above the conditions' sum.
+describe('run_ship_synced_scope — the counts beside the conditions', () => {
+	it('adds nothing to the line of a pair no merge named', () => {
+		expect(run_ship_synced_scope.breakdown_text(undefined)).toBe('')
+	})
+
+	it('counts the unchecked own edits the names took in (ac-c5893692)', async () => {
+		read_parts.mockResolvedValue(synced_parts([SYNCED_CODE], [OWN, SYNCED_DOC]))
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.breakdown).toMatchObject({ own_edits: 2 })
+		expect(reading?.overlap).toStrictEqual([OWN, SYNCED_DOC])
+	})
+
+	it('leaves out a count no check was handed', () => {
+		expect(run_ship_synced_scope.breakdown_text({ shared: 2, lint_named: undefined })).toBe(
+			' — shared 2',
+		)
 	})
 })
 
@@ -259,7 +334,8 @@ describe('run_ship_synced_scope.read_sync — what test:related is named over', 
 	const MAIN_SIZE = 1500
 	const MAIN = Array.from({ length: MAIN_SIZE }, (_, index) => `scripts/main/m${String(index)}.ts`)
 	const MAIN_TESTS = MAIN.map((file) => file.replace('.ts', '.test.ts'))
-	const MEETS = { left: MAIN, shared: MAIN_TESTS, meeting: [...MAIN, ...MAIN_TESTS] }
+	const MEETING = [...MAIN, ...MAIN_TESTS]
+	const MEETS = { left: MAIN, shared: MAIN_TESTS, meeting: MEETING, touching: MEETING }
 
 	beforeEach(() => {
 		vi.spyOn(changed_file_scope, 'repository_root_or_cwd').mockResolvedValue(process.cwd())
@@ -308,7 +384,9 @@ describe('run_ship_synced_scope.read_sync — own edits after a merge', () => {
 		read_parts
 			.mockResolvedValueOnce(synced_parts([SYNCED_CODE], [OWN]))
 			.mockResolvedValueOnce(synced_parts([SYNCED_CODE], [COMPONENT]))
-		split.mockResolvedValue({ left: [SYNCED_CODE], shared: [SHARED_TEST], meeting: [] })
+		split.mockResolvedValue(
+			meets_at({ shared: [SHARED_TEST], meeting: [SHARED_TEST], touching: [SHARED_TEST] }),
+		)
 
 		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
 

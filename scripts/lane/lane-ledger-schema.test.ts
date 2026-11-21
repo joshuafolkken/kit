@@ -92,6 +92,49 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 	})
 })
 
+// joshuafolkken/kit#7803: a row written before the split (the cases above) parses without it.
+describe('lane_ledger_schema.entry_schema on a test-pinned run that split its probed hunks', () => {
+	it('keeps the counts of the rechecked and the unregistered hunks it probed', () => {
+		const run = {
+			kind: KIND.TEST_PINNED,
+			at: AT,
+			held: 1,
+			rechecked: 2,
+			unregistered: 3,
+			probes: [],
+			elapsed_ms: 9,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
+// joshuafolkken/kit#7806: a row written before the miss counts (the cases above) parses without them.
+describe('lane_ledger_schema.entry_schema on a test-pinned run that counted its cache misses', () => {
+	it('keeps the probed hunks counted by why the cache missed them', () => {
+		const misses = { change: 3, test_contents: 1 }
+		const run = { kind: KIND.TEST_PINNED, at: AT, held: 1, misses, probes: [], elapsed_ms: 9 }
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+
+	it('parses a row with no miss counts', () => {
+		const run = { kind: KIND.TEST_PINNED, at: AT, held: 1, probes: [], elapsed_ms: 9 }
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
+// joshuafolkken/kit#7809: a row written before the launch keys (the cases above) parses without them.
+describe('lane_ledger_schema.entry_schema on a test-pinned run that kept its launch', () => {
+	it('keeps the cut, the reason mark and the work tree it read', () => {
+		const launch = { first_unpinned: true, reasoned: false, cut: 2, tree_hash: 'abc' }
+		const run = { kind: KIND.TEST_PINNED, at: AT, held: 1, probes: [], elapsed_ms: 9, ...launch }
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
 // joshuafolkken/kit#5385
 describe('lane_ledger_schema.entry_schema on a test-pinned probe', () => {
 	it('keeps a probe the type check pinned, and rejects an unknown pinner', () => {

@@ -38,21 +38,28 @@ function resume_of(child: number | string, is_backlog_live = false): string {
 		: `${RESUME_COMMAND} ${issue_cite.plain_for('program', child)}`
 }
 
-function recovery_of(cause: string): string {
-	if (cause === STALE_HANDOFF.why) {
-		return `repair the stale hand-off cut record with \`${run_cut.END_COMMAND}\` (retry alone does not clear it)`
-	}
-
-	return /cut.*(?:handed-off|already handed off)/iu.test(cause)
-		? `clear the handed-off cut with \`${run_cut.END_COMMAND}\``
-		: 'fix the cause'
+// A cause's recovery: the clause `Next:` words it with, and the one action to take first — a command
+// with its arguments filled in, or `parent:` prose where no command does the work (joshuafolkken/kit#7850).
+interface Recovery {
+	clause: string
+	first: (child: string) => string
 }
 
-// The next action as a clause, which a park comment's `Next:` and the plan's note end with.
-function next_step(child: number | string, cause = ''): string {
-	const recovery = recovery_of(cause)
-
-	return `${recovery}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
+const ORDINARY_RECOVERY: Recovery = {
+	clause: 'fix the cause',
+	first: (child) => `pnpm josh ship --log ${child}`,
+}
+const STALE_HANDOFF_RECOVERY: Recovery = {
+	clause: `repair the stale hand-off cut record with \`${run_cut.END_COMMAND}\` (retry alone does not clear it)`,
+	first: () => run_cut.END_COMMAND,
+}
+const HANDED_OFF_RECOVERY: Recovery = {
+	clause: `clear the handed-off cut with \`${run_cut.END_COMMAND}\``,
+	first: () => run_cut.END_COMMAND,
+}
+const ESCALATION_RECOVERY: Recovery = {
+	clause: 'give it a stronger profile',
+	first: () => 'parent: resume it one josh.worker profile up',
 }
 
 // The worker's own declaration that its Issue needs a stronger `josh.worker` profile
@@ -61,6 +68,40 @@ function next_step(child: number | string, cause = ''): string {
 const ESCALATION_REQUESTED: StallCause = {
 	short: 'escalation requested',
 	why: 'the worker declared that its Issue needs a stronger josh.worker profile.',
+}
+
+function recovery_of(cause: string): Recovery {
+	if (cause === STALE_HANDOFF.why) return STALE_HANDOFF_RECOVERY
+	if (cause === ESCALATION_REQUESTED.why) return ESCALATION_RECOVERY
+
+	return /cut.*(?:handed-off|already handed off)/iu.test(cause)
+		? HANDED_OFF_RECOVERY
+		: ORDINARY_RECOVERY
+}
+
+// The next action as a clause, which a park comment's `Next:` and the plan's note end with.
+function next_step(child: number | string, cause = ''): string {
+	const { clause } = recovery_of(cause)
+
+	return `${clause}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
+}
+
+// The one action to take first, which a park comment's `josh:outcome` marker carries for the board's
+// row; the resume command stays on the comment's `Next:` line.
+function next_action(child: number | string, cause = ''): string {
+	return recovery_of(cause).first(String(child))
+}
+
+// The Japanese counterpart of `next_step` for the ordinary cause, which a Japanese park comment ends with.
+function next_step_ja(child: number | string): string {
+	return `原因を直してから、稼働中の backlogrun では \`${resume_of(child, true)}\`、それ以外では \`${resume_of(child, false)}\` で再開してください。`
+}
+
+// A child parked again on the lane tree it parked on before the last adopted option, so the option was
+// never taken (joshuafolkken/kit#7820). No retry check reads it: a requeue would hit the same wall.
+const PARK_LOOP: StallCause = {
+	short: 'park loop',
+	why: 'the child parked again on an unchanged lane tree after the adopted option, so the option was never taken.',
 }
 
 const CARRYING_CLASSES = [SESSION_UNFINISHED, ESCALATION_REQUESTED]
@@ -140,7 +181,10 @@ const run_stalled = {
 	cause_of,
 	class_of,
 	escalation_requested,
+	next_action,
 	next_step,
+	next_step_ja,
+	PARK_LOOP,
 	park_event,
 	resume_of,
 	row_text,

@@ -67,6 +67,17 @@ describe('test_titles.titles_of — Playwright calls', () => {
 	})
 })
 
+// joshuafolkken/kit#7883: a renamed test is told by its body, so each test carries it.
+describe('test_titles.tests_of — each test with its body', () => {
+	it('pairs each test’s full name with the source of the arguments after its title', () => {
+		const text = "describe('panel', () => {\n\tit('draws', () => draw(1), 500)\n})"
+
+		expect(test_titles.tests_of(ts, text)).toStrictEqual([
+			{ title: 'panel > draws', body: '() => draw(1),500' },
+		])
+	})
+})
+
 describe('test_titles.leaf_of', () => {
 	it('is the title the test carries itself', () => {
 		expect(test_titles.leaf_of(FULL_NAME)).toBe(LEAF)

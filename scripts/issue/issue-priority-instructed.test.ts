@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PRIORITY_CRITICAL_LABEL, PRIORITY_HIGH_LABEL } from './issue-labels'
 import { issue_priority_instructed } from './issue-priority-instructed'
 
@@ -32,9 +33,53 @@ function serve(...labels: ReadonlyArray<string>): void {
 }
 
 beforeEach(() => {
+	vi.stubEnv(session_language.ENV_KEY, 'en')
 	mocked_add.mockResolvedValue(true)
 	mocked_clear.mockResolvedValue(true)
 	mocked_comment.mockResolvedValue(true)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
+// joshuafolkken/kit#7707: the sentence follows the session language; the label names, the command and
+// the `Reason:` label do not.
+describe('issue_priority_instructed.apply — the session language', () => {
+	it.each(['ja', ''])('writes the sentence in Japanese for %j', async (lang) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+		serve('bug')
+
+		await issue_priority_instructed.apply(ISSUE_NUMBER, 'critical', REASON)
+
+		expect(mocked_comment).toHaveBeenCalledWith(
+			ISSUE_NUMBER,
+			`人の指示（\`josh issue:priority --critical\`）で\`${PRIORITY_CRITICAL_LABEL}\` を付けました。\n\nReason: ${REASON}`,
+		)
+	})
+
+	it('writes the removal in Japanese for ja', async () => {
+		vi.stubEnv(session_language.ENV_KEY, 'ja')
+		serve('bug', PRIORITY_HIGH_LABEL)
+
+		await issue_priority_instructed.apply(ISSUE_NUMBER, 'normal', REASON)
+
+		expect(mocked_comment).toHaveBeenCalledWith(
+			ISSUE_NUMBER,
+			`人の指示（\`josh issue:priority --normal\`）で優先度ラベルを外しました。\n\nReason: ${REASON}`,
+		)
+	})
+
+	it('writes the sentence in English for en', async () => {
+		serve('bug')
+
+		await issue_priority_instructed.apply(ISSUE_NUMBER, 'critical', REASON)
+
+		expect(mocked_comment).toHaveBeenCalledWith(
+			ISSUE_NUMBER,
+			`Applied \`${PRIORITY_CRITICAL_LABEL}\` on a person's instruction (\`josh issue:priority --critical\`).\n\nReason: ${REASON}`,
+		)
+	})
 })
 
 describe('issue_priority_instructed.apply', () => {

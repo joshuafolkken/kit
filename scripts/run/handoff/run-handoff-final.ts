@@ -12,6 +12,7 @@ const CODEX_MESSAGE_SCHEMA = z.object({
 })
 // An Issue or a pull request, the two things a workflow creates and the brief asks the child to name.
 const GITHUB_URL_PATTERN = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+/gu
+const ISSUE_PATH = '/issues/'
 
 function message_of(line: string): string | undefined {
 	const value = json_value.parse_or_undefined(line)
@@ -33,6 +34,13 @@ function github_urls(text: string): ReadonlyArray<string> {
 	return [...new Set(text.match(GITHUB_URL_PATTERN))]
 }
 
-const run_handoff_final = { final_message, github_urls }
+// Whether the message names a created Issue — a pull request URL alone does not.
+function names_issue(message: string | undefined): boolean {
+	if (message === undefined) return false
+
+	return github_urls(message).some((url) => url.includes(ISSUE_PATH))
+}
+
+const run_handoff_final = { final_message, github_urls, names_issue }
 
 export { run_handoff_final }

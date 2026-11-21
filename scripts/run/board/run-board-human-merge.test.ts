@@ -93,26 +93,27 @@ function layout_of(plan: BoardPlan): ReturnType<typeof run_board_layout.layout_o
 }
 
 describe('run board human merge layout', () => {
-	it('moves a touched running issue into waiting with its PR number', () => {
+	it('moves a touched running issue into the decision section with its PR number', () => {
 		const layout = layout_of(plan_of())
 
 		expect(layout.active).toEqual([])
 		expect(layout.queued).toEqual([])
-		expect(layout.unreached).toMatchObject([
+		expect(layout.unreached).toEqual([])
+		expect(layout.people).toMatchObject([
 			{
 				number: ISSUE,
-				state: 'waiting',
+				state: 'human',
 				reason: { icon: '🔏', value: 'PR 6225', tail: MERGE_TAIL },
 			},
 		])
 	})
 
-	it('removes the special wait when the label is removed or the issue closes', () => {
+	it('removes the merge row when the label is removed or the issue closes', () => {
 		const plan = plan_of()
 		const closed = { ...plan, context: { ...plan.context, open_numbers: new Set<number>() } }
 
-		expect(layout_of(plan_of([])).unreached).toEqual([])
-		expect(layout_of(closed).unreached).toEqual([])
+		expect(layout_of(plan_of([])).people).toEqual([])
+		expect(layout_of(closed).people).toEqual([])
 	})
 
 	it('handles queued and closed children and an unread PR number', () => {
@@ -127,8 +128,8 @@ describe('run board human merge layout', () => {
 			waves: { waves: [[{ ...CHILD, state: 'CLOSED' as const }]], unreached: [] },
 		}
 
-		expect(layout_of(queued).unreached[0]?.reason).toEqual({ icon: '🔏', value: undefined })
-		expect(layout_of(closed).unreached).toEqual([])
+		expect(layout_of(queued).people[0]?.reason).toEqual({ icon: '🔏', value: undefined })
+		expect(layout_of(closed).people).toEqual([])
 	})
 })
 
@@ -136,7 +137,7 @@ describe('run board human merge actions', () => {
 	it('tells the person to find the PR when the read listing holds none for the issue', () => {
 		const plan = { ...plan_of(), human_merge_prs: new Map<number, number>() }
 
-		expect(layout_of(plan).unreached[0]?.reason).toEqual({
+		expect(layout_of(plan).people[0]?.reason).toEqual({
 			icon: '🔏',
 			value: undefined,
 			tail: FIND_TAIL,
@@ -155,21 +156,24 @@ async function rendered(plan: BoardPlan, form: 'chat' | 'screen'): Promise<Array
 }
 
 describe('run board human merge rows', () => {
-	it('keeps a simultaneous decision label in waiting instead of people', () => {
+	it('draws a merge wait with a simultaneous decision label in people with its merge action', () => {
 		const layout = layout_of(plan_of([...LABELS, NEEDS_DECISION_LABEL]))
 
-		expect(layout.people).toEqual([])
-		expect(layout.unreached[0]?.state).toBe('waiting')
+		expect(layout.unreached).toEqual([])
+		expect(layout.people[0]?.state).toBe('human')
+		expect(layout.people[0]?.reason).toMatchObject({ icon: '🔏', tail: MERGE_TAIL })
 	})
 
-	it.each(['screen', 'chat'] as const)('renders the waiting row and legend in %s', async (form) => {
-		const relevant = await rendered(plan_of(), form)
+	it.each(['screen', 'chat'] as const)(
+		'renders the decision row and legend in %s',
+		async (form) => {
+			const relevant = await rendered(plan_of(), form)
 
-		expect(relevant).toMatchSnapshot()
-		expect(relevant.join('\n')).toContain('PR 6225')
-		expect(relevant.join('\n')).toContain(MERGE_TAIL)
-		expect(relevant.join('\n')).toContain('🔏 human merge')
-	})
+			expect(relevant).toMatchSnapshot()
+			expect(relevant.join('\n')).toContain(MERGE_TAIL)
+			expect(relevant.join('\n')).toContain('🔏 human merge')
+		},
+	)
 
 	it.each(['screen', 'chat'] as const)(
 		'renders the find action with no open PR in %s',
@@ -195,9 +199,9 @@ const LINKED = run_board_render_fixture.header({
 const PLAIN = run_board_render_fixture.header()
 
 function waiting_row(): BoardRow {
-	const [row] = layout_of(plan_of()).unreached
+	const [row] = layout_of(plan_of()).people
 
-	if (row === undefined) throw new Error('no waiting row')
+	if (row === undefined) throw new Error('no decision row')
 
 	return row
 }
@@ -218,14 +222,13 @@ describe('run board human merge pull request links', () => {
 		expect(run_board_render_condition.tail_of(row, 0, PLAIN)).toBe(MERGE_TAIL)
 	})
 
-	it('draws the linked PR number in the rendered waiting row', async () => {
+	it('draws the linked PR number in the rendered decision row', async () => {
 		const { LOCAL, harness } = run_board_fixture
 		const { ports, frames } = harness(LOCAL, [plan_of()])
 
 		await run_board_tick.tick(run_board_tick.FRESH_STATE, { ...ports, link: osc_link })
 		const linked = osc_link(String(PR), PULL_URL)
 
-		expect(frames.at(-1)).toContain(`PR ${linked}`)
 		expect(frames.at(-1)).toContain(`→ merge PR #${linked}`)
 	})
 
@@ -240,11 +243,11 @@ describe('run board human merge pull request links', () => {
 })
 
 describe('run board human merge earlier lanes', () => {
-	it('draws the waiting issue once while keeping unrelated earlier lanes', () => {
+	it('draws the decision issue once while keeping unrelated earlier lanes', () => {
 		const earlier = { lanes: [String(ISSUE), '1'], unknown: [String(ISSUE), '2'] }
 		const layout = run_board_layout.layout_of(plan_of(), new Map(), undefined, earlier)
 
-		expect(layout.unreached.map((row) => row.number)).toEqual([ISSUE])
+		expect(layout.people.map((row) => row.number)).toEqual([ISSUE])
 		expect(layout.earlier?.map((row) => row.number)).toEqual([1, 2])
 	})
 })

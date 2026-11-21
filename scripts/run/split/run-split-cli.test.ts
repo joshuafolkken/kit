@@ -8,6 +8,7 @@ const CHILDREN = '--children'
 const ONE_CHILD = ['10', CHILDREN, '11']
 const NEEDS_DECISION = 'needs-decision'
 const PREREQUISITE = '--prerequisite'
+const ORDER_REASON = '--order-reason'
 const split = vi.hoisted(() => vi.fn())
 const prerequisite = vi.hoisted(() => vi.fn())
 
@@ -49,18 +50,23 @@ describe('run_split_cli.run — arguments', () => {
 		expect(errors).toStrictEqual([run_split_cli.USAGE])
 	})
 
-	it('splits `#N` into its children with the order and the title', async () => {
-		const argv = ['10', CHILDREN, '11, 12', '--ordered', '--title', 'T']
+	it('splits `#N` into its children with the order, its reason and the title', async () => {
+		const reason = '#10 -> #11 -> #12: uses #10'
+		const argv = ['10', CHILDREN, '11, 12', '--ordered', ORDER_REASON, reason, '--title', 'T']
 
 		expect(await run_split_cli.run(argv)).toBe(0)
 		expect(split).toHaveBeenCalledWith({
 			issue: '10',
 			children: ['11', '12'],
 			is_ordered: true,
+			chains: [],
+			order_reasons: [reason],
 			title: 'T',
 		})
 	})
+})
 
+describe('run_split_cli.run — the order', () => {
 	it('leaves the order off and the title unset when neither is given', async () => {
 		await run_split_cli.run(ONE_CHILD)
 
@@ -68,14 +74,26 @@ describe('run_split_cli.run — arguments', () => {
 			issue: '10',
 			children: ['11'],
 			is_ordered: false,
+			chains: [],
+			order_reasons: [],
 			title: undefined,
 		})
+	})
+
+	it('reads each `--chain` as given, leaving their reading to `epic`', async () => {
+		const chains = ['#10 -> #12', '#11 -> #12']
+		const argv = ['10', CHILDREN, '11,12', ...chains.flatMap((chain) => ['--chain', chain])]
+
+		expect(await run_split_cli.run(argv)).toBe(0)
+		expect(split).toHaveBeenCalledWith(expect.objectContaining({ chains, is_ordered: false }))
 	})
 })
 
 describe('run_split_cli.USAGE', () => {
 	it('names both forms', () => {
 		expect(run_split_cli.USAGE).toContain('--children <N1,N2,...>')
+		expect(run_split_cli.USAGE).toContain('[--ordered | --chain "<chain>"...]')
+		expect(run_split_cli.USAGE).toContain('[--order-reason "<chain>: <reason>"...]')
 		expect(run_split_cli.USAGE).toContain('--prerequisite <P>')
 	})
 })
@@ -87,6 +105,8 @@ describe('run_split_cli.run — `--prerequisite`', () => {
 		[['10', PREREQUISITE, '10']],
 		[['10', PREREQUISITE, '11', CHILDREN, '12']],
 		[['10', PREREQUISITE, '11', '--ordered']],
+		[['10', PREREQUISITE, '11', '--chain', '#10 -> #11']],
+		[['10', PREREQUISITE, '11', ORDER_REASON, '#11 -> #10: x']],
 	])('refuses %j, which no prerequisite form reads, and writes nothing', async (argv) => {
 		expect(await run_split_cli.run(argv)).toBe(1)
 		expect(prerequisite).not.toHaveBeenCalled()
@@ -145,5 +165,12 @@ describe('run_split_cli.run — a failure', () => {
 			'Done: nothing.',
 			'Rerun with `--title <title>`.',
 		])
+	})
+
+	it('asks for fixed `--chain` values when the chain refusal wrote nothing', async () => {
+		split.mockResolvedValue({ kind: 'failed', step: 'chain', reason: 'a cycle', done: [] })
+
+		expect(await run_split_cli.run(ONE_CHILD)).toBe(1)
+		expect(errors.at(-1)).toBe('Rerun with the `--chain` / `--order-reason` values fixed.')
 	})
 })

@@ -3,22 +3,26 @@ import { git_directory } from '#scripts/discovery/git-directory'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { lane_state } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
+import { run_hold, type HoldRead, type RunHold } from '#scripts/run/hold/run-hold'
 import { run_hold_ended, type EndedHold } from '#scripts/run/hold/run-hold-ended'
+import { run_board_records } from './run-board-records'
 import { run_board_span, type BoardSpan } from './run-board-span'
 
 // A single `fullrun #N` or `halfrun #N` has no carry record; the only record that says it is running
 // here is this checkout's hold (`run-hold.ts`), so the board draws it from there — no store of its own
-// (joshuafolkken/kit#6597). The hold marks a `fullrun` (`is_fullrun`); `run:entry` claims a `halfrun`
-// unmarked (`run-entry-children.ts`), so an unmarked numbered hold is one.
+// (joshuafolkken/kit#6597). The hold marks a `fullrun` (`is_fullrun`) and a `prrun` (`is_prrun` beside
+// it, joshuafolkken/kit#7724); `run:entry` claims a `halfrun` unmarked (`run-entry-children.ts`), so an
+// unmarked numbered hold is one. A `prrun`'s record written before `is_prrun` existed reads as a `fullrun`.
+// A stopped `halfrun` or `prrun` keeps its hold across a person's latency (`run_hold.is_stop_marked`), so
+// the board draws it stopped under its own command until the next run takes the hold (joshuafolkken/kit#7710).
 
 const FULLRUN = 'fullrun'
 const HALFRUN = 'halfrun'
-const SINGLE_INVOCATION = /^(?<command>fullrun|halfrun) #(?<issue>\d+)$/u
+const PRRUN = 'prrun'
+const SINGLE_INVOCATION = /^(?<command>fullrun|halfrun|prrun) #(?<issue>\d+)$/u
 // The launch the board reads a row's running state from, placed before every event of the run.
 const LAUNCH_POSITION = 0
 const FREE_READ: HoldRead = { kind: 'free' }
@@ -30,6 +34,8 @@ interface SingleRun {
 
 interface RootRun extends SingleRun {
 	events: ReadonlyArray<RunEvent>
+	// Set only on a run a stop ended: its start and its stop, which its row is drawn from.
+	stopped?: EndedRoot | undefined
 }
 
 interface EndedRoot extends SingleRun {
@@ -41,27 +47,45 @@ interface EndedRoot extends SingleRun {
 // subprocess the redraw would wait on, as `run-board-read.ts`'s main work tree does.
 const directories = stamped_memo.create<Promise<string | undefined>>()
 
-// A held, numbered hold is a running run unless a stop marked it: a stopped `halfrun` or `prrun` keeps
-// its hold across a person's latency (`run_hold.is_stop_marked`), long after the run stopped.
-function is_running(read: HoldRead): read is Extract<HoldRead, { kind: 'held' }> {
-	if (read.kind !== 'held') return false
+// A held, numbered hold is a single run's, running or stopped.
+function held_of(read: HoldRead): RunHold | undefined {
+	if (read.kind !== 'held') return undefined
 
-	return issue_number_shape.is_issue_number(read.hold.issue) && !run_hold.is_stop_marked(read.hold)
+	return issue_number_shape.is_issue_number(read.hold.issue) ? read.hold : undefined
+}
+
+// The command a hold's or an ended record's marks name: a stop's own, else the claim's.
+function command_of(
+	mark: Pick<RunHold, 'is_fullrun' | 'is_prrun' | 'is_halfrun_stop' | 'prrun_stop_head'>,
+): string {
+	if (mark.is_halfrun_stop === true) return HALFRUN
+	if (mark.is_prrun === true || mark.prrun_stop_head !== undefined) return PRRUN
+
+	return mark.is_fullrun === true ? FULLRUN : HALFRUN
+}
+
+// A running run's span is open from its claim. A stopped run's ends at its stop, the record's
+// `taken_at`, so its time stands still; a stop recorded before `started_at` was runs from it.
+function times_of(hold: RunHold): Pick<BoardSpan, 'started_ms' | 'ended_ms'> | undefined {
+	const taken_ms = run_event_scope.moment_of(hold.taken_at)
+
+	if (taken_ms === undefined) return undefined
+	if (!run_hold.is_stop_marked(hold)) return { started_ms: taken_ms, ended_ms: undefined }
+
+	const started_ms = run_event_scope.moment_of(hold.started_at ?? hold.taken_at) ?? taken_ms
+
+	return { started_ms, ended_ms: taken_ms }
 }
 
 function span_of(read: HoldRead): BoardSpan | undefined {
-	if (!is_running(read)) return undefined
+	const hold = held_of(read)
+	const times = hold === undefined ? undefined : times_of(hold)
 
-	const started_ms = run_event_scope.moment_of(read.hold.taken_at)
-
-	if (started_ms === undefined) return undefined
-
-	const command = read.hold.is_fullrun === true ? FULLRUN : HALFRUN
+	if (hold === undefined || times === undefined) return undefined
 
 	return {
-		invocation: `${command} ${issue_cite.plain_for('program', read.hold.issue)}`,
-		started_ms,
-		ended_ms: undefined,
+		invocation: `${command_of(hold)} ${issue_cite.plain_for('program', hold.issue)}`,
+		...times,
 	}
 }
 
@@ -96,10 +120,9 @@ function lane_read(issue: string): HoldRead {
 
 // The single run a lane of this repository holds, read from the root checkout (joshuafolkken/kit#7653);
 // an ended lane holds none.
-async function lane_span(directory: string): Promise<BoardSpan | undefined> {
-	const records = await lane_state.read_records(directory)
-
-	return records
+function lane_span(directory: string): BoardSpan | undefined {
+	return run_board_records
+		.read_records(directory)
 		.filter((record) => record.state !== 'ended')
 		.map((record) => span_of(lane_read(record.issue)))
 		.find(Boolean)
@@ -115,7 +138,7 @@ async function span_here(is_carried: boolean): Promise<BoardSpan | undefined> {
 
 	if (directory === undefined) return undefined
 
-	return span_of(run_hold.read_hold(run_hold.hold_path(directory))) ?? (await lane_span(directory))
+	return span_of(run_hold.read_hold(run_hold.hold_path(directory))) ?? lane_span(directory)
 }
 
 // A run the root checkout's merge released, as `run-hold-ended.ts` kept it; `undefined` where its
@@ -128,9 +151,7 @@ function ended_of(ended: EndedHold): EndedRoot | undefined {
 
 	if (started_ms === undefined || ended_ms === undefined) return undefined
 
-	const command = ended.is_fullrun === true ? FULLRUN : HALFRUN
-
-	return { command, issue: Number(ended.issue), started_ms, ended_ms }
+	return { command: command_of(ended), issue: Number(ended.issue), started_ms, ended_ms }
 }
 
 function is_inside(run: EndedRoot, span: BoardSpan): boolean {
@@ -191,6 +212,15 @@ function name_of(invocation: string): string | undefined {
 	return single_of(invocation)?.command
 }
 
+// A single run a stop ended — the only single run whose span ends; `undefined` for any other span.
+function stopped_of(span: BoardSpan): EndedRoot | undefined {
+	const single = single_of(span.invocation)
+
+	if (single === undefined || span.ended_ms === undefined) return undefined
+
+	return { ...single, started_ms: span.started_ms, ended_ms: span.ended_ms }
+}
+
 // The root checkout's single run beside a carried run, with its own span's events its row's phase is
 // read from (joshuafolkken/kit#7524).
 function root_of(span: BoardSpan, events: ReadonlyArray<RunEvent>): RootRun | undefined {
@@ -198,7 +228,9 @@ function root_of(span: BoardSpan, events: ReadonlyArray<RunEvent>): RootRun | un
 
 	if (single === undefined) return undefined
 
-	return { ...single, events: events_of(span, run_board_span.events_of(events, span)) }
+	const spanned = events_of(span, run_board_span.events_of(events, span))
+
+	return { ...single, events: spanned, stopped: stopped_of(span) }
 }
 
 const run_board_single = {
@@ -210,6 +242,7 @@ const run_board_single = {
 	scope_of,
 	span_here,
 	span_of,
+	stopped_of,
 }
 
 export { run_board_single }

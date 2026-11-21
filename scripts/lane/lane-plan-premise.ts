@@ -1,11 +1,8 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import {
-	measure_declaration,
-	type MeasureDeclaration,
-	type MeasureVerdict,
-} from '#scripts/issue/measure-declaration'
+import { measure_declaration, type MeasureDeclaration } from '#scripts/issue/measure-declaration'
+import { premise_judge, type PremiseRun } from '#scripts/issue/premise-judge'
 import { session_cite } from '#scripts/issue/session-cite'
-import { trusted_measure, type CommandRun, type TrustedBody } from '#scripts/issue/trusted-measure'
+import { trusted_measure, type TrustedBody } from '#scripts/issue/trusted-measure'
 
 // joshuafolkken/kit#7022: an issue filed on a premise that no longer held (joshuafolkken/kit#6982) reached
 // a lane, which noticed only by chance before implementing. A first `lane:plan` re-runs every premise
@@ -30,9 +27,9 @@ function listed_premises(
 }
 
 // A failed command keeps its message, so the stop says why the premise could not be measured.
-function measured(declaration: MeasureDeclaration, run: CommandRun): Measured {
-	if (run.kind === 'failed') return { holds: false, value: `failed (${run.message})` }
-	const verdict: MeasureVerdict = measure_declaration.judge(declaration, run.output)
+function measured(premise: PremiseRun): Measured {
+	if (premise.kind === 'failed') return { holds: false, value: `failed (${premise.message})` }
+	const { verdict } = premise
 	const value = 'value' in verdict ? String(verdict.value) : verdict.kind
 
 	return { holds: verdict.kind === 'pass', value }
@@ -40,7 +37,7 @@ function measured(declaration: MeasureDeclaration, run: CommandRun): Measured {
 
 // The premise's value goes on stderr; one that does not hold is returned for the stop.
 function checked(declaration: MeasureDeclaration, source: TrustedBody): string | undefined {
-	const result = measured(declaration, trusted_measure.run_command(declaration.command, source))
+	const result = measured(premise_judge.run_of(declaration, source))
 	const line = `${measure_declaration.format(declaration)} measured ${result.value}`
 
 	console.error(`premise: ${line}`)

@@ -62,7 +62,28 @@ describe('review_findings_cli.run', () => {
 		)
 
 		expect(await report_of(root)).toBe(
-			'findings by category:\n  tests: 2\nzero-finding rounds recorded: 1',
+			'findings by category:\n  tests: 2\nzero-finding rounds recorded: 1\nfindings by kind (0 of 2 findings carry a kind):',
+		)
+	})
+
+	// joshuafolkken/kit#7886: the kind split follows, with the share that carries one.
+	it('counts the findings by kind, most frequent first, beside the ones written without', async () => {
+		const root = root_with(
+			'- rf:tests | low | a.ts | 2026-09-22 | #1 | - | untested-branch\n',
+			'- rf:comments | low | b.ts | 2026-09-22 | #2 | fixed | stale-docs\n',
+			'- rf:comments | low | c.ts | 2026-09-22 | #2 | fixed | stale-docs\n- rf:tests | low | d.ts | 2026-09-22 | #2\n',
+		)
+
+		expect(await report_of(root)).toBe(
+			[
+				'findings by category:',
+				'  comments: 2',
+				'  tests: 2',
+				'zero-finding rounds recorded: 0',
+				'findings by kind (3 of 4 findings carry a kind):',
+				'  stale-docs: 2',
+				'  untested-branch: 1',
+			].join('\n'),
 		)
 	})
 
@@ -87,6 +108,7 @@ describe('review_findings_cli.run --period', () => {
 				'  bug-risks: high 1 · medium 0 · low 0',
 				'  tests: high 0 · medium 0 · low 1',
 				'zero-finding rounds recorded: 1',
+				'findings by kind (0 of 2 findings carry a kind):',
 			].join('\n'),
 		)
 	})
@@ -99,13 +121,13 @@ describe('review_findings_cli.run --period', () => {
 
 	it('starts a period reaching past the date range at the epoch rather than throwing', async () => {
 		expect(await report_of(root_with(ledger[0] ?? ''), ['--period', '200000000'])).toBe(
-			'findings by category and severity since 1970-01-01:\n  tests: high 0 · medium 0 · low 1\nzero-finding rounds recorded: 0',
+			'findings by category and severity since 1970-01-01:\n  tests: high 0 · medium 0 · low 1\nzero-finding rounds recorded: 0\nfindings by kind (0 of 1 findings carry a kind):',
 		)
 	})
 
 	it('leaves the run with no argument on the all-time category counts', async () => {
 		expect(await report_of(root_with(...ledger))).toBe(
-			'findings by category:\n  tests: 2\n  bug-risks: 1\nzero-finding rounds recorded: 2',
+			'findings by category:\n  tests: 2\n  bug-risks: 1\nzero-finding rounds recorded: 2\nfindings by kind (0 of 3 findings carry a kind):',
 		)
 	})
 })

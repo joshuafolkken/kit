@@ -42,7 +42,7 @@ beforeEach(() => {
 	vi.stubEnv(lane_child_marker.KEY, ISSUE)
 	directories.mockResolvedValue([GIT_DIRECTORY, GIT_DIRECTORY])
 	repository.mockReturnValue(GIT_DIRECTORY)
-	run_hold.create_hold(run_hold.hold_path(GIT_DIRECTORY), ISSUE, new Date())
+	run_hold.create_hold(run_hold.hold_path(GIT_DIRECTORY), ISSUE, { now: new Date() })
 	errors.length = 0
 	vi.spyOn(console, 'error').mockImplementation((line: string) => {
 		errors.push(line)
@@ -63,7 +63,9 @@ describe('direct run:release from a dispatched lane child', () => {
 		['numbered', ['--release', ISSUE]],
 	])('refuses %s release before removing the hold', async (_name, argv) => {
 		expect(await main_entry_fixture.run_entry(ENTRY, argv)).toBe(FAILURE)
-		expect(errors.join('\n')).toContain(`pnpm josh run:park ${ISSUE} --body-file`)
+		expect(errors.join('\n')).toContain(
+			`pnpm josh run:park ${ISSUE} --body-file <path> --outcome "<next action>"`,
+		)
 		expect(run_hold.read_hold(run_hold.hold_path(GIT_DIRECTORY)).kind).toBe('held')
 	})
 

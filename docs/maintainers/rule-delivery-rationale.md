@@ -423,3 +423,15 @@ test file pins:
   `stop_hook_active` never blocks; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
   repository or an unknown owner is silent; a bare `#N` in the reply neither acts nor blocks), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring
+- `scripts/rules/deferral-owner.test.ts` and `scripts/rules/stop-rules-deferral.test.ts` — pin the
+  `deferral-owner` stop row (joshuafolkken/kit#8296). A reply recommending a later decision, investigation
+  or filing, with no `#N`, filing draft or reason not to track in that paragraph, blocks in every session —
+  a consultation one included, since the deferred point otherwise belongs to nobody once the reply ends.
+  A fence, a quote, a third-party repository or an unknown owner is silent, as for `filing-offer`
+- `scripts/rules/reply-close.test.ts` and `scripts/rules/stop-rules-reply-close.test.ts` — pin the
+  `reply-close` stop row (joshuafolkken/kit#8299). A reply whose last paragraph has no `次の一手:` / `Next:`
+  line and no nothing-left line blocks once, so a person closing the session need not ask what is left. Only
+  the close is checked: whether the interim output was minimal has no line a hook can read. A code-block-only
+  reply, a `Recommended:` decision, a held stop (its decision refusal asks the same), a lane child, a headless
+  session or an unread prompt is silent; a reply also over the length limit gets both asks in one refusal,
+  since the loop-breaker lets the rewrite stop unchecked

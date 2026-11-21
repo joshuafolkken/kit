@@ -1,7 +1,9 @@
 import { agent_worker_profile } from '#scripts/agent/agent-worker-profile'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_stalled } from './run-stalled'
 import { run_stalled_park } from './run-stalled-park'
@@ -18,6 +20,11 @@ const DISABLED_NOTE = `run:park ${ESCALATE_FLAG}: refused — this repository's 
 interface Escalation {
 	issue: string
 	reason: string
+}
+
+interface CommentProse {
+	lead: string
+	next: string
 }
 
 function is_requested(argv: ReadonlyArray<string>): boolean {
@@ -70,14 +77,32 @@ function accepted(
 	return refusal === undefined ? escalation : undefined
 }
 
+function is_japanese(): boolean {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang)
+}
+
+function english_prose(issue: string): CommentProse {
+	return {
+		lead: `Parked with \`${RUN_STALLED_LABEL}\`: ${run_stalled.ESCALATION_REQUESTED.why}`,
+		next: `the backlogrun drive resumes it one \`worker:<name>\` profile up, or hands it to a person at the top profile; without a drive, give it a stronger profile, ${run_stalled.next_step(issue)}.`,
+	}
+}
+
+function japanese_prose(issue: string): CommentProse {
+	return {
+		lead: `\`${RUN_STALLED_LABEL}\` で park しました: worker が、この Issue にはより強い josh.worker プロファイルが要ると宣言しました。`,
+		next: `backlogrun のドライブが \`worker:<name>\` プロファイルを一つ上げて再開し、最上位のプロファイルなら人に回します。ドライブが無いときは、より強いプロファイルを与え、${run_stalled.next_step_ja(issue)}`,
+	}
+}
+
+// The prose follows the session language; the label, the commands and the `Reason:` / `Next:` keys stay English.
 function comment_of(escalation: Escalation): string {
 	const { issue, reason } = escalation
+	const { lead, next } = is_japanese() ? japanese_prose(issue) : english_prose(issue)
+	const body = [lead, `- Reason: ${reason}`, `- Next: ${next}`].join('\n')
+	const summary = run_stalled.next_action(issue, run_stalled.ESCALATION_REQUESTED.why)
 
-	return [
-		`Parked with \`${RUN_STALLED_LABEL}\`: ${run_stalled.ESCALATION_REQUESTED.why}`,
-		`- Reason: ${reason}`,
-		`- Next: the backlogrun drive resumes it one \`worker:<name>\` profile up, or hands it to a person at the top profile; without a drive, give it a stronger profile, ${run_stalled.next_step(issue)}.`,
-	].join('\n')
+	return issue_outcome.body_of({ body, summary })
 }
 
 // The parked Issue, or `undefined` when the declaration is refused or the park could not be written.

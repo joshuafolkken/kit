@@ -18,8 +18,8 @@ afterEach(() => {
 
 describe('test_pinned_ledger.record snapshot context', () => {
 	it('keeps the initial checkout lane when a probe runs from a snapshot', async () => {
-		vi.spyOn(lane_paths, 'issue_here').mockImplementation((directory) =>
-			directory === PROJECT_ROOT ? 5078 : undefined,
+		vi.spyOn(lane_paths, 'issue_here').mockImplementation((options) =>
+			options?.directory === PROJECT_ROOT ? 5078 : undefined,
 		)
 		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 
@@ -35,7 +35,7 @@ describe('test_pinned_ledger.record', () => {
 		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 
 		await test_pinned_ledger.record(
-			{ held: 3, rewired: 2, over_cap: 4, origin: PRE_DETACH },
+			{ held: 3, rechecked: 5, unregistered: 6, rewired: 2, over_cap: 4, origin: PRE_DETACH },
 			[PROBE],
 			2000,
 		)
@@ -43,6 +43,8 @@ describe('test_pinned_ledger.record', () => {
 		expect(write).toHaveBeenCalledWith({
 			issue: 5078,
 			held: 3,
+			rechecked: 5,
+			unregistered: 6,
 			rewired: 2,
 			over_cap: 4,
 			probes: [PROBE],
@@ -50,7 +52,51 @@ describe('test_pinned_ledger.record', () => {
 			origin: PRE_DETACH,
 		})
 	})
+})
 
+// joshuafolkken/kit#7806
+describe('test_pinned_ledger.record with the cache misses', () => {
+	it('writes the probed hunks counted by why the cache missed them', async () => {
+		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(7806)
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+		const misses = test_pinned_ledger.miss_counts(['change', undefined, 'change', 'basis'])
+
+		await test_pinned_ledger.record({ held: 0, rewired: 0, misses }, [], 10)
+
+		expect(write).toHaveBeenCalledWith(
+			expect.objectContaining({ issue: 7806, misses: { change: 2, basis: 1 } }),
+		)
+	})
+})
+
+// joshuafolkken/kit#7809
+describe('test_pinned_ledger.record with the launch', () => {
+	it('writes a cut, reasoned run with the work tree it read', async () => {
+		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(7809)
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+		const launch = { first_unpinned: true, reasoned: true, cut: 3, tree_hash: 'abc' }
+
+		await test_pinned_ledger.record({ held: 0, rewired: 0, launch }, [], 10)
+
+		expect(write).toHaveBeenCalledWith(expect.objectContaining({ issue: 7809, ...launch }))
+	})
+
+	it('writes none of the launch keys for a run with none', async () => {
+		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(7809)
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+
+		await test_pinned_ledger.record({ held: 0, rewired: 0, launch: {} }, [], 10)
+
+		const row = write.mock.calls[0]?.[0]
+
+		expect(row).not.toHaveProperty('cut')
+		expect(row).not.toHaveProperty('first_unpinned')
+		expect(row).not.toHaveProperty('reasoned')
+		expect(row).not.toHaveProperty('tree_hash')
+	})
+})
+
+describe('test_pinned_ledger.record outside a lane', () => {
 	it('leaves the lane out of a run outside a lane, and names an unnamed origin manual', async () => {
 		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(undefined)
 		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
@@ -60,6 +106,8 @@ describe('test_pinned_ledger.record', () => {
 		expect(write).toHaveBeenCalledWith({
 			issue: undefined,
 			held: 0,
+			rechecked: 0,
+			unregistered: 0,
 			rewired: 0,
 			over_cap: 0,
 			probes: [],

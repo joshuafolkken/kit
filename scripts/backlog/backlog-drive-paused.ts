@@ -134,6 +134,7 @@ async function emit_paused(compose: () => Promise<string>): Promise<string | und
 
 async function send_paused(body: string): Promise<boolean> {
 	return await telegram_notify.confirm({
+		reason: 'run-stopped',
 		issue_title: PAUSED_TITLE,
 		body,
 		recovery: PAUSED_RECOVERY,

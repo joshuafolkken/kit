@@ -18,6 +18,9 @@ const test_related_schema = z.object({
 	reuse_reason: z.string().optional(),
 	reuse_elapsed_ms: z.number().optional(),
 	select_elapsed_ms: z.number().optional(),
+	// How the tests past the changed ones were chosen: by declaration users, or by the import graph
+	// where no symbol reading could be made — absent on rows written before it (joshuafolkken/kit#7980).
+	select_method: z.enum(['symbol', 'import']).optional(),
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
 	issue: z.number().optional(),
@@ -28,7 +31,8 @@ const test_related_schema = z.object({
 	readers: z.number(),
 	test_files: z.number().optional(),
 	trigger_files: z.array(z.string()).optional(),
-	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532).
+	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532) —
+	// on rows written before `deferred` replaced it (joshuafolkken/kit#7976), as `full_reach` is.
 	over_cap: z.number().optional(),
 	// The widest of them in the run's own change, the hub that put the run past the cap
 	// (joshuafolkken/kit#5699); absent when main or the map's tree brought them all (joshuafolkken/kit#5756).
@@ -36,6 +40,13 @@ const test_related_schema = z.object({
 	// The files past the cap it left at their whole reach, each with that reach, widest first — absent
 	// where there were none and on rows written before it (joshuafolkken/kit#7639).
 	full_reach: z.array(full_reach_schema).optional(),
+	// How many test files the cap left out of the run for CI to run — absent on a run that kept the whole
+	// suite and on rows written before it (joshuafolkken/kit#7976), which read `over_cap` instead.
+	deferred: z.number().optional(),
+	// The changed file that added the most test files to the run, and that number — absent where no
+	// reach was read and on rows written before it (joshuafolkken/kit#7735).
+	widest_file: z.string().optional(),
+	widest_tests: z.number().optional(),
 	// The branch change read beside the run, by half and by base (joshuafolkken/kit#6982).
 	branch_tracked: z.number().optional(),
 	branch_untracked: z.number().optional(),
@@ -43,9 +54,45 @@ const test_related_schema = z.object({
 	// `changed` split by whether that branch change holds the file (joshuafolkken/kit#7066).
 	changed_in_branch: z.number().optional(),
 	changed_off_branch: z.number().optional(),
+	// Whether the run read only the last red run's failed files and what moved since, rather than its
+	// whole reach — absent on a `--touched` run and on rows written before it (joshuafolkken/kit#7786).
+	red_rerun: z.boolean().optional(),
+	// The stages around the selection (joshuafolkken/kit#7828): the launcher's `dist` rebuild, the wait
+	// for the core claim and vitest from start to end — each absent where it did not run, and on rows
+	// written before it.
+	rebuild_ms: z.number().optional(),
+	core_wait_ms: z.number().optional(),
+	vitest_ms: z.number().optional(),
+	// What the run read and how it ended (joshuafolkken/kit#7965): the digest of the changed-file map it
+	// started on and that map's base, its exit code, the test files a red run failed on and who started
+	// it — each absent where it was not read, and on rows written before it.
+	tree: z.string().optional(),
+	base: z.string().optional(),
+	exit_code: z.number().optional(),
+	failed: z.array(z.string()).optional(),
+	caller: z.string().optional(),
 	elapsed_ms: z.number(),
 })
 
-const lane_ledger_schema_related = { test_related_schema }
+// One `josh lint:related` run (joshuafolkken/kit#7827): the launcher's `dist` rebuild, the wait for the
+// command's core reservation, the scoped `--fix` / `--write` pass, the structural checks, the
+// prettier / ESLint pair, the document checks and the unused-members check — each absent where it did
+// not run — beside the whole run and its exit code.
+const lint_related_schema = z.object({
+	kind: z.literal(KIND.LINT_RELATED),
+	at: z.string(),
+	issue: z.number().optional(),
+	rebuild_ms: z.number().optional(),
+	core_wait_ms: z.number().optional(),
+	fix_ms: z.number().optional(),
+	structural_ms: z.number().optional(),
+	lint_ms: z.number().optional(),
+	documents_ms: z.number().optional(),
+	unused_members_ms: z.number().optional(),
+	elapsed_ms: z.number(),
+	exit_code: z.number(),
+})
+
+const lane_ledger_schema_related = { lint_related_schema, test_related_schema }
 
 export { lane_ledger_schema_related }

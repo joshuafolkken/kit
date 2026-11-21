@@ -114,3 +114,39 @@ describe('lane_breakdown_pinned.detail_text', () => {
 		expect(lane_breakdown_pinned.detail_text([])).toBe('')
 	})
 })
+
+// joshuafolkken/kit#7803: an older row, with neither count, reads as the first detail case above.
+describe('lane_breakdown_pinned.detail_text on rows that split the probed hunks', () => {
+	it('names the rechecked and the unregistered hunks, summed over the rows', () => {
+		const split: TestPinnedEntry = { ...row(INSIDE), rechecked: 1, unregistered: 1 }
+
+		expect(lane_breakdown_pinned.detail_text([split, { ...split, probes: [] }])).toBe(
+			' (test:pinned 6 hunks, 4 cached, 2 rechecked, 2 unregistered, 2 probed, scripts/b.ts 2.0 min, scripts/a.ts 3 test files 1.0 min)',
+		)
+	})
+})
+
+// joshuafolkken/kit#7809: an older row, with no cut, names none (the cases above).
+describe('lane_breakdown_pinned.detail_text on a row that stopped at the first unpinned hunk', () => {
+	it('counts the hunks the stop never probed', () => {
+		expect(lane_breakdown_pinned.detail_text([{ ...row(INSIDE), cut: 5 }])).toBe(
+			' (test:pinned 9 hunks, 2 cached, 2 probed, 5 cut, scripts/b.ts 2.0 min, scripts/a.ts 3 test files 1.0 min)',
+		)
+	})
+})
+
+// joshuafolkken/kit#7806: an older row, with no miss counts, names none (the cases above).
+describe('lane_breakdown_pinned.detail_text on rows that counted the cache misses', () => {
+	it('names the probed hunks by why the cache missed them, summed over the rows, a missing entry as `no entry`', () => {
+		const counted: TestPinnedEntry = { ...row(INSIDE), misses: { change: 1, test_contents: 1 } }
+		const more: TestPinnedEntry = {
+			...counted,
+			probes: [],
+			misses: { change: 2, unregistered: 1 },
+		}
+
+		expect(lane_breakdown_pinned.detail_text([counted, more, row(INSIDE)])).toContain(
+			'6 cached, miss: 3 change, 1 test_contents, 1 no entry, 4 probed,',
+		)
+	})
+})

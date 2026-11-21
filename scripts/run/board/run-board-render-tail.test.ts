@@ -10,9 +10,9 @@ import { run_board_render_tail } from './run-board-render-tail'
 import type { UsualTimes } from './run-board-usual'
 
 // joshuafolkken/kit#3769, #4043, #4292: how long a child has stood at its phase is drawn in the row's
-// lead — right-aligned, colored against the phase's usual time — and a running row ends on the kind and
-// the age of its newest activity, right-aligned in one column on every row; the event that entered the
-// phase is not drawn twice.
+// lead — right-aligned, colored against the phase's usual time — and a running row ends, after its
+// finish (#7994), on the kind and the age of its newest activity, right-aligned in one column on every
+// row; the event that entered the phase is not drawn twice.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const PHASE_TIME = '8′00″'
@@ -28,8 +28,8 @@ const LONG_PHASE = 125 * MINUTE
 const LONG_TIME = '2°05′00″'
 // The columns the past-an-hour phase time takes beyond the usual one.
 const WIDER = LONG_TIME.length - PHASE_TIME.length
-// The long phase's row ends on its activity, then what it ran past the ship budget.
-const LONG_END = /Long {2,}👀 3′00″ {2}over budget \+117′$/u
+// The long phase's row ends on its finish, unmeasured with no lane total, then its activity.
+const LONG_END = /Long {2,}🎯 — {2}👀 3′00″$/u
 const EVENT: LaneEvent = { phase: 'review', words: 'ship review', at_ms: NOW - 3 * MINUTE }
 
 function running(number: number, title = `Issue ${String(number)}`): BoardRow {
@@ -72,9 +72,9 @@ function tail(row: BoardRow, extra: Partial<BoardHeader> = {}): Array<string | u
 	return run_board_render_tail.tail_of(row, board(extra))
 }
 
-// A running row's whole end outside followup: one part.
+// A running row's end outside followup: the one part after its finish.
 function quiet_tail(row: BoardRow, extra: Partial<BoardHeader> = {}): string | undefined {
-	return tail(row, extra)[0]
+	return tail(row, extra)[1]
 }
 
 // How long a row has stood at its phase, as the lead draws it.
@@ -133,6 +133,20 @@ describe('run_board_render_tail.tail_of phase time', () => {
 	})
 })
 
+// joshuafolkken/kit#7905: the host's stops are no time spent at the phase, nor against its usual time.
+describe('run_board_render_tail.phase_time net of the host stops', () => {
+	it('draws and colors the phase time net of the host stops inside it', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		const row = running(2)
+		const gaps = [{ from_ms: NOW - 6 * MINUTE, to_ms: NOW - 3 * MINUTE }]
+		const slept: BoardRow = { ...row, status: { ...row.status, state: 'running', gaps } }
+		const net = '5′00″'.padStart(TIME_WIDTH)
+
+		expect(time_of(row, { usual: usual(2) })).toBe(styleText('red', PHASE_PART))
+		expect(time_of(slept, { usual: usual(2) })).toBe(styleText('yellow', net))
+	})
+})
+
 // joshuafolkken/kit#6577: a stopped row's phase time stops where its lane stopped.
 describe('run_board_render_tail.phase_time of a stopped row', () => {
 	it('freezes a stopped row at its stop, however far now has moved', () => {
@@ -148,7 +162,7 @@ describe('run_board_render_tail.phase_time of a stopped row', () => {
 
 describe('run_board_render_tail.tail_of activity', () => {
 	it('draws the newest event’s phase icon and its age, and no phase time', () => {
-		expect(tail(running(1))).toStrictEqual([ACTIVITY])
+		expect(tail(running(1))).toStrictEqual(['🎯 —', ACTIVITY])
 	})
 
 	it('draws 🔧 where the newest operation is newer than the newest event', () => {
@@ -283,7 +297,7 @@ describe('run_board_render.render tail column', () => {
 	it('starts a waiting row’s other blockers two blanks after its title', () => {
 		const line = tail_lines().find((text) => text.includes('Waiting'))
 
-		expect(line).toMatch(/^ {4}🔗 9\+1 {9}3 {7}Waiting {2}10$/u)
+		expect(line).toMatch(/^ {5}🔗 9\+1 {9}3 {7}Waiting {2}10$/u)
 	})
 
 	// The header's third line says the run has ended, so only the row's tail draws 🔧.

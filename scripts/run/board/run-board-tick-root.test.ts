@@ -113,6 +113,67 @@ describe('run_board_tick.tick — the root single run’s legend and absence', (
 	})
 })
 
+// joshuafolkken/kit#7710: a `halfrun` or `prrun` a stop ended keeps its 🏠 row, led by ✅, with no phase
+// and its time fixed at the stop, counted as no lane.
+function stopped_root(command: string): LocalRead {
+	const stopped = { command, issue: ROOT, started_ms: START, ended_ms: START + RUN_MS }
+	const launch = event(KIND.CHILD_LAUNCH, `#${String(ROOT)} ${command}`)
+
+	return { ...CARRIED, root: { command, issue: ROOT, events: [launch], stopped } }
+}
+
+describe('run_board_tick.tick — a root single run a stop ended', () => {
+	it.each(['halfrun', 'prrun'])(
+		'keeps the 🏠 %s row, led by ✅ with its fixed time',
+		async (name) => {
+			const lines = await frame_of(stopped_root(name))
+			const row = lines[index_of(lines, `🏠 ${name}`) + 1] ?? ''
+
+			expect(row.trimStart().startsWith(`${STATE_ICONS.merged} `)).toBe(true)
+			expect(row).toContain(String(ROOT))
+			expect(row).toContain('25′00″')
+			expect(row).not.toContain(STATE_ICONS.stopped)
+		},
+	)
+
+	it('counts the stopped run in neither the lanes nor the header’s running children', async () => {
+		const lines = await frame_of(stopped_root('halfrun'))
+		const plain = await frame_of(CARRIED)
+
+		expect(lines.some((line) => line.includes(`${LANES_ICON} lanes 1/${String(LANE_LIMIT)}`))).toBe(
+			true,
+		)
+		expect(header(lines)).toStrictEqual(header(plain))
+	})
+})
+
+describe('run_board_tick.tick — a single run’s own board a stop ended', () => {
+	const STOPPED_SINGLE: LocalRead = {
+		...LOCAL,
+		ended_ms: START + RUN_MS,
+		run_name: 'halfrun',
+		events: [event(KIND.CHILD_LAUNCH, `#${String(ROOT)} halfrun`)],
+		stopped_single: {
+			command: 'halfrun',
+			issue: ROOT,
+			started_ms: START,
+			ended_ms: START + RUN_MS,
+		},
+	}
+
+	it('draws its row under 🏠 halfrun, led by ✅ with its fixed time', async () => {
+		const lines = await frame_of(STOPPED_SINGLE)
+		const home = index_of(lines, '🏠 halfrun')
+		const row = lines[home + 1] ?? ''
+
+		expect(home).toBeGreaterThan(-1)
+		expect(row.trimStart().startsWith(`${STATE_ICONS.merged} `)).toBe(true)
+		expect(row).toContain(String(ROOT))
+		expect(row).toContain('25′00″')
+		expect(lines.some((line) => line.includes(STATE_ICONS.stopped))).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#7525: a root single run a merge ended leaves 🏠 and joins ✅ done as a lane does.
 const ENDED: LocalRead = {
 	...CARRIED,

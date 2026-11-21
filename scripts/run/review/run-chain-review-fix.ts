@@ -1,5 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { cost_cli } from '#scripts/cost-runtime/cost-cli'
+import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_handoff, type Handoff } from '#scripts/run/cut/run-cut-handoff'
@@ -12,6 +14,12 @@ import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
 // `run:cut --impl`. The gate and round 2 are untouched: the fresh session records this round 1, and the
 // ship reads it as before. Outside a lane, on a committed tree, or where the cut does not relaunch, the
 // fix stays in place.
+//
+// **Only past the cut threshold** (joshuafolkken/kit#8312). The saving is the re-read context, so it is
+// priced by the same break-even every other cut reads (`context-cut-payback.ts`): below it, the fresh
+// session's preamble rewrite costs more than the fix turns re-reading this context, and the fix stays
+// in place. `run:cut --impl` trusts its caller to have checked (`run-cut-cli.ts` → `pre_gate_answer`),
+// so the check lives here.
 
 type FixNext = (issue: string) => string
 
@@ -44,9 +52,14 @@ function write_handoff(issue: string, handoff: Handoff): string | undefined {
 }
 
 // The cut needs an uncommitted tree (`run-cut-ready.ts`): a round whose `run:review` open committed it
-// is fixed in place, since a cut there answers `unready` and records a decline.
+// is fixed in place, since a cut there answers `unready` and records a decline. An `under` or
+// unmeasurable session is fixed in place too, as `run:cut` treats them.
 function can_cut(): boolean {
-	return lane_child_marker.is_child_of(process.cwd()) && run_cut_ready.is_ready_sync()
+	return (
+		lane_child_marker.is_child_of(process.cwd()) &&
+		run_cut_ready.is_ready_sync() &&
+		cost_cli.session_verdict() === cost_verdict.OVER_VERDICT
+	)
 }
 
 function cut_next(file: string, in_place: string): FixNext {

@@ -9,9 +9,9 @@ import {
 import { git_command } from '#scripts/git/git-command'
 import { main_merge, type MergeOutcome } from '#scripts/git/main-merge'
 import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
-import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
+import { run_ship_behind_default } from './run-ship-behind-default'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_overlap } from './run-ship-overlap'
@@ -44,8 +44,7 @@ const MERGED_GATE_NOTE =
 const PUSHED_NOTE = 'pushed the merge ahead of the gate, so CI runs beside it'
 const PUSH_FAILED_NOTE =
 	'the push ahead of the gate failed; the commit stage pushes after the gate:'
-const PAIR_RED_NOTE =
-	'the scoped pair is red on the merged tree; the commit stage pushes after the gate'
+const PAIR_RED_NOTE = 'the scoped pair is red on the tree merged with the default branch:'
 const LEFT_TO_CI_NOTE =
 	'the default branch moved since the sync without a conflict — not merged again; the pull request CI checks the merge ref'
 const MERGED_AGAIN_NOTE =
@@ -83,6 +82,10 @@ async function merge_outcome(): Promise<MergeOutcome> {
 	} catch (error) {
 		return { kind: 'refused', message: error_text.message_of(error) }
 	}
+}
+
+function joined(lines: ReadonlyArray<string>): string {
+	return lines.filter((line) => line !== '').join('\n')
 }
 
 function conflict_result(files: ReadonlyArray<string>, lead: string): StepResult {
@@ -129,28 +132,16 @@ async function commit_locally(title: string, is_dirty: boolean): Promise<JoshRes
 // (joshuafolkken/kit#5067): CI and SonarQube start from this push, and pushed after the gate they ran
 // behind it, leaving the followup minutes of waiting. Only the pull request's own branch moves; the
 // merge still needs the gate, the review attest and a green CI, and a red gate stops the ship before
-// the followup as before, the next push replacing the commit. Its pre-push hook runs the related tests
-// (`pre-push-related-switch.ts`), since the gate over this same tree runs the whole suite next. A
+// the followup as before, the next push replacing the commit. Its pre-push hook runs the related tests,
+// as every push the gate record does not cover does (`pre-push-unit.ts`, joshuafolkken/kit#7977). A
 // branch with no open pull request pushes nothing here: CI runs on pull requests only. An unmoved
 // default branch pushes nothing either, so the commit stage stays the one push; a merged one makes it
 // two, and CI and the review bots run again on the second. A failed push stops nothing: the commit
-// stage pushes the gated tree.
-//
-// **The scoped pair settles before that push** (joshuafolkken/kit#6121): the merge moved the base
-// under the pair's records, so the hook's related run read none of them and re-ran tests the pair had
-// passed. A merge sharing nothing with the branch re-records the pair without a run, any other runs it
-// where the two meet, and the hook then reuses `test:related`'s record; the gate stage reuses the pair.
+// stage pushes the gated tree. The scoped pair is green on the merged tree before it (`merged_pair`).
 async function push_ahead(title: string): Promise<string> {
-	const pair = await run_ship_scoped.scoped_pair()
-
-	if (pair.code !== SUCCESS_EXIT_CODE) return PAIR_RED_NOTE
-
 	const push = await timed(
 		STEP.PUSH,
-		async () =>
-			await josh_command.josh_run(push_argv(title), should_forward_stderr, undefined, {
-				[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
-			}),
+		async () => await josh_command.josh_run(push_argv(title), should_forward_stderr),
 	)
 
 	return push.code === SUCCESS_EXIT_CODE ? PUSHED_NOTE : [PUSH_FAILED_NOTE, push.out].join('\n')
@@ -172,6 +163,22 @@ async function pushed_note(outcome: MergeOutcome, title: string): Promise<string
 	return await push_ahead(title)
 }
 
+// **The scoped pair settles on every merged tree, before any push** (joshuafolkken/kit#6121): the merge
+// moved the base under the pair's records, so the hook's related run read none of them and re-ran tests
+// the pair had passed. A merge sharing nothing with the branch re-records the pair without a run, any
+// other runs it where the two meet, and the hook then reuses `test:related`'s record; the gate stage
+// reuses the pair. **It is the ship's first pair when the default branch moved** — the preflight left
+// it here (joshuafolkken/kit#8304) — so a red one stops the ship before the review, tagged a check.
+async function merged_pair(outcome: MergeOutcome): Promise<StepResult | undefined> {
+	if (outcome.kind !== 'merged') return undefined
+
+	const pair = await run_ship_scoped.scoped_pair()
+
+	if (pair.code === SUCCESS_EXIT_CODE) return undefined
+
+	return { ...pair, out: joined([PAIR_RED_NOTE, pair.out]), cause: run_ship_stop_cause.CAUSE.CHECK }
+}
+
 async function waited_note(issue: string): Promise<string> {
 	const overlap = await timed(
 		STEP.OVERLAP_WAIT,
@@ -181,6 +188,21 @@ async function waited_note(issue: string): Promise<string> {
 	return run_ship_overlap.note(overlap)
 }
 
+// The merge, the pair over a merged tree, then the push ahead of the gate; `waited` leads every note.
+async function merged_stage(waited: string, title: string): Promise<StepResult> {
+	const outcome = await merge_outcome()
+
+	if (outcome.kind === 'conflict') return conflict_result(outcome.files, waited)
+
+	const red = await merged_pair(outcome)
+
+	if (red !== undefined) return { ...red, out: joined([waited, sync_note(outcome), red.out]) }
+
+	const pushed = await pushed_note(outcome, title)
+
+	return { code: SUCCESS_EXIT_CODE, out: joined([waited, sync_note(outcome), pushed]) }
+}
+
 // The merge waits first for any lane whose open pull request changes the same paths
 // (`run-ship-overlap.ts`), so it brings that pull request in before the gate rather than meeting it
 // as `DIRTY` after CI.
@@ -188,20 +210,9 @@ async function sync_stage(issue: string, title: string, is_dirty: boolean): Prom
 	const waited = await waited_note(issue)
 	const failed_commit = await commit_locally(title, is_dirty)
 
-	if (failed_commit !== undefined) {
-		const out = [waited, failed_commit.out].filter((line) => line !== '').join('\n')
+	if (failed_commit === undefined) return await merged_stage(waited, title)
 
-		return { ...failed_commit, out }
-	}
-
-	const outcome = await merge_outcome()
-
-	if (outcome.kind === 'conflict') return conflict_result(outcome.files, waited)
-
-	const pushed = await pushed_note(outcome, title)
-	const out = [waited, sync_note(outcome), pushed].filter((line) => line !== '').join('\n')
-
-	return { code: SUCCESS_EXIT_CODE, out }
+	return { ...failed_commit, out: joined([waited, failed_commit.out]) }
 }
 
 // The tree merged with a default branch that moved is gated before it is pushed: a tree only the
@@ -220,18 +231,6 @@ async function gate_merged(): Promise<StepResult | undefined> {
 	return { ...gate, out, cause: run_ship_stop_cause.CAUSE.CHECK }
 }
 
-// Whether origin's default branch holds a commit the branch lacks. An unreadable count reads as moved,
-// so the skipped merge is still said on the ship log.
-async function is_behind_default(): Promise<boolean> {
-	try {
-		const default_branch = await git_command.get_default_branch()
-
-		return (await git_command.commit_count_beyond('HEAD', `origin/${default_branch}`)) > 0
-	} catch {
-		return true
-	}
-}
-
 // A default branch that merges into the branch without a conflict is left to CI: the pull request's
 // checks run on the merge ref, the tree combined with the default branch, so a tree only the combined
 // change breaks still turns them red, and the followup merges again (`merge_again`). A probe that
@@ -240,7 +239,7 @@ async function is_merge_left_to_ci(): Promise<boolean> {
 	const conflicts = await run_ship_conflict_probe.read_conflicts()
 
 	if (conflicts?.length !== 0) return false
-	if (await is_behind_default()) console.error(LEFT_TO_CI_NOTE)
+	if (await run_ship_behind_default.is_behind_default()) console.error(LEFT_TO_CI_NOTE)
 
 	return true
 }
@@ -398,7 +397,6 @@ const run_ship_sync = {
 	MAX_MERGE_RETRIES,
 	MERGED_AGAIN_NOTE,
 	MERGED_GATE_NOTE,
-	PAIR_RED_NOTE,
 	PUSHED_NOTE,
 	PUSH_FAILED_NOTE,
 	catch_up,

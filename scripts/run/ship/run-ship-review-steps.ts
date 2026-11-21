@@ -6,16 +6,16 @@ import { review_interaction } from '#scripts/review/review-interaction'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
 import { review_round } from '#scripts/review/review-round'
 import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-round-reuse'
-import { review_round2 } from '#scripts/review/review-round2'
-import { review_stop_log } from '#scripts/review/review-stop-log'
+import { review_round2, type RoundTwoAnswer } from '#scripts/review/review-round2'
 import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_final_review } from './run-ship-final-review'
-import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
+import { run_ship_review } from './run-ship-review'
 import { run_ship_review_checkpoint } from './run-ship-review-checkpoint'
 import { run_ship_review_reason } from './run-ship-review-reason'
-import { run_ship_reviewer, type Round } from './run-ship-reviewer'
+import { run_ship_review_record } from './run-ship-review-record'
+import { run_ship_reviewer } from './run-ship-reviewer'
+import { run_ship_round_two_ledger } from './run-ship-round-two-ledger'
 import { run_ship_scoped } from './run-ship-scoped'
-import { run_ship_stage } from './run-ship-stage'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
 import type { StepResult } from './run-ship-sync'
 
@@ -55,10 +55,8 @@ function round_two_decision(issue: string): ReadonlyArray<string> {
 
 const REVIEW_BRIEF = 'review:brief'
 const ROUND_TWO_BRIEF = [REVIEW_BRIEF, '--round', '2']
-const INTERACTION_FLAG = '--interaction'
-const INTERACTION_BRIEF = [REVIEW_BRIEF, INTERACTION_FLAG]
+const INTERACTION_BRIEF = [REVIEW_BRIEF, run_ship_review_record.INTERACTION_FLAG]
 const UNREADABLE_DECISION_NOTE = 'review:round2 printed no decision josh ship can read:'
-const COMMENT_FLAG = '--comment'
 
 const FIXED_JOIN_NOTE =
 	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate re-runs once the tree is fixed.'
@@ -76,10 +74,6 @@ const ROUND_ONE_OPENS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
 	code: [RUN_REVIEW, run_review.CODE_ONLY_FLAG],
 	interaction: INTERACTION_BRIEF,
 }
-const SLOT_RECORD_FLAGS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
-	code: [],
-	interaction: [INTERACTION_FLAG],
-}
 const {
 	attest_phase,
 	current_verdict,
@@ -95,6 +89,7 @@ const {
 	tagged,
 	tagged_phase,
 } = run_ship_reviewer
+const { is_fix_verified, outcome_for_round, record_and_route } = run_ship_review_record
 
 // A red join blocks unless the reviewer fixed findings in place: the background gate then read the
 // tree before the fixes, so its verdict describes a tree that no longer exists. The join still ran to
@@ -126,64 +121,6 @@ async function join_gate(slots: ReadonlyArray<ReviewSlot>): Promise<JoshResult> 
 	note(FIXED_JOIN_NOTE)
 
 	return { code: SUCCESS_EXIT_CODE, out: joined.out }
-}
-
-// A passing round 2 records on the issue so it cannot move the tree the parallel gate reads.
-// Blocking findings stop both stages before the commit (`review-record-comment.ts`).
-function record_flags(round: Round, outcome: RoundOutcome): ReadonlyArray<string> {
-	return round === ROUND_TWO && outcome.is_passing ? [COMMENT_FLAG] : []
-}
-
-// The interaction slot records with `--interaction`, its `- ri:` line.
-async function record_and_route(
-	issue: string,
-	round: Round,
-	outcome_of: (verdict: ScoredVerdict) => RoundOutcome,
-	slot: ReviewSlot = CODE,
-): Promise<StepResult> {
-	const verdict = current_verdict(slot)
-
-	if (verdict.kind === run_ship_review.VERDICT.INVALID) return failure(verdict.note, CAUSE.INFRA)
-
-	const outcome = outcome_of(verdict)
-	const flags = [...SLOT_RECORD_FLAGS[slot], ...record_flags(round, outcome)]
-	const specs = run_ship_review.recorded_specs(verdict, outcome)
-	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...specs])
-
-	if (recorded.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, recorded)
-
-	review_stop_log.record({
-		issue: Number(issue),
-		stage: run_ship_stage.STAGE.REVIEW,
-		findings: run_ship_review.passing_fixes(verdict, outcome),
-		is_fixed: true,
-	})
-
-	const out = [...verdict.report, outcome.note].join('\n')
-
-	return outcome.is_passing ? { code: SUCCESS_EXIT_CODE, out } : failure(out, CAUSE.FINDING)
-}
-
-// Fixes made in place are counted only once the scoped pair is green on the fixed tree. The reviewer is
-// asked to leave it green; this is the check that it did, and a fix it could not get green is routed as
-// the finding it still is — recorded, then stopped before the gate and the commit take it in. One
-// scoped pair answers for every slot's fixes: they share the tree.
-async function is_fix_verified(slots: ReadonlyArray<ReviewSlot>): Promise<boolean> {
-	const is_fixed = slots.some(
-		(slot) => current_verdict(slot).kind === run_ship_review.VERDICT.FIXED,
-	)
-
-	if (!is_fixed) return true
-
-	const checked = await scoped_pair()
-
-	return checked.code === SUCCESS_EXIT_CODE
-}
-
-function outcome_for_round(round: Round, verdict: ScoredVerdict): RoundOutcome {
-	return round === ROUND_TWO
-		? run_ship_review.round_two_outcome(verdict)
-		: run_ship_review.round_one_outcome(verdict)
 }
 
 async function round_one_record(
@@ -401,9 +338,10 @@ async function review_stage(
 // The round-2 verification pass, after sync and beside the gate: due only when the round-1 fix
 // delta says so, then scoped pair → brief → fresh reviewer → attest → record.
 //
-// **The decision is read as JSON and recorded in the lane ledger before it is acted on**, so
-// `josh lane:stats` can count the period's round-2 runs and skips by their reason code
-// (joshuafolkken/kit#4064). Output it cannot parse stops the ship rather than guessing a verdict.
+// **The decision is read as JSON and recorded in the lane ledger**, so `josh lane:stats` can count
+// the period's round-2 runs and skips by their reason code (joshuafolkken/kit#4064): a skip when
+// decided, a required run once it returns (`acted_round_two`). Output it cannot parse stops the
+// ship rather than guessing a verdict.
 async function reviewed_round_two(issue: string): Promise<StepResult> {
 	const provider = reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, ROUND_TWO)
 
@@ -423,6 +361,21 @@ async function reviewed_round_two(issue: string): Promise<StepResult> {
 	)
 }
 
+// A skip is recorded as decided; a run once it has an outcome (`run-ship-round-two-ledger.ts`).
+async function acted_round_two(issue: string, answer: RoundTwoAnswer): Promise<StepResult> {
+	if (answer.verdict !== review_round2.REQUIRED_VERDICT) {
+		await run_ship_round_two_ledger.record(issue, answer)
+
+		return skipped(`${answer.verdict}\n${ROUND_TWO_SKIPPED_NOTE}`)
+	}
+
+	const result = await reviewed_round_two(issue)
+
+	await run_ship_round_two_ledger.record(issue, answer, result)
+
+	return result
+}
+
 async function execute_round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(round_two_decision(issue))
 
@@ -435,17 +388,8 @@ async function execute_round_two_stage(issue: string): Promise<StepResult> {
 	}
 
 	note(answer.reason)
-	await lane_ledger_write.record_round_two({
-		issue: Number(issue),
-		verdict: answer.verdict,
-		code: answer.code,
-	})
 
-	if (answer.verdict !== review_round2.REQUIRED_VERDICT) {
-		return skipped(`${answer.verdict}\n${ROUND_TWO_SKIPPED_NOTE}`)
-	}
-
-	return await reviewed_round_two(issue)
+	return await acted_round_two(issue, answer)
 }
 
 async function round_two_stage(issue: string): Promise<StepResult> {

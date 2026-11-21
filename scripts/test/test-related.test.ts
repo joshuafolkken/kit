@@ -23,10 +23,7 @@ vi.mock('./related-heavy-tests', () => ({
 	related_heavy_tests: { exclude_flags: vi.fn(() => []) },
 }))
 vi.mock('./test-unit-guard', () => ({
-	test_unit_guard: {
-		is_running: vi.fn(),
-		run_guarded_vitest: vi.fn(),
-	},
+	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
 // **Mocked rather than exercised, because the real one writes the record this checkout's own run
 // relies on** (joshuafolkken/kit#1511) — the second-writer trap joshuafolkken/kit#1437 closed for the
@@ -43,9 +40,13 @@ vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
 
 	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
 })
-// The claim and the reach cap walk no import graph here; what they claim and cap is
-// `test-related.claim.test.ts` and `test-related-cap.test.ts`.
+// The claim and the selection walk no import graph here; what they claim and select is
+// `test-related.claim.test.ts` and `test-related-select.test.ts`.
 vi.mock('./test-pinned-reach')
+vi.mock('./test-related-select', async () => await import('./test-related-select-fixture'))
+vi.mock('./test-document-readers', () => ({
+	test_document_readers: { readers_of: vi.fn(async () => new Map()) },
+}))
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)

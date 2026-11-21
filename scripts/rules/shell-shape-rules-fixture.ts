@@ -46,6 +46,7 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'destructive-command': [SUBSHELL, HEREDOC],
 	'repo-admin': [],
 	'protected-file': [HEREDOC],
+	'memory-durable-write': [],
 	egress: ['curl-data-file', MULTILINE_FIELD, SEMICOLON, HEREDOC, 'name-prefix'],
 	'direct-pr-create': [SEMICOLON, HEREDOC],
 	'pr-merge': [SEMICOLON, HEREDOC],
@@ -82,6 +83,7 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	// The corpus heredoc is `cat`'s, which runs nothing; a shell's heredoc is pinned in its own test.
 	'lane-direct-tool': [],
 	'lane-spilled-read': [],
+	'poll-loop-child': [],
 	'implementation-cut': [],
 }
 

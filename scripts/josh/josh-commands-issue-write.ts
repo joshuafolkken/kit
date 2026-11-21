@@ -60,6 +60,24 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '6636 other-change' }],
 		},
 	},
+	'issue:kind': {
+		script: 'scripts/issue/issue-kind-cli.ts',
+		description:
+			"Switch an issue between bug and non-bug: the body's kind declarations, then its bug/enhancement labels",
+		category: 'AI tools',
+		reference: [
+			'<issue> bug --origin <#PR|不明（reason）> | non-bug --purpose <feature|improvement|time-saving> | non-bug --release-class other-change',
+			'automation',
+			['network'],
+		],
+		usage: {
+			examples: [
+				{ arguments: '6636 bug --origin "#<PR>"' },
+				{ arguments: '6636 non-bug --purpose improvement' },
+				{ arguments: '6636 non-bug --release-class other-change' },
+			],
+		},
+	},
 	'issue:comment': {
 		script: 'scripts/issue/issue-comment-main.ts',
 		description: 'Post one comment to an issue from a file, so no shell expands the body',
@@ -142,7 +160,8 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--repo <owner/name>'],
-					description: "write to that repository's issue.",
+					description:
+						"write to that repository's issue; with `--planned` from another repository's checkout, apply `plan:unverified` instead of `run:planned`.",
 				},
 			],
 		},

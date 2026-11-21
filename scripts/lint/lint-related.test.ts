@@ -44,16 +44,16 @@ vi.mock('#scripts/document/document-checks', () => ({
 }))
 // Mocked so no case scans this checkout's real program; the scan is `unused-members-check.test.ts`.
 vi.mock('#scripts/exports/unused-members-check', () => ({
-	unused_members_check: { run_unused_members: vi.fn() },
+	unused_members_check: { spawn_unused_members: vi.fn() },
 }))
 // Mocked so no case spawns this checkout's real guard tests; what they report is
 // `structural-checks.test.ts`.
 vi.mock('#scripts/gate/structural-checks', () => ({
 	structural_checks: { run_structural: vi.fn(async () => 0) },
 }))
-// Mocked so no case runs this checkout's real `josh metrics`; what it asks is `metrics-totals.test.ts`.
+// Mocked so a call that brought the totals pass back is caught rather than run (joshuafolkken/kit#7823).
 vi.mock('#scripts/gate/metrics-totals', () => ({
-	metrics_totals: { growth_notice: vi.fn() },
+	metrics_totals: { rerecord: vi.fn(), totals_check: vi.fn(), totals_refusal: vi.fn() },
 }))
 
 const mocked_root = vi.mocked(git_command.repository_root)
@@ -64,8 +64,7 @@ const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
 const mocked_byte_all = vi.mocked(document_checks.check_all)
 const mocked_byte_files = vi.mocked(document_checks.check_files)
-const mocked_notice = vi.mocked(metrics_totals.growth_notice)
-const mocked_unused = vi.mocked(unused_members_check.run_unused_members)
+const mocked_unused = vi.mocked(unused_members_check.spawn_unused_members)
 const mocked_structural = vi.mocked(structural_checks.run_structural)
 
 // joshuafolkken/kit#1298: the narrowed run is only worth having if the fallbacks reach the whole
@@ -110,7 +109,7 @@ function eslint_arguments(): ReadonlyArray<string> {
 function green_checks_after_lint(): void {
 	mocked_byte_all.mockReturnValue(0)
 	mocked_byte_files.mockReturnValue(0)
-	mocked_unused.mockResolvedValue(0)
+	mocked_unused.mockResolvedValue({ exit_code: 0, output: '' })
 }
 
 beforeEach(() => {
@@ -122,42 +121,16 @@ beforeEach(() => {
 	// As the real one: any argument reads no tree (`scoped-green.test.ts`).
 	mocked_before.mockImplementation(async (argv) => (argv.length === 0 ? BEFORE_TREE : undefined))
 	green_checks_after_lint()
-	mocked_notice.mockResolvedValue(undefined)
 })
 
-// joshuafolkken/kit#4594: a grown metrics total is reported in the loop rather than first at the
-// detached ship's pre-detach stop.
-describe('lint_related.run_related_lint — the metrics growth notice', () => {
-	const notice = 'josh metrics: 1 total(s) grew past the merge-base'
-
-	it('prints the growth notice beside the lint', async () => {
-		mocked_notice.mockResolvedValue(notice)
-
-		await lint_related.run_related_lint([])
-
-		expect(mocked_notice).toHaveBeenCalledWith(REPOSITORY_ROOT)
-		expect(written_output()).toContain(notice)
-	})
-
-	it('skips the whole-repository totals pass on a red lint', async () => {
-		mocked_scoped.mockResolvedValue(FAILED)
-
-		await lint_related.run_related_lint([])
-
-		expect(mocked_notice).not.toHaveBeenCalled()
-	})
-
-	it('skips the whole-repository totals pass on a run narrowed by file arguments', async () => {
-		await lint_related.run_related_lint([CHANGED_SOURCE])
-
-		expect(mocked_notice).not.toHaveBeenCalled()
-	})
-
-	it('keeps the lint exit code and its green record when a total grew', async () => {
-		mocked_notice.mockResolvedValue(notice)
-
+// joshuafolkken/kit#7823: the totals pass cost a green bare run about 12 s; run:review's open and the
+// gate stop on a grown total, so the loop measures none.
+describe('lint_related.run_related_lint — the metrics totals', () => {
+	it('runs no metrics totals pass on a green bare run', async () => {
 		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
-		expect_recorded(0)
+
+		for (const member of Object.values(metrics_totals)) expect(member).not.toHaveBeenCalled()
+		expect(written_output()).not.toContain('metrics')
 	})
 })
 
@@ -272,11 +245,12 @@ describe('lint_related.run_related_lint — the document checks', () => {
 		expect(mocked_byte_files).not.toHaveBeenCalled()
 	})
 
-	it('returns and records a byte-check failure after a green lint, skipping the unused member check', async () => {
+	it('returns and records a byte-check failure after a green lint, before the unused member check', async () => {
 		mocked_byte_files.mockReturnValue(FAILED)
+		mocked_unused.mockResolvedValue({ exit_code: FAILED, output: '' })
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
-		expect(mocked_unused).not.toHaveBeenCalled()
+		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: documents`)
 		expect_recorded(FAILED)
 	})
 })
@@ -292,7 +266,7 @@ describe('lint_related.run_related_lint — the unused namespace member check', 
 	})
 
 	it('returns an unused member it found as the run’s failure', async () => {
-		mocked_unused.mockResolvedValue(FAILED)
+		mocked_unused.mockResolvedValue({ exit_code: FAILED, output: '' })
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
 		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: unused members`)

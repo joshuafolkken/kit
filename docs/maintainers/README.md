@@ -22,6 +22,7 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 
 - [release.md](./release.md) — releasing a new version
 - [publishing.md](./publishing.md) — the publish jobs and the one-time public npm setup
+- [registry-migration-smoke.md](./registry-migration-smoke.md) — smoke-testing the published npm migration entry on isolated consumer copies, and the recorded run
 
 ## Measure the distributed rules
 

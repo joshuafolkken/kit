@@ -1,6 +1,10 @@
 import { styleText } from 'node:util'
 import { figure_format } from '#scripts/lib/figure-format'
+import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_fit, type DetailPart } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_labels } from './run-board-labels'
+import { run_board_quota_lamps } from './run-board-quota-lamps'
 import type { QuotaProvider, QuotaReading, Quotas, QuotaWindow } from './run-board-quota-read'
 import { run_board_render_quota_cell, type Cell } from './run-board-render-quota-cell'
 import {
@@ -27,7 +31,7 @@ const WEEK_MINUTES = DAYS_PER_WEEK * MINUTES_PER_DAY
 const WEEK_MS = WEEK_MINUTES * MS_PER_MINUTE
 const STALE_MINUTES = 10
 const PERCENT = 100
-const INDENT = '  '
+const INDENT = run_board_render_section.ROW_INDENT
 // `🤖 Claude`, the widest name, and a space; the label column's own lead space makes it two.
 const NAME_WIDTH = 10
 const COUNT_MARK = '≈'
@@ -41,6 +45,12 @@ const PACE_MARK = '┊'
 const RESET_MARK = '↻'
 const LABEL = '⛽ usage'
 const LIMIT_MARK = '🛑'
+// The held row's lead and the word before its time, by what holds the launches.
+const LIMIT_HOLD_WORDS = { head: `${LIMIT_MARK} limit`, time: 'resumes' }
+const AUTH_HOLD_WORDS = {
+	head: `${run_board_labels.WAIT_ICONS.auth_failure} auth failed`,
+	time: 'recheck',
+}
 const SEPARATOR = ' · '
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
@@ -57,10 +67,13 @@ const LEGEND = [
 	run_board_render_quota_github.LEGEND_ENTRY,
 ]
 
-// The reset a usage limit holds the run's launches until, and how many children it stopped.
+// The reset a usage limit holds the run's launches until, and how many children it stopped. An
+// authentication failure holds them too (`cause: 'auth'`), its time the next recheck, not a reset
+// (joshuafolkken/kit#8013).
 interface QuotaHold {
 	reset_ms: number
 	parked: number
+	cause?: HoldCause | undefined
 }
 
 interface QuotaView {
@@ -70,6 +83,8 @@ interface QuotaView {
 	hold?: QuotaHold | undefined
 	// GitHub's allowances, drawn after the usage-limit rows; none where they could not be read.
 	rate_limit?: GithubRateLimit | undefined
+	// Whether the frame runs the WOPR lamp panel (`run-board-quota-lamps.ts`).
+	has_lamps?: boolean | undefined
 }
 
 // The windows the provider reported, shortest first — the order its row and its summary both read.
@@ -155,11 +170,12 @@ function stale_text(reading: QuotaReading, now_ms: number): string | undefined {
 	return minutes > STALE_MINUTES ? `${String(minutes)}′` : undefined
 }
 
-// A single `—` where the provider reported no window, so none read stays apart from 0%.
+// A single `—` where the provider reported no window, so none read stays apart from 0%, in the window
+// label's column.
 function cells_text(reading: QuotaReading | undefined, now_ms: number): string {
 	const windows = windows_of(reading)
 
-	if (windows.length === 0) return NONE
+	if (windows.length === 0) return run_board_render_quota_cell.label_cell(NONE)
 
 	return run_board_render_quota_cell.row_text(
 		windows.map((window) => cell_of(window, now_ms, per_task_in(reading, window))),
@@ -175,10 +191,11 @@ function reading_text(reading: QuotaReading | undefined, now_ms: number): string
 }
 
 function hold_text(hold: QuotaHold, now_ms: number): string {
-	const resumes = `resumes ${RESET_MARK} ${reset_text(hold.reset_ms, now_ms)}`
+	const words = hold.cause === 'auth' ? AUTH_HOLD_WORDS : LIMIT_HOLD_WORDS
+	const time = `${words.time} ${RESET_MARK} ${reset_text(hold.reset_ms, now_ms)}`
 	const parked = hold.parked > 0 ? [`${String(hold.parked)} parked`] : []
 
-	return [`${LIMIT_MARK} limit`, resumes, ...parked].join(SEPARATOR)
+	return [words.head, time, ...parked].join(SEPARATOR)
 }
 
 function providers_of(view: QuotaView): ReadonlyArray<QuotaProvider> {
@@ -195,14 +212,14 @@ function name_of(provider: QuotaProvider | 'github', view: QuotaView): string {
 
 	const mark = provider === view.scheduler_provider ? SCHEDULER_MARK : '  '
 
-	return `${mark} ${name}`
+	return run_board_label_pair.pair(mark, name)
 }
 
 function name_cell(name: string): string {
 	return padded(name, NAME_WIDTH)
 }
 
-// Claude's row reads its hold while a usage limit stops the run's launches.
+// Claude's row reads its hold while a usage limit or an authentication failure stops the run's launches.
 function row_of(provider: QuotaProvider, view: QuotaView): string {
 	const { hold, now_ms } = view
 	const body =
@@ -257,7 +274,7 @@ function rate_limit_summary(view: QuotaView): Array<string> {
 function summary_of(view: QuotaView): string {
 	const parts = providers_of(view).map((provider) => {
 		const reading = view.quotas?.[provider]
-		const name = name_of(provider, view).trimStart()
+		const name = run_board_label_pair.bare(name_of(provider, view)).trimStart()
 
 		return `${name} ${percents_text(reading, view.now_ms)}${counts_text(reading, view.now_ms)}`
 	})
@@ -269,14 +286,17 @@ function summary_of(view: QuotaView): string {
 function usage_part(view: QuotaView): DetailPart | undefined {
 	if (view.quotas === undefined) return undefined
 
+	const has_lamps = view.has_lamps === true
+	const providers = providers_of(view).map((provider) => row_of(provider, view))
 	const rows = [
-		...providers_of(view).map((provider) => row_of(provider, view)),
+		...run_board_quota_lamps.provider_rows(providers, has_lamps),
 		...rate_limit_rows(view),
 	]
 	const lines = rows.map((text) => ({ text, is_detail: false }))
 	const rule = run_board_render_section.columns_rule(LABEL, [])
+	const head = [run_board_quota_lamps.gap_line(has_lamps), rule]
 
-	return { head: ['', rule], lines, label: LABEL, summary: summary_of(view) }
+	return { head, lines, label: LABEL, summary: summary_of(view) }
 }
 
 const run_board_render_quota = { LEGEND, usage_part }

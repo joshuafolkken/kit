@@ -13,6 +13,7 @@ import { run_hold_ended } from '#scripts/run/hold/run-hold-ended'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { vi } from 'vitest'
+import { run_board_records } from './run-board-records'
 
 const REPOSITORY = '/repo/.git'
 const MAIN_ROOT = '/repo'
@@ -60,7 +61,7 @@ function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(run_hold_ended, 'read_ended').mockReturnValue([])
 	vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
 	vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
-	vi.spyOn(lane_state, 'read_records').mockResolvedValue([])
+	vi.spyOn(run_board_records, 'read_records').mockReturnValue([])
 }
 
 function arrange(read: CarryRead, ended: EndedRun | undefined): void {
@@ -84,7 +85,7 @@ function arrange_states(records: ReadonlyArray<LaneStateRecord>): void {
 	vi.mocked(lane_state.read_states).mockResolvedValue(
 		new Map(records.map((one) => [one.issue, one])),
 	)
-	vi.mocked(lane_state.read_records).mockResolvedValue([...records])
+	vi.mocked(run_board_records.read_records).mockReturnValue([...records])
 }
 
 const run_board_read_fixture = {

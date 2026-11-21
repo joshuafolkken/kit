@@ -1,8 +1,10 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_body } from '#scripts/josh/cli-body'
-import type { InsertKind, InsertPosition } from './epic-chains'
+import { shell_quote } from '#scripts/lib/shell-quote'
+import { epic_chains, type InsertKind, type InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv, type FormFlags } from './epic-cli-argv'
+import { epic_cli_chain, type ChainRead } from './epic-cli-chain'
 import { epic_cli_decide } from './epic-cli-decide'
 import { epic_cli_remove } from './epic-cli-remove'
 import { epic_parse, type ExternalChild } from './epic-parse'
@@ -38,25 +40,29 @@ const DECISION_FLAG = '--decision-file'
 const NOTIFY_FLAG = '--notify'
 // Which flags each form knows, and which of them consume the argument after them — per form, for the
 // reason `epic-cli-argv.ts` gives.
+const BATCH_LIST_FLAGS = [epic_cli_chain.CHAIN_FLAG, epic_cli_chain.ORDER_REASON_FLAG]
 const CREATE_FORM: FormFlags = {
 	switches: [ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG],
+	list_flags: BATCH_LIST_FLAGS,
 }
 const PROMOTE_FORM: FormFlags = {
 	switches: [PROMOTE_FLAG, ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG, TITLE_FLAG],
+	list_flags: BATCH_LIST_FLAGS,
 }
 const RECONCILE_FORM: FormFlags = { switches: [RECONCILE_FLAG] }
 const CHECK_FORM: FormFlags = { switches: [] }
 const ADD_FORM: FormFlags = {
 	switches: [ADD_FLAG],
 	value_flags: [BEFORE_FLAG, AFTER_FLAG, ORDER_BEFORE_FLAG, ORDER_AFTER_FLAG, DECISION_FLAG],
+	list_flags: BATCH_LIST_FLAGS,
 }
 
 const { count_flag, is_switch_set, is_value_unusable, positionals_of, read_flag_value, read_form } =
 	epic_cli_argv
 
-interface CreateArguments {
+interface CreateArguments extends ChainRead {
 	title: string
 	children: Array<number>
 	is_ordered: boolean
@@ -67,7 +73,7 @@ interface CreateArguments {
 
 // `--promote <N> <N1> <N2> …`: the issue to promote, then its children. The title is optional — the
 // issue already has one, and `--title` renames it; the discussion in it is usually the split rationale.
-interface PromoteArguments {
+interface PromoteArguments extends ChainRead {
 	epic_number: number
 	children: Array<number>
 	is_ordered: boolean
@@ -96,7 +102,9 @@ function to_create_arguments(parsed: EpicArgv): CreateArguments | undefined {
 	const children = epic_cli_argv.to_child_numbers(raw_children)
 	if (children.length === 0) return undefined
 
-	return { title, children, ...read_batch_flags(parsed) }
+	const batch = { children, ...read_batch_flags(parsed) }
+
+	return { title, ...batch, ...epic_cli_chain.read_chains(parsed, batch) }
 }
 
 // The title comes first so the children can stay a bare list of numbers, which is how they are
@@ -143,7 +151,9 @@ function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
 
 	if (subject === undefined || title === '') return undefined
 
-	return { ...subject, ...read_batch_flags(parsed), title }
+	const batch = { ...subject, ...read_batch_flags(parsed) }
+
+	return { ...batch, ...epic_cli_chain.read_chains(parsed, batch), title }
 }
 
 function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {
@@ -152,10 +162,11 @@ function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments 
 	return parsed === undefined ? undefined : to_promote_arguments(parsed)
 }
 
-// `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]`: the epic
-// to insert into, then the children. The epic comes first for the same reason it does under
-// `--promote`, so the children stay a bare list of numbers.
-interface AddArguments {
+// `--add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M> |
+// --chain "#A -> #B" ...]`: the epic to insert into, then the children. The epic comes first for the
+// same reason it does under `--promote`, so the children stay a bare list of numbers. `--chain` beside
+// a positioning flag is refused: both would decide where the dependency goes.
+interface AddArguments extends ChainRead {
 	epic_number: number
 	children: Array<number>
 	position?: InsertPosition | undefined
@@ -241,6 +252,20 @@ function parse_position(parsed: EpicArgv): PositionOutcome {
 	}
 }
 
+interface PlacedPosition {
+	position?: InsertPosition | undefined
+	is_order_only?: boolean | undefined
+}
+
+// The positioning flag that names `position` — `--before`, `--order-after`, … — or `undefined` with
+// no position. Read back from the parsed value, so the refusal beside `--chain` and the cross-repository
+// suggestion both name the flag the person typed.
+function to_position_flag(placed: PlacedPosition): string | undefined {
+	if (placed.position === undefined) return undefined
+
+	return `${placed.is_order_only === true ? '--order-' : '--'}${placed.position.kind}`
+}
+
 // Whether *this* is why the insertion could not be read, so the refusal can say so. Without it the
 // caller prints the generic requirements line, and a shell that expanded `--decision-file $REC` to
 // nothing is answered with "an epic number and at least one child issue number are required" — advice
@@ -255,11 +280,14 @@ function to_add_arguments(parsed: EpicArgv): AddArguments | undefined {
 	const outcome = parse_position(parsed)
 	if (outcome.is_refused) return undefined
 
+	const chain_subject = { is_ordered: false, rival_flag: to_position_flag(outcome) }
+
 	return {
 		...subject,
 		position: outcome.position,
 		is_order_only: outcome.is_order_only,
 		decision_path: read_flag_value(parsed, DECISION_FLAG),
+		...epic_cli_chain.read_chains(parsed, chain_subject),
 	}
 }
 
@@ -298,18 +326,34 @@ function find_cross_repo_add_target(argv: ReadonlyArray<string>): CrossRepoAddTa
 	return local === undefined ? undefined : { epic, local }
 }
 
+// Each `--order-reason` as the other checkout reads it back: the chain line, then its reason.
+function format_order_reasons(local: AddArguments): Array<string> {
+	return (local.order_reasons ?? []).flatMap((entry) => [
+		epic_cli_chain.ORDER_REASON_FLAG,
+		shell_quote.single_quoted(
+			`${epic_chains.render_chains([entry.chain]).join('')}: ${entry.reason}`,
+		),
+	])
+}
+
 // Rebuilt from the parsed values rather than echoed from `argv`, so the suggested command is exactly
 // what the other checkout would read — and carries the position, which is the one part of the
 // instruction the epic itself does not record.
+// The order-only prefix rides along, since it is what decides whether the other checkout writes a
+// dependency — a suggestion that dropped it would be a different instruction. So do the `--chain`
+// declarations, for the same reason — and their reasons, without which the other checkout refuses them.
 function format_add_arguments(local: AddArguments): string {
-	const { position } = local
-	// The order-only prefix rides along, since it is what decides whether the other checkout writes a
-	// dependency — a suggestion that dropped it would be a different instruction.
-	const prefix = local.is_order_only === true ? '--order-' : '--'
-	const suffix =
-		position === undefined ? '' : ` ${prefix}${position.kind} ${String(position.target)}`
+	const flag = to_position_flag(local)
+	const position =
+		flag === undefined || local.position === undefined ? [] : [flag, String(local.position.target)]
+	const chains = epic_chains
+		.render_chains(local.chains)
+		.flatMap((line) => [epic_cli_chain.CHAIN_FLAG, `"${line}"`])
+	const reasons = format_order_reasons(local)
 
-	return `${[local.epic_number, ...local.children].map(String).join(' ')}${suffix}`
+	return [local.epic_number, ...local.children, ...position, ...chains, ...reasons]
+		.map(String)
+		.join(' ')
 }
 
 // **`--decision-file` is named rather than relayed**. The suggestion is a

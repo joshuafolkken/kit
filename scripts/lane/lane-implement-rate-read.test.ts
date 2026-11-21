@@ -118,6 +118,24 @@ describe.each([
 	context_tests(reader)
 })
 
+describe('read_ledger', () => {
+	it('keeps only the kinds the rate and the size ratios read (#8243)', async () => {
+		const context = measured_context()
+
+		lane_ledger_write.append(context.ledger_path, {
+			kind: 'held',
+			at: MERGED_AT,
+			issue: ISSUE,
+			reason: 'other',
+		})
+
+		const entries = await lane_implement_rate_read.read_ledger(context)
+
+		expect(lane_ledger.read_entries(context.ledger_path).at(-1)).toMatchObject({ kind: 'held' })
+		expect(entries.map((entry) => entry.kind)).toStrictEqual(['dispatch', 'stage', 'size', 'merge'])
+	})
+})
+
 describe('measurements', () => {
 	it('reads growth without an implement duration (ac-4b828b0f)', async () => {
 		const context = context_of()

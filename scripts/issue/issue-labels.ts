@@ -17,6 +17,10 @@ const IN_PROGRESS_LABEL = 'in-progress'
 // Namespaced like `run:solo`: a bare `planned` is a common roadmap label a person may already apply,
 // and reading one as kickoff's mark would skip the planning that never happened.
 const PLANNED_LABEL = 'run:planned'
+// Applied by `issue:plan --planned` in place of `run:planned` when `--repo` names a repository other
+// than the working checkout's: that plan's estimate came from the wrong tree (joshuafolkken/kit#7733).
+// `issue-auto-ok.ts` excludes it; re-planning from the target's checkout removes it.
+const PLAN_UNVERIFIED_LABEL = 'plan:unverified'
 // Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
 // forever.
@@ -118,7 +122,8 @@ const PARKED_LABELS: ReadonlySet<string> = new Set([
 
 // The labels that mean an open issue must not be handed to a run as it stands: an `epic`
 // tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
-// a running workflow, and a parked issue (`PARKED_LABELS`) waits on a person. Held here rather than in either
+// a running workflow, `plan:unverified` waits on a re-plan from the target's checkout, and a parked
+// issue (`PARKED_LABELS`) waits on a person. Held here rather than in either
 // caller because both the next-issues display and the `auto-ok` pickup ask the same question, and
 // two copies would answer it differently the first time one of them gained another label.
 //
@@ -129,6 +134,7 @@ const PARKED_LABELS: ReadonlySet<string> = new Set([
 const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
+	PLAN_UNVERIFIED_LABEL,
 	...PARKED_LABELS,
 ])
 
@@ -206,6 +212,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 	},
 	{ name: IN_PROGRESS_LABEL, color: '0075ca', description: 'Work is actively in progress' },
 	{ name: PLANNED_LABEL, color: 'c2e0c6', description: 'kickoff posted the plan' },
+	{
+		name: PLAN_UNVERIFIED_LABEL,
+		color: 'e4e669',
+		description: "Planned from another repository's checkout — re-plan in the target to run it",
+	},
 	{
 		name: RUN_SOLO_LABEL,
 		color: 'b60205',
@@ -385,6 +396,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	BREAKING_CHANGE_LABEL,
 	IN_PROGRESS_LABEL,
 	PLANNED_LABEL,
+	PLAN_UNVERIFIED_LABEL,
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 	AUTO_OK_LABEL,
@@ -444,6 +456,7 @@ export {
 	OTHER_CHANGE_LABEL,
 	parked_label_of,
 	PARKED_LABELS,
+	PLAN_UNVERIFIED_LABEL,
 	PLANNED_LABEL,
 	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,

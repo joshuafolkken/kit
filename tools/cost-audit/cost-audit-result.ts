@@ -237,7 +237,14 @@ function result_lines(breakdown: ResultBreakdown): Array<string> {
 	]
 }
 
-const cost_audit_result = { ROW_LIMIT, UNKNOWN_EFFORT, breakdown_of, result_lines }
+const cost_audit_result = {
+	ROW_LIMIT,
+	UNKNOWN_EFFORT,
+	breakdown_of,
+	command_of,
+	josh_of,
+	result_lines,
+}
 
 export type { DuplicateReads, EffortSpend, ResultBreakdown, ResultChars }
 export { cost_audit_result }

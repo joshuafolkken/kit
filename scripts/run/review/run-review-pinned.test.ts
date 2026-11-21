@@ -68,7 +68,7 @@ vi.mock('./run-review-steps', () => ({
 	},
 }))
 
-const BRIEF_LINE = `code brief: ${BRIEF_PATH}\ncode prompt: ${run_ship_review.round_one_opening(BRIEF_PATH)}\n`
+const BRIEF_LINE = `code brief: ${BRIEF_PATH}\ncode prompt: ${run_ship_review.round_one_opening(BRIEF_PATH, 'initial')}\n`
 const FAILURE_EXIT_CODE = 1
 const REASON = 'the branch only logs'
 const SITE = 'scripts/a.ts 0123456789abcdef'
@@ -152,7 +152,7 @@ describe('run:review when no brief follows', () => {
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG])).toBe(FAILURE_EXIT_CODE)
 		expect(pinned_run).not.toHaveBeenCalled()
 		expect(output.stderr.join('')).toBe(
-			'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] | --pinned | --push\n',
+			'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] [--chunk] | --pinned | --push\n',
 		)
 	})
 })

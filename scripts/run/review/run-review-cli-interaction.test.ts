@@ -97,7 +97,12 @@ const CODE: ReviewSlot = 'code'
 const INTERACTION: ReviewSlot = 'interaction'
 
 function brief_lines(slot: ReviewSlot, brief: string): string {
-	return `${slot} brief: ${brief}\n${slot} prompt: ${run_ship_review.round_one_opening(brief)}\n`
+	const opening = run_ship_review.round_one_opening(
+		brief,
+		slot === CODE ? 'initial' : 'interaction',
+	)
+
+	return `${slot} brief: ${brief}\n${slot} prompt: ${opening}\n`
 }
 
 const PATH_LINES = `${brief_lines(CODE, CODE_PATH)}${brief_lines(INTERACTION, INTERACTION_PATH)}`

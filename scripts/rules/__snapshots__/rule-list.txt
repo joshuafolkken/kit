@@ -14,7 +14,7 @@
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Unasked filing** (`unasked-filing`, `.claude/skills/workflow-commands/observation-filing.md`)
   - fires: `pnpm josh pretool:guard` — an interactive session’s `pnpm josh issue:file` when the person’s last prompt asks for no filing; it hands over propose-then-file. Every occurrence
-  - silent: an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, or a prompt that asks for filing
+  - silent: an unattended run (a kit-launched or headless session, a lane child, the `backlogrun` parent), `--check`, `--publish`, or a prompt that asks for filing
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Direct issue comment** (`direct-issue-comment`, `shell-body.md`)
   - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. A line that is only `gh issue comment <N>` with one `--body-file` / `-F <path>` is rewritten to `pnpm josh issue:comment <N> --body-file <path>`; every other form is refused, every occurrence
@@ -50,7 +50,7 @@
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Early progress report** (`early-heartbeat`, `.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet")
   - fires: `pnpm josh pretool:guard` — a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence
-  - silent: no hand-made wait timer — `run:progress` holds the one clock
+  - silent: no hand-made wait timer — `run:progress` holds the one clock; a dispatched lane child, which runs no watcher and waits with the Stop hook's `pnpm josh wait`
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Test declaration** (`test-declared`, `testing-guide.md` → "0. Per-Requirement Test Coverage (MANDATORY)")
   - fires: `pnpm josh pretool:guard` — `pnpm josh git -y` (`josh g`) while `pnpm josh test:declared` answers `required`
@@ -176,9 +176,17 @@
   - fires: `pnpm josh pretool:guard` — network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential, keychain or environment prints — in each shell segment and nested command. Every occurrence
   - silent: ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Durable rule in MEMORY** (`memory-durable-write`, `principles.md`)
+  - fires: `pnpm josh pretool:guard` — a `Write` or `Edit` under `~/.claude/projects/<slug>/memory/` that leaves a `type: feedback` frontmatter. Every occurrence
+  - silent: the `user`, `project` and `reference` types, the `MEMORY.md` index, or a path outside `~/.claude/projects`
+  - not automated: the prompt/doc change that replaces the memory is prose only the model can write
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
-  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence, outside a started child
   - silent: the command started with `run_in_background` — its exit ends the wait
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Output poll loop in a started child** (`poll-loop-child`, `.claude/skills/workflow-commands/background-commands.md`)
+  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence, in a started lane, hand-off or beside child
+  - silent: `pnpm josh wait` before the read, or the command run in the foreground
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Direct git status** (`direct-git-status`, `docs/josh-commands-backlog.md` → "`josh tree:status`")
   - fires: `pnpm josh pretool:guard` — a `git status` with no flag or only `-s` / `--short` / `-b` / `--branch` / `--porcelain` (bare, wrapped or inside `sh -c`); it points at `pnpm josh tree:status`. Once per run
@@ -212,6 +220,10 @@
   - fires: `pnpm josh stop:guard` — a reply whose narrative outside code, tables and lists is over 400 letters. Blocks the stop
   - silent: a reply under the limit, a prompt asking for the detail (`詳しく` / `具体的に` / `詳細`), a fixed output in a code block, no prompt of the person’s on the transcript tail, or a headless session
   - not automated: the shorter reply is prose only the model can write
+- **Reply close** (`reply-close`, `principles.md` → "concise-reply")
+  - fires: `pnpm josh stop:guard` — a reply whose last paragraph has no `次の一手:` / `Next:` line and no `このセッションのやり残しはない` / `Nothing left in this session` line. Blocks the stop
+  - silent: a reply with a `Recommended:` decision, a reply that is only a code block (a fixed output), a held stop with no decision (its own refusal asks for the close), no prompt of the person’s on the transcript tail, or an unattended session (headless, a lane child, the backlogrun parent)
+  - not automated: whether anything is left, and what, is known only to the model that did the work
 - **Stop notification** (`stop-notify`, `rule-delivery.md` → "stop-notify")
   - fires: `pnpm josh stop:guard` — a stop with the work tree held and no `confirmation` notify that turn. Sends the notify itself; blocks only when the send fails
   - silent: no hold, a `confirmation` notify on the tail, or a pre-gate cut taken
@@ -224,3 +236,7 @@
   - fires: `pnpm josh stop:guard` — an unattended run (a kit-launched headless session, a lane child, a `backlogrun` parent) whose last reply offers to file without filing. Blocks the stop
   - silent: an interactive session, already filed, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner
   - not automated: the filing needs a title and a body only the model can write
+- **Deferral owner** (`deferral-owner`, `prompts/collaboration-workflow/principles.md` → "concise-reply")
+  - fires: `pnpm josh stop:guard` — any session whose last reply recommends deciding, investigating or filing later with no `#N`, filing draft or reason not to track in that paragraph. Blocks the stop
+  - silent: an owner in the same paragraph, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner
+  - not automated: which Issue owns the deferral, or why it is not tracked, is the model’s call

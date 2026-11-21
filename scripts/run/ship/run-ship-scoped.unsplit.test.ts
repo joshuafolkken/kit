@@ -45,6 +45,7 @@ const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const FAILURE = 'no import graph could be built'
 const UNSPLIT = run_ship_synced_scope.unsplit_line(FAILURE)
 const NAMED_FILE = 'scripts/run/ship/run-ship-scoped.ts'
+const MEETING_FILE = 'scripts/run/ship/run-ship-narrowed.ts'
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
@@ -112,7 +113,8 @@ describe('run_ship_scoped.scoped_pair — the lap of a merge-scoped pair', () =>
 		await run_ship_lap.within('6196', 'gate', run_ship_scoped.scoped_pair)
 
 		expect(commands()).toStrictEqual([`${LINT} ${NAMED_FILE}`, `${TEST} ${NAMED_FILE}`])
-		expect(lap()).toMatchObject({ step: PAIR_STEP, named: 1 })
+		// joshuafolkken/kit#7846: a pair named with no merge read kept no per-check count (ac-c5893692).
+		expect(lap()).toMatchObject({ named: 1, breakdown: { lint_named: 1, test_named: 1 } })
 	})
 
 	it('records the failure of a merge the import graph could not split', async () => {
@@ -130,21 +132,88 @@ describe('run_ship_scoped.scoped_pair — the lap of a merge-scoped pair', () =>
 	})
 })
 
-// joshuafolkken/kit#7052: lint's meeting handed to test:related ran every importer of main's modules.
-describe('run_ship_scoped.scoped_pair — each check over its own part of a merge', () => {
-	it('names test:related over its own part and lint:related over the overlap alone', async () => {
-		const meeting = 'scripts/run/ship/run-ship-narrowed.ts'
+// joshuafolkken/kit#7788: which condition named a pair of 901 files over a 25-file branch.
+describe('run_ship_scoped.scoped_pair — what each condition named', () => {
+	beforeEach(() => {
+		vi.mocked(lane_ledger_write.record_ship_lap).mockClear()
+	})
+
+	it('logs and laps what each condition named (ac-10542962, ac-490219c5)', async () => {
+		const breakdown = { both: 1, unsplit: 0, read_by_tests: 0, shared: 3, lint_meeting: 1 }
 
 		read_sync_mock.mockResolvedValue({
 			checks: [],
-			synced: [meeting],
-			overlap: [meeting],
+			synced: [NAMED_FILE],
+			overlap: [NAMED_FILE],
+			breakdown,
+		})
+
+		await run_ship_lap.within('7788', 'sync', run_ship_scoped.scoped_pair)
+
+		expect(process.stdout.write).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'both 1, unsplit 0, read_by_tests 0, shared 3, lint_meeting 1, lint_named 1, test_named 1.',
+			),
+		)
+		expect(lap()).toMatchObject({
+			step: PAIR_STEP,
+			named: 1,
+			breakdown: { ...breakdown, lint_named: 1, test_named: 1 },
+		})
+	})
+})
+
+// joshuafolkken/kit#7846: `named` is the union of both checks' files, which hid what each ran over.
+describe('run_ship_scoped.scoped_pair — the files each check was handed', () => {
+	beforeEach(() => {
+		vi.mocked(lane_ledger_write.record_ship_lap).mockClear()
+	})
+
+	it('laps each check its own part of a merge (ac-c5893692)', async () => {
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: [MEETING_FILE],
+			overlap: [MEETING_FILE],
+			test_overlap: [NAMED_FILE, MEETING_FILE],
+			breakdown: { shared: 1 },
+		})
+
+		await run_ship_lap.within('7846', 'sync', run_ship_scoped.scoped_pair)
+
+		expect(lap()).toMatchObject({
+			named: 2,
+			breakdown: { shared: 1, lint_named: 1, test_named: 2 },
+		})
+	})
+})
+
+// joshuafolkken/kit#7052: lint's meeting handed to test:related ran every importer of main's modules.
+describe('run_ship_scoped.scoped_pair — each check over its own part of a merge', () => {
+	it('names test:related over its own part and lint:related over the overlap alone', async () => {
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: [MEETING_FILE],
+			overlap: [MEETING_FILE],
 			test_overlap: [NAMED_FILE],
 		})
 
 		await run_ship_scoped.scoped_pair()
 
-		expect(commands()).toStrictEqual([`${LINT} ${meeting}`, `${TEST} ${NAMED_FILE}`])
+		expect(commands()).toStrictEqual([`${LINT} ${MEETING_FILE}`, `${TEST} ${NAMED_FILE}`])
+	})
+
+	// joshuafolkken/kit#7788: a test reaching both sides through others is no file lint reads.
+	it('runs test:related alone when lint:related has no file where the two meet', async () => {
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: [NAMED_FILE],
+			overlap: [],
+			test_overlap: [NAMED_FILE],
+		})
+
+		await run_ship_scoped.scoped_pair()
+
+		expect(commands()).toStrictEqual([`${TEST} ${NAMED_FILE}`])
 	})
 
 	it('runs the pair bare when test:related’s own part cannot be named', async () => {

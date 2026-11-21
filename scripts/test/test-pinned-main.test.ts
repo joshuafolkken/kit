@@ -70,7 +70,7 @@ describe('test_pinned_main.main', () => {
 		run.mockResolvedValue(CLEAN_REPORT)
 
 		expect(await test_pinned_main.main([])).toBe(0)
-		expect(run).toHaveBeenCalledWith(20, false, MANUAL)
+		expect(run).toHaveBeenCalledWith(20, false, MANUAL, false)
 		expect(output.stdout.join('')).toBe('unpinned 0 · unchecked 0\n')
 	})
 
@@ -78,7 +78,7 @@ describe('test_pinned_main.main', () => {
 		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], unchecked: [HUNK], max_hunks: 1 })
 
 		expect(await test_pinned_main.main(['--max', '1'])).toBe(1)
-		expect(run).toHaveBeenCalledWith(1, false, MANUAL)
+		expect(run).toHaveBeenCalledWith(1, false, MANUAL, false)
 		expect(output.stdout.join('')).toBe(
 			`${GREEN_LINE}unchecked 1 — over the 1-hunk cap\n` +
 				'full output: josh-test-pinned-list-\n' +
@@ -109,6 +109,16 @@ describe('test_pinned_main.main --help', () => {
 		expect(output.stderr.join('')).toContain(
 			`\n  over the ${String(test_pinned_logic.MAX_TEST_FILES)}-test-file cap,\n`,
 		)
+	})
+
+	// joshuafolkken/kit#7809: the usage names the `--reasoned` flag and what it marks.
+	it('names --reasoned in the synopsis and says what it marks', async () => {
+		await test_pinned_main.main(['--help'])
+
+		const usage = output.stderr.join('')
+
+		expect(usage).toContain('[--first-unpinned] [--reasoned] [--help]')
+		expect(usage).toContain('--reasoned marks there a launch under an --unpinned-ok reason')
 	})
 })
 
@@ -221,7 +231,7 @@ describe('test_pinned_main.main --first-unpinned', () => {
 		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], cut: [CUT_HUNK] })
 
 		expect(await test_pinned_main.main([FIRST_UNPINNED])).toBe(1)
-		expect(run).toHaveBeenCalledWith(20, true, MANUAL)
+		expect(run).toHaveBeenCalledWith(20, true, MANUAL, false)
 		expect(output.stdout.join('')).toContain(
 			'unchecked 1 — not probed: the run stopped at the first unpinned hunk',
 		)
@@ -243,6 +253,15 @@ describe('test_pinned_main.main --origin', () => {
 
 		await test_pinned_main.main(['--origin', PRE_DETACH, '--record', TOKEN])
 
-		expect(run).toHaveBeenCalledWith(20, false, PRE_DETACH)
+		expect(run).toHaveBeenCalledWith(20, false, PRE_DETACH, false)
+	})
+
+	// joshuafolkken/kit#7809: a launch under an `--unpinned-ok` reason is marked on the run's ledger row.
+	it('hands the run a reasoned launch', async () => {
+		run.mockResolvedValue(CLEAN_REPORT)
+
+		await test_pinned_main.main(['--reasoned', '--origin', PRE_DETACH, '--record', TOKEN])
+
+		expect(run).toHaveBeenCalledWith(20, false, PRE_DETACH, true)
 	})
 })

@@ -74,7 +74,8 @@ describe('run_board_render.render — a running lane row on a narrow pane', () =
 		for (const line of lines) {
 			expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
 			expect(line).toContain(ELAPSED)
-			expect(line).toMatch(/…$/u)
+			// The title's cut, then the unmeasured finish (joshuafolkken/kit#7920).
+			expect(line).toMatch(/… {2}🎯 —$/u)
 		}
 	})
 
@@ -97,5 +98,43 @@ describe('run_board_render.render — a running lane row on a narrow pane', () =
 
 	it('draws a frame with no pane, or a pane wide enough, as it was', () => {
 		expect(lane_lines(WIDE)).toStrictEqual(lane_lines(undefined))
+	})
+})
+
+// joshuafolkken/kit#8257: a queued row with a path after it pads its title to the title column, so a
+// narrow pane takes its overrun from that padding before it cuts the title itself.
+const QUEUED_NUMBER = 4041
+const QUEUED_TITLE = 'A queued row waits'
+const PATH = 'package.json'
+const SHORTENED = 10
+
+function queued_line(columns: number | undefined): string {
+	const reason = { icon: '📂', issues: [String(HELD)], tail: PATH }
+	const row: BoardRow = {
+		number: QUEUED_NUMBER,
+		title: QUEUED_TITLE,
+		kind: undefined,
+		state: 'waiting',
+		status: undefined,
+		waits: [],
+		reason,
+	}
+	const layout = { ...EMPTY_LAYOUT, queued: [{ kind: 'row' as const, row }] }
+	const size = columns === undefined ? undefined : { columns, rows: 50 }
+	const lines = run_board_render
+		.render({ header: header({ layout }), notes: [], size })
+		.map((line) => stripVTControlCharacters(line))
+
+	return lines.find((line) => line.includes(String(QUEUED_NUMBER))) ?? ''
+}
+
+describe('run_board_render.render — a padded queued row on a narrow pane', () => {
+	it('gives up its title padding first, keeping its whole title and path within the pane', () => {
+		const columns = run_board_fit.width_of(queued_line(undefined)) - SHORTENED
+		const line = queued_line(columns)
+
+		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(columns)
+		expect(line).toContain(QUEUED_TITLE)
+		expect(line).toContain(PATH)
 	})
 })

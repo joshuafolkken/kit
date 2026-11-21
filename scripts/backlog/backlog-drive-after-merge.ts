@@ -2,6 +2,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_read } from '#scripts/issue/issue-read'
 import { josh_command } from '#scripts/josh/josh-run'
+import { session_language } from '#scripts/josh/session-language'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_park_body } from '#scripts/run/park/run-park-body'
@@ -18,10 +19,65 @@ import { backlog_drive_retry } from './backlog-drive-retry'
 // option, recorded as `Auto-decided: …` and announced afterwards, so a person overrides it with a
 // later decision comment instead of being waited on. A park whose every option a person must take stays.
 
+// The heading and the `Auto-decided: ` prefix are matched (here and by `run-cut-digest.ts`), so they stay
+// English; the prose under them follows the session language (`prompts/collaboration-workflow/overview.md`).
 const DECISION_HEADING = '## Decision (backlog:drive)'
+const DECISION_PREFIX = 'Auto-decided: '
 const SUCCESS_EXIT_CODE = 0
-const DEFAULT_REASON =
-	'because the park had no recommendation and it is the first reversible option with the smallest change (not tier C, no permission, no size approval)'
+
+interface DecisionWords {
+	recommended: (pick: string) => string
+	choice: (pick: string, over: string) => string
+	no_other: string
+	other: (options: string) => string
+	reason: string
+}
+
+function english_recommended(pick: string): string {
+	return `Taking recommended option ${pick}: tier A, no person's permission needed.`
+}
+
+function english_choice(pick: string, over: string): string {
+	return `option ${pick} over ${over}`
+}
+
+function english_other(options: string): string {
+	return `option ${options}`
+}
+
+function japanese_recommended(pick: string): string {
+	return `推奨案 ${pick} を選ぶ。tier A で、人の許可は要らない。`
+}
+
+function japanese_choice(pick: string, over: string): string {
+	return `案 ${pick} を選ぶ（${over}）`
+}
+
+function japanese_other(options: string): string {
+	return `案 ${options} より優先`
+}
+
+const EN: DecisionWords = {
+	recommended: english_recommended,
+	choice: english_choice,
+	no_other: 'no other option',
+	other: english_other,
+	reason:
+		' because the park had no recommendation and it is the first reversible option with the smallest change (not tier C, no permission, no size approval).',
+}
+
+const JA: DecisionWords = {
+	recommended: japanese_recommended,
+	choice: japanese_choice,
+	no_other: 'ほかに案は無い',
+	other: japanese_other,
+	reason:
+		'。推奨案が無く、戻せる案（tier C でなく、許可もサイズ承認も要らない）のうち変更が最も小さい最初の案だから。',
+}
+
+function words(): DecisionWords {
+	return session_language.is_japanese(session_language.resolve_session_lang().lang) ? JA : EN
+}
 
 interface ParkPorts {
 	bodies: (issue: string) => Promise<ReadonlyArray<string>>
@@ -57,27 +113,26 @@ async function notify_decided(line: string): Promise<boolean> {
 const PORTS: ParkPorts = { bodies: trusted_bodies, run: run_josh, notify: notify_decided }
 
 function recommended(pick: number): Decision {
-	return {
-		text: `Taking recommended option ${String(pick)}: tier A, no person's permission needed.`,
-	}
+	return { text: words().recommended(String(pick)) }
 }
 
 function defaulted(issue: string, park: string): Decision | undefined {
 	const pick = run_park_body.default_pick(park)
 
 	if (pick === undefined) return undefined
-	const over = pick.over.length === 0 ? 'no other option' : `option ${pick.over.join(', ')}`
-	const choice = `Auto-decided: option ${String(pick.number)} over ${over}`
+	const prose = words()
+	const over = pick.over.length === 0 ? prose.no_other : prose.other(pick.over.join(', '))
+	const choice = `${DECISION_PREFIX}${prose.choice(String(pick.number), over)}`
 
 	return {
-		text: `${choice} ${DEFAULT_REASON}.`,
+		text: `${choice}${prose.reason}`,
 		notice: `${issue_cite.plain_for('program', issue)}: ${choice}`,
 	}
 }
 
 function decision_of(issue: string, bodies: ReadonlyArray<string>): Decision | undefined {
 	if (bodies.some((body) => body.startsWith(DECISION_HEADING))) return undefined
-	const park = bodies.findLast((body) => run_park_body.problem_of(body) === undefined)
+	const park = bodies.findLast((body) => run_park_body.is_park(body))
 
 	if (park === undefined) return undefined
 	const pick = run_park_body.auto_pick(park)

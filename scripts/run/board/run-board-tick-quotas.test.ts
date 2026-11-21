@@ -13,6 +13,7 @@ const QUOTAS: Quotas = {
 	claude: { windows: [{ minutes: 300, used_percent: 42, resets_ms: 0 }], taken_ms: 0 },
 	codex: undefined,
 }
+const HOUR_MS = 3_600_000
 const DRAWN_NAMES = { claude: 'Claude', codex: 'Codex' } as const
 
 describe('run_board_tick.tick quotas', () => {
@@ -55,6 +56,20 @@ describe('run_board_tick.tick quotas', () => {
 
 		expect(state.quotas).toBeUndefined()
 		expect(frames.join('\n')).not.toContain('⛽ usage')
+	})
+})
+
+describe('run_board_tick.tick quota hold', () => {
+	// joshuafolkken/kit#8013: the hold's cause reaches the usage row, so an auth failure is no limit.
+	it('draws the authentication-failure hold the local read carries on the usage row', async () => {
+		const held = { ...LOCAL, usage_reset_ms: Date.now() + HOUR_MS, usage_cause: 'auth' as const }
+		const { ports, frames, gathering } = harness(held, [plan_titled('a')])
+
+		gathering.read_quotas = vi.fn(async () => QUOTAS)
+		await tick(FRESH_STATE, ports)
+
+		expect(frames.join('\n')).toContain('🔑 auth failed · recheck ↻')
+		expect(frames.join('\n')).not.toContain('🛑 limit')
 	})
 })
 

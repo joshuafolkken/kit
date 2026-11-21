@@ -1,3 +1,4 @@
+import { backlog_interrupt } from '#scripts/backlog/backlog-interrupt'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
 import { epic_busy, type BusyRead } from './epic-busy'
@@ -12,6 +13,7 @@ import { epic_lane_occupancy, type OccupancyRead } from './epic-lane-occupancy'
 import { epic_rank } from './epic-rank'
 import type { EpicVerdict } from './epic-report'
 import { epic_solo } from './epic-solo'
+import { epic_solo_parked } from './epic-solo-parked'
 import { epic_solo_stale } from './epic-solo-stale'
 import { epic_triage, type TriageVerdict } from './epic-triage'
 
@@ -273,6 +275,30 @@ function triage_offer(pools: ReadonlyArray<RepoPool>, request: LaneRequest): Lan
 	}
 }
 
+// An interrupt defect outside every pool that awaits a person's decision holds a `--lanes` ask the
+// way it holds `backlog:next` (joshuafolkken/kit#7860).
+async function interrupt_offer(request: LaneRequest): Promise<LaneOffer | undefined> {
+	if (!request.is_all_lanes) return undefined
+
+	const pending = await backlog_interrupt.read(request.repo)
+
+	if (pending.length === NO_LANES) return undefined
+
+	return {
+		children: [],
+		verdict: WAIT_VERDICT,
+		notice: backlog_interrupt.decision_message(pending, request.repo),
+	}
+}
+
+// A parked `run:solo` issue still open holds every offer, whatever the occupancy
+// (`epic-solo-parked.ts`).
+async function parked_offer(request: LaneRequest): Promise<LaneOffer | undefined> {
+	const notice = await epic_solo_parked.notice(request.repo)
+
+	return notice === undefined ? undefined : { children: [], verdict: WAIT_VERDICT, notice }
+}
+
 function full_notice(
 	occupancy: OccupancyRead,
 	request: LaneRequest,
@@ -318,7 +344,12 @@ async function offer_for_repo(
 	pools: ReadonlyArray<RepoPool>,
 	request: LaneRequest,
 ): Promise<LaneOffer> {
-	return triage_offer(pools, request) ?? (await offer_after_triage(pools, request))
+	return (
+		triage_offer(pools, request) ??
+		(await interrupt_offer(request)) ??
+		(await parked_offer(request)) ??
+		(await offer_after_triage(pools, request))
+	)
 }
 
 // A `--repo` compared against the repository this command runs in, case-insensitively as GitHub

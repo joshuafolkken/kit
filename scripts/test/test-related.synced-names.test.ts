@@ -21,8 +21,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	},
 }))
 vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
-// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+// The selection walks no import graph here; what it selects is `test-related-select.test.ts`.
 vi.mock('./test-pinned-reach')
+vi.mock('./test-related-select', async () => await import('./test-related-select-fixture'))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -67,6 +68,7 @@ function with_map(): void {
 		left: [],
 		shared: [SHARED_TEST],
 		meeting: [SHARED_TEST],
+		touching: [],
 	})
 	vi.spyOn(test_read_map, 'read_map').mockReturnValue({
 		version: test_read_map.MAP_VERSION,

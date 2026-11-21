@@ -9,6 +9,7 @@ function row(key: string, current: number, previous: number, is_regression = fal
 }
 
 const NO_DENSITY = { requests: 0, calls: 0, single: 0 }
+const REVIEW_FIX_PHASE = 'implement: review-fix'
 const NO_REGRESSIONS = 'Regressions: none'
 const NO_REWRITES = { after_wait: { count: 0, usd: 0 }, within_ttl: { count: 0, usd: 0 } }
 const NO_FIRST = { sessions: 0, p50_tokens: undefined }
@@ -40,15 +41,45 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		kinds: [],
 		tools: [],
 		guards: [],
-		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
+		rewrites: { current: NO_REWRITES, previous: NO_REWRITES, waits: [] },
+		write_causes: [],
 		phases: [],
 		agents: [],
 		usage: NO_USAGE,
 		results: NO_RESULTS,
 		sequences: { runs: [], retries: [] },
+		resumes: { triggers: [], review_fix: row(REVIEW_FIX_PHASE, 0, 0) },
 		...overrides,
 	}
 }
+
+// joshuafolkken/kit#8311: the resume sessions by trigger, and their share of the review-fix phase.
+describe('cost_audit_format.report_lines — the resume triggers', () => {
+	const triggers = [
+		{ key: 'review-fix cut', current: { sessions: 4, usd: 8 }, previous: { sessions: 1, usd: 2 } },
+	]
+	const resumes = { triggers, review_fix: row(REVIEW_FIX_PHASE, 6, 1) }
+
+	it('prints each trigger with its sessions and per-merge cost beside the period before', () => {
+		const merges = { current: 4, previous: 2 }
+		const lines = cost_audit_format.report_lines(audit_with({ resumes, merges }))
+
+		expect(lines).toContain(
+			'  review-fix cut: $8.0000 (prev $2.0000, +300.0%) · 4 session(s) (prev 1) · $2.0000 per merge (prev $1.0000)',
+		)
+		expect(lines).toContain(
+			'  resume within implement: review-fix: $6.0000 (prev $1.0000, +500.0%)',
+		)
+	})
+
+	it('leaves out the per-merge cost when the merges were not read', () => {
+		const lines = cost_audit_format.report_lines(audit_with({ resumes }))
+
+		expect(lines).toContain(
+			'  review-fix cut: $8.0000 (prev $2.0000, +300.0%) · 4 session(s) (prev 1)',
+		)
+	})
+})
 
 // joshuafolkken/kit#7042: the usage breakdown a cost-reduction Issue compares before and after.
 describe('cost_audit_format.report_lines — the usage breakdown', () => {
@@ -91,6 +122,20 @@ describe('cost_audit_format.report_lines — the usage breakdown', () => {
 	})
 })
 
+// joshuafolkken/kit#7877: the cache write by cause, each row beside the period before.
+describe('cost_audit_format.report_lines — the cache write by cause', () => {
+	it('prints a cause dollars, writes and tokens, and its 1h write at the 5m rate', () => {
+		const write = { tokens_5m: 1_000_000, tokens_1h: 1_000_000, usd_5m: 5, usd_1h: 8 }
+		const current = { writes: 3, write, usd_1h_at_5m: 5 }
+		const previous = { writes: 2, write: { ...write, usd_1h: 0 }, usd_1h_at_5m: 0 }
+		const write_causes = [{ cause: 'session start' as const, current, previous }]
+
+		expect(cost_audit_format.report_lines(audit_with({ write_causes }))).toContain(
+			'  session start: $13.0000 (prev $5.0000, +160.0%) · 3 writes (prev 2), 2,000,000 tokens · 1h 1,000,000 tokens ($8.0000), $5.0000 at 5m',
+		)
+	})
+})
+
 describe('cost_audit_format.report_lines — the lane-child density line', () => {
 	it('prints the lane children calls per request and single-call share beside the previous period', () => {
 		const lane_density = {
@@ -112,29 +157,36 @@ describe('cost_audit_format.report_lines — the lane-child density line', () =>
 
 // joshuafolkken/kit#5952: a measurement Issue declares the density, so it has to be a bare number.
 describe('cost_audit_format.density_value — the density as one number', () => {
-	it('prints the current period calls per request alone, two decimals', () => {
-		const lane_density = {
-			current: { requests: 4, calls: 8, single: 1 },
-			previous: { requests: 100, calls: 145, single: 79 },
-		}
-
-		expect(cost_audit_format.density_value(audit_with({ lane_density }))).toBe('2.00')
+	it('prints the calls per request alone, two decimals', () => {
+		expect(cost_audit_format.density_value({ requests: 4, calls: 8, single: 1 })).toBe('2.00')
 	})
 
 	it('answers nothing, not a zero, where no lane child made a request', () => {
-		expect(cost_audit_format.density_value(audit_with())).toBeUndefined()
+		expect(cost_audit_format.density_value(NO_DENSITY)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8284: the line above the number names the value and the dates it covers.
+describe('cost_audit_format.density_label — the line over the density', () => {
+	it('names the value and the UTC dates of the window, its end excluded', () => {
+		const window = { start_ms: Date.UTC(2026, 10, 10), end_ms: Date.UTC(2026, 10, 19) }
+
+		expect(cost_audit_format.density_label(window)).toBe(
+			'lane-child calls per request 2026-11-10..2026-11-18',
+		)
 	})
 })
 
 describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 	it('prints the rewrites after a wait and within the TTL beside the previous period', () => {
 		const current = { after_wait: { count: 631, usd: 182 }, within_ttl: { count: 2, usd: 0.5 } }
-		const lines = cost_audit_format.report_lines(
-			audit_with({ rewrites: { current, previous: NO_REWRITES } }),
-		)
+		const waits = [{ by: 'phase', rows: [{ key: 'plan', count: 631, usd: 182, tokens: 1 }] }]
+		const rewrites = { current, previous: NO_REWRITES, waits }
+		const lines = cost_audit_format.report_lines(audit_with({ rewrites }))
 
 		expect(lines).toContain('  after a wait of 5 min or more: 631 ($182.0000) (prev 0 ($0.0000))')
 		expect(lines).toContain('  within 5 min: 2 ($0.5000) (prev 0 ($0.0000))')
+		expect(lines).toContain('  plan: 631 · $182.0000 · 1 tokens')
 	})
 })
 
@@ -229,14 +281,13 @@ const FULLRUN_LINE = '  fullrun: $9.0000 (prev $12.0000, -25.0%)'
 describe('cost_audit_format.report_lines — the session kinds by model', () => {
 	it('prints each model of a session kind under it with its dollars by token type', () => {
 		const models = [{ model: OPUS, input: 4, cache_read: 2, cache_write: 1, output: 2 }]
+		const sessions = { current: 3, previous: 0 }
 		const lines = cost_audit_format.report_lines(
-			audit_with({ kinds: [{ ...row('fullrun', 9, 12), models }] }),
+			audit_with({ kinds: [{ ...row('fullrun', 9, 12), models, sessions }] }),
 		)
-		const kind = lines.indexOf(FULLRUN_LINE)
+		const kind = lines.indexOf(`${FULLRUN_LINE} · 3 session(s) (prev 0)`)
 
-		expect(lines[kind - 1]).toBe(
-			'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)',
-		)
+		expect(lines[kind - 1]).toMatch(/^By session kind \(cost · sessions · cost per session/u)
 		expect(lines[kind + 1]).toBe(
 			'    claude-opus-4-6: $9.0000 — $4.0000 / $2.0000 / $1.0000 / $2.0000',
 		)

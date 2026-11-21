@@ -4,6 +4,9 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 // command's usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so
 // the map keeps its order.
 
+const BOARD_THEME = '--theme wargames'
+const MATRIX_THEME = '--theme matrix'
+
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
 		script: 'scripts/run/progress/run-progress-main.ts',
@@ -55,16 +58,27 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
-		reference: ['[--once | --chat | --every <minutes>]', 'automation', ['files', 'network']],
+		reference: [
+			`[--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--timing]`,
+			'automation',
+			['files', 'network'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'redraw until interrupted' },
 				{ arguments: '--once', note: 'one frame, then exit' },
 				{ arguments: '--chat', note: 'one frame for a chat, recorded as a progress report' },
 				{
+					arguments: '--chat --fresh',
+					note: 'the same, read from scratch past the one-minute record',
+				},
+				{
 					arguments: '--every 5',
 					note: 'the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends',
 				},
+				{ arguments: BOARD_THEME, note: 'cyan phosphor text and dashed rules' },
+				{ arguments: MATRIX_THEME, note: 'green phosphor text and the TRACE gauge' },
+				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
 			],
 			flags: [
 				{
@@ -73,9 +87,69 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 						'answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.',
 				},
 				{
+					names: ['--once', '--chat'],
+					description:
+						'each keeps the frame it drew for one minute, per checkout (`--once` per theme and per terminal or pipe); asked again within the minute, it writes that frame with a `recorded <N>s ago` line, read nothing. The age counts from when the read began.',
+				},
+				{
+					names: ['--fresh'],
+					description:
+						'with `--chat`: reads from scratch past the record, and records what it drew; the `run:handoff-lanes` chain passes it right after a merge.',
+				},
+				{
 					names: ['--every <minutes>'],
 					description:
 						'sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'draws uncolored text in phosphor cyan, rules as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board (`backlogrun` too), `--theme` wins. A live board types its opening line, reveals its first frame block by block, left to right, 75 ms a line (a key skips it), then types each new issue row, `█` after it. Unknown names are refused; `--chat` and `--every` never take it.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`; one table, `run-board-theme-glyphs.ts`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'drops an icon drawn beside the label that says what it marks (`CPU`, `QUEUED`), keeping one before a value (`CP 67%`): in a column’s rule its place is the rule, a heading reads `V -- NAME`, a row label moves into its place. One helper marks them (`run-board-label-pair.ts`); no theme and `--chat` draw as before.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`DC`), green done (`OK`), bold white in progress (`RN`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'ends the header’s first line on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'a live board runs a WOPR lamp panel on `24h`, `7d`, the blank line and usage’s first two provider rows (both or neither): past `NOW`, a `■` every other column to the throughput rule’s end, yellow, yellow, red, yellow, red, out in dimmed half yellow on every row (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).',
+				},
+				{
+					names: [MATRIX_THEME],
+					description:
+						'draws as `--theme wargames` does, red and amber kept, with uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No opening line, lamps or typed rows.',
+				},
+				{
+					names: ['--timing'],
+					description:
+						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.',
+				},
+				{
+					names: ['--timing'],
+					description:
+						"on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`) and the GC within it (`run-board-stall.ts`).",
 				},
 			],
 		},
@@ -131,6 +205,24 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					arguments: 'backlogrun <E> --only',
 					note: 'josh backlogrun with this session’s --agent',
 				},
+			],
+		},
+	},
+	wait: {
+		script: 'scripts/run/run-wait-main.ts',
+		description:
+			'Wait until a pid or process ends or a file exists, or one ship:wait chunk (done | pending)',
+		category: 'AI tools',
+		reference: [
+			'[--pid <pid> | --process <pattern> | --file <path>]',
+			'automation',
+			['processes', 'files'],
+		],
+		is_read_only: true,
+		usage: {
+			examples: [
+				{ arguments: '--process "run:chain <N>"', note: 'as `pgrep -f`' },
+				{ arguments: '', note: 'a background subagent: the chunk' },
 			],
 		},
 	},

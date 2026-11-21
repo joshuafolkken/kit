@@ -36,6 +36,7 @@ import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { raw_field_body } from './raw-field-body'
 import { repeat_check_related } from './repeat-check-related'
+import { reply_close } from './reply-close'
 import { reviewer_foreground } from './reviewer-foreground'
 import { round_one_check_related } from './round-one-check-related'
 import { rule_body_guard } from './rule-body-guard'
@@ -192,7 +193,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 				'`.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet"',
 			fires:
 				'a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence',
-			quiet: 'no hand-made wait timer — `run:progress` holds the one clock',
+			quiet:
+				"no hand-made wait timer — `run:progress` holds the one clock; a dispatched lane child, which runs no watcher and waits with the Stop hook's `pnpm josh wait`",
 		},
 	},
 	// Before `run-tail`: whether to commit at all is decided before how to push.
@@ -250,6 +252,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	...file_edit_rows.SHELL_ROWS,
 	...permission_guards.ROWS,
 	poll_loop.ROW,
+	poll_loop.STARTED_CHILD_ROW,
 	// After the safety rows: a harmless read is steered only once nothing on the line is refused.
 	direct_git_status.ROW,
 	// Before `rule-body`, its one overlap: the cut is the right first act, and `rule-body` delivers on
@@ -311,6 +314,7 @@ const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
 	INVESTIGATION_RULE,
 	// Delivered by `stop:guard`; listed here so `rule:value` counts its refusals.
 	concise_reply.ROW,
+	reply_close.ROW,
 ]
 
 const { SWITCH_ENV_KEY, guard_of } = delivered_rules_guard
@@ -326,7 +330,7 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 // still right one reissue later; stamps are keyed per id, so it is delivered then.
 function delivery(
 	raw_payload: string,
-	now_ms: number = Date.now(),
+	now_ms: number,
 	context: HookContext = hook_context.from_process(),
 ): string | undefined {
 	for (const guard of GUARDS.values()) {

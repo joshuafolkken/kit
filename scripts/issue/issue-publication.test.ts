@@ -140,6 +140,25 @@ it('makes no publication write when a later child cannot be read', async () => {
 	expect(issue_publication_state.is_pending(read(FIRST).body)).toBe(true)
 })
 
+const UNVERIFIED = [PLANNED, 'plan:unverified']
+const RE_RECORD = 'needs its plan re-recorded'
+
+// joshuafolkken/kit#8105: `run:pause` judges a prepared prerequisite's plan by this same predicate.
+it('names the missing plan of an unplanned or unverified child and passes a planned one', () => {
+	expect(issue_publication.missing_plan_of(child(FIRST))).toBe('needs its recorded plan')
+	expect(issue_publication.missing_plan_of({ ...child(FIRST), labels: UNVERIFIED })).toContain(
+		RE_RECORD,
+	)
+	expect(issue_publication.missing_plan_of({ ...child(FIRST), labels: [PLANNED] })).toBeUndefined()
+})
+
+it('withholds a child whose plan was written outside the target checkout', async () => {
+	ready()
+	rows.set(FIRST, { ...read(FIRST), labels: UNVERIFIED })
+	await expect(issue_publication.publish(EPIC, REPO)).rejects.toThrow(RE_RECORD)
+	expect(write).not.toHaveBeenCalled()
+})
+
 it('refuses a foreign tracker before reading or writing its issues', async () => {
 	await expect(issue_publication.publish(EPIC, 'another-owner/kit')).rejects.toThrow(
 		'known first-party',

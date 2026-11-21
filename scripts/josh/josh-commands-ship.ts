@@ -58,7 +58,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
-			'[--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] | --pinned | --push [<slots>]',
+			'[--code-only] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | --join [--fixing] [--chunk] | --pinned | --push [<slots>]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -85,6 +85,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					note: 'the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds',
 				},
 				{
+					arguments: '--join --chunk',
+					note: '`run:chain`’s join: a gate still running at the `ship:wait` chunk exits 4, `pending` — re-run the same command',
+				},
+				{
 					arguments: '--pinned',
 					note: "collect a stopped ship's remaining verdicts before editing or retrying; a lane child waits only for this continuation",
 				},
@@ -96,11 +100,12 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	// The main line's chain up to the review, folded into one call: `main:merge`, `review:selfcheck`,
-	// `check:related` and `run:review` were four round trips re-billing the run's full context each.
+	// `check:related` and `run:review` were four round trips re-billing the run's full context each. In
+	// kit `command:derive --check` runs before `run:review`, so a hand-edited generated page stops there.
 	'run:chain': {
 		script: 'scripts/run/review/run-chain-cli.ts',
 		description:
-			'Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action',
+			'Open the review, or --join to join, attest, record and recheck it; --ship then ships a clean recheck. Stops at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
 			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
@@ -111,7 +116,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '<N>',
-					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review',
+					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review',
 				},
 				{
 					arguments: '<N> --from check:related',
@@ -122,12 +127,16 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					note: 'forwarded to run:review as given',
 				},
 				{
-					arguments: '<N> --accept-metrics "<why>"',
-					note: 'forwarded to run:review, whose open records a grown metrics total as `metrics --accept` does',
+					arguments: '<N> --accept-metrics "<why>" --from metrics-totals',
+					note: 'after a metrics-totals stop (a total grew, asked right after check:related): run:review records the growth as `metrics --accept` does',
+				},
+				{
+					arguments: '<N> --from run:review',
+					note: 'refused before run:review when the scoped checks are not green, naming `--from check:related`',
 				},
 				{
 					arguments: '<N> --join',
-					note: 'join the gate, attest and record; every finding holds for disposition',
+					note: 'join, attest, record, recheck metrics and unpinned; every finding holds for disposition',
 				},
 				{
 					arguments: '<N> --join --fixing',

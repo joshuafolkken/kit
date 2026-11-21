@@ -1,3 +1,4 @@
+import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
 	build_text,
@@ -133,6 +134,15 @@ describe('build_text — stranded header', () => {
 		const result = build_text(make_base({ task_type: 'stranded' }))
 
 		expect(result).toBe(`🚨 ${REPO_NAME}: Run stranded — nobody is driving it\n${ISSUE_TITLE}`)
+	})
+})
+
+// joshuafolkken/kit#8332: lanes left free with no issue ready to start read apart from the idle run.
+describe('build_text — shortfall header', () => {
+	it('uses 💺 + the no-issue-ready label', () => {
+		const result = build_text(make_base({ task_type: 'shortfall' }))
+
+		expect(result).toBe(`💺 ${REPO_NAME}: Lanes free — no issue ready to start\n${ISSUE_TITLE}`)
 	})
 })
 
@@ -321,6 +331,23 @@ describe('telegram_notify.send — JOSH_NOTIFY=off opts out explicitly', () => {
 		silence_console()
 
 		await expect(telegram_notify.send(make_base({}))).rejects.toThrow(BOT_TOKEN_KEY)
+	})
+})
+
+// joshuafolkken/kit#8332: the shortfall notice keeps the same switch every other type does.
+describe('telegram_notify.shortfall — JOSH_NOTIFY=off', () => {
+	it('never fetches', async () => {
+		vi.stubEnv(NOTIFY_SWITCH_KEY, 'off')
+		vi.spyOn(gh_spawn, 'get_repo_name_with_owner_within').mockReturnValue(REPO_NAME)
+		const fetch_spy = vi.fn()
+
+		vi.stubGlobal('fetch', fetch_spy)
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await expect(telegram_notify.shortfall({ body: BODY, recovery: RECOVERY_HINT })).resolves.toBe(
+			true,
+		)
+		expect(fetch_spy).not.toHaveBeenCalled()
 	})
 })
 

@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs'
 import { json_value } from '#scripts/lib/json-value'
 import { time_reported_failure } from '#scripts/time-runtime/time-reported-failure'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
 import { codex_prompt } from './codex-prompt'
 import { turn_filings } from './turn-filings'
@@ -14,6 +16,9 @@ import { turn_filings } from './turn-filings'
 
 const NO_PROMPT = ''
 const HUMAN_ORIGIN = 'human'
+// How far back a prompt off the tail is looked for — a bound on one hook's read, not the whole of a
+// long run's transcript, which grows past it (`transcript-tail.ts`; joshuafolkken/kit#7781).
+const PROMPT_REACH_BYTES = 4_194_304
 
 const PROMPT_LINE_SCHEMA = z.object({
 	isMeta: z.boolean().nullish(),
@@ -73,6 +78,51 @@ function person_prompt(tail: string): string | undefined {
 		.findLast((text) => text !== undefined)
 }
 
+// **The transcript text the person's last prompt is read from** — the tail when it carries one, else a
+// wider read reaching `PROMPT_REACH_BYTES` back: a large read after the prompt (a skill, a template)
+// pushes it off the tail (joshuafolkken/kit#7781). A missing transcript leaves the tail as it is.
+function prompt_reach(tail: string, transcript_path: string): string {
+	if (person_prompt(tail) !== undefined || !existsSync(transcript_path)) return tail
+
+	return transcript_tail.read_tail(transcript_path, PROMPT_REACH_BYTES)
+}
+
+const BLOCK_SCHEMA = z.object({ type: z.string(), id: z.string().nullish() })
+const CALL_LINE_SCHEMA = z.object({
+	type: z.literal('assistant'),
+	message: z.object({ content: z.array(BLOCK_SCHEMA) }),
+})
+
+function is_call_line(line: string, tool_use_id: string): boolean {
+	const call = CALL_LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+	if (!call.success) return false
+
+	return call.data.message.content.some(
+		(block) => block.type === 'tool_use' && block.id === tool_use_id,
+	)
+}
+
+// **The person's prompt a tool call was made under** — their last prompt before the assistant line
+// carrying `tool_use_id`, so a prompt sent while the call runs does not stand in for it
+// (joshuafolkken/kit#8248). `undefined` when that line, or a prompt before it, is not on the text.
+function call_prompt(text: string, tool_use_id: string): string | undefined {
+	const lines = text.split('\n')
+	const index = lines.findIndex((line) => is_call_line(line, tool_use_id))
+	if (index === -1) return undefined
+
+	return person_prompt(lines.slice(0, index).join('\n'))
+}
+
+// `call_prompt` read from the transcript — the tail first, then `PROMPT_REACH_BYTES` back when the
+// call or its prompt sits before the tail.
+function call_prompt_at(transcript_path: string, tool_use_id: string): string | undefined {
+	if (!existsSync(transcript_path)) return undefined
+	const prompt = call_prompt(transcript_tail.read_tail(transcript_path), tool_use_id)
+	if (prompt !== undefined) return prompt
+
+	return call_prompt(transcript_tail.read_tail(transcript_path, PROMPT_REACH_BYTES), tool_use_id)
+}
+
 // When the person last prompted on the tail, or `undefined` when no prompt of theirs is on it.
 function prompt_time(tail: string): string | undefined {
 	return tail
@@ -97,6 +147,13 @@ function pause_start(tail: string): string | undefined {
 	return prompt_time(tail) ?? tail_time(tail)
 }
 
-const last_prompt = { pause_start, person_prompt, turn_prompt }
+const last_prompt = {
+	call_prompt,
+	call_prompt_at,
+	pause_start,
+	person_prompt,
+	prompt_reach,
+	turn_prompt,
+}
 
 export { last_prompt }

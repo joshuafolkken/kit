@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_render_section } from './run-board-render-section'
 import type { ItemState } from './run-board-status'
 
 // joshuafolkken/kit#4042: the running and parked rows lead with no rule, the finished ones gather
@@ -11,6 +13,7 @@ import type { ItemState } from './run-board-status'
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of, note, rule } =
 	run_board_render_fixture
+const DECISION = '🙋 decision'
 
 // A rule's start, whatever column the lane rows' titles run it on to.
 function lead(label: string): string {
@@ -48,7 +51,7 @@ describe('run_board_render.render sections', () => {
 	const order = [
 		'Issue 1',
 		'Issue 2',
-		lead('🙋 decision'),
+		lead(DECISION),
 		'Issue 6',
 		lead('📌 findings 1'),
 		'finding',
@@ -78,5 +81,37 @@ describe('run_board_render.render sections', () => {
 		const bare = lines_of(header({ layout: LAYOUT }), [])
 
 		expect(bare.some((line) => line.includes('📌'))).toBe(false)
+	})
+})
+
+const { ROW_INDENT, heading_lines, lone_head, open_head } = run_board_render_section
+const { width_of } = run_board_fit
+const HEAD = heading_lines(DECISION)
+const RULE_LINE = HEAD.at(-1) ?? ''
+
+function icon_column(line: string): number {
+	return width_of(line.slice(0, line.indexOf('🙋')))
+}
+
+// joshuafolkken/kit#8257: every section's row starts in one column, and a live section drawn with no
+// fold key leads with one rule, so its icon stands where an opened section's does.
+describe('run_board_render_section row indent and lone heading', () => {
+	it('starts every section’s row five columns in', () => {
+		expect(width_of(ROW_INDENT)).toBe(5)
+	})
+
+	it('leads a live section with no fold key with one rule, its icon in the second column', () => {
+		const lone = lone_head(HEAD, DECISION).at(-1) ?? ''
+
+		expect(lone.startsWith(`─ ${DECISION} ─`)).toBe(true)
+		expect(icon_column(lone)).toBe(icon_column(open_head(HEAD, DECISION).at(-1) ?? ''))
+		expect(icon_column(lone)).toBe(2)
+		expect(width_of(lone)).toBe(width_of(RULE_LINE))
+	})
+
+	it('leaves a chat’s decision heading on its `── ` lead', () => {
+		const chat = lines_of(header({ layout: LAYOUT, form: 'chat' }), [])
+
+		expect(chat.some((line) => line.startsWith(lead(DECISION)))).toBe(true)
 	})
 })

@@ -77,7 +77,7 @@ const DECISION_REASON =
 	'it waits on nobody, continue the run, or say in one line that nothing is awaited. Do not repeat ' +
 	'your previous reply.'
 
-const stop_decision = { DECISION_REASON, contains_question, decision_of, is_question }
+const stop_decision = { DECISION_REASON, bare_line, contains_question, decision_of, is_question }
 
 export type { StopDecision }
 export { stop_decision }

@@ -5,7 +5,9 @@ import { backlog_plan_read, type OpenListing, type Plan } from '#scripts/backlog
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import { epic_classify } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { gh_request_tally, type CallCount } from '#scripts/gh/gh-request-tally'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { run_board_decision_read } from './run-board-decision-read'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
@@ -17,21 +19,31 @@ import { run_board_layout, type BoardPlan } from './run-board-layout'
 // places the pool with, fed as an opted-in set of their own, so an epic is expanded the way the run
 // expands it and no second placement exists to disagree with it.
 
+// Counts, not ms, under the `--timing` report's ms heading — the name says so. They count the window,
+// not the plan alone: the thread-wide tally also takes the calls other board reads send concurrently.
+const GH_CALLS_PHASE = 'gh calls during plan read (count)'
+const GH_NOT_MODIFIED_PHASE = 'gh 304 during plan read (count)'
+
 // The reads the plan is drawn from, a seam so each scope is tested without GitHub.
 interface PlanPorts {
 	fetch_open: () => Promise<OpenListing | undefined>
 	fetch_opted_in: () => Promise<OptedInRead>
-	classify: (opted_in: OptedIn, exclude: ReadonlyArray<number>) => Promise<Plan | undefined>
+	classify: (
+		opted_in: OptedIn,
+		exclude: ReadonlyArray<number>,
+		open: OpenListing,
+	) => Promise<Plan | undefined>
 }
 
 // The board leads a row withheld for a person with 🙋, so classifying says no ❗ notice over it.
 async function classify_quietly(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
+	open: OpenListing,
 ): Promise<Plan | undefined> {
 	epic_classify.mute_notices()
 
-	return await backlog_plan_read.classify(opted_in, exclude)
+	return await backlog_plan_read.classify(opted_in, exclude, open)
 }
 
 const LIVE_PORTS: PlanPorts = {
@@ -40,9 +52,11 @@ const LIVE_PORTS: PlanPorts = {
 	classify: classify_quietly,
 }
 
-// One classified plan, against the listing it was read with.
+// One classified plan, against the listing it was read with, and the opted-in pool read beside it —
+// `undefined` when the scope draws no pool.
 interface PlanRead {
 	listing: OpenListing
+	pool: OptedInRead | undefined
 	ports: PlanPorts
 }
 
@@ -60,13 +74,14 @@ async function board_of(
 	exclude: ReadonlyArray<number>,
 	read: PlanRead,
 ): Promise<BoardPlan | undefined> {
-	const plan = await read.ports.classify(opted_in, exclude)
+	const plan = await read.ports.classify(opted_in, exclude, read.listing)
 
 	if (plan === undefined) return undefined
 
 	return {
 		waves: backlog_waves.build(plan.result, plan.repo, plan.scope),
 		tracked: plan.tracked,
+		epics: plan.epics,
 		context: backlog_plan_read.context_of(plan, read.listing),
 		labels: labels_of(read.listing.rows),
 		declared: plan.scope.declared,
@@ -78,9 +93,9 @@ async function pool_board(
 	exclude: ReadonlyArray<number>,
 	read: PlanRead,
 ): Promise<BoardPlan | undefined> {
-	const opted_in = await read.ports.fetch_opted_in()
+	const { pool } = read
 
-	return opted_in.kind === 'read' ? await board_of(opted_in, exclude, read) : undefined
+	return pool?.kind === 'read' ? await board_of(pool, exclude, read) : undefined
 }
 
 // The named issues as the open listing holds them — a closed one is the stream's to show, not the plan's.
@@ -129,6 +144,14 @@ function withheld_of(lead: BoardPlan, pool: BoardPlan, held: ReadonlySet<number>
 	return new Set([...lead_withheld(lead, pool), ...from_pool])
 }
 
+// One map from the pool's and the named plan's, the named plan's entry winning a shared key.
+function merged<Value>(
+	pool: ReadonlyMap<number, Value> | undefined,
+	lead: ReadonlyMap<number, Value> | undefined,
+): Map<number, Value> {
+	return new Map([...(pool ?? []), ...(lead ?? [])])
+}
+
 // The named waves lead and the pool's follow, a child the named plan already holds left out of the pool
 // so a named epic's children are not drawn twice.
 function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
@@ -140,10 +163,11 @@ function joined(lead: BoardPlan, pool: BoardPlan): BoardPlan {
 			unreached: [...lead.waves.unreached, ...not_held(pool.waves.unreached, held)],
 			running: [...(lead.waves.running ?? []), ...not_held(pool.waves.running ?? [], held)],
 		},
-		tracked: new Map([...pool.tracked, ...lead.tracked]),
+		tracked: merged(pool.tracked, lead.tracked),
+		epics: merged(pool.epics, lead.epics),
 		context: pool.context,
 		labels: pool.labels,
-		declared: new Map([...(pool.declared ?? []), ...(lead.declared ?? [])]),
+		declared: merged(pool.declared, lead.declared),
 		withheld: withheld_of(lead, pool, held),
 	}
 }
@@ -158,27 +182,68 @@ async function scoped_board(named: NamedPlan, read: PlanRead): Promise<BoardPlan
 	return pool === undefined ? undefined : joined(lead, pool)
 }
 
+// The pool, read only when the scope draws it: an `--only` run names its issues and draws no pool.
+async function read_pool(named: NamedPlan, ports: PlanPorts): Promise<OptedInRead | undefined> {
+	if (named.only && named.issues.length > 0) return undefined
+
+	return await launch_timing.timed('plan: pool', ports.fetch_opted_in)
+}
+
+// The open listing and the pool take nothing from each other, so they are read side by side
+// (joshuafolkken/kit#8220).
+async function read_steps(named: NamedPlan, ports: PlanPorts): Promise<BoardPlan | undefined> {
+	const [listing, pool] = await Promise.all([
+		launch_timing.timed('plan: list', ports.fetch_open),
+		read_pool(named, ports),
+	])
+
+	if (listing === undefined || listing.rows.length === 0) return undefined
+
+	const read = { listing, pool, ports }
+
+	const plan =
+		named.issues.length === 0 ? await pool_board([], read) : await scoped_board(named, read)
+	const decided = await launch_timing.timed(
+		'plan: decisions',
+		async () => await run_board_decision_read.with_decisions(plan),
+	)
+
+	// The pull requests are paired after the decisions, so a blocker the 🙋 section draws is paired too.
+	return await launch_timing.timed(
+		'plan: prs',
+		async () => await run_board_human_merge.with_prs(decided),
+	)
+}
+
+// The `gh` calls sent while the plan was read and how many GitHub answered 304, counted as `--timing`
+// phases (joshuafolkken/kit#8218). The rate-limit, thanks and closed reads running beside it in the
+// same thread are included.
+function mark_calls(before: CallCount): void {
+	const after = gh_request_tally.snapshot()
+
+	launch_timing.mark(GH_CALLS_PHASE, after.calls - before.calls)
+	launch_timing.mark(GH_NOT_MODIFIED_PHASE, after.not_modified - before.not_modified)
+}
+
 // `undefined` is a failed read, which the board answers by keeping the plan it already has.
 // An empty listing is one too: the board is read while its own run's issues are open, and an empty one
 // drew every live child finished and the pool empty (joshuafolkken/kit#4537). The guard is the board's
 // alone — `backlog:plan` in a repository with no open issue reads an empty listing correctly.
+// Each step is timed under a `plan:` phase; `launch_timing` keeps the first read's.
 async function read_plan(
 	named: NamedPlan,
 	ports: PlanPorts = LIVE_PORTS,
 ): Promise<BoardPlan | undefined> {
-	const listing = await ports.fetch_open()
+	const before = gh_request_tally.snapshot()
 
-	if (listing === undefined || listing.rows.length === 0) return undefined
-
-	const read = { listing, ports }
-
-	const plan =
-		named.issues.length === 0 ? await pool_board([], read) : await scoped_board(named, read)
-
-	return await run_board_decision_read.with_decisions(await run_board_human_merge.with_prs(plan))
+	try {
+		return await read_steps(named, ports)
+	} finally {
+		mark_calls(before)
+	}
 }
 
-const run_board_plan = { read_plan }
+const run_board_plan = { GH_CALLS_PHASE, GH_NOT_MODIFIED_PHASE, read_plan }
 
 export { run_board_plan }
 export type { PlanPorts }

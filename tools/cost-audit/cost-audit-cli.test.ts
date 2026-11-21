@@ -1,17 +1,24 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { measure_declaration, type MeasureDeclaration } from '#scripts/issue/measure-declaration'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
+import type { LedgerEntry } from '#scripts/lane/lane-ledger'
+import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cost_audit } from './cost-audit'
 import { cost_audit_cli } from './cost-audit-cli'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_read } from './cost-audit-read'
+import { cost_audit_tool } from './cost-audit-tool'
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { repo_get_name_with_owner: vi.fn() },
 }))
-vi.mock('./cost-audit-read', () => ({ cost_audit_read: { load: vi.fn() } }))
+vi.mock('./cost-audit-read', () => ({
+	cost_audit_read: { load: vi.fn(), load_lane_children: vi.fn(() => []) },
+}))
 vi.mock('#scripts/lane/lane-net-read', () => ({
 	lane_net_read: { read_ledger: vi.fn(() => []), read_events: vi.fn(() => []) },
 }))
@@ -21,6 +28,7 @@ const NOW_MS = ms(day(14))
 const exec_gh_api = vi.mocked(git_gh_exec.exec_gh_api)
 const repo_name = vi.mocked(git_gh_command.repo_get_name_with_owner)
 const load = vi.mocked(cost_audit_read.load)
+const load_lane_children = vi.mocked(cost_audit_read.load_lane_children)
 // One $2 request three days into the current seven-day period.
 const SESSIONS = [session('fullrun', [record('a', day(10), 2)])]
 const LANE_SESSION = { ...session('fullrun', [record('a', day(10), 2)], [], true), issue: 7 }
@@ -154,6 +162,83 @@ describe('cost_audit_cli.run — the printed report', () => {
 
 		expect(await cost_audit_cli.run(['--period', '0'], '/repo', NOW_MS)).toBe(1)
 		expect(error).toHaveBeenCalledWith(cost_audit_cli.USAGE)
+	})
+})
+
+// joshuafolkken/kit#8383: the Issues the lane ledger records a merge of reach the audit.
+describe('cost_audit_cli.run — the merged-issue set', () => {
+	beforeEach(stub_sources)
+
+	it("passes the ledger's merge entries as merged_issues", async () => {
+		const at = '2026-01-10T00:00:00.000Z'
+		const entries: Array<LedgerEntry> = [
+			{ kind: 'merge', at, issue: 5 },
+			{ kind: 'dispatch', at, issue: 6 },
+		]
+
+		vi.spyOn(lane_ledger_archive, 'read_history').mockResolvedValue(entries)
+		const audit = vi.spyOn(cost_audit, 'audit')
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		await cost_audit_cli.run([], '/repo', NOW_MS)
+
+		expect(audit).toHaveBeenCalledWith(expect.objectContaining({ merged_issues: new Set([5]) }))
+	})
+
+	it('passes merged_issues as undefined when the ledger cannot be read', async () => {
+		vi.spyOn(lane_ledger_archive, 'read_history').mockRejectedValue(new Error('unreadable'))
+		const audit = vi.spyOn(cost_audit, 'audit')
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		await cost_audit_cli.run([], '/repo', NOW_MS)
+
+		expect(audit).toHaveBeenCalledWith(expect.objectContaining({ merged_issues: undefined }))
+	})
+})
+
+// joshuafolkken/kit#8284: `--density` reads the current period's lane children alone and labels the number.
+const GREP_CALL = { name: 'Grep', input: {} }
+const DENSITY_SESSION = {
+	...LANE_SESSION,
+	categories: new Map([['a', [cost_audit_tool.category_of(GREP_CALL.name, GREP_CALL.input)]]]),
+}
+const DENSITY_ARGV = ['--density']
+const LABEL_PATTERN = /^lane-child calls per request \d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$/u
+
+describe('cost_audit_cli.run — --density', () => {
+	beforeEach(stub_sources)
+
+	it('reads the lane children from the period start, with no full load, merges or breakdowns', async () => {
+		const of = vi.spyOn(lane_breakdown, 'of')
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		load_lane_children.mockReturnValue([DENSITY_SESSION])
+
+		expect(await cost_audit_cli.run(DENSITY_ARGV, '/repo', NOW_MS)).toBe(0)
+		expect(load_lane_children).toHaveBeenCalledWith('/repo', ms(day(7)))
+		expect([load, exec_gh_api, repo_name, of].map((one) => one.mock.calls.length)).toStrictEqual([
+			0, 0, 0, 0,
+		])
+	})
+
+	it('prints the label line, then the number a measure declaration reads as the last line', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		load_lane_children.mockReturnValue([DENSITY_SESSION])
+		await cost_audit_cli.run(DENSITY_ARGV, '/repo', NOW_MS)
+
+		const output = info.mock.calls.map(([line]) => String(line))
+		const declaration: MeasureDeclaration = {
+			command: 'pnpm josh cost:audit --density',
+			operator: '<=',
+			threshold: 2,
+		}
+
+		expect(output).toStrictEqual([expect.stringMatching(LABEL_PATTERN), '1.00'])
+		expect(measure_declaration.judge(declaration, output.join('\n'))).toStrictEqual({
+			kind: 'pass',
+			value: 1,
+		})
 	})
 })
 

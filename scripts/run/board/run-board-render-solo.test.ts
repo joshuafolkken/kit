@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_lead } from './run-board-render-lead'
@@ -71,6 +72,17 @@ describe('run_board_render.render solo lane rows', () => {
 			const line = line_of(solo, number)
 
 			expect(`${LANE_INDENT}${line.slice(SOLO_ICON.length)}`).toBe(line_of(plain, number))
+		}
+	})
+
+	// joshuafolkken/kit#8257: 🧍 takes the indent's two columns, so the icon stays in the row indent's.
+	it('stands a solo and a plain row’s phase icon in the shared row indent’s column', () => {
+		const lines = [line_of(solo, RUNNING), line_of(plain, RUNNING)]
+
+		for (const line of lines) {
+			const before = line.slice(0, line.indexOf('🔨'))
+
+			expect(run_board_fit.width_of(before)).toBe(run_board_fit.ROW_INDENT.length)
 		}
 	})
 

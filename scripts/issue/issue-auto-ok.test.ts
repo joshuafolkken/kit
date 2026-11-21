@@ -14,7 +14,14 @@ const FENCED_BODY = '## 背景\n\n```md\n- 人の判断: 不要\n```\n'
 const OUTSIDE_BACKGROUND_BODY = '## 背景\n\n- 種別: 非不具合\n\n## 期待結果\n\n- 人の判断: 不要\n'
 const DECISION_RULE = '- 判定規則: A で足りるなら A、そうでなければ B（#6403）'
 const SOURCE_USER = '- 出所: user'
-const EXCLUDED_LABELS = ['release', 'breaking-change', 'deferred', 'needs-human-review', 'epic']
+const EXCLUDED_LABELS = [
+	'release',
+	'breaking-change',
+	'deferred',
+	'needs-human-review',
+	'epic',
+	'plan:unverified',
+]
 
 function filing_of(overrides: Partial<AutoOkFiling>): AutoOkFiling {
 	return {
@@ -142,6 +149,26 @@ describe('issue_auto_ok.declaration_problem', () => {
 			expect(problem).toContain('`- 人の判断: 要（<which one>）`')
 		},
 	)
+
+	it('limits the needed judgement to one required before merge, pointing at the criterion', () => {
+		const problem = issue_auto_ok.declaration_problem(UNDECLARED_BODY)
+
+		expect(problem).toContain('is needed before merge')
+		expect(problem).toContain('`issue-template.md`')
+	})
+})
+
+describe('issue_auto_ok.declares_judgement_needed', () => {
+	it.each([NEEDED_BODY, '## 背景\n\n- 人の判断: 要\n'])(
+		'reads a needed declaration, with or without its reason: %s',
+		(body) => {
+			expect(issue_auto_ok.declares_judgement_needed(body)).toBe(true)
+		},
+	)
+
+	it.each([NOT_NEEDED_BODY, UNDECLARED_BODY])('reads no need otherwise: %s', (body) => {
+		expect(issue_auto_ok.declares_judgement_needed(body)).toBe(false)
+	})
 })
 
 describe('issue_auto_ok.decision_problem', () => {

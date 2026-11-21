@@ -104,3 +104,112 @@ describe('run_board_keys.read_keys store', () => {
 		expect(calls).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#7927: the key that skips the intro is spent on it, neither folding nor saving.
+describe('run_board_keys.read_keys intercept', () => {
+	it('hands intercepted keys to the taker, not the folds, until released', () => {
+		const keys = fake_keys()
+		const saved: Array<Array<string>> = []
+		const taken: Array<string> = []
+		const reading = read_keys({
+			...keys.input,
+			store: {
+				load: () => new Set(),
+				save: (folded) => {
+					saved.push([...folded])
+				},
+			},
+		})
+		const release = reading.intercept?.(() => {
+			taken.push('key')
+		})
+
+		keys.type('q')
+		keys.type(CTRL_C)
+		release?.()
+		keys.type('q')
+		expect([taken, saved, keys.calls]).toStrictEqual([
+			['key'],
+			[['queued']],
+			['raw true', 'interrupt'],
+		])
+	})
+})
+
+// joshuafolkken/kit#7953: `s` flips the sound, saving each flip; switching it on plays launch once, and
+// while it is off the board's cue plays nothing.
+interface SoundRig {
+	keys: FakeKeys
+	saved: Array<boolean>
+	played: Array<string>
+	reading: ReturnType<typeof read_keys>
+}
+
+function sound_rig(is_on: boolean): SoundRig {
+	const keys = fake_keys()
+	const saved: Array<boolean> = []
+	const played: Array<string> = []
+	const store = {
+		load: (): ReadonlySet<never> => new Set(),
+		save: () => undefined,
+		load_sound: () => is_on,
+		save_sound: (next: boolean) => {
+			saved.push(next)
+		},
+	}
+	const reading = read_keys({ ...keys.input, store }, (name) => {
+		played.push(name)
+	})
+
+	return { keys, saved, played, reading }
+}
+
+describe('run_board_keys.read_keys sound', () => {
+	it('flips on → off → on with s, saving each flip and folding nothing', () => {
+		const { keys, saved, reading } = sound_rig(true)
+
+		keys.type('s')
+		expect(reading.sound?.()).toBe(false)
+		keys.type('s')
+		expect([reading.sound?.(), saved, reading.folded?.().size]).toStrictEqual([
+			true,
+			[false, true],
+			0,
+		])
+	})
+
+	it('plays launch once at the moment the sound is switched on', () => {
+		const { keys, played } = sound_rig(false)
+
+		keys.type('s')
+		expect(played).toStrictEqual(['launch'])
+	})
+
+	it('plays no cue while the sound is off, and the cue passed on while it is on', () => {
+		const { keys, played, reading } = sound_rig(true)
+
+		reading.cue?.('drain')
+		keys.type('s')
+		reading.cue?.('alert')
+		expect(played).toStrictEqual(['drain'])
+	})
+})
+
+// joshuafolkken/kit#8250: switching the sound off silences the trill sounding then; switching it on
+// leaves the trill to the next typing.
+describe('run_board_keys.read_keys trill', () => {
+	it('switches the trill off with the sound, and not on with it', () => {
+		const keys = fake_keys()
+		const switched: Array<boolean> = []
+		const store = { load: (): ReadonlySet<never> => new Set(), save: () => undefined }
+
+		read_keys({ ...keys.input, store }, undefined, {
+			set: (is_on) => {
+				switched.push(is_on)
+			},
+		})
+		keys.type('s')
+		keys.type('s')
+		expect(switched).toStrictEqual([false])
+	})
+})

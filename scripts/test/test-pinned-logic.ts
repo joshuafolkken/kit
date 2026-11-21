@@ -26,6 +26,13 @@ const GREEN_REASON = 'reverting it left every related test green'
 const NO_TEST_REASON = 'no related test ran with it reverted'
 const STUB_GREEN_REASON = 'replacing its body with a throw left every related test green'
 const STUB_NO_TEST_REASON = 'no related test ran with its body replaced by a throw'
+const REVERT_REASONS = [GREEN_REASON, NO_TEST_REASON] as const
+const STUB_REASONS = [STUB_GREEN_REASON, STUB_NO_TEST_REASON] as const
+const BRANCH_REASONS = [
+	'a throw in this branch left every related test green: no test takes it',
+	'no related test ran with a throw in this branch',
+] as const
+const BRANCH_FIX = 'add a test that takes this branch'
 const UNPARSED_REASON = 'an added file, and typescript is not installed to read its functions'
 const NO_RUNNER_REASON = 'vitest is not installed to run its related tests'
 const STOPPED_REASON = 'vitest stopped before any test ran with it reverted'
@@ -47,8 +54,10 @@ interface Hunk {
 	// length share the rest.
 	new_lines?: Array<string>
 	// Set on an added file's probe (`test-pinned-functions.ts`): the function the old lines put back
-	// with its body replaced by a throw.
+	// with its body replaced by a throw. On a branch probe, the arm's label.
 	function_name?: string
+	// Set on a changed branch's arm probe (`test-pinned-branches.ts`): the old lines throw in that arm.
+	is_branch?: boolean
 }
 
 interface HunkSplit {
@@ -270,10 +279,23 @@ function location(hunk: Hunk): string {
 	return hunk.function_name === undefined ? line : `${line} ${hunk.function_name}`
 }
 
-function reason(hunk: UnpinnedHunk): string {
-	if (hunk.function_name === undefined) return hunk.is_green ? GREEN_REASON : NO_TEST_REASON
+// The probe kind's reasons: when its related tests ran green, and when none ran.
+function reasons_of(hunk: Hunk): readonly [string, string] {
+	if (hunk.is_branch === true) return BRANCH_REASONS
 
-	return hunk.is_green ? STUB_GREEN_REASON : STUB_NO_TEST_REASON
+	return hunk.function_name === undefined ? REVERT_REASONS : STUB_REASONS
+}
+
+function reason(hunk: UnpinnedHunk): string {
+	const [green, no_test] = reasons_of(hunk)
+
+	return hunk.is_green ? green : no_test
+}
+
+function branch_hint(tests: ReadonlyArray<string>): string {
+	const named = tests.length === 0 ? 'no related tests' : `related tests: ${tests.join(', ')}`
+
+	return `${named}; ${BRANCH_FIX}`
 }
 
 function unchecked_reason(report: PinnedReport): string {
@@ -282,6 +304,8 @@ function unchecked_reason(report: PinnedReport): string {
 
 function hint(hunk: UnpinnedHunk): string {
 	const tests = hunk.related_tests
+
+	if (hunk.is_branch === true) return branch_hint(tests ?? [])
 
 	if (tests === undefined) {
 		return 'related tests unavailable; add or strengthen a regression test that fails when this change is reverted'
@@ -385,6 +409,8 @@ const test_pinned_logic = {
 	MAX_TEST_FILES,
 	outcome,
 	parse_hunks,
+	reason,
+	hint,
 	report_parts,
 	report_text,
 	revert,

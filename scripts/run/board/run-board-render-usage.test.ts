@@ -73,7 +73,8 @@ describe('run_board_render.render usage cells', () => {
 		const lines = lines_of(board())
 
 		expect(row_line(lines, 'Issue 1')).toMatch(USAGE)
-		expect(row_line(lines, 'Issue 1')).toMatch(/Issue 1 +🔗 3$/u)
+		// The unmeasured finish ends the row's tail (joshuafolkken/kit#7920), what was filed after it.
+		expect(row_line(lines, 'Issue 1')).toMatch(/Issue 1 +🎯 — {2}🔗 3$/u)
 		expect(row_line(lines, 'Issue 1')).not.toContain('🧠')
 	})
 
@@ -199,7 +200,7 @@ describe('run_board_render.render usage column on every row', () => {
 	it('draws no usage on a finished row', () => {
 		const lines = mixed_lines()
 
-		expect(row_line(lines, 'Issue 3')).toMatch(/^ {4}✅ \d{2}-\d{2} \d{2}:\d{2} 3 {7}Issue 3/u)
+		expect(row_line(lines, 'Issue 3')).toMatch(/^ {5}✅ \d{2}-\d{2} \d{2}:\d{2} 3 {7}Issue 3/u)
 		expect(row_line(lines, 'Issue 5')).not.toMatch(FIGURE)
 	})
 
@@ -246,9 +247,13 @@ function planned_lines(): Array<string> {
 }
 
 describe('run_board_render.render usage column on a plan row', () => {
-	it('starts what an untouched row waits on two blanks after its title', () => {
+	// joshuafolkken/kit#8257: a queued row's title is padded to the title column, so what it waits on
+	// starts where a waiting row's reason does.
+	it('starts what an untouched queued row waits on two blanks after its padded title', () => {
 		const lines = planned_lines()
+		const line = row_line(lines, 'Planned')
+		const title_start = column_of(line, 'Planned')
 
-		expect(row_line(lines, 'Planned')).toMatch(/Planned {2}3554$/u)
+		expect(column_of(line, '3554')).toBe(title_start + run_board_render.TITLE_LIMIT + 2)
 	})
 })

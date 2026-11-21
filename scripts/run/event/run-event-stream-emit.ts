@@ -46,19 +46,19 @@ async function lane_record(issue: string): Promise<LaneStateRecord | undefined> 
 async function ending_fields(
 	target: string,
 	event: Omit<RunEvent, 'pos'>,
-): Promise<Pick<RunEvent, 'elapsed_ms'>> {
+): Promise<Pick<RunEvent, 'elapsed_ms' | 'excluded_ms'>> {
 	const issue = run_event_scope.issue_named(event)
 
 	if (issue === undefined || !run_board_lane_time.OFF_LANE_KINDS.has(event.kind)) return {}
 
-	const elapsed_ms = run_board_lane_time.ending_elapsed({
+	const time = run_board_lane_time.ending_elapsed({
 		events: run_event_stream.read_events(target),
 		issue: Number(issue),
 		record: await lane_record(issue),
 		ended_ms: Date.parse(event.at),
 	})
 
-	return elapsed_ms === undefined ? {} : { elapsed_ms }
+	return time ?? {}
 }
 
 /**
@@ -68,7 +68,7 @@ async function ending_fields(
  */
 async function append_with(
 	target: string,
-	event: Omit<RunEvent, 'pos' | 'elapsed_ms'>,
+	event: Omit<RunEvent, 'pos' | 'elapsed_ms' | 'excluded_ms'>,
 ): Promise<AppendResult> {
 	return run_event_stream.append_event(target, {
 		...event,
@@ -85,17 +85,18 @@ async function append_at(
 	return await append_with(target, { kind, text, at: at.toISOString() })
 }
 
+type EmitOptions = Pick<RunEvent, 'stop'> & { at?: Date }
+
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
  * every error is swallowed, because the reporting path must never fail the work it reports on.
- * `at` is the caller's instant where another record must carry the same one; `fields` the event's
+ * `at` is the caller's instant where another record must carry the same one; the rest the event's
  * structured fields beside its text — a park's ship stop.
  */
 async function emit(
 	kind: string,
 	text: string,
-	at: Date = new Date(),
-	fields: Pick<RunEvent, 'stop'> = {},
+	{ at = new Date(), ...fields }: EmitOptions = {},
 ): Promise<void> {
 	try {
 		const target = await stream_target()

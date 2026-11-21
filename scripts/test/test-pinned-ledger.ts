@@ -3,8 +3,11 @@ import type { TestPinnedRecord } from '#scripts/lane/lane-ledger'
 import { lane_ledger_pinned_origin } from '#scripts/lane/lane-ledger-pinned-origin'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import type { MissReason } from './test-pinned-cache-logic'
 import type { Hunk } from './test-pinned-logic'
 import type { PinnedBy, RedProbe } from './test-red-logic'
+
+type MissCounts = Partial<Record<MissReason, number>>
 
 // One `test-pinned` ledger row per `josh test:pinned` run that probed (joshuafolkken/kit#5078): how
 // many hunks the verdict cache answered, and each probed hunk's test files and wall time, so
@@ -39,12 +42,37 @@ function origin_of(raw: string | undefined): PinnedOrigin | undefined {
 }
 
 // The hunks a run did not probe: `held` the cache answered, `rewired` left out as a rewire, `over_cap`
-// over the test-file cap; and what started it, `manual` when unnamed.
+// over the test-file cap; and what started it, `manual` when unnamed. The probed ones split as the
+// cache knew them (joshuafolkken/kit#7803): `rechecked` against a few tests, `unregistered` with no
+// cached verdict. `misses` counts the probed hunks by why the cache did not hold their verdict
+// (joshuafolkken/kit#7806). `launch` is how the run was started and where it stopped
+// (joshuafolkken/kit#7809).
 interface Skipped {
 	held: number
+	rechecked?: number
+	unregistered?: number
+	misses?: MissCounts
 	rewired: number
 	over_cap?: number
 	origin?: PinnedOrigin | undefined
+	launch?: PinnedLaunch
+}
+
+// `first_unpinned` under `--first-unpinned`, `reasoned` under an `--unpinned-ok` reason, `cut` the
+// probes a stop at the first unpinned hunk never started, `tree_hash` the work tree the run read; each
+// absent where it does not apply.
+type PinnedLaunch = Pick<TestPinnedRecord, 'cut' | 'first_unpinned' | 'reasoned' | 'tree_hash'>
+
+// Each reason the cache missed a hunk (`test_pinned_cache.misses`) with its hunk count; a hunk it held
+// counts in none.
+function miss_counts(misses: ReadonlyArray<MissReason | undefined>): MissCounts {
+	const counts: MissCounts = {}
+
+	for (const miss of misses) {
+		if (miss !== undefined) counts[miss] = (counts[miss] ?? 0) + 1
+	}
+
+	return counts
 }
 
 async function record(
@@ -53,13 +81,17 @@ async function record(
 	elapsed_ms: number,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(PROJECT_ROOT),
+		issue: lane_paths.issue_here({ directory: PROJECT_ROOT }),
 		held: skipped.held,
+		rechecked: skipped.rechecked ?? 0,
+		unregistered: skipped.unregistered ?? 0,
+		misses: skipped.misses,
 		rewired: skipped.rewired,
 		over_cap: skipped.over_cap ?? 0,
 		probes: [...probes],
 		elapsed_ms,
 		origin: skipped.origin ?? MANUAL_ORIGIN,
+		...skipped.launch,
 	})
 }
 
@@ -71,7 +103,7 @@ async function record_discarded(
 	origin: PinnedOrigin = BACKGROUND_ORIGIN,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(PROJECT_ROOT),
+		issue: lane_paths.issue_here({ directory: PROJECT_ROOT }),
 		held: 0,
 		probes: [],
 		elapsed_ms,
@@ -80,7 +112,14 @@ async function record_discarded(
 	})
 }
 
-const test_pinned_ledger = { BACKGROUND_ORIGIN, origin_of, record, record_discarded, time_of }
+const test_pinned_ledger = {
+	BACKGROUND_ORIGIN,
+	miss_counts,
+	origin_of,
+	record,
+	record_discarded,
+	time_of,
+}
 
-export type { PinnedOrigin, ProbeTime, Skipped }
+export type { MissCounts, PinnedLaunch, PinnedOrigin, ProbeTime, Skipped }
 export { test_pinned_ledger }

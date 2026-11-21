@@ -1,4 +1,5 @@
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
@@ -161,7 +162,7 @@ function landing_ms(command: string, now_ms: number, last_report_ms: number): nu
  * the lesser of the two, because a missing record loses one detection while a wrong one blocks every
  * arm until it expires.
  */
-function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean {
+function decide_on_clock(call: GuardedCall, run: GuardRun, can_record: boolean): boolean {
 	const last_report_ms = run_progress_clock.read_last_report_sync()
 
 	if (last_report_ms === undefined) return false
@@ -176,6 +177,19 @@ function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean 
 	if (can_record) ARM_RECORD.record(target, lands_ms)
 
 	return false
+}
+
+/**
+ * **A lane child is out of the rule's scope** (joshuafolkken/kit#8278). It never runs the watcher —
+ * `run:progress` declines in a dispatched lane child — so the clock it would read is the parent's, and
+ * the remedy the refusal names does nothing there. Its wait is the Stop hook's blocking call
+ * (`lane-background.ts` → `LANE_AGENT_WAIT`, joshuafolkken/kit#8336) or a bare `sleep`; refusing a
+ * `sleep` left the child polling verification commands as a wait instead.
+ */
+function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean {
+	if (lane_child_marker.is_child_of(run.context.cwd, run.context.env)) return false
+
+	return decide_on_clock(call, run, can_record)
 }
 
 // The instruction in the shape a refusal can carry: what the call is about to do, what already does it

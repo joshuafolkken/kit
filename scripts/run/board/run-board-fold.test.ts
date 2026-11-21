@@ -38,6 +38,7 @@ const QUEUED = '⏳ queued'
 const WAITING = '🔗 waiting'
 const FINDINGS = '📌 findings'
 const PROCESSES = '💻 processes'
+const DECISION = '🙋 decision'
 const GROUPS = '▶ 1.0 ── 🌐 2.0'
 const USAGE = '⛽ usage'
 const USAGE_SUMMARY = 'Claude 42/68 · Codex 45'
@@ -130,9 +131,19 @@ describe('run_board_fold.fold_parts open', () => {
 	})
 
 	it('leaves a section no key folds as it was', () => {
-		const decision: PlanSection = { head: heading_lines('🙋 decision'), lines: rows(1, 'decision') }
+		const decision: PlanSection = { head: heading_lines(DECISION), lines: rows(1, 'decision') }
 
 		expect(fold_parts(parts_of({ plan: [decision] }), new Set(ALL)).plan).toStrictEqual([decision])
+	})
+
+	it('leads a labeled section no key folds with a rule, as wide as the rule it had', () => {
+		const head = heading_lines(DECISION)
+		const decision: PlanSection = { head, lines: rows(1, 'decision'), label: DECISION }
+		const drawn =
+			fold_parts(parts_of({ plan: [decision] }), new Set(ALL)).plan[0]?.head.at(-1) ?? ''
+
+		expect(drawn.startsWith(`─ ${DECISION} ─`)).toBe(true)
+		expect(width_of(drawn)).toBe(width_of(head.at(-1) ?? ''))
 	})
 })
 
@@ -300,6 +311,6 @@ describe('run_board_fold.bounded rule width', () => {
 
 describe('run_board_fold.KEYS_LINE', () => {
 	it('names every key once', () => {
-		expect(KEYS_LINE).toBe(' t u l p f q w d: fold · a: all · Ctrl-C: quit')
+		expect(KEYS_LINE).toBe(' t u l p f q w d: fold · a: all · s: sound · Ctrl-C: quit')
 	})
 })

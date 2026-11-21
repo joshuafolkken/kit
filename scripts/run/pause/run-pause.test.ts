@@ -89,16 +89,26 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 	},
 }))
 
+// The prepared-prerequisite step is `run-pause-publish.test.ts`'s; here only its place in the order.
+vi.mock('#scripts/run/pause/run-pause-publish', () => ({
+	run_pause_publish: {
+		publish_prepared: async () => 'not prepared',
+		unplanned: async () => undefined,
+	},
+}))
+
 const REQUEST = { issue: '10', prerequisite: '11' }
 const MESSAGE = 'run:pause: #10 waits on #11'
 const BLOCKED_BY = 'blocked-by'
 const RECORDED_IN_EPIC = 'recorded in epic'
 const BOTH_TRACKED = '- [ ] #10\n- [ ] #11'
+const PAUSE_MARKER = '<!-- josh:run-pause #10 for #11 -->'
+const JAPANESE_HEADLINE = '一時停止: 先に #11 が入る必要がある。'
 
 it('detects the exact paused issue without confusing a longer number', async () => {
 	state.comments = ['<!-- josh:run-pause #100 for #11 -->']
 	expect(await run_pause_comment.is_paused(REQUEST.issue)).toBe(false)
-	state.comments.push('<!-- josh:run-pause #10 for #11 -->')
+	state.comments.push(PAUSE_MARKER)
 	expect(await run_pause_comment.is_paused(REQUEST.issue)).toBe(true)
 })
 
@@ -151,6 +161,32 @@ describe('run_pause.pause — the four steps in order', () => {
 		expect(state.stashes).toStrictEqual([`On 4160-lane: ${MESSAGE}`])
 		expect(state.comments[0]).toContain(`pnpm josh stash:pop "${MESSAGE}"`)
 		expect(state.blockers).toStrictEqual([11])
+	})
+
+	// joshuafolkken/kit#8086: a prepared `#N` is settled before the hold is released.
+	it('settles a prepared prerequisite after the relation and before the release', async () => {
+		const result = await run_pause.pause(REQUEST)
+		const steps = result.done.map(({ step }) => step)
+
+		expect(steps.indexOf('publish-prepared')).toBe(steps.indexOf(BLOCKED_BY) + 1)
+		expect(steps.at(-1)).toBe('release')
+	})
+
+	// joshuafolkken/kit#7700: the headline follows the session language; the marker, the stash
+	// message and the pause read stay the same in both.
+	it.each([
+		['ja', JAPANESE_HEADLINE],
+		['', JAPANESE_HEADLINE],
+		['en', 'Paused: #11 has to land first.'],
+	])('writes the headline in session language %j', async (lang, headline) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+
+		await run_pause.pause(REQUEST)
+
+		expect(state.comments[0]?.split('\n', 1)[0]).toBe(headline)
+		expect(state.comments[0]).toContain(PAUSE_MARKER)
+		expect(state.stashes).toStrictEqual([`On 4160-lane: ${MESSAGE}`])
+		expect(await run_pause_comment.is_paused(REQUEST.issue)).toBe(true)
 	})
 
 	it('says nothing was set aside on a clean tree', async () => {
@@ -268,7 +304,7 @@ describe('run_pause.pause — a failure stops, and a rerun continues', () => {
 		const result = await run_pause.pause(REQUEST)
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'release' })
-		expect(result.done).toHaveLength(3)
+		expect(result.done).toHaveLength(4)
 	})
 })
 

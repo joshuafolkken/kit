@@ -2,6 +2,7 @@ import { session_language } from '#scripts/josh/session-language'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
+import { lane_breakdown_chain } from './lane-breakdown-chain'
 import {
 	lane_breakdown_implement,
 	type ImplementDetail,
@@ -20,8 +21,9 @@ import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 // investigation comments it on the lane's Issue and leads its prompt with it (`lane-overrun.ts`).
 
 const HEADING = 'Net time by stage, longest first'
-const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, split run, host sleep)'
-const SLEPT = 'of which host sleep'
+const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, split run, host stop)'
+// A host stop is a sleep or a network outage (joshuafolkken/kit#7867), joined in `lane-host-gaps.ts`.
+const SLEPT = 'of which host stop (sleep or network down)'
 const YIELDED = 'of which yield wait'
 const HOLDER = 'yield wait: holder remaining'
 const GAP = 'yield wait: redispatch gap (offer + launch)'
@@ -48,6 +50,8 @@ interface Report {
 	// The start to plan's time outside every call and wait, absent when no calls were read
 	// (joshuafolkken/kit#6119).
 	plan_outside?: PlanOutside | undefined
+	// Each `run:chain` stage's runs and minutes, printed under the implementation (joshuafolkken/kit#7736).
+	chain?: ReadonlyArray<string>
 }
 
 // A stage's line, the laps printed under it, and the call groups printed under it in the bullets
@@ -138,7 +142,10 @@ function implement_calls(detail: ImplementDetail): Array<string> {
 
 // The call groups printed under a stage, none for a stage other than the start to plan and the implement.
 function calls_of(name: string, report: Report): Array<string> {
-	if (name === lane_breakdown.IMPLEMENT_STAGE) return implement_calls(report.detail)
+	if (name === lane_breakdown.IMPLEMENT_STAGE) {
+		return [...implement_calls(report.detail), ...(report.chain ?? [])]
+	}
+
 	if (name !== lane_breakdown.PLAN_STAGE) return []
 
 	return (report.plan_calls ?? []).map((group) => lane_breakdown_calls.group_text(group))
@@ -238,6 +245,7 @@ function report_of(
 		critical: lane_ci_path_stats.last_check_text(entries, issue),
 		plan_calls: lane_breakdown_implement.plan_calls(calls, breakdown),
 		plan_outside: lane_breakdown_implement.plan_outside(calls, breakdown),
+		chain: lane_breakdown_chain.lines_of(entries, issue),
 	}
 }
 

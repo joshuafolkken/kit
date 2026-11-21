@@ -137,7 +137,7 @@ shape `backlog:offer` folded the parent loop head on. It asks `run:cut --resume 
 
 ## `josh ship` in detail
 
-A `preflight` stage runs first: it asks every pull-request precondition at once — `git -y`'s preflight (release classification, branch and title checks) and, for a runtime change, the `## 実機証跡` section `followup` gates on, read from `--body-file` or else the open PR's body — and reports them together, then meets the scoped lint/test pair. A stop those checks would cause therefore lands before the review and the gate rather than after them. The gate stage meets the scoped pair again before `josh gate`, as a round-1 reviewer may have edited the tree since. The checks themselves are unchanged; only where they run moved — except that a scoped pair stale only from a merge with the default branch sharing nothing with the branch is recorded without a run (`run-ship-synced-scope.ts`). A pair its records cannot narrow runs over only the files moved since this ship last met it green on the same base, or where a merge meets the branch; a moved config file or a deleted file runs the whole pair (`run-ship-narrowed.ts`). A pair that read the whole branch names why on its `ship-lap` row (`fallback`), which `lane:breakdown` prints.
+A `preflight` stage runs first: it asks every pull-request precondition at once — `git -y`'s preflight (release classification, branch and title checks) and, for a runtime change, the `## 実機証跡` section `followup` gates on, read from `--body-file` or else the open PR's body — and reports them together, then meets the scoped lint/test pair. A default branch that moved past the branch (fetched first) leaves that pair to the sync stage, which meets it over the merged tree and stops on its red, so the ship runs it once rather than twice (joshuafolkken/kit#8304). A stop those checks would cause therefore lands before the review and the gate rather than after them. The gate stage meets the scoped pair again before `josh gate`, as a round-1 reviewer may have edited the tree since. The checks themselves are unchanged; only where they run moved — except that a scoped pair stale only from a merge with the default branch sharing nothing with the branch is recorded without a run (`run-ship-synced-scope.ts`). A pair its records cannot narrow runs over only the files moved since this ship last met it green on the same base, or where a merge meets the branch; a moved config file or a deleted file runs the whole pair (`run-ship-narrowed.ts`). A pair that read the whole branch names why on its `ship-lap` row (`fallback`), which `lane:breakdown` prints.
 
 `--review` runs review round 1 beside the gate, after any scoped check not yet green. The round-1 reviewer fixes a small, local Medium in place and marks it `fixed `, counted once the scoped pair is green; a High, an unfixed Medium or a refusal stops the ship. After sync and round 1, `round-2` asks `review:round2 --record <N>` and, on `required`, runs the scoped pair, `review:brief --round 2`, a read-only reviewer, attest and record beside the gate. Both stages join before the commit opens the PR; a blocking round 2 follows the existing review-stop path. Sync finishes first because it changes HEAD, which checkout attestation pins.
 
@@ -159,7 +159,7 @@ The `⛽ usage` section's `≈N` divides the window's rise across the last ten d
 
 The first column is what the board shows and where: the run's state (`▶` working, `⏸` idle, `✋` waiting on a person, `■` ended) before `josh-board` — or a single run's own name — over the kit version the supervisor recorded in its wake record as it started, over the repository's name. The version is the running process's, never the checkout's package.json, so a board still showing the old version after a merge says the supervisor has not handed over to the new code yet. With no supervisor's record to read — before it starts, after it exits, in a single run — the version is `-`.
 
-The first line is how far the run is: `⏰` elapsed as a span in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — no leading zero unit; every length on the board is written so) — counting from the moment `josh backlogrun` started the session — a progress bar with arrivals as `(+N)` and per-state counts, and `⚠` only when a plan read failed. It is the progress in every state; what only the plan knows is `-` until the plan is read. The mark stands still in every state: the spinner turns on the third line. `⏳` is a waiting child — its count on the first line, and its row, a lane's whose child has not launched yet among them — and, followed by a spinner at the end of the first line, a plan read in flight.
+The first line is how far the run is: `⏰` elapsed as a span in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — no leading zero unit; every length on the board is written so) — counting from the moment `josh backlogrun` started the session — a progress bar with arrivals as `(+N)` and per-state counts, and `⚠` only when a plan read failed. It is the progress in every state; what only the plan knows is `-` until the plan is read. The mark stands still in every state: the spinner turns on the third line. `⏳` is a waiting child — its count on the first line, and its row, a lane's whose child has not launched yet among them — and, followed by a spinner at the end of the first line, a plan read in flight. `🎯 ~HH:MM` after the bar is the estimated finish as a local time of day (`🎯 ~MM-DD HH:MM` when it falls on another day), so it reads without adding a span to the clock (joshuafolkken/kit#7770). It is drawn from the lane ledger's dispatch-to-merge totals of the last three days, else the whole ledger (`run-board-lane-totals.ts`), not from each phase's usual time summed once, which left out retried ships and the waits between phases. A waiting child takes the median total; a running child takes the median of what the lanes that ran longer than it took beyond its time so far, and one longer than every measured lane falls back to its phase's and the later phases' usual times rather than nothing. With no merged lane measured, no `🎯` is drawn.
 
 The third line is what the run is doing now, after the repository's name, and is there for the whole run — the name alone only while the stream holds no event. Its three cells stand under the ones above: a spinner under `⏰` and `💓` — turning on a terminal while a child runs and while the run itself is at a stage, a judgment session after the first launch included, and blank while the run watches, after it ended and in a chat — then how long ago what it says happened, as a span right-aligned with theirs to the widest of the three, then the kind's icon under `💪` and the words, in English with no label. The kinds are `🔧` an operation; a child's event under its row's phase icon (`🔍 📝 🔨 👀 🚦 🔀 📦 🔂 ⚓ 📣`, `💥` failed); a stage's own icon (`🚀` starting session, `📝` planning, `🤝` handing off, `🤔` waiting on judgment, `💭` judgment session running, `🚫` no child launched, `🚪` opening lane, `📥` installing dependencies, `📤` dispatching); `🔄` children running; `🔭` watching; and `🔚` ended — the header's own end mark, as `🏁` is a done row's. The legend names `🔧` and `🔚`, the two whose words do not say what they are:
 
@@ -189,6 +189,69 @@ Each read recomputes only what changed (#4263):
 The live board gathers in a `worker_threads` worker (`run-board-gather-worker.ts`, #4267): the stream, lane and session-log reads, the `ps` usage sample and the machine sample run there, and each redraw takes the worker's newest answer, so a `git` or `ps` call never freezes the spinner. A local read that is unchanged since the last answer is not posted again, and a stream read again with the same events is posted without them, so the board keeps its own `events` array. The plan, the closed children and the thanks roster are still read on the board's own thread, since they wait on the network rather than block. A round whose reads throw is posted as failed and the worker reads again next round (#4387); a worker that fails or exits is started again on the next redraw. Either draws `❗ read HH:MM <reason>` in the header, the error's first line cut to 40 columns, until a read answers; with no run read yet, it takes the place of `no run`, since a failed read cannot tell whether a run is there. `--once`, `--chat` and `--every` draw one frame, so they gather on their own thread with the same code (`run-board-gather.ts`).
 
 What stays on the board's thread — the layout, the frame and its fit — is held to a frame budget by `run-board-frame-budget.test.ts`: each of three redraws over eight lanes, a thousand processes and six thousand events, right after the worker read the same stream again, must read fewer events than one fold of the stream. The budget counts the events a redraw reads — the calls to `run_event_scope.issue_named`, which every fold makes once per event — not its time (#5161): a 40ms wall-clock budget failed unrelated pull requests on a loaded CI runner, and on a fast machine passed a redraw that folded the stream again. The folds over the whole stream (the activity and the statuses) are kept for the `events` array the board holds, so a redraw does not fold the stream again until the stream changes: a redraw that keeps them reads one event, and one that folds again reads 18,294 events, about three folds of the six thousand. The second test pins that each redraw draws the array the first frame folded; the third hands the stream over afresh on every read and shows the count catches that miss.
+
+### Sound cues
+
+The live redraw sounds a cue as the run moves (joshuafolkken/kit#7949, `run-board-sound-transition.ts`). Each frame is read against the one before, and only what is new sounds. The rules:
+
+- The loudest one alone: `alert` wins over `human`, and `human` wins over the information cues `launch`, `lane-end` and `drain`. Within one tier the first named wins (`run-board-sound-cues.ts`).
+- The opening frame is the base: the first frame sounds nothing, whatever it shows, even a run that is stopped or waiting on a person. A frame drawn before the plan's layout is read counts as the first frame too.
+- Live only: `--once`, `--chat` and `--every` never sound.
+- One replay after 10 minutes: a `human` or `alert` cue still standing 10 minutes after it sounded replays once. Where several stand, only the loudest replays. A cue sounded afresh, or a different cue starting to stand, starts the count again. An information cue never replays, and a frame's own cue takes precedence over a replay (`run-board-sound-repeat.ts`).
+- Picked before the header is drawn, sound on or off: each cue carries what sounded it — the lane's issue and its word, or the run's condition — and the frame that picks it ends the header's second line on it, so a muted board still shows what it would have sounded (joshuafolkken/kit#8107, `run-board-header-notice.ts`).
+
+The scenes, in the order the module's tests list them (`run-board-sound-transition.test.ts` checks this table against them):
+
+| Scene                                      | Cue        |
+| ------------------------------------------ | ---------- |
+| a launch                                   | `launch`   |
+| a restart from waiting                     | `launch`   |
+| a merge                                    | `lane-end` |
+| a done lane                                | `lane-end` |
+| a drain                                    | `drain`    |
+| a human review beside a running lane       | `human`    |
+| a park                                     | `human`    |
+| a stopped lane                             | `alert`    |
+| a failed ship                              | `alert`    |
+| a usage-limit hold                         | `alert`    |
+| an outage                                  | `alert`    |
+| the run stopping                           | `alert`    |
+| the run left waiting on a person           | `alert`    |
+| an outage opening under a usage-limit hold | `alert`    |
+| a red CI                                   | —          |
+| a withdrawal                               | —          |
+| a pause                                    | —          |
+| a phase moving on                          | —          |
+| an unchanged frame                         | —          |
+
+What each cue sounds like:
+
+- Rising sine notes mean a start or a success: `launch` is two notes, `lane-end` three and `drain` four.
+- `human` is two triangle-wave A5 tones.
+- `alert` is a falling square-wave figure, played three times.
+
+`s` turns the sound on or off — the cues and the typing trill below. The default is on, and turning it on plays `launch` once; turning it off also stops a trill that is sounding. The setting is saved as `sound` in `~/.claude/josh/board.json` (under `$CLAUDE_CONFIG_DIR` if set). A missing or non-boolean value reads as on.
+
+Each cue is synthesized to a WAV once and cached in `~/.claude/josh/sounds`. A detached player plays it:
+
+| OS      | Player                                       |
+| ------- | -------------------------------------------- |
+| macOS   | `afplay`                                     |
+| Linux   | `paplay`, else `pw-play`, else `aplay`       |
+| Windows | `powershell` with `System.Media.SoundPlayer` |
+
+The board writes the terminal BEL instead in three cases: the platform has no row in this table, every player for it fails, or the WAV cannot be written (`run-board-sound-player.ts`).
+
+#### The typing trill
+
+A live board in a theme sounds a teletype trill while it types: the opening `SHALL WE PLAY A GAME?` and each row that appears (joshuafolkken/kit#8250, `run-board-sound-typing.ts`). It works apart from the cues:
+
+- The sound: two sine notes, B♭5 then D6, 25 ms each. One pair is 50 ms, the same as one letter (the theme row's `intro.letter_ms` in `run-board-theme-defs.ts`). The WAV holds 160 pairs (about 8 seconds). The persistent cache key covers the notes, output format and synthesis source; a cache hit skips synthesis across board restarts. Packaged builds hash their bundle, conservatively invalidating sounds when the bundle changes.
+- One player: the trill has one on/off state. While any line types it is on; once every line is typed through it is off. Rows that type at the same time do not start a second player. macOS uses AVAudioPlayer through JXA; Windows uses SoundPlayer.PlayLooping; Linux streams repeated raw PCM to paplay, pw-play or aplay with pipe backpressure. The player never restarts at clip boundaries. Single-shot cues keep their OS players.
+- Apart from the cues: no tier, transition or repeat rule reaches it. A cue on the same frame sounds over the trill and does not stop it.
+- Stops: the letters typed through or skipped by a key, every row typed through, `s` turning the sound off, and the board closing (quit, Ctrl-C) — the player is killed, so no process stays behind.
+- Silent where it cannot play: a trill whose player fails rings no BEL, which stays the cues' single notice.
+- Live in a theme only: `--once`, `--chat`, `--every` and a board with no theme never sound it.
 
 ## The strand report in detail
 
@@ -227,9 +290,18 @@ Under its `yield → redispatch` row, four rows split each yield by where its wa
 
 A part nothing ended is counted as not ended, and the parts after it are absent.
 
+The `catch rate` table (`lane-catch-rate-stats.ts`, joshuafolkken/kit#7875) has one row per round 2 `required` code, gate check and ship preflight kind:
+
+- runs, catches (non-empty `findings`, a failed check, an unmet kind) and rate %
+- minutes: gate checks only; round 2 and the preflight record no time
+- reused and unmoved checks are left out of the runs
+- a round 2 with no recorded `findings` counts under `no outcome`, outside the rate
+
+`candidates:` lists the rows at or below a 5% rate over at least 20 runs. It only lists: each candidate is retired, sampled or moved to a lighter path in its own Issue.
+
 ## `josh lane:net` in detail
 
-Each wait runs from the park, outage or usage-limit stop to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop is read off its `usage-limit` event on the run's stream (joshuafolkken/kit#4745), as an outage is. The host's sleep is taken out of every lane it falls in, whatever the issue (joshuafolkken/kit#5032): `backlog:drive`'s load sampler records a `sleep` event when the gap between its once-a-minute ticks exceeds three intervals, spanning from the tick that was due to the late one (`lane-sleep.ts`). A yield — `lane:plan` gave the seat back — waits from the child's yield note until the issue's next dispatch, no seat held, and is taken out too (joshuafolkken/kit#5216); the note, not the withdrawal `run:merge` closes the lane with, starts it, since that withdrawal can be missing (joshuafolkken/kit#5755); `josh lane:stats` times it as its `yield → redispatch` gap. Overlapping waits — a park the host slept through, or an outage and a park — are joined and taken out once. The ship's followup — each `followup start` ship stage to the issue's next ship stage or the merge — is the driver's CI, CodeRabbit and merge wait, no seat held, and is joined with the waits and taken out too (joshuafolkken/kit#6541); `lane:breakdown` shows it as the `driver followup` line, apart from the waits.
+Each wait runs from the park, outage or usage-limit stop to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop is read off its `usage-limit` event on the run's stream (joshuafolkken/kit#4745), as an outage is. The host's sleep is taken out of every lane it falls in, whatever the issue (joshuafolkken/kit#5032): `backlog:drive`'s load sampler records a `sleep` event when the gap between its once-a-minute ticks exceeds three intervals, spanning from the tick that was due to the late one (`lane-sleep.ts`). A network outage is taken out the same way (joshuafolkken/kit#7867): each tick probes reachability and records `offline` while it fails and `online` when it answers again, and an outage ends at its recovery or one tick past its last `offline`, so a drive that stopped mid-outage never stretches it over later lanes (`lane-offline.ts`, `lane-offline-spans.ts`); the sleeps and outages are joined as host stops (`lane-host-gaps.ts`). A yield — `lane:plan` gave the seat back — waits from the child's yield note until the issue's next dispatch, no seat held, and is taken out too (joshuafolkken/kit#5216); the note, not the withdrawal `run:merge` closes the lane with, starts it, since that withdrawal can be missing (joshuafolkken/kit#5755); `josh lane:stats` times it as its `yield → redispatch` gap. Overlapping waits — a park the host slept through, or an outage and a park — are joined and taken out once. The ship's followup — each `followup start` ship stage to the issue's next ship stage or the merge — is the driver's CI, CodeRabbit and merge wait, no seat held, and is joined with the waits and taken out too (joshuafolkken/kit#6541); `lane:breakdown` shows it as the `driver followup` line, apart from the waits.
 
 ## `josh cost` in detail
 

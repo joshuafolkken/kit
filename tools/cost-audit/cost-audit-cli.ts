@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json } from '#scripts/git/parse-json-array'
 import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
+import type { LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -145,15 +146,23 @@ async function read_merges(days: number, now_ms: number): Promise<MergeCounts | 
 	}
 }
 
+// The lane ledger with its archive, or `undefined` when it could not be read — the audit then has no
+// merged-issue set rather than an empty one that would read every lane as unmerged.
+async function read_ledger(): Promise<ReadonlyArray<LedgerEntry> | undefined> {
+	try {
+		return await lane_ledger_archive.read_history({})
+	} catch {
+		return undefined
+	}
+}
+
 // Each lane's stages by its Issue, read off the ledger and the run events `josh lane:breakdown` reads; a
 // lane the ledger holds no dispatch and merge of has none.
 async function read_breakdowns(
 	sessions: ReadonlyArray<AuditSession>,
+	entries: ReadonlyArray<LedgerEntry>,
 ): Promise<Map<number, Breakdown>> {
-	const [entries, events] = await Promise.all([
-		lane_ledger_archive.read_history({}),
-		lane_net_read.read_events({}),
-	])
+	const events = await lane_net_read.read_events({})
 	const issues = new Set(sessions.flatMap((session) => session.issue ?? []))
 	const pairs = [...issues].map(
 		(issue) => [issue, lane_breakdown.of(entries, events, issue)] as const,
@@ -162,14 +171,25 @@ async function read_breakdowns(
 	return new Map(pairs.filter((pair): pair is [number, Breakdown] => pair[1] !== undefined))
 }
 
+// The Issues the ledger records a merge of, or `undefined` when the ledger could not be read.
+function merged_issues_of(
+	entries: ReadonlyArray<LedgerEntry> | undefined,
+): ReadonlySet<number> | undefined {
+	if (entries === undefined) return undefined
+
+	return new Set(entries.flatMap((entry) => (entry.kind === 'merge' ? entry.issue : [])))
+}
+
 async function measure(cwd: string, days: number, now_ms: number): Promise<Audit> {
 	const sessions = cost_audit_read.load(cwd, cost_audit.since_ms(days, now_ms))
+	const entries = await read_ledger()
 	const [merges, breakdowns] = await Promise.all([
 		read_merges(days, now_ms),
-		read_breakdowns(sessions),
+		read_breakdowns(sessions, entries ?? []),
 	])
+	const merged_issues = merged_issues_of(entries)
 
-	return cost_audit.audit({ sessions, days, now_ms, merges, breakdowns })
+	return cost_audit.audit({ sessions, days, now_ms, merges, breakdowns, merged_issues })
 }
 
 // The default period's summary line, for `josh retrospective`, with the filing line a regression adds.
@@ -181,14 +201,26 @@ async function summary(cwd: string, now_ms: number = Date.now()): Promise<string
 	)
 }
 
-// `--density` prints the lane-child density alone, so the number is the output's last line; a period
-// with no lane-child request prints nothing, never a zero a declared bound would read as met.
-function printed_lines(argv: ReadonlyArray<string>, audit: Audit): Array<string> {
-	if (!argv.includes(DENSITY_FLAG)) return cost_audit_format.report_lines(audit)
+// `--density` reads the lane children's own sessions of the current period alone, with no merges,
+// breakdowns or pricing (joshuafolkken/kit#8284), and prints a label line over the number, so the
+// number stays the output's last line; a period with no lane-child request prints nothing, never a
+// zero a declared bound would read as met.
+function density_lines(cwd: string, span: AuditSpan): Array<string> {
+	const [window] = cost_audit.windows_of(span.days, span.now_ms)
+	const sessions = cost_audit_read.load_lane_children(cwd, window.start_ms)
+	const value = cost_audit_format.density_value(cost_audit.density_inside(sessions, window))
 
-	const value = cost_audit_format.density_value(audit)
+	return value === undefined ? [] : [cost_audit_format.density_label(window), value]
+}
 
-	return value === undefined ? [] : [value]
+async function printed_lines(
+	argv: ReadonlyArray<string>,
+	cwd: string,
+	span: AuditSpan,
+): Promise<Array<string>> {
+	if (argv.includes(DENSITY_FLAG)) return density_lines(cwd, span)
+
+	return cost_audit_format.report_lines(await measure(cwd, span.days, span.now_ms))
 }
 
 // Nothing to print is a failure: `--density` with no sample exits non-zero, like `lane:value`.
@@ -207,7 +239,7 @@ async function run(
 
 	if (span === undefined) return cli_flags.answer_usage(argv, USAGE)
 
-	return printed(printed_lines(argv, await measure(cwd, span.days, span.now_ms)))
+	return printed(await printed_lines(argv, cwd, span))
 }
 
 const cost_audit_cli = { USAGE, read_period, read_span, merged_query, run, summary }

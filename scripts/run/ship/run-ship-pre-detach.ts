@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { derive_check } from '#scripts/document/derive-check'
 import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateStepResult } from '#scripts/gate/gate-report'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
+import { project_checks } from '#scripts/gate/project-checks'
 import { structural_checks } from '#scripts/gate/structural-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
@@ -24,10 +26,11 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // the gate's own check passed silently here is recorded with the gate's per-check record
 // (`check-reuse.ts`), so the supervised gate stage reuses it while its declared inputs have not moved
 // and runs it again when they have. The record, its judgment and its inputs are the gate's; only the
-// type check (`check`) and `exports:unused` (`exports`) carry a gate label. The rest stay unrecorded:
-// `cspell:dot` declares no inputs and runs every gate (`verification-inputs.ts`), the guard tests are a
-// slice of the unit suite and do not answer for the gate's `test:unit`, and the metrics totals leave
-// out the durations the gate's `metrics` holds.
+// type check (`check`), `exports:unused` (`exports`) and `cspell:dot` (`cspell`) carry a gate label.
+// `cspell:dot` declares every file as its input (`verification-inputs.ts`, joshuafolkken/kit#5156), so
+// the gate reuses it only while no file moved. The rest stay unrecorded: the guard tests are a slice of
+// the unit suite and do not answer for the gate's `test:unit`, and the metrics totals leave out the
+// durations the gate's `metrics` holds.
 //
 // joshuafolkken/kit#3924: nine of ten ship gate stops were `exports:unused`, `cspell:dot` or a
 // repository-wide guard test failing on the child's own code — none a check `test:related` selects,
@@ -64,7 +67,7 @@ const UNPINNED = 'unpinned'
 const { METRICS_RERECORD_COMMAND } = metrics_totals
 const STATIC_CHECKS: ReadonlyArray<PreDetachCheck> = [
 	{ list: ['josh', 'exports:unused'], label: gate_labels.EXPORTS_LABEL },
-	{ list: ['josh', 'cspell:dot'] },
+	{ list: ['josh', gate_labels.SPELL_CHECK_TARGET], label: gate_labels.SPELL_CHECK_LABEL },
 ]
 const GUARD_TEST_TARGETS: ReadonlyArray<string> = [
 	'scripts/document',
@@ -86,6 +89,21 @@ function guard_tests(directory: string): Array<PreDetachCheck> {
 	return targets.length === 0 ? [] : [{ list: [...GUARD_TEST_COMMAND, ...targets] }]
 }
 
+// The guard tests' `josh` arguments, for `run:chain`'s stage before the review; empty when none is
+// present (joshuafolkken/kit#7773).
+function guard_test_argv(directory: string): ReadonlyArray<string> {
+	const [check] = guard_tests(directory)
+
+	return check === undefined ? [] : check.list.slice(1)
+}
+
+// `exports:unused`'s `josh` arguments, the static check `check:related` does not run.
+function exports_argv(): ReadonlyArray<string> {
+	const [exports_check] = STATIC_CHECKS
+
+	return exports_check === undefined ? [] : exports_check.list.slice(1)
+}
+
 // The totals' judgment `josh run:review`'s open stops on (`metrics_totals.totals_check`), run again
 // here as the backstop; none outside kit.
 async function metrics_runs(directory: string): Promise<Array<PreDetachRun>> {
@@ -99,12 +117,21 @@ async function metrics_runs(directory: string): Promise<Array<PreDetachRun>> {
 	]
 }
 
+// The generated-page check `run:chain` runs before the review, run again here; none outside kit
+// (joshuafolkken/kit#7728).
+function generated_page_checks(directory: string): Array<PreDetachCheck> {
+	if (!project_checks.is_kit_repository(directory)) return []
+
+	return [{ list: ['josh', ...derive_check.DERIVE_CHECK_ARGV] }]
+}
+
 async function command_lists(directory: string): Promise<Array<PreDetachCheck>> {
 	const type_check = await type_check_step.resolve_type_check_args(directory)
 
 	return [
 		{ list: type_check, label: gate_labels.TYPE_CHECK_LABEL },
 		...STATIC_CHECKS,
+		...generated_page_checks(directory),
 		...guard_tests(directory),
 	]
 }
@@ -218,7 +245,9 @@ const run_ship_pre_detach = {
 	STATIC_CHECKS,
 	UNPINNED,
 	checks,
+	exports_argv,
 	failure_prefix,
+	guard_test_argv,
 	with_pinned,
 }
 

@@ -220,40 +220,27 @@ describe('lane_background.foreground_input — a foreground ship', () => {
 })
 
 // joshuafolkken/kit#4711: a `ship:wait` at the two-minute default is moved aside mid-chunk and dies with the
-// headless turn, its verdict unread.
-describe('lane_background.foreground_input — ship:wait', () => {
-	it.each([
-		['in the foreground', { command: SHIP_WAIT }],
-		['in the background', { command: SHIP_WAIT, run_in_background: true }],
-	])('gives a ship:wait %s the foreground cap in a lane child', (_case, input) => {
-		expect(lane_background.foreground_input({ name: BASH, input }, in_lane)).toStrictEqual({
-			command: SHIP_WAIT,
-			run_in_background: false,
-			timeout: FOREGROUND_TIMEOUT_MS,
-		})
-	})
-
-	it('does not refuse a backgrounded ship:wait, since it is rewritten instead', () => {
-		expect(lane_background.is_background_long_run(background_call(SHIP_WAIT), in_lane)).toBe(false)
-	})
-})
-
+// headless turn, its verdict unread. joshuafolkken/kit#8336: `josh wait` lasts up to the same chunk.
 // joshuafolkken/kit#4864: a `lane:plan` cut at the default records its plan with the wait unfinished.
-describe('lane_background.foreground_input — lane:plan', () => {
-	it('gives a lane:plan the foreground cap in a lane child', () => {
-		const input = { command: LANE_PLAN }
-
-		expect(lane_background.foreground_input({ name: BASH, input }, in_lane)).toStrictEqual({
-			command: LANE_PLAN,
-			run_in_background: false,
-			timeout: FOREGROUND_TIMEOUT_MS,
+describe.each([SHIP_WAIT, 'pnpm josh wait --pid 123', LANE_PLAN])(
+	'lane_background.foreground_input — %s',
+	(wait) => {
+		it.each([
+			['in the foreground', { command: wait }],
+			['in the background', { command: wait, run_in_background: true }],
+		])('gives the wait %s the foreground cap in a lane child', (_case, input) => {
+			expect(lane_background.foreground_input({ name: BASH, input }, in_lane)).toStrictEqual({
+				command: wait,
+				run_in_background: false,
+				timeout: FOREGROUND_TIMEOUT_MS,
+			})
 		})
-	})
 
-	it('names lane:plan in the note on the rewritten call', () => {
-		expect(lane_background.FOREGROUND_NOTE).toContain('josh lane:plan')
-	})
-})
+		it('does not refuse the backgrounded wait, since it is rewritten instead', () => {
+			expect(lane_background.is_background_long_run(background_call(wait), in_lane)).toBe(false)
+		})
+	},
+)
 
 describe('lane_background.ROW — delivery', () => {
 	it('is registered as a delivered rule refusing every occurrence', () => {
@@ -281,10 +268,16 @@ describe('lane_background.ROW — delivery', () => {
 
 	// A launched ship is waited on, so a stop returns to this session (joshuafolkken/kit#4711); `ship
 	// --detach` runs the first wait chunk itself and only a `pending` is re-issued (joshuafolkken/kit#5625).
+	// The note names every rewritten command, and a `josh wait` re-runs itself (joshuafolkken/kit#8336).
 	it.each([
 		['refusal', lane_background.LANE_BACKGROUND_REASON, 'runs `josh ship:wait` itself'],
-		['foreground note', lane_background.FOREGROUND_NOTE, '`josh ship:wait` on its `pending`'],
-	])('the %s leaves the first wait to the launched ship', (_name, text, wording) => {
+		...[
+			'`josh ship:wait` on its `pending`',
+			'josh lane:plan',
+			'josh wait',
+			'a `pending` wait is re-run as it says',
+		].map((wording) => ['foreground note', lane_background.FOREGROUND_NOTE, wording]),
+	])('the %s names %j for the wait that follows', (_name, text, wording) => {
 		expect(text).toContain(wording)
 	})
 })

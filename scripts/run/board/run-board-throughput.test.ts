@@ -50,6 +50,11 @@ function active_at(row: ThroughputRow, start_ms: number): number | undefined {
 	return row.cells.find((cell) => cell.start_ms === start_ms)?.active_ms
 }
 
+// The span a row's cells cover, a clock change's extra or missing hour counted.
+function window_of(row: ThroughputRow | undefined): number {
+	return (row?.cells ?? []).reduce((total, cell) => total + cell.end_ms - cell.start_ms, 0)
+}
+
 describe('run_board_throughput cells', () => {
 	it('derives 24 hourly cells and 14 half-day cells, the newest holding now', () => {
 		const [day, week] = rows([])
@@ -101,7 +106,7 @@ describe('run_board_throughput across a clock change', () => {
 			const hours = week?.cells.map((cell) => new Date(cell.start_ms).getHours())
 
 			expect(new Set(hours)).toStrictEqual(new Set([0, 12]))
-			expect(week?.window_ms).toBe(169 * HOUR)
+			expect(window_of(week)).toBe(169 * HOUR)
 		} finally {
 			vi.unstubAllEnvs()
 		}
@@ -121,9 +126,20 @@ describe('run_board_throughput active figures', () => {
 
 		expect(active_at(day, local(8))).toBe(20 * MINUTE)
 		expect(day.active_ms).toBe(100 * MINUTE)
-		expect(day.window_ms).toBe(24 * HOUR)
+		expect(window_of(day)).toBe(24 * HOUR)
 		expect(day.per_hour).toBeCloseTo(2 / (70 / 60))
 		expect(day.done).toBe(3)
+	})
+
+	// joshuafolkken/kit#7905: a host sleep shorter than the quiet-stretch cut is not active time either.
+	it('keeps a host sleep inside an active stretch out of ACTIVE', () => {
+		const sleep = { ...event(local(9, 20), KIND.SLEEP), elapsed_ms: 5 * MINUTE }
+		const [awake] = rows(stream(...beats(EIGHT, NOW)))
+		const [slept] = rows(stream(...beats(EIGHT, NOW), sleep))
+
+		expect(active_at(awake, NINE)).toBe(HOUR)
+		expect(active_at(slept, NINE)).toBe(55 * MINUTE)
+		expect(slept.active_ms).toBe(awake.active_ms - 5 * MINUTE)
 	})
 })
 
@@ -139,11 +155,11 @@ describe('run_board_throughput current cell and closes', () => {
 		const [day, week] = rows(events)
 
 		expect(day.now).toBe(3)
-		expect(day.peak).toEqual({ done: 2, per_hour: 2, start_ms: local(8) })
+		expect(day.peak).toEqual({ done: 2, per_hour: 2 })
 		expect(day.per_hour).toBeCloseTo(3 / 2)
 		expect(week.now).toBeUndefined()
-		expect(week.peak).toEqual({ done: 1, per_hour: 1 / 12, start_ms: local(-12) })
-		expect(week.window_ms).toBe(168 * HOUR)
+		expect(week.peak).toEqual({ done: 1, per_hour: 1 / 12 })
+		expect(window_of(week)).toBe(168 * HOUR)
 	})
 
 	it('counts as DONE the closes the done section draws merged, once per child', () => {

@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit, type PlanLine } from './run-board-fit'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
+import { run_board_row_key } from './run-board-row-key'
+import { run_board_seat } from './run-board-seat'
 import type { UsageFigure } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
@@ -110,7 +113,7 @@ describe('run_board_render_lanes.lanes_section', () => {
 
 	it('heads the lines with a rule whose labels stand over the cells', () => {
 		const [section] = lanes_section([LINE], CELLS, header())
-		const rule = section?.head[1] ?? ''
+		const rule = run_board_label_pair.bare(section?.head[1] ?? '')
 
 		expect(rule.startsWith('── 🧵 lanes ')).toBe(true)
 		expect(column_of(rule, '💪 CPU')).toBe(USAGE_START)
@@ -120,10 +123,10 @@ describe('run_board_render_lanes.lanes_section', () => {
 	// joshuafolkken/kit#7523: a single run runs in the root checkout, not in a lane.
 	it.each(['fullrun', 'halfrun'])('heads a single %s row with 🏠 and its name', (run_name) => {
 		const [section] = lanes_section([LINE], CELLS, header({ run_name }))
-		const rule = section?.head[1] ?? ''
+		const rule = run_board_label_pair.bare(section?.head[1] ?? '')
 
 		expect(rule.startsWith(`── 🏠 ${run_name} `)).toBe(true)
-		expect(rule).not.toContain(LANES_LABEL)
+		expect(rule).not.toContain(run_board_label_pair.bare(LANES_LABEL))
 		expect(section?.lines).toStrictEqual([LINE])
 		expect(column_of(rule, '💪 CPU')).toBe(USAGE_START)
 		expect(column_of(rule, '⏰')).toBe(ELAPSED_START)
@@ -134,6 +137,53 @@ describe('run_board_render_lanes.lanes_section', () => {
 		const icons = [LANES_LABEL, ...COLUMN_LABELS].map((label) => label.split(' ', 1)[0] ?? '')
 
 		expect(icons.map((icon) => run_board_fit.width_of(icon))).toStrictEqual([2, 2, 2, 2])
+	})
+})
+
+describe('run_board_render_lanes.COLUMN_LABELS', () => {
+	it('marks each label as an icon beside its text, drawn bare without a theme', () => {
+		const bare = COLUMN_LABELS.map((label) => run_board_label_pair.bare(label))
+
+		expect(COLUMN_LABELS.every((label) => label.includes(run_board_label_pair.MARK))).toBe(true)
+		expect(bare.map((label) => label.split(' ').slice(1).join(' '))).toStrictEqual([
+			'CPU',
+			'MEM',
+			'CMPRS',
+		])
+	})
+})
+
+function without_keys(texts: ReadonlyArray<string>): Array<string> {
+	return texts.map((text) => run_board_row_key.without_key(text))
+}
+
+// joshuafolkken/kit#8116: a themed frame keys each empty seat's reason after its lead, by the uncut words.
+describe('run_board_render_lanes.lanes_section seat keys', () => {
+	const SEATED = { lane_limit: 2, occupied_count: 0, seats: {} }
+	const SEAT_KEY = `seat:${run_board_seat.NO_CANDIDATE}`
+	const NARROW = 20
+
+	function seat_texts(keyed: boolean, columns?: number): Array<string> {
+		const [section] = lanes_section([], undefined, header({ ...SEATED, is_keyed: keyed }), columns)
+
+		return (section?.lines ?? []).filter((line) => line.is_seat === true).map((line) => line.text)
+	}
+
+	it('keys each seat line after its lead only where the frame is keyed', () => {
+		const splits = seat_texts(true).map((text) => run_board_row_key.split_key(text))
+
+		expect(splits.map((split) => split.key)).toStrictEqual([SEAT_KEY, SEAT_KEY])
+		expect(splits.every((split) => split.prefix.endsWith('💺 '))).toBe(true)
+		expect(seat_texts(false).map((text) => run_board_row_key.split_key(text).key)).toStrictEqual([
+			undefined,
+			undefined,
+		])
+	})
+
+	it('draws the same seat lines with the key taken out, cut at the pane’s edge or not', () => {
+		expect(without_keys(seat_texts(true))).toStrictEqual(seat_texts(false))
+		expect(without_keys(seat_texts(true, NARROW))).toStrictEqual(seat_texts(false, NARROW))
+		expect(run_board_row_key.split_key(seat_texts(true, NARROW)[0] ?? '').key).toBe(SEAT_KEY)
 	})
 })
 

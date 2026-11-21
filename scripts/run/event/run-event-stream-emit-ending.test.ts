@@ -53,22 +53,24 @@ async function newest_event(): Promise<unknown> {
 describe('run_event_stream_emit.emit -- an ending records its lane time', () => {
 	it('records the time since the launch on a merge', async () => {
 		read_state_mock.mockResolvedValue(RECORD)
-		await run_event_stream_emit.emit(KIND.CHILD_LAUNCH, '#4430', LAUNCHED_AT)
-		await run_event_stream_emit.emit(KIND.MERGE, MERGED_TEXT, ENDED_AT)
+		await run_event_stream_emit.emit(KIND.CHILD_LAUNCH, '#4430', { at: LAUNCHED_AT })
+		await run_event_stream_emit.emit(KIND.MERGE, MERGED_TEXT, { at: ENDED_AT })
 
 		expect(await newest_event()).toMatchObject({ kind: KIND.MERGE, elapsed_ms: IN_LANE_MS })
 	})
 
 	it('records the time from the lane record when the stream holds no launch', async () => {
 		read_state_mock.mockResolvedValue(RECORD)
-		await run_event_stream_emit.emit(KIND.WITHDRAW, '#4430 withdrawn by a person: x', ENDED_AT)
+		await run_event_stream_emit.emit(KIND.WITHDRAW, '#4430 withdrawn by a person: x', {
+			at: ENDED_AT,
+		})
 
 		expect(await newest_event()).toMatchObject({ kind: KIND.WITHDRAW, elapsed_ms: IN_LANE_MS })
 	})
 
 	it('records nothing on an event that does not end a child', async () => {
 		read_state_mock.mockResolvedValue(RECORD)
-		await run_event_stream_emit.emit(KIND.CUT, '#4430 cut', ENDED_AT)
+		await run_event_stream_emit.emit(KIND.CUT, '#4430 cut', { at: ENDED_AT })
 
 		expect(await newest_event()).not.toHaveProperty('elapsed_ms')
 	})
@@ -77,7 +79,7 @@ describe('run_event_stream_emit.emit -- an ending records its lane time', () => 
 describe('run_event_stream_emit -- an ending with no time, or appended by hand', () => {
 	it('still writes the ending, with no time, when the lane record cannot be read', async () => {
 		read_state_mock.mockRejectedValue(new Error('unreadable'))
-		await run_event_stream_emit.emit(KIND.MERGE, MERGED_TEXT, ENDED_AT)
+		await run_event_stream_emit.emit(KIND.MERGE, MERGED_TEXT, { at: ENDED_AT })
 
 		const newest = await newest_event()
 
@@ -99,7 +101,7 @@ describe('run_event_stream_emit -- an ending with no time, or appended by hand',
 
 	it('records nothing for a child with no lane record', async () => {
 		read_state_mock.mockResolvedValue(undefined)
-		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, ENDED_AT)
+		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, { at: ENDED_AT })
 
 		expect(await newest_event()).not.toHaveProperty('elapsed_ms')
 	})
@@ -109,7 +111,7 @@ describe('run_event_stream_emit -- an ending with no time, or appended by hand',
 		read_state_mock.mockResolvedValue(undefined)
 		const stop = { stage: 'followup', cause: 'check' }
 
-		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, ENDED_AT, { stop })
+		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, { at: ENDED_AT, stop })
 
 		expect(await newest_event()).toMatchObject({ kind: KIND.PARK, text: PARKED_TEXT, stop })
 	})

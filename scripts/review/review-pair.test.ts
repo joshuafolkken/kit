@@ -4,6 +4,7 @@ import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { review_attest } from './review-attest'
 import { review_pair } from './review-pair'
+import { review_prompt_level } from './review-prompt-level'
 import { review_round } from './review-round'
 
 // joshuafolkken/kit#6902: round 1's code brief is copied for a Sonnet reviewer only when the paired
@@ -67,6 +68,15 @@ describe('review_pair.offer', () => {
 		const final = `${BRIEF}\n${review_round.FINAL_LINE}`
 
 		expect(review_pair.offer(final, ON, fresh_directory())).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8337: the paired launch names its trigger for `cost:audit`.
+describe('review_pair.opening', () => {
+	it('writes the paired trigger into the paired prompt', () => {
+		const prompt = review_pair.opening(review_pair.paths(fresh_directory()).brief)
+
+		expect(review_prompt_level.trigger_of(prompt)).toBe('paired')
 	})
 })
 

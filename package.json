@@ -1,5 +1,5 @@
 {
-	"version": "1.3164.0",
+	"version": "1.3473.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Hand-off kit for Claude Code and Codex: backlogrun takes your GitHub Issues to tested, reviewed, merged PRs — in parallel and unattended — with the rules, hooks and checks that keep the agent on track",
 	"keywords": [
@@ -53,6 +53,7 @@
 		"lefthook",
 		".claude/settings.json",
 		".claude/skills",
+		"!.claude/skills/board-theme",
 		".claude/agents",
 		".claude/.claude-plugin",
 		".claude-plugin",
@@ -150,7 +151,7 @@
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@playwright/test": ">=1.0.0",
-		"@stylistic/eslint-plugin": "^5.10.0",
+		"@stylistic/eslint-plugin": "^6.0.0",
 		"eslint": "^10.4.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-import-resolver-typescript": "^4.4.5",
@@ -227,8 +228,7 @@
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@playwright/test": "^1.64.1",
-		"@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
-		"@stylistic/eslint-plugin": "^5.10.0",
+		"@stylistic/eslint-plugin": "^6.0.0",
 		"@types/node": "^26.6.6",
 		"@types/run-parallel": "^1.1.2",
 		"@types/semver": "^7.8.0",
@@ -250,12 +250,13 @@
 		"prettier-plugin-tailwindcss": "^0.8.1",
 		"rollup": "^4.67.4",
 		"rollup-plugin-dts": "^6.5.1",
-		"secretlint": "^13.1.0",
+		"secretlint": "^14.0.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.72.1",
 		"vitest": "^5.1.0"
 	},
 	"dependencies": {
+		"@cacheable/memory": "^2.2.0",
 		"cli-spinners": "^3.4.0",
 		"csv-parse": "^7.0.3",
 		"execa": "^10.2.1",

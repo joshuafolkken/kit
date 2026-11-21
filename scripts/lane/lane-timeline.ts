@@ -4,6 +4,8 @@ import { lane_breakdown, type Breakdown, type Segment } from './lane-breakdown'
 import { lane_ledger, type LedgerEntry, type ShipLapEntry } from './lane-ledger'
 import { lane_net_time, type LaneSpan } from './lane-net-time'
 import { lane_stop_stats } from './lane-stop-stats'
+import { lane_timeline_steps } from './lane-timeline-steps'
+import type { ToolCall } from './lane-transcript-calls'
 import { lane_yield } from './lane-yield'
 
 // `josh lane:breakdown <issue> --timeline` — one lane in time order, one line an event
@@ -15,7 +17,13 @@ import { lane_yield } from './lane-yield'
 const { EVENT_KIND } = run_event_stream
 const { KIND } = lane_ledger
 
-const ROW = { STAGE: 'stage', EXCLUDED: 'excluded', DRIVER: 'driver', EVENT: 'event' } as const
+const ROW = {
+	STAGE: 'stage',
+	STEP: 'step',
+	EXCLUDED: 'excluded',
+	DRIVER: 'driver',
+	EVENT: 'event',
+} as const
 
 type RowKind = (typeof ROW)[keyof typeof ROW]
 
@@ -36,6 +44,8 @@ interface Timeline {
 interface Records {
 	entries: ReadonlyArray<LedgerEntry>
 	events: ReadonlyArray<RunEvent>
+	// The lane's transcript calls, for the steps only they time (`lane-timeline-steps.ts`).
+	calls?: ReadonlyArray<ToolCall>
 }
 
 interface Mark {
@@ -45,8 +55,13 @@ interface Mark {
 
 const MERGE_STEP = 'merge'
 const NO_KIND = 'wait'
-const SLEEP_KIND = 'sleep'
-const CLOCK_LENGTH = 16
+// A host sleep or network outage (joshuafolkken/kit#7867), joined in `lane-host-gaps.ts`.
+const SLEEP_KIND = 'host stop'
+const CLOCK_LENGTH = 19
+// `HH:MM:SS` in an ISO time, and its width.
+const TIME_START = 11
+const TIME_END = 19
+const END_LENGTH = TIME_END - TIME_START
 const COLUMN_WIDTH = 9
 
 // The events that open a wait `lane_net_time.waits` takes out, by the name its line carries.
@@ -188,13 +203,36 @@ function notice_rows(entries: ReadonlyArray<LedgerEntry>, issue: number): Array<
 		.flatMap((entry) => notice_row(entry))
 }
 
+// The timed steps inside the stages, and the points among them (a review round's verdict).
+function step_rows(records: Records, issue: number): Array<TimelineRow> {
+	const steps = lane_timeline_steps.of(records.entries, records.calls ?? [], issue)
+
+	return steps.map((step) => ({ ...step, kind: step.ms === undefined ? ROW.EVENT : ROW.STEP }))
+}
+
 function point_rows(records: Records, issue: number): Array<TimelineRow> {
 	const events = marks_of(records.events, issue, POINT_EVENTS).map((mark) => ({
 		...mark,
 		kind: ROW.EVENT,
 	}))
+	const ledger = [...merge_rows(records.entries, issue), ...notice_rows(records.entries, issue)]
 
-	return [...events, ...merge_rows(records.entries, issue), ...notice_rows(records.entries, issue)]
+	return [...events, ...ledger, ...step_rows(records, issue)]
+}
+
+// Each ship row named with its attempt's number.
+function with_attempts(
+	rows: ReadonlyArray<TimelineRow>,
+	records: Records,
+	issue: number,
+): Array<TimelineRow> {
+	const starts = lane_timeline_steps.attempt_starts(records.entries, issue)
+
+	return rows.map((row) =>
+		row.kind === ROW.EVENT
+			? row
+			: { ...row, name: lane_timeline_steps.numbered(row.name, row.at_ms, starts) },
+	)
 }
 
 /**
@@ -214,7 +252,9 @@ function of(records: Records, issue: number, breakdown: Breakdown): Timeline | u
 		...points,
 	]
 
-	return { from_ms: span.from_ms, rows: rows.toSorted((left, right) => left.at_ms - right.at_ms) }
+	const sorted = rows.toSorted((left, right) => left.at_ms - right.at_ms)
+
+	return { from_ms: span.from_ms, rows: with_attempts(sorted, records, issue) }
 }
 
 // The net milliseconds the stage lines add up to.
@@ -228,19 +268,26 @@ function clock(at_ms: number): string {
 	return `${new Date(at_ms).toISOString().slice(0, CLOCK_LENGTH).replace('T', ' ')}Z`
 }
 
+// A timed row's end, its time of day alone; a point's is blank.
+function end_clock(row: TimelineRow): string {
+	if (row.ms === undefined) return ''.padEnd(END_LENGTH)
+
+	return new Date(row.at_ms + row.ms).toISOString().slice(TIME_START, TIME_END)
+}
+
 function row_text(row: TimelineRow, from_ms: number): string {
 	const elapsed = `+${((row.at_ms - from_ms) / MS_PER_MINUTE).toFixed(1)}`
 	const took = row.ms === undefined ? '-' : lane_breakdown.minutes_text(row.ms)
 	const tag = row.kind === ROW.STAGE ? '' : `[${row.kind}] `
 
-	return `${clock(row.at_ms)}  ${elapsed.padStart(COLUMN_WIDTH)}  ${took.padStart(COLUMN_WIDTH)}  ${tag}${row.name}`
+	return `${clock(row.at_ms)}  ${end_clock(row)}  ${elapsed.padStart(COLUMN_WIDTH)}  ${took.padStart(COLUMN_WIDTH)}  ${tag}${row.name}`
 }
 
 // The timeline's lines under a header naming the columns, and the stage lines' sum.
 function text(lane: string, timeline: Timeline): string {
-	const head = `${lane} timeline — start (UTC), minutes since dispatch, duration, event`
+	const head = `${lane} timeline — start (UTC), end, minutes since dispatch, duration, event`
 	const lines = timeline.rows.map((row) => row_text(row, timeline.from_ms))
-	const total = `net ${lane_breakdown.minutes_text(net_ms(timeline))} — the stage lines' sum; [excluded], [driver] and [event] lines stand apart`
+	const total = `net ${lane_breakdown.minutes_text(net_ms(timeline))} — the stage lines' sum; [step], [excluded], [driver] and [event] lines stand apart`
 
 	return [head, ...lines, total].join('\n')
 }

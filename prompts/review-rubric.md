@@ -80,6 +80,8 @@ For each finding:
 - On a `high` or `medium`, cite every other site of the same pattern in the change's files and their
   callers as `file_path:line_number`, so one fix pass closes them all
 - On a test-1 finding rated `low`, write `no failure scenario — <what you tried>`
+- On its submitted finding line → prefix `kind=<kind> `, e.g. `kind=stale-docs comments:low:a.md:3 — …`;
+  values (`other` when none fits): `scripts/review/review-finding-kind.ts` → `KINDS`
 
 A category with no findings needs a proof statement, e.g. `No issues — checked null returns on X,
 verified Y edge case, Z is guarded by type.` A bare `No issues` is allowed only for Security,
@@ -126,7 +128,8 @@ Actively try to break the changed code.
 - Boundary values and concurrency: empty / zero / max inputs, unawaited promises, shared state,
   re-entrancy
 - Impact outside the diff: open the callers of every changed export or signature and verify they still
-  hold; flag duplication the change introduces
+  hold; flag duplication the change introduces. Prose keeping an old name, value or `--flag`: already
+  searched by self-check 2 (`docs/josh-commands-backlog.md` → "`josh prose:stale`")
 - Regressions in existing behavior covered elsewhere
 - Commands the changed prose tells a reader to run, run from a cwd other than the root with absolute,
   relative and empty inputs, in a scratch copy when they write: `prompts/review.md` → "Before round 1
@@ -164,10 +167,14 @@ switching `no-restricted-syntax` off.
 
 - Every code change has a corresponding test (unit or E2E) per `CLAUDE.md` Code Change Rules Step 0
 - Test titles describe behavior, not implementation
-- **Mutation check**: for the most critical test added or changed — if the key assertion/condition in
-  the implementation were inverted or removed, would it fail? If no or uncertain, rewrite it.
+- **Mutation check**: for the most critical test added or changed — would it fail on an inverted
+  condition or a changed value, an `if` with no `else` dropped, or an `&&` / `||` operand removed? If
+  no or uncertain, rewrite it. A reverted hunk or a changed branch arm no test takes is
+  `josh test:pinned`'s (`docs/josh-commands.md` → "`josh test:pinned`").
 - **Requirement check**: does the test verify the behavior the issue/task describes, or only that code
   runs without error?
+- A `Removed tests` row already written as `置き換え` → a rename the check matched, not a finding
+  (`scripts/review/renamed-tests.ts`).
 
 ### 7. Comments & content
 

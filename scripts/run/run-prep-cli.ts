@@ -137,6 +137,7 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		locations: reads.locations,
 		ship_problems: reads.ship_problems,
 		investigation: reads.investigation,
+		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
 	}
 }
 

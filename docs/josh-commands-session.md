@@ -136,6 +136,25 @@ pnpm josh doc:read backlogrun.md   # over the cap: prints a directive, no conten
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh doc:read` in detail".
 
+### `josh scratch:run`
+
+<!-- usage: scratch:run -->
+
+Run a scratch script that may write only to the scratch directory, with no network or child.
+
+```bash
+pnpm josh scratch:run .josh/tmp/scratch/chart.mjs   # writes only under .josh/tmp/scratch/
+```
+
+<!-- /usage -->
+
+- Runs a script from the scratch directory `.josh/tmp/scratch/` under Node's permission model: `--permission --allow-fs-read=* --allow-fs-write=<scratch real path>`.
+- No `--allow-net`, `--allow-child-process`, `--allow-worker` or `--allow-addons` — a write outside the scratch directory, a network call or a child process fails at runtime with `ERR_ACCESS_DENIED`.
+- Fails closed: a script outside the scratch directory is refused, and so is every run on a Node that does not know `--allow-net`.
+- The child's working directory is the script's directory.
+
+**Output / exit codes:** a refusal prints its reason and exits 1; otherwise the script's own exit code.
+
 ### `josh read:files`
 
 <!-- usage: read:files -->
@@ -268,6 +287,8 @@ pnpm josh cost:audit --density                               # the lane-child ca
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. It reads kit's own transcript store, kit-lanes included.
 
 It prints the total, the merged pull requests and the cost per merge (omitted when GitHub cannot be read), then one table each by session kind, tool category and guard. A row that grew past `REGRESSION_THRESHOLD` (`tools/cost-audit/cost-audit.ts`) is marked `regression`, and the closing line lists them. `josh retrospective` carries its one-line summary.
+
+A session-kind row also gives each period's session count and cost per session, so a grown row shows whether more sessions ran or each one cost more.
 
 Under the cost per merge, `lane-child density` gives the lane children's tool calls per request and their share of single-call requests, beside the period before.
 

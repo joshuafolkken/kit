@@ -30,6 +30,11 @@ describe('run_board_plan.read_plan — the live ports', () => {
 		await run_board_plan.read_plan({ issues: [], only: false })
 
 		expect(epic_classify.mute_notices).toHaveBeenCalled()
-		expect(backlog_plan_read.classify).toHaveBeenCalled()
+		// joshuafolkken/kit#8220: the listing read beside the pool is handed on, so the epics come from it.
+		expect(backlog_plan_read.classify).toHaveBeenCalledWith(
+			expect.anything(),
+			[],
+			expect.objectContaining({ is_capped: false }),
+		)
 	})
 })

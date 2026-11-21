@@ -151,16 +151,14 @@ function created_directories(
 	)
 }
 
-// A changed file is read by whoever read it, listed its own directory or walked any directory above
-// it. A directory new since the recording is also a new entry in the listing above it and a probe of
-// it that now answers differently; a directory that already existed reads the same to both, whatever
-// changed deeper down.
+// The listings whose entries a changed file moves: its own directory's, and the one above each
+// directory new since the recording.
 //
 // **A run record reaches only a test that read it by name** (joshuafolkken/kit#5001): a test listing or
 // walking the root or `.josh/` reads the checkout around it, not the observation or accepted metrics
 // a lane writes after its checks went green, so those keys would run every such test for bookkeeping.
-function lookup_keys(relative: string, recorded: ReadonlySet<string>): Array<string> {
-	if (run_record_path.is_run_record(relative)) return [relative]
+function listing_keys(relative: string, recorded: ReadonlySet<string>): Array<string> {
+	if (run_record_path.is_run_record(relative)) return []
 
 	const directories = directories_above(relative)
 	const created = created_directories(directories, recorded)
@@ -169,18 +167,39 @@ function lookup_keys(relative: string, recorded: ReadonlySet<string>): Array<str
 		...created.map((directory) => path.dirname(directory)),
 	]
 
+	return listed.map((directory) => test_read_trace.read_key(directory, 'listing'))
+}
+
+// A changed file is read by whoever read it, listed its own directory or walked any directory above
+// it. A directory new since the recording is also a new entry in the listing above it and a probe of
+// it that now answers differently; a directory that already existed reads the same to both, whatever
+// changed deeper down.
+function lookup_keys(relative: string, recorded: ReadonlySet<string>): Array<string> {
+	if (run_record_path.is_run_record(relative)) return [relative]
+
+	const directories = directories_above(relative)
+
 	return [
 		relative,
-		...created,
-		...listed.map((directory) => test_read_trace.read_key(directory, 'listing')),
+		...created_directories(directories, recorded),
+		...listing_keys(relative, recorded),
 		...directories.map((directory) => test_read_trace.read_key(directory, 'walk')),
 	]
 }
 
-function readers_of(map: ReadMap, relative: string): Array<string> {
-	const keys = lookup_keys(relative, new Set(map.directories))
-
+function readers_at(map: ReadMap, keys: ReadonlyArray<string>): Array<string> {
 	return [...new Set(keys.flatMap((key) => map.readers[key] ?? []))]
+}
+
+function readers_of(map: ReadMap, relative: string): Array<string> {
+	return readers_at(map, lookup_keys(relative, new Set(map.directories)))
+}
+
+// **Only the listings among `readers_of`'s keys** (joshuafolkken/kit#8275): the readers a changed file
+// reaches by moving the entries of a directory a test enumerates, which no import names. The touched
+// `test:related` adds them without the walks above or the readers by name, so it stays narrow.
+function listing_readers_of(map: ReadMap, relative: string): Array<string> {
+	return readers_at(map, listing_keys(relative, new Set(map.directories)))
 }
 
 // **A directory inside which no recorded test listed, walked or read any entry** (joshuafolkken/kit#4303).
@@ -276,6 +295,7 @@ const test_read_map = {
 	changed_since_tree,
 	collect_records,
 	in_unread_directory,
+	listing_readers_of,
 	map_path,
 	merge_records,
 	parse_map,

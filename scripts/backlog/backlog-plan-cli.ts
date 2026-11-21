@@ -6,6 +6,7 @@ import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_named } from './backlog-named'
 import { backlog_next } from './backlog-next'
+import { backlog_pending_publication } from './backlog-pending-publication'
 import { backlog_plan, type NamedPlan } from './backlog-plan'
 import { backlog_plan_read, type OpenListing, type Plan } from './backlog-plan-read'
 import { backlog_plan_words } from './backlog-plan-words'
@@ -37,9 +38,11 @@ const NAMED_COMMAND = 'backlogrun'
 const ONLY_FLAG = '--only'
 // The flag that renders the run's order wave by wave instead of the pool's sections.
 const WAVES_FLAG = '--waves'
+// The flag that lists the prepared issues blocking an open issue instead of the plan.
+const PENDING_PUBLICATION_FLAG = '--pending-publication'
 
 const USAGE =
-	'Usage: josh backlog:plan [#<issue-number>...] [--only] [--waves] [--exclude <issue-number>[,<issue-number>...]]...'
+	'Usage: josh backlog:plan [#<issue-number>...] [--only] [--waves] [--pending-publication] [--exclude <issue-number>[,<issue-number>...]]...'
 
 // The waves play the opted-in pool forward, and a named prefix runs ahead of it one issue at a time —
 // an epic among them running its children first — so waves drawn from the pool alone would promise an
@@ -187,6 +190,8 @@ function refusal_of(
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (argv.includes(PENDING_PUBLICATION_FLAG)) return await backlog_pending_publication.report()
+
 	const is_only = has_only_flag(argv)
 	const is_waves = argv.includes(WAVES_FLAG)
 	const rest = without_flags(argv)

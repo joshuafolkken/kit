@@ -202,7 +202,7 @@ describe('run_board_decision_read.with_decisions — the GraphQL read', () => {
 
 		const plan = await run_board_decision_read.with_decisions(plan_of())
 
-		expect(plan?.decision_waits?.size).toBe(3)
+		expect(plan?.decision_blockers?.flatMap((blocker) => blocker.blocks)).toHaveLength(3)
 		expect(mocked_api).toHaveBeenCalledOnce()
 		expect(view).not.toHaveBeenCalled()
 		expect(read).not.toHaveBeenCalled()

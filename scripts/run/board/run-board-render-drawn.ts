@@ -1,5 +1,7 @@
+import { run_board_estimate } from './run-board-estimate'
 import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_header_time } from './run-board-header-time'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_render_checks } from './run-board-render-checks'
@@ -35,9 +37,28 @@ function has_solo_lane(header: BoardHeader): boolean {
 	return lanes.some((row) => row.is_solo === true)
 }
 
+// 🎯 where the header or a row's end draws it (joshuafolkken/kit#7920).
+function estimate_of(header: BoardHeader, rows: ReadonlyArray<BoardRow>): string | undefined {
+	const is_drawn = rows.some((row) => run_board_estimate.is_finish_drawn(row, header))
+	const row_legend = is_drawn ? run_board_estimate.LEGEND : undefined
+
+	return run_board_header.estimate_legend(header) ?? row_legend
+}
+
+// 📴 where it stands in the 💓's place, the network down (joshuafolkken/kit#7895).
+function offline_of(header: BoardHeader): string | undefined {
+	return run_board_header_time.is_offline(header)
+		? `${HEADER_ICONS.offline} ${WORDS.offline}`
+		: undefined
+}
+
 // The third line's kinds, ⏰ where the lanes rule stands it over the lanes' times, then the estimated
-// finish and the time to the first lane.
-function named_of(header: BoardHeader, icons: ReadonlySet<string>): Array<string> {
+// finish, the time to the first lane and the outage.
+function named_of(
+	header: BoardHeader,
+	icons: ReadonlySet<string>,
+	rows: ReadonlyArray<BoardRow>,
+): Array<string> {
 	const is_operation = icons.has(NOW_ICONS.operation)
 	const operation = is_operation ? `${NOW_ICONS.operation} ${WORDS.operation}` : undefined
 	const elapsed = has_lanes(header) ? `${HEADER_ICONS.elapsed} ${WORDS.elapsed}` : undefined
@@ -45,8 +66,9 @@ function named_of(header: BoardHeader, icons: ReadonlySet<string>): Array<string
 		run_board_header.now_legend(header),
 		operation,
 		elapsed,
-		run_board_header.estimate_legend(header),
+		estimate_of(header, rows),
 		run_board_first_lane.legend(header.activity),
+		offline_of(header),
 	]
 
 	return legends.filter((legend) => legend !== undefined)
@@ -68,7 +90,7 @@ function drawn_of(
 	return {
 		leads,
 		icons,
-		named: named_of(header, icons),
+		named: named_of(header, icons, rows),
 		checks: run_board_render_checks.legend_of(checks),
 		held: run_board_render_waits.legend_of(header),
 		quota: header.quotas === undefined ? [] : run_board_render_quota.LEGEND,

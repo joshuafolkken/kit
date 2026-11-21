@@ -124,6 +124,33 @@ describe('repeat_check_related.repeats_before_brief — calls that did not run',
 
 		expect(repeat_check_related.repeats_before_brief(`${refused}\n${PENDING_LINE}`)).toBe(false)
 	})
+
+	// joshuafolkken/kit#7961: a run cut short never reached its verdict, so it is not the one run.
+	it.each([
+		['timed out', 'Exit code 143\nCommand timed out after 2m 0s'],
+		['killed', 'Exit code 137\n$ tsx scripts/josh/josh.ts lint:related'],
+		['interrupted', '[Request interrupted by user for tool use]'],
+	])('does not count a check:related that was %s before it finished', (_label, content) => {
+		const cut_short = [
+			time_transcript_fixture.josh_call_line(1, BRANCH, CHECK, CHECK_ID),
+			time_transcript_fixture.error_result_line(2, BRANCH, CHECK_ID, content),
+		].join('\n')
+
+		expect(repeat_check_related.repeats_before_brief(`${cut_short}\n${FIX_LINE}`)).toBe(false)
+	})
+
+	it.each([
+		['red', 'Exit code 1\n$ tsx scripts/josh/josh.ts check:related'],
+		['green', undefined],
+	])('still counts a %s check:related that finished', (_label, content) => {
+		const result =
+			content === undefined
+				? time_transcript_fixture.result_line(2, BRANCH, CHECK_ID)
+				: time_transcript_fixture.error_result_line(2, BRANCH, CHECK_ID, content)
+		const finished = [time_transcript_fixture.josh_call_line(1, BRANCH, CHECK, CHECK_ID), result]
+
+		expect(repeat_check_related.repeats_before_brief([...finished, FIX_LINE].join('\n'))).toBe(true)
+	})
 })
 
 describe('the repeat-check-related delivery in a lane child', () => {
@@ -132,12 +159,14 @@ describe('the repeat-check-related delivery in a lane child', () => {
 	it('refuses a mid-run full-reach check:related on every occurrence', () => {
 		const payload = payload_of('repeat', CHECK, CHECKED_AND_FIXED)
 
-		expect(delivered_rules.delivery(payload)).toBe(REASON)
-		expect(delivered_rules.delivery(payload)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(REASON)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(REASON)
 	})
 
 	it('lets the first check:related through', () => {
-		expect(delivered_rules.delivery(payload_of('first', CHECK, FIX_LINE))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('first', CHECK, FIX_LINE), Date.now()),
+		).toBeUndefined()
 	})
 
 	// joshuafolkken/kit#5784: the touched run is the mid-run check the refusal points to.
@@ -145,7 +174,7 @@ describe('the repeat-check-related delivery in a lane child', () => {
 		const command = 'pnpm josh check:related --touched'
 
 		expect(
-			delivered_rules.delivery(payload_of('touched-check', command, CHECKED_AND_FIXED)),
+			delivered_rules.delivery(payload_of('touched-check', command, CHECKED_AND_FIXED), Date.now()),
 		).toBeUndefined()
 		expect(REASON).toContain('`pnpm josh check:related --touched`')
 	})
@@ -156,20 +185,24 @@ describe('the repeat-check-related delivery in a lane child', () => {
 			time_transcript_fixture.result_line(2, BRANCH, CHECK_ID),
 		].join('\n')
 
-		expect(delivered_rules.delivery(payload_of('after-touched', CHECK, touched))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('after-touched', CHECK, touched), Date.now()),
+		).toBeUndefined()
 	})
 
 	it('lets a by-name test:related --touched through', () => {
 		const command = 'pnpm josh test:related --touched'
 
 		expect(
-			delivered_rules.delivery(payload_of('touched', command, CHECKED_AND_FIXED)),
+			delivered_rules.delivery(payload_of('touched', command, CHECKED_AND_FIXED), Date.now()),
 		).toBeUndefined()
 	})
 })
 
 describe('the repeat-check-related delivery outside a lane child', () => {
 	it('lets a repeated check:related through', () => {
-		expect(delivered_rules.delivery(payload_of('person', CHECK, CHECKED_AND_FIXED))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('person', CHECK, CHECKED_AND_FIXED), Date.now()),
+		).toBeUndefined()
 	})
 })

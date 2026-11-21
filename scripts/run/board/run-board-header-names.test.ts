@@ -46,6 +46,11 @@ describe('run_board_header_names.names_of', () => {
 		expect(names().at(-1)).toBe('  [kit](home)')
 	})
 
+	// joshuafolkken/kit#8107: the speaker moved to the end of the second line.
+	it('draws no sound mark after the name', () => {
+		expect(names()[0]).not.toMatch(/[🔊🔇]/u)
+	})
+
 	it('draws the names plain where the frame opens no links', () => {
 		expect(names({ kit_version: VERSION, comment_link: undefined }).slice(0, -1)).toStrictEqual([
 			'▶ josh-board',

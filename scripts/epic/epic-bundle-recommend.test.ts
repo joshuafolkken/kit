@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BacklogIssue } from './epic-bundle'
 import { epic_bundle_recommend } from './epic-bundle-recommend'
 
@@ -30,20 +31,42 @@ describe('epic_bundle_recommend.recommend_epic', () => {
 	})
 })
 
-describe('epic_bundle_recommend.placement_record', () => {
-	it('records the epic taken, the ones rejected, why and the date', () => {
-		const record = epic_bundle_recommend.placement_record(
-			{
-				subject: SUBJECT_NUMBER,
-				epic: NEWER_EPIC,
-				epics: [OLDER_EPIC, NEWER_EPIC],
-				members: [member(1, OLDER_EPIC), member(2, NEWER_EPIC), member(3, NEWER_EPIC)],
-			},
-			DATE,
-		)
+function record_of(): string {
+	return epic_bundle_recommend.placement_record(
+		{
+			subject: SUBJECT_NUMBER,
+			epic: NEWER_EPIC,
+			epics: [OLDER_EPIC, NEWER_EPIC],
+			members: [member(1, OLDER_EPIC), member(2, NEWER_EPIC), member(3, NEWER_EPIC)],
+		},
+		DATE,
+	)
+}
 
-		expect(record).toBe(
-			'Auto-decided (2026-11-02, `epic:bundle --apply`): placed #894 in #893 over #880 because it tracks the most related issues (#880: 1, #893: 2); a tie goes to the older epic.',
+describe('epic_bundle_recommend.placement_record', () => {
+	const PREFIX = 'Auto-decided (2026-11-02, `epic:bundle --apply`): placed #894 in #893 over #880'
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('records the epic taken, the ones rejected, why and the date in English under en', () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
+
+		expect(record_of()).toBe(
+			`${PREFIX} because it tracks the most related issues (#880: 1, #893: 2); a tie goes to the older epic.`,
 		)
 	})
+
+	// The prefix is the fixed decision marker, so only the reason changes (ac-8cca0653).
+	it.each(['ja', ''])(
+		'writes the reason in Japanese for the session language %j, keeping the prefix (ac-bc8ebf54)',
+		(lang) => {
+			vi.stubEnv(session_language.ENV_KEY, lang)
+
+			expect(record_of()).toBe(
+				`${PREFIX} — 関連する Issue を最も多く追っているため（#880: 1, #893: 2）。同数なら古い epic を選ぶ。`,
+			)
+		},
+	)
 })

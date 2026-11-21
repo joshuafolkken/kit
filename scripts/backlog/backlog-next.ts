@@ -1,7 +1,7 @@
 import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli, type OptedInRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
-import { epic_busy } from '#scripts/epic/epic-busy'
+import { epic_busy, type BusyRead } from '#scripts/epic/epic-busy'
 import type { Classification } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
@@ -9,8 +9,11 @@ import { epic_next } from '#scripts/epic/epic-next'
 import type { EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
+import type { SoloGate } from '#scripts/epic/epic-solo'
+import { epic_solo_parked } from '#scripts/epic/epic-solo-parked'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { OpenListing } from '#scripts/git/git-schemas'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
@@ -18,6 +21,7 @@ import { run_startup } from '#scripts/run/startup/run-startup'
 import { backlog_auto_triage } from './backlog-auto-triage'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
+import { backlog_interrupt } from './backlog-interrupt'
 import { backlog_next_offer } from './backlog-next-offer'
 import { backlog_next_report } from './backlog-next-report'
 import { backlog_pool } from './backlog-pool'
@@ -168,9 +172,9 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 
 	const children = reads.flatMap((read) => read.snapshot.children)
 	const untrusted = await auto_ok_author.untrusted_child_keys(children, context.repo)
-	// The defect priority and the ranking keys are applied here rather than when printing, so
-	// `backlog:plan` shows the order the run takes. The
-	// ranking goes last: its sort is stable, so the defect order survives as its final key.
+	// The new-mechanism deferral and the ranking keys are applied here rather than when printing, so
+	// `backlog:plan` shows the order the run takes. A defect goes first by a ranking key; the
+	// ranking goes last: its sort is stable, so the deferral survives as its final key.
 	const ordered = await backlog_defect_priority.prioritize(
 		combine(views_from(reads, context, untrusted), context, untrusted),
 		context.repo,
@@ -193,6 +197,25 @@ function is_transport_failure(result: EpicNextResult): boolean {
 	return result.anomalies.some((anomaly) => anomaly.is_unreachable === true)
 }
 
+// A pending interrupt outside the pool holds every candidate (`backlog-interrupt.ts`), and so does a
+// parked `run:solo` issue still open (`epic-solo-parked.ts`); else the ranked `run:solo` gate decides.
+async function gate_of(
+	result: EpicNextResult,
+	read: BusyRead,
+	context: PoolContext,
+): Promise<SoloGate> {
+	const { repo } = context
+	const held = backlog_interrupt.hold(result, read, context.interrupts ?? [], repo)
+
+	if (held !== undefined) return held
+
+	const parked = await epic_solo_parked.hold(result, repo)
+
+	if (parked !== undefined) return parked
+
+	return backlog_rank.gate(result, read, repo, await backlog_gate_scope.gate_scope(context, read))
+}
+
 // The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
 // `resolve` and a plan made before the run lists everything. The holders are
 // read only on a `run` answer — the one answer the gate can change. The cap follows the gate
@@ -201,15 +224,11 @@ async function gate_ready(result: EpicNextResult, context: PoolContext): Promise
 	if (result.verdict !== 'run') return result
 
 	const { repo } = context
-	const { read, notice } = await epic_solo_stale.release(
-		await epic_busy.read_repository(repo),
-		repo,
-	)
+	const released = await epic_solo_stale.release(await epic_busy.read_repository(repo), repo)
 
-	if (notice !== undefined) console.error(notice)
+	if (released.notice !== undefined) console.error(released.notice)
 
-	const scope = await backlog_gate_scope.gate_scope(context, read)
-	const gated = backlog_rank.gate(result, read, repo, scope)
+	const gated = await gate_of(result, released.read, context)
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 
@@ -243,6 +262,17 @@ async function answer_held(
 	return await backlog_next_report.report_held(gated, context, untriaged)
 }
 
+// The pool's untriaged candidates and the pending interrupts outside it (`backlog-interrupt.ts`).
+async function untriaged_of(
+	resolved: EpicNextResult,
+	context: PoolContext,
+): Promise<{ result: EpicNextResult; untriaged: ReadonlyArray<EpicChild> }> {
+	const settled = await backlog_auto_triage.untriaged_of(resolved, context.repo)
+	const interrupts = backlog_interrupt.untriaged(context.interrupts ?? [], context.repo)
+
+	return { result: settled.result, untriaged: [...settled.untriaged, ...interrupts] }
+}
+
 // Each answer is recorded once in the lane ledger before it is printed (`backlog-next-offer.ts`).
 async function answer_pool(context: PoolContext): Promise<number> {
 	const resolved = await run_startup.phase(
@@ -261,7 +291,7 @@ async function answer_pool(context: PoolContext): Promise<number> {
 		return backlog_next_report.report_retry(context)
 	}
 
-	const { result, untriaged } = await backlog_auto_triage.untriaged_of(resolved, context.repo)
+	const { result, untriaged } = await untriaged_of(resolved, context)
 
 	if (untriaged.length > 0) return await answer_held(result, context, untriaged)
 
@@ -275,12 +305,19 @@ async function answer_pool(context: PoolContext): Promise<number> {
 // The two reads that stand between the opted-in listing and the pool. Extracted for the same reason
 // `resolve` is: `backlog:plan` needs the identical context, and a second copy of these two failure
 // branches would be a second place for them to be worded differently. `undefined` is the failure —
-// already reported.
+// already reported. The three reads take nothing from one another, so they run side by side
+// (joshuafolkken/kit#8220); the failures are still checked tracking first, so a double failure says what
+// it said before. `open` is a whole open listing a plan read already holds, which answers the epics.
 async function context_of(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
+	open?: OpenListing,
 ): Promise<PoolContext | undefined> {
-	const tracking = await auto_ok_cli.fetch_tracking(opted_in.issues.length)
+	const [tracking, repo, measurements] = await Promise.all([
+		auto_ok_cli.fetch_tracking(opted_in.issues.length, open),
+		git_gh_command.repo_get_name_with_owner(),
+		lane_net_read.measurements(),
+	])
 
 	if (tracking.kind !== 'read') {
 		console.error(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
@@ -288,15 +325,13 @@ async function context_of(
 		return undefined
 	}
 
-	const repo = await git_gh_command.repo_get_name_with_owner()
-
 	if (repo === undefined) {
 		console.error(REPO_UNREADABLE_MESSAGE)
 
 		return undefined
 	}
 
-	return { opted_in, tracking, repo, exclude, ...(await lane_net_read.measurements()) }
+	return { opted_in, tracking, repo, exclude, ...measurements }
 }
 
 async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
@@ -315,7 +350,7 @@ async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promis
 
 	if (context === undefined) return FAILURE_EXIT_CODE
 
-	return await answer_pool(context)
+	return await answer_pool({ ...context, interrupts: await backlog_interrupt.read(context.repo) })
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

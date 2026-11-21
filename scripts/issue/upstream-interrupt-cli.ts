@@ -39,7 +39,7 @@ const OPTIONS = {
 } as const
 const RECOVERY = 'If this did not arrive, the finder issue carries the same record.'
 const RECOMMENDED = 'Wait for the upstream fix'
-const NOTIFY_COMMAND = 'pnpm josh notify --task-type confirmation'
+const NOTIFY_COMMAND = 'pnpm josh notify --task-type confirmation --reason upstream-interrupt'
 const ALTERNATIVES = ['Defer the upstream issue and resume the finder now']
 
 interface ParsedInterrupt {
@@ -123,11 +123,14 @@ async function stash(interrupt: Interrupt): Promise<boolean> {
 
 // `--found-during` names the finder to `issue:file`, so `--blocks-finder` records it — not the lane or
 // branch Issue — as blocked, and the filing cap counts against it.
+// The filing always blocks the finder: this command stops it until the upstream fix lands, so the
+// relation is recorded even where the caller left `--blocks-finder` off (joshuafolkken/kit#7695).
+// The flag stays accepted, and the re-run line repeats it only where it was given.
 function filing_argv(interrupt: Interrupt): ReadonlyArray<string> {
 	const argv = [interrupt.title, '--body-file', interrupt.body_file, '--route', 'interrupt']
 	const finder = ['--found-during', interrupt.finder]
 
-	return [...argv, '--repo', interrupt.repo, ...finder, ...blocks_finder_flag(interrupt)]
+	return [...argv, '--repo', interrupt.repo, ...finder, BLOCKS_FINDER_FLAG]
 }
 
 // The filed Issue as `owner/repo#N`, the qualified form the backlink heading requires. A refused
@@ -216,6 +219,8 @@ async function comment(interrupt: Interrupt, body: string): Promise<boolean> {
 
 async function notify(interrupt: Interrupt, body: string): Promise<boolean> {
 	const is_sent = await telegram_notify.confirm({
+		reason: 'upstream-interrupt',
+		issue: interrupt.finder,
 		issue_title: interrupt.title,
 		body,
 		recovery: RECOVERY,

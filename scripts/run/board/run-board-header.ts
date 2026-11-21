@@ -1,15 +1,20 @@
 import { styleText } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
-import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import type { RunActivity } from './run-board-activity'
 import { run_board_estimate } from './run-board-estimate'
+import { run_board_faint } from './run-board-faint'
 import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
-import { run_board_fresh } from './run-board-fresh'
+import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_names, type RunMark } from './run-board-header-names'
+import { run_board_header_notice, type Notice } from './run-board-header-notice'
+import { run_board_header_time } from './run-board-header-time'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
+import type { LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
+import { run_board_length } from './run-board-length'
 import type { BoardLinks } from './run-board-link'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now, type NowLine } from './run-board-now'
@@ -19,9 +24,10 @@ import type { ProcessGroups } from './run-board-process-groups'
 import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
 import type { SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
-import type { RunActivity } from './run-board-status'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
 
@@ -40,21 +46,16 @@ import type { UsualTimes } from './run-board-usual'
 // line's words rather than off a line that changes shape. A value not read yet is drawn `-`, never
 // `0`, so a header still loading reads as unknown rather than as an empty run.
 
-const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of } = run_board_labels
+const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of } = run_board_labels
 const { cell_of } = run_board_render_slot
 const { title_of } = run_board_render_title
+const { now_text, time_parts } = run_board_header_time
 // The columns a failed read's reason is cut to, so the header keeps its line.
 const REASON_LIMIT = 40
-const { padded } = run_board_fresh
-const aged_fresh = run_board_fresh.aged
 const UNKNOWN = '-'
+// The age of a saved plan (joshuafolkken/kit#8219); a theme draws it as its glyph table says.
+const SAVED_ICON = '🕘'
 const { GAP, PERCENT_WIDTH } = run_board_machine
-// A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
-// twice that it is drawn as alarming.
-const STALE_MINUTES = 15
-const STALE_MS = STALE_MINUTES * MS_PER_MINUTE
-const ALARM_FACTOR = 2
-const ALARM_MS = STALE_MS * ALARM_FACTOR
 
 // Who reads the frame: a person on a screen, or a chat a session answers a progress question in, which
 // draws what the screen does but for the machine, its memory alone — a CPU or swap figure read once
@@ -79,6 +80,10 @@ interface BoardHeader
 	run_name?: string | undefined
 	// The kit version the run's supervisor recorded; `undefined` draws `-`.
 	kit_version?: string | undefined
+	// The live board's sound switch and its last notice, drawn at the second line's end
+	// (`run-board-header-notice.ts`); `undefined` where no key is read.
+	is_sound_on?: boolean | undefined
+	notice?: Notice | undefined
 	started_ms: number
 	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined
@@ -89,6 +94,9 @@ interface BoardHeader
 	// The total the board first saw, so arrivals since then read as `(+N)`.
 	baseline_total: number | undefined
 	plan_fetched_ms: number | undefined
+	// When the plan drawn was read, while it is the one a live board saved before it opened
+	// (`run-board-tick-draw.ts`); none once a fresh plan lands (joshuafolkken/kit#8219).
+	plan_saved_ms?: number | undefined
 	plan_failed_ms: number | undefined
 	// When the reads off this machine last failed (`run-board-gather-thread.ts`); none once they answer.
 	read_failed_ms?: number | undefined
@@ -102,10 +110,12 @@ interface BoardHeader
 	usages?: BoardUsage | undefined
 	// The claims waiting in the machine-wide core budget (`run-board-render-waits.ts`).
 	budget_waits?: ReadonlyArray<BudgetWait> | undefined
-	// The usage limit holding the run's launches; `undefined` where none holds.
+	// The usage limit or authentication failure holding the run's launches; `undefined` where none holds.
 	quota_hold?: QuotaHold | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined
+	// How long lanes took from dispatch to merge, which the estimated finish is drawn from.
+	lane_totals?: LaneTotals | undefined
 	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
 	lane_limit?: number | undefined
 	// The slots occupied according to the same capacity read that supplies the limit.
@@ -120,12 +130,20 @@ interface BoardHeader
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined
+	// Whether each issue row leads its text with its key (`run-board-row-key.ts`) — only where the board
+	// types the rows that appear, so every other frame is drawn as it was.
+	is_keyed?: boolean | undefined
+	// The theme the frame is drawn in, whose alert display ends the first line (`run-board-theme-defs.ts`).
+	theme?: Theme | undefined
 	form: BoardForm
 	// The repository the plan was read for, as `owner/repo`; `undefined` before a plan is read.
 	repo: string | undefined
 	// The repository's open and closed issues, `undefined` where none was read.
 	issue_count?: IssueCount | undefined
 }
+
+// What the run's mark is read off: no port, so a frame's data decides it before it is drawn.
+type MarkHeader = Pick<BoardHeader, 'activity' | 'layout'>
 
 interface BoardCounts {
 	total: number
@@ -148,12 +166,9 @@ function counts_of(layout: BoardLayout): BoardCounts {
 	return { total, settled, parked, running, remaining: total - settled - running }
 }
 
-// The marks of a run that is working: they turn the spinner, and only they can go stale.
-const WORKING_MARKS: ReadonlySet<RunMark> = new Set<RunMark>(['running', 'setup'])
-
 // Nothing running: the run is at work on a stage of its own; else it is waiting on a person when all
 // the plan has left is what `needs-decision` holds, or idle.
-function quiet_mark(header: BoardHeader): RunMark {
+function quiet_mark(header: MarkHeader): RunMark {
 	const { activity, layout } = header
 	if (run_board_setup.is_working(activity.setup, activity.is_setup_working)) return 'setup'
 
@@ -163,102 +178,10 @@ function quiet_mark(header: BoardHeader): RunMark {
 }
 
 // The run's state, each state overriding the ones below it.
-function mark_of(header: BoardHeader, running: number): RunMark {
+function mark_of(header: MarkHeader, running: number): RunMark {
 	if (header.activity.is_stopped) return 'stopped'
 
 	return running > 0 ? 'running' : quiet_mark(header)
-}
-
-// A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
-// (`run-board-render-tail.ts`).
-function aged(part: string, age_ms: number): string {
-	if (age_ms > ALARM_MS) return styleText('red', part)
-
-	return age_ms > STALE_MS ? styleText('yellow', part) : part
-}
-
-// How long ago the stream last moved. An ended run has no heartbeat to keep: one counting on would
-// read as a hang.
-function age_of(header: BoardHeader): number | undefined {
-	const last = header.activity.last_event_ms
-
-	if (last === undefined || header.ended_ms !== undefined) return undefined
-
-	return header.now_ms - last
-}
-
-// The minute an ended run ended, standing where its heartbeat did. Blank while the run has none to draw.
-function ended_part(header: BoardHeader): string {
-	const { ended_ms } = header
-
-	return ended_ms === undefined ? '' : `${HEADER_ICONS.ended} ${minute_of(ended_ms)}`
-}
-
-// The `💓` under the run's age, in the `⏰`'s own format with its digits right-aligned to `width` —
-// only a working run can be stale, so only it is colored. Only an ended run draws anything else there:
-// the minute it ended. Its digits are emphasized for a few seconds after a new event resets them
-// (`run-board-fresh.ts`).
-function beat_part(header: BoardHeader, mark: RunMark, width: number): string {
-	const age = age_of(header)
-
-	if (age === undefined) return ended_part(header)
-
-	const span = span_of(age)
-	const part = `${HEADER_ICONS.heartbeat} ${padded(span, width, aged_fresh(span, age, header))}`
-
-	return WORKING_MARKS.has(mark) ? aged(part, age) : part
-}
-
-// An age in the `⏰`'s format, blank where there is none to draw — no event gave it a time, or the
-// `💓` draws none.
-function span_or_blank(age: number | undefined): string {
-	return age === undefined ? '' : span_of(age)
-}
-
-// How long ago what the third line says happened, counted to now: an ended run's age stops at its end,
-// so its last words would otherwise stay fresh on every frame after it.
-function fresh_age(now: NowLine | undefined, header: BoardHeader): number | undefined {
-	const age = now?.age_ms
-
-	return age === undefined ? undefined : age + header.now_ms - (header.ended_ms ?? header.now_ms)
-}
-
-// The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
-// works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
-// the line says is fresh.
-function now_time(
-	header: BoardHeader,
-	mark: RunMark,
-	now: NowLine | undefined,
-	width: number,
-): string {
-	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
-	const icon = cell_of(spinner, run_board_fit.width_of(HEADER_ICONS.heartbeat))
-	const age = span_or_blank(now?.age_ms)
-
-	return `${icon} ${padded(age, width, aged_fresh(age, fresh_age(now, header), header))}`
-}
-
-// What the third line says, emphasized while it is fresh.
-function now_text(now: NowLine, header: BoardHeader): string {
-	return `${now.icon} ${aged_fresh(now.text, fresh_age(now, header), header)}`
-}
-
-// A run's age over the `💓` — or over the minute an ended run ended — over the third line's age: the
-// shorter lengths are right-aligned to the longest, so the digits stand in one column when only one has
-// passed ten hours.
-function time_parts(header: BoardHeader, mark: RunMark, now: NowLine | undefined): Array<string> {
-	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
-	const age = span_or_blank(now?.age_ms)
-	const width = Math.max(
-		...[elapsed, span_or_blank(age_of(header)), age].map((span) => span.length),
-	)
-
-	return [
-		`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`,
-		beat_part(header, mark, width),
-		now_time(header, mark, now, width),
-	]
 }
 
 // A read is said only when it failed — the board otherwise keeps quiet about a routine read — and why,
@@ -278,8 +201,13 @@ function loading_part(header: BoardHeader): string | undefined {
 	return is_plan_loading && spinner !== undefined ? `${HEADER_ICONS.loading} ${spinner}` : undefined
 }
 
-function layout_of(header: BoardHeader): BoardLayout {
+function layout_of(header: MarkHeader): BoardLayout {
 	return header.layout ?? run_board_layout.EMPTY_LAYOUT
+}
+
+// The run's state as the header's first line draws it, for a reader outside the frame.
+function run_mark_of(header: MarkHeader): RunMark {
+	return mark_of(header, counts_of(layout_of(header)).running)
 }
 
 // Whether the plan has been read: until it has, the board draws the run's own children alone, and the
@@ -331,19 +259,44 @@ function waiting_of(counts: BoardCounts, header: BoardHeader): string {
 	return `${String(counts.remaining)}${run_board_priority.tally_of(layout_of(header))}`
 }
 
+// A figure only the plan knows, drawn faint while the plan is a saved one.
+function planned(header: BoardHeader, part: string | undefined): string | undefined {
+	if (part === undefined || header.plan_saved_ms === undefined) return part
+
+	return run_board_faint.faint(part)
+}
+
 function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string | undefined> {
 	const is_read = is_plan_read(header)
 
 	return [
-		`${tally_part(counts, header)}${is_read ? plus_of(counts, header) : ''}`,
-		estimate_part(header),
+		planned(header, `${tally_part(counts, header)}${is_read ? plus_of(counts, header) : ''}`),
+		planned(header, estimate_part(header)),
 		`${STATE_ICONS.running} ${String(counts.running)}`,
-		`${STATE_ICONS.waiting} ${is_read ? waiting_of(counts, header) : UNKNOWN}`,
+		planned(header, `${STATE_ICONS.waiting} ${is_read ? waiting_of(counts, header) : UNKNOWN}`),
 		`${STATE_ICONS.parked} ${String(counts.parked)}`,
 	]
 }
 
-// The run's progress, then what its reads are doing.
+// How long ago the saved plan drawn was read, last on the line, so nothing moves as it goes.
+function saved_part(header: BoardHeader): string | undefined {
+	const { plan_saved_ms } = header
+
+	return plan_saved_ms === undefined
+		? undefined
+		: `${SAVED_ICON} ${run_board_length.span_of(header.now_ms - plan_saved_ms)}`
+}
+
+// The alert level a themed screen ends the progress line on, drawn as the theme's row says.
+function alert_part(header: BoardHeader): string | undefined {
+	if (header.theme === undefined || header.form !== 'screen') return undefined
+
+	return run_board_theme_defs.THEME_DEFS[header.theme].alert(
+		run_board_header_defcon.level_of(header),
+	)
+}
+
+// The run's progress, then what its reads are doing, then the alert level.
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
@@ -352,6 +305,8 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 		warning_of(WORDS.plan, header.plan_failed_ms),
 		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
+		alert_part(header),
+		saved_part(header),
 	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
@@ -392,11 +347,14 @@ const MACHINE_UNKNOWN = [HEADER_ICONS.cpu, HEADER_ICONS.memory, HEADER_ICONS.swa
 	.map((icon) => `${icon} ${UNKNOWN}`)
 	.join(GAP)
 
-// The machine the run is on, its first figure as wide as the tally over it.
+// The machine the run is on, its first figure as wide as the tally over it, then the sound switch and
+// the last notice where the board reads the switch.
 function machine_part(counts: BoardCounts, header: BoardHeader): string {
 	const width = figure_width(total_of(counts, header))
+	const machine = run_board_machine.line_of(machine_of(header), width) ?? MACHINE_UNKNOWN
+	const notice = run_board_header_notice.part_of(header)
 
-	return run_board_machine.line_of(machine_of(header), width) ?? MACHINE_UNKNOWN
+	return notice === undefined ? machine : [machine, notice].join(GAP)
 }
 
 // The lines' cells of one column, the narrower padded to the wider as the terminal counts them.
@@ -438,21 +396,30 @@ function estimate_legend(header: BoardHeader): string | undefined {
 	return estimate_part(header) === undefined ? undefined : run_board_estimate.LEGEND
 }
 
+// The key the third line's words carry where the board types rows (`run-board-header-time.ts`), so a
+// frame knows them typed; none while the line names no words.
+function now_key(header: BoardHeader): string | undefined {
+	const now = now_line(counts_of(layout_of(header)), header)
+
+	return now === undefined ? undefined : run_board_row_key.key_of('now', now.text)
+}
+
 // The third line's icon, so the legend names the phase it draws.
 function now_icon(header: BoardHeader): string | undefined {
 	return now_line(counts_of(layout_of(header)), header)?.icon
 }
 
 const run_board_header = {
-	aged,
 	counts_of,
 	estimate_legend,
 	header_lines,
 	is_plan_read,
 	now_icon,
+	now_key,
 	now_legend,
+	run_mark_of,
 	warning_of,
 }
 
 export { run_board_header }
-export type { BoardCounts, BoardForm, BoardHeader, BoardUsage }
+export type { BoardCounts, BoardForm, BoardHeader, BoardUsage, MarkHeader }

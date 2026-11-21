@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { agent_role_profile } from './agent-role-profile'
 import { agent_session_role } from './agent-session-role'
 
 const ABSENT_MARK = 'absent mark'
+
+function linked(): boolean {
+	return true
+}
+
+function unlinked(): boolean {
+	return false
+}
 
 describe('agent_session_role', () => {
 	it.each(['gpt-6.1-sol', 'gpt-6.1-astra', 'claude-fable-5-1'])(
@@ -12,7 +20,7 @@ describe('agent_session_role', () => {
 				const source = { [agent_session_role.KEY]: role, model }
 
 				expect(agent_session_role.can_implement(source)).toBe(role === 'worker')
-				expect(agent_session_role.scope_line(source)).toContain(
+				expect(agent_session_role.scope_line(source, linked)).toContain(
 					role === 'worker' ? 'implementation is permitted' : 'operations only',
 				)
 			}
@@ -49,9 +57,70 @@ describe('agent_session_role', () => {
 // joshuafolkken/kit#7293: the consultation scope must not read as unconditional filing permission.
 describe('agent_session_role.scope_line', () => {
 	it('grants filing only on the user’s explicit instruction outside a worker lane', () => {
-		const line = agent_session_role.scope_line({})
+		const line = agent_session_role.scope_line({}, linked)
 
 		expect(line).toContain('filing only on the user’s explicit instruction')
 		expect(line).not.toContain('consultation, filing and operations')
+	})
+
+	// joshuafolkken/kit#7783: a filing instruction in consultation is kickoff new, handed off.
+	it('hands a filing instruction to run:handoff kickoff new outside a worker lane', () => {
+		const line = agent_session_role.scope_line({}, linked)
+
+		expect(line).toContain('hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`')
+	})
+
+	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.
+	it('answers an imperative request with a plan and a filing plan outside a worker lane', () => {
+		const line = agent_session_role.scope_line({}, linked)
+
+		expect(line).toContain('imperative request with investigation, a plan and a filing plan')
+	})
+
+	it('hands a no-filing request to the investigator and producer subagents outside a worker lane', () => {
+		const line = agent_session_role.scope_line({}, linked)
+
+		expect(line).toContain('「起票せずに」')
+		expect(line).toContain('investigator and producer subagents, never edited by this session')
+	})
+
+	// joshuafolkken/kit#8262: a consultation artifact has its own scratch route.
+	it('names the scratch route for a consultation artifact outside a worker lane', () => {
+		const line = agent_session_role.scope_line({}, linked)
+
+		expect(line).toContain('`.josh/tmp/scratch/`')
+		expect(line).toContain('`pnpm josh scratch:run <path>`')
+	})
+
+	it('keeps the worker lane line free of the filing plan', () => {
+		const line = agent_session_role.scope_line(
+			agent_session_role.env_for(agent_role_profile.WORKER),
+			unlinked,
+		)
+
+		expect(line).toBe(
+			'Session scope: implementation lane; implementation is permitted by the launcher role.',
+		)
+	})
+})
+
+// joshuafolkken/kit#7756: nothing can be filed without GitHub, so the line drops the filing plan.
+describe('agent_session_role.scope_line without GitHub', () => {
+	it('answers an imperative request with a plan only when GitHub is not linked', () => {
+		const line = agent_session_role.scope_line({}, unlinked)
+
+		expect(line).toContain('GitHub is not linked')
+		expect(line).toContain('investigation and a plan only, without a filing plan')
+		expect(line).not.toContain('a plan and a filing plan')
+		expect(line).not.toContain('kickoff new')
+		expect(line).toContain('Model names and conversational requests do not grant')
+	})
+
+	it('reads the GitHub link only outside a worker lane', () => {
+		const is_linked = vi.fn(linked)
+
+		agent_session_role.scope_line(agent_session_role.env_for(agent_role_profile.WORKER), is_linked)
+
+		expect(is_linked).not.toHaveBeenCalled()
 	})
 })

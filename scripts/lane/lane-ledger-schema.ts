@@ -2,10 +2,13 @@ import { run_startup_schema } from '#scripts/run/startup/run-startup-schema'
 import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
+import { lane_ledger_schema_estimate } from './lane-ledger-schema-estimate'
 import { lane_ledger_schema_load } from './lane-ledger-schema-load'
 import { lane_ledger_schema_offer } from './lane-ledger-schema-offer'
 import { lane_ledger_schema_related } from './lane-ledger-schema-related'
+import { lane_ledger_schema_round } from './lane-ledger-schema-round'
 import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
+import { lane_ledger_schema_split } from './lane-ledger-schema-split'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
 
@@ -14,7 +17,10 @@ const { early_push_schema, ship_lap_schema, size_schema, stop_schema, unplanned_
 	lane_ledger_schema_ship
 const { pinned_origin_schema } = lane_ledger_pinned_origin
 const { load_schema } = lane_ledger_schema_load
-const { test_related_schema } = lane_ledger_schema_related
+const { lint_related_schema, test_related_schema } = lane_ledger_schema_related
+const { round_one_schema, round_two_schema, offerable_schema, core_wait_schema } =
+	lane_ledger_schema_round
+const { split_notice_schema, split_filed_schema, push_miss_schema } = lane_ledger_schema_split
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -52,6 +58,9 @@ const gate_schema = z.object({
 	// A gate that reused a green record for this tree and base and started no check: counted, never
 	// timed (joshuafolkken/kit#4397).
 	is_reused: z.boolean().optional(),
+	// Why a gate that ran its checks did not reuse the green record — `gate_skip.miss_kind`'s kind,
+	// never its sentence (joshuafolkken/kit#8285). Absent on a reused gate and on older rows.
+	fallback: z.string().optional(),
 	// The lane the gate ran in, so `josh lane:breakdown` puts its checks under the lane's ship gate;
 	// absent outside a lane and on a row written before it (joshuafolkken/kit#5319).
 	issue: z.number().optional(),
@@ -111,54 +120,6 @@ const lane_state_schema = z.object({
 	issue: z.number(),
 	state: z.enum(['paused', 'running']),
 })
-// The round 1 a `josh ship` acted on for `issue`: `verdict` is the reviewer's — `clean`, `fixed`,
-// `blocking` — or `reused` where a round recorded before the ship still described the tree, so the
-// period's ship-time rounds that passed with no fix are counted (joshuafolkken/kit#4620).
-const round_one_schema = z.object({
-	kind: z.literal(KIND.ROUND_ONE),
-	at: z.string(),
-	issue: z.number(),
-	verdict: z.string(),
-})
-// One `review:round2` decision a `josh ship` acted on for `issue`: `verdict` and the stable reason
-// `code` it fell under, so the period's skips and runs are counted by why (joshuafolkken/kit#4064).
-const round_two_schema = z.object({
-	kind: z.literal(KIND.ROUND_TWO),
-	at: z.string(),
-	issue: z.number(),
-	verdict: z.string(),
-	code: z.string(),
-})
-// A stall detector observation, written only when it changes: whether offerable backlog work and a free
-// lane coexisted, so a stall is aged from when both first held rather than from the last launch
-// (joshuafolkken/kit#4349).
-const offerable_schema = z.object({
-	kind: z.literal(KIND.OFFERABLE),
-	at: z.string(),
-	is_offerable: z.boolean(),
-})
-// One claim that waited `waited_ms` for the core budget before `command` could start — written by the
-// command itself, so a wait inside a gate, a scoped check or a ship lands in one record. `issue` is the
-// lane the claim ran in, absent outside a lane (joshuafolkken/kit#4382).
-const core_wait_schema = z.object({
-	kind: z.enum([KIND.CORE_WAIT, KIND.CORE_ADMISSION]),
-	at: z.string(),
-	command: z.string(),
-	waited_ms: z.number(),
-	issue: z.number().optional(),
-	admission_reason: z.string().optional(),
-	overflow: z.boolean().optional(),
-	budget_cores: z.number().optional(),
-	budget_memory_mb: z.number().optional(),
-	available_mb: z.number().optional(),
-	busy_cores: z.number().optional(),
-	requested_cores: z.number().optional(),
-	granted_cores: z.number().optional(),
-	memory_mb: z.number().optional(),
-	wait_reason: z.string().optional(),
-	admission_waited_ms: z.number().optional(),
-	memory_pressured: z.boolean().optional(),
-})
 // One vitest run's slowest test files, each with its wall time from environment setup to its last
 // test, so a unit run whose wall time far outran its CPU names the file it stalled on
 // (joshuafolkken/kit#4451). Written by the run itself (`tools/test/unit-file-reporter.ts`).
@@ -176,7 +137,12 @@ const unit_files_schema = z.object({
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
-// (joshuafolkken/kit#5385), absent on a test's verdict. Origin values live in the constants leaf.
+// (joshuafolkken/kit#5385), absent on a test's verdict. `misses` counts the probed hunks by why the
+// cache did not hold their verdict (joshuafolkken/kit#7806), absent on older rows. `first_unpinned`
+// marks a run under `--first-unpinned`, `reasoned` one under an `--unpinned-ok` reason, `cut` counts
+// the probes its stop never started, and `tree_hash` names the work tree it read
+// (joshuafolkken/kit#7809); each absent where it does not apply and on older rows. Origin values live
+// in the constants leaf.
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
@@ -188,40 +154,19 @@ const test_pinned_schema = z.object({
 	at: z.string(),
 	issue: z.number().optional(),
 	held: z.number(),
+	rechecked: z.number().optional(),
+	unregistered: z.number().optional(),
+	misses: z.record(z.string(), z.number()).optional(),
 	rewired: z.number().optional(),
 	over_cap: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),
 	elapsed_ms: z.number(),
 	origin: pinned_origin_schema.optional(),
 	discarded: z.boolean().optional(),
-})
-// The split notice shown to the lane of `issue`, with the measured diff it fired on — the diff notice
-// written once per Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it
-// first (joshuafolkken/kit#4695). Each `split` from `josh lane:plan` writes one more, `reason` naming its
-// axis; a diff notice has none (joshuafolkken/kit#5568), and the implement-budget notice is `budget`
-// (joshuafolkken/kit#6544).
-const split_notice_schema = z.object({
-	kind: z.literal(KIND.SPLIT_NOTICE),
-	at: z.string(),
-	issue: z.number(),
-	files: z.number(),
-	lines: z.number(),
-	reason: z.enum(['files', 'hunks', 'lines', 'hub', 'budget']).optional(),
-})
-// One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
-const split_filed_schema = z.object({
-	kind: z.literal(KIND.SPLIT_FILED),
-	at: z.string(),
-	issue: z.number(),
-	child: z.string(),
-})
-// A pre-push hook that could not reuse the green gate record and ran the `whole` or the `related`
-// suite: `reason` is the miss's kind (`hook_gate_reuse.miss_kind`), never its sentence (joshuafolkken/kit#5234).
-const push_miss_schema = z.object({
-	kind: z.literal(KIND.PUSH_MISS),
-	at: z.string(),
-	scope: z.enum(['whole', 'related']),
-	reason: z.string(),
+	first_unpinned: z.boolean().optional(),
+	reasoned: z.boolean().optional(),
+	cut: z.number().optional(),
+	tree_hash: z.string().optional(),
 })
 // The lane limit a run started under or `lane:limit` set it to (`lane-limit-history.ts`, joshuafolkken/kit#6139).
 const limit_schema = z.object({ kind: z.literal(KIND.LIMIT), at: z.string(), limit: z.number() })
@@ -235,6 +180,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	stage_schema,
 	stop_schema,
 	lane_ledger_schema_ship.chain_schema,
+	lane_ledger_schema_ship.chain_stage_entry_schema,
 	overlap_schema,
 	held_schema,
 	released_schema,
@@ -245,15 +191,18 @@ const entry_schema = z.discriminatedUnion('kind', [
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,
+	lint_related_schema,
 	test_pinned_schema,
 	split_notice_schema,
 	split_filed_schema,
 	unplanned_notice_schema,
+	lane_ledger_schema_ship.preflight_schema,
 	lane_state_schema,
 	push_miss_schema,
 	ship_lap_schema,
 	size_schema,
 	limit_schema,
+	lane_ledger_schema_estimate.estimate_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -274,6 +223,8 @@ type UnitFilesEntry = z.infer<typeof unit_files_schema>
 type UnitFileRecord = z.infer<typeof unit_file_schema>
 type TestRelatedEntry = z.infer<typeof test_related_schema>
 type TestRelatedRecord = Omit<TestRelatedEntry, 'kind' | 'at'>
+type LintRelatedEntry = z.infer<typeof lint_related_schema>
+type LintRelatedRecord = Omit<LintRelatedEntry, 'kind' | 'at'>
 type TestPinnedEntry = z.infer<typeof test_pinned_schema>
 type TestPinnedRecord = Omit<TestPinnedEntry, 'kind' | 'at'>
 type SplitNoticeEntry = z.infer<typeof split_notice_schema>
@@ -318,6 +269,8 @@ export type {
 	LaneStateChangeRecord,
 	LedgerEntry,
 	LimitEntry,
+	LintRelatedEntry,
+	LintRelatedRecord,
 	LoadEntry,
 	MergeEntry,
 	OfferableEntry,

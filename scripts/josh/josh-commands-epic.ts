@@ -14,11 +14,28 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
-		reference: ['<title> <issue...> [--ordered]', 'automation', ['network']],
+		reference: [
+			'<title> <issue...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <reason>"...]',
+			'automation',
+			['network'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '"Epic: split the parser work" 101 102 103' },
-				{ arguments: '"Epic: staged rollout" 101 102 --ordered' },
+				{
+					arguments:
+						'"Epic: staged rollout" A B --ordered --order-reason "#A -> #B: B ships the flag A adds"',
+				},
+				{
+					arguments:
+						'"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: …" --order-reason "#B -> #C: …"',
+					note: 'a join',
+				},
+				{
+					arguments:
+						'"Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: #B calls the parser #A adds"',
+					note: 'why B waits on A',
+				},
 				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
 				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
@@ -40,6 +57,16 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--ordered'],
 					description:
 						'argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.',
+				},
+				{
+					names: ['--chain "#A -> #B"'],
+					description:
+						'repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.',
+				},
+				{
+					names: ['--order-reason "#A -> #B: <reason>"'],
+					description:
+						'repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain` or `--ordered`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.',
 				},
 				{
 					names: ['--rationale-file <path|->'],
@@ -161,6 +188,8 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'auto-ok:judge': {
 		script: 'scripts/auto-ok/auto-ok-judge-cli.ts',
+		// `.env` may hold `JOSH_SESSION_LANG`, which picks the judgement comment's language.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline)',
 		category: 'AI tools',

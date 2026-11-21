@@ -134,6 +134,54 @@ describe('lane_stats.row — the lane median', () => {
 	})
 })
 
+// joshuafolkken/kit#7775: the estimate rows add the two ratio columns and leave every other column
+// where it was.
+const RUN = '2026-10-06T00:00:00.000Z'
+const NEXT_RUN = '2026-10-07T00:00:00.000Z'
+const NEXT_RUN_ISSUE = 9
+const ESTIMATES: ReadonlyArray<LedgerEntry> = [
+	{ kind: 'dispatch', at: hours_before_now(5), issue: MERGE_ISSUE },
+	{
+		kind: 'estimate',
+		at: hours_before_now(5),
+		issue: MERGE_ISSUE,
+		run: RUN,
+		finish_at: hours_before_now(4),
+	},
+	{
+		kind: 'estimate',
+		at: hours_before_now(3),
+		issue: MERGE_ISSUE,
+		run: RUN,
+		finish_at: hours_before_now(1),
+	},
+	// The next run's first row, which marks the run above as over.
+	{
+		kind: 'estimate',
+		at: hours_before_now(1),
+		issue: NEXT_RUN_ISSUE,
+		run: NEXT_RUN,
+		finish_at: hours_before_now(0),
+	},
+]
+
+describe('lane_stats.row — the estimate ratios', () => {
+	it('prints the first and the median ratio of a finished run', () => {
+		const entries = [...ESTIMATES, ...MERGES]
+
+		// The run ends at the issue's first merge, 2 h ago: 3 h over 1 h expected, then 1 h over 2 h.
+		expect(cell_of(entries, 'estimate ratio first')).toBe('3.0')
+		expect(cell_of(entries, 'estimate ratio median')).toBe('1.8')
+	})
+
+	it('leaves every other column unchanged by the estimate rows', () => {
+		const without = cells([...ESTIMATES.slice(0, 1), ...MERGES, ...GATES])
+		const with_estimates = cells([...ESTIMATES, ...MERGES, ...GATES])
+
+		expect(with_estimates.slice(0, -2)).toEqual(without.slice(0, -2))
+	})
+})
+
 // joshuafolkken/kit#4910: the median hides the lanes past the overrun threshold.
 describe('lane_stats.row — the lane tail', () => {
 	const OVER = 'lanes over 40 min'

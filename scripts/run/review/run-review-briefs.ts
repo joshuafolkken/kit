@@ -7,6 +7,7 @@ import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_pair } from '#scripts/review/review-pair'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { review_round } from '#scripts/review/review-round'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 
@@ -55,7 +56,7 @@ function save_brief(slot: ReviewSlot, text: string): void {
 	const opening =
 		review_round.from_brief(text) === '2'
 			? run_ship_review.final_opening(brief)
-			: run_ship_review.round_one_opening(brief)
+			: run_ship_review.round_one_opening(brief, review_prompt_level.round_one_trigger(slot))
 
 	process.stdout.write(`${slot} brief: ${brief}\n${slot} prompt: ${opening}\n`)
 	const paired = slot === CODE ? review_pair.offer(text) : undefined

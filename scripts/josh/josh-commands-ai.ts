@@ -420,6 +420,22 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 		},
 	},
+	// The same `.env` read as `lane:withdraw`, whose withdrawal it runs first.
+	'lane:fold': {
+		script: 'scripts/lane/lane-fold-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Hand a component issue over to the issue that wires it: withdraw its lane with the work stashed, tell the taker how to bring the stash in and to close it, and remove the taker’s blocked-by on it — a re-run finishes only the steps left',
+		category: 'AI tools',
+		reference: [
+			'<issue> --into <issue> --reason <text>',
+			'developer',
+			['files', 'git', 'processes', 'network'],
+		],
+		usage: {
+			examples: [{ arguments: '7945 --into 7951 --reason "ships with the wiring"' }],
+		},
+	},
 	'lane:resolve': {
 		script: 'scripts/lane/lane-resolve-cli.ts',
 		description:
@@ -444,7 +460,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			"Record a lane child's planned files; yield its lane, naming file and holder, when an earlier-planned running lane declares or plans one; `--size-approval` bounds lines/files",
 		category: 'AI tools',
 		reference: [
-			'<issue> <path>... [--probe] [--single] [--estimate <json-file>] [--size-approval <json-file>] [--imports <path>...]',
+			'<issue> <path>... [--probe] [--single "<reason>"] [--estimate <json-file>] [--size-approval <json-file>] [--imports <path>...]',
 			'automation',
 			['files', 'network'],
 		],
@@ -558,7 +574,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'lane:net': {
 		...MEASURE_ARGUMENTS,
 		description:
-			"Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's sleeps and the ship's followup",
+			"Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's stops (sleeps and network outages) and the ship's followup",
 		category: 'AI tools',
 		reference: ['<issue>', 'maintainer', ['none']],
 		default_script_arguments: ['net'],
@@ -592,6 +608,35 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 					note: 'the breakdown the overrun investigation comments on the lane',
 				},
 				{ arguments: '4970 --timeline', note: 'when each stage ran and where the lane waited' },
+			],
+		},
+	},
+	'lane:phases': {
+		script: 'scripts/lane/lane-phases-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			"Print the lanes' median minutes and sample count by phase, across Issues or a date range",
+		category: 'AI tools',
+		reference: ['<issue>... | --since <date> [--until <date>]', 'maintainer', ['none']],
+		usage: {
+			flags: [
+				{
+					names: ['--since'],
+					description:
+						'reads the lanes merged on or after this date (ISO) instead of named Issues.',
+				},
+				{
+					names: ['--until'],
+					description:
+						'with `--since`, leaves out the lanes merged at or after this instant (ISO; a bare date is its midnight UTC).',
+				},
+			],
+			examples: [
+				{ arguments: '101 102 103', note: 'the phases of the named lanes' },
+				{
+					arguments: '--since 2026-11-19 --until 2026-11-20',
+					note: 'the lanes merged in a period',
+				},
 			],
 		},
 	},

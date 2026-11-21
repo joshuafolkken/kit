@@ -5,14 +5,14 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_logic } from './test-pinned-logic'
-import { test_pinned_reach } from './test-pinned-reach'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
 import { test_related_record } from './test-related-record'
+import { test_related_select } from './test-related-select'
 import { test_unit_guard } from './test-unit-guard'
 
-// joshuafolkken/kit#5532: a changed file past the reach cap is printed as over cap, recorded so, and not
-// named as an argument vitest was not given.
+// joshuafolkken/kit#5532, #7976: a change past the cap runs the selected test files alone, prints and
+// records how many were deferred to CI with the hub, and names no argument as one vitest was not given.
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({
@@ -38,16 +38,14 @@ vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
 	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
 })
 vi.mock('./test-pinned-reach')
-// The cap cases assume stable imports; changed imports are covered by test-related.imports.test.ts.
-vi.mock('./test-related-imports', () => ({
-	test_related_imports: {
-		stable_files: async (_root: string, files: ReadonlyArray<string>) => [...files],
-	},
-}))
+// What the cap cut is fed by each case; the cut itself is `test-related-select.test.ts`.
+vi.mock('./test-related-select', async () => await import('./test-related-select-fixture'))
 
 const REPOSITORY_ROOT = process.cwd()
 const CHANGED_SOURCE = path.join('scripts', 'test', 'test-related-cap.ts')
-const OVER_CAP = test_pinned_logic.MAX_TEST_FILES + 1
+const SELECTED_TEST = path.join('scripts', 'test', 'test-related-cap.test.ts')
+const DEFERRED = 5
+const OVER_CAP = test_pinned_logic.MAX_TEST_FILES + DEFERRED
 
 function written_output(): string {
 	return vi
@@ -80,27 +78,38 @@ beforeEach(() => {
 	vi.mocked(scoped_green.read_before).mockResolvedValue(undefined)
 	vi.mocked(test_unit_guard.run_guarded_vitest).mockResolvedValue(0)
 	vi.mocked(test_unit_guard.is_running).mockReturnValue(true)
-	vi.mocked(test_pinned_reach.reached_test_counts).mockImplementation(async (files) => {
-		await Promise.resolve()
-
-		return files.map((file) => ({ file, count: OVER_CAP }))
+	vi.mocked(test_related_select.select).mockResolvedValue({
+		tests: [SELECTED_TEST],
+		deferred: DEFERRED,
+		reach: [{ file: CHANGED_SOURCE, count: OVER_CAP }],
+		method: 'import',
 	})
 })
 
-describe('test_related.run_related_tests — a file past the reach cap', () => {
-	it('prints it as over cap and records the count', async () => {
+describe('test_related.run_related_tests — a change past the cap', () => {
+	it('prints the deferred count with the hub and records it', async () => {
 		const record = vi.spyOn(test_related_record, 'record_run')
 
 		await test_related.run_related_tests([])
 
-		expect(written_output()).toContain(`1 over cap (150 test files), hub ${CHANGED_SOURCE}`)
-		expect(record.mock.calls[0]?.[0].over_cap).toEqual([CHANGED_SOURCE])
+		expect(written_output()).toContain(
+			`${String(DEFERRED)} deferred to CI past the cap (150 test files), hub ${CHANGED_SOURCE}`,
+		)
+		expect(record.mock.calls[0]?.[0].deferred).toBe(DEFERRED)
 	})
 
-	it('does not name an over-cap argument as one vitest was not given', async () => {
+	it('hands vitest the selected test files alone', async () => {
+		await test_related.run_related_tests([])
+
+		const argv = vi.mocked(test_unit_guard.run_guarded_vitest).mock.calls[0]?.[1]
+
+		expect(argv?.slice(0, 2)).toStrictEqual(['run', path.join(REPOSITORY_ROOT, SELECTED_TEST)])
+	})
+
+	it('does not name a capped argument as one vitest was not given', async () => {
 		await test_related.run_related_tests([CHANGED_SOURCE])
 
-		expect(written_output()).toContain('1 over cap')
+		expect(written_output()).toContain('deferred to CI')
 		expect(written_output()).not.toContain('not a file this check reads')
 	})
 })

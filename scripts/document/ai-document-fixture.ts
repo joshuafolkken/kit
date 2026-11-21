@@ -29,8 +29,10 @@ const README_DOC = 'README.md'
 const CONTRIBUTING_DOC = 'CONTRIBUTING.md'
 
 // A verbatim quote of a Japanese prompt heading or literal sits in a code span, a fence or double
-// quotes (`docs/maintainers/README.md` → "Language"); everything else is English.
-const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"/gu
+// quotes (`docs/maintainers/README.md` → "Language"); everything else is English. A link target
+// counts as a quote too: an anchor into a Japanese heading spells that heading, while the link's
+// visible text stays prose.
+const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"|\]\([^)\n]*\)/gu
 const JAPANESE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
 
 // The document the pointers name. Written once so the pointer suite and the pointers agree.
@@ -78,6 +80,26 @@ function distributed_skill_markdown(): ReadonlyArray<string> {
 	return PLUGIN_SKILL_DIRECTORIES.flatMap((directory) => markdown_under(directory))
 }
 
+const KIT_ONLY_SKILL_PREFIX = '!.claude/skills/'
+
+// The markdown under the kit-only skills: an agent in kit still reads them, so they are byte-budgeted
+// like the distributed ones. The set is the `package.json` `files` negations that keep them out of the
+// package, so excluding a skill and budgeting it cannot drift apart.
+function kit_only_skill_markdown(): ReadonlyArray<string> {
+	const manifest = JSON.parse(readFileSync(package_file('package.json'), 'utf8')) as {
+		files?: Array<string>
+	}
+
+	return (manifest.files ?? [])
+		.filter((entry) => entry.startsWith(KIT_ONLY_SKILL_PREFIX))
+		.flatMap((entry) => markdown_under(entry.slice(1)))
+}
+
+// Every markdown file under `docs/`, the published documentation a consumer reads.
+function documentation_pages(): ReadonlyArray<string> {
+	return markdown_under(DOCS_ROOT)
+}
+
 // Every file that can route a reader somewhere — the rule document, every distributed skill, and
 // every markdown file under `prompts/` and `docs/`. Two suites check citations against this set and
 // each excludes a different handful from it; the *set* is what must not drift between them, since a
@@ -87,12 +109,12 @@ function routing_documents(): ReadonlyArray<string> {
 		...AI_DOCS,
 		...distributed_skill_markdown(),
 		...markdown_under(PROMPT_ROOT),
-		...markdown_under(DOCS_ROOT),
+		...documentation_pages(),
 	]
 }
 
 // Every document an agent reads in full during a session — the rule document, every distributed
-// skill, every workflow prompt, the four routed `docs/` command references and the label page. `document/document-byte-budget.ts`
+// and kit-only skill, every workflow prompt, the four routed `docs/` command references and the label page. `document/document-byte-budget.ts`
 // walks this set to assert none has grown past its recorded ceiling and that the budget names
 // exactly these files. Composed from the same roots as `routing_documents`, minus the rest of
 // `docs/`, so the two cannot drift on the directories they share.
@@ -100,6 +122,7 @@ function agent_read_documents(): ReadonlyArray<string> {
 	return [
 		...AI_DOCS,
 		...distributed_skill_markdown(),
+		...kit_only_skill_markdown(),
 		...markdown_under(PROMPT_ROOT),
 		...COMMAND_REFERENCE_DOCS,
 		LABEL_REFERENCE_DOC,
@@ -221,6 +244,7 @@ export {
 	CLAUDE_SETTINGS,
 	COMMAND_REFERENCE_DOCS,
 	CONTRIBUTING_DOC,
+	documentation_pages,
 	ENV_EXAMPLE,
 	has_japanese_prose,
 	linked_paths,

@@ -1,7 +1,12 @@
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { lane_await } from '#scripts/lane/lane-await'
-import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
+import {
+	lane_process_table,
+	type ProcessTable,
+	type TableRead,
+} from '#scripts/lane/lane-process-table'
+import { launch_timing } from '#scripts/lane/launch-timing'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { BoardUsage } from './run-board-header'
 import { run_board_idle, type IdleSince } from './run-board-idle'
@@ -24,6 +29,7 @@ const MACHINE_SAMPLE_MS = MS_PER_SECOND
 const LOCAL_READ_SECONDS = 5
 const LOCAL_READ_MS = LOCAL_READ_SECONDS * MS_PER_SECOND
 const { is_due } = run_board_state
+const { timed } = launch_timing
 
 interface GatherPorts {
 	// Every process on the machine, one `ps` (`lane-process-table.ts`); a read takes it at most once
@@ -33,7 +39,8 @@ interface GatherPorts {
 	read_local: (table: TableRead) => Promise<LocalRead | undefined>
 	read_machine: () => Promise<MachineSample>
 	// The claims waiting in the core budget, read on the machine's second; none where it is not given.
-	read_waits?: (() => Array<BudgetWait>) | undefined
+	// Handed the round's snapshot, so each claim's liveness reads its start there rather than a `ps`.
+	read_waits?: ((table: ProcessTable | undefined) => Array<BudgetWait>) | undefined
 	// Every process and its lane, the last reading's lanes reused (`run-board-usage-read.ts`).
 	read_usage: (before: UsageMark | undefined, table: TableRead) => Promise<UsageMark | undefined>
 	// The usage-limit windows' held readings (`run-board-quota-held.ts`); none where it is not given.
@@ -140,31 +147,81 @@ async function reread(
 	return { read: await read_at(read, ports, { now_ms: ports.now(), ...later }), snapshot: later }
 }
 
-// The sample is timed when it is taken, not when the reads began: it is due by the reads' clock, so a
-// sample taken a few milliseconds in does not slip to the read after the second.
+// The machine and the quotas, which read no process snapshot, so they are taken beside the lane read
+// (joshuafolkken/kit#7931); `undefined` when no sample is due.
+interface Sampled {
+	machine: MachineMark
+	quotas: Quotas | undefined
+}
+
+// The sample is timed when it is taken, and due by the same clock the round's sample is stamped with.
+async function sample(
+	state: GatherState,
+	ports: GatherPorts,
+	now_ms: number,
+): Promise<Sampled | undefined> {
+	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, now_ms)) return undefined
+
+	const at_ms = ports.now()
+	const [machine_sample, quotas] = await Promise.all([
+		timed('machine', ports.read_machine),
+		timed('quotas', async () => await ports.read_quotas?.()),
+	])
+
+	return { machine: { sample: machine_sample, at_ms }, quotas }
+}
+
+// The usages read the lane read's snapshot, so they follow it.
 async function resample(
 	state: GatherState,
 	ports: GatherPorts,
 	at: SnapshotAt,
+	sampled: Sampled | undefined,
 ): Promise<GatherState> {
-	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, at.now_ms)) return state
+	if (sampled === undefined) return state
 
-	const at_ms = ports.now()
-	const machine = { sample: await ports.read_machine(), at_ms }
-	const gauges = run_board_machine.gauges_of(state.machine, machine)
-	const budget_waits = ports.read_waits?.() ?? []
-	const usages = await run_board_usage_board.read_usages(state, ports, at.table)
-	const quotas = await ports.read_quotas?.()
+	const gauges = run_board_machine.gauges_of(state.machine, sampled.machine)
+	const budget_waits = ports.read_waits?.(await at.table()) ?? []
+	const usages = await timed(
+		'usages',
+		async () => await run_board_usage_board.read_usages(state, ports, at.table),
+	)
 
-	return { ...state, ...usages, machine, gauges, budget_waits, quotas, sampled_ms: at.now_ms }
+	return { ...state, ...usages, ...sampled, gauges, budget_waits, sampled_ms: at.now_ms }
+}
+
+// Handed the round's state as soon as its lane read lands, ahead of the usages (joshuafolkken/kit#8134).
+type OnLocal = (read: GatherState) => void
+
+// A round whose lane read was not due hands nothing early.
+async function reread_handed(
+	state: GatherState,
+	ports: GatherPorts,
+	snapshot: Snapshot,
+	on_local: OnLocal | undefined,
+): Promise<{ read: GatherState; snapshot: Snapshot }> {
+	const reread_result = await reread(state, ports, snapshot)
+
+	if (reread_result.read.read_ms !== state.read_ms) on_local?.(reread_result.read)
+
+	return reread_result
 }
 
 // One round of the reads. The process snapshot is read once, by whichever of the lane read and the
-// sample asks first.
-async function gather(state: GatherState, ports: GatherPorts, pace: Pace): Promise<GatherState> {
-	const { read, snapshot } = await reread(state, ports, fresh_snapshot(ports, pace))
+// usages asks first.
+async function gather(
+	state: GatherState,
+	ports: GatherPorts,
+	pace: Pace,
+	on_local?: OnLocal,
+): Promise<GatherState> {
+	const now_ms = ports.now()
+	const [{ read, snapshot }, sampled] = await Promise.all([
+		reread_handed(state, ports, fresh_snapshot(ports, pace), on_local),
+		sample(state, ports, now_ms),
+	])
 
-	return await resample(read, ports, { now_ms: ports.now(), ...snapshot })
+	return await resample(read, ports, { now_ms, ...snapshot }, sampled)
 }
 
 // What a frame draws, without the marks the next reads compare against.

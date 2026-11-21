@@ -6,7 +6,7 @@ import type { LaneSpan } from './lane-net-time'
 // The host's sleep (joshuafolkken/kit#5032): a closed lid stops every lane, yet no park, outage or
 // usage-limit event says so, and its minutes read as work. The load sampler's timer does not fire while
 // the host sleeps, so a tick later than a few intervals is the sign: the wall clock past the tick that
-// was due is recorded as one `sleep` event, and every lane's net time takes it out (`lane-net-time.ts`).
+// was due is recorded as one `sleep` event, and every lane's time takes it out (`lane-host-gaps.ts`).
 // A tick merely slowed by load runs well inside the threshold, so a busy host is not read as asleep.
 
 const { EVENT_KIND } = run_event_stream
@@ -42,17 +42,7 @@ async function record(span: LaneSpan, events_path?: string): Promise<void> {
 	run_event_stream.append_event(target, event_of(span))
 }
 
-// Every sleep on `events`, oldest first.
-function spans(events: ReadonlyArray<RunEvent>): Array<LaneSpan> {
-	return events
-		.filter((event) => event.kind === EVENT_KIND.SLEEP)
-		.map((event) => {
-			const to_ms = Date.parse(event.at)
-
-			return { from_ms: to_ms - (event.elapsed_ms ?? 0), to_ms }
-		})
-}
-
-const lane_sleep = { gap_of, record, spans }
+// The sleeps are read back by `lane-host-gaps.ts`.
+const lane_sleep = { gap_of, record }
 
 export { lane_sleep }

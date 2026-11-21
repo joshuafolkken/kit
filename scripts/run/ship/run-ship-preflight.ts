@@ -7,12 +7,14 @@ import { git_issue } from '#scripts/git/git-issue'
 import { git_preflight, type Unmet } from '#scripts/git/git-preflight'
 import { cli_body } from '#scripts/josh/cli-body'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { error_text } from '#scripts/lib/error-message'
 import { report_format_reference } from '#scripts/report/report-format-reference'
 import { acceptance_map } from '#scripts/review/acceptance-map'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
+import { run_ship_behind_default } from './run-ship-behind-default'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
@@ -47,6 +49,19 @@ const PRECONDITION = {
 	UNPLANNED: run_ship_planned.PRECONDITION,
 	UNREADABLE: 'unreadable',
 } as const
+// The kinds `asked_problems` asks; `unreadable` is a failed read, not a precondition asked.
+const ASKED_KINDS = [
+	...Object.values(git_preflight.PRECONDITION),
+	PRECONDITION.LIVE_EVIDENCE,
+	PRECONDITION.ACCEPTANCE_MAP,
+	PRECONDITION.REMOVED_TESTS,
+	PRECONDITION.LOCK,
+	PRECONDITION.UNPLANNED,
+]
+const DEFERRED: PreflightResult = {
+	code: SUCCESS_EXIT_CODE,
+	out: 'ready — scoped pair left to the tree the sync stage merges: the default branch moved',
+}
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the body this ship delivers has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and write it into the ship body draft run:prep wrote (josh ship reads it when --body-file is omitted), or pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
 const EVIDENCE_PENDING = `This change touches runtime code and no PR is open yet: write the ${live_evidence.EVIDENCE_HEADING} section into the ship body draft run:prep wrote (or a file handed to josh ship with --body-file <path>), or the ship refuses. Write it ${live_evidence.EVIDENCE_FORMAT}`
 
@@ -159,34 +174,87 @@ async function planned_problems(): Promise<Array<Unmet>> {
 	return of_kind(PRECONDITION.UNPLANNED, await run_ship_planned.problems())
 }
 
+type TreeParts = [Array<Unmet>, Array<Unmet>, Array<Unmet>, Array<Unmet>]
+
+// The judgments read off the Issue, the body and the tree alone — the git preflight with its
+// classification, the evidence, the removed tests and the lane plan — so `josh preflight:check` asks
+// them before the review through these same calls (joshuafolkken/kit#7773).
+async function tree_parts(
+	cli_input: string | undefined,
+	body_path: string | undefined,
+	no_body_problem?: string,
+): Promise<TreeParts> {
+	return await Promise.all([
+		caught(git_preflight.problems_of({ cli_input, will_open_pr: true })),
+		caught(evidence_problems(body_path, no_body_problem)),
+		caught(removed_test_problems(body_path)),
+		caught(planned_problems()),
+	])
+}
+
 // The lock file is asked here too, so a drift stops the ship before the gate
 // rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> {
-	const [preflight, evidence, acceptance, removed, lock, planned] = await Promise.all([
-		caught(git_preflight.problems_of({ cli_input: request.title, will_open_pr: true })),
-		caught(evidence_problems(request.body_path)),
+	const [[preflight, evidence, removed, planned], acceptance, lock] = await Promise.all([
+		tree_parts(request.title, request.body_path),
 		caught(acceptance_problems(request.body_path)),
-		caught(removed_test_problems(request.body_path)),
 		caught(lock_problems()),
-		caught(planned_problems()),
 	])
 
 	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned]
 }
 
+// The tree judgments `run:chain` asks before the review, of the body the ship will read when
+// `--body-file` is omitted; before a PR exists the evidence is asked for as that draft, as `ahead` does.
+async function chain_problems(): Promise<Array<Unmet>> {
+	const parts = await tree_parts(undefined, undefined, EVIDENCE_PENDING)
+
+	return parts.flat()
+}
+
+// Every evaluation, passed or stopped, writes the kinds it asked beside the ones it found unmet, so
+// the ledger reads each kind's stops against its evaluations (joshuafolkken/kit#7874). A kind found
+// unmet was evaluated, so a failed read's `unreadable` joins the kinds asked rather than stopping unasked.
+async function recorded(
+	result: PreflightResult,
+	evaluated: ReadonlyArray<string>,
+): Promise<PreflightResult> {
+	const issue = git_issue.branch_number(await git_branch.current())
+	const unmet = [...(result.preconditions ?? [])]
+
+	if (issue !== undefined) {
+		await lane_ledger_write.record_preflight({
+			issue: Number(issue),
+			evaluated: [...new Set([...evaluated, ...unmet])],
+			unmet,
+		})
+	}
+
+	return result
+}
+
+async function scoped_stage(): Promise<PreflightResult> {
+	const scoped = await run_ship_scoped.scoped_pair()
+
+	if (scoped.code === SUCCESS_EXIT_CODE) return { code: SUCCESS_EXIT_CODE, out: 'ready' }
+
+	return { ...scoped, preconditions: [PRECONDITION.SCOPED] }
+}
+
+// **A default branch that moved leaves the pair to the merged tree** (joshuafolkken/kit#8304): the sync
+// stage merges it and, with a pull request open, runs the pair over the merged tree before its push;
+// without one the gate stage's pair is the first. Either stops a red pair before any push, and this
+// one's record would not outlive the merge's moved base.
 async function asked_stage(request: PreflightRequest): Promise<PreflightResult> {
 	const problems = await run_ship_lap.timed(
 		run_ship_lap.STEP.PRECONDITIONS,
 		async () => await asked_problems(request),
 	)
 
-	if (problems.length > 0) return refusal(problems)
+	if (problems.length > 0) return await recorded(refusal(problems), ASKED_KINDS)
+	if (await run_ship_behind_default.is_merge_ahead()) return await recorded(DEFERRED, ASKED_KINDS)
 
-	const scoped = await run_ship_scoped.scoped_pair()
-
-	if (scoped.code === SUCCESS_EXIT_CODE) return { code: SUCCESS_EXIT_CODE, out: 'ready' }
-
-	return { ...scoped, preconditions: [PRECONDITION.SCOPED] }
+	return await recorded(await scoped_stage(), [...ASKED_KINDS, PRECONDITION.SCOPED])
 }
 
 // The title and the body this ship delivers key the reuse; an unreadable body is asked every time.
@@ -276,6 +344,8 @@ const run_ship_preflight = {
 	EVIDENCE_PROBLEM,
 	acceptance_pending_text,
 	ahead,
+	body_text,
+	chain_problems,
 	stage,
 }
 

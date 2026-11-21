@@ -26,7 +26,7 @@ const RUNNING = 3701
 const SHARED = 'package.json'
 const NO_LANE_LEFT = 0
 const ONE_LANE_LEFT = 1
-const { STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
+const { STAGE_ICONS, WAIT_ICONS } = run_board_labels
 const { LANE_STAGE } = run_event_setup
 const UNTRIAGED_REASON: RowReason = { icon: WAIT_ICONS.untriaged, issues: [] }
 // joshuafolkken/kit#5518: ✋ marks the untriaged row held alone for its judgment.
@@ -162,12 +162,12 @@ describe('run_board_reason.reader — a row a blocker keeps waiting', () => {
 		])
 	})
 
-	it('leads a row with 🙋 where the classifier withholds it for a person', () => {
+	it('leads a row the classifier withholds for a person with plain 🔗 (joshuafolkken/kit#8026)', () => {
 		const blocked = child(HELD, [BLOCKER, OTHER_BLOCKER])
 		const issues = [String(BLOCKER), String(OTHER_BLOCKER)]
 		const plan = { ...plan_of([blocked, child(BLOCKER)]), withheld: new Set([HELD]) }
 
-		expect(reasons([blocked], { plan })).toStrictEqual([{ icon: STATE_ICONS.human, issues }])
+		expect(reasons([blocked], { plan })).toStrictEqual([{ icon: WAIT_ICONS.blocker, issues }])
 	})
 
 	it('leads a row with 🔗 where its blocker is outside the plan but the classifier waits on time', () => {
@@ -332,7 +332,20 @@ describe('run_board_reason.reader — a row whose declared start time is ahead',
 
 		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([NO_LANE_REASON])
 	})
+})
 
+// joshuafolkken/kit#8133: the same body on a later redraw whose clock has passed the start time.
+describe('run_board_reason.reader — a row whose declared start time a later redraw passes', () => {
+	it('drops the start time on the first redraw whose clock has passed it', () => {
+		const pool = [not_before(FUTURE)]
+		const passed = { free_lanes: NO_LANE_LEFT, now_ms: Date.parse(FUTURE) + SECOND }
+
+		expect(reasons(pool, { free_lanes: NO_LANE_LEFT })).toStrictEqual([FUTURE_REASON])
+		expect(reasons(pool, passed)).toStrictEqual([NO_LANE_REASON])
+	})
+})
+
+describe('run_board_reason.reader — a row whose declared start time is ahead, beside other reasons', () => {
 	// joshuafolkken/kit#5518: `backlog:next` names no such row as held, so it is not drawn ✋.
 	it('leads an untriaged row whose start time is ahead with ❓, not ✋', () => {
 		const row = { ...not_before(FUTURE), labels: [] }

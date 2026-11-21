@@ -198,6 +198,7 @@ const run_headless = {
 	is_headless,
 	is_headless_parent,
 	is_owned_here,
+	is_started_child,
 	must_keep_waiting,
 }
 

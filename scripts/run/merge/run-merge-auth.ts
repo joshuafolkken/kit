@@ -13,7 +13,6 @@ import { run_merge_usage_limit } from './run-merge-usage-limit'
 // after a merge sends it again. **It is no `OUTAGE`**: the per-child cap counts those
 // (`run-merge-cap.ts`). Script-emitted, so English.
 
-const LIMIT = 'authentication failure'
 const RECHECK_MS = 600_000
 const RECHECK_TEXT = '10 minutes'
 const RECOVERY =
@@ -26,7 +25,10 @@ async function is_first_hold(): Promise<boolean> {
 		.since(events, run_event_stream.EVENT_KIND.MERGE)
 		.every(
 			(event) =>
-				!(event.kind === run_event_stream.EVENT_KIND.USAGE_LIMIT && event.text.includes(LIMIT)),
+				!(
+					event.kind === run_event_stream.EVENT_KIND.USAGE_LIMIT &&
+					run_merge_usage_limit.cause_of(event) === 'auth'
+				),
 		)
 }
 
@@ -35,6 +37,8 @@ async function notify(child: string): Promise<void> {
 	const text = `${cite} could not authenticate — run /login; the run resumes by itself`
 
 	await telegram_notify.confirm({
+		reason: 'unauthenticated',
+		issue: child,
 		issue_title: 'backlogrun waiting: Claude authentication failed',
 		body: `${text}. Launches are held and re-tried every ${RECHECK_TEXT}; the child was released, neither parked nor counted as a failure.`,
 		recovery: RECOVERY,
@@ -46,7 +50,7 @@ async function notify(child: string): Promise<void> {
 async function hold(child: string, now_ms: number): Promise<void> {
 	const is_first = await is_first_hold()
 
-	await run_merge_usage_limit.record(child, now_ms + RECHECK_MS, LIMIT)
+	await run_merge_usage_limit.record(child, now_ms + RECHECK_MS, run_merge_usage_limit.AUTH_LIMIT)
 
 	if (is_first) await notify(child)
 }

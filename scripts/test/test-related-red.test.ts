@@ -8,6 +8,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_related_red, type RedRun, type RelatedInput } from './test-related-red'
+import { test_related_reuse } from './test-related-reuse'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
 // joshuafolkken/kit#5386: a red bare run records its failed files, so the run after the fix reads only
@@ -18,6 +19,8 @@ const OTHER_BASE = 'merged-main-sha'
 const FAILED_TEST = 'scripts/test/alpha.test.ts'
 const OWED_SOURCE = 'scripts/test/beta.ts'
 const MOVED_SOURCE = 'scripts/test/gamma.ts'
+const PASSED_TEST = 'scripts/test/delta.test.ts'
+const PASSED_DIGEST = 'delta-inputs'
 const BEFORE: GateTree = { files: { [FAILED_TEST]: 'blob-1' }, base: BASE }
 const MOVED_TREE: GateTree = { files: { [FAILED_TEST]: 'blob-2' }, base: BASE }
 const FAIL_LINE = `FAIL  ${FAILED_TEST} > suite > case\n`
@@ -37,6 +40,8 @@ function red_run(overrides: Partial<RedRun> = {}): RedRun {
 		first_exit: 1,
 		started_ms: STARTED_MS,
 		owed: [OWED_SOURCE],
+		root: directory,
+		passed: [PASSED_TEST],
 		...overrides,
 	}
 }
@@ -62,6 +67,7 @@ beforeEach(() => {
 	vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue(BEFORE)
 	vi.spyOn(review_stamps.test_related_red_stamp, 'write').mockReturnValue('')
 	vi.spyOn(review_stamps.test_related_red_stamp, 'remove').mockReturnValue()
+	vi.spyOn(test_related_reuse, 'blobs').mockResolvedValue({})
 	vi.spyOn(since_green, 'read_moved_parts').mockResolvedValue({
 		changed: [MOVED_SOURCE],
 		synced: [],
@@ -102,7 +108,30 @@ describe('test_related_red.record_red', () => {
 			{ [OWED_SOURCE]: 'no-base', [FAILED_TEST]: 'failed' },
 		)
 	})
+})
 
+// joshuafolkken/kit#7966: the passed files' input digests ride the red record to the next green.
+describe('test_related_red.record_red — passed files', () => {
+	it("records the passed files' input digests beside the marks, a mark winning", async () => {
+		write_log(LOG_WRITTEN_S)
+		vi.mocked(test_related_reuse.blobs).mockResolvedValue({
+			[PASSED_TEST]: PASSED_DIGEST,
+			[FAILED_TEST]: 'stale-digest',
+		})
+
+		await test_related_red.record_red(red_run())
+
+		expect(test_related_reuse.blobs).toHaveBeenCalledWith(directory, [PASSED_TEST])
+		expect(review_stamps.test_related_red_stamp.write).toHaveBeenCalledWith(
+			BEFORE.files,
+			undefined,
+			BASE,
+			{ [PASSED_TEST]: PASSED_DIGEST, [OWED_SOURCE]: 'no-base', [FAILED_TEST]: 'failed' },
+		)
+	})
+})
+
+describe('test_related_red.record_red — clearing', () => {
 	it.each([
 		['the first pass was green', { first_exit: 0 }],
 		['the unit log is older than the run', { started_ms: LOG_STALE_S * 1000 + 1 }],
@@ -132,6 +161,24 @@ describe('test_related_red.record_red', () => {
 	})
 })
 
+// joshuafolkken/kit#8288: the files reuse never excludes, read by a run that narrows by no red record.
+describe('test_related_red.recorded_failures', () => {
+	it('reads the failed marks alone, on any base', () => {
+		const record = stored(OTHER_BASE)
+
+		record.blobs = { ...record.blobs, [PASSED_TEST]: PASSED_DIGEST }
+		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(record)
+
+		expect(test_related_red.recorded_failures()).toEqual([FAILED_TEST])
+	})
+
+	it('reads nothing without a red record', () => {
+		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(undefined)
+
+		expect(test_related_red.recorded_failures()).toEqual([])
+	})
+})
+
 describe('test_related_red.read_red', () => {
 	it('reads the failed, owed and moved files on the record base', async () => {
 		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(stored(BASE))
@@ -147,6 +194,18 @@ describe('test_related_red.read_red', () => {
 			undefined,
 			BEFORE,
 		)
+	})
+
+	it('reads only the marks, never a passed file digest, as failed or owed', async () => {
+		const record = stored(BASE)
+
+		record.blobs = { ...record.blobs, [PASSED_TEST]: PASSED_DIGEST }
+		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(record)
+
+		await expect(test_related_red.read_red(BEFORE)).resolves.toMatchObject({
+			failed: [FAILED_TEST],
+			owed: [OWED_SOURCE],
+		})
 	})
 
 	it('ignores a record written on another base', async () => {

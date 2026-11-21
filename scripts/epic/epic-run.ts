@@ -1,7 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { EPIC_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
-import { epic_body } from './epic-body'
+import { epic_body, type EpicBodyInput } from './epic-body'
 import { epic_promote } from './epic-promote'
 import { epic_relations } from './epic-relations'
 import { epic_validate, type EpicSubject } from './epic-validate'
@@ -16,17 +16,18 @@ interface CreateEpicInput {
 	children: ReadonlyArray<number>
 	rationale: string
 	is_ordered: boolean
+	chains?: EpicBodyInput['chains']
+	order_reasons?: EpicBodyInput['order_reasons']
 	origin?: string | undefined
 }
 
 // The relations the declared order implies, applied through the shared module `--add` also uses so
 // the two cannot drift. A failure is reported and stepped over rather than aborting a batch that is
 // otherwise fine — see `epic-relations.ts` for why the relation is not part of the contract.
-async function apply_dependencies(input: {
-	children: ReadonlyArray<number>
-	is_ordered: boolean
-}): Promise<void> {
-	const pairs = epic_body.build_dependency_pairs(input.children, input.is_ordered)
+async function apply_dependencies(
+	input: Pick<EpicBodyInput, 'children' | 'is_ordered' | 'chains'>,
+): Promise<void> {
+	const pairs = epic_body.build_dependency_pairs(input.children, input.is_ordered, input.chains)
 	if (pairs.length === 0) return
 
 	const failures = await epic_relations.apply_relations(pairs, 'record')
@@ -71,13 +72,7 @@ async function fill_run_command(
 	try {
 		await git_gh_command.issue_edit_body(
 			String(epic_number),
-			epic_body.build_epic_body({
-				children: input.children,
-				rationale: input.rationale,
-				is_ordered: input.is_ordered,
-				origin: input.origin,
-				epic_number,
-			}),
+			epic_body.build_epic_body({ ...input, epic_number }),
 		)
 	} catch {
 		console.info('⚠️  Could not substitute the epic number into the Execution section.')
@@ -93,12 +88,7 @@ async function create_epic_number(input: CreateEpicInput): Promise<number | unde
 		description: EPIC_LABEL_DESCRIPTION,
 	})
 
-	const body = epic_body.build_epic_body({
-		children: input.children,
-		rationale: input.rationale,
-		is_ordered: input.is_ordered,
-		origin: input.origin,
-	})
+	const body = epic_body.build_epic_body(input)
 
 	const url = await git_gh_command.issue_create_with_label({
 		title: input.title,
@@ -108,7 +98,7 @@ async function create_epic_number(input: CreateEpicInput): Promise<number | unde
 	const epic_number = parse_created_number(url)
 
 	console.info(`📋 Created epic: ${url}`)
-	await apply_dependencies({ children: input.children, is_ordered: input.is_ordered })
+	await apply_dependencies(input)
 	await fill_run_command(epic_number, input)
 	console.info(`▶ Run the children with: ${epic_body.format_run_command(epic_number)}`)
 
@@ -126,6 +116,8 @@ interface PromoteEpicInput {
 	children: ReadonlyArray<number>
 	rationale: string
 	is_ordered: boolean
+	chains?: EpicBodyInput['chains']
+	order_reasons?: EpicBodyInput['order_reasons']
 	origin?: string | undefined
 	title?: string | undefined
 }
@@ -211,7 +203,7 @@ async function promote_epic(input: PromoteEpicInput): Promise<number> {
 	if (written !== SUCCESS_EXIT_CODE) return written
 
 	console.info(`📋 Promoted ${session_cite.issue(input.epic_number)} to an epic.`)
-	await apply_dependencies({ children: input.children, is_ordered: input.is_ordered })
+	await apply_dependencies(input)
 	console.info(`▶ Run the children with: ${epic_body.format_run_command(input.epic_number)}`)
 
 	return SUCCESS_EXIT_CODE

@@ -13,6 +13,9 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 }))
 vi.mock('#scripts/epic/epic-blocked-by', () => ({ epic_blocked_by: { record: vi.fn() } }))
 vi.mock('#scripts/run/park/run-park', () => ({ run_park: { clear: vi.fn() } }))
+vi.mock('./backlog-triage-filing', () => ({
+	backlog_triage_filing: { prepared_problem: vi.fn(), publish_after: vi.fn() },
+}))
 vi.mock('./backlog-triage-unblock', () => ({ backlog_triage_unblock: { remove: vi.fn() } }))
 
 const { backlog_triage_unblock } = await import('./backlog-triage-unblock')
@@ -313,5 +316,29 @@ describe('josh backlog:triage --unblock', () => {
 
 		expect(await backlog_triage_cli.run(UNBLOCK_ARGV, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('could not comment'))
+	})
+})
+
+// joshuafolkken/kit#7695: the relation an upstream interrupt recorded names its blocker upstream.
+describe('josh backlog:triage --unblock — a blocker in another repository', () => {
+	const upstream = `joshuafolkken/app-kit#${BLOCKER}`
+	const argv = ['--apply', ISSUE, UNBLOCK_FLAG, upstream, '--reason', REASON]
+
+	it('takes a blocker in another repository and cites it there', async () => {
+		expect(await backlog_triage_cli.run(argv, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)
+		expect(remove_blocked_by).toHaveBeenCalledWith({ issue: ISSUE, prerequisite: upstream })
+		expect(post_comment.mock.calls[0]?.[1]).toContain(`unblocked from ${upstream}`)
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining(`https://github.com/joshuafolkken/app-kit/issues/${BLOCKER}`),
+		)
+	})
+
+	it('links the blocker in its repository when that relation cannot be removed', async () => {
+		remove_blocked_by.mockRejectedValueOnce(new Error('offline'))
+
+		expect(await backlog_triage_cli.run(argv, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining(`https://github.com/joshuafolkken/app-kit/issues/${BLOCKER}`),
+		)
 	})
 })

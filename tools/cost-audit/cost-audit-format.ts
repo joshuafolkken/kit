@@ -1,10 +1,13 @@
 import { figure_format } from '#scripts/lib/figure-format'
-import type { Audit, AuditRow } from './cost-audit'
+import type { Audit, AuditRow, AuditWindow, MergeCounts } from './cost-audit'
+import { cost_audit_cause, type CauseRow } from './cost-audit-cause'
 import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_result } from './cost-audit-result'
+import type { TriggerRow } from './cost-audit-resume'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 import { cost_audit_sequence } from './cost-audit-sequence'
+import { cost_audit_session_count } from './cost-audit-session-count'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import {
 	cost_audit_usage,
@@ -13,6 +16,7 @@ import {
 	type LongOutput,
 	type UsageBreakdown,
 } from './cost-audit-usage'
+import { cost_audit_wait_format } from './cost-audit-wait-format'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
 // summary line `josh retrospective` carries so a run's digest shows the trend it ran in.
@@ -28,13 +32,17 @@ const FILING_ROW_SEPARATOR = ', '
 const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
 // Each row's model lines follow it, indented: the same four token types in dollars.
 const KIND_TITLE =
-	'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)'
+	'By session kind (cost · sessions · cost per session, each beside the period before; this period per model: cost — input / cache read / cache write / output in dollars)'
 const LONG_OUTPUT = String(cost_audit_usage.LONG_OUTPUT_TOKENS)
 // Each phase and agent type row also counts its calls whose output passed `LONG_OUTPUT_TOKENS`
 // (joshuafolkken/kit#7045), so the period's long outputs are placed, not only totalled.
 const TABLE_FIGURES = `cost — billed input / cache read / cache write / output tokens · calls with output over ${LONG_OUTPUT} tokens; per model in dollars`
 const PHASE_TITLE = `Lane children by phase (this period: ${TABLE_FIGURES})`
 const AGENT_TITLE = `Lane subagents by agent type (this period: ${TABLE_FIGURES})`
+const RESUME_TITLE =
+	'Resume sessions by trigger (cost · sessions · cost per merge, each beside the period before)'
+// The last resume line: the resume sessions' dollars inside the review-fix phase.
+const RESUME_SHARE_LEAD = 'resume within '
 
 interface AuditSection {
 	name: string
@@ -53,8 +61,9 @@ function change(row: AuditRow): string {
 
 function row_line(row: AuditRow): string {
 	const figures = `${figure_format.format_usd(row.current)} (prev ${figure_format.format_usd(row.previous)}, ${change(row)})`
+	const sessions = cost_audit_session_count.row_text(row, row.sessions)
 
-	return `  ${row.key}: ${figures}${row.is_regression ? REGRESSION_MARK : ''}`
+	return `  ${row.key}: ${figures}${sessions}${row.is_regression ? REGRESSION_MARK : ''}`
 }
 
 function sections_of(audit: Audit): Array<AuditSection> {
@@ -74,6 +83,7 @@ function merge_lines(audit: Audit): Array<string> {
 }
 
 const DENSITY_DECIMALS = 2
+const ISO_DATE_LENGTH = 10
 
 function density_text(density: Density): string {
 	const calls = cost_audit_density.calls_per_request(density).toFixed(DENSITY_DECIMALS)
@@ -89,15 +99,23 @@ function density_line(audit: Audit): string {
 	return `  lane-child density: ${density_text(current)} (prev ${density_text(previous)})`
 }
 
-// The period's lane-child calls per request alone — `cost:audit --density`'s output, a number a
+// The period's lane-child calls per request alone — `cost:audit --density`'s last line, a number a
 // measurement Issue declares because it is the output's last line (`measure-declaration.ts`). A period
 // with no lane-child request answers `undefined`, never a zero that would pass a declared bound.
-function density_value(audit: Audit): string | undefined {
-	const { current } = audit.lane_density
+function density_value(density: Density): string | undefined {
+	if (density.requests === 0) return undefined
 
-	if (current.requests === 0) return undefined
+	return cost_audit_density.calls_per_request(density).toFixed(DENSITY_DECIMALS)
+}
 
-	return cost_audit_density.calls_per_request(current).toFixed(DENSITY_DECIMALS)
+function utc_date(at_ms: number): string {
+	return new Date(at_ms).toISOString().slice(0, ISO_DATE_LENGTH)
+}
+
+// The line `--density` prints above its number, naming the value and the UTC dates the window covers,
+// its end excluded (joshuafolkken/kit#8284).
+function density_label(window: AuditWindow): string {
+	return `lane-child calls per request ${utc_date(window.start_ms)}..${utc_date(window.end_ms - 1)}`
 }
 
 function rewrite_figures(count: RewriteCount): string {
@@ -118,7 +136,33 @@ function rewrite_lines(audit: Audit): Array<string> {
 		`Full cache rewrites (cache write over ${floor} tokens, the earlier context not read back)`,
 		rewrite_line('after a wait of 5 min or more', current.after_wait, previous.after_wait),
 		rewrite_line('within 5 min', current.within_ttl, previous.within_ttl),
+		...cost_audit_wait_format.wait_lines(audit.rewrites.waits),
 	]
+}
+
+function tokens_usd(tokens: number, usd: number): string {
+	return `${figure_format.format_tokens(tokens)} tokens (${figure_format.format_usd(usd)})`
+}
+
+const CAUSE_TITLE =
+	'Cache write by cause (this period against the one before: dollars · writes, tokens · 1h tokens, also at the 5m rate)'
+
+function cause_line({ cause, current, previous }: CauseRow): string {
+	const usd = {
+		current: cost_audit_cause.usd_of(current),
+		previous: cost_audit_cause.usd_of(previous),
+	}
+	const dollars = row_line({ key: cause, ...usd, is_regression: false })
+	const tokens = figure_format.format_tokens(current.write.tokens_5m + current.write.tokens_1h)
+	const writes = `${String(current.writes)} writes (prev ${String(previous.writes)}), ${tokens} tokens`
+	const one_hour = `1h ${tokens_usd(current.write.tokens_1h, current.write.usd_1h)}, ${figure_format.format_usd(current.usd_1h_at_5m)} at 5m`
+
+	return `${dollars} · ${writes} · ${one_hour}`
+}
+
+// The cache write split by what caused it (joshuafolkken/kit#7877); the rows add up to the cache write.
+function cause_lines(audit: Audit): Array<string> {
+	return ['', CAUSE_TITLE, ...audit.write_causes.map((row) => cause_line(row))]
 }
 
 function phase_line(row: PhaseRow): string {
@@ -160,10 +204,6 @@ function phase_lines(audit: Audit): Array<string> {
 		...token_table_lines(PHASE_TITLE, audit.phases),
 		...token_table_lines(AGENT_TITLE, audit.agents),
 	]
-}
-
-function tokens_usd(tokens: number, usd: number): string {
-	return `${figure_format.format_tokens(tokens)} tokens (${figure_format.format_usd(usd)})`
 }
 
 function first_text(first: FirstContext, unit: string): string {
@@ -216,6 +256,37 @@ function section_lines(section: AuditSection): Array<string> {
 	return ['', section.title, ...body]
 }
 
+function trigger_per_merge(row: TriggerRow, merges: MergeCounts | undefined): string {
+	if (merges === undefined || merges.current === 0 || merges.previous === 0) return ''
+
+	const current = figure_format.format_usd(row.current.usd / merges.current)
+	const previous = figure_format.format_usd(row.previous.usd / merges.previous)
+
+	return ` · ${current} per merge (prev ${previous})`
+}
+
+function trigger_line(row: TriggerRow, merges: MergeCounts | undefined): string {
+	const usd = { current: row.current.usd, previous: row.previous.usd }
+	const cost = row_line({ key: row.key, ...usd, is_regression: false })
+	const sessions = cost_audit_session_count.counts_text({
+		current: row.current.sessions,
+		previous: row.previous.sessions,
+	})
+
+	return `${cost} · ${sessions}${trigger_per_merge(row, merges)}`
+}
+
+function resume_lines(audit: Audit): Array<string> {
+	const { triggers, review_fix } = audit.resumes
+
+	return [
+		'',
+		RESUME_TITLE,
+		...triggers.map((row) => trigger_line(row, audit.merges)),
+		row_line({ ...review_fix, key: `${RESUME_SHARE_LEAD}${review_fix.key}` }),
+	]
+}
+
 // Every flagged row, named by its section so `doc read` the tool and a guard of the same name differ.
 function regression_names(audit: Audit): Array<string> {
 	const head = [audit.total, audit.per_merge]
@@ -244,6 +315,8 @@ function report_lines(audit: Audit): Array<string> {
 		density_line(audit),
 		...sections_of(audit).flatMap((section) => section_lines(section)),
 		...rewrite_lines(audit),
+		...cause_lines(audit),
+		...resume_lines(audit),
 		...phase_lines(audit),
 		...usage_lines(audit.usage),
 		...cost_audit_result.result_lines(audit.results),
@@ -277,6 +350,7 @@ const cost_audit_format = {
 	FILING_PREFIX,
 	FILING_ROW_SEPARATOR,
 	FILING_SUFFIX,
+	density_label,
 	density_value,
 	filing_lines,
 	report_lines,

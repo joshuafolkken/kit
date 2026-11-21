@@ -37,7 +37,7 @@ describe('backlog_drive_trace.traced', () => {
 		expect(run_event_stream_emit.emit).toHaveBeenCalledWith(LANE_PHASE, `#${ISSUE} collect done`)
 	})
 
-	it('closes a throwing step as failed and rethrows its error', async () => {
+	it('closes a throwing step as failed with its reason and rethrows its error', async () => {
 		const failure = new Error('launch broke')
 
 		await expect(
@@ -45,6 +45,18 @@ describe('backlog_drive_trace.traced', () => {
 				throw failure
 			}),
 		).rejects.toBe(failure)
-		expect(emitted()).toStrictEqual([`#${ISSUE} launch start`, `#${ISSUE} launch failed`])
+		expect(emitted()).toStrictEqual([
+			`#${ISSUE} launch start`,
+			`#${ISSUE} launch failed: launch broke`,
+		])
+	})
+
+	it('keeps the failed line to the first line of a multi-line error (ac-78ae82e4)', async () => {
+		await expect(
+			backlog_drive_trace.traced(ISSUE, backlog_drive_trace.STEP.COLLECT, async () => {
+				throw new Error('gh failed\nstack-ish detail')
+			}),
+		).rejects.toThrow('gh failed')
+		expect(emitted()).toContain(`#${ISSUE} collect failed: gh failed`)
 	})
 })

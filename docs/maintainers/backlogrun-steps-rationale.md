@@ -16,7 +16,7 @@ declaration — so what admits it is a rule a person wrote, applied the same way
 than the run's own discretion. An issue already open is judged by `auto-ok:judge`
 (joshuafolkken/kit#3854), and only once the opted-in pool is exhausted and a lane is free: the command
 re-checks the same excluded labels, and the agent reads the body for a policy decision, an external
-account or a person's visual check — what a filing's `- 人の判断:` line declares. Every answer leaves a
+account or a person's visual check needed before merge — what a filing's `- 人の判断:` line declares. Every answer leaves a
 judgement comment, so a person sees each opt-in and can revert it, and the brake still bounds how much
 one invocation runs. A named issue is approved by the keyword and its number for the same reason
 `queue` was explicit authorization to merge each of its issues (joshuafolkken/kit#1984): typing them is

@@ -5,7 +5,7 @@ import { run_handoff_lanes, type HandoffIo } from './run-handoff-lanes'
 
 const COST = 'cost --cut'
 const CARRY = 'run:carry --cut'
-const BOARD = 'run:board --chat'
+const BOARD = 'run:board --chat --fresh'
 const HANDOFF = 'run:report --handoff'
 const CUT_LINE = 'run:handoff-lanes — cut'
 

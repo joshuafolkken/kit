@@ -31,7 +31,7 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 	'test:reach': {
 		script: 'scripts/test/test-reach-cli.ts',
 		description:
-			"Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone",
+			"Print how many test files a change to each file selects — the count test:related sizes its claim by — one '<count> <file>' line per file, or with --count one file's count alone",
 		category: 'Development',
 		reference: ['<files...> | --count <file>', 'automation', ['none']],
 		usage: {
@@ -53,7 +53,7 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 			"Revert each changed hunk outside tests and fixtures only they reach, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on",
 		category: 'Development',
 		reference: [
-			'[--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned]',
+			'[--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--reasoned]',
 			'developer',
 			['git', 'processes'],
 		],
@@ -73,6 +73,10 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--first-unpinned',
 					note: 'start no probe once one hunk is unpinned; the rest count as unchecked',
+				},
+				{
+					arguments: '--reasoned',
+					note: 'mark the run on its lane ledger row as launched under an --unpinned-ok reason',
 				},
 			],
 		},

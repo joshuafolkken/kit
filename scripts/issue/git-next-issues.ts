@@ -1,10 +1,11 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
+import { defect_rate } from './defect-rate'
 import { expected_effect_lint } from './expected-effect-lint'
 import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
 import { issue_priority } from './issue-priority'
-import { issue_rank, type DependencyRow } from './issue-rank'
+import { issue_rank, type DependencyRow, type RankRow } from './issue-rank'
 import { session_cite } from './session-cite'
 import { size_estimate } from './size-estimate'
 
@@ -21,8 +22,8 @@ const FETCH_LIMIT = 20
 const DISPLAY_LIMIT = 5
 const HEADER = '🗒 Next issues (oldest first on ties):'
 
-// Surfacing an `epic`, an `in-progress` or a `needs-decision` issue as "next" would suggest a run
-// the workflow rules forbid, duplicate, or cannot finish. The set itself is
+// Surfacing an `epic`, an `in-progress`, a `plan:unverified` or a parked issue as "next" would suggest
+// a run the workflow rules forbid, duplicate, or cannot finish. The set itself is
 // shared with the `auto-ok` pickup, which asks the same question of the same listing shape.
 function has_excluded_label(issue: OpenIssueData): boolean {
 	return has_any_label(issue.labels, NOT_DIRECTLY_RUNNABLE_LABELS)
@@ -54,6 +55,21 @@ function dependency_row(issue: OpenIssueData): DependencyRow {
 	}
 }
 
+function rank_row(issue: OpenIssueData, dependents: ReadonlyMap<string, number>): RankRow {
+	const labels = (issue.labels ?? []).map((label) => label.name)
+	const body = issue.body ?? ''
+
+	return {
+		is_defect: defect_rate.is_defect({ body, labels }),
+		is_last: issue_priority.is_last(issue.body),
+		labels,
+		lost_minutes: issue_priority.lost_minutes(issue.body),
+		gain_minutes: expected_effect_lint.weekly_minutes(issue.body),
+		dependents: dependents.get(String(issue.number)) ?? 0,
+		estimated_lines: size_estimate.declared_size(body)?.lines,
+	}
+}
+
 // Every candidate in rank order, uncapped. `backlog:next` takes this rather than `prioritize`, so the
 // `run:solo` gate sees the whole ranking before anything is cut.
 function order(
@@ -65,14 +81,7 @@ function order(
 		.toSorted(compare_oldest_first)
 	const dependents = issue_rank.count_dependents(candidates.map((issue) => dependency_row(issue)))
 
-	return issue_rank.rank(candidates, (issue) => ({
-		is_last: issue_priority.is_last(issue.body),
-		labels: (issue.labels ?? []).map((label) => label.name),
-		lost_minutes: issue_priority.lost_minutes(issue.body),
-		gain_minutes: expected_effect_lint.weekly_minutes(issue.body),
-		dependents: dependents.get(String(issue.number)) ?? 0,
-		estimated_lines: size_estimate.declared_size(issue.body ?? '')?.lines,
-	}))
+	return issue_rank.rank(candidates, (issue) => rank_row(issue, dependents))
 }
 
 // **This display deliberately does not drop a blocked issue, and the `auto-ok` pickup deliberately

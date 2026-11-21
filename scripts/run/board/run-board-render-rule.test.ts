@@ -68,9 +68,10 @@ function rules_of(lines: ReadonlyArray<string>): Array<string> {
 	return lines.filter((line) => RULE_MARKS.some((mark) => line.startsWith(mark)))
 }
 
-// The column the lane row's cut title ends in, its ellipsis included.
+// The column the lane row's cut title ends in, its ellipsis included — found by what a title at its
+// floor keeps before the ellipsis.
 function title_end(lines: ReadonlyArray<string>): number {
-	const lane = lines.find((line) => line.includes(LONG_TITLE.slice(0, TITLE_FLOOR))) ?? ''
+	const lane = lines.find((line) => line.includes(LONG_TITLE.slice(0, TITLE_FLOOR - 1))) ?? ''
 
 	return width_of(lane.slice(0, lane.indexOf('…') + 1))
 }
@@ -92,12 +93,15 @@ describe('run_board_render rules', () => {
 		expect(new Set(rules.map((line) => width_of(line)))).toStrictEqual(new Set([title_end(lines)]))
 	})
 
-	it('ends every rule where a narrow pane cuts the lane title', () => {
+	// joshuafolkken/kit#8247: the rules follow a full title's end, not a lane title its tail cuts.
+	it('runs every rule past where a narrow pane cuts a tailed lane title, within the pane', () => {
 		const lines = frame(new Set(), NARROW)
-		const widths = rules_of(lines).map((line) => width_of(line))
+		const widths = new Set(rules_of(lines).map((line) => width_of(line)))
+		const [width = 0] = widths
 
-		expect(title_end(lines)).toBeLessThan(NARROW)
-		expect(new Set(widths)).toStrictEqual(new Set([title_end(lines)]))
+		expect(widths.size).toBe(1)
+		expect(width).toBeGreaterThan(title_end(lines))
+		expect(width).toBeLessThanOrEqual(NARROW)
 	})
 })
 

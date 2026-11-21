@@ -215,7 +215,7 @@ function print_watcher_section(): number {
 async function resume_stopped(
 	{ issue_number, command }: EntryRequest,
 	token: string,
-	stopped_run: { adopt: (issue: string) => Promise<boolean> },
+	stopped_run: { adopt: (issue: string, command: string) => Promise<boolean> },
 ): Promise<number> {
 	const cost = await check_cost()
 
@@ -225,7 +225,7 @@ async function resume_stopped(
 		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: false })
 	}
 
-	if (!(await stopped_run.adopt(issue_number))) {
+	if (!(await stopped_run.adopt(issue_number, command))) {
 		const parts = { issue_number, hold: run_hold_cli.BUSY_VERDICT, cost, report: HOLD_STOP_NOTE }
 
 		return await stop_run({ parts, command, reason: HOLD_REASON, should_release: false })

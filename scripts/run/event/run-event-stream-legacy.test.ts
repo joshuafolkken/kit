@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { run_board_status } from '#scripts/run/board/run-board-status'
+import { run_board_activity } from '#scripts/run/board/run-board-activity'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { run_event_stream } from './run-event-stream'
@@ -47,10 +47,11 @@ describe('run_event_stream — a line of the retired idle kind', () => {
 	it('leaves the run’s newest activity at its last real event', () => {
 		const events = run_event_stream.read_events(legacy_stream())
 
-		expect(run_board_status.activity_of(events)).toStrictEqual({
+		expect(run_board_activity.activity_of(events)).toStrictEqual({
 			setup: undefined,
 			setup_ms: undefined,
 			last_event_ms: Date.parse(LAUNCHED_AT),
+			outage: undefined,
 			latest: { text: LAUNCH, at_ms: Date.parse(LAUNCHED_AT) },
 			idle_ms: Date.parse(LAUNCHED_AT),
 			is_stopped: false,

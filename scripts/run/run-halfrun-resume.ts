@@ -2,6 +2,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state } from '#scripts/lane/lane-state'
 import {
 	run_hold,
+	type HoldMark,
 	type HoldRead,
 	type RunHold,
 	type StopMarkFields,
@@ -48,6 +49,14 @@ function is_own_record(read: HoldRead, issue: string): boolean {
 	return hold === undefined || hold.issue === issue || hold.issue === run_hold.UNNUMBERED_ISSUE
 }
 
+// When the stopping run began: its own record's claim, or the start a stop already marked kept; none on
+// a free tree.
+function started_of(read: HoldRead): string | undefined {
+	const hold = hold_of(read)
+
+	return hold?.started_at ?? hold?.taken_at
+}
+
 // `mark` is the `halfrun` stop's by default; a `prrun` stop passes its own, so
 // the own-record check is one check whichever run is stopping.
 function mark_stop_at(
@@ -62,15 +71,17 @@ function mark_stop_at(
 	if (!is_own_record(read, issue)) return FOREIGN
 
 	run_hold.release_hold(target)
+	const started = { ...mark, started_at: started_of(read) }
 
-	return run_hold.create_stop_hold(target, issue, mark) ? MARKED : FOREIGN
+	return run_hold.create_stop_hold(target, issue, started) ? MARKED : FOREIGN
 }
 
-// The stopped run's record is replaced by this `fullrun`'s, shared with the `prrun` resume.
-function take_over(target: string, issue: string): boolean {
+// The stopped run's record is replaced by the resuming `fullrun`'s or `prrun`'s (`mark`), shared with
+// the `prrun` resume.
+function take_over(target: string, issue: string, mark: HoldMark): boolean {
 	run_hold.release_hold(target)
 
-	return run_hold.create_hold(target, issue, new Date(), true)
+	return run_hold.create_hold(target, issue, mark)
 }
 
 // **A fix round re-opens the stop** (`run:hold <N> --halfrun-round`, joshuafolkken/kit#7494): the person
@@ -112,10 +123,10 @@ function no_stop_message(issue: string): string {
 }
 
 // `false` leaves the record untouched, so the ordinary claim that follows decides the tree.
-function adopt_at(target: string, issue: string, is_dirty: boolean): boolean {
+function adopt_at(target: string, issue: string, is_dirty: boolean, mark: HoldMark): boolean {
 	if (!is_halfrun_stop(run_hold.read_hold(target), issue, is_dirty)) return false
 
-	return take_over(target, issue)
+	return take_over(target, issue, mark)
 }
 
 // **An unreadable git directory is no resume**, never a crash: `run:entry` must still print its one
@@ -139,12 +150,14 @@ async function is_pending(issue: string): Promise<boolean> {
 	return is_halfrun_stop(run_hold.read_hold(target), issue, await run_hold.is_tree_dirty())
 }
 
-async function adopt(issue: string): Promise<boolean> {
+// `command` is the resuming run — `fullrun` or `prrun` — whose mark the new record carries.
+async function adopt(issue: string, command: string): Promise<boolean> {
 	const target = await hold_target()
 
 	if (target === undefined) return false
 
-	const is_adopted = adopt_at(target, issue, await run_hold.is_tree_dirty())
+	const mark = run_hold.resumed_mark(command)
+	const is_adopted = adopt_at(target, issue, await run_hold.is_tree_dirty(), mark)
 
 	if (is_adopted) await resume_lane(issue, 'run:entry')
 

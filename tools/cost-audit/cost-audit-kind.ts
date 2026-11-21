@@ -18,7 +18,9 @@ import { run_handoff_launch } from '#scripts/run/handoff/run-handoff-launch'
 const RUN_KEYWORDS = ['fullrun', 'halfrun', 'prrun', 'backlogrun', 'kickoff'] as const
 
 const CONVERSATION = 'conversation'
+const RESUME = 'resume'
 const REVIEW = 'review'
+const SUBAGENT = 'subagent'
 const REVIEW_MARKER = '/code-review'
 const RESUME_PREFIX = 'Resuming'
 const WAKE_MARKER = 'Driver handoff'
@@ -33,8 +35,8 @@ const RULES: ReadonlyArray<KindRule> = [
 	{ kind: 'wake', matches: (prompt) => prompt.includes(WAKE_MARKER) },
 	{ kind: 'handoff', matches: (prompt) => prompt.includes(run_handoff_launch.ORIGIN_MARKER) },
 	{ kind: REVIEW, matches: (prompt) => prompt.includes(REVIEW_MARKER) },
-	{ kind: 'subagent', matches: (_prompt, is_delegated) => is_delegated },
-	{ kind: 'resume', matches: (prompt) => prompt.trimStart().startsWith(RESUME_PREFIX) },
+	{ kind: SUBAGENT, matches: (_prompt, is_delegated) => is_delegated },
+	{ kind: RESUME, matches: (prompt) => prompt.trimStart().startsWith(RESUME_PREFIX) },
 ]
 
 function run_keyword(prompt: string): string | undefined {
@@ -49,6 +51,6 @@ function kind_of(prompt: string, is_delegated: boolean): string {
 	return rule?.kind ?? run_keyword(prompt) ?? CONVERSATION
 }
 
-const cost_audit_kind = { CONVERSATION, REVIEW, kind_of }
+const cost_audit_kind = { CONVERSATION, RESUME, REVIEW, SUBAGENT, kind_of }
 
 export { cost_audit_kind }

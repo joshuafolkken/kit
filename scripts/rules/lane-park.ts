@@ -71,6 +71,19 @@ function mentions_confirmation_notify(text: string): boolean {
 	return NOTIFY_INVOCATION.test(text) && CONFIRMATION_TASK_TYPE.test(text)
 }
 
+// The checkout and environment a lane child is read from; each defaults to this process's own.
+interface ChildPlace {
+	directory?: string
+	source?: MarkerSource
+}
+
+function resolved_place({
+	directory = process.cwd(),
+	source = process.env,
+}: ChildPlace): Required<ChildPlace> {
+	return { directory, source }
+}
+
 // **The command test comes first and the world is consulted second**, so the `is_child_of` read — the
 // dispatch mark against this checkout's own issue — runs only on the handful of calls that are a
 // confirmation stop, not on every `Bash` call in the run. `is_child_of` is the same mechanical
@@ -80,10 +93,9 @@ function mentions_confirmation_notify(text: string): boolean {
 // **A child that handed its region to the detached ship is not parking**: its
 // stop waits on nobody, so the park checklist is the wrong advice. `lane_handoff.is_handed_off` is the
 // reading the `Stop` hook stands its notify demand down on, so the two hooks cannot disagree.
-function is_parking_child(
-	directory: string = process.cwd(),
-	source: MarkerSource = process.env,
-): boolean {
+function is_parking_child(place: ChildPlace = {}): boolean {
+	const { directory, source } = resolved_place(place)
+
 	return (
 		lane_child_marker.is_child_of(directory, source) &&
 		!lane_handoff.is_handed_off(directory, source)
@@ -93,11 +105,9 @@ function is_parking_child(
 // A parking child that has not parked yet: `run:park` left no record for its issue in this repository.
 // Kept apart from `is_parking_child`, which `run:entry` reads to leave a lane child's stop to this row
 // whether or not it has parked.
-function is_unparked_child(
-	directory: string = process.cwd(),
-	source: MarkerSource = process.env,
-): boolean {
-	if (!is_parking_child(directory, source)) return false
+function is_unparked_child(place: ChildPlace = {}): boolean {
+	const { directory, source } = resolved_place(place)
+	if (!is_parking_child({ directory, source })) return false
 
 	const issue = lane_child_marker.marked_issue(source)
 
@@ -112,7 +122,9 @@ function is_unparked_stop(command: string, is_child: () => boolean = is_unparked
 
 // The row's trigger: the lane child read from the hook call's own cwd and environment.
 function is_unparked_stop_in(command: string, context: HookContext): boolean {
-	return is_unparked_stop(command, () => is_unparked_child(context.cwd, context.env))
+	return is_unparked_stop(command, () =>
+		is_unparked_child({ directory: context.cwd, source: context.env }),
+	)
 }
 
 // **Keeping this rule is applying `needs-decision`**, the one act the park asks for before the stop.
@@ -142,8 +154,8 @@ function records_the_park(command: string): boolean {
 // single source is `backlogrun-park.md` → "park and continue", and a second copy here would be the
 // clone `CLAUDE.md` prohibits.
 const LANE_PARK_REASON =
-	'⛔ lane child park: this session is a dispatched lane child, so a stop for a person parks first: ' +
-	'`pnpm josh run:park <N> --body-file <path>` (options, tiers, recommendation, stash — it applies ' +
+	'⛔ lane child park: a dispatched lane child parks first when it stops for a person: ' +
+	'`pnpm josh run:park <N> --body-file <path> --outcome "<next action>"` (options, tiers, recommendation, stash — it applies ' +
 	'`needs-decision`); a ' +
 	'`needs-human-review` / `already-done` stop already is. The park is the stop: no notify ' +
 	'after it. Refused once per run ' +

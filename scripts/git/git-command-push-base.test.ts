@@ -159,7 +159,7 @@ describe('git_command.push runs the pre-push hook outside the push budget', () =
 // joshuafolkken/kit#7539: a caller's setting reaches the hook run ahead, never the transfer.
 describe('git_command.push hands the caller environment to the hook', () => {
 	it('relays it to the hook and not to the push', async () => {
-		const environment = { JOSH_PRE_PUSH_RELATED: '1' }
+		const environment = { JOSH_SAMPLE_HOOK_SETTING: '1' }
 
 		await git_command.push(environment)
 

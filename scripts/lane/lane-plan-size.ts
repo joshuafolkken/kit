@@ -10,6 +10,8 @@ import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
+import { lane_plan_moves } from './lane-plan-moves'
+import { lane_plan_new_files, type NewFilesFloor } from './lane-plan-new-files'
 import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget } from './lane-stage-budget'
 
@@ -72,6 +74,7 @@ interface PlanSignals {
 	hunk_files: ReadonlyArray<string>
 	committed_files: ReadonlyArray<string>
 	base_files?: ReadonlySet<string> | undefined
+	moved_source_lines?: ReadonlyMap<string, number> | undefined
 	files_ratio?: number | undefined
 	lines_ratio: number | undefined
 	implement_rate: ImplementRate | undefined
@@ -93,6 +96,8 @@ interface MeasureOver {
 	declared: number
 	limit: number
 	measured: number
+	floor?: NewFilesFloor | undefined
+	moved?: number | undefined
 }
 
 // `limit` is the test-file cap the hubs' reach passes.
@@ -235,12 +240,48 @@ function lines_limit(signals: PlanSignals): number {
 	return bar ?? Math.floor(guide_of(signals).lines / declared_growth.factor(growth, 'lines'))
 }
 
-function lines_over(declared: number, signals: PlanSignals): MeasureOver | undefined {
+// The grown declaration, floored by the plan's new files (`lane-plan-new-files.ts`, joshuafolkken/kit#8120):
+// a floor past the lines the bar allows answers too, though the declaration stays within it. The plan's
+// moves add on top (`lane-plan-moves.ts`, joshuafolkken/kit#8119); with none the judgment is unchanged.
+function lines_over(
+	declared: number,
+	signals: PlanSignals,
+	planned: PlannedChange,
+): MeasureOver | undefined {
 	const limit = lines_limit(signals)
-	if (declared <= limit) return undefined
-	const measured = Math.round(declared * declared_growth.factor(ratios_of(signals), 'lines'))
+	const growth = declared_growth.factor(ratios_of(signals), 'lines')
+	const floor = lane_plan_new_files.floor_lines(planned.new_files)
+	const grown_limit = Math.floor(limit * growth)
+	const { moved } = planned
+	// The grown declaration plus the moves within the grown bar — `declared <= limit` with no move.
+	if ((declared - limit) * growth + moved <= 0 && floor + moved <= grown_limit) return undefined
+	const measured = Math.max(Math.round(declared * growth), floor) + moved
+	const named = lane_plan_new_files.floor_of(planned.new_files, grown_limit)
 
-	return { reason: 'lines', declared, limit, measured }
+	return {
+		reason: 'lines',
+		declared,
+		limit,
+		measured,
+		floor: named,
+		moved: moved === 0 ? undefined : moved,
+	}
+}
+
+// What the plan's own files add to the lines axis: its new files and the lines its moves carry.
+interface PlannedChange {
+	new_files: number
+	moved: number
+}
+
+function planned_change(plan: LanePlan, signals: PlanSignals): PlannedChange {
+	const counted = plan.paths.filter((file) => is_counted(file))
+	const sources = lane_plan_moves.sources_of(counted, signals.base_files)
+
+	return {
+		new_files: lane_plan_new_files.new_files_of(counted, signals.base_files).length,
+		moved: lane_plan_moves.moved_lines(sources, signals.moved_source_lines),
+	}
 }
 
 function unapproved(
@@ -264,7 +305,7 @@ function planned_lines(
 	const approval = plan.size_approval ?? recorded?.size_approval
 	if (approval === undefined && lane_plan.is_sized(recorded)) return undefined
 
-	return unapproved(lines_over(declared, signals), plan, approval)
+	return unapproved(lines_over(declared, signals, planned_change(plan, signals)), plan, approval)
 }
 
 function measure_over(
@@ -288,6 +329,21 @@ function measure_over(
 // plan of an Issue with no single-deliverable decision answers `split`, and only before work starts.
 function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
 	return over !== undefined && (plan.single === true || plan.sized === true)
+}
+
+// The size `over` measured: the plan's files (tests excluded) and the lines axis's projection, else none.
+function measured_of(plan: LanePlan, over: Oversize): { files: number; lines: number } {
+	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
+
+	return { files, lines: over.reason === 'lines' ? over.measured : 0 }
+}
+
+// Whether `over` passes the cap (1.5 × the guide, `split-cap.ts`) — the line a lane splits on before its
+// first edit; past the declaration but within the cap it goes on (joshuafolkken/kit#7729).
+function is_past_cap(plan: LanePlan, over: Oversize): boolean {
+	const { files, lines } = measured_of(plan, over)
+
+	return split_assess.is_over_cap(files, lines, over.guide)
 }
 
 function hub_over(signals: PlanSignals): HubOver | undefined {
@@ -331,6 +387,8 @@ function bar_tail(): string {
 }
 
 const SIZE_PREFIX = issue_body_keys.prefix('size')
+const SINGLE_HINT =
+	'`--single "<why it cannot be merged in parts>"` — the reason goes on the Issue and the ledger'
 
 function files_text(issue: number, over: FilesOver): string {
 	const planned = [...over.kept, ...over.split_off]
@@ -338,7 +396,7 @@ function files_text(issue: number, over: FilesOver): string {
 	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
-	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
+	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
 }
 
 function waiver_text(issue: number, over: Oversize): string {
@@ -350,7 +408,11 @@ function measure_bar(over: MeasureOver): string {
 		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`${SIZE_PREFIX}\` declares`
 	}
 
-	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)} declared lines the size bar allows`
+	const floor =
+		over.floor === undefined ? '' : `, and ${lane_plan_new_files.floor_text(over.floor)}`
+	const moved = over.moved === undefined ? '' : `, and ${lane_plan_moves.moved_text(over.moved)}`
+
+	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration${floor}${moved} — over the ${String(over.limit)} declared lines the size bar allows`
 }
 
 function measure_text(issue: number, over: MeasureOver): string {
@@ -358,7 +420,7 @@ function measure_text(issue: number, over: MeasureOver): string {
 }
 
 function hub_text(issue: number, over: HubOver): string {
-	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
+	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
 }
 
 function over_text(issue: number, over: Oversize): string {
@@ -374,7 +436,15 @@ function refusal_text(issue: number, over: Oversize): string {
 	return `${text} ${split_assess.policy_text(guide)}`
 }
 
-const lane_plan_size = { declares, is_waived, oversize, refusal_text, waiver_text }
+const lane_plan_size = {
+	declares,
+	is_past_cap,
+	is_waived,
+	measured_of,
+	oversize,
+	refusal_text,
+	waiver_text,
+}
 
 export { lane_plan_size }
 export type { Oversize, PlanSignals, SplitReason }

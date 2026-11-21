@@ -6,6 +6,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
+import { lane_tree_edit } from '#scripts/lane/lane-tree-edit'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -59,8 +60,11 @@ const cap_clear = vi.spyOn(issue_file_cap, 'is_cap_clear')
 const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear')
 const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
+// The lane is past its first edit, so the split refusal never depends on this worktree's git state.
+const is_edited = vi.spyOn(lane_tree_edit, 'is_edited')
 
 beforeEach(() => {
+	is_edited.mockResolvedValue(true)
 	vi.unstubAllEnvs()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -88,8 +92,9 @@ describe('issue_file_cli.run — the filing cap', () => {
 		for (const step of [fold_clear, issue_list, scout]) expect(step).not.toHaveBeenCalled()
 	})
 
-	// joshuafolkken/kit#7183: an omitted origin is the dispatched lane's own, so its split is refused.
-	it('refuses a split filed from the dispatched lane without --found-during, before any step', async () => {
+	// joshuafolkken/kit#7183: an omitted origin is the dispatched lane's own, so its split is refused
+	// once the lane has edited (joshuafolkken/kit#7729).
+	it('refuses a split filed from the edited dispatched lane without --found-during, before any step', async () => {
 		vi.stubEnv(lane_child_marker.KEY, String(ORIGIN))
 
 		expect(await issue_file_cli.run(argv_of('--route', 'split'))).toBe(FAILURE_EXIT_CODE)

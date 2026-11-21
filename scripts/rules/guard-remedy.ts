@@ -30,6 +30,10 @@ const STOP_NOTIFY = 'the hook sends the notify itself; it blocks only when the s
 const HOLD_RELEASE = 'the hook releases the hold itself; it blocks only when that release fails'
 const FILING_OFFER = 'the filing needs a title and a body only the model can write'
 const CONCISE_REPLY = 'the shorter reply is prose only the model can write'
+const REPLY_CLOSE =
+	'whether anything is left, and what, is known only to the model that did the work'
+const DEFERRAL_OWNER =
+	'which Issue owns the deferral, or why it is not tracked, is the model’s call'
 const NARROW_ENOUGH = 'which reading is narrow enough to keep is the author’s call'
 const BODY_TO_FILE = 'the body moves to a file the call does not name'
 
@@ -79,6 +83,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'repeat-check-related': judgment(ANOTHER_COMMAND),
 	'early-heartbeat': judgment(ANOTHER_COMMAND),
 	'poll-loop': judgment(ANOTHER_COMMAND),
+	'poll-loop-child': judgment(ANOTHER_COMMAND),
 	'lane-park': judgment(ANOTHER_COMMAND),
 	'lane-split-park': judgment(ANOTHER_COMMAND),
 	'lane-interactive-ask': judgment(ANOTHER_COMMAND),
@@ -108,11 +113,16 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'repo-admin': judgment(NO_RUN),
 	'protected-file': judgment(NO_RUN),
 	egress: judgment(NO_RUN),
+	'memory-durable-write': judgment(
+		'the prompt/doc change that replaces the memory is prose only the model can write',
+	),
 	// The `Stop` rows: the hook judges a finished reply, so it has no call to rewrite.
 	'stop-notify': judgment(STOP_NOTIFY),
 	'filing-offer': judgment(FILING_OFFER),
+	'deferral-owner': judgment(DEFERRAL_OWNER),
 	'hold-release': judgment(HOLD_RELEASE),
 	'concise-reply': judgment(CONCISE_REPLY),
+	'reply-close': judgment(REPLY_CLOSE),
 }
 
 // A row family shares one class: `oracle-consulted:pkg:scout` is an `oracle-consulted` row.

@@ -15,7 +15,7 @@ or a split found mid-run does **not** stop it:
 
 **A split** → file the children with `route:split` (no confirmation) by `split-assessment.md` → "Two
 or more always means an epic", then
-`pnpm josh run:split <N> --children <N1,N2,...> [--ordered] [--title "<title>"]` (`docs/josh-commands-run.md`
+`pnpm josh run:split <N> --children <N1,N2,...> [--chain "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...] [--title "<title>"]` (`docs/josh-commands-run.md`
 → "`josh run:split`"). `epic #<E>` → continue into the loop against `#<E>`; `needs-decision` → report.
 
 **A prerequisite** `<P>` → file it with `route:tier-a` (no confirmation), then
@@ -24,6 +24,8 @@ or more always means an epic", then
 **do not stop**, continue into the loop against `#<E>`; `needs-decision` → report.
 
 Over the size bar before dispatch → a split-only unit, not a lane (`scripts/backlog/backlog-drive-split-unit.ts`).
+`lane:plan` answers `split` before the first edit → **A split** above; never after it, nor for review-finding work
+(`split-assessment.md` → "Over the guide before the gate").
 
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
 - **Every guard applies unchanged** (`backlogrun.md` → "Guards").

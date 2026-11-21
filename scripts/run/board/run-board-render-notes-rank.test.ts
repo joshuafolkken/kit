@@ -6,12 +6,14 @@ import type { BoardRow } from './run-board-layout'
 import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_render_section } from './run-board-render-section'
 
 // joshuafolkken/kit#4097: the findings section says nothing twice, and a full one keeps the lines a
 // person has to act on.
 
 const { minute_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of, note } = run_board_render_fixture
+const { ROW_INDENT } = run_board_render_section
 const KIND = run_event_stream.EVENT_KIND
 const REPO = 'joshuafolkken/kit'
 const GUARD = 'Stop the guard'
@@ -38,7 +40,7 @@ describe('run_board_render.render findings without repeated words', () => {
 	it('draws a note that opens with its own number once', () => {
 		const lines = lines_of(header(), notes_of([event(KIND.NOTE, '#4073 auto-ok applied')]))
 
-		expect(lines).toContain(`    💬 ${minute_of(NOW)} 4073  auto-ok applied`)
+		expect(lines).toContain(`${ROW_INDENT}💬 ${minute_of(NOW)} 4073  auto-ok applied`)
 	})
 
 	// joshuafolkken/kit#4099: the child is a 🙋 decision row while it stays parked, and once it resumes
@@ -55,7 +57,7 @@ describe('run_board_render.render findings without repeated words', () => {
 		const lines = lines_of(header({ repo: REPO }), notes_of([event(KIND.NOTE, text)]))
 
 		expect(lines).toContain(
-			`    💬 ${minute_of(NOW)} 4095  waiting on #4085 and joshuafolkken/app-kit#12`,
+			`${ROW_INDENT}💬 ${minute_of(NOW)} 4095  waiting on #4085 and joshuafolkken/app-kit#12`,
 		)
 	})
 })
@@ -71,19 +73,19 @@ describe('run_board_render.render a full findings section', () => {
 	const lines = lines_of(listing([4100]), [listed, ...seen, park, filed])
 	const drawn = lines
 		.slice(lines.findIndex((line) => line.startsWith(`── ${NOTES_HEADING} `)) + 1)
-		.filter((line) => line.startsWith(' '.repeat(4)))
+		.filter((line) => line.startsWith(ROW_INDENT))
 
 	it('keeps 💤, then a filed Issue with no row, then notes, and draws no line for a filed row', () => {
 		expect(drawn.slice(0, 2)).toStrictEqual([
-			`    💤 ${minute_of(park.at_ms)} 4095  Measure`,
-			`    🆕 ${minute_of(filed.at_ms)} 4096  Fix`,
+			`${ROW_INDENT}💤 ${minute_of(park.at_ms)} 4095  Measure`,
+			`${ROW_INDENT}🆕 ${minute_of(filed.at_ms)} 4096  Fix`,
 		])
-		expect(drawn.slice(2)).toStrictEqual(
+		expect(drawn.slice(2, -1)).toStrictEqual(
 			[0, 1, 2, 3].map(
-				(index) => `    💬 ${minute_of(NOW - index * MINUTE)} 3415  seen ${String(index)}`,
+				(index) => `${ROW_INDENT}💬 ${minute_of(NOW - index * MINUTE)} 3415  seen ${String(index)}`,
 			),
 		)
-		expect(lines).toContain('  more 2')
+		expect(drawn.at(-1)).toBe(`${ROW_INDENT}💬 2 more`)
 	})
 
 	it('names ✚ for the filed row, and in the findings only the kinds drawn', () => {

@@ -38,7 +38,7 @@ interface StopPorts {
 const RECOVERY = 'If this did not arrive, the run:entry output in the session names the stop.'
 const LATER_ALTERNATIVE = 'Leave the Issue for a later session — nothing was changed'
 const NOTIFY_FAILED_NOTE =
-	'(the confirmation Telegram could not be sent — send it with `pnpm josh notify --task-type confirmation --recommended "<choice>"` before stopping)'
+	'(the confirmation Telegram could not be sent — send it with `pnpm josh notify --task-type confirmation --reason run-stopped --recommended "<choice>"` before stopping)'
 const RELEASED_NOTE = '(hold released by run:entry — the tree is free for the resume)'
 const RELEASE_FAILED_NOTE =
 	'(the hold could not be released — run `pnpm josh run:release` before stopping)'
@@ -79,6 +79,8 @@ async function notify_stop(notice: StopNotice, ports: StopPorts): Promise<void> 
 	if (ports.is_parking_child()) return
 
 	const is_sent = await ports.notify({
+		reason: 'run-stopped',
+		issue: notice.issue_number,
 		issue_title: `${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)} stopped`,
 		body: body_of(notice),
 		recovery: RECOVERY,

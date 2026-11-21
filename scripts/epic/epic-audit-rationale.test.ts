@@ -161,4 +161,19 @@ describe('find_unjustified_orders — an epic created with `--ordered`', () => {
 			findings_of({ pairs, decisions: epic_decision.read_recorded_reasons(body) }),
 		).toStrictEqual([])
 	})
+
+	it('reports nothing when the order carries its own reason instead of the pointer', () => {
+		const reason = '#102 reads the table #101 writes'
+		const body = epic_body.build_epic_body({
+			children: [101, 102],
+			rationale: '',
+			is_ordered: true,
+			order_reasons: [{ chain: [101, 102], reason }],
+		})
+		const pairs = pairs_of(epic_parse.parse_dependency_links(body), [child(101), child(102)])
+		const decisions = epic_decision.read_recorded_reasons(body)
+
+		expect(decisions).toContain(reason)
+		expect(findings_of({ pairs, decisions })).toStrictEqual([])
+	})
 })

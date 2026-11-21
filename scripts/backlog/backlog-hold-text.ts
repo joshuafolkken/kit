@@ -1,3 +1,4 @@
+import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { backlog_hold_codes } from './backlog-hold-codes'
 import { backlog_wait_cause, type WaitCause } from './backlog-wait-cause'
 
@@ -35,6 +36,7 @@ const PERSON_HAND_BACKS: ReadonlySet<string> = new Set(['judge', 'triage'])
 // `offer:<verdict>:<detail>`: the offer started nothing, for its cause or its answer.
 const OFFER_TEXT: ReadonlyMap<string, string> = new Map([
 	['solo', 'a run:solo issue must finish first'],
+	['decision', 'an interrupt defect awaits your decision'],
 	['blocked', 'every queued issue is blocked'],
 	['exhausted', 'the backlog has nothing left to start'],
 	['untriaged', AWAIT_TRIAGE],
@@ -53,6 +55,11 @@ const CAUSE_JOINER = ' or '
 
 const MEMORY_TEXT = 'memory pressure is high; lanes resume when it eases'
 const USAGE_LIMIT_TEXT = 'the usage limit is reached; lanes resume when it resets'
+// A `usage-limit` hold an authentication failure caused (joshuafolkken/kit#8014): the recheck may clear
+// it, and only a person's re-login ends one that keeps failing — the remedies Claude's own error names.
+// The remedy leads, so a seat line cut to an 80-column pane still shows it.
+const AUTH_FAILURE_TEXT =
+	'auth failed; run `claude auth login` (or set CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`) if the recheck does not clear it'
 const DRIVERLESS_TEXT = 'no driver is running'
 
 // What follows `<prefix>:` in the code, or `undefined` when the code does not start with it.
@@ -92,19 +99,21 @@ function prefixed_text(code: string): string | undefined {
 	return offer === undefined ? undefined : offer_text(offer)
 }
 
-function whole_text(code: string): string | undefined {
+function whole_text(code: string, cause: HoldCause | undefined): string | undefined {
 	if (code === MEMORY_REASON) return MEMORY_TEXT
+	if (code !== USAGE_LIMIT_REASON) return undefined
 
-	return code === USAGE_LIMIT_REASON ? USAGE_LIMIT_TEXT : undefined
+	return cause === 'auth' ? AUTH_FAILURE_TEXT : USAGE_LIMIT_TEXT
 }
 
 // The sentence for a hold code; a `driverless:` code is the mark's own sentence after a missing driver.
-function text_of(code: string): string {
+// `cause` is what the usage-limit hold stops for (`run-merge-usage-limit.ts`); unread, it reads as a limit.
+function text_of(code: string, cause?: HoldCause): string {
 	if (code.startsWith(DRIVERLESS_PREFIX)) {
-		return `${DRIVERLESS_TEXT}; ${text_of(code.slice(DRIVERLESS_PREFIX.length))}`
+		return `${DRIVERLESS_TEXT}; ${text_of(code.slice(DRIVERLESS_PREFIX.length), cause)}`
 	}
 
-	return prefixed_text(code) ?? whole_text(code) ?? code
+	return prefixed_text(code) ?? whole_text(code, cause) ?? code
 }
 
 // Whether the hold is the driver's hand-back a session restart ends, a driverless mark's included —

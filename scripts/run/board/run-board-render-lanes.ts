@@ -1,11 +1,13 @@
 import { run_board_earlier } from './run-board-earlier'
 import { run_board_fit, type PlanLine, type PlanSection, type RowYield } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
+import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_section, type RuleColumn } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
 import { run_board_seat } from './run-board-seat'
 import type { LaneUsages, UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
@@ -19,15 +21,16 @@ import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 
 const { HEADER_ICONS } = run_board_labels
 const { cell_widths, cells_of, lane_limits } = run_board_usage_text
-const { columns_rule } = run_board_render_section
+const { ROW_INDENT, columns_rule } = run_board_render_section
 const { ELAPSED_START, LANES_LABEL, USAGE_START, column_offset, lane_label, root_label } =
 	run_board_render_lead
 const { width_of } = run_board_fit
 const { columns_cut } = run_board_render_title
 const { reasons_of } = run_board_seat
-// A seat line's lead up to its icon: a lane row's indent, progress column and the blank after it.
-const SEAT_LEAD_WIDTH = 5
-const SEAT_LEAD = ' '.repeat(SEAT_LEAD_WIDTH)
+const { keyed } = run_board_row_key
+// A seat line's lead up to its icon: as wide as a lane row's indent, progress column and the blank
+// after it, the column every section's row starts at.
+const SEAT_LEAD = ROW_INDENT
 const SEAT_ICON = '💺'
 // A seat line ends the lanes section as a lane row does, so the section keeps it, and gives way
 // before every running row in a short pane (`run-board-fit.ts`).
@@ -38,7 +41,11 @@ const CELL_GAP = ' '
 const LABEL_TAIL = 2
 // Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a
 // terminal draws them: 🛤 and 🗜, text symbols drawn as emoji, overlapped the blank after them.
-const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, '🤏 CMPRS']
+const COLUMN_LABELS = [
+	run_board_label_pair.pair(HEADER_ICONS.cpu, 'CPU'),
+	run_board_label_pair.pair(HEADER_ICONS.memory, 'MEM'),
+	run_board_label_pair.pair('🤏', 'CMPRS'),
+]
 
 // What one frame's lane cells are drawn with.
 interface LaneCells {
@@ -129,23 +136,23 @@ function label_columns(first: number, gauge: number): Array<RuleColumn> {
 
 // A seat's reason, ending on an ellipsis at the pane's edge where it is wider, so the line keeps one
 // line as a lane row's head does.
-function seat_text(lead: string, reason: string, columns: number | undefined): string {
-	const line = `${lead}${reason}`
+function seat_reason(lead: string, reason: string, columns: number | undefined): string {
+	if (columns === undefined || width_of(`${lead}${reason}`) <= columns) return reason
 
-	if (columns === undefined || width_of(line) <= columns) return line
-
-	return `${lead}${columns_cut(reason, Math.max(1, columns - width_of(lead)))}`
+	return columns_cut(reason, Math.max(1, columns - width_of(lead)))
 }
 
 // Each empty seat's reason (`run-board-seat.ts`), its icon in the column a lane row's phase icon
-// stands in; a single run launches no lane, so it draws none.
+// stands in; a single run launches no lane, so it draws none. A themed frame keys the reason after the
+// lead by its uncut words (joshuafolkken/kit#8116), so a seat's line types when its reason is new.
 function seat_lines(header: BoardHeader, columns: number | undefined): Array<PlanLine> {
 	if (header.run_name !== undefined) return []
 
-	const lead = `${' '.repeat(column_offset(header))}${SEAT_LEAD}${SEAT_ICON} `
+	const lead = `${SEAT_LEAD}${SEAT_ICON} `
+	const section = header.is_keyed === true ? 'seat' : undefined
 
 	return reasons_of(header).map((reason) => ({
-		text: seat_text(lead, reason, columns),
+		text: `${lead}${keyed(section, reason, seat_reason(lead, reason, columns))}`,
 		row: SEAT_YIELD,
 		is_seat: true,
 	}))

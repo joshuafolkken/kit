@@ -1,6 +1,6 @@
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
-import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
+import { epic_bundle_cli, type BundleMode } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
@@ -24,7 +24,7 @@ import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_file_pass, type Filing } from './issue-file-pass'
 import { issue_file_worker } from './issue-file-worker'
-import { has_label_name, has_parked_label, RUN_SOLO_LABEL } from './issue-labels'
+import { has_label_name, has_parked_label, RUN_SOLO_LABEL, SPLIT_ROUTE_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
 import { issue_publication_state } from './issue-publication-state'
 import { issue_release_cli } from './issue-release-cli'
@@ -83,7 +83,7 @@ async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<st
 		...issue_publication_state.creation(
 			filing.body,
 			labels,
-			filing.args.is_prepared === true || has_label_name(labels, 'route:split'),
+			filing.args.is_prepared === true || has_label_name(labels, SPLIT_ROUTE_LABEL),
 		),
 		repo: filing.target,
 	})
@@ -119,19 +119,33 @@ async function link_release(url: string, filing: Filing): Promise<void> {
 	)
 }
 
+// A failed applied placement exits 1 whether or not `apply_decision` was reached (an unreadable backlog,
+// an unread subject, a failed write), so its line itself says the Issue exists.
+function unplaced_message(url: string, mode: BundleMode): string {
+	if (mode !== 'place') {
+		return `⚠ epic:bundle did not place ${url} — run \`pnpm josh epic:bundle <N>\`.`
+	}
+
+	return `✖ ${url} is filed but in no epic — do not file it again: run \`pnpm josh epic:bundle <N> --apply\`.`
+}
+
 // The Issue exists once `create` returns, so a failed placement is reported rather than failed: a
-// non-zero exit would read as "not filed" and invite the second filing the scout exists to stop.
+// non-zero exit would read as "not filed" and invite the second filing the scout exists to stop —
+// except an unpublished split child filed directly (`is_placing_split`), which publishing reaches only
+// through an epic: its placement is applied, and one that places nothing fails the filing with the next
+// steps (`epic-bundle-apply.ts`).
 // The open listing trails the create call; `report_for` reads the new issue on its own when the
 // listing does not show it yet.
-async function place(url: string, target: string): Promise<void> {
+async function place(url: string, target: string, mode: BundleMode): Promise<boolean> {
 	const issue_number = issue_number_of(url)
 	const exit_code = Number.isSafeInteger(issue_number)
-		? await epic_bundle_cli.report_for(issue_number, target)
+		? await epic_bundle_cli.report_for(issue_number, target, mode)
 		: FAILURE_EXIT_CODE
 
-	if (exit_code !== SUCCESS_EXIT_CODE) {
-		console.error(`⚠ epic:bundle did not answer for ${url} — run \`pnpm josh epic:bundle <N>\`.`)
-	}
+	if (exit_code === SUCCESS_EXIT_CODE) return true
+	console.error(unplaced_message(url, mode))
+
+	return mode !== 'place'
 }
 
 // Every filing lands on the run's event stream: this is the one filing path, so
@@ -183,6 +197,26 @@ async function record_parks(url: string, filing: Filing): Promise<void> {
 	}
 }
 
+// The filed Issue's repository where it is not this one — the blocker an interrupt filed upstream.
+function blocker_repo_of(filing: Filing): string | undefined {
+	return issue_file.is_same_repository(filing.target, filing.current) ? undefined : filing.target
+}
+
+async function block_finder(
+	url: string,
+	filing: Filing,
+	found_during: string | undefined,
+): Promise<void> {
+	await issue_file_interrupt.block_finder({
+		route: filing.args.route,
+		is_blocking_finder: filing.args.is_blocking_finder,
+		found_during,
+		blocker: issue_number_of(url),
+		blocker_repo: blocker_repo_of(filing),
+		finder_repo: filing.current,
+	})
+}
+
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain_for(
@@ -200,13 +234,7 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 		current: filing.current,
 	})
 	await split_resolution.record_child({ route: filing.args.route, found_during, child: url })
-	await issue_file_interrupt.block_finder({
-		route: filing.args.route,
-		is_blocking_finder: filing.args.is_blocking_finder,
-		found_during,
-		blocker: issue_number_of(url),
-		is_here: issue_file.is_same_repository(filing.target, filing.current),
-	})
+	await block_finder(url, filing, found_during)
 	await record_parks(url, filing)
 }
 
@@ -237,9 +265,10 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<stri
 	await record_solo(url, filing, labels)
 	await record(url, filing, labels)
 	await link_release(url, filing)
-	await place(url, filing.target)
+	const is_placing = filing.is_placing_split === true && has_label_name(labels, SPLIT_ROUTE_LABEL)
+	const mode = is_placing ? 'place' : 'report'
 
-	return url
+	return (await place(url, filing.target, mode)) ? url : undefined
 }
 
 // The holds that end the filing before the one pass, read first: the filing cap reads the local event
@@ -248,7 +277,7 @@ async function is_run_clear(filing: Filing): Promise<boolean> {
 	const prefix = issue_file_fold.reference_prefix(filing.target, filing.current)
 
 	return (
-		split_resolution.is_split_clear(filing.args) &&
+		(await split_resolution.is_split_clear(filing.args)) &&
 		(await issue_file_cap.is_cap_clear(filing.args.found_during)) &&
 		(await issue_file_fold.is_fold_clear(prefix, filing.args)) &&
 		(await split_direction.is_direction_clear(filing.args, filing.body))
@@ -355,7 +384,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await issue_file_pass.with_repository_restored(async () => {
 		if (filing.args.is_check) return await check(filing)
 
-		return (await file(filing)) === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+		const url = await file({ ...filing, is_placing_split: true })
+
+		return url === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 	})
 }
 

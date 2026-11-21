@@ -1,5 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
+import { backlog_triage_adopted } from '#scripts/backlog/backlog-triage-adopted'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
+import type { IssueComment } from '#scripts/issue/issue-read'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
@@ -10,12 +12,14 @@ import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 
-const { NOW, STARTED, header } = run_board_render_fixture
+const { NOW, STARTED, header, unfinished } = run_board_render_fixture
 const ISSUE = 7387
 const URL = 'https://github.com/joshuafolkken/kit/issues/7387#issuecomment-6818874860'
 const SUMMARY = 'Approval needed: defer impact study'
 const DECISION = 'needs-decision'
 const WIDTH = 120
+// A pane too narrow for the parked row's whole line.
+const NARROW = 65
 const PLAN: BoardPlan = {
 	pause_reasons: new Map([[ISSUE, { summary: SUMMARY, url: URL, at_ms: NOW }]]),
 	waves: { waves: [], unreached: [] },
@@ -55,17 +59,30 @@ function line_of(status: ItemStatus, columns = WIDTH, is_linked = true): string 
 }
 
 describe('run_board_render pause reasons', () => {
-	it.each([WIDTH, 65])('fits then links the visible pause reason at %s columns', (columns) => {
+	it('fits then links the visible pause reason on a wide pane', () => {
 		const status: ItemStatus = { state: 'parked', started_ms: STARTED }
-		const linked = line_of(status, columns)
-		const plain = line_of(status, columns, false)
+		const linked = line_of(status)
+		const plain = line_of(status, WIDTH, false)
 		const visible = stripVTControlCharacters(linked)
-		const tail = visible.split('  ').at(-1)?.trim() ?? ''
+		// The reason before the `🎯 —` a parked row ends on (joshuafolkken/kit#7920).
+		const tail = unfinished(visible).split('  ').at(-1)?.trim() ?? ''
 
 		expect(linked).toContain(osc8(tail, URL))
 		expect(visible).toBe(stripVTControlCharacters(plain))
-		expect(run_board_fit.width_of(visible)).toBeLessThanOrEqual(columns)
+		expect(run_board_fit.width_of(visible)).toBeLessThanOrEqual(WIDTH)
 		expect(plain).not.toContain(URL)
+		expect(visible.split('\n')).toHaveLength(1)
+	})
+
+	// joshuafolkken/kit#7849: a parked row cuts its title to the floor and keeps its whole reason.
+	it('keeps and links the whole pause reason on a narrow pane, cutting the title', () => {
+		const status: ItemStatus = { state: 'parked', started_ms: STARTED }
+		const linked = line_of(status, NARROW)
+		const visible = stripVTControlCharacters(linked)
+
+		expect(linked).toContain(osc8(SUMMARY, URL))
+		expect(visible).toBe(stripVTControlCharacters(line_of(status, NARROW, false)))
+		expect(visible).toContain('Overlap…')
 		expect(visible.split('\n')).toHaveLength(1)
 	})
 
@@ -80,6 +97,57 @@ describe('run_board_render pause reasons', () => {
 
 		expect(line_of(next)).not.toContain(URL)
 		expect(line_of(next)).toContain('Reason unavailable: inspect issue')
+	})
+})
+
+const ADOPT_URL = 'https://github.com/joshuafolkken/kit/issues/7780#issuecomment-2'
+const LAUNCHED = Date.parse('2026-11-17T13:58:06Z')
+
+const ADOPTED = backlog_triage_adopted.text_of({ issue: '7780', option: 2, reason: 'k', done: '' })
+const STOP = {
+	author: 'owner',
+	body: run_board_pause_fixture.parked.body,
+	html_url: run_board_pause_fixture.parked.url,
+	created_at: '2026-11-17T13:55:07Z',
+	is_trusted: true,
+}
+
+function adopt_of(body: string, created_at = '2026-11-17T13:56:58Z'): IssueComment {
+	return { author: 'owner', body, html_url: ADOPT_URL, created_at, is_trusted: true }
+}
+
+function relaunch_line(comments: ReadonlyArray<IssueComment>, launched_ms = LAUNCHED): string {
+	const record = run_board_pause.from_comments(comments)
+	const plan = { ...PLAN, pause_reasons: new Map([[ISSUE, record]]) }
+
+	return render_of(plan, { state: 'parked', launched_ms }, WIDTH, true)
+}
+
+describe('run_board_render relaunch after an adopt', () => {
+	// joshuafolkken/kit#7780's order: the stop, then the adopt, then the relaunch.
+	it('shows the adopted option relaunching, linked to the adopt comment', () => {
+		const line = relaunch_line([STOP, adopt_of(ADOPTED)])
+
+		expect(line).toContain(osc8('adopted option 2 · relaunching', ADOPT_URL))
+		expect(line).not.toContain(run_board_pause.FALLBACK)
+	})
+
+	it('keeps the fallback when no option was adopted after the stop', () => {
+		expect(relaunch_line([STOP, adopt_of('a later note')])).toContain(run_board_pause.FALLBACK)
+	})
+
+	it('keeps the fallback for an adopt before the latest stop', () => {
+		const line = relaunch_line([adopt_of(ADOPTED, '2026-11-17T13:50:00Z'), STOP])
+
+		expect(line).toContain(run_board_pause.FALLBACK)
+	})
+
+	it('keeps the fallback for an adopt after the launch', () => {
+		const launched_ms = Date.parse('2026-11-17T13:56:00Z')
+
+		expect(relaunch_line([STOP, adopt_of(ADOPTED)], launched_ms)).toContain(
+			run_board_pause.FALLBACK,
+		)
 	})
 })
 

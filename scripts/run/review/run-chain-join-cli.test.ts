@@ -1,8 +1,11 @@
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_record_slot } from '#scripts/review/review-record-slot'
+import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detach-pinned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 import { run_chain_review_fix } from './run-chain-review-fix'
+import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -17,7 +20,9 @@ const RUN_REVIEW = 'run:review'
 const ATTEST = 'review:attest'
 const RECORD = 'review:record'
 const RECORD_ARGV = [RECORD, '--from-slot', '--issue', ISSUE]
-const JOIN_LINE = [[RUN_REVIEW, JOIN], [ATTEST, '--check'], RECORD_ARGV]
+// The chain's join is chunked: it returns `pending` before the prompt cache expires (#8309).
+const CHUNK = '--chunk'
+const JOIN_LINE = [[RUN_REVIEW, JOIN, CHUNK], [ATTEST, '--check'], RECORD_ARGV]
 const STOP_EXIT = 2
 const LOW_FINDING = 'bug-risks:low:scripts/a.ts — a nit'
 const MEDIUM_FINDING = 'fixed bug-risks:medium:scripts/b.ts — fixed in place'
@@ -52,6 +57,9 @@ beforeEach(() => {
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	slot_holds('')
+	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
+	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
+	vi.spyOn(run_ship_pre_detach_pinned, 'pinned_check').mockResolvedValue({ code: 0, out: '' })
 	error_lines.length = 0
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
 	vi.spyOn(console, 'error').mockImplementation((line: string) => {
@@ -73,7 +81,7 @@ describe('run_chain_cli.run --join — a clean round', () => {
 	it('forwards --fixing to the join', async () => {
 		await run_chain_cli.run([ISSUE, JOIN, '--fixing'])
 
-		expect(ran()[0]).toStrictEqual([RUN_REVIEW, JOIN, '--fixing'])
+		expect(ran()[0]).toStrictEqual([RUN_REVIEW, JOIN, '--fixing', CHUNK])
 	})
 
 	it('leaves an unreadable slot to review:record, whose refusal names it', async () => {
@@ -144,7 +152,28 @@ describe('run_chain_cli.run --join — findings held for the record', () => {
 		expect(errors()).toContain('2 finding(s)')
 		expect(errors()).toContain(SHIP_REVIEW)
 	})
+})
 
+describe('run_chain_cli.run --join — the recheck the held round asks for', () => {
+	it('asks for the recheck of the fixed tree, which ships, naming no second ship', async () => {
+		slot_holds(MEDIUM_FINDING)
+
+		await run_chain_cli.run(SHIPPING)
+
+		expect(errors()).toContain(`--join --ship '${TITLE}' --from recheck\`, which ships`)
+		expect(errors()).not.toContain(SHIP_REVIEW)
+	})
+
+	it('names the ship after the recheck when the chain was not given one', async () => {
+		slot_holds(MEDIUM_FINDING)
+
+		await run_chain_cli.run([ISSUE, JOIN])
+
+		expect(errors()).toContain(`--join --from recheck\`, ${SHIP_REVIEW}`)
+	})
+})
+
+describe('run_chain_cli.run --join — the held round routed for its fix', () => {
 	it('routes the held round through the review-fix next action (ac-c38296ce)', async () => {
 		const route = vi.spyOn(run_chain_review_fix, 'route').mockReturnValue(() => 'cut now')
 

@@ -27,10 +27,10 @@ limit. A backgrounded `Agent` → the same; in a lane child → the `lane-backgr
 
 **Never hand-write a `while`/`until` … `sleep` loop over the output file, or a counted `for` that sleeps** — a regex that never matches
 waits to the block limit, one that matches a mid-run line exits early. the `poll-loop` row of `pnpm josh rule:list` refuses it
-(`prompts/collaboration-workflow/rule-delivery.md`).
+(`prompts/collaboration-workflow/rule-delivery.md`); in a started child, the `poll-loop-child` row.
 
 Nor a `sleep` chain followed by a read before the completion notification (`sleep 20; tail …/x.output`,
-`sleep 20; ps -p <pid>`) — the same poll unrolled; the same row refuses it.
+`sleep 20; ps -p <pid>`) — the same poll unrolled; the same row refuses it. Started child → `pnpm josh wait`: the `poll-loop-child` row.
 
 **To glance at interim output, `Read` the output file once**, never in a sleep loop. CI is waited on by
 `pnpm josh followup`; a progress heartbeat is `run:progress --wait`'s job (`early-heartbeat` refuses a
@@ -72,11 +72,11 @@ push reissued detached is not refused again.
 **One turn does end before the push: a dispatched lane child's pre-gate cut** — `pre-gate-cut.md` →
 "Taking the cut".
 
-**A headless lane child (`claude -p`) is where "a background command re-invokes the run" does not
-hold: its background Bash tasks are killed when its turn ends.** It hands the gate-to-merge region to a
-foreground `pnpm josh ship --detach` (`chain-rule.md` step 0); the `lane-background` row of `pnpm josh rule:list` refuses a
-backgrounded `josh gate` / `git` / `followup` / `ship` there, and the `Stop` hook sends a child with a
-task still running back to wait.
+**A started child (`claude -p` — a lane, `run:handoff` or beside child) is where "a background command
+re-invokes the run" does not hold: nothing re-invokes it after its turn.** How it waits → the
+`poll-loop-child` row of `pnpm josh rule:list`; the `Stop` hook sends it back to wait while a task runs.
+A lane child hands the gate-to-merge region to a foreground `pnpm josh ship --detach` (`chain-rule.md`
+step 0); the `lane-background` row refuses a backgrounded `josh gate` / `git` / `followup` / `ship` there.
 
 The operational section above is the single source of the rule. `followup.md`, `chain-rule.md` and
 `progress-watcher.md` → "Progress while the run is quiet" route here for it rather than restating it.

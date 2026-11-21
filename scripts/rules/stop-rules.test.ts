@@ -8,6 +8,43 @@ const { DECISION, DECISION_MESSAGE, action_kinds, context } = stop_rules_fixture
 const NO_REPRINT = 'do not repeat your previous reply'
 const BARE_MESSAGE = 'done in #7'
 
+// joshuafolkken/kit#7858: a `run:handoff` child is no lane child, yet nothing re-invokes it after its
+// turn, so a stop with a task still running ends its run unfinished.
+describe('stop_rules.stop_outcome — started child background wait', () => {
+	const RUNNING = { background_pending: true, command_pending: true }
+
+	it('refuses a hand-off child stopping with a background task running', () => {
+		expect(
+			stop_rules.stop_outcome(context({ ...RUNNING, started_child: true })).reason,
+		).toBeDefined()
+	})
+
+	it('addresses a hand-off child, keeping the ship re-issue to the lane child', () => {
+		const { reason } = stop_rules.stop_outcome(context({ ...RUNNING, started_child: true }))
+
+		expect(reason).toContain('started child (lane, hand-off or beside)')
+		expect(reason).toContain('(lane child) re-issue the work')
+	})
+
+	it('addresses a hand-off child waiting on a subagent alone', () => {
+		const only_agent = context({ ...RUNNING, command_pending: false, started_child: true })
+
+		expect(stop_rules.stop_outcome(only_agent).reason).toContain('started child (lane, hand-off')
+	})
+
+	it('still refuses a lane child stopping with a background task running', () => {
+		expect(stop_rules.stop_outcome(context({ ...RUNNING, lane_child: true })).reason).toBeDefined()
+	})
+
+	it('lets an interactive session stop with a background task running', () => {
+		expect(stop_rules.stop_outcome(context(RUNNING)).reason).toBeUndefined()
+	})
+
+	it('lets a hand-off child stop once nothing runs', () => {
+		expect(stop_rules.stop_outcome(context({ started_child: true })).reason).toBeUndefined()
+	})
+})
+
 describe('stop_rules.stop_outcome — stop notification', () => {
 	// joshuafolkken/kit#3919: the hook sends it itself rather than refusing the stop.
 	it('sends the notify for a held tree that stopped without notifying', () => {
@@ -69,6 +106,28 @@ describe('stop_rules.stop_outcome — lane child stop', () => {
 		const held = { lane_child: true, hold_issue: '7', tree_clean: true, message: DECISION_MESSAGE }
 
 		expect(action_kinds(held)).toEqual(['release'])
+	})
+
+	// joshuafolkken/kit#7749: the queued notice resumes the lane a moment after this stop.
+	it('keeps the hold while a completion notice is queued but undelivered', () => {
+		const held = { lane_child: true, hold_issue: '7', tree_clean: true, notice_queued: true }
+
+		expect(action_kinds(held)).toEqual([])
+	})
+})
+
+describe('stop_rules.stop_outcome — a queued notice outside a lane', () => {
+	it('neither notifies nor releases a held clean tree', () => {
+		const outcome = stop_rules.stop_outcome(
+			context({
+				hold_issue: '7',
+				tree_clean: true,
+				notice_queued: true,
+				message: DECISION_MESSAGE,
+			}),
+		)
+
+		expect(outcome.actions).toEqual([])
 	})
 })
 

@@ -7,6 +7,7 @@ import {
 	type SectionKey,
 	type TerminalSize,
 } from './run-board-fit'
+import { run_board_lamps, type PanelSpan } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
 
 // A live `run:board`'s sections folded and unfolded by one key each (joshuafolkken/kit#4172): every
@@ -15,7 +16,7 @@ import { run_board_render_section } from './run-board-render-section'
 // A folded section is its heading alone, led by ▸ and saying what it holds, and the rows it gave up go
 // to the other sections before `run-board-fit.ts` cuts anything; an unfolded one's heading is led by ▾.
 
-const { folded_head, open_head, row_count, widened } = run_board_render_section
+const { folded_head, lone_head, open_head, row_count, widened } = run_board_render_section
 const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
 	['t', 'throughput'],
 	['u', 'usage'],
@@ -27,8 +28,10 @@ const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
 	['d', 'done'],
 ])
 const ALL_KEY = 'a'
+// Flips the board's sound on and off (`run-board-keys.ts`); named here so the key line lists it.
+const SOUND_KEY = 's'
 const SECTIONS: ReadonlyArray<SectionKey> = [...SECTION_KEYS.values()]
-const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: all · Ctrl-C: quit`
+const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: all · ${SOUND_KEY}: sound · Ctrl-C: quit`
 
 // The live terminal a frame is kept within, the footer the frame ends on and gives way first, and the
 // sections a person folded; none for a frame that is not redrawn in place, which is drawn as it was.
@@ -70,7 +73,8 @@ function headed<Part extends Headed>(part: Part, label: string, summary: string 
 function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): PlanSection {
 	const { key, label } = section
 
-	if (key === undefined || label === undefined) return section
+	if (label === undefined) return section
+	if (key === undefined) return { ...section, head: lone_head(section.head, label) }
 	if (!folded.has(key)) return headed(section, label, undefined)
 
 	const count = row_count(section.lines)
@@ -141,15 +145,67 @@ function widened_parts(parts: FrameParts): FrameParts {
 	}
 }
 
+// No panel: every panel started is dropped.
+const NO_PANEL: PanelSpan = { start: 0, end: 0 }
+
+// Every panel starts where the throughput rows' does and runs on to the end of the throughput rule, its
+// head's widest line (joshuafolkken/kit#8236, joshuafolkken/kit#8277); none where no throughput row starts
+// one — a folded or missing section.
+function panel_span(throughput: DetailPart | undefined): PanelSpan {
+	if (throughput === undefined) return NO_PANEL
+	const end = Math.max(...throughput.head.map((line) => run_board_fit.width_of(line)))
+	const starts = throughput.lines.map((line) => run_board_lamps.start_column(line.text))
+	const start = starts.find((column) => column !== undefined)
+
+	return start === undefined ? NO_PANEL : { start, end }
+}
+
+// The usage rows run their panels both or neither: none where one's text reaches the panel's start.
+function rows_span(usage: DetailPart, span: PanelSpan): PanelSpan {
+	const starts = usage.lines.map((line) => run_board_lamps.start_column(line.text))
+	const is_clear = starts.every((column) => column === undefined || column < span.start)
+
+	return is_clear ? span : NO_PANEL
+}
+
+function lamped(
+	part: DetailPart | undefined,
+	span: PanelSpan,
+	rows = span,
+): DetailPart | undefined {
+	if (part === undefined) return undefined
+	const head = part.head.map((line) => run_board_lamps.expanded(line, span))
+	const lines = part.lines.map((line) => ({
+		...line,
+		text: run_board_lamps.expanded(line.text, rows),
+	}))
+
+	return { ...part, head, lines }
+}
+
+function lamped_parts(parts: FrameParts): FrameParts {
+	const { throughput, usage } = parts
+	const span = panel_span(throughput)
+	const rows = usage === undefined ? span : rows_span(usage, span)
+
+	return {
+		...parts,
+		throughput: lamped(throughput, span),
+		usage: lamped(usage, span, rows),
+		usage_alone: lamped(usage, NO_PANEL),
+	}
+}
+
 // A live frame is kept within its terminal, folded as a person folded it; any other is drawn whole.
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size, folded } = bounds
-	const shown = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
+	const ruled = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
+	const shown = lamped_parts(ruled)
 
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }
 
-const run_board_fold = { KEYS_LINE, SECTIONS, bounded, fold_parts, toggled }
+const run_board_fold = { KEYS_LINE, SECTIONS, SOUND_KEY, bounded, fold_parts, toggled }
 
 export { run_board_fold }
 export type { FrameBounds }

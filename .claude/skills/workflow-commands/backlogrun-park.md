@@ -29,8 +29,10 @@ When a child hits something only a person can decide (→ "Only a person's judge
 child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file .josh/tmp/park.md   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases
+pnpm josh run:park <N> --body-file .josh/tmp/park.md --outcome "<next action>"   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases
 ```
+
+`--outcome` — the recommended option's next action, a filled-in `pnpm josh` command before `parent:` / `person:` prose: `issue_outcome.NEXT_FORMAT` (`scripts/issue/issue-outcome.ts`), `docs/josh-commands-board.md`.
 
 Return to step 1.
 
@@ -77,6 +79,7 @@ It never carries:
   (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合"),
   its filing carrying the `- 原因の park:` line when it parked or stopped an Issue (`issue-template.md` → I);
 - a wait on an open blocker or a start date — `run:merge` releases it (`run-merge-steps.ts`);
+- sampling a process hours apart — `docs/josh-commands-run.md` → "`josh run:observe`";
 - a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`)
   and re-offers the causes it can itself up to its auto-retry cap; any other or capped row →
   `run:add <N> --retry`
@@ -91,9 +94,12 @@ known, and removed when the reason is not on it.
 A recommendation the child lacked the permission to take → the parent runs
 `pnpm josh backlog:triage --apply <N> --adopt <k> --reason <text>` (tiers: `operating-rules.md` →
 "decision-autonomy"): a scoped size approval, a premise the body constrains, a run-tooling defect to
-file. An option whose `必要な権限` starts with `親` → carry it out first, then adopt it with
-`--done <what was done>`. A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
-decision, `run:park <N> --clear`, `run:add <N> --retry`.
+file. A `必要な権限` off the vocabulary → refused by `run:park`; a close is `親（issue:close）`, a filing
+`親（issue:file …）`, shipping in another Issue's PR `親（lane:fold <N> --into #<M>）` (`docs/josh-commands-run.md` → "`josh run:park`"). An option whose `必要な権限` is `親` → carry it out first, then adopt it with
+`--done <what was done>`; one naming `issue:file` → `--done "filed #<M>"`; one naming `issue:close` or `lane:fold` → no `--done`, the adopt closes or folds it (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"). A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
+decision, `run:park <N> --clear`, `run:add <N> --retry`. A park splitting `<N>` → `split-assessment.md`
+→ "Two or more always means an epic" (plan, publish) before adopting; `backlog:triage` refuses an unplanned
+prepared `#M` (`docs/josh-commands-backlog.md` → "`josh backlog:triage`").
 
 ### A park the driver decides
 
@@ -127,9 +133,9 @@ single source of the distinction, the filing, the pause and the ceiling. Then:
 
 ## Splitting a child mid-run
 
-**A dispatched child is never split** (`split-assessment.md` → "Over the guide before the gate"):
-finish it, and file an independent new requirement found in it as an observation, without
-`--route split`.
+**A dispatched child is never split** inside its lane (`split-assessment.md` → "Over the guide before
+the gate"): finish it, and file an independent new requirement found in it as an observation, without
+`--route split`. A park the parent takes over and splits follows "A park the parent session resolves".
 
 A split is decided before dispatch: file the new children (Tier A, first-party; `split-assessment.md`
 → "Two or more always means an epic"), then

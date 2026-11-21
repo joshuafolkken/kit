@@ -29,6 +29,8 @@ const lane_plan_schema = z.object({
 	// `--single`: the plan is one deliverable with no separately-mergeable part, so a files-axis overrun
 	// is noted for the pre-gate `run:cut` to verify rather than refused (joshuafolkken/kit#6647).
 	single: z.boolean().optional(),
+	// Why the plan cannot be merged in parts, which `--single` requires (joshuafolkken/kit#7729).
+	single_reason: z.string().optional(),
 	cleared: z.boolean().optional(),
 	// The plan met the size bar (`lane-plan-size.ts`), whatever the overlap check answered after it.
 	sized: z.boolean().optional(),

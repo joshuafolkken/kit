@@ -225,3 +225,71 @@ describe('prose_stale_read.references — a deleted name a live module still dec
 		TIMEOUT_MS,
 	)
 })
+
+// joshuafolkken/kit#8048: the observation ledgers are history, so a removed name they record is not
+// stale prose.
+async function remove_recorded(prose_file: string): Promise<Array<Reference>> {
+	await write(GONE_CODE, 'export function recorded_name(): void {}\n')
+	await write('.josh/observations/archive-2026-11.md', '- `recorded_name` was seen\n')
+	await write(prose_file, 'recorded_name\n')
+	await commit('recorded')
+	await rm(path.join(fixture.root, GONE_CODE))
+
+	return await found_references()
+}
+
+describe('prose_stale_read.references — the observation ledgers', () => {
+	it(
+		'answers ok when only a ledger under .josh/observations/ names the removed name',
+		async () => {
+			const found = await remove_recorded('.josh/observations/7977.md')
+
+			expect(prose_stale_scan.report(found)).toEqual({ text: 'ok', exit_code: 0 })
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'still counts docs prose naming the removed name, without the ledger',
+		async () => {
+			const found = await remove_recorded('docs/f.md')
+
+			expect(prose_stale_scan.report(found).text).toBe('docs/f.md:1 name recorded_name')
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#7725: a kept file's private `old_name` renamed, with `other` outside the change
+// declaring its own `old_name` under a comment that names it.
+async function rename_beside(other: string): Promise<Array<Reference>> {
+	await write(other, '// `old_name` checks its own input\nfunction old_name(): void {}\n')
+	await commit('other')
+	await write(CODE, 'function new_name(): void {}\n')
+
+	return await found_references()
+}
+
+describe('prose_stale_read.references — a renamed name a live module still declares', () => {
+	it(
+		'does not count prose naming `old_name`, which the module outside the change still declares',
+		async () => {
+			const found = await rename_beside('scripts/other.ts')
+
+			expect(prose_stale_scan.report(found)).toEqual({ text: 'ok', exit_code: 0 })
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'still counts prose naming `old_name` when only a test file declares it',
+		async () => {
+			const found = await rename_beside('scripts/other.test.ts')
+
+			expect(prose_stale_scan.report(found).text).toContain(
+				'scripts/b.ts:1 name old_name (renamed to new_name)',
+			)
+		},
+		TIMEOUT_MS,
+	)
+})

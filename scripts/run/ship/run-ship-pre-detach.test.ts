@@ -43,7 +43,8 @@ const OK = 0
 const FAILED = 1
 const TYPE_CHECK = 'josh check'
 const EXPORTS = 'josh exports:unused'
-const STATIC = [TYPE_CHECK, EXPORTS, 'josh cspell:dot']
+const SPELL = 'josh cspell:dot'
+const STATIC = [TYPE_CHECK, EXPORTS, SPELL]
 const GUARD_TARGET = 'scripts/document'
 const GUARD_TEST_COMMAND = 'josh test:unit --passWithNoTests'
 const GUARD_TESTS = `${GUARD_TEST_COMMAND} ${GUARD_TARGET}`
@@ -51,6 +52,7 @@ const TYPE_ERROR = 'scripts/a.test.ts(3,7): error TS4111: Property comes from an
 const ACCEPT_HINT = 'pnpm josh metrics --accept --reason "<why>"'
 const GUARD_FAILURE = 'FAIL scripts/document/document-byte-budget.test.ts > stays under budget'
 const STATIC_RED = ['pre-detach']
+const DERIVE_CHECK = 'josh command:derive --check'
 
 interface Answer {
 	exit_code: number | undefined
@@ -275,7 +277,7 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 			code: OK,
 			out: run_ship_pre_detach.PASSED,
 		})
-		expect(commands()).toStrictEqual([metrics, ...STATIC])
+		expect(commands()).toStrictEqual([metrics, ...STATIC, DERIVE_CHECK])
 	})
 
 	// joshuafolkken/kit#4716: the totals may re-record the approval file, so they finish before the tree
@@ -325,7 +327,7 @@ describe('run_ship_pre_detach.checks — an approval write still in progress', (
 			return { exit_code: OK, output: '' }
 		})
 		await run_ship_pre_detach.checks(tree.directory, undefined, pinned)
-		expect(commands()).toStrictEqual([metrics, ...STATIC])
+		expect(commands()).toStrictEqual([metrics, ...STATIC, DERIVE_CHECK])
 		expect(pinned).toHaveBeenCalledOnce()
 	})
 })
@@ -344,23 +346,24 @@ function handed(): ReadonlyArray<Handed> {
 
 // joshuafolkken/kit#4505: the gate's own checks hand their results to the gate's per-check record.
 describe('run_ship_pre_detach.checks — what the gate reuses', () => {
-	it('hands the type check and the unused-export check over under their gate labels', async () => {
+	it('hands the type check, the unused-export check and cspell over under their gate labels', async () => {
 		await run_ship_pre_detach.checks(tree.directory)
 
 		expect(handed().map(({ label, command }) => [label, command])).toStrictEqual([
 			['check', TYPE_CHECK],
 			['exports', EXPORTS],
+			['cspell', SPELL],
 		])
 		expect(record_mock).toHaveBeenCalledWith(expect.anything(), READ_TREE, expect.anything())
 	})
 
-	it('hands over no spelling, guard test or metrics result', async () => {
+	it('hands over no guard test or metrics result', async () => {
 		create(GUARD_TARGET)
 		is_kit_mock.mockReturnValue(true)
 
 		await run_ship_pre_detach.checks(tree.directory)
 
-		expect(handed().map(({ label }) => label)).toStrictEqual(['check', 'exports'])
+		expect(handed().map(({ label }) => label)).toStrictEqual(['check', 'exports', 'cspell'])
 	})
 
 	it('hands a failed check over as failed, for the gate to leave unrecorded', async () => {
@@ -368,6 +371,6 @@ describe('run_ship_pre_detach.checks — what the gate reuses', () => {
 
 		await run_ship_pre_detach.checks(tree.directory)
 
-		expect(handed().map(({ exit_code }) => exit_code)).toStrictEqual([OK, FAILED])
+		expect(handed().map(({ exit_code }) => exit_code)).toStrictEqual([OK, FAILED, OK])
 	})
 })

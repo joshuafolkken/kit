@@ -41,7 +41,7 @@ function is_over(message: string, prompt: string | undefined): boolean {
 	return prose_length(message) > PROSE_LIMIT
 }
 
-function section_text(root: string): string | undefined {
+function section_text(root: string = PACKAGE_DIRECTORY): string | undefined {
 	const markdown = document_section.read_optional(path.join(root, PRINCIPLES_FILE))
 
 	return markdown === undefined ? undefined : document_section.section(markdown, SECTION)?.text
@@ -83,6 +83,7 @@ const concise_reply = {
 	build_reason,
 	is_over,
 	prose_length,
+	section_text,
 }
 
 export { concise_reply }

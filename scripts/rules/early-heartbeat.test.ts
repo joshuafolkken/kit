@@ -1,13 +1,15 @@
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { hook_context } from '#scripts/hooks/hook-context'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { early_heartbeat } from './early-heartbeat'
+import { lane_background } from './lane-background'
 
 // joshuafolkken/kit#1570. The three things the Issue asked to be able to demonstrate: an automatic
 // heartbeat cannot be armed before the interval has elapsed, one armed for the full interval is
@@ -54,12 +56,21 @@ function with_last_report(elapsed_ms: number | undefined): void {
 	)
 }
 
+// A context with no lane mark, so the suite reads as a person's run even when it runs inside a lane
+// child — the one session kind the rule stands down for (joshuafolkken/kit#8278). A lane-child case
+// marks the session with `as_lane_child` instead.
+const UNMARKED_CONTEXT = hook_context_fixture.of(WORK_DIRECTORY, {})
+
 function arm(name: string, command: string, now_ms = NOW_MS, can_record = true): boolean {
 	return early_heartbeat.decide(
 		{ name: 'Bash', input: { command } },
-		{ transcript: transcript_named(name), now_ms, context: hook_context.from_process() },
+		{ transcript: transcript_named(name), now_ms, context: UNMARKED_CONTEXT },
 		can_record,
 	)
+}
+
+function as_lane_child(): void {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 }
 
 function payload_for(transcript: string, command: string): string {
@@ -231,7 +242,9 @@ describe('delivered_rules.delivery — the row, through the hook that carries it
 
 		const payload = payload_for(transcript_named('delivered'), EARLY_SLEEP)
 
-		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.EARLY_HEARTBEAT_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBe(
+			delivered_rules.EARLY_HEARTBEAT_REASON,
+		)
 	})
 
 	// **Not once per run.** Every other row is delivered once because the run then obeys it; this one
@@ -242,8 +255,10 @@ describe('delivered_rules.delivery — the row, through the hook that carries it
 
 		const payload = payload_for(transcript_named('repeat'), EARLY_SLEEP)
 
-		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.EARLY_HEARTBEAT_REASON)
-		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBe(
+		expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBe(
+			delivered_rules.EARLY_HEARTBEAT_REASON,
+		)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1, UNMARKED_CONTEXT)).toBe(
 			delivered_rules.EARLY_HEARTBEAT_REASON,
 		)
 	})
@@ -253,7 +268,45 @@ describe('delivered_rules.delivery — the row, through the hook that carries it
 
 		const payload = payload_for(transcript_named('explicit'), EXPLICIT_ASK)
 
-		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8278: a lane child waiting on a background subagent is told by the Stop hook to
+// make one blocking call (joshuafolkken/kit#8336); refusing a bare `sleep` and pointing at a watcher a
+// lane child never runs left the child polling verification commands as a wait.
+describe('a lane child — the Stop hook wait is the one form, and nothing refuses it', () => {
+	it('lets a bare sleep through where a parent would be refused', () => {
+		with_last_report(MINUTE_MS)
+		as_lane_child()
+
+		expect(arm('lane-wait', EARLY_SLEEP)).toBe(false)
+		expect(arm('lane-wait', EARLY_SLEEP, NOW_MS + 1)).toBe(false)
+	})
+
+	it.each([lane_background.LANE_AGENT_WAIT, EARLY_SLEEP])(
+		'delivers no refusal naming the watcher a lane child never runs, for %j',
+		(command) => {
+			with_last_report(MINUTE_MS)
+			as_lane_child()
+
+			const payload = payload_for(transcript_named('lane-delivery'), command)
+
+			expect(delivered_rules.delivery(payload, NOW_MS, UNMARKED_CONTEXT)).toBeUndefined()
+		},
+	)
+
+	it('names in the Stop hook reason the one blocking wait, not a sleep the rule reads as a timer', () => {
+		const wait = lane_background.LANE_AGENT_WAIT
+
+		expect(lane_background.LANE_AGENT_STOP_REASON).toContain(`\`${wait}\``)
+		expect(lane_background.LANE_AGENT_STOP_REASON).not.toContain('sleep 20')
+		expect(early_heartbeat.is_wait_timer(wait)).toBe(false)
+	})
+
+	// A hand-off or beside child gets no foreground rewrite, so the reason itself carries the timeout.
+	it('names the Bash timeout the wait needs outside a lane child', () => {
+		expect(lane_background.LANE_AGENT_STOP_REASON).toContain('`timeout: 600000`')
 	})
 })
 

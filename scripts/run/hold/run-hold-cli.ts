@@ -1,4 +1,3 @@
-import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_state } from '#scripts/lane/lane-state'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
@@ -11,6 +10,14 @@ import { test_e2e_stamp } from '#scripts/test/test-e2e-stamp'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
 import { run_hold_adopt } from './run-hold-adopt'
 import { run_hold_block } from './run-hold-block'
+import {
+	run_hold_request,
+	type ClaimRequest,
+	type HoldRequest,
+	type StopKind,
+	type StopRequest,
+	type TakeOverRequest,
+} from './run-hold-request'
 import { run_stop_notify } from './run-stop-notify'
 
 // `josh run:hold [<N>]` and `josh run:release [<N> | --force]` — the working-tree guard the typed
@@ -41,27 +48,17 @@ import { run_stop_notify } from './run-stop-notify'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const RELEASE_FLAG = '--release'
-// What removes a record this run did not write. **Deliberate friction**: every release names the run
-// it belongs to, and the one act that cannot — clearing a record somebody else left behind — is
-// spelled out rather than reached by typing the ordinary command.
-const FORCE_FLAG = '--force'
-// What `fullrun #N`'s entry claims with, so the record says the run is a `fullrun` — the one run whose
-// implementation cut outside a lane resumes as `fullrun #N`.
-const FULLRUN_FLAG = '--fullrun'
-const HALFRUN_STOP_FLAG = '--halfrun-stop'
-// A `halfrun` fix round's start: the stopped record re-opened as the round's (`run-halfrun-resume.ts`).
-const HALFRUN_ROUND_FLAG = '--halfrun-round'
-// A `prrun`'s stop before merge: its record keeps the commit it stopped on.
-const PRRUN_STOP_FLAG = '--prrun-stop'
-// A `needs-human-review` stop: marked as a `halfrun` stop is, with its own confirmation.
-const HUMAN_REVIEW_STOP_FLAG = '--human-review-stop'
-// A `new` run's hand-over of its unnumbered record to the Issue it filed (`run-hold-adopt.ts`).
-const ADOPT_FLAG = '--adopt'
-// The most a claim reads: the issue number and the one flag after it.
-const MAX_CLAIM_ARGUMENTS = 2
-const USAGE =
-	'Usage: josh run:hold [<issue-number> [--fullrun | --halfrun-stop | --halfrun-round | --human-review-stop | --prrun-stop]] | josh run:hold --adopt <issue-number> | josh run:release [<issue-number> | --force]'
+const {
+	ADOPT_KIND,
+	FORCE_RELEASE_KIND,
+	HALFRUN_STOP_KIND,
+	HUMAN_REVIEW_STOP_KIND,
+	PRRUN_STOP_KIND,
+	USAGE,
+	is_stop_request,
+	is_take_over_request,
+	parse_request,
+} = run_hold_request
 
 const COMMAND = 'run:hold'
 
@@ -75,127 +72,6 @@ const NONE_VERDICT = 'none'
 const HELD_VERDICT = 'held'
 // A stop before commit asked on a tree `josh test:e2e` has not answered green on: nothing was marked.
 const E2E_OWED_VERDICT = 'e2e-owed'
-
-const FORCE_RELEASE_KIND = 'force-release'
-const HALFRUN_STOP_KIND = 'halfrun-stop'
-const HUMAN_REVIEW_STOP_KIND = 'human-review-stop'
-const PRRUN_STOP_KIND = 'prrun-stop'
-const ADOPT_KIND = 'adopt'
-const HALFRUN_ROUND_KIND = 'halfrun-round'
-
-type StopKind = typeof HALFRUN_STOP_KIND | typeof HUMAN_REVIEW_STOP_KIND | typeof PRRUN_STOP_KIND
-
-// The requests that take over a record this issue's own run left: `--adopt` and `--halfrun-round`.
-interface TakeOverRequest {
-	kind: typeof ADOPT_KIND | typeof HALFRUN_ROUND_KIND
-	issue: string
-}
-
-interface ClaimRequest {
-	kind: 'claim'
-	issue: string
-	is_fullrun?: boolean
-}
-
-interface StopRequest {
-	kind: StopKind
-	issue: string
-}
-
-type HoldRequest =
-	| ClaimRequest
-	| StopRequest
-	| TakeOverRequest
-	| { kind: 'release'; claimant: string }
-	| { kind: typeof FORCE_RELEASE_KIND }
-
-const STOP_KINDS: ReadonlySet<string> = new Set([
-	HALFRUN_STOP_KIND,
-	HUMAN_REVIEW_STOP_KIND,
-	PRRUN_STOP_KIND,
-])
-
-function is_stop_request(request: HoldRequest): request is StopRequest {
-	return STOP_KINDS.has(request.kind)
-}
-
-const TAKE_OVER_KINDS: ReadonlySet<string> = new Set([ADOPT_KIND, HALFRUN_ROUND_KIND])
-
-function is_take_over_request(request: HoldRequest): request is TakeOverRequest {
-	return TAKE_OVER_KINDS.has(request.kind)
-}
-
-const FORCE_RELEASE_REQUEST: HoldRequest = { kind: FORCE_RELEASE_KIND }
-
-function release_request(claimant: string): HoldRequest {
-	return { kind: 'release', claimant }
-}
-
-const STOP_KIND_BY_FLAG: ReadonlyMap<string, StopKind> = new Map([
-	[HALFRUN_STOP_FLAG, HALFRUN_STOP_KIND],
-	[HUMAN_REVIEW_STOP_FLAG, HUMAN_REVIEW_STOP_KIND],
-	[PRRUN_STOP_FLAG, PRRUN_STOP_KIND],
-])
-
-// The flag after a numbered claim: absent, `--fullrun`, `--halfrun-stop`, `--halfrun-round`,
-// `--human-review-stop` or `--prrun-stop`. Anything else is a usage error.
-function numbered_claim(issue: string, flag: string | undefined): HoldRequest | undefined {
-	if (flag === undefined) return { kind: 'claim', issue }
-
-	const stop_kind = STOP_KIND_BY_FLAG.get(flag)
-
-	if (stop_kind !== undefined) return { kind: stop_kind, issue }
-
-	if (flag === HALFRUN_ROUND_FLAG) return { kind: HALFRUN_ROUND_KIND, issue }
-
-	return flag === FULLRUN_FLAG ? { kind: 'claim', issue, is_fullrun: true } : undefined
-}
-
-function parse_claim(argv: ReadonlyArray<string>): HoldRequest | undefined {
-	const [first, flag] = argv
-
-	if (first === undefined) return { kind: 'claim', issue: run_hold.UNNUMBERED_ISSUE }
-
-	if (argv.length > MAX_CLAIM_ARGUMENTS || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(first)) {
-		return undefined
-	}
-
-	return numbered_claim(first, flag)
-}
-
-function parse_release_argument(first: string): HoldRequest | undefined {
-	if (first === FORCE_FLAG) return FORCE_RELEASE_REQUEST
-
-	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(first) ? release_request(first) : undefined
-}
-
-// **A bare `run:release` is the unnumbered run's release, not a release of whatever is there.** It
-// mirrors the bare claim, which records `new`, so the two spellings stay one pair.
-function parse_release(argv: ReadonlyArray<string>): HoldRequest | undefined {
-	const [first] = argv
-
-	if (first === undefined) return release_request(run_hold.UNNUMBERED_ISSUE)
-
-	return argv.length > 1 ? undefined : parse_release_argument(first)
-}
-
-function parse_adopt(argv: ReadonlyArray<string>): HoldRequest | undefined {
-	const [issue] = argv
-
-	if (issue === undefined || argv.length > 1) return undefined
-
-	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)
-		? { kind: ADOPT_KIND, issue }
-		: undefined
-}
-
-function parse_request(argv: ReadonlyArray<string>): HoldRequest | undefined {
-	if (argv[0] === RELEASE_FLAG) return parse_release(argv.slice(1))
-
-	if (argv[0] === ADOPT_FLAG) return parse_adopt(argv.slice(1))
-
-	return parse_claim(argv)
-}
 
 // One shape for every answer that carries an explanation: the reason to standard error, the single
 // token to standard output, and the exit code that says whether anything was established.
@@ -219,7 +95,7 @@ function report_hold(): number {
 // A record already here is never overwritten by a claim: overwriting is what the guard exists to
 // prevent, and the person who knows the other run has ended clears it with `run:release --force`.
 function take_free_tree(target: string, request: ClaimRequest): number {
-	const is_taken = run_hold.create_hold(target, request.issue, new Date(), request.is_fullrun)
+	const is_taken = run_hold.create_hold(target, request.issue, request.mark)
 
 	if (is_taken) return report_hold()
 

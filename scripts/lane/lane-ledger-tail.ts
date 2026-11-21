@@ -64,35 +64,100 @@ function base_of(previous: Tail | undefined, snapshot: Snapshot): Tail | undefin
 	return previous.ino === snapshot.ino && previous.size < snapshot.size ? previous : undefined
 }
 
-function grow(base: Tail | undefined, snapshot: Snapshot, from: number, bytes: Buffer): Tail {
-	const end = bytes.lastIndexOf(LINE_SEPARATOR) + 1
-	const lines = [...(base?.lines ?? EMPTY), ...parse_text(bytes.toString('utf8', 0, end))]
-	const fragment = parse_text(bytes.toString('utf8', end))
-	const entries = fragment.length === 0 ? lines : [...lines, ...fragment]
+// The entries a store keeps; the others are parsed and dropped (joshuafolkken/kit#8034).
+type Keep = (entry: LedgerEntry) => boolean
 
-	return { ...snapshot, size: from + bytes.length, offset: from + end, lines, entries }
+function read_range(descriptor: number, start: number, end: number): Buffer {
+	const bytes = Buffer.alloc(end - start)
+
+	return bytes.subarray(0, readSync(descriptor, bytes, 0, bytes.length, start))
 }
 
-function next_tail(descriptor: number, snapshot: Snapshot, previous: Tail | undefined): Tail {
+// joshuafolkken/kit#8243: a read parses the file a chunk at a time, so a fresh process's first read of
+// a ledger of a hundred megabytes never holds its whole text, every line and every parsed entry at
+// once — only the entries kept so far and one chunk.
+const GROW_CHUNK_BYTES = 1_048_576
+const NO_BYTES = Buffer.alloc(0)
+
+interface Reading {
+	readonly descriptor: number
+	readonly size: number
+	readonly is_kept: Keep
+}
+
+// The kept entries of the complete lines read through `position`, and the bytes read past the last
+// line separator — a line a chunk boundary cut, or at the end the fragment still landing.
+interface Growth {
+	readonly lines: Array<LedgerEntry>
+	readonly position: number
+	readonly rest: Buffer
+}
+
+function parse_kept(bytes: Buffer, is_kept: Keep): Array<LedgerEntry> {
+	return parse_text(bytes.toString('utf8')).filter((entry) => is_kept(entry))
+}
+
+// One chunk further, or `undefined` once the snapshot's size — or the file's end — is reached.
+function grow_chunk(reading: Reading, growth: Growth): Growth | undefined {
+	const { descriptor, size, is_kept } = reading
+	const end_of_chunk = Math.min(size, growth.position + GROW_CHUNK_BYTES)
+	const read = read_range(descriptor, Math.min(growth.position, end_of_chunk), end_of_chunk)
+
+	if (read.length === 0) return undefined
+
+	const bytes = Buffer.concat([growth.rest, read])
+	const end = bytes.lastIndexOf(LINE_SEPARATOR) + 1
+	const kept = parse_kept(bytes.subarray(0, end), is_kept)
+
+	for (const entry of kept) growth.lines.push(entry)
+
+	return { lines: growth.lines, position: growth.position + read.length, rest: bytes.subarray(end) }
+}
+
+function grow_all(reading: Reading, start: Growth): Growth {
+	let growth = start
+	let next = grow_chunk(reading, growth)
+
+	while (next !== undefined) {
+		growth = next
+		next = grow_chunk(reading, growth)
+	}
+
+	return growth
+}
+
+// Where a read starts: past the base's parsed lines, or the file's start for a full read.
+function start_of(base: Tail | undefined): Growth {
+	if (base === undefined) return { lines: [], position: 0, rest: NO_BYTES }
+
+	return { lines: [...base.lines], position: base.offset, rest: NO_BYTES }
+}
+
+function next_tail(
+	descriptor: number,
+	snapshot: Snapshot,
+	previous: Tail | undefined,
+	is_kept: Keep,
+): Tail {
 	if (previous !== undefined && is_unchanged(previous, snapshot)) return previous
 
-	const base = base_of(previous, snapshot)
-	const from = base?.offset ?? 0
-	const bytes = Buffer.alloc(snapshot.size - from)
-	const length = readSync(descriptor, bytes, 0, bytes.length, from)
+	const start = start_of(base_of(previous, snapshot))
+	const { lines, position, rest } = grow_all({ descriptor, size: snapshot.size, is_kept }, start)
+	const fragment = parse_kept(rest, is_kept)
+	const entries = fragment.length === 0 ? lines : [...lines, ...fragment]
 
-	return grow(base, snapshot, from, bytes.subarray(0, length))
+	return { ...snapshot, size: position, offset: position - rest.length, lines, entries }
 }
 
 // `undefined` for an absent, unowned or unreadable file: an empty ledger.
-function read_tail(path: string, previous: Tail | undefined): Tail | undefined {
+function with_ledger<T>(path: string, read_open: (descriptor: number) => T): T | undefined {
 	try {
 		if (!stamp_file.is_own_regular_file(path)) return undefined
 
 		const descriptor = openSync(path, READ_FLAGS)
 
 		try {
-			return next_tail(descriptor, snapshot_of(fstatSync(descriptor)), previous)
+			return read_open(descriptor)
 		} finally {
 			closeSync(descriptor)
 		}
@@ -101,24 +166,252 @@ function read_tail(path: string, previous: Tail | undefined): Tail | undefined {
 	}
 }
 
-const tails = new Map<string, Tail>()
-
-// Every entry, oldest first; the same array while the file is unchanged, so a reader can key its own
-// aggregation on it.
-function read(path: string): ReadonlyArray<LedgerEntry> {
-	const tail = read_tail(path, tails.get(path))
-
-	if (tail === undefined) {
-		tails.delete(path)
-
-		return EMPTY
-	}
-
-	tails.set(path, tail)
-
-	return tail.entries
+function read_tail(path: string, previous: Tail | undefined, is_kept: Keep): Tail | undefined {
+	return with_ledger(path, (descriptor) =>
+		next_tail(descriptor, snapshot_of(fstatSync(descriptor)), previous, is_kept),
+	)
 }
 
-const lane_ledger_tail = { read }
+interface TailStore {
+	// The kept entries, oldest first; the same array while the file is unchanged, so a reader can key
+	// its own aggregation on it.
+	readonly read: (path: string) => ReadonlyArray<LedgerEntry>
+	// Lets go of the path's kept entries; the next read parses the whole file again.
+	readonly forget: (path: string) => void
+}
 
+function is_any(): boolean {
+	return true
+}
+
+// The tails read so far, by path, holding only the entries `is_kept` passes — a reader that needs a
+// few kinds keeps those, not the whole ledger (joshuafolkken/kit#8034).
+function tail_store(is_kept: Keep = is_any): TailStore {
+	const tails = new Map<string, Tail>()
+
+	function read(path: string): ReadonlyArray<LedgerEntry> {
+		const tail = read_tail(path, tails.get(path), is_kept)
+
+		if (tail === undefined) {
+			tails.delete(path)
+
+			return EMPTY
+		}
+
+		tails.set(path, tail)
+
+		return tail.entries
+	}
+
+	function forget(path: string): void {
+		tails.delete(path)
+	}
+
+	return { read, forget }
+}
+
+const every_entry = tail_store()
+
+// The recent window read backward from the end (joshuafolkken/kit#7930): a fresh process reads only the
+// chunks covering the window, not the whole ledger. `reached_start` — the ledger's start was read with
+// no line older than the window by the margin met, so the window may reach past it.
+interface RecentWindow {
+	readonly entries: ReadonlyArray<LedgerEntry>
+	readonly reached_start: boolean
+}
+
+const CHUNK_BYTES = 65_536
+// The ledger is not strictly in time order: a merge line is dated back to its ship's report, minutes
+// before it lands (`run-merge-dated.ts`), so the scan stops only past this margin.
+const BACKDATE_MARGIN_MS = 3_600_000
+const NONE: RecentWindow = { entries: EMPTY, reached_start: true }
+
+// Where the chunk's first complete line starts: its head may be a line cut by the chunk boundary,
+// carried into the chunk before it — unless the chunk starts the file.
+function first_line_at(bytes: Buffer, is_file_start: boolean): number {
+	if (is_file_start) return 0
+
+	const index = bytes.indexOf(LINE_SEPARATOR)
+
+	return index === -1 ? bytes.length : index + 1
+}
+
+function is_since(entry: LedgerEntry, since_ms: number): boolean {
+	return Date.parse(entry.at) >= since_ms
+}
+
+// Adds the text's entries in the window to `found`, newest first; true once a line older than the
+// window by more than the backdate margin is met — no line before it can still fall in the window.
+function take_newest(found: Array<LedgerEntry>, text: string, since_ms: number): boolean {
+	const newest_first = parse_text(text).toReversed()
+	const stop = newest_first.findIndex((entry) => !is_since(entry, since_ms - BACKDATE_MARGIN_MS))
+	const scanned = stop === -1 ? newest_first : newest_first.slice(0, stop)
+
+	found.push(...scanned.filter((entry) => is_since(entry, since_ms)))
+
+	return stop !== -1
+}
+
+interface Scan {
+	readonly descriptor: number
+	readonly since_ms: number
+	readonly chunk_bytes: number
+	readonly found: Array<LedgerEntry>
+}
+
+// The bytes still to read: through `end`, then `carry` — a line the later chunk's boundary cut.
+interface Cursor {
+	readonly end: number
+	readonly carry: Buffer
+}
+
+// One chunk back: the cursor before it, or `undefined` once a line older than the window is met.
+function step_back(scan: Scan, cursor: Cursor): Cursor | undefined {
+	const start = Math.max(0, cursor.end - scan.chunk_bytes)
+	const bytes = Buffer.concat([read_range(scan.descriptor, start, cursor.end), cursor.carry])
+	const cut = first_line_at(bytes, start === 0)
+
+	if (take_newest(scan.found, bytes.toString('utf8', cut), scan.since_ms)) return undefined
+
+	return { end: start, carry: bytes.subarray(0, cut) }
+}
+
+function scan_back(
+	descriptor: number,
+	since_ms: number,
+	chunk_bytes: number,
+	end = fstatSync(descriptor).size,
+): RecentWindow {
+	const scan: Scan = { descriptor, since_ms, chunk_bytes, found: [] }
+	let cursor: Cursor | undefined = { end, carry: Buffer.alloc(0) }
+
+	while (cursor !== undefined && cursor.end > 0) cursor = step_back(scan, cursor)
+
+	return { entries: scan.found.toReversed(), reached_start: cursor !== undefined }
+}
+
+// The entries at or after `since_ms`, oldest first; malformed lines skipped as `read` skips them.
+function read_since(path: string, since_ms: number, chunk_bytes = CHUNK_BYTES): RecentWindow {
+	return with_ledger(path, (descriptor) => scan_back(descriptor, since_ms, chunk_bytes)) ?? NONE
+}
+
+// joshuafolkken/kit#8133: a window a long-lived reader asks for again and again, while the ledger is
+// appended every few seconds — read backward once from its oldest start, then grown by the appended
+// bytes alone, as a tail is. An earlier start, another inode, a shrink or a change that kept the size
+// reads the window backward again.
+interface Window {
+	readonly since_ms: number
+	readonly tail: Tail
+}
+
+// Bytes through the file's last line separator, sought a chunk at a time from the end: the window read
+// backward ends on a complete line, and the line still landing after it — however long — is parsed as
+// a tail's fragment is.
+function line_end(descriptor: number, size: number): number {
+	let end = size
+
+	while (end > 0) {
+		const start = Math.max(0, end - CHUNK_BYTES)
+		const index = read_range(descriptor, start, end).lastIndexOf(LINE_SEPARATOR)
+
+		if (index !== -1) return start + index + 1
+		end = start
+	}
+
+	return 0
+}
+
+function seed(descriptor: number, snapshot: Snapshot, since_ms: number, is_kept: Keep): Window {
+	const offset = line_end(descriptor, snapshot.size)
+	const { entries } = scan_back(descriptor, since_ms, CHUNK_BYTES, offset)
+	const lines = entries.filter((entry) => is_kept(entry))
+	const read: Tail = { ...snapshot, size: offset, offset, lines, entries: lines }
+
+	return { since_ms, tail: next_tail(descriptor, snapshot, read, is_kept) }
+}
+
+function is_growable(window: Window, snapshot: Snapshot, since_ms: number): boolean {
+	if (since_ms < window.since_ms) return false
+
+	return is_unchanged(window.tail, snapshot) || base_of(window.tail, snapshot) !== undefined
+}
+
+function next_window(
+	descriptor: number,
+	previous: Window | undefined,
+	since_ms: number,
+	is_kept: Keep,
+): Window {
+	const snapshot = snapshot_of(fstatSync(descriptor))
+
+	if (previous === undefined || !is_growable(previous, snapshot, since_ms)) {
+		return seed(descriptor, snapshot, since_ms, is_kept)
+	}
+
+	return {
+		since_ms: previous.since_ms,
+		tail: next_tail(descriptor, snapshot, previous.tail, is_kept),
+	}
+}
+
+// joshuafolkken/kit#8206: a sliding window — its reader's start only moves on with the clock — lets go
+// of the lines before the start once it moved on by `PRUNE_STEP_MS`, so a reader running for days holds
+// its window and at most one step more. A later ask for an earlier start reads backward again, so a
+// reader asking for several fixed starts keeps its window whole.
+const PRUNE_STEP_MS = BACKDATE_MARGIN_MS
+
+function pruned(window: Window, since_ms: number): Window {
+	if (since_ms - window.since_ms < PRUNE_STEP_MS) return window
+
+	const { tail } = window
+	const lines = tail.lines.filter((entry) => is_since(entry, since_ms))
+	const fragment = tail.entries.slice(tail.lines.length)
+	const entries = fragment.length === 0 ? lines : [...lines, ...fragment]
+
+	return { since_ms, tail: { ...tail, lines, entries } }
+}
+
+interface WindowStore {
+	// The kept entries at or after `since_ms`, oldest first; an absent or unreadable file has none.
+	readonly read: (path: string, since_ms: number) => ReadonlyArray<LedgerEntry>
+}
+
+interface WindowOptions {
+	// The entries the window keeps; every entry when omitted.
+	readonly is_kept?: Keep
+	// The reader's start only moves on with the clock: lines before it are let go (#8206).
+	readonly slides?: boolean
+}
+
+function window_store({ is_kept = is_any, slides = false }: WindowOptions = {}): WindowStore {
+	const windows = new Map<string, Window>()
+
+	function read(path: string, since_ms: number): ReadonlyArray<LedgerEntry> {
+		const window = with_ledger(path, (descriptor) =>
+			next_window(descriptor, windows.get(path), since_ms, is_kept),
+		)
+
+		if (window === undefined) {
+			windows.delete(path)
+
+			return EMPTY
+		}
+
+		windows.set(path, slides ? pruned(window, since_ms) : window)
+
+		return window.tail.entries.filter((entry) => is_since(entry, since_ms))
+	}
+
+	return { read }
+}
+
+const lane_ledger_tail = {
+	GROW_CHUNK_BYTES,
+	read: every_entry.read,
+	read_since,
+	tail_store,
+	window_store,
+}
+
+export type { RecentWindow, TailStore, WindowStore }
 export { lane_ledger_tail }

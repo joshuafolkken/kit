@@ -6,17 +6,18 @@ import { epic_triage } from '#scripts/epic/epic-triage'
 import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
-import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_planning, type Planning } from './run-board-planning'
+import { run_board_publication } from './run-board-publication'
 import { run_board_setup } from './run-board-setup'
 import type { ItemStatus } from './run-board-status'
 
@@ -34,7 +35,7 @@ import type { ItemStatus } from './run-board-status'
 // judging it is what a person can do meanwhile.
 
 const { LANE_STAGE } = run_event_setup
-const { HEADER_ICONS, STAGE_ICONS, STATE_ICONS, WAIT_ICONS } = run_board_labels
+const { HEADER_ICONS, STAGE_ICONS, WAIT_ICONS } = run_board_labels
 const NO_FREE_LANES = 0
 const FIRST_ONLY = 1
 
@@ -56,6 +57,8 @@ interface ReasonRead extends Overlay {
 	lane_limit?: number | undefined
 	// The reset a Claude usage limit holds launches until (`run-merge-usage-limit.ts`), if one does.
 	usage_reset_ms?: number | undefined
+	// What that hold is for — an authentication failure's recheck or a usage limit's reset.
+	usage_cause?: HoldCause | undefined
 	// The driver holds its offered issue for memory (`backlog-drive-memory.ts`).
 	is_memory_held?: boolean | undefined
 	// The machine's latest gauges, the figures a memory hold names.
@@ -77,7 +80,7 @@ interface Pool {
 	planning: Planning | undefined
 	// The first `run:solo` candidate and the candidates behind it (`epic-solo.ts`), if any.
 	solo: SoloQueue | undefined
-	// The running `run:solo` issue that lets nothing new start (`epic_solo.holder_of`), if any.
+	// The running or parked `run:solo` issue that lets nothing new start (`epic_solo.holder_of`), if any.
 	solo_holder: number | undefined
 }
 
@@ -131,6 +134,13 @@ function running_labelled(read: ReasonRead): Array<Labelled> {
 		.map(([number, labels]) => ({ number, labels }))
 }
 
+// Every open parked issue: a parked `run:solo` issue still holds the gate (`epic-solo-parked.ts`).
+function parked_labelled(read: ReasonRead): Array<Labelled> {
+	return [...read.plan.labels]
+		.filter(([, labels]) => has_parked_label(labels))
+		.map(([number, labels]) => ({ number, labels }))
+}
+
 function pool_of(read: ReasonRead): Pool {
 	const waiting = run_board_layout.waiting_children(read)
 	const running = running_of(read)
@@ -141,7 +151,8 @@ function pool_of(read: ReasonRead): Pool {
 		withheld: read.plan.withheld ?? new Set(),
 		planning: run_board_planning.planning_of(read, running),
 		solo: epic_solo.queue_of(candidates),
-		solo_holder: epic_solo.holder_of(running_labelled(read)),
+		solo_holder:
+			epic_solo.holder_of(running_labelled(read)) ?? epic_solo.holder_of(parked_labelled(read)),
 	}
 }
 
@@ -198,16 +209,22 @@ function no_memory_of(gauges: MachineGauges | undefined): RowReason {
 	}
 }
 
-// `🪫 10-25 16:30`: the reset a usage limit holds every launch until, in the board's local time.
-function usage_limit_of(reset_ms: number): RowReason {
-	return { icon: WAIT_ICONS.usage_limit, value: run_board_labels.day_minute_of(reset_ms) }
+// `🪫 10-25 16:30`: the reset a usage limit holds every launch until, in the board's local time;
+// `🔑 10-25 16:30` where the hold is an authentication failure's recheck instead.
+function usage_limit_of(reset_ms: number, cause: HoldCause | undefined): RowReason {
+	const icon = cause === 'auth' ? WAIT_ICONS.auth_failure : WAIT_ICONS.usage_limit
+
+	return { icon, value: run_board_labels.day_minute_of(reset_ms) }
 }
 
 // The machine's room: no lane left under the limit, else a usage limit not yet reset, else no memory
 // for one more — the order `backlog:drive` asks them in.
 function room_wait(read: ReasonRead): RowReason | undefined {
 	if (read.free_lanes === NO_FREE_LANES) return no_lane_of(read)
-	if (read.usage_reset_ms !== undefined) return usage_limit_of(read.usage_reset_ms)
+
+	if (read.usage_reset_ms !== undefined) {
+		return usage_limit_of(read.usage_reset_ms, read.usage_cause)
+	}
 
 	return read.is_memory_held === true ? no_memory_of(read.gauges) : undefined
 }
@@ -222,7 +239,8 @@ function named_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | u
 	return holder === undefined ? undefined : { icon: WAIT_ICONS.named, issues: [String(holder)] }
 }
 
-// `🔒 4374`: the running `run:solo` issue nothing new starts beside until it merges or is parked.
+// `🔒 4374`: the running or parked `run:solo` issue nothing new starts beside until it merges, is
+// closed, or has `run:solo` removed.
 function held_solo_of(pool: Pool): RowReason | undefined {
 	if (pool.solo_holder === undefined) return undefined
 
@@ -301,25 +319,11 @@ function not_before_of(child: EpicChild, now_ms: number): RowReason | undefined 
 	}
 }
 
-// `🔗 4183` for a blocker the run finishes, `🙋 4183` where the classifier withholds the row for a
-// person: the run will not finish a blocker it waits on (joshuafolkken/kit#4292).
-function blocker_icon(child: EpicChild, pool: Pool): string {
-	return pool.withheld.has(child.number) ? STATE_ICONS.human : WAIT_ICONS.blocker
-}
-
-// The decision a withheld row waits on, followed through its blockers as the plan was read — kept even
-// where no blocker still stands at this frame, so the row itself says what a person decides.
-function decision_tail(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
-	return pool.withheld.has(child.number) ? read.plan.decision_waits?.get(child.number) : undefined
-}
-
-function blocker_reason(
-	child: EpicChild,
-	waits: ReadonlyArray<string>,
-	tail: string | undefined,
-	pool: Pool,
-): RowReason {
-	return { icon: blocker_icon(child, pool), issues: waits, ...(tail !== undefined && { tail }) }
+// `🔗 4183`: the blockers still standing. A row the classifier withholds for a person is drawn the
+// same way — the blocker a person acts on leads the 🙋 decision section with the action
+// (`run-board-decision-rows.ts`, joshuafolkken/kit#8026), so the row it holds says no more.
+function blocker_reason(waits: ReadonlyArray<string>): RowReason {
+	return { icon: WAIT_ICONS.blocker, issues: waits }
 }
 
 // `✋`: an issue nobody has judged, due and unblocked, held alone for its judgment while `backlog:next`
@@ -338,19 +342,18 @@ function wait_of(
 	pool: Pool,
 ): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return untriaged_of(child, waits, read)
-	const tail = decision_tail(child, read, pool)
-
-	if (tail !== undefined || waits.length > 0) return blocker_reason(child, waits, tail, pool)
+	if (waits.length > 0) return blocker_reason(waits)
 
 	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }
 
-// `📰`: an issue whose filing has not published yet (`issue-publication-state.ts`), which no pickup
-// offers until it does, whatever else would keep it (joshuafolkken/kit#7572).
-function publication_of(child: EpicChild): RowReason | undefined {
-	return issue_publication_state.is_pending(child.body)
-		? { icon: WAIT_ICONS.publication }
-		: undefined
+// `📰` with the step the pending filing still lacks (`run-board-publication.ts`), whatever else would
+// keep the row (joshuafolkken/kit#7572). Any open epic's task list reaches the child, not only an
+// opted-in one's, so `tracked` alone would ask a child of another epic for an epic placement.
+function publication_of(child: EpicChild, { plan }: ReasonRead): RowReason | undefined {
+	const epic = plan.tracked.get(child.number) ?? plan.epics?.get(child.number)
+
+	return run_board_publication.reason_of(child, epic)
 }
 
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.
@@ -363,7 +366,7 @@ function reader(read: ReasonRead): ReasonOf {
 			run_board_human_merge.reason_of(child, current.plan) ??
 			stage_of(child, current) ??
 			planned_of(child, pool) ??
-			publication_of(child) ??
+			publication_of(child, current) ??
 			wait_of(child, waits, current, pool)
 		)
 	}

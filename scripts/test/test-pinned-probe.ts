@@ -3,9 +3,10 @@ import path from 'node:path'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { direct_importers } from './direct-importers'
 import { related_heavy_tests } from './related-heavy-tests'
-import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic'
+import { test_pinned_cache_logic, type MissReason, type Recheck } from './test-pinned-cache-logic'
 import {
 	test_pinned_ledger,
+	type PinnedLaunch,
 	type PinnedOrigin,
 	type ProbeTime,
 	type Skipped,
@@ -39,6 +40,7 @@ interface Probe {
 	hunk: Hunk
 	index: number
 	recheck?: Recheck | undefined
+	miss?: MissReason | undefined
 	reach?: number | undefined
 	spawned?: ReadonlyArray<string> | undefined
 }
@@ -153,11 +155,12 @@ interface Halt {
 	is_set: boolean
 }
 
-// What every lane of one run shares: its workers per tree, the caller's hand-off, the probes' times,
-// how many probes ran in stages, and the halt a `--first-unpinned` run carries.
+// What every lane of one run shares: its workers per tree, the caller's hand-off, the probes started
+// and their times, how many probes ran in stages, and the halt a `--first-unpinned` run carries.
 interface Lane {
 	workers: number
 	on_verdict: OnVerdict
+	started: Array<Probe>
 	times: Array<ProbeTime>
 	staged: Staged
 	halt?: Halt | undefined
@@ -196,6 +199,8 @@ function halt_on(lane: Lane, verdict: RedProbe): void {
 
 async function timed_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<RedProbe> {
 	const started = Date.now()
+
+	lane.started.push(probe)
 	const verdict = await verdict_of(tree, probe, lane)
 
 	lane.times.push(test_pinned_ledger.time_of(probe.hunk, verdict, Date.now() - started))
@@ -248,12 +253,15 @@ async function pooled(
 
 // `held` counts the hunks the cache answered, `rewired` the ones left out as a rewire
 // (`test-pinned-rewire.ts`), `over_cap` the ones over the test-file cap; `is_first_unpinned` starts
-// no probe once one is unpinned.
+// no probe once one is unpinned; `is_reasoned` marks a run under an `--unpinned-ok` reason and
+// `tree_hash` the work tree it read, both for its ledger row only.
 interface CheckOptions {
 	held?: number
 	rewired?: number
 	over_cap?: number
 	is_first_unpinned?: boolean
+	is_reasoned?: boolean
+	tree_hash?: string | undefined
 	origin?: PinnedOrigin | undefined
 }
 
@@ -263,12 +271,32 @@ interface Checked {
 	staged: Staged
 }
 
-function skipped_of(options: CheckOptions): Skipped {
+// How the run was started and the probes its stop never started (joshuafolkken/kit#7809), each key
+// only where it applies.
+function launch_of(options: CheckOptions, cut: number): PinnedLaunch {
+	return {
+		...(options.is_first_unpinned === true && { first_unpinned: true }),
+		...(options.is_reasoned === true && { reasoned: true }),
+		...(cut > 0 && { cut }),
+		...(options.tree_hash !== undefined && { tree_hash: options.tree_hash }),
+	}
+}
+
+// The started probes split as the cache knew them (joshuafolkken/kit#7803): a recheck, or none at
+// all — and by why the cache missed them (joshuafolkken/kit#7806). A halted run's unstarted probes
+// count in none; `cut` counts them.
+function skipped_of(options: CheckOptions, probes: ReadonlyArray<Probe>, cut: number): Skipped {
+	const rechecked = probes.filter((probe) => probe.recheck !== undefined).length
+
 	return {
 		held: options.held ?? 0,
+		rechecked,
+		unregistered: probes.length - rechecked,
+		misses: test_pinned_ledger.miss_counts(probes.map((probe) => probe.miss)),
 		rewired: options.rewired ?? 0,
 		over_cap: options.over_cap ?? 0,
 		origin: options.origin,
+		launch: launch_of(options, cut),
 	}
 }
 
@@ -281,15 +309,20 @@ async function checked_on(
 	on_verdict: OnVerdict,
 	options: CheckOptions = {},
 ): Promise<Checked> {
-	const started = Date.now()
-	const times: Array<ProbeTime> = []
-	const staged = test_pinned_stage.none()
-	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
-	const verdicts = await pooled(paths, probes, { on_verdict, times, staged, halt })
+	const began = Date.now()
+	const lane = {
+		on_verdict,
+		started: new Array<Probe>(),
+		times: new Array<ProbeTime>(),
+		staged: test_pinned_stage.none(),
+		halt: options.is_first_unpinned === true ? { is_set: false } : undefined,
+	}
+	const verdicts = await pooled(paths, probes, lane)
+	const skipped = skipped_of(options, lane.started, probes.length - lane.started.length)
 
-	await test_pinned_ledger.record(skipped_of(options), times, Date.now() - started)
+	await test_pinned_ledger.record(skipped, lane.times, Date.now() - began)
 
-	return { verdicts, staged }
+	return { verdicts, staged: lane.staged }
 }
 
 const test_pinned_probe = { checked_on, selection_of }

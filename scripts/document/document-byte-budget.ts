@@ -57,6 +57,8 @@ function block_ceiling(size: number): number {
 // a stale entry (a file that no longer exists or that an entry now reads) and on an un-budgeted
 // unreached file, so the definition cannot rot as documents move on or off the execution path.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
+	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 4096 },
+	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 8192 },
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 4096 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 4096 },
@@ -82,19 +84,27 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// joshuafolkken/kit#6540), so joshuafolkken/kit#6676 split its board, lane and session commands
 	// into pages of their own, each at its smallest block.
 	// The drive's own `run:stalled` retry under `run:add --retry` (joshuafolkken/kit#7076) crossed the 53248 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
+	// `run:park`'s required `--outcome` in its example (joshuafolkken/kit#7850) crossed the 57344 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 61_440 },
 	// The finished rows' icons, `⏩` already done among them (joshuafolkken/kit#7095), crossed the 20480 block.
-	{ path: 'docs/josh-commands-board.md', bytes: 24_576 },
+	// The parked row's next action from `run:park --outcome` (joshuafolkken/kit#7850) crossed the 24576 block.
+	// `run:board --timing` (joshuafolkken/kit#7929) crossed the 28672 block.
+	// `run:board --theme matrix` (joshuafolkken/kit#8354) crossed the 32768 block.
+	{ path: 'docs/josh-commands-board.md', bytes: 36_864 },
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
-	{ path: 'docs/josh-commands-lane.md', bytes: 36_864 },
+	// `josh lane:phases` (joshuafolkken/kit#8287) crossed the 36864 block.
+	{ path: 'docs/josh-commands-lane.md', bytes: 40_960 },
 	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.
-	{ path: 'docs/josh-commands-session.md', bytes: 20_480 },
+	// `josh scratch:run` (joshuafolkken/kit#8263) crossed the 20480 block.
+	{ path: 'docs/josh-commands-session.md', bytes: 24_576 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`
 	// (joshuafolkken/kit#6463) crossed the 73728 block; the drive's sample wait (joshuafolkken/kit#6503)
-	// crossed the 77824 block; `issue:fold-existing --found-during` (joshuafolkken/kit#6641) crossed the 81920 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 81_920 },
+	// crossed the 77824 block; `issue:fold-existing --found-during` (joshuafolkken/kit#6641) crossed the 81920 block;
+	// `--adopt`'s park loop (joshuafolkken/kit#7820) crossed the 86016 block;
+	// `backlog:plan --pending-publication` (joshuafolkken/kit#8087) crossed the 90112 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 94_208 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
@@ -110,17 +120,19 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
 	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block; the
 	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one; the
-	// premise row (joshuafolkken/kit#7021) crossed the 16384 one.
+	// premise row (joshuafolkken/kit#7021) crossed the 16384 one; the before-merge criterion of the
+	// human-judgement declaration (joshuafolkken/kit#8246) crossed the 20480 one.
 	// The template's en column (joshuafolkken/kit#7211).
 	{ path: 'prompts/collaboration-workflow/issue-template.en.md', bytes: 8192 },
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 20_480 },
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 24_576 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/output-bounds.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 4096 },
-	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 12_288 },
+	// #7854: concise-reply's hand-back and recommendation lines, durable-rules' guard line.
+	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 8192 },

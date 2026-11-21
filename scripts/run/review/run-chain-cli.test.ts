@@ -1,6 +1,10 @@
+import { derive_check } from '#scripts/document/derive-check'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { review_brief_cli } from '#scripts/review/review-brief-cli'
+import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 
@@ -13,11 +17,28 @@ vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mo
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
+const ACCEPTANCE_CHECK = 'acceptance:check'
 const RUN_REVIEW = 'run:review'
 const RUN_CUT = 'run:cut'
 const ISSUE = '5630'
 const FROM = '--from'
-const MAIN_LINE = [[MAIN_MERGE], [SELFCHECK], [CHECK_RELATED], [RUN_REVIEW]]
+// The ship's refusals asked after the acceptance map (joshuafolkken/kit#7773).
+const BEFORE_REVIEW = [
+	['preflight:check'],
+	['exports:unused'],
+	run_ship_pre_detach.guard_test_argv(process.cwd()),
+]
+const BEFORE_REVIEW_NAMES = 'acceptance:check → preflight:check → exports:unused → guard-tests'
+// The test runs in kit, so the chain carries the generated-page check (joshuafolkken/kit#7728).
+const MAIN_LINE = [
+	[MAIN_MERGE],
+	[SELFCHECK],
+	[CHECK_RELATED],
+	derive_check.DERIVE_CHECK_ARGV,
+	[ACCEPTANCE_CHECK],
+	...BEFORE_REVIEW,
+	[RUN_REVIEW],
+]
 const STOP_EXIT = 2
 const UNPINNED_OK = ['--unpinned-ok', 'only logs']
 const ACCEPT_METRICS = ['--accept-metrics', 'a new command']
@@ -38,7 +59,10 @@ function stop_at(name: string): void {
 	}))
 }
 
+// The metrics and scoped-green asks (`run-chain-gates.ts`) answer green unless a test says otherwise.
 beforeEach(() => {
+	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
+	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
@@ -57,12 +81,12 @@ afterEach(() => {
 })
 
 describe('run_chain_cli.run — the chain', () => {
-	it('runs main:merge, the self-check, the scoped pair and run:review in order', async () => {
+	it('runs main:merge, the self-check, the scoped pair, the acceptance map and run:review in order', async () => {
 		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(0)
 
 		expect(ran()).toStrictEqual(MAIN_LINE)
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran main:merge → review:selfcheck → check:related → run:review',
+			`run:chain 5630 — ran main:merge → review:selfcheck → check:related → metrics-totals → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
 		)
 	})
 
@@ -73,7 +97,7 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(ran()).toStrictEqual(MAIN_LINE.slice(1))
 		expect(info_lines).toContain(
-			'run:chain 5630 — ran review:selfcheck → check:related → run:review',
+			`run:chain 5630 — ran review:selfcheck → check:related → metrics-totals → command:derive → ${BEFORE_REVIEW_NAMES} → run:review`,
 		)
 	})
 
@@ -95,6 +119,22 @@ describe('run_chain_cli.run — the chain', () => {
 
 		expect(error_lines.join('\n')).toContain('rerun `pnpm josh run:chain 5630`;')
 		expect(error_lines.join('\n')).toContain(RESUME_PAST_SELFCHECK)
+	})
+})
+
+// joshuafolkken/kit#7727: ship's acceptance-map refusal asked before the review, not at ship's preflight.
+describe('run_chain_cli.run — acceptance:check', () => {
+	it('stops on a missing acceptance-map row before run:review, naming the resume at acceptance:check', async () => {
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(true)
+		stop_at(ACCEPTANCE_CHECK)
+
+		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(1)
+
+		expect(ran()).not.toContainEqual([RUN_REVIEW])
+		expect(error_lines.join('\n')).toContain(
+			'run:chain 5630 — stopped at acceptance:check (exit 2)',
+		)
+		expect(error_lines.join('\n')).toContain('`pnpm josh run:chain 5630 --from acceptance:check`')
 	})
 })
 
@@ -127,6 +167,12 @@ describe('run_chain_cli.run — resume and forwarding', () => {
 		await expect(run_chain_cli.run([ISSUE, FROM, RUN_REVIEW])).resolves.toBe(0)
 
 		expect(ran()).toStrictEqual([[RUN_REVIEW]])
+	})
+
+	it('resumes at acceptance:check, then runs the ship refusals and run:review', async () => {
+		await expect(run_chain_cli.run([ISSUE, FROM, ACCEPTANCE_CHECK])).resolves.toBe(0)
+
+		expect(ran()).toStrictEqual([[ACCEPTANCE_CHECK], ...BEFORE_REVIEW, [RUN_REVIEW]])
 	})
 
 	it('forwards --unpinned-ok to run:review alone', async () => {
@@ -209,7 +255,22 @@ describe('run_chain_cli.run — the ledger line', () => {
 			issue: 5630,
 			join: false,
 			elapsed_ms: expect.any(Number) as number,
+			stages: expect.any(Array) as Array<unknown>,
 		})
+	})
+
+	// joshuafolkken/kit#7736: the line carries each stage that ran, the stopped one last.
+	it('records the stages that ran through the stopped one', async () => {
+		const record = recorded()
+
+		stop_at(CHECK_RELATED)
+		await run_chain_cli.run([ISSUE, FROM, CHECK_RELATED])
+
+		expect(record).toHaveBeenCalledWith(
+			expect.objectContaining({
+				stages: [expect.objectContaining({ name: CHECK_RELATED }) as unknown],
+			}),
+		)
 	})
 
 	it('records nothing when the arguments are refused', async () => {

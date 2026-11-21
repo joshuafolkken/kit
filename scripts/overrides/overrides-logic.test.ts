@@ -1,22 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { overrides_fixture } from './overrides-fixture'
 import { overrides_check } from './overrides-logic'
 
-function make_overrides(entries: Array<[string, string]>): Record<string, string> {
-	return Object.fromEntries(entries)
-}
-
-function make_package_json(
-	deps: Record<string, string>,
-	development_deps: Record<string, string>,
-): string {
-	return JSON.stringify({
-		dependencies: deps,
-		devDependencies: development_deps,
-	})
-}
-
-const CAPPED_PKG_KEY = 'some-pkg@>=5'
-const CAPPED_PKG_VALUE = '^4'
+const { make_overrides, make_package_json, CAPPED_PKG_KEY, CAPPED_PKG_VALUE } = overrides_fixture
 const ESBUILD_KEY = 'esbuild@<=0.24.2'
 const ESBUILD_VALUE = '>=0.25.0'
 const NEW_PKG_KEY = 'new-pkg@>=1'
@@ -184,33 +170,6 @@ describe('overrides_check.extract_overridden_package_names', () => {
 	})
 })
 
-describe('overrides_check.list_excluded_package_names', () => {
-	it('always includes the held-back typescript package', () => {
-		expect(overrides_check.list_excluded_package_names({})).toEqual(['typescript'])
-	})
-
-	it('merges held-back packages with capped-override packages', () => {
-		const overrides = make_overrides([[CAPPED_PKG_KEY, CAPPED_PKG_VALUE]])
-
-		expect(overrides_check.list_excluded_package_names(overrides)).toEqual([
-			'typescript',
-			'some-pkg',
-		])
-	})
-
-	it('merges held-back packages with bare-override packages', () => {
-		const overrides = make_overrides([['svelte', '^5.55.7']])
-
-		expect(overrides_check.list_excluded_package_names(overrides)).toEqual(['typescript', 'svelte'])
-	})
-
-	it('deduplicates a package that is both held back and capped', () => {
-		const overrides = make_overrides([['typescript@>=7', '^6']])
-
-		expect(overrides_check.list_excluded_package_names(overrides)).toEqual(['typescript'])
-	})
-})
-
 describe('integration: filtering overridden packages from update targets', () => {
 	it('excludes overridden packages from dependency list', () => {
 		const overrides = make_overrides([
@@ -299,31 +258,11 @@ describe('overrides_check.build_update_command — indirect overrides', () => {
 
 		expect(result).toEqual(['pnpm', 'update', '--latest', 'svelte', 'vitest'])
 		expect(overrides_check.list_excluded_package_names(overrides)).toEqual([
-			'typescript',
+			...overrides_check.HELD_BACK_PACKAGE_NAMES,
 			'vite',
 			'postcss',
 			'nanoid',
 		])
-	})
-})
-
-describe('overrides_check.build_update_command — held-back packages', () => {
-	it('excludes the held-back typescript package even without any overrides', () => {
-		const content = make_package_json({ svelte: '^5' }, { typescript: '^6', vitest: '^3' })
-		const result = overrides_check.build_update_command({}, content)
-
-		expect(result).toEqual(['pnpm', 'update', '--latest', 'svelte', 'vitest'])
-	})
-
-	it('excludes both held-back and overridden packages together', () => {
-		const overrides = make_overrides([[CAPPED_PKG_KEY, CAPPED_PKG_VALUE]])
-		const content = make_package_json(
-			{ svelte: '^5' },
-			{ 'some-pkg': '^4', typescript: '^6', vitest: '^3' },
-		)
-		const result = overrides_check.build_update_command(overrides, content)
-
-		expect(result).toEqual(['pnpm', 'update', '--latest', 'svelte', 'vitest'])
 	})
 })
 

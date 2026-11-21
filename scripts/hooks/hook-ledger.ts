@@ -97,22 +97,33 @@ function entry_of(
 	}
 }
 
-// `undefined` outside a repository and under a test run, so a hook suite never writes the real ledger.
-function ledger_directory(context: HookContext = hook_context.from_process()): string | undefined {
+// A named ledger's home in the common git directory, shared with `confirmation-ledger.ts`.
+// `undefined` outside a repository and under a test run, so a suite never writes the real ledger.
+function directory_of(name: string, context: HookContext): string | undefined {
 	if (context.env['VITEST'] !== undefined) return undefined
 
 	const common = git_common_directory.repository(context.cwd)
 
 	return common === undefined
 		? undefined
-		: path.join(common, git_common_directory.STATE_DIRECTORY, LEDGER_DIRECTORY)
+		: path.join(common, git_common_directory.STATE_DIRECTORY, name)
 }
 
-async function append(entry: HookLedgerEntry, directory: string): Promise<void> {
-	const day = observation_ledger_home.ledger_date(new Date(entry.at))
+function ledger_directory(context: HookContext = hook_context.from_process()): string | undefined {
+	return directory_of(LEDGER_DIRECTORY, context)
+}
 
+// The day file an entry stamped `at` goes to.
+function day_file(directory: string, at: string): string {
+	return path.join(
+		directory,
+		`${observation_ledger_home.ledger_date(new Date(at))}${LEDGER_EXTENSION}`,
+	)
+}
+
+async function append_line(entry: object, at: string, directory: string): Promise<void> {
 	await mkdir(directory, { recursive: true })
-	await appendFile(path.join(directory, `${day}${LEDGER_EXTENSION}`), `${JSON.stringify(entry)}\n`)
+	await appendFile(day_file(directory, at), `${JSON.stringify(entry)}\n`)
 }
 
 // **The ledger only counts, so it never fails the hook.** A line it could not write leaves the
@@ -127,7 +138,9 @@ async function record(
 	try {
 		const branch = await git_spawn.read(['-C', context.cwd, 'rev-parse', '--abbrev-ref', 'HEAD'])
 
-		await append(entry_of(refusal, branch, new Date(), context.env), directory)
+		const entry = entry_of(refusal, branch, new Date(), context.env)
+
+		await append_line(entry, entry.at, directory)
 	} catch {
 		// Nothing to report to: the hook has already answered the call.
 	}
@@ -151,8 +164,11 @@ function blocked_reason(envelope: string): string | undefined {
 }
 
 const hook_ledger = {
+	LEDGER_EXTENSION,
+	append_line,
 	blocked_reason,
 	command_of,
+	directory_of,
 	ledger_directory,
 	record,
 	record_reason,

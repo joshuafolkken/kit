@@ -45,13 +45,19 @@ const CHILDREN = EPICS.flatMap((epic) => epic.children)
 const PRE_FIX_READS_PER_CHILD = 4
 // One open pull request listing and one GraphQL query, however many children there are.
 const RESUME_READS = 2
-// The listed children are candidates, so each one's body is read too (11 of the 21); without #6611
-// the scan read each listed child again, 32 calls.
-const SCAN_CALL_CAP = 21
-const PRE_FIX_SCAN_CALLS = 63
+// The listed children are candidates; before #7912 each one's body was read too, so a defect could
+// lead ties, and now that a defect is a ranking key, a body is read only while the defect rate is
+// above its baseline. Without #6611 the scan read each listed child again. One more is the
+// `route:interrupt` listing (#7860), a single read however large the backlog, and one more the open
+// `run:solo` listing (#7855).
+const SCAN_CALL_CAP = 12
+const PRE_FIX_SCAN_CALLS = 65
+// The body reads #7912 dropped, one per listed child.
+const PRE_FIX_BODY_READS = CHILDREN.length
 // The second scan with nothing changed, measured: the epic listing, the three epic bodies and the open
-// pull request listing (#7620) come back 304, so they are not billed.
-const SECOND_SCAN_CALL_CAP = 15
+// pull request listing (#7620) come back 304, so they are not billed. The open `run:solo` listing
+// (#7855) is read again each scan.
+const SECOND_SCAN_CALL_CAP = 6
 
 const streams = console_streams()
 
@@ -225,7 +231,8 @@ it('keeps one scan of 11 epic children under the gh call cap', async () => {
 	expect(git_gh_exec.exec_gh_api).toHaveBeenCalledTimes(RESUME_READS)
 
 	const calls = scan_calls()
-	const pre_fix = calls - RESUME_READS + PRE_FIX_READS_PER_CHILD * CHILDREN.length
+	const pre_fix =
+		calls - RESUME_READS + PRE_FIX_READS_PER_CHILD * CHILDREN.length + PRE_FIX_BODY_READS
 
 	expect(pre_fix).toBe(PRE_FIX_SCAN_CALLS)
 	expect(calls).toBeLessThanOrEqual(SCAN_CALL_CAP)

@@ -10,6 +10,7 @@ const KIND = {
 	STAGE: 'stage',
 	STOP: 'stop',
 	CHAIN: 'chain',
+	CHAIN_STAGE: 'chain-stage',
 	OVERLAP: 'overlap',
 	HELD: 'held',
 	RELEASED: 'released',
@@ -21,16 +22,19 @@ const KIND = {
 	CORE_ADMISSION: 'core-admission',
 	UNIT_FILES: 'unit-files',
 	TEST_RELATED: 'test-related',
+	LINT_RELATED: 'lint-related',
 	TEST_PINNED: 'test-pinned',
 	SPLIT_NOTICE: 'split-notice',
 	SPLIT_FILED: 'split-filed',
 	UNPLANNED_NOTICE: 'unplanned-notice',
+	PREFLIGHT: 'preflight',
 	LANE_STATE: 'lane-state',
 	PUSH_MISS: 'push-miss',
 	EARLY_PUSH: 'early-push',
 	SHIP_LAP: 'ship-lap',
 	SIZE: 'size',
 	LIMIT: 'limit',
+	ESTIMATE: 'estimate',
 } as const
 
 const lane_ledger_kind = { KIND }

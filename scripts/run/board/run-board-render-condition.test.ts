@@ -91,8 +91,10 @@ describe('run_board_render_condition.waits_of', () => {
 	const blocked = row(1, reason, [BLOCKER, OTHER, LAST])
 
 	it('follows a conditioned row’s title with the issues after the first', () => {
-		expect(waits_of(blocked, header(), true)).toBe(`${OTHER}, ${LAST}`)
-		expect(waits_of(row(2, { issues: [BLOCKER] }, [BLOCKER]), header(), true)).toBeUndefined()
+		expect(waits_of(blocked, header(), CONDITION_WIDTH)).toBe(`${OTHER}, ${LAST}`)
+		expect(
+			waits_of(row(2, { issues: [BLOCKER] }, [BLOCKER]), header(), CONDITION_WIDTH),
+		).toBeUndefined()
 	})
 
 	it('follows any other row’s title with 🔗 and every blocker still standing', () => {
@@ -103,13 +105,13 @@ describe('run_board_render_condition.waits_of', () => {
 	it('keeps 🔗 and every blocker on a conditioned row whose wait names no issue, as a stalled one', () => {
 		const stalled = row(3, { tail: 'fullrun #3' }, [BLOCKER, OTHER])
 
-		expect(waits_of(stalled, header(), true)).toBe(`🔗 ${BLOCKER}, ${OTHER}`)
+		expect(waits_of(stalled, header(), CONDITION_WIDTH)).toBe(`🔗 ${BLOCKER}, ${OTHER}`)
 	})
 
 	it('follows a conditioned row’s title with every issue when the first overruns the column', () => {
 		const cross = row(4, { issues: [CROSS_REPO, OTHER] }, [CROSS_REPO, OTHER])
 
-		expect(waits_of(cross, header(), true)).toBe(`${CROSS_REPO}, ${OTHER}`)
+		expect(waits_of(cross, header(), CONDITION_WIDTH)).toBe(`${CROSS_REPO}, ${OTHER}`)
 	})
 })
 
@@ -120,8 +122,8 @@ describe('run_board_render.render — the condition column across sections', () 
 	const lines = lines_of(header({ layout }))
 
 	it('starts every queued and waiting row’s number in one column', () => {
-		const queued_line = lines.find((line) => line.startsWith(`    ${WAIT_ICONS.lane} `)) ?? ''
-		const waiting_line = lines.find((line) => line.startsWith(`    ${WAIT_ICONS.blocker} `)) ?? ''
+		const queued_line = lines.find((line) => line.startsWith(`     ${WAIT_ICONS.lane} `)) ?? ''
+		const waiting_line = lines.find((line) => line.startsWith(`     ${WAIT_ICONS.blocker} `)) ?? ''
 
 		expect(queued_line.indexOf(' 5')).toBe(waiting_line.indexOf(' 1234'))
 		expect(queued_line).not.toBe('')
@@ -133,8 +135,9 @@ describe('run_board_render.render — the condition column across sections', () 
 		const behind = row(4269, { icon: WAIT_ICONS.solo_ahead, issues: ['4287'] })
 		const rows = [solo, behind].map((entry) => ({ kind: 'row' as const, row: entry }))
 		const drawn = lines_of(header({ layout: { ...EMPTY_LAYOUT, queued: rows } }))
-		const solo_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo} `)) ?? ''
-		const behind_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo_ahead} `)) ?? ''
+		const solo_line = drawn.find((line) => line.startsWith(`     ${WAIT_ICONS.solo} `)) ?? ''
+		const behind_line =
+			drawn.find((line) => line.startsWith(`     ${WAIT_ICONS.solo_ahead} `)) ?? ''
 
 		expect(solo_line).toContain(`4288+1${' '.repeat(CONDITION_WIDTH - '4288+1'.length)} 4287`)
 		expect(solo_line.endsWith('4268')).toBe(true)
@@ -149,6 +152,28 @@ describe('run_board_render.render — the condition column across sections', () 
 	})
 })
 
+// joshuafolkken/kit#7695: a waiting row's upstream Issue in another repository is drawn whole.
+describe('run_board_render.render — a waiting row held by another repository’s Issue', () => {
+	const queued = { kind: 'row' as const, row: row(5, { icon: WAIT_ICONS.lane, value: '4/4' }) }
+	const short = row(320, { icon: WAIT_ICONS.blocker, issues: ['kit#7691'] }, ['kit#7691'])
+	const long = row(321, { icon: WAIT_ICONS.blocker, issues: [CROSS_REPO] }, [CROSS_REPO])
+	const layout = { ...EMPTY_LAYOUT, queued: [queued], unreached: [short, long] }
+	const lines = lines_of(header({ layout }))
+
+	function line_of(number: string): string {
+		return lines.find((line) => line.endsWith(` ${number}`)) ?? ''
+	}
+
+	it('widens the column to the longest reference, every number in one column', () => {
+		const width = run_board_render_condition.width_for([short, long])
+
+		expect(width).toBe(CROSS_REPO.length)
+		expect(line_of('321')).toContain(`${CROSS_REPO} 321`)
+		expect(line_of('320')).toContain(`kit#7691${' '.repeat(width - 'kit#7691'.length)} 320`)
+		expect(line_of('5').indexOf(' 5')).toBe(line_of('320').indexOf(' 320'))
+	})
+})
+
 // joshuafolkken/kit#4391: 🔒 names the running run:solo issue in the column.
 describe('run_board_render.render — a row a running run:solo issue holds', () => {
 	it('draws the holder in the condition column', () => {
@@ -156,7 +181,8 @@ describe('run_board_render.render — a row a running run:solo issue holds', () 
 		const drawn = lines_of(
 			header({ layout: { ...EMPTY_LAYOUT, queued: [{ kind: 'row', row: held }] } }),
 		)
-		const held_line = drawn.find((line) => line.startsWith(`    ${WAIT_ICONS.solo_running} `)) ?? ''
+		const held_line =
+			drawn.find((line) => line.startsWith(`     ${WAIT_ICONS.solo_running} `)) ?? ''
 
 		expect(held_line).toContain(`4374${' '.repeat(CONDITION_WIDTH - '4374'.length)} 4387`)
 		expect(held_line.endsWith('4387')).toBe(true)

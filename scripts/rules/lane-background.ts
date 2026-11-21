@@ -38,11 +38,11 @@ import { run_tail_rule } from './run-tail-rule'
 
 // The josh subcommands that run long enough to be backgrounded, as `time_josh_names` names them — canonical,
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
-// `ship`, `ship:wait` and `lane:plan` are run in the foreground at the cap rather than refused: a
-// `ship:wait` left at the two-minute default is moved aside mid-chunk and dies with the turn, its verdict
-// unread, and a cut `lane:plan` leaves its plan recorded with the check it gates unanswered.
+// `ship`, `ship:wait`, `wait` and `lane:plan` are run in the foreground at the cap rather than refused:
+// a `ship:wait` or `wait` left at the two-minute default is moved aside mid-chunk and dies with the turn,
+// its verdict unread, and a cut `lane:plan` leaves its plan recorded with the check it gates unanswered.
 const FOREGROUND_COMMANDS: ReadonlySet<string> = new Set(
-	['ship', 'ship:wait', 'lane:plan'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
+	['ship', 'ship:wait', 'wait', 'lane:plan'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
 )
 const LONG_RUNNING_COMMANDS: ReadonlySet<string> = new Set([
 	...['gate', 'git', 'followup'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
@@ -140,10 +140,10 @@ function foreground_input(
 }
 
 const FOREGROUND_NOTE =
-	"lane background: a lane child's `josh ship`, `josh ship:wait` or `josh lane:plan` backgrounded, by its flag or by " +
+	"lane background: a lane child's `josh ship`, `josh ship:wait`, `josh wait` or `josh lane:plan` backgrounded, by its flag or by " +
 	'outrunning the Bash timeout, dies with the headless turn — so it was run in the foreground at the ' +
-	'600000 ms cap, where `ship` detaches itself after the preflight. Then follow ' +
-	'`chain-rule.md` step 0 (`josh ship:wait` on its `pending`).'
+	'600000 ms cap, where `ship` detaches after the preflight. Then a `pending` wait is re-run as ' +
+	'it says (a ship: `chain-rule.md` step 0, `josh ship:wait` on its `pending`).'
 
 type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
 
@@ -201,18 +201,24 @@ const LANE_BACKGROUND_REASON =
 	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
 const LANE_BACKGROUND_STOP_REASON =
-	'⛔ lane background stop: this is a dispatched lane child (`JOSH_LANE_CHILD`) and a background task ' +
+	'⛔ lane background stop: this is a started child (lane, hand-off or beside) and a background task ' +
 	'it launched has not finished, and ending this turn kills it. Wait for it in the foreground, or ' +
-	're-issue the work through `pnpm josh ship --detach` — do not notify, stop or repeat your reply.'
+	'(lane child) re-issue the work through `pnpm josh ship --detach` — do not notify, stop or repeat ' +
+	'your reply.'
 
 // **Only subagents left: the wait that receives their answer** (joshuafolkken/kit#4803). Their completion
-// notice is delivered only when a tool call ends, so one long hand-written loop holds it back until the
-// loop itself gives up; short foreground calls, one at a time, let it in at the first one to end.
+// notice is delivered only when a tool call ends, so a hand-written loop holds it back until the loop
+// itself gives up. **A foreground dispatch needs no wait at all**, so the reason leads with it: a
+// short `sleep` repeated rereads the context on every call (joshuafolkken/kit#7879). One already in the
+// background is waited on by the foreground work left, then `LANE_AGENT_WAIT`: one call that lasts up to
+// the `ship:wait` chunk, so a long wait costs one request per chunk (joshuafolkken/kit#8336).
+const LANE_AGENT_WAIT = 'pnpm josh wait'
 const LANE_AGENT_STOP_REASON =
-	'⛔ lane agent stop: this is a dispatched lane child (`JOSH_LANE_CHILD`) and a subagent it launched ' +
-	'has not finished; ending this turn kills it. Its completion notice arrives only when a tool call ' +
-	'ends: wait with one short foreground call at a time (`sleep 20`) until it arrives — never a loop ' +
-	'over its `.output`. Do not notify, stop or repeat your reply.'
+	'⛔ lane agent stop: a subagent this started child (lane, hand-off or beside) launched has not ' +
+	'finished; ending this turn kills it. Dispatch subagents with `run_in_background: false`: no wait. Its notice arrives only ' +
+	`when a tool call ends: do the foreground work left, then one \`${LANE_AGENT_WAIT}\` ` +
+	'(Bash `timeout: 600000`) at a time — ' +
+	'never a loop over `.output`. Do not notify, stop or repeat your reply.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. It fires on every occurrence (`decide`
 // returns true): a child must never background these, so the route is always the detached ship, never
@@ -241,6 +247,7 @@ const ROW = {
 const lane_background = {
 	FOREGROUND_NOTE,
 	LANE_AGENT_STOP_REASON,
+	LANE_AGENT_WAIT,
 	LANE_BACKGROUND_REASON,
 	LANE_BACKGROUND_STOP_REASON,
 	ROW,

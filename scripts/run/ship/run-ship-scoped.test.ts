@@ -342,7 +342,7 @@ describe('run_ship_scoped.scoped_gate', () => {
 
 		expect(await run_ship_scoped.scoped_gate()).toStrictEqual({ code: OK, out: '' })
 		expect(commands()).toStrictEqual([LINT, GATE])
-		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate', WHOLE_TREE_FLAG], true)
+		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate', WHOLE_TREE_FLAG], true, undefined, {})
 	})
 
 	it('stops before josh gate when the scoped pair fails', async () => {

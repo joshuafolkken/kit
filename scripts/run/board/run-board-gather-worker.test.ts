@@ -6,20 +6,22 @@ import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_read } from './run-board-read'
 import { run_board_tick } from './run-board-tick'
+import { run_board_worker_entry } from './run-board-worker-entry'
 
 // joshuafolkken/kit#4267: a live board's reads run on its worker thread, so the redraw's own thread
 // reads no run stream, no process table and no machine gauge — none of which can then stop a spinner.
 
 const { harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
-const { WORKER_URL, worker_gatherer, worker_options } = run_board_gather_thread
+const { worker_gatherer, worker_options } = run_board_gather_thread
 // The worker starts tsx and takes a first round of real reads before the first frame.
 const FIRST_ROUND_MS = 60_000
 const workers: Array<Worker> = []
 
-// A dist-launched parent carries no loader in its command line.
+// The source worker, started the way a source-run board starts it: with the loader added.
 function spawn(): Worker {
-	const worker = new Worker(WORKER_URL, worker_options([]))
+	const launch = run_board_worker_entry.launch_of(false, [])
+	const worker = new Worker(launch.url, worker_options(launch))
 
 	workers.push(worker)
 
