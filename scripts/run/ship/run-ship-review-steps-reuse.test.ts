@@ -12,6 +12,7 @@ const movement_mock = vi.hoisted(() => vi.fn())
 const stopped_on_mock = vi.hoisted(() => vi.fn())
 const mark_stopped_mock = vi.hoisted(() => vi.fn())
 const interaction_status_mock = vi.hoisted(() => vi.fn(async (): Promise<unknown> => undefined))
+const resolutions_mock = vi.hoisted(() => vi.fn(async (): Promise<ReadonlyArray<unknown>> => []))
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: () => false },
 }))
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
+vi.mock('#scripts/lane/lane-resolve', () => ({ lane_resolve: { resolutions: resolutions_mock } }))
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 
@@ -188,13 +190,19 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 	})
 })
 
-// joshuafolkken/kit#8379: the rerun of a stale issue says so on its launch prompt.
+// joshuafolkken/kit#8379: the rerun of a stale issue says so on its launch prompt; joshuafolkken/kit#8494:
+// so does the round after a conflict resolution, over the stale rerun.
 describe('run_ship_review_steps.review_stage — the launch trigger of round 1', () => {
+	const RESOLVED = [{ created_at: '2026-11-02T00:00:00Z', body: '## Lane conflict resolved' }]
+
 	it.each([
-		[true, review_prompt_level.RETRY.STALE],
-		[false, 'initial'],
-	])('names the launch trigger when stale is %s', async (is_stale, trigger) => {
+		[true, [], review_prompt_level.RETRY.STALE],
+		[false, [], 'initial'],
+		[false, RESOLVED, review_prompt_level.RETRY.POST_CONFLICT],
+		[true, RESOLVED, review_prompt_level.RETRY.POST_CONFLICT],
+	])('names the launch trigger when stale is %s', async (is_stale, resolved, trigger) => {
 		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		resolutions_mock.mockResolvedValueOnce(resolved)
 
 		await run_ship_review_steps.review_stage(ISSUE, is_stale)
 

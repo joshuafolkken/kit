@@ -3,7 +3,8 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
-import { review_prompt_level, type RetryTrigger } from '#scripts/review/review-prompt-level'
+import { review_post_conflict } from '#scripts/review/review-post-conflict'
+import type { RetryTrigger } from '#scripts/review/review-prompt-level'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
 import { review_round } from '#scripts/review/review-round'
 import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-round-reuse'
@@ -70,7 +71,6 @@ const ROUND_ONE_RECORDED_NOTE =
 const { run_phases, scoped_pair } = run_ship_scoped
 const { CAUSE } = run_ship_stop_cause
 const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
-const { STALE } = review_prompt_level.RETRY
 // `run:review` opens code's brief alone here: the interaction slot's is the ship's own open beside it.
 const ROUND_ONE_OPENS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
 	code: [RUN_REVIEW, run_review.CODE_ONLY_FLAG],
@@ -240,16 +240,17 @@ function round_one_provider(
 	return reviewed_together(round_one_opens(slots, unpinned_ok), prompt_of, issue, ROUND_ONE)
 }
 
-// The provider step: a stale round's launches name the stale rerun, else the retry the checkpoint
-// reruns the step under, if any (joshuafolkken/kit#8492).
+// The provider step: the round's own cause — a resolved conflict or a stale record — names its
+// launches, else the retry the checkpoint reruns the step under, if any (joshuafolkken/kit#8492,
+// joshuafolkken/kit#8494).
 function round_one_phase(
 	issue: string,
 	slots: ReadonlyArray<ReviewSlot>,
 	unpinned_ok: ReadonlyArray<string>,
-	is_stale: boolean,
+	cause: RetryTrigger | undefined,
 ): RetryPhase {
 	return async (retry) =>
-		await run_phases(round_one_provider(issue, slots, unpinned_ok, is_stale ? STALE : retry))
+		await run_phases(round_one_provider(issue, slots, unpinned_ok, cause ?? retry))
 }
 
 // A recorded round 1 attested on this branch, its tree held or moved only where round 2 reads: the
@@ -276,12 +277,13 @@ async function round_one_stage(
 	// A stale record narrows nothing: the next round reads the whole change under the new specification,
 	// and its launches name the stale rerun (joshuafolkken/kit#8379).
 	if (is_stale) review_reviewed_tree.discard()
+	const cause = await review_post_conflict.trigger(Number(issue), is_stale)
 	const ran = await run_ship_review_checkpoint.run(
 		issue,
 		`one-${slots.join('-')}`,
 		[
 			['scoped', tagged_phase(CAUSE.CHECK, scoped_pair)],
-			['provider', round_one_phase(issue, slots, unpinned_ok, is_stale)],
+			['provider', round_one_phase(issue, slots, unpinned_ok, cause)],
 			['gate', tagged_phase(CAUSE.CHECK, async () => await join_gate(slots))],
 			['attest', attest_phase],
 			['record', async () => await code_round_one_record(issue, slots)],
