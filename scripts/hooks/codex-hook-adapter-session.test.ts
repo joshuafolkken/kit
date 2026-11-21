@@ -55,7 +55,10 @@ function edit_payload(session_id?: string): string {
 
 // The hook's own verdict, priced on the environment the adapter hands the guards.
 function hook_verdict(project: string, raw_payload: string): string {
-	return cost_cli.session_verdict(project, codex_hook_adapter.session_context(raw_payload).env)
+	return cost_cli.session_verdict({
+		cwd: project,
+		environment: codex_hook_adapter.session_context(raw_payload).env,
+	})
 }
 
 interface SessionFixture {

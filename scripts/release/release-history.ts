@@ -86,7 +86,7 @@ async function read_base(
 // `origin/<default>` rather than from the checkout's own `package.json`, so the number it raises is
 // main's latest even when the run happens in a work tree cut for the release.
 async function read_current_version(
-	tip: string = DEFAULT_TIP,
+	tip: string,
 	reader: HistoryReader = git_reader,
 ): Promise<string | undefined> {
 	return await read_version_at(reader, tip)

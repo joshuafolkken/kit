@@ -275,12 +275,17 @@ function figures_of(measurement: OverMeasurement | undefined): SessionFigures {
 	return { verdict, cost, threshold: cut_threshold(measurement) }
 }
 
+interface SessionScope {
+	cwd?: string | undefined
+	environment?: Environment | undefined
+}
+
 // The `--cut` verdict and its figures as a value, printing nothing. `run:report --handoff` quotes the
 // figures in the hand-off report; `session_verdict` reads the verdict alone.
-function session_figures(
-	cwd: string = process.cwd(),
-	environment: Environment = process.env,
-): SessionFigures {
+function session_figures({
+	cwd = process.cwd(),
+	environment = process.env,
+}: SessionScope = {}): SessionFigures {
 	const provider = provider_of(environment)
 
 	return figures_of(provider === undefined ? undefined : measure(cwd, provider, environment))
@@ -291,11 +296,8 @@ function session_figures(
 // `run` returns. `unmeasurable` is the read-only counterpart of `report_empty` / the empty-session
 // error: a session with no provider, no transcript of its own, or no request cannot be priced, and
 // saying so is not the same as `under`.
-function session_verdict(
-	cwd: string = process.cwd(),
-	environment: Environment = process.env,
-): CostVerdict {
-	return session_figures(cwd, environment).verdict
+function session_verdict(scope: SessionScope = {}): CostVerdict {
+	return session_figures(scope).verdict
 }
 
 function run_context(
@@ -310,14 +312,21 @@ function run_context(
 	return { over: options.over, path: options.path, provider }
 }
 
+// `--path <dir>` reads the target project instead of the process cwd.
+function run_target(context: RunContext, cwd: string, environment: Environment): number {
+	const target = transcript_cwd.resolve(context.path, cwd)
+	if (reject_openai_cross_project(context, target, cwd)) return FAILURE_EXIT_CODE
+
+	return run_over(target, context.over, context.provider, environment)
+}
+
 // This process's own working directory, kept as-is: from a lane the transcript search covers the
 // lane's own slug alone, so pre-rewriting the cwd to the main checkout here
 // would drop the lane's own slug and hide a dispatched child's transcript.
 // `time-cli.ts` gives the same reason.
 function run(
 	argv: ReadonlyArray<string>,
-	cwd: string = process.cwd(),
-	environment: Environment = process.env,
+	{ cwd = process.cwd(), environment = process.env }: SessionScope = {},
 ): number {
 	const context = run_context(argv, environment)
 
@@ -327,11 +336,7 @@ function run(
 		return FAILURE_EXIT_CODE
 	}
 
-	// `--path <dir>` reads the target project instead of the process cwd.
-	const target = transcript_cwd.resolve(context.path, cwd)
-	if (reject_openai_cross_project(context, target, cwd)) return FAILURE_EXIT_CODE
-
-	return run_over(target, context.over, context.provider, environment)
+	return run_target(context, cwd, environment)
 }
 
 const cost_cli = {

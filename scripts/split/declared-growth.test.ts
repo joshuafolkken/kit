@@ -11,24 +11,26 @@ describe('declared growth', () => {
 	})
 })
 
-describe('split notice growth', () => {
-	const DECLARED = { files: 2, lines: 40 }
-	const GUIDE = split_assess.guide_for(12, undefined, { files: 1.5, lines: 1.25 })
+const DECLARED = { files: 2, lines: 40 }
+const GUIDE = split_assess.guide_for(12, undefined, { files: 1.5, lines: 1.25 })
 
+// The notice for a single-verdict diff of this size against the declaration and measured growth.
+function grown_notice(files: number, lines: number): string | undefined {
+	return split_assess.notice(
+		{ files, lines, verdict: 'single' },
+		{ declared: DECLARED, guide: GUIDE },
+	)
+}
+
+describe('split notice growth', () => {
 	it('uses independent file and line boundaries (ac-54136377)', () => {
-		expect(
-			split_assess.notice({ files: 3, lines: 50, verdict: 'single' }, DECLARED, GUIDE),
-		).toBeUndefined()
-		expect(
-			split_assess.notice({ files: 4, lines: 50, verdict: 'single' }, DECLARED, GUIDE),
-		).toBeDefined()
-		expect(
-			split_assess.notice({ files: 3, lines: 51, verdict: 'single' }, DECLARED, GUIDE),
-		).toBeDefined()
+		expect(grown_notice(3, 50)).toBeUndefined()
+		expect(grown_notice(4, 50)).toBeDefined()
+		expect(grown_notice(3, 51)).toBeDefined()
 	})
 
 	it('prints guide and axis growth values with their sources (ac-75138e94)', () => {
-		const notice = split_assess.notice({ files: 4, lines: 50, verdict: 'single' }, DECLARED, GUIDE)
+		const notice = grown_notice(4, 50)
 
 		expect(notice).toContain('guide 8 files / 200 lines (fallback)')
 		expect(notice).toContain('growth files × 1.5 (measured) / lines × 1.25 (measured)')

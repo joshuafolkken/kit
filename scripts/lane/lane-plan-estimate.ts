@@ -47,7 +47,7 @@ async function attach(plan: LanePlan, file: string | undefined): Promise<LanePla
 		throw new Error('planned path needs an estimate')
 	}
 
-	const size = split_assess.measure(scope.changes, undefined, new Set(scope.added))
+	const size = split_assess.measure(scope.changes, { added: new Set(scope.added) })
 
 	return { ...plan, paths, estimated_size: { files: size.files, lines: size.lines } }
 }

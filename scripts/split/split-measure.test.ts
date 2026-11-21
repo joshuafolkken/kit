@@ -99,7 +99,7 @@ describe('read_branch measured guide', () => {
 		})
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(SMALL_DIFF)
 		const measured = await split_measure.read_branch()
-		const notice = split_assess.notice(measured, { files: 1, lines: 40 })
+		const notice = split_assess.notice(measured, { declared: { files: 1, lines: 40 } })
 
 		expect(notice).toContain('growth files × 1 (measured) / lines × 1.25 (measured)')
 		expect(split_assess.reason(measured)).toContain('guide 8 files / 200 lines (fallback)')
@@ -175,7 +175,7 @@ describe('read_branch excludes run records', () => {
 		const measurement = await split_measure.read_branch()
 
 		expect(measurement).toEqual({ files: 1, lines: 1, verdict: 'single', guide: LEGACY_GUIDE })
-		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeUndefined()
+		expect(split_assess.notice(measurement, { declared: { files: 1, lines: 10 } })).toBeUndefined()
 	})
 })
 

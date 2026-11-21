@@ -77,11 +77,13 @@ function launch(
 	return result.status ?? FAILURE_EXIT_CODE
 }
 
-function run(
-	argv: ReadonlyArray<string>,
-	root: string = process.cwd(),
-	flags: NodeFlags = process.allowedNodeEnvironmentFlags,
-): number {
+// The checkout a run resolves its script under, and the flags this Node knows.
+interface RunScope {
+	root?: string | undefined
+	flags?: NodeFlags | undefined
+}
+
+function run_in(argv: ReadonlyArray<string>, root: string, flags: NodeFlags): number {
 	const [name = '', ...script_arguments] = argv
 	const script = path.resolve(root, name)
 	const scratch_root = scratch_root_of(root)
@@ -94,6 +96,13 @@ function run(
 	}
 
 	return launch(script, scratch_root, script_arguments)
+}
+
+function run(
+	argv: ReadonlyArray<string>,
+	{ root = process.cwd(), flags = process.allowedNodeEnvironmentFlags }: RunScope = {},
+): number {
+	return run_in(argv, root, flags)
 }
 
 function main(argv: ReadonlyArray<string>): void {

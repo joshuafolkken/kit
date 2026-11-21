@@ -32,7 +32,10 @@ describe('confirmation_ledger.record', () => {
 	it('appends one line naming the reason, the Issue, the checkout and when it was asked', async () => {
 		const directory = path.join(scratch, 'record')
 
-		await confirmation_ledger.record({ reason: STOPPED, issue: ISSUE }, directory, context_of(HERE))
+		await confirmation_ledger.record(
+			{ reason: STOPPED, issue: ISSUE },
+			{ directory, context: context_of(HERE) },
+		)
 		const [entry] = await read_all(directory)
 
 		expect(entry).toMatchObject({ reason: STOPPED, issue: ISSUE, checkout: HERE })
@@ -40,9 +43,10 @@ describe('confirmation_ledger.record', () => {
 		expect(Number.isNaN(Date.parse(entry?.asked_at ?? ''))).toBe(false)
 	})
 
+	// Under a test run the default ledger directory is none.
 	it('writes nothing when there is no ledger directory', async () => {
 		await expect(
-			confirmation_ledger.record({ reason: STOPPED }, undefined, context_of(HERE)),
+			confirmation_ledger.record({ reason: STOPPED }, { context: context_of(HERE) }),
 		).resolves.toBeUndefined()
 	})
 })
@@ -53,8 +57,7 @@ describe('confirmation_ledger.record_sent', () => {
 
 		await confirmation_ledger.record_sent(
 			{ task_type: 'confirmation' },
-			directory,
-			context_of(HERE),
+			{ directory, context: context_of(HERE) },
 		)
 
 		expect(await read_all(directory)).toMatchObject([{ reason: 'needs-decision' }])
@@ -63,7 +66,10 @@ describe('confirmation_ledger.record_sent', () => {
 	it('records nothing for a send that is not a confirmation', async () => {
 		const directory = path.join(scratch, 'not-sent')
 
-		await confirmation_ledger.record_sent({ task_type: 'completion' }, directory, context_of(HERE))
+		await confirmation_ledger.record_sent(
+			{ task_type: 'completion' },
+			{ directory, context: context_of(HERE) },
+		)
 
 		expect(await read_all(directory)).toEqual([])
 	})
@@ -73,8 +79,11 @@ describe('confirmation_ledger.answer', () => {
 	it("closes only this checkout's confirmations, at the first answer after each", async () => {
 		const directory = path.join(scratch, 'answer')
 
-		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
-		await confirmation_ledger.record({ reason: 'run-handoff' }, directory, context_of(ELSEWHERE))
+		await confirmation_ledger.record({ reason: STOPPED }, { directory, context: context_of(HERE) })
+		await confirmation_ledger.record(
+			{ reason: 'run-handoff' },
+			{ directory, context: context_of(ELSEWHERE) },
+		)
 		await confirmation_ledger.answer(directory, context_of(HERE), LATER)
 		await confirmation_ledger.answer(directory, context_of(HERE), ANSWERED_AT)
 		const entries = await read_all(directory)
@@ -89,7 +98,7 @@ describe('confirmation_ledger.answer', () => {
 		const directory = path.join(scratch, 'answer-before')
 
 		await confirmation_ledger.answer(directory, context_of(HERE), EPOCH)
-		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
+		await confirmation_ledger.record({ reason: STOPPED }, { directory, context: context_of(HERE) })
 
 		const [entry] = await read_all(directory)
 
@@ -99,7 +108,7 @@ describe('confirmation_ledger.answer', () => {
 	it('appends its line and never rewrites the lines already there', async () => {
 		const directory = path.join(scratch, 'append-only')
 
-		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
+		await confirmation_ledger.record({ reason: STOPPED }, { directory, context: context_of(HERE) })
 		const before = readFileSync(day_path(directory), 'utf8')
 
 		await confirmation_ledger.answer(directory, context_of(HERE))
@@ -126,7 +135,7 @@ describe('confirmation_ledger.read', () => {
 	it('skips a broken line', async () => {
 		const directory = path.join(scratch, 'broken')
 
-		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
+		await confirmation_ledger.record({ reason: STOPPED }, { directory, context: context_of(HERE) })
 		appendFileSync(day_path(directory), '{"torn\n')
 
 		expect(await read_all(directory)).toHaveLength(1)
@@ -135,7 +144,7 @@ describe('confirmation_ledger.read', () => {
 	it('returns only the lines asked at or after the start of the period', async () => {
 		const directory = path.join(scratch, 'period')
 
-		await confirmation_ledger.record({ reason: STOPPED }, directory, context_of(HERE))
+		await confirmation_ledger.record({ reason: STOPPED }, { directory, context: context_of(HERE) })
 
 		expect(await confirmation_ledger.read(directory, ANSWERED_AT)).toEqual([])
 		expect(await read_all(directory)).toHaveLength(1)
