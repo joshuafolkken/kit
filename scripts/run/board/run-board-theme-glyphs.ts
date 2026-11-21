@@ -1,5 +1,5 @@
 import { run_board_fit } from './run-board-fit'
-import { run_board_labels } from './run-board-labels'
+import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
 // joshuafolkken/kit#7988: the WarGames theme draws the board as a text terminal would, so every icon is
@@ -175,24 +175,24 @@ const PLAIN: Open = { is_colored: false, intensity: '' }
 
 // Inside a color a render module gave, the text is left uncolored, so that color is not cut; a tone
 // that ends bold or dim (`ESC[22m`) is followed by the bold or dim the line had on.
-function toned_text(text: string, tone: Tone, open: Open): string {
+function toned_text(text: string, tone: Tone, open: Open, idle: Paint): string {
 	if (open.is_colored) return text
-	const toned = run_board_theme_tones.toned(tone, text)
+	const toned = run_board_theme_tones.toned(tone, text, idle)
 
 	return toned === text ? text : toned + open.intensity
 }
 
 // An emoji, with its variation selector, as its text in its tone's color padded to the width it took;
 // one the table misses as `?`, so no emoji is ever drawn.
-function text_of(glyph: string, open: Open): string {
+function text_of(glyph: string, open: Open, idle: Paint): string {
 	const [text, tone] = entry_of(glyph)
 	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
 
-	return toned_text(text, tone, open) + padding
+	return toned_text(text, tone, open, idle) + padding
 }
 
-function glyphs_as_text(text: string, open: Open): string {
-	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open))
+function glyphs_as_text(text: string, open: Open, idle: Paint): string {
+	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open, idle))
 }
 
 // The first code of the color escape a segment starts with; `undefined` for any other segment.
@@ -239,8 +239,8 @@ function mapped(frame: string, draw: (text: string, open: Open) => string): stri
 	return drawn.join(ESC)
 }
 
-function textual(frame: string): string {
-	return mapped(frame, glyphs_as_text)
+function textual(frame: string, idle: Paint = run_board_theme_tones.IDLE_PAINT): string {
+	return mapped(frame, (text, open) => glyphs_as_text(text, open, idle))
 }
 
 const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, mapped, textual }
