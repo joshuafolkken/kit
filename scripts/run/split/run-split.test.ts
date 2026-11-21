@@ -1,3 +1,6 @@
+import { epic_body } from '#scripts/epic/epic-body'
+import { epic_cli } from '#scripts/epic/epic-cli'
+import { epic_cli_chain } from '#scripts/epic/epic-cli-chain'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_split } from './run-split'
@@ -170,6 +173,29 @@ describe('run_split.split — an epic already tracks the issue', () => {
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'chain', done: [] })
 		expect(state.calls).toStrictEqual([])
+	})
+})
+
+// The `## Decisions` record `epic --add` writes for the argv `run:split` handed it, read by `epic`'s
+// own parser rather than restated here.
+function added_decision(argv: ReadonlyArray<string>): string | undefined {
+	const parsed = epic_cli.parse_add_arguments(argv)
+	if (parsed === undefined || parsed.chain_refusal !== undefined) return undefined
+	const chains = epic_cli_chain.declared_of(parsed)
+
+	return epic_body.format_added_order(chains, parsed.order_reasons ?? [])
+}
+
+describe('run_split.split — an ordered split into an existing epic records its reason', () => {
+	it('hands `epic --add` the chain and reason it writes under `## Decisions`', async () => {
+		tracking_with.mockResolvedValue(TRACKED)
+
+		await run_split.split(ORDERED)
+
+		const decision = added_decision(epic_run.mock.calls[0]?.[0] ?? [])
+
+		expect(decision).toContain('- Order: `#10 -> #11 -> #12`, declared by `josh epic --add`')
+		expect(decision).toContain('- Reasoning: uses #10')
 	})
 })
 

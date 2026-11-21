@@ -134,9 +134,9 @@ pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"           
 A split found mid-run in one call: the run set aside as `run:pause` sets it aside (stash, comment,
 release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
 already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
-that epic audited with `epic:audit`. Each `--chain` and `--order-reason` goes to `epic` (creation or
-`--add`) as given; `--after <issue>` writes `<issue> -> <children…>`, the chain `--ordered` declares, so
-its `--order-reason` goes with it. The last line is `epic #<E>`. An epic listing that cannot tell
+that epic audited with `epic:audit`. `--after <issue>` writes `<issue> -> <children…>`, the chain
+`--ordered` declares, so its `--order-reason` goes with it. Same-file children get no order:
+`backlog:next` keeps overlapping paths apart. The last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
 `needs-decision`. Without `--title` and with no tracking epic, or with a `--chain` `epic` refuses
 (`--chain` beside `--ordered`, a malformed line, a number outside `<issue>` and the children, a cycle
