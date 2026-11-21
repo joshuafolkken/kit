@@ -136,13 +136,15 @@ The header is three lines — the first two in three columns, the third the repo
 
 The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
-The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues. `🛫`: start to first lane.
+The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues.
 
 The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
 A live board ends the second line on the sound switch (`🔊` on, `🔇` off) and the last notice, sounded or muted: `🔊 10:42 alert · #<N> stopped` — time, cue, cause; `(repeat)` on a replay, `🔊 —` before the first. `--once`, `--chat` and Telegram draw none.
 
 While a running run's stream holds an outage with no `online` after it, last seen (`offline` or `offline-tick`) within two sampler ticks, `📴` (named in the legend) stands in the `💓`'s place with the time since the network went down, in yellow. The connection events never count as the `💓`'s newest event.
+
+The `💻 processes` rule ends on `🛫`: start to first lane.
 
 The third line is what the run is doing now: a spinner, its age, then the kind's icon and words — the repository's name alone while the stream holds no event.
 

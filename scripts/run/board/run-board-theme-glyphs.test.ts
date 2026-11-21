@@ -4,6 +4,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
+import { run_board_theme } from './run-board-theme'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
@@ -31,6 +32,8 @@ const TABLE: Readonly<Record<Tone, ReadonlyArray<string>>> = {
 	info: ['HB', 'MM', 'DK', 'CP', 'FT', 'BG', 'EP'],
 }
 const DISCLOSURE = '▾'
+const KANA = 'ｦｱｳｴｵｶｷｹｺｻ'
+const TEXTUAL = 'run_board_theme_glyphs.textual'
 
 function board_emoji(): Set<string> {
 	const sources = readdirSync(BOARD).filter(
@@ -81,7 +84,7 @@ describe('run_board_theme_glyphs table', () => {
 	})
 })
 
-describe('run_board_theme_glyphs.textual', () => {
+describe(TEXTUAL, () => {
 	beforeEach(() => {
 		vi.stubEnv('FORCE_COLOR', '0')
 	})
@@ -102,6 +105,42 @@ describe('run_board_theme_glyphs.textual', () => {
 		expect(new Set(turns)).toStrictEqual(new Set(TURN))
 		expect(turns.at(0)).toBe(TURN[0])
 		expect(turns.at(-1)).toBe(TURN.at(-1))
+	})
+})
+
+describe('run_board_theme_glyphs themed spinners', () => {
+	beforeEach(() => {
+		vi.stubEnv('FORCE_COLOR', '0')
+	})
+
+	it('maps all matrix spinner frames to one-column kana in order (ac-6bea4c04)', () => {
+		const turns = run_board_labels.SPINNER_FRAMES.map((frame) => textual(frame, 'matrix'))
+
+		expect(turns.join('')).toBe(KANA)
+		expect(turns.map((glyph) => run_board_fit.width_of(glyph))).toStrictEqual(turns.map(() => 1))
+	})
+
+	it('keeps spinner frames unchanged with no theme (ac-97dd53ee)', () => {
+		const frames = run_board_labels.SPINNER_FRAMES.join('')
+
+		expect(run_board_theme.restyle(undefined, frames)).toBe(frames)
+	})
+
+	it('switches cached spinner writes between matrix and wargames (ac-bfea97d9)', () => {
+		const frames = run_board_labels.SPINNER_FRAMES.join('')
+
+		for (const theme of ['matrix', 'wargames', 'matrix'] as const) {
+			const expected = theme === 'matrix' ? KANA : '│││╱╱───╲╲'
+
+			expect(run_board_theme.restyle(theme, frames)).toBe(expected)
+			expect(run_board_theme.restyle(theme, frames)).toBe(expected)
+		}
+	})
+})
+
+describe(TEXTUAL, () => {
+	beforeEach(() => {
+		vi.stubEnv('FORCE_COLOR', '0')
 	})
 
 	it('keeps the rules and gauges', () => {

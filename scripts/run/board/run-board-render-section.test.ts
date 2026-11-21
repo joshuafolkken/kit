@@ -115,3 +115,40 @@ describe('run_board_render_section row indent and lone heading', () => {
 		expect(chat.some((line) => line.startsWith(lead(DECISION)))).toBe(true)
 	})
 })
+
+// joshuafolkken/kit#8474: a text drawn at a rule's right end, the rule giving up its columns.
+describe('run_board_render_section tail at a rule end', () => {
+	const { tailed, widened } = run_board_render_section
+	const RULE = `── ${DECISION} ${'─'.repeat(30)}`
+	const WIDTH = 70
+
+	it('ends the rule on the tail after one blank, the rule as wide as before', () => {
+		const ruled = tailed(RULE, 'ab 12')
+
+		expect(ruled.endsWith('─ ab 12')).toBe(true)
+		expect(width_of(ruled)).toBe(width_of(RULE))
+	})
+
+	it('counts an emoji in the tail as two columns', () => {
+		expect(width_of(tailed(RULE, '🛫 2′10″'))).toBe(width_of(RULE))
+	})
+
+	it('keeps two rule characters before a tail too wide for the rule', () => {
+		expect(tailed(RULE, 'x'.repeat(40))).toBe(`── ${DECISION} ── ${'x'.repeat(40)}`)
+	})
+
+	it('leaves the rule as it is with no tail', () => {
+		expect(tailed(RULE, undefined)).toBe(RULE)
+		expect(widened(['', RULE], WIDTH)).toStrictEqual([
+			'',
+			`${RULE}${'─'.repeat(WIDTH - width_of(RULE))}`,
+		])
+	})
+
+	it('ends a widened rule on the tail at the widened column', () => {
+		const ruled = widened(['', RULE], WIDTH, '🛫 9″').at(-1) ?? ''
+
+		expect(ruled.endsWith('─ 🛫 9″')).toBe(true)
+		expect(width_of(ruled)).toBe(WIDTH)
+	})
+})

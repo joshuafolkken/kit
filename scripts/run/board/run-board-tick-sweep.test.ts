@@ -50,6 +50,19 @@ describe('run_board_tick — the sweep (joshuafolkken/kit#8240)', () => {
 	})
 })
 
+// joshuafolkken/kit#8391: a no-run frame keeps no blinking cell from the run frame before it.
+describe('run_board_tick — the blinking cells of a no-run frame (joshuafolkken/kit#8391)', () => {
+	it('drops the last frame’s lamps and TRACE field when it draws no run', async () => {
+		const { ports } = harness(undefined, [plan_titled('a')])
+		const trace = { row: 1, column: 1, style: '' }
+		const lamp = { row: 2, column: 2, panel_row: 0, group: 0, lamp: 0 }
+		const drawn = await tick({ ...FRESH_STATE, lamps: [lamp], traces: [trace] }, ports)
+
+		expect(drawn.lamps).toBeUndefined()
+		expect(drawn.traces).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#8404, #8425: waiting runs keep their heartbeat only in wargames.
 describe('run_board_tick — the sweep of a waiting run (joshuafolkken/kit#8404)', () => {
 	it.each([undefined, 'matrix', 'wargames'] as const)('scopes waiting sweeps to %s', (theme) => {

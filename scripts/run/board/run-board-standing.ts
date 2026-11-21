@@ -21,7 +21,8 @@ const GAP_FACTOR = 1.5
 // Reasons only a person clears, and what they do.
 const ACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
 	[/gh auth login|not logged in|authentication|HTTP 401/iu, 'gh auth login'],
-	[/spawn gh ENOENT|gh: command not found/iu, 'gh not found'],
+	// `gh CLI is not installed` is `git-gh-check.ts`'s wording for a gh missing from the PATH.
+	[/spawn gh ENOENT|gh: command not found|gh CLI is not installed/iu, 'gh not found'],
 ]
 // Reasons that clear on their own as the board retries.
 const TRANSIENT =

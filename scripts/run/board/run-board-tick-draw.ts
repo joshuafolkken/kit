@@ -214,10 +214,10 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	draw(redraw.ports, run_board_type_rows.typed_lines(drawn.lines, typing, redraw.now_ms))
 	redraw.ports.typing_sound?.set(run_board_type_rows.is_typing(typing, redraw.now_ms))
 
-	const { spots, sweep, lamps } = drawn
+	const { spots, sweep, lamps, traces } = drawn
 	const { rules, strips } = decoded_of(redraw.ports, drawn)
 
-	return { ...state, ...display.carried, spots, sweep, lamps, rules, strips, typing }
+	return { ...state, ...display.carried, spots, sweep, lamps, traces, rules, strips, typing }
 }
 
 const run_board_tick_draw = { bounds_of, decoded_of, draw, draw_display, has_lamps, has_strip }

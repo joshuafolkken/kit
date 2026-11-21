@@ -125,7 +125,7 @@ function widened_part<Part extends Headed>(part: Part, width: number): Part {
 }
 
 function widened_detail(part: DetailPart | undefined, width: number): DetailPart | undefined {
-	return part === undefined ? undefined : widened_part(part, width)
+	return part === undefined ? undefined : { ...part, head: widened(part.head, width, part.tail) }
 }
 
 // Every rule run on to the lane rows' title column, folded or open (joshuafolkken/kit#5520).

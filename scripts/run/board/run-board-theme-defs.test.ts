@@ -18,6 +18,7 @@ const AMBER: ThemeDefinition = {
 	intro: { line: 'READY', letter_ms: 1, hold_ms: 1 },
 	alert: run_board_header_defcon.field_of,
 	lamps: false,
+	spinner: '|',
 	live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
 }
 const WIDER = { ...THEME_DEFS, amber: AMBER }
@@ -68,6 +69,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 			alert: run_board_header_defcon.field_of,
 			lamps: true,
+			spinner: '│╱─╲',
 			live: { sweep: true, types_rows: true, trill: true, codes: true, strip: false },
 		})
 	})
@@ -83,6 +85,7 @@ describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 			intro: { line: '', letter_ms: 0, hold_ms: 0 },
 			alert: run_board_header_trace.field_of,
 			lamps: false,
+			spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 			live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
 		})
 	})
