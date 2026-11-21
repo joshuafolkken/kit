@@ -32,15 +32,11 @@ const reuse_mock = vi.hoisted(() => vi.fn(async (_k: unknown, ask: () => unknown
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { PRECONDITION: {}, problems_of: problems_mock },
 }))
-vi.mock('#scripts/git/changed-paths', () => ({
-	changed_paths: { read_changed_paths: paths_mock },
-}))
+vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: paths_mock } }))
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { pr_get_body: pr_body_mock, issue_get_body: issue_body_mock },
 }))
-vi.mock('#scripts/gh/git-pr', () => ({
-	git_pr: { release_classification: classification_mock },
-}))
+vi.mock('#scripts/gh/git-pr', () => ({ git_pr: { release_classification: classification_mock } }))
 vi.mock('#scripts/git/git-branch', () => ({
 	git_branch: { current: vi.fn().mockResolvedValue('2946-lane') },
 }))
@@ -58,6 +54,9 @@ vi.mock('./run-ship-preflight-reuse', () => ({ run_ship_preflight_reuse: { run: 
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
 vi.mock('./run-ship-planned', () => ({
 	run_ship_planned: { PRECONDITION: 'unplanned', problems: planned_mock },
+}))
+vi.mock('./run-ship-prepared-children', () => ({
+	run_ship_prepared_children: { PRECONDITION: 'prepared', problems: vi.fn().mockResolvedValue([]) },
 }))
 vi.mock('./run-ship-body-draft', () => ({
 	run_ship_body_draft: { existing: draft_mock, prepare: prepare_mock },
