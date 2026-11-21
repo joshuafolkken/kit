@@ -257,8 +257,11 @@ function opening<Read>(
 const run_board_intro = {
 	ERASE_LINE_END,
 	LINE_START,
+	LIVE_RAIN,
+	RAIN_THEMES,
 	REVEAL_LINE_MS,
 	after,
+	listen,
 	opening,
 	play,
 	rain,
