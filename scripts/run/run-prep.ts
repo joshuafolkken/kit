@@ -1,4 +1,5 @@
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
+import { issue_post_merge_check } from '#scripts/issue/issue-post-merge-check'
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
 import { run_investigation_record, type InvestigationRecord } from './run-investigation-record'
 
@@ -72,6 +73,8 @@ interface PrepParts {
 	// The investigation record — where it goes and what an earlier read saved; unset where no git
 	// directory answers.
 	investigation?: InvestigationRecord | undefined
+	// The `post_merge_check:` answer line (`issue-post-merge-check.ts`); unset where the body read failed.
+	post_merge_check?: string | undefined
 }
 
 function human_review_value(state: IssueState | undefined): string {
@@ -93,10 +96,14 @@ function summary(parts: PrepParts): string {
 
 // The state's three lines come from `issue:state`'s own formatter, so the spelling a document compares
 // against — `human_review: yes` included — is the one this bundle prints.
+// The post-merge check sits beside `human_review:`, the other line the completion gate branches on.
 function state_body(parts: PrepParts): string {
-	return parts.state === undefined
-		? parts.state_failure
-		: issue_state.format_issue_state(parts.state)
+	const state =
+		parts.state === undefined ? parts.state_failure : issue_state.format_issue_state(parts.state)
+	const post_merge_check =
+		parts.post_merge_check ?? `${issue_post_merge_check.LABEL}${issue_post_merge_check.UNKNOWN}`
+
+	return `${state}\n${post_merge_check}`
 }
 
 function section(header: string, body: string): string {

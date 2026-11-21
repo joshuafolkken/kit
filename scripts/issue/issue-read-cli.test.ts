@@ -205,6 +205,14 @@ describe('issue_read_cli.read_block — the trust it carries', () => {
 
 		expect(block).toMatchObject({ trust: { has_trusted_comment: false } })
 	})
+
+	// joshuafolkken/kit#8502: `run:prep` reads `post_merge_check` from the body, never from a comment.
+	it('carries the body alone, without the comments', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		expect(await issue_read_cli.read_block(ISSUE)).toMatchObject({ body: 'The body' })
+	})
 })
 
 describe('issue_read_cli.run — a number that produced nothing', () => {
