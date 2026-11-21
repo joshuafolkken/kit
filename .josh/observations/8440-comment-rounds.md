@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-carried.ts:65 | 2026-11-21 | #8440 | filed:#8460 | state-reasoning
+- rf:bug-risks | low | scripts/backlog/backlog-drive-carried.ts:65 | 2026-11-21 | #8440 | - | state-reasoning
+- rf:bug-risks | medium | scripts/backlog/backlog-drive-carried.ts:41 | 2026-11-21 | #8440 | - | state-reasoning
