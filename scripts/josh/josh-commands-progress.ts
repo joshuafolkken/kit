@@ -109,7 +109,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`; one table, `run-board-theme-glyphs.ts`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.',
+						'draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`; one table, `run-board-theme-glyphs.ts`), a state read faster as a shape drawn as one (`🔄` → `>>`, `🧊` → `||`, `🔗` → `<-`, `⏸` → `║`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.',
 				},
 				{
 					names: [BOARD_THEME],
@@ -119,7 +119,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`DC`), green done (`OK`), bold white in progress (`RN`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.',
+						'colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`\\O`), green done (`OK`), bold white in progress (`>>`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.',
 				},
 				{
 					names: [BOARD_THEME],
