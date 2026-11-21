@@ -1,0 +1,7 @@
+{
+	"reason": "#8497: a retried waiting row reads the plan row's hold reason (held_of) instead of always the free-lane tail",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}

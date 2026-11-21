@@ -303,6 +303,10 @@ function permission_of_option(body: string, number: number): string | undefined 
 	return option_at(body, number)?.permission
 }
 
+function permissions_of(body: string): ReadonlyArray<string | undefined> {
+	return parse(body).options.map((option) => option.permission)
+}
+
 // Whether option `number` is the parent's filing of an Issue the child then waits on.
 function filing_action(body: string, number: number): boolean {
 	return parent_command(body, number, FILING_COMMAND)
@@ -429,6 +433,7 @@ const run_park_body = {
 	is_park,
 	parent_action,
 	permission_of: permission_of_option,
+	permissions_of,
 	problem_of,
 	summary_of,
 }

@@ -6,10 +6,9 @@ const ASSISTANT = 'assistant'
 const OPUS = 'claude-opus-5'
 const MINIMAL_USAGE = { input_tokens: 1, output_tokens: 1 }
 
-function line(
-	overrides: Record<string, unknown> = {},
-	usage: Record<string, unknown> = {},
-): string {
+type LineOverrides = Record<string, unknown> & { usage?: Record<string, unknown> | undefined }
+
+function line({ usage = {}, ...overrides }: LineOverrides = {}): string {
 	return JSON.stringify({
 		type: ASSISTANT,
 		requestId: REQUEST_ID,
@@ -144,7 +143,7 @@ describe('cost_usage.parse_line on null-valued fields', () => {
 describe('cost_usage.parse_line on the cache-write TTL', () => {
 	it('splits the cache write by TTL when the line carries the detail', () => {
 		const detail = { ephemeral_1h_input_tokens: 80, ephemeral_5m_input_tokens: 20 }
-		const outcome = cost_usage.parse_line(line({}, { cache_creation: detail }))
+		const outcome = cost_usage.parse_line(line({ usage: { cache_creation: detail } }))
 
 		expect(outcome.kind === 'record' && outcome.record.totals.cache_write_1h_tokens).toBe(80)
 		expect(outcome.kind === 'record' && outcome.record.totals.cache_write_5m_tokens).toBe(20)
@@ -171,7 +170,7 @@ describe('cost_usage.parse_line on the thinking-token count', () => {
 	// A reported zero is still a measurement — the model did no thinking — not an absent field.
 	it('marks a reported zero measured rather than absent', () => {
 		const outcome = cost_usage.parse_line(
-			line({}, { output_tokens_details: { thinking_tokens: 0 } }),
+			line({ usage: { output_tokens_details: { thinking_tokens: 0 } } }),
 		)
 
 		expect(outcome.kind === 'record' && outcome.record.totals.thinking_measured).toBe(true)

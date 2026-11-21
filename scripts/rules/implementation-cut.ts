@@ -118,7 +118,11 @@ function session_verdict(
 	source: AgentEnvironment,
 ): CostVerdict {
 	return implementation_cut_verdict.reused_verdict(
-		() => cost_cli.session_verdict(directory, environment_for(transcript, source)),
+		() =>
+			cost_cli.session_verdict({
+				cwd: directory,
+				environment: environment_for(transcript, source),
+			}),
 		transcript,
 	)
 }
@@ -139,7 +143,10 @@ function current_state(context: HookContext, transcript?: string): LaneCostState
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
 		verdict: (): CostVerdict =>
 			transcript === undefined
-				? implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict(cwd, env), cwd)
+				? implementation_cut_verdict.reused_verdict(
+						() => cost_cli.session_verdict({ cwd, environment: env }),
+						cwd,
+					)
 				: session_verdict(transcript, cwd, env),
 		can_cut: (issue: string): boolean => can_cut_sync(issue, cwd),
 	}

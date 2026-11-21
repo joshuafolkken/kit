@@ -73,10 +73,16 @@ function guarded_share(
 const LANE_COUNT_SOURCE = `import { unit_lane_count } from '#scripts/test/unit-lane-count'
 process.stdout.write(String(unit_lane_count.live_lane_count({ checkout: process.argv[1] })))`
 
-function spawned_lane_count(
-	checkout: string = process.cwd(),
-	environment: NodeJS.ProcessEnv = process.env,
-): number {
+// The checkout the probe reads its lanes beside, and the environment the child starts under.
+interface ProbeScope {
+	checkout?: string | undefined
+	environment?: NodeJS.ProcessEnv | undefined
+}
+
+function spawned_lane_count({
+	checkout = process.cwd(),
+	environment = process.env,
+}: ProbeScope = {}): number {
 	const child = spawnSync(
 		process.execPath,
 		['--input-type=module', '-e', LANE_COUNT_SOURCE, checkout],
