@@ -72,11 +72,12 @@ interface NotesPart extends Foldable {
 }
 
 // A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once;
-// `summary` is what its folded heading says.
+// `summary` is what its folded heading says; `tail` is drawn at the right end of its rule.
 interface DetailPart extends Foldable {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<{ text: string; is_detail: boolean }>
 	summary?: string | undefined
+	tail?: string | undefined
 }
 
 // A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around

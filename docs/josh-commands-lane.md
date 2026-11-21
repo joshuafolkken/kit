@@ -517,7 +517,7 @@ A lane child runs it once its work summary settles, before the first edit, namin
 
 Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single "<reason>"` keeps an indivisible contract together.
 
-A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
+A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document. Nor does a path under `.josh/tmp/`: git ignores it, so no lane's change carries it.
 
 A lane child's `issue:plan` runs it on the recorded plan's backticked paths (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
 

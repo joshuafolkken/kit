@@ -4,12 +4,12 @@ import type { LaneAnswer } from '#scripts/lane/lane-capacity'
 import type { RunActivity } from './run-board-activity'
 import { run_board_estimate } from './run-board-estimate'
 import { run_board_faint } from './run-board-faint'
-import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_names, type RunMark } from './run-board-header-names'
 import { run_board_header_notice, type Notice } from './run-board-header-notice'
+import { run_board_header_parts } from './run-board-header-parts'
 import { run_board_header_time } from './run-board-header-time'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
@@ -35,19 +35,19 @@ import type { UsualTimes } from './run-board-usual'
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
 // and how far through the plan it is. Every time comes from a record (the carry's start, the stream's
 // events); nothing here guesses one, but the estimated finish after the progress bar, which is drawn `~`
-// as the estimate it is (`run-board-estimate.ts`). Two lines of symbols rather than sentences: the `⏰` that moves
-// every second is the proof the board is live, so no `updated` line is drawn. **Always three lines,
-// the first two in three columns**: the run's mark and the board's name over the kit version over the
-// repository (`run-board-header-names.ts`), the run's age over the `💓`, then the progress over the
-// machine the run is on — so the first line reads as how far the run is and the second as what it runs
-// on, a slow run apart from a stuck one. The third says what the run is doing now (`run-board-now.ts`):
-// the spinner, its time and its kind's icon under the second and third columns' icons and digits, so
-// the mark itself never turns. All three are written the
-// same while the run works and while it waits, so a wait is read off the mark, the `💓` and the third
-// line's words rather than off a line that changes shape. A value not read yet is drawn `-`, never
+// as the estimate it is (`run-board-estimate.ts`). Two lines of symbols rather than sentences: the `⏰`
+// that moves every second is the proof the board is live, so no `updated` line is drawn. **Always three
+// lines, the first two in three columns**: the run's mark and the board's name over the kit version over
+// the repository (`run-board-header-names.ts`), the run's age, then the progress over the machine the
+// run is on and the notice slot (`run-board-header-notice.ts`) — so the first line reads as how far the
+// run is and the second as what it runs on and what holds, a slow run apart from a stuck one. The third
+// says what the run is doing now (`run-board-now.ts`): the spinner, its time and its kind's icon under
+// the second and third columns' icons and digits, so the mark itself never turns. All three are written
+// the same while the run works and while it waits, so a wait is read off the mark, the notice slot and the
+// third line's words rather than off a line that changes shape. A value not read yet is drawn `-`, never
 // `0`, so a header still loading reads as unknown rather than as an empty run.
 
-const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of } = run_board_labels
+const { HEADER_ICONS, STATE_ICONS, bar_of, minute_of } = run_board_labels
 const { cell_of } = run_board_render_slot
 const { title_of } = run_board_render_title
 const { now_text, time_parts } = run_board_header_time
@@ -99,6 +99,8 @@ interface BoardHeader
 	// (`run-board-tick-draw.ts`); none once a fresh plan lands (joshuafolkken/kit#8219).
 	plan_saved_ms?: number | undefined
 	plan_failed_ms: number | undefined
+	// Why the plan read failed, said as a finding (`run-board-standing.ts`).
+	plan_error?: string | undefined
 	// When the reads off this machine last failed (`run-board-gather-thread.ts`); none once they answer.
 	read_failed_ms?: number | undefined
 	// Why they failed, drawn beside the failure.
@@ -298,25 +300,28 @@ function alert_part(header: BoardHeader): string | undefined {
 	)
 }
 
-// The run's progress, then what its reads are doing, then the alert level.
+// The run's progress, then a plan read in flight, then the alert level; a failing read is said in the
+// notice slot (`run-board-standing.ts`).
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
-		run_board_first_lane.part(header.activity),
 		loading_part(header),
-		warning_of(WORDS.plan, header.plan_failed_ms),
-		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
 		alert_part(header),
 		saved_part(header),
 	]
 
-	return parts.filter((part) => part !== undefined).join(GAP)
+	return run_board_header_parts.keyed_progress(
+		header,
+		parts.filter((part) => part !== undefined).join(GAP),
+	)
 }
 
-// The children drawn as running: only their operations are the run's newest.
+// The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):
+// only their operations are the run's newest.
 function running_issues(layout: BoardLayout): ReadonlySet<number> {
-	const running = layout.active.filter((row) => row.state === 'running')
+	const rows = layout.root === undefined ? layout.active : [...layout.active, layout.root.row]
+	const running = rows.filter((row) => row.state === 'running')
 
 	return new Set(running.map((row) => row.number))
 }
@@ -350,14 +355,12 @@ const MACHINE_UNKNOWN = [HEADER_ICONS.cpu, HEADER_ICONS.memory, HEADER_ICONS.swa
 	.map((icon) => `${icon} ${UNKNOWN}`)
 	.join(GAP)
 
-// The machine the run is on, its first figure as wide as the tally over it, then the sound switch and
-// the last notice where the board reads the switch.
+// The machine the run is on, its first figure as wide as the tally over it, then the notice slot.
 function machine_part(counts: BoardCounts, header: BoardHeader): string {
 	const width = figure_width(total_of(counts, header))
 	const machine = run_board_machine.line_of(machine_of(header), width) ?? MACHINE_UNKNOWN
-	const notice = run_board_header_notice.part_of(header)
 
-	return notice === undefined ? machine : [machine, notice].join(GAP)
+	return [machine, run_board_header_notice.part_of(header)].join(GAP)
 }
 
 // The lines' cells of one column, the narrower padded to the wider as the terminal counts them.
@@ -367,7 +370,7 @@ function column_of(cells: ReadonlyArray<string>): Array<string> {
 	return cells.map((cell) => cell_of(cell, width))
 }
 
-// The board's name, the run's age and progress, then the kit version, heartbeat and machine under
+// The board's name, the run's age and progress, then the kit version, an ended run's end and machine under
 // them, then the repository and what the run is doing now — its time under theirs, its kind's icon
 // under the `💪`, no label — in every state the board can be in. A stream with no event yet leaves the
 // repository alone on the third line.

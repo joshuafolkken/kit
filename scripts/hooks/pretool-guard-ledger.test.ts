@@ -111,11 +111,29 @@ describe('pretool_guard.record_refusal — the call context', () => {
 		await pretool_guard.record_refusal(
 			payload,
 			{ reason: undefined, notice: undefined, fault: undefined },
-			context,
+			{ context },
 		)
 
 		expect(rules).toHaveBeenCalledWith(environment)
 		expect(ledger).toHaveBeenCalledWith(HOOK, undefined, payload, context)
 		expect(usage).toHaveBeenCalledWith(payload, context)
+	})
+
+	it('records against the demoted rules it is handed, reading none from the context', async () => {
+		const context = hook_context_fixture.of(WORK_DIRECTORY, { VITEST: 'true' })
+		const payload = bash_payload(ALLOWED_COMMAND)
+		const rules = vi.spyOn(hook_demoted, 'rules')
+		const ledger = vi.spyOn(hook_ledger, 'record_reason').mockResolvedValue(undefined)
+
+		vi.spyOn(direct_gh_usage, 'record').mockResolvedValue(undefined)
+
+		await pretool_guard.record_refusal(
+			payload,
+			{ reason: 'refused', notice: undefined, fault: undefined },
+			{ context, demoted: new Set() },
+		)
+
+		expect(rules).not.toHaveBeenCalled()
+		expect(ledger).toHaveBeenCalledWith(HOOK, 'refused', payload, context)
 	})
 })

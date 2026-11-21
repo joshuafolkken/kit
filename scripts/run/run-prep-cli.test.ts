@@ -58,6 +58,7 @@ const FAILURE = 1
 const ISSUE = '1978'
 const OTHER_ISSUE = '1979'
 const BLOCK = 'issue: 1978\nThe body\n\ncomment by alice: agreed'
+const TRUSTED = { is_body_trusted: true, has_trusted_comment: true }
 const OPEN_STATE: IssueState = { state: 'OPEN', labels: ['auto-ok'], is_human_review: false }
 const SKIP_DECISION = { scope: 'skip', reason: 'ran 2 hours ago; window is 12h' }
 const LOCATIONS = 'run:prep\n  scripts/josh/josh-commands-ai.ts:42  run:prep'
@@ -80,7 +81,7 @@ function reported(): string {
 }
 
 function stub_ok(): void {
-	read_block_mock.mockResolvedValue({ kind: 'ok', block: BLOCK })
+	read_block_mock.mockResolvedValue({ kind: 'ok', block: BLOCK, body: BLOCK, trust: TRUSTED })
 	read_state_mock.mockResolvedValue({ kind: 'state', state: OPEN_STATE })
 }
 

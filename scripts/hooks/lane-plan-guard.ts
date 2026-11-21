@@ -35,8 +35,7 @@ function lane_child_edit(
 
 function reason(
 	raw_payload: string,
-	directory: string = process.cwd(),
-	source: MarkerSource = process.env,
+	{ directory, source }: { directory: string; source: MarkerSource },
 ): string | undefined {
 	const issue = lane_child_edit(raw_payload, directory, source)
 

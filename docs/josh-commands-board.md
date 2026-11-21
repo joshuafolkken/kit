@@ -116,7 +116,8 @@ pnpm josh run:board --once --timing    # one frame, then how long each phase of 
 - `--theme wargames` — ends the header’s first line on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.
 - `--theme wargames` — a live board runs a WOPR lamp panel on `24h`, `7d`, the blank line and usage’s first two provider rows (both or neither): past `NOW`, a `■` every other column to the throughput rule’s end, yellow, yellow, red, yellow, red, out in dimmed half yellow on every row (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.
 - `--theme wargames` — bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).
-- `--theme matrix` — draws as `--theme wargames` does, red and amber kept, with uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No opening line, lamps or typed rows.
+- `--theme matrix` — draws as `--theme wargames` does, red and amber kept, with uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No lamps or typed rows.
+- `--theme matrix` — a live board types three lead lines in bright green, erasing each, then shows `KNOCK, KNOCK, JOSH.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.
 - `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.
 - `--timing` — on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`) and the GC within it (`run-board-stall.ts`).
 
@@ -136,13 +137,15 @@ The header is three lines — the first two in three columns, the third the repo
 
 The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
-The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues. `🛫`: start to first lane.
+The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues.
 
 The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
 A live board ends the second line on the sound switch (`🔊` on, `🔇` off) and the last notice, sounded or muted: `🔊 10:42 alert · #<N> stopped` — time, cue, cause; `(repeat)` on a replay, `🔊 —` before the first. `--once`, `--chat` and Telegram draw none.
 
 While a running run's stream holds an outage with no `online` after it, last seen (`offline` or `offline-tick`) within two sampler ticks, `📴` (named in the legend) stands in the `💓`'s place with the time since the network went down, in yellow. The connection events never count as the `💓`'s newest event.
+
+The `💻 processes` rule ends on `🛫`: start to first lane.
 
 The third line is what the run is doing now: a spinner, its age, then the kind's icon and words — the repository's name alone while the stream holds no event.
 
@@ -205,7 +208,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🔒 <N>` — running or parked `run:solo` issue `<N>`: nothing starts until it merges, closes or loses the label; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, the parked half `epic_solo_parked`'s.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and waits …".
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
-- `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
+- `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title (a `docs/*.md` path or one under `.josh/tmp/` never counts); `backlog:next` answers "waits: its `<file>` overlaps …".
 - `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, an earlier run's too; an unread limit leaves it blank.
   An empty seat draws a `💺` line under the lanes rule: the first `blocked: #<N>: <cause>` while the newest launch was refused, the rest `no issue ready to start` when no waiting row is free to start, `held — <sentence>` while the ledger's open hold stops one that is.
   A hold that a session's driver restart ends, not a person, reads `driver restart pending — <sentence>`.
@@ -226,6 +229,14 @@ While the run is at its `planning` stage, the one row it launches next — a nam
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 
 **Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
+
+The live board writes why it ended to `.josh/tmp/run-board-exit.json` in the checkout.
+
+- Kinds: `tick` (the live loop threw outside a redraw), `uncaught`, `rejection`, `signal` (SIGHUP or SIGTERM) and `stdout` (a stdout `error`, such as a closed pipe). The first reason wins; Ctrl+C writes nothing.
+- A redraw that throws does not end the board: it redraws the last frame with a `redraw` warning on its last line and keeps going. It is written as kind `redraw`; the same failure again (same message and stack) only raises `count` and moves `last_at`, so the file stays one record long. Another failure replaces it, and an exit replaces it too.
+- Fields: the kind, the message, the stack, the time, the uptime and the pid; a `redraw` record also has `count` and `last_at`.
+- The next live board prints it as one line on stderr before it enters its screen, then removes the file: `run:board: the last live board exited abnormally …`, or for a `redraw` record `run:board: the last live board's redraw failed N time(s) (<reason>), from <time> to <last time>`.
+- An uncaught failure or a stdout error exits 1; SIGHUP exits 129.
 
 A running `fullrun #N`, `halfrun #N` or `prrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane.
 

@@ -186,11 +186,13 @@ describe('run_board_tick.tick before the plan is read', () => {
 
 	// joshuafolkken/kit#3689: a waiting run's second line is a working run's — the heartbeat, then the
 	// machine. joshuafolkken/kit#3692: no plan is read yet, so no repository is named before them.
+	// joshuafolkken/kit#8475: the second line draws no heartbeat — its gap stands in the notice slot.
 	it('marks the run ⏸ and draws no wait on the second line when no child runs', async () => {
 		const lines = await loading([{ ...DRAIN, pos: 1 }])
 
 		expect(lines[0]).toMatch(/^⏸ josh-board {2}⏰ (?:\d+′)?\d+″ {2}✅/u)
-		expect(lines[1]).toMatch(/^ {2}- +💓 (?:\d+′)?\d+″ {2}🧠/u)
+		expect(lines[1]).toMatch(/^ {2}- +🧠/u)
+		expect(lines[1]).not.toContain('💓')
 		expect(lines[2]).toMatch(/^ +(?:\d+′)?\d+″ {2}🔭 watching/u)
 		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})

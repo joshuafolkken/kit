@@ -1,0 +1,3 @@
+- rf:project-conventions | low | scripts/run/board/run-board-codes.ts:64 | 2026-11-20 | #8403 | - | naming-callers
+- rf:comments | low | scripts/run/board/run-board-strip.test.ts:130 | 2026-11-20 | #8403 | - | stale-comment
+- rf:comments | low | scripts/run/board/run-board-codes.test.ts:125 | 2026-11-20 | #8403 | - | stale-comment

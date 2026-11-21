@@ -11,18 +11,20 @@ function body_of(files: number, lines: number): string {
 describe('size_estimate measured thresholds', () => {
 	it('uses the same derived guide for verdict and refusal text', () => {
 		const body = body_of(1, 160)
-		const measured = size_estimate.over_guide(body, undefined, RATE)
+		const measured = size_estimate.over_guide(body, undefined, { rate: RATE })
 
 		expect(measured).toEqual({ files: 1, lines: 160, verdict: 'split' })
-		expect(size_estimate.guide_problem(body, undefined, RATE)).toContain('12 files or 300 lines')
-		expect(size_estimate.over_guide(body_of(1, 120), undefined, RATE)).toBeUndefined()
+		expect(size_estimate.guide_problem(body, undefined, { rate: RATE })).toContain(
+			'12 files or 300 lines',
+		)
+		expect(size_estimate.over_guide(body_of(1, 120), undefined, { rate: RATE })).toBeUndefined()
 	})
 
 	it('uses the derived cap in the refusal text', () => {
-		expect(size_estimate.guide_problem(body_of(1, 460), undefined, RATE)).toContain(
+		expect(size_estimate.guide_problem(body_of(1, 460), undefined, { rate: RATE })).toContain(
 			'18 files or 450 lines',
 		)
-		expect(size_estimate.over_cap(body_of(1, 200), undefined, RATE)).toBeUndefined()
+		expect(size_estimate.over_cap(body_of(1, 200), undefined, { rate: RATE })).toBeUndefined()
 	})
 
 	// joshuafolkken/kit#7074: within the cap, an unreasoned projection over the size bar is
@@ -42,11 +44,11 @@ describe('size_estimate measured thresholds', () => {
 	// joshuafolkken/kit#7005: the split exemption covers the guide and cap, not the size bar.
 	it('preserves the split exemption while exposing its measured warning', () => {
 		const body = body_of(1, 400)
-		const problem = size_estimate.guide_problem(body, SPLIT, RATE)
+		const problem = size_estimate.guide_problem(body, SPLIT, { rate: RATE })
 
 		expect(problem).toContain('over the 18-minute size bar')
 		expect(problem).not.toContain('exceeds the cap')
-		expect(size_estimate.over_cap(body, SPLIT, RATE)).toBeUndefined()
-		expect(size_estimate.split_over_guide(body, SPLIT, RATE)?.verdict).toBe('split')
+		expect(size_estimate.over_cap(body, SPLIT, { rate: RATE })).toBeUndefined()
+		expect(size_estimate.split_over_guide(body, SPLIT, { rate: RATE })?.verdict).toBe('split')
 	})
 })

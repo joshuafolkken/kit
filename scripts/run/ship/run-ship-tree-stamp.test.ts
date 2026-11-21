@@ -36,7 +36,7 @@ describe('run_ship_tree_stamp', () => {
 	})
 
 	it('does not reuse a stamp written but never completed', () => {
-		STAMP.write(TREE.files, undefined, TREE.base)
+		STAMP.write(TREE.files, { base: TREE.base })
 
 		expect(run_ship_tree_stamp.is_reusable(STAMP, TREE)).toBe(false)
 	})

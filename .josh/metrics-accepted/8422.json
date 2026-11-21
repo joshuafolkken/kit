@@ -1,0 +1,7 @@
+{
+	"reason": "unicorn 80 prefer-options-parameter: the SizeRates/SourceOptions option types and the guide_refusal helper that keeps guide_problem within the complexity limit",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

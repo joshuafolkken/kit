@@ -197,9 +197,7 @@ describe('review:brief --full-change', () => {
 		expect(review_stamps.round_one_stamp.write).not.toHaveBeenCalled()
 		expect(review_stamps.briefed_stamp.write).toHaveBeenCalledWith(
 			{ [OTHER_FILE]: 'digest' },
-			undefined,
-			COMMIT,
-			expect.any(Object),
+			{ base: COMMIT, blobs: expect.any(Object) },
 		)
 	})
 })

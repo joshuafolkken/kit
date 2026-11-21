@@ -125,6 +125,8 @@ interface BoardData extends GatherRead {
 	attempted_ms: number | undefined
 	fetched_ms: number | undefined
 	failed_ms: number | undefined
+	// Why the last plan read failed, while it does (joshuafolkken/kit#8475).
+	plan_error?: string | undefined
 	// The run's children read closed, kept for the run: a closed issue's answer does not change.
 	closed: ReadonlyMap<number, ClosedIssue>
 	closed_fetch: Fetch<ClosedAnswer> | undefined
@@ -160,6 +162,8 @@ interface BoardView {
 	sweep?: Sweep | undefined
 	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
+	// Where the last frame drew its worst-level TRACE field, blinked between redraws (`run-board-trace-spot.ts`).
+	traces?: ReadonlyArray<Spot> | undefined
 	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).
 	rules?: ReadonlyArray<RuleCell> | undefined
 	// Where the last frame has a lamp strip above a section rule, filled as a row types (`run-board-strip.ts`).

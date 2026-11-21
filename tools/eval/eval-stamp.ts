@@ -84,7 +84,7 @@ function try_read_tree(
 
 // A failed write leaves no record, and no record answers `required`, which is the safe direction.
 function write_stamp(target: string = stamp_path()): string {
-	return access.write(read_tree(), target)
+	return access.write(read_tree(), { target })
 }
 
 // The record's other half. `write_stamp` says a run measured this tree; this says that run reached a

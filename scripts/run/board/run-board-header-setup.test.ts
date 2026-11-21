@@ -1,4 +1,4 @@
-import { stripVTControlCharacters, styleText } from 'node:util'
+import { stripVTControlCharacters } from 'node:util'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
@@ -138,7 +138,7 @@ describe('run_board_header.header_lines before the first child launches', () => 
 
 		expect(first).toMatch(/^▶ josh-board {2}⏰ 10″ {2}✅ +0\/- /u)
 		expect(first).not.toContain(STAGE.STARTING)
-		expect(second).toMatch(/^ {2}- {11}💓 /u)
+		expect(second).toMatch(/^ {2}- +💪 /u)
 		expect(third).toBe(`${NOW_INDENT}⠋   0″  🚀 starting session`)
 	})
 
@@ -161,10 +161,12 @@ describe('run_board_header.header_lines before the first child launches', () => 
 		expect(long[2]).not.toBe(short[2])
 	})
 
-	it('says a plan read failed on the first line, not after the stage', () => {
+	// joshuafolkken/kit#8475: in the notice slot, not on the first line.
+	it('says a plan read failed in the notice slot, not after the stage', () => {
 		const board = header({ plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(/ {2}❗ /u)
+		expect(title_of(board)).not.toContain('❗')
+		expect(lines_of(board)[1]).toMatch(/ {2}❗ stale /u)
 		expect(now_of(board)).toBe('⠋   0″  🚀 starting session')
 	})
 })
@@ -283,13 +285,9 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		expect(title_of(board)).toMatch(/^▶ josh-board .*✅ /u)
 	})
 
-	it('colors the heartbeat of a setup that has gone quiet, as a running run’s', () => {
-		vi.stubEnv('FORCE_COLOR', '1')
+	it('says no heartbeat of a setup that has gone quiet, as of a running run', () => {
+		const quiet = header({ now_ms: NOW + STALE_MS, activity: standing(STAGE.PLANNING) })
 
-		const [, second] = run_board_header.header_lines(
-			header({ now_ms: NOW + STALE_MS, activity: standing(STAGE.PLANNING) }),
-		)
-
-		expect(second).toContain(styleText('red', '💓 40′00″'))
+		expect(lines_of(quiet)[1]).toMatch(/ {2}❗ no heartbeat 40′$/u)
 	})
 })

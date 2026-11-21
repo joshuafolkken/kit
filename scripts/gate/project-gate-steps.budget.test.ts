@@ -58,7 +58,7 @@ function budget_of(sleep: () => Promise<void> = no_wait, is_reserved = true): St
 }
 
 async function run_steps(budget: StepBudget = budget_of()): Promise<ReadonlyArray<GateStepResult>> {
-	return await project_gate_steps.run_project_steps(probe.project, undefined, budget)
+	return await project_gate_steps.run_project_steps({ directory: probe.project, budget })
 }
 
 // Each step's run reports the claims the ledger held while it ran, then exits with `exit_code`.

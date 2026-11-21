@@ -28,8 +28,8 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // back** rather than waiting for the holder to end (joshuafolkken/kit#4926): polling kept the seat taken
 // while nothing moved, which made two lanes one. It notes its yield (`lane-yield.ts`), keeps its plan as
 // yielded, releases its hold, prints `yield` and the child ends; the issue is offered again once the
-// holder's lane ends. A document under `docs/` is never a clash (`backlog-overlap.ts` →
-// `is_shared_document`).
+// holder's lane ends. A document under `docs/` or a path under `.josh/tmp/` is never a clash
+// (`backlog-overlap.ts` → `is_excluded`).
 //
 // **A lane dispatched before its holder, with commits, may wait instead** (joshuafolkken/kit#5986,
 // `lane-plan-wait.ts`): when the holder's estimated remaining time fits the lane's own worked time, it

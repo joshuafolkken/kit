@@ -1,0 +1,7 @@
+{
+	"reason": "Splitting run fields into their own module adds its imports and export lines (+7) so run-board-read.ts has room under the file cap (#8480)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}

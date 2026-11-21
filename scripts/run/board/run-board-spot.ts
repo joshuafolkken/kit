@@ -11,6 +11,7 @@ const SPOT = '\u{E000}'
 const TICK = '\u{E003}'
 const LAMP_START = '\u{E004}'
 const LAMP = '\u{E005}'
+const TRACE = '\u{E006}'
 const SECONDS_MARK = '″'
 const LAMP_MARK = '■'
 // eslint-disable-next-line no-control-regex -- the color escapes a spot keeps are control characters
@@ -33,10 +34,28 @@ function spot_at(line: string, index: number, row: number, columns: number): Spo
 }
 
 function drawn(line: string, frame: string): string {
-	return line.split(SPOT).join(frame).split(TICK).join(SECONDS_MARK).split(LAMP).join(LAMP_MARK)
+	return line
+		.split(SPOT)
+		.join(frame)
+		.split(TICK)
+		.join(SECONDS_MARK)
+		.split(LAMP)
+		.join(LAMP_MARK)
+		.split(TRACE)
+		.join('T')
 }
 
-const run_board_spot = { LAMP, LAMP_MARK, LAMP_START, SECONDS_MARK, SPOT, TICK, drawn, spot_at }
+const run_board_spot = {
+	LAMP,
+	LAMP_MARK,
+	LAMP_START,
+	SECONDS_MARK,
+	SPOT,
+	TICK,
+	TRACE,
+	drawn,
+	spot_at,
+}
 
 export { run_board_spot }
 export type { Spot }

@@ -12,9 +12,9 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 
-// The header's time cells (`run-board-header.ts`): the run's age over the `💓` — or over the minute an
-// ended run ended — over the third line's spinner and age, and the `💓`'s stale coloring a row's newest
-// activity shares (`run-board-render-tail.ts`).
+// The header's time cells (`run-board-header.ts`): the run's age over the minute an ended run ended over
+// the third line's spinner and age, and the stale coloring a row's newest activity takes
+// (`run-board-render-tail.ts`).
 
 const { HEADER_ICONS, minute_of, span_of } = run_board_labels
 const { cell_of } = run_board_render_slot
@@ -43,8 +43,8 @@ interface TimeHeader {
 // The marks of a run that is working: they turn the spinner, and only they can go stale.
 const WORKING_MARKS: ReadonlySet<RunMark> = new Set<RunMark>(['running', 'setup'])
 
-// A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
-// (`run-board-render-tail.ts`).
+// A part aged as a working run's quiet is: yellow once stale, red once alarming — a row's newest
+// activity (`run-board-render-tail.ts`).
 function aged(part: string, age_ms: number): string {
 	if (age_ms > ALARM_MS) return styleText('red', part)
 
@@ -53,7 +53,7 @@ function aged(part: string, age_ms: number): string {
 
 // How long ago the stream last moved. An ended run has no heartbeat to keep: one counting on would
 // read as a hang.
-function age_of(header: TimeHeader): number | undefined {
+function age_of(header: OutageHeader): number | undefined {
 	const last = header.activity.last_event_ms
 
 	if (last === undefined || header.ended_ms !== undefined) return undefined
@@ -81,47 +81,20 @@ function offline_age(header: OutageHeader): number | undefined {
 	return outage === undefined ? undefined : header.now_ms - outage.from_ms
 }
 
-// Whether the `💓` gives way to the `📴` — the legend names it only then.
+// Whether the notice slot says the `📴` — the legend names it only then.
 function is_offline(header: OutageHeader): boolean {
 	return offline_age(header) !== undefined
 }
 
-// The age the `💓`'s cell draws: the outage's while one is open, else the newest event's.
-function beat_age(header: TimeHeader): number | undefined {
-	return offline_age(header) ?? age_of(header)
-}
-
-// The minute an ended run ended, standing where its heartbeat did. Blank while the run has none to draw.
+// The minute an ended run ended, under the run's age. Blank while the run runs: its heartbeat and an
+// outage are said in the notice slot (`run-board-standing.ts`, joshuafolkken/kit#8475).
 function ended_part(header: TimeHeader): string {
 	const { ended_ms } = header
 
 	return ended_ms === undefined ? '' : `${HEADER_ICONS.ended} ${minute_of(ended_ms)}`
 }
 
-// The `💓` under the run's age, in the `⏰`'s own format with its digits right-aligned to `width` —
-// only a working run can be stale, so only it is colored. Only an ended run draws anything else there:
-// the minute it ended. Its digits are emphasized for a few seconds after a new event resets them
-// (`run-board-fresh.ts`). While the network is down, the `📴` and the outage's age stand there instead,
-// yellow throughout: the newest event's age would read an outage as a hang.
-function beat_part(header: TimeHeader, mark: RunMark, width: number): string {
-	const offline = offline_age(header)
-
-	if (offline !== undefined) {
-		return styleText('yellow', `${HEADER_ICONS.offline} ${span_of(offline).padStart(width)}`)
-	}
-
-	const age = age_of(header)
-
-	if (age === undefined) return ended_part(header)
-
-	const span = span_of(age)
-	const part = `${HEADER_ICONS.heartbeat} ${padded(span, width, aged_fresh(span, age, header))}`
-
-	return WORKING_MARKS.has(mark) ? aged(part, age) : part
-}
-
-// An age in the `⏰`'s format, blank where there is none to draw — no event gave it a time, or the
-// `💓` draws none.
+// An age in the `⏰`'s format, blank where there is none to draw — no event gave it a time.
 function span_or_blank(age: number | undefined): string {
 	return age === undefined ? '' : span_of(age)
 }
@@ -143,7 +116,7 @@ function is_swept(header: TimeHeader, mark: RunMark): boolean {
 	return header.spinner !== undefined && mark !== 'stopped' && header.ended_ms === undefined
 }
 
-// The third line's time: the spinner in the `⏰`'s and `💓`'s column — turning only while the run
+// The third line's time: the spinner in the `⏰`'s column — turning only while the run
 // works, so a watch or an end stands blank — then its age, digits under theirs, emphasized while what
 // the line says is fresh, its `″` the sweep's placeholder where the run is swept.
 function now_time(
@@ -169,23 +142,21 @@ function now_text(now: NowLine, header: TimeHeader): string {
 	return `${now.icon} ${run_board_row_key.keyed(section, now.text, words)}`
 }
 
-// A run's age over the `💓` — or over the minute an ended run ended — over the third line's age: the
-// shorter lengths are right-aligned to the longest, so the digits stand in one column when only one has
-// passed ten hours.
+// A run's age over the minute an ended run ended over the third line's age: the shorter lengths are
+// right-aligned to the longer, so the digits stand in one column when only one has passed ten hours.
 function time_parts(header: TimeHeader, mark: RunMark, now: NowLine | undefined): Array<string> {
 	const elapsed = span_of((header.ended_ms ?? header.now_ms) - header.started_ms)
 	const age = span_or_blank(now?.age_ms)
-	const width = Math.max(
-		...[elapsed, span_or_blank(beat_age(header)), age].map((span) => span.length),
-	)
+	const width = Math.max(elapsed.length, age.length)
 
 	return [
 		`${HEADER_ICONS.elapsed} ${elapsed.padStart(width)}`,
-		beat_part(header, mark, width),
+		ended_part(header),
 		now_time(header, mark, now, width),
 	]
 }
 
-const run_board_header_time = { aged, is_offline, now_text, time_parts }
+const run_board_header_time = { age_of, aged, is_offline, now_text, offline_age, time_parts }
 
 export { run_board_header_time }
+export type { OutageHeader }

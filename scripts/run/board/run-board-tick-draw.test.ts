@@ -148,7 +148,7 @@ describe('run_board_tick_draw.draw_display sound mark', () => {
 		const launched = header_drawn({ is_on: false, state: before, rows: [row(1, 'running')] })
 
 		expect(launched.state.notice?.cause).toStrictEqual({ cue: 'launch', word: 'running', issue: 1 })
-		expect(launched.lines[1]).toMatch(/🔇 \d{2}:\d{2} launch · #1 running$/u)
+		expect(launched.lines[1]).toMatch(/🔇 🔄 #1 \d{2}:\d{2}$/u)
 	})
 })
 

@@ -45,7 +45,7 @@ function estimate_of(header: BoardHeader, rows: ReadonlyArray<BoardRow>): string
 	return run_board_header.estimate_legend(header) ?? row_legend
 }
 
-// 📴 where it stands in the 💓's place, the network down (joshuafolkken/kit#7895).
+// 📴 where it stands in the notice slot, the network down (joshuafolkken/kit#7895, #8475).
 function offline_of(header: BoardHeader): string | undefined {
 	return run_board_header_time.is_offline(header)
 		? `${HEADER_ICONS.offline} ${WORDS.offline}`
@@ -67,7 +67,7 @@ function named_of(
 		operation,
 		elapsed,
 		estimate_of(header, rows),
-		run_board_first_lane.legend(header.activity),
+		run_board_first_lane.legend(header),
 		offline_of(header),
 	]
 

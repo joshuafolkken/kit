@@ -41,6 +41,12 @@ interface PlanRead {
 	listing: OpenListing
 }
 
+// The open listing, or why it was not read.
+interface OpenListingRead {
+	listing: OpenListing | undefined
+	error?: string | undefined
+}
+
 // The lane limit a wave is cut at, capped at the port seats as a launch is; `undefined` when the
 // limit cannot be read, so the plan stays drawable and says it is uncapped.
 async function read_wave_limit(): Promise<number | undefined> {
@@ -95,17 +101,27 @@ async function classify(
 // Every open issue, read once. It carries both halves the plan needs and the pool does not hold: the
 // titles, and the set the out-of-scope rows are subtracted from. One read serves both, so the plan
 // costs exactly one `gh` call more than the answer it is rendering.
-async function fetch_open(): Promise<OpenListing | undefined> {
-	const { json, is_capped } = await git_gh_command.issue_list_recent(auto_ok_cli.LISTING_LIMIT)
+// `error` is gh's reason when the listing was not read at all, so `run:board` can name what a person
+// fixes (joshuafolkken/kit#8507); a listing read but not parsed carries none.
+async function read_open(): Promise<OpenListingRead> {
+	const { json, is_capped, error } = await git_gh_command.issue_list_recent(
+		auto_ok_cli.LISTING_LIMIT,
+	)
 
-	if (json === undefined) return undefined
+	if (json === undefined) return { listing: undefined, error }
 
 	const read = read_json_listing(json, open_issue_schema)
 
-	if (read.kind !== 'read') return undefined
+	if (read.kind !== 'read') return { listing: undefined }
 	await issue_sample_prime.prime(read.rows.map((row) => row.body))
 
-	return { rows: read.rows, is_capped }
+	return { listing: { rows: read.rows, is_capped } }
+}
+
+async function fetch_open(): Promise<OpenListing | undefined> {
+	const { listing } = await read_open()
+
+	return listing
 }
 
 // A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is
@@ -132,7 +148,7 @@ async function read_plan(exclude: ReadonlyArray<number> = []): Promise<PlanRead 
 	return plan === undefined ? undefined : { plan, listing }
 }
 
-const backlog_plan_read = { classify, context_of, fetch_open, read_plan }
+const backlog_plan_read = { classify, context_of, fetch_open, read_open, read_plan }
 
 export { backlog_plan_read }
 export type { Plan, PlanRead }

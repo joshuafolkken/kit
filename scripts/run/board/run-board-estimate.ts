@@ -124,6 +124,12 @@ function lanes_of(running: ReadonlyArray<BoardRow>, read: EstimateRead, totals: 
 	return { free, ends, floor: Math.max(0, ...solo), per_child }
 }
 
+// Whether this run's lane totals foretell the row: not an earlier run's lane (🧳), nor one this run took
+// over from an ended run (joshuafolkken/kit#8455) — its time began under that run.
+function is_foretold(row: BoardRow): boolean {
+	return row.is_earlier !== true && row.status?.is_adopted !== true
+}
+
 // How long the run has left, `undefined` where nothing is left to run or no lane total is measured.
 function left_ms(read: EstimateRead): number | undefined {
 	const { layout } = read
@@ -131,7 +137,7 @@ function left_ms(read: EstimateRead): number | undefined {
 
 	if (layout === undefined || totals.length === 0) return undefined
 
-	const running = layout.active.filter((row) => row.state === 'running')
+	const running = layout.active.filter((row) => row.state === 'running' && is_foretold(row))
 	const waiting = waiting_rows(layout)
 
 	if (running.length + waiting.length === 0) return undefined
@@ -156,11 +162,11 @@ function row_finish(row: BoardRow, read: EstimateRead): RowFinish | undefined {
 
 // Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and a parked one, while the
 // run goes on; a row waiting on a person draws none, its finish never measured (joshuafolkken/kit#8166) — a stopped or ended run's header draws no 🎯, nor do its rows. An
-// earlier run's lane (🧳) draws none: this run's lane totals do not foretell it.
+// earlier run's lane (🧳), or an adopted one, draws none: this run's lane totals do not foretell it.
 function is_finish_drawn(row: BoardRow, run: RunMotion): boolean {
 	const is_moving = run.ended_ms === undefined && !run.activity.is_stopped
 
-	return is_moving && row.is_earlier !== true && FINISH_STATES.has(row.state)
+	return is_moving && is_foretold(row) && FINISH_STATES.has(row.state)
 }
 
 // The local finish time, with its `MM-DD` when it falls on another day than now.

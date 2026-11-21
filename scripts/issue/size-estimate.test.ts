@@ -107,23 +107,23 @@ describe('size_estimate measured growth', () => {
 		const body = body_with(estimate(6, 150))
 
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1, lines: 1 } }),
 		).toBeUndefined()
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1.5, lines: 1 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1.5, lines: 1 } }),
 		).toBeDefined()
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1.5 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1, lines: 1.5 } }),
 		).toBeDefined()
 	})
 
 	it('falls back only on the missing axis', () => {
 		const body = body_with(estimate(5, 101))
 
-		expect(size_estimate.over_guide(body, undefined, undefined, { files: 1 })).toBeDefined()
-		expect(size_estimate.over_guide(body, undefined, undefined, { lines: 1 })).toBeDefined()
+		expect(size_estimate.over_guide(body, undefined, { growth: { files: 1 } })).toBeDefined()
+		expect(size_estimate.over_guide(body, undefined, { growth: { lines: 1 } })).toBeDefined()
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1, lines: 1 } }),
 		).toBeUndefined()
 	})
 
@@ -133,9 +133,9 @@ describe('size_estimate measured growth', () => {
 		const files = body_with(estimate(9, 100))
 		const lines = body_with(estimate(8, 101))
 
-		expect(size_estimate.over_cap(within, undefined, undefined, growth)).toBeUndefined()
-		expect(size_estimate.over_cap(files, undefined, undefined, growth)).toBeDefined()
-		expect(size_estimate.over_cap(lines, undefined, undefined, growth)).toBeDefined()
+		expect(size_estimate.over_cap(within, undefined, { growth })).toBeUndefined()
+		expect(size_estimate.over_cap(files, undefined, { growth })).toBeDefined()
+		expect(size_estimate.over_cap(lines, undefined, { growth })).toBeDefined()
 	})
 })
 

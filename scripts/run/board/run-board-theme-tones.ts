@@ -21,14 +21,14 @@ const TONE_PAINTS: Readonly<Record<Tone, Paint | undefined>> = {
 	human: { rgb: '255;95;215', named: 'magentaBright' },
 	done: GAUGE_SHADES.normal,
 	running: { rgb: '255;255;255', named: 'whiteBright' },
-	idle: IDLE_PAINT,
+	idle: undefined,
 	info: undefined,
 }
 
 // Text in its tone's color, and the running tone bold too; `painted` and `styleText` draw no escape
 // where stdout draws no color. The bold closes itself, so the line after it is not bold.
-function toned(tone: Tone, text: string): string {
-	const colored = painted(TONE_PAINTS[tone], text)
+function toned(tone: Tone, text: string, idle: Paint = IDLE_PAINT): string {
+	const colored = painted(tone === 'idle' ? idle : TONE_PAINTS[tone], text)
 
 	return tone === 'running' ? styleText('bold', colored) : colored
 }

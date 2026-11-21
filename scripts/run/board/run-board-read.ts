@@ -20,20 +20,15 @@ import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
 import { run_board_ledger_window } from './run-board-ledger-window'
-import {
-	run_board_operation_read,
-	type OperationSources,
-	type SessionOperations,
-} from './run-board-operation-read'
+import type { SessionOperations } from './run-board-operation-read'
 import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
 import { run_board_read_local } from './run-board-read-local'
 import { run_board_records } from './run-board-records'
-import { run_board_scope } from './run-board-scope'
+import { run_board_run_fields, type RunSpan } from './run-board-run-fields'
 import type { EndedRoot, RootRun } from './run-board-single'
-import type { BoardSpan } from './run-board-span'
-import { run_board_span_read, type SpanHere } from './run-board-span-read'
-import { run_board_throughput, type ThroughputRow } from './run-board-throughput'
+import { run_board_span_read } from './run-board-span-read'
+import type { ThroughputRow } from './run-board-throughput'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
 
 // What `run:board` reads locally each tick: the run's span and scope, its events and its open lanes.
@@ -136,22 +131,6 @@ async function main_root(): Promise<string> {
 	} catch (error) {
 		main_roots.keep(new Set())
 		throw error
-	}
-}
-
-// Where each session of the run writes what it does: a lane's child to its dispatch log, in the lane's
-// own checkout; the parent and a judgment session to theirs, in this one.
-function sources_of(
-	repository: string,
-	lanes: ReadonlyArray<LaneInfo>,
-	transcript: string | undefined,
-): OperationSources {
-	const root = process.cwd()
-
-	return {
-		lanes: lanes.map((lane) => ({ issue: lane.issue, log: lane.output, root: lane.directory })),
-		owner: { log: transcript, root },
-		judgment: { log: run_wake.wake_log_path(repository), root },
 	}
 }
 
@@ -291,38 +270,6 @@ const read_records = timing(
 )
 const { read_roots, read_span_events, span_fields } = run_board_read_local
 
-type RunSpan = SpanHere & { span: BoardSpan }
-type RunFields = Pick<
-	LocalRead,
-	| keyof Omit<SpanHere, 'span' | 'root' | 'transcript'>
-	| 'scope'
-	| 'throughput'
-	| 'lanes'
-	| 'operations'
->
-
-// The fields read off the span's record and the run's stream, with no subprocess.
-function run_fields(
-	repository: string,
-	read: RunSpan,
-	lanes: ReadonlyArray<LaneInfo>,
-	events: ReadonlyArray<RunEvent>,
-): RunFields {
-	const { span, transcript, carry, resume, roots, is_stranded, is_session_active } = read
-
-	return {
-		scope: run_board_scope.scope_of(span.invocation, carry?.added),
-		throughput: run_board_throughput.rows_of(events, Date.now()),
-		lanes: lanes.map((lane) => lane.issue),
-		resume,
-		roots,
-		carry,
-		is_stranded,
-		is_session_active,
-		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
-	}
-}
-
 // The run's reads past its span. The roots, the run's events and the lane room read none of each
 // other's results, so their subprocesses run together; the synchronous ledger read runs while they
 // are in flight (joshuafolkken/kit#7931).
@@ -341,7 +288,7 @@ async function run_read(
 		read_room(lanes, lane_read.lane_states, table),
 		read_records(repository, events),
 	])
-	const fields = run_fields(repository, read, lanes, events)
+	const fields = run_board_run_fields.fields_of(repository, read, lanes, events)
 
 	return {
 		...span_fields(span, root_fields),

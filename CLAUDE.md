@@ -50,7 +50,7 @@ Before building a feature, run `pnpm josh pkg:scout <keywords>` and act on its `
 
 ## Completion gate (before you tell the user work is done)
 
-In order, none skipped: tests (Step 0) → refactor → `pnpm josh gate` → Pre-commit Self-Review → IDE feedback → E2E (`prompts/testing-guide.md` → "Closing the E2E gate without a human run") → live-execution evidence (`prompts/collaboration-workflow/report-format.md`). **UI verification:** a rendered-UI change is not done until you have looked at it with `/verify-ui`, or asked the user to.
+In order, none skipped: tests (Step 0) → refactor → `pnpm josh gate` → Pre-commit Self-Review → IDE feedback → E2E (`prompts/testing-guide.md` → "Closing the E2E gate without a human run") → live-execution evidence (`prompts/collaboration-workflow/report-format.md`). **UI verification:** a rendered-UI change is not done until you have looked at it with `/verify-ui`, or asked the user to (`post_merge_check:` → `/verify-ui`).
 
 ## Pre-commit Self-Review (mandatory)
 

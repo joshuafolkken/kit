@@ -6,11 +6,22 @@ import { run_board_theme_tones } from './run-board-theme-tones'
 // joshuafolkken/kit#8349: what each theme draws, one row per theme — a theme is added by adding its
 // row, and the theme names the CLI and the worker accept are this table's keys.
 
+// joshuafolkken/kit#8441: lines typed before the theme's line in `paint`, each held with its cursor for
+// `hold_ms`, then erased and followed by `gap_ms`; where a theme has them, its line shows at once.
+interface IntroLeads {
+	lines: ReadonlyArray<string>
+	hold_ms: number
+	gap_ms: number
+	paint: Paint
+}
+
 interface IntroDefinition {
-	// The line typed before the first frame, and the pauses after each letter and after the line.
+	// The line typed before the first frame — shown at once after the theme's leads where it has them —
+	// and the pauses after each letter and after the line.
 	line: string
 	letter_ms: number
 	hold_ms: number
+	leads?: IntroLeads
 }
 
 // The live board's effects (joshuafolkken/kit#8360): whether each row types as it appears, and whether
@@ -29,8 +40,9 @@ interface LiveDefinition {
 interface ThemeDefinition {
 	// The color the theme draws text no color is given in.
 	paint: Paint
-	// The color of a section rule's `─`, where it is not the text's (joshuafolkken/kit#8397).
-	rule?: Paint
+	// Section dashes and heading text, and the theme's idle glyphs (joshuafolkken/kit#8390).
+	rule: { dash: Paint; text: Paint }
+	idle: Paint
 	intro: IntroDefinition
 	// The alert field a screen's first line ends on, drawn from the level every theme shares
 	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
@@ -38,27 +50,48 @@ interface ThemeDefinition {
 	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
 	// joshuafolkken/kit#8359).
 	lamps: boolean
+	// Glyphs spread over the board spinner's cycle, in order (joshuafolkken/kit#8366).
+	spinner: string
 	live: LiveDefinition
 }
+
+const CYAN: Paint = { rgb: '62;236;225', named: 'cyan' }
+const { IDLE_PAINT } = run_board_theme_tones
 
 const THEME_DEFS = {
 	wargames: {
 		// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
-		paint: { rgb: '62;236;225', named: 'cyan' },
+		paint: CYAN,
 		// The rules in the idle tone, behind the row typing (joshuafolkken/kit#8397).
-		rule: run_board_theme_tones.IDLE_PAINT,
+		rule: { dash: IDLE_PAINT, text: CYAN },
+		idle: IDLE_PAINT,
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
+		spinner: '│╱─╲',
 		live: { sweep: true, types_rows: true, trill: true, codes: true, strip: false },
 	},
-	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening and live
-	// effects come with the epic's later children, so it types no opening line yet.
+	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening types three
+	// lines and shows the last at once (joshuafolkken/kit#8441), and its live effects come with the
+	// epic's later children.
 	matrix: {
 		paint: run_board_header_trace.SHADES.body,
-		intro: { line: '', letter_ms: 0, hold_ms: 0 },
+		rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
+		idle: run_board_header_trace.SHADES.mid,
+		intro: {
+			line: 'KNOCK, KNOCK, JOSH.',
+			letter_ms: 50,
+			hold_ms: 1300,
+			leads: {
+				lines: ['WAKE UP, JOSH...', 'THE BOARD HAS YOU...', 'FOLLOW THE WHITE RABBIT.'],
+				hold_ms: 1100,
+				gap_ms: 300,
+				paint: run_board_header_trace.SHADES.bright,
+			},
+		},
 		alert: run_board_header_trace.field_of,
 		lamps: false,
+		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 		live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
@@ -105,4 +138,4 @@ const run_board_theme_defs = {
 }
 
 export { run_board_theme_defs }
-export type { IntroDefinition, LiveDefinition, LiveDefs, Theme, ThemeDefinition }
+export type { IntroDefinition, IntroLeads, LiveDefinition, LiveDefs, Theme, ThemeDefinition }

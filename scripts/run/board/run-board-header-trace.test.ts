@@ -4,6 +4,7 @@ import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8354: the matrix theme's `TRACE` gauge — one more cell filled per level nearer 1,
@@ -22,7 +23,9 @@ const CALM = 5
 function header_line(extra: Partial<BoardHeader>): string {
 	const board = header({ layout: EMPTY_LAYOUT, lane_limit: 3, theme: 'matrix', ...extra })
 
-	return stripVTControlCharacters(run_board_header.header_lines(board)[0] ?? '')
+	return stripVTControlCharacters(
+		run_board_spot.drawn(run_board_header.header_lines(board)[0] ?? '', ''),
+	)
 }
 
 afterEach(() => {
@@ -40,7 +43,7 @@ describe('run_board_header_trace.field_of', () => {
 	])('fills the cells for level %i', (level, text) => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(field_of(level)).toBe(text)
+		expect(run_board_spot.drawn(field_of(level), '')).toBe(text)
 	})
 
 	it('draws the filled cells bright and the rest dark in 24-bit color', () => {
@@ -57,10 +60,14 @@ describe('run_board_header_trace.field_of', () => {
 		expect(field_of(CALM)).toContain(`${NAMED_GREEN}■`)
 	})
 
-	it('blinks the whole field in the failure red at level 1', () => {
+	it('draws the static worst field red without terminal blink or markers', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(field_of(HALTED)).toBe(`${BLINK}${RED}TRACE ■■■■■${ESCAPE}39m${ESCAPE}25m`)
+		const field = run_board_spot.drawn(field_of(HALTED), '')
+
+		expect(field).toBe(`${RED}TRACE ■■■■■${ESCAPE}39m`)
+		expect(field).not.toContain(BLINK)
+		expect(field).not.toContain(run_board_spot.TRACE)
 	})
 })
 

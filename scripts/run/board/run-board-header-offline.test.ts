@@ -6,8 +6,8 @@ import type { BoardRow } from './run-board-layout'
 import { run_board_render_drawn } from './run-board-render-drawn'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-// joshuafolkken/kit#7895: while the run's stream leaves an outage open, the `💓` gives way to the `📴`
-// and the outage's age, in yellow; the legend names it.
+// joshuafolkken/kit#7895, #8475: while the run's stream leaves an outage open, the notice slot says the
+// `📴` and the outage's age, in yellow, ahead of any notice; the legend names it.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header } = run_board_render_fixture
 const SECOND = 1000
@@ -55,25 +55,22 @@ describe('run_board_header.header_lines -- offline', () => {
 		vi.unstubAllEnvs()
 	})
 
-	it('draws 📴 and the outage’s age in yellow in place of the 💓', () => {
+	it('draws 📴 and the outage’s age in yellow in the notice slot', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const offline = board(SEEN)
 
-		// Right-aligned under the run's age, as the 💓's digits are.
-		expect(beat_line(offline)).toMatch(/📴 +12′34″/u)
-		expect(beat_line(offline)).not.toContain('💓')
+		expect(beat_line(offline)).toMatch(/ {2}📴 12′34″$/u)
 		expect(raw_lines(offline)[1]).toContain(`${YELLOW}${OFFLINE_MARK}`)
 	})
 
-	it('draws the 💓 and the newest event’s age while online', () => {
-		expect(beat_line(board(undefined))).toContain('💓')
+	it('draws no 📴 while online', () => {
 		expect(beat_line(board(undefined))).not.toContain(OFFLINE_MARK)
 	})
 
-	it('right-aligns the run’s age to an outage longer than the run', () => {
+	it('leaves the run’s age as it is under an outage longer than the run', () => {
 		const long = { from_ms: NOW - 10 * HOUR, down_ms: SEEN.down_ms }
 
-		expect(plain_lines(board(long))[0]).toContain('⏰  2°10′00″')
+		expect(plain_lines(board(long))[0]).toBe(plain_lines(board(undefined))[0])
 	})
 
 	it('leaves the third line as it is online', () => {
@@ -89,14 +86,13 @@ describe('run_board_header.header_lines -- an outage not drawn', () => {
 		expect(line).not.toContain(OFFLINE_MARK)
 	})
 
-	it('draws the 💓 over an outage its sampler no longer sees, or a stopped run', () => {
+	it('draws no 📴 over an outage its sampler no longer sees, or a stopped run', () => {
 		const stale = board({ ...SEEN, down_ms: NOW - 3 * MINUTE })
 		const stopped = header({
 			layout: LAYOUT,
 			activity: { last_event_ms: NOW - MINUTE, outage: SEEN, is_stopped: true },
 		})
 
-		expect(beat_line(stale)).toContain('💓')
 		expect(beat_line(stale)).not.toContain(OFFLINE_MARK)
 		expect(beat_line(stopped)).not.toContain(OFFLINE_MARK)
 	})
