@@ -5,6 +5,7 @@ import type { BoardState } from './run-board-state'
 import type { Theme } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 import { run_board_tick_draw } from './run-board-tick-draw'
+import type { TypingSpan } from './run-board-type-rows'
 
 // joshuafolkken/kit#8356: the matrix board draws its lamp panel as the idle rain, and its new rows decode
 // on a terminal drawing color; elsewhere they type or show at once.
@@ -114,12 +115,12 @@ function size(): { rows: number; columns: number } {
 }
 
 // A live redraw of a frame in `theme`, on a terminal drawing color: the state its turns carry.
-function redrawn_state(theme: Theme): BoardState {
+function redrawn_state(theme: Theme, drop?: DropScreen): BoardState {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 	const { FRESH_STATE, layout_for } = run_board_tick
 	const { ports } = harness(LOCAL, [])
-	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
+	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms, drop }
 	const redraw = { ports: { ...ports, types_rows: true, theme, size }, now_ms: START }
 
 	return drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
@@ -162,5 +163,30 @@ describe('run_board_tick_draw.draw_display with the drop', () => {
 
 	it('keeps no drop for the wargames board’s turns', () => {
 		expect(redrawn_state('wargames').drop).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8369: a redraw carries the last frame's pour spans on while a drop they sped up can
+// still be on screen, so the drops neither jump back up nor vanish mid-fall; an older span is let go.
+// The pour spans the matrix board's next redraw keeps, the last frame having carried `span`.
+function carried(span: TypingSpan): ReadonlyArray<TypingSpan> {
+	const last = redrawn_state('matrix').drop
+
+	if (last === undefined) throw new Error('the matrix board drew no drop')
+
+	return redrawn_state('matrix', { ...last, pours: [span] }).drop?.pours ?? []
+}
+
+describe('run_board_tick_draw.draw_display with the last frame’s pours', () => {
+	const { START } = run_board_fixture
+	const RECENT = { from_ms: START - 2000, to_ms: START - 1500 }
+	const STALE = { from_ms: START - 3_600_000, to_ms: START - 3_599_000 }
+
+	it('keeps a span a drop it sped up can still be on screen for', () => {
+		expect(carried(RECENT)).toContainEqual(RECENT)
+	})
+
+	it('lets go of a span older than the slowest drop’s time on screen', () => {
+		expect(carried(STALE)).not.toContainEqual(STALE)
 	})
 })

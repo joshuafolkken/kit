@@ -20,7 +20,7 @@ import { run_board_render_stress_fixture } from './run-board-render-stress-fixtu
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
-import { run_board_type_rows } from './run-board-type-rows'
+import { run_board_type_rows, type TypingSpan } from './run-board-type-rows'
 import type { UsageMark } from './run-board-usage'
 import { run_board_usage_board } from './run-board-usage-board'
 
@@ -274,7 +274,8 @@ describe('run_board_spin.spun draw budget', () => {
 
 // joshuafolkken/kit#8367: the matrix board keeps the stress frame's cells on each redraw and writes the
 // drops' cells on every step between, so both are held under one drop step.
-function drop_ms(at_ms: number): number {
+// joshuafolkken/kit#8369: a pour adds four drops a step, so the step is held under one too while it pours.
+function drop_ms(at_ms: number, pours: ReadonlyArray<TypingSpan> = []): number {
 	const started = performance.now()
 	const lines = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows)
 	const screen = run_board_drop_screen.screen_of(
@@ -282,8 +283,9 @@ function drop_ms(at_ms: number): number {
 		run_board_type_rows.NO_TYPING,
 		PANE,
 	)
+	const poured = run_board_rain_drop.poured(screen, pours, at_ms)
 
-	run_board_rain_drop.drop_bytes(screen, at_ms, at_ms - run_board_rain_drop.DROP_MS)
+	run_board_rain_drop.drop_bytes(poured, at_ms, at_ms - run_board_rain_drop.DROP_MS)
 
 	return performance.now() - started
 }
@@ -291,6 +293,16 @@ function drop_ms(at_ms: number): number {
 describe('run_board_rain_drop draw budget', () => {
 	it('keeps the stress frame’s cells and writes a drop step within one step', () => {
 		const spent = Array.from({ length: DRAWS }, (_, index) => drop_ms(START + index * SECOND_MS))
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
+
+	it('writes a pouring step within one step, the pour on long enough to fill the board', () => {
+		const spent = Array.from({ length: DRAWS }, (_, index) => {
+			const at_ms = START + index * SECOND_MS
+
+			return drop_ms(at_ms, [{ from_ms: at_ms - 10 * SECOND_MS, to_ms: at_ms + SECOND_MS }])
+		})
 
 		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
 	})

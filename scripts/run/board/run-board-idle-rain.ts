@@ -2,6 +2,7 @@ import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_rain } from './run-board-rain'
+import { run_board_sweep } from './run-board-sweep'
 
 // joshuafolkken/kit#8356: the matrix board's idle rain, drawn in the lamp panel's cells — from past the
 // throughput rows' NOW, every other column, on the panel's five rows — so it takes no column the board's
@@ -12,10 +13,14 @@ import { run_board_rain } from './run-board-rain'
 
 const { SHADES } = run_board_header_trace
 const { mixed } = run_board_lamps
-// The demo's live frame, the rows a drop falls a frame idle and pouring, and its gap's rows.
+// The demo's live frame, the rows a drop falls a frame idle, and its gap's rows.
 const FRAME_MS = 70
 const SPEED = { least: 0.12, spread: 0.22 }
-const POUR_SPEED = 0.8
+// joshuafolkken/kit#8369: the pour while a row types, in rows a board drop's step
+// (`run_board_sweep.SWEEP_MS`) — a poured drop's pace, `least` plus a share of `spread`, and the least
+// every falling drop speeds up to. The panel's drops pour at that least's rows a second.
+const POUR = { least: 0.6, spread: 0.5 }
+const POUR_SPEED = (POUR.least * FRAME_MS) / run_board_sweep.SWEEP_MS
 const GAP = { least: 6, spread: 10 }
 const PANEL_ROWS = 5
 const TRAIL: ReadonlyArray<Paint> = [SHADES.bright, SHADES.mid, SHADES.dark]
@@ -85,7 +90,7 @@ function cell_text(place: RainPlace, at: RainMoment): string {
 	return run_board_labels.painted(paint, glyph)
 }
 
-const run_board_idle_rain = { SPEED, cell_text, never, pace_of, row_at, speed_of }
+const run_board_idle_rain = { POUR, SPEED, cell_text, never, pace_of, row_at, speed_of }
 
 export { run_board_idle_rain }
 export type { RainMoment, RainPlace }

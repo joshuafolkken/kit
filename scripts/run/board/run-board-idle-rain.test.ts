@@ -4,12 +4,14 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_idle_rain, type RainMoment } from './run-board-idle-rain'
 import { run_board_lamp_spots, type LampMoment } from './run-board-lamp-spots'
 import { run_board_spot } from './run-board-spot'
+import { run_board_sweep } from './run-board-sweep'
 
 // joshuafolkken/kit#8356: the matrix board's idle rain in the lamp panel's cells — one column wide, a
 // white-green head with the blank below it, pouring faster while a row decodes, written only where the
 // lamps sit.
 
-const { SPEED, cell_text, row_at, speed_of } = run_board_idle_rain
+const { POUR, SPEED, cell_text, row_at, speed_of } = run_board_idle_rain
+const PRECISION = 9
 const { lamps_in, write_lamps } = run_board_lamp_spots
 const { LAMP } = run_board_spot
 const START = Date.parse('2026-11-22T09:00:00.000Z')
@@ -80,6 +82,16 @@ describe('run_board_idle_rain.speed_of', () => {
 		expect(idle).toBeLessThanOrEqual(SPEED.least + SPEED.spread)
 		expect(speed_of(column, { ...IDLE, is_burst: true })).toBeGreaterThan(idle)
 	})
+
+	// joshuafolkken/kit#8369: the panel's frame is the demo's live one; the board's drop steps the sweep's.
+	it.each(COLUMNS)(
+		'pours column %i at the board drops’ least pour pace, in rows a second',
+		(column) => {
+			const per_ms = speed_of(column, { ...IDLE, is_burst: true }) / FRAME_MS
+
+			expect(per_ms * run_board_sweep.SWEEP_MS).toBeCloseTo(POUR.least, PRECISION)
+		},
+	)
 })
 
 // The screen places, `row;column`, the rain wrote at `at` after `since`, past the theme, and whether it

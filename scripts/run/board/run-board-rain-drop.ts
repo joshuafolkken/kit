@@ -6,22 +6,30 @@ import { run_board_idle_rain } from './run-board-idle-rain'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_rain } from './run-board-rain'
+import { run_board_rain_pour } from './run-board-rain-pour'
 import { run_board_sweep } from './run-board-sweep'
+import type { TypingSpan } from './run-board-type-rows'
 
 // joshuafolkken/kit#8367: the matrix board's drop, in place of the wargames sweep. On every second one
 // drop enters the top row in a column drawn at random and falls down the whole board at the idle rain
 // panel's pace (`run_board_idle_rain.pace_of`), a step every `DROP_MS`, until its trail falls past the
 // frame's last row on screen. A blank cell it passes shows code; a cell with text keeps its character,
 // white at the head and bright for the two cells behind it, so a drop never hides what the board says.
-// Each drop is read off the clock and the second it entered on, so a turn writes only the cells that
+// Each drop is read off the clock and the step it entered on, so a turn writes only the cells that
 // changed since the last one.
+// joshuafolkken/kit#8369: while a row types the rain pours — `POUR_PER_STEP` drops enter on each step in
+// place of the second's one, each at its own pace in the pour's spread, and every drop falling speeds
+// up to at least the pour's pace (`run_board_idle_rain.POUR`). From the step the typing ends the second's
+// drop returns; a poured drop keeps its own pace until it falls off.
 
 const { SHADES } = run_board_header_trace
 const { cell_at, is_kept, key_of } = run_board_drop_screen
+const { POUR } = run_board_idle_rain
 const DROP_MS = run_board_sweep.SWEEP_MS
+const POUR_PER_STEP = 4
 const TRAIL: ReadonlyArray<Paint> = [SHADES.bright, SHADES.mid, SHADES.dark, SHADES.darkest]
 const LIT_TRAIL = 2
-const SALT = { column: 1, speed: 2, glyph: 3 }
+const SALT = { column: 1, speed: 2, glyph: 3, pour_column: 4, pour_speed: 5 }
 const SCALE = 1000
 const CSI = '\u{1B}['
 const { RESET } = run_board_cut_styled
@@ -39,46 +47,90 @@ function mixed_share(values: ReadonlyArray<number>): number {
 	return (run_board_lamps.mixed(values) % SCALE) / SCALE
 }
 
+function column_of(fraction: number, columns: number): number {
+	return 1 + Math.min(columns - 1, Math.floor(fraction * columns))
+}
+
 // The drop that entered on the second `born_ms`: its column and its pace.
 function fall_of(born_ms: number, columns: number, share: Share): Fall {
-	const column = 1 + Math.min(columns - 1, Math.floor(share([born_ms, SALT.column]) * columns))
+	const column = column_of(share([born_ms, SALT.column]), columns)
 
 	return { born_ms, column, speed: run_board_idle_rain.pace_of(share([born_ms, SALT.speed])) }
+}
+
+// The `nth` drop the rain poured in on the step `born_ms`: its column and its pace in the pour's spread.
+function poured_fall(born_ms: number, nth: number, columns: number, share: Share): Fall {
+	const column = column_of(share([born_ms, SALT.pour_column, nth]), columns)
+	const speed = POUR.least + share([born_ms, SALT.pour_speed, nth]) * POUR.spread
+
+	return { born_ms, column, speed }
 }
 
 function steps_of(fall: Fall, at_ms: number): number {
 	return Math.floor((at_ms - fall.born_ms) / DROP_MS)
 }
 
-// The screen row the drop's head is on: the top row on the second it enters.
-function head_row(fall: Fall, at_ms: number): number {
-	return 1 + Math.floor(steps_of(fall, at_ms) * fall.speed)
+// The screen row the drop's head is on: the top row on the step it enters, falling at least the pour's
+// pace on each step the rain pours.
+function head_row(fall: Fall, at_ms: number, pours: ReadonlyArray<TypingSpan> = []): number {
+	const steps = steps_of(fall, at_ms)
+	const sped = run_board_rain_pour.poured_steps(pours, fall.born_ms, fall.born_ms + steps * DROP_MS)
+	const fallen = (steps - sped) * fall.speed + sped * Math.max(fall.speed, POUR.least)
+
+	return 1 + Math.floor(fallen)
 }
 
-// The drops on the screen at `at_ms`: one entered on each second, back as far as the slowest could still
-// have its trail on the frame's last row.
-function falls_at(screen: DropScreen, at_ms: number, share: Share): Array<Fall> {
-	const bottom = screen.rows.length
-	const reach_ms = Math.ceil((bottom + TRAIL.length) / run_board_idle_rain.pace_of(0)) * DROP_MS
+// How far back a drop at `pace` can have entered and still have its trail on the frame's last row.
+function reach_ms(screen: DropScreen, pace: number): number {
+	return Math.ceil((screen.rows.length + TRAIL.length) / pace) * DROP_MS
+}
+
+// One drop entered on each second the rain does not pour, back as far as the slowest could still be on
+// screen.
+function second_falls(screen: DropScreen, at_ms: number, share: Share): Array<Fall> {
+	const reach = reach_ms(screen, run_board_idle_rain.pace_of(0))
 	const last = Math.floor(at_ms / MS_PER_SECOND)
-	const first = Math.max(0, Math.floor((at_ms - reach_ms) / MS_PER_SECOND))
+	const first = Math.max(0, Math.floor((at_ms - reach) / MS_PER_SECOND))
 	const seconds = Array.from({ length: last - first + 1 }, (_second, index) => first + index)
 
 	return seconds
 		.map((second) => fall_of(second * MS_PER_SECOND, screen.columns, share))
-		.filter((fall) => head_row(fall, at_ms) - TRAIL.length <= bottom)
+		.filter((fall) => !run_board_rain_pour.is_pouring(screen.pours ?? [], fall.born_ms))
 }
 
-// A blank cell under the drop: a fresh glyph at the head every step, a settled one in the trail.
-function code_glyph(fall: Fall, place: ScreenPlace, at_ms: number): string {
-	const { row, column } = place
-	const step = steps_of(fall, at_ms)
+// `POUR_PER_STEP` drops entered on each step up to `at_ms` the rain pours, back as far as the slowest
+// could still be on screen.
+function poured_falls(screen: DropScreen, at_ms: number, share: Share): Array<Fall> {
+	const from_ms = at_ms - reach_ms(screen, POUR.least)
+	const past_ms = (Math.floor(at_ms / DROP_MS) + 1) * DROP_MS
+	const steps = run_board_rain_pour.pour_steps(screen.pours ?? [], from_ms, past_ms)
 
-	if (head_row(fall, at_ms) === row) {
-		return run_board_rain.fresh(() => mixed_share([fall.born_ms, step, SALT.glyph]))
+	return steps.flatMap((born_ms) =>
+		Array.from({ length: POUR_PER_STEP }, (_drop, nth) =>
+			poured_fall(born_ms, nth, screen.columns, share),
+		),
+	)
+}
+
+// The drops on the screen at `at_ms`: the seconds' and the pour's.
+function falls_at(screen: DropScreen, at_ms: number, share: Share): Array<Fall> {
+	const falls = [...second_falls(screen, at_ms, share), ...poured_falls(screen, at_ms, share)]
+
+	return falls.filter(
+		(fall) => head_row(fall, at_ms, screen.pours) - TRAIL.length <= screen.rows.length,
+	)
+}
+
+// A blank cell under the drop: a fresh glyph at the head (`index` 0) every step, a settled one in the
+// trail.
+function code_glyph(fall: Fall, place: ScreenPlace, index: number, at_ms: number): string {
+	if (index === 0) {
+		const step = steps_of(fall, at_ms)
+
+		return run_board_rain.fresh(() => mixed_share([fall.born_ms, step, SALT.glyph, fall.column]))
 	}
 
-	return run_board_rain.settled({ x: column, y: row }, run_board_idle_rain.never)
+	return run_board_rain.settled({ x: place.column, y: place.row }, run_board_idle_rain.never)
 }
 
 // What the drop draws in its `index`th cell (0 the head): code in a blank, the cell's own character lit
@@ -100,14 +152,14 @@ function lit_text(
 
 // The drop's cells on the screen at `at_ms`, each as written, by `row;column`.
 function fall_cells(screen: DropScreen, fall: Fall, at_ms: number): Array<[string, string]> {
-	const head = head_row(fall, at_ms)
+	const head = head_row(fall, at_ms, screen.pours)
 
 	return Array.from({ length: TRAIL.length + 1 }, (_cell, index) => ({
 		row: head - index,
 		column: fall.column,
 	})).flatMap((place, index) => {
 		if (place.row < 1 || place.row > screen.rows.length || is_kept(screen, place)) return []
-		const text = lit_text(screen, place, index, () => code_glyph(fall, place, at_ms))
+		const text = lit_text(screen, place, index, () => code_glyph(fall, place, index, at_ms))
 
 		return text === undefined ? [] : [[key_of(place), text]]
 	})
@@ -145,7 +197,16 @@ function drop_bytes(
 	return [...left, ...lit].join('')
 }
 
-const run_board_rain_drop = { DROP_MS, drop_bytes, falls_at, head_row }
+// The screen with the spans the rain pours over: this frame's rows typing and the last frame's spans a
+// drop they sped up can still be on screen for, merged.
+function poured(screen: DropScreen, spans: ReadonlyArray<TypingSpan>, now_ms: number): DropScreen {
+	const since_ms = now_ms - reach_ms(screen, run_board_idle_rain.pace_of(0))
+	const kept = spans.filter((span) => span.to_ms > since_ms)
+
+	return { ...screen, pours: run_board_rain_pour.merged(kept) }
+}
+
+const run_board_rain_drop = { DROP_MS, drop_bytes, falls_at, head_row, poured }
 
 export { run_board_rain_drop }
 export type { Fall, Share }
