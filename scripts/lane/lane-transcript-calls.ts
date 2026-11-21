@@ -95,9 +95,14 @@ interface CallInput {
 const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Task'])
 const GENERAL_PURPOSE = 'general-purpose'
 // The words each pass's prompt carries: the interaction brief's path or block, the round-2 prompt's lead.
+const INTERACTION_MARKERS: ReadonlyArray<string> = [
+	'review-brief-interaction-',
+	'## Interaction review',
+]
+const ROUND_TWO_MARKERS: ReadonlyArray<string> = ['round-2 verification pass']
 const PASS_MARKERS: ReadonlyArray<readonly [ReadonlyArray<string>, string]> = [
-	[['review-brief-interaction-', '## Interaction review'], 'interaction'],
-	[['round-2 verification pass'], 'round 2'],
+	[INTERACTION_MARKERS, 'interaction'],
+	[ROUND_TWO_MARKERS, 'round 2'],
 ]
 
 function string_or_undefined(value: unknown): string | undefined {
@@ -265,7 +270,7 @@ function parse(source: CallSource, raw: string): Array<ToolCall> {
 	return [...pairs.uses].map(([id, use]) => to_call(source, use, pairs.results.get(id)))
 }
 
-const lane_transcript_calls = { parse }
+const lane_transcript_calls = { INTERACTION_MARKERS, ROUND_TWO_MARKERS, parse }
 
 export type { Subagent, ToolCall }
 export { lane_transcript_calls }

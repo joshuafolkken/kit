@@ -9,6 +9,7 @@ import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_result, type ResultBreakdown } from './cost-audit-result'
 import { cost_audit_resume, type TriggerRow } from './cost-audit-resume'
+import { cost_audit_review_trigger, type ReviewTriggers } from './cost-audit-review-trigger'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_sequence, type Sequences } from './cost-audit-sequence'
 import { cost_audit_session_count, type SessionCounts } from './cost-audit-session-count'
@@ -85,6 +86,8 @@ interface Audit {
 	sequences: Sequences
 	// The resume sessions by trigger, each period's (joshuafolkken/kit#8311).
 	resumes: ResumeBreakdown
+	// The reviewer runs by trigger, each period's (joshuafolkken/kit#8361).
+	review_triggers: ReviewTriggers
 }
 
 interface ResumeBreakdown {
@@ -292,6 +295,17 @@ function resumes(input: AuditInput, current: AuditWindow, previous: AuditWindow)
 	}
 }
 
+function review_triggers(
+	input: AuditInput,
+	current: AuditWindow,
+	previous: AuditWindow,
+): ReviewTriggers {
+	return cost_audit_review_trigger.breakdown_of(input.sessions, input.merged_issues, {
+		current: (at_ms) => is_inside(at_ms, current),
+		previous: (at_ms) => is_inside(at_ms, previous),
+	})
+}
+
 // The lane-child density of the requests made inside `window`.
 function density_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWindow): Density {
 	return cost_audit_density.density_of(inside(sessions, window))
@@ -346,6 +360,7 @@ function audit(input: AuditInput): Audit {
 		rewrites: rewrites(input, current_window, previous_window),
 		write_causes: write_causes(input.sessions, current_window, previous_window),
 		resumes: resumes(input, current_window, previous_window),
+		review_triggers: review_triggers(input, current_window, previous_window),
 	}
 }
 
