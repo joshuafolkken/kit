@@ -15,6 +15,7 @@ const SECOND_MS = 1000
 const MINUTES = { recent: 1, before_retry: 4, past_retry: 6, before_gap: 20, past_gap: 31 }
 const RETRYING_1 = '❗ stale 1′00″ · retrying'
 const LOGIN = 'gh auth login'
+const NOT_FOUND = 'gh not found'
 const SAYS_RETRYING = '· retrying'
 
 function ago(minutes: number): number {
@@ -83,7 +84,8 @@ describe('run_board_standing.slot_of, what a failure asks of a person', () => {
 	it.each([
 		['gh: not logged in to any hosts', LOGIN],
 		['HTTP 401: Bad credentials', LOGIN],
-		['spawn gh ENOENT', 'gh not found'],
+		['spawn gh ENOENT', NOT_FOUND],
+		['gh CLI is not installed. Install it from https://cli.github.com/', NOT_FOUND],
 		['connect ETIMEDOUT 140.82.112.6:443', 'retrying'],
 		['HTTP 502: Bad Gateway', 'retrying'],
 	])('says %s as %s', (reason, action) => {

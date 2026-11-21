@@ -8,11 +8,13 @@ import { run_board_plan } from './run-board-plan'
 
 vi.mock('#scripts/backlog/backlog-plan-read', () => ({
 	backlog_plan_read: {
-		fetch_open: vi.fn(async () => ({
-			rows: [
-				{ number: 1, title: 'Open', createdAt: '2026-01-01T00:00:00Z', blockedBy: { nodes: [] } },
-			],
-			is_capped: false,
+		read_open: vi.fn(async () => ({
+			listing: {
+				rows: [
+					{ number: 1, title: 'Open', createdAt: '2026-01-01T00:00:00Z', blockedBy: { nodes: [] } },
+				],
+				is_capped: false,
+			},
 		})),
 		classify: vi.fn(async () => undefined),
 		context_of: vi.fn(),
