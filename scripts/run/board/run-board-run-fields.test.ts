@@ -3,6 +3,8 @@ import { run_wake } from '#scripts/run/wake/run-wake'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_operation_read } from './run-board-operation-read'
 import { run_board_run_fields, type RunSpan } from './run-board-run-fields'
+import { run_board_scope } from './run-board-scope'
+import { run_board_throughput } from './run-board-throughput'
 
 const REPOSITORY = '/repo'
 const TRANSCRIPT = '/sessions/owner.jsonl'
@@ -60,9 +62,25 @@ describe('run_board_run_fields.fields_of', () => {
 		const fields = run_board_run_fields.fields_of(REPOSITORY, READ, LANES, [])
 
 		expect(fields.lanes).toEqual(['101', '102'])
-		expect(fields.is_session_active).toBe(true)
 		expect(read).toHaveBeenCalledWith(
 			run_board_run_fields.sources_of(REPOSITORY, LANES, TRANSCRIPT),
 		)
+	})
+
+	it('carries the span record fields and derives the scope and throughput', () => {
+		vi.spyOn(run_board_operation_read, 'read').mockReturnValue(undefined as never)
+		vi.spyOn(run_board_throughput, 'rows_of').mockReturnValue([])
+
+		expect(run_board_run_fields.fields_of(REPOSITORY, READ, LANES, [])).toEqual({
+			scope: run_board_scope.scope_of('backlogrun'),
+			throughput: [],
+			lanes: ['101', '102'],
+			resume: undefined,
+			roots: {},
+			carry: undefined,
+			is_stranded: false,
+			is_session_active: true,
+			operations: undefined,
+		})
 	})
 })
