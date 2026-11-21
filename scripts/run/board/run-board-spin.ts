@@ -185,9 +185,12 @@ function boundary_after(now_ms: number, interval_ms: number): number {
 	return now_ms - (now_ms % interval_ms) + interval_ms
 }
 
-// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236).
+// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236);
+// the idle rain runs from the first frame (joshuafolkken/kit#8356).
 function blinking(turning: Turning): ReadonlyArray<Lamp> {
-	return turning.typing.seen === undefined ? [] : (turning.lamps ?? [])
+	const is_ready = turning.is_rain === true || turning.typing.seen !== undefined
+
+	return is_ready ? (turning.lamps ?? []) : []
 }
 
 function traces_of(turning: Turning): ReadonlyArray<Spot> {

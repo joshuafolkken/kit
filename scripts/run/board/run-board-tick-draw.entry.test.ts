@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_fixture } from './run-board-fixture'
+import type { Theme } from './run-board-theme-defs'
+import { run_board_tick } from './run-board-tick'
 import { run_board_tick_draw } from './run-board-tick-draw'
 
 // joshuafolkken/kit#8356: the matrix board draws its lamp panel as the idle rain, and its new rows decode
@@ -70,5 +73,34 @@ describe('run_board_tick_draw.entry_of', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(entry_of(MATRIX)).toBe('none')
+	})
+})
+
+const WIDE = { rows: 60, columns: 200 }
+
+function size(): { rows: number; columns: number } {
+	return WIDE
+}
+
+// A live redraw of a frame in `theme`, on a terminal drawing color: whether the rain runs and rows decode.
+function redrawn(theme: Theme): { is_rain: boolean; is_decoding: boolean } {
+	vi.stubEnv('FORCE_COLOR', '3')
+	const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
+	const { FRESH_STATE, layout_for } = run_board_tick
+	const { ports } = harness(LOCAL, [])
+	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
+	const redraw = { ports: { ...ports, types_rows: true, theme, size }, now_ms: START }
+	const drawn = drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
+
+	return { is_rain: drawn.is_rain === true, is_decoding: drawn.typing?.is_decoding === true }
+}
+
+describe('run_board_tick_draw.draw_display with the entry', () => {
+	it('keeps the rain and the decoding for the matrix board’s turns', () => {
+		expect(redrawn('matrix')).toStrictEqual({ is_rain: true, is_decoding: true })
+	})
+
+	it('keeps neither for the wargames board’s turns', () => {
+		expect(redrawn('wargames')).toStrictEqual({ is_rain: false, is_decoding: false })
 	})
 })

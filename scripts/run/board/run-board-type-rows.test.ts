@@ -235,6 +235,13 @@ describe('run_board_type_rows — a decoding row', () => {
 
 		expect(next(NO_TYPING, frame, START, true).is_decoding).toBe(true)
 	})
+
+	it('keeps the frame’s decoding past the base', () => {
+		const base = next(NO_TYPING, frame_of([]), START, true)
+		const frame = { ...frame_of([line_of('done:7', 0)]), is_decoding: true }
+
+		expect(next(base, frame, START + SECOND, true).is_decoding).toBe(true)
+	})
 })
 
 // joshuafolkken/kit#8402: the block stays lit at every moment a row types — no blank beat.
