@@ -70,6 +70,14 @@ function party_refusal(target: string): string | undefined {
 	return party === repo_party.THIRD_PARTY ? THIRD_PARTY_MESSAGE : UNKNOWN_PARTY_MESSAGE
 }
 
+// The run Issue a lane child files from, recorded on a prepared child so the lane's ship publishes or
+// refuses it (joshuafolkken/kit#8542); a mark leaked into another checkout is not trusted.
+function lane_origin(): number | undefined {
+	if (!lane_child_marker.is_child_of(process.cwd())) return undefined
+
+	return Number(lane_child_marker.marked_issue())
+}
+
 // `undefined` when the create call failed. `gh`'s standard error is captured into the thrown error
 // rather than printed, so it is printed here — otherwise the filing fails with no reason given. A label
 // the create applies is provisioned first, so it never arrives with a generated color.
@@ -84,6 +92,7 @@ async function create(filing: Filing, labels: ReadonlyArray<string>): Promise<st
 			filing.body,
 			labels,
 			filing.args.is_prepared === true || has_label_name(labels, SPLIT_ROUTE_LABEL),
+			lane_origin(),
 		),
 		repo: filing.target,
 	})

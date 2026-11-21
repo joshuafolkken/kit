@@ -11,7 +11,10 @@ import {
 // them: its row leads the 🙋 decision section with 🔏 (joshuafolkken/kit#8026).
 const DRAWN_ELSEWHERE: ReadonlyMap<string, string> = new Map([
 	[ALREADY_DONE_LABEL, 'the done section (joshuafolkken/kit#7095)'],
-	[NEEDS_HUMAN_REVIEW_LABEL, 'nowhere: it withholds the commit, not the lane'],
+	[
+		NEEDS_HUMAN_REVIEW_LABEL,
+		'its lane record, once the lane stopped (run-board-review-stop.ts, joshuafolkken/kit#8527)',
+	],
 ])
 
 function human_labels(): ReadonlyArray<string> {

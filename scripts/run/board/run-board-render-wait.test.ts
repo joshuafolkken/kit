@@ -15,7 +15,7 @@ const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_rende
 const SECOND = 1000
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 const EMPTY_BAR = '─'.repeat(10)
-const COUNTS = `✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`
+const COUNTS = `✅  0/0 ${EMPTY_BAR}  🔄 0  💤 0`
 // The second line's name column with no kit version recorded: `-` under the board's name.
 const VERSION_CELL = '  -'.padEnd('⏸ josh-board'.length)
 // The time cell a running run leaves blank, as wide as the `⏰ 2°10′00″` over it.

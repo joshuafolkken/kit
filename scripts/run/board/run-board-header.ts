@@ -20,7 +20,6 @@ import type { BoardLinks } from './run-board-link'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
-import { run_board_priority } from './run-board-priority'
 import type { ProcessGroups } from './run-board-process-groups'
 import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
@@ -259,11 +258,6 @@ function estimate_part(header: BoardHeader): string | undefined {
 	return is_moving ? run_board_estimate.part_of(header) : undefined
 }
 
-// The ⏳ count with the priorities among it (joshuafolkken/kit#4383).
-function waiting_of(counts: BoardCounts, header: BoardHeader): string {
-	return `${String(counts.remaining)}${run_board_priority.tally_of(layout_of(header))}`
-}
-
 // A figure only the plan knows, drawn faint while the plan is a saved one.
 function planned(header: BoardHeader, part: string | undefined): string | undefined {
 	if (part === undefined || header.plan_saved_ms === undefined) return part
@@ -278,7 +272,6 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string 
 		planned(header, `${tally_part(counts, header)}${is_read ? plus_of(counts, header) : ''}`),
 		planned(header, estimate_part(header)),
 		`${STATE_ICONS.running} ${String(counts.running)}`,
-		planned(header, `${STATE_ICONS.waiting} ${is_read ? waiting_of(counts, header) : UNKNOWN}`),
 		`${STATE_ICONS.parked} ${String(counts.parked)}`,
 	]
 }

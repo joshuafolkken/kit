@@ -108,7 +108,7 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 		const lines = await frame_with([...RELEASED_LABELS, 'needs-decision'])
 
 		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
-		expect(lines[0]).toContain('⏳ 1  💤 0')
+		expect(lines[0]).toContain('✅  0/1')
 	})
 
 	// joshuafolkken/kit#4127: the findings section read the park off the stream and kept saying it.

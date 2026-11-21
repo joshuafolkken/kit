@@ -1,6 +1,5 @@
 import { shell_quote } from '#scripts/lib/shell-quote'
 import { run_ship_stage, type Stage } from './run-ship-stage'
-import type { ShipArguments } from './run-ship-steps'
 import type { Cause } from './run-ship-stop-cause'
 
 // The command a relaunched lane child runs once it has fixed what stopped its detached ship.
@@ -48,9 +47,21 @@ interface ShipResume {
 	is_review_stale?: boolean
 }
 
+// The started ship's options this module reads — `ShipArguments` narrowed to them, so naming it here
+// does not import the stage list, which would put every ship stage under the epic domain's reach
+// (joshuafolkken/kit#8542; `scripts/epic/epic-layering.test.ts`).
+interface StartedShip {
+	title: string
+	notify: ReadonlyArray<string>
+	body: ReadonlyArray<string>
+	cites: ReadonlyArray<string>
+	is_review: boolean
+	unpinned_ok: ReadonlyArray<string>
+}
+
 // A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path
 // or an issue number and fits the prompt; `shell_quote.word` quotes the `--unpinned-ok` reason.
-function resume_of(args: ShipArguments): ShipResume {
+function resume_of(args: StartedShip): ShipResume {
 	const cites = args.cites.flatMap((cite) => ['--cite', cite])
 
 	return {

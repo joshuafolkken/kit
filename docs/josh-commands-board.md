@@ -131,14 +131,14 @@ A live board and `--every` record too; a board's age counts from its plan read.
 The header is three lines — the first two in three columns, the third the repository's name, a spinner and time under the second column, then the kind's icon and words under the third:
 
 ```
-▶ josh-board   ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0  📮 87/6,912
+▶ josh-board   ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  💤 0  📮 87/6,912
   v1.3153.0+1  💓      20″  💪  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
   kit          ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
 The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
-The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues.
+The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, the running and parked counts, `📮` open/closed issues. The queued and waiting counts are on their headings, not here.
 
 The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
@@ -166,6 +166,8 @@ A fold persists across launches, saved to `~/.claude/josh/board.json` (under `$C
 A missing or broken file opens every section; an unknown section name is dropped. A board that is not a terminal (`--chat`, `--once` into a pipe) neither reads nor writes it.
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
+
+The `⏳ queued` and `🔗 waiting` headings count their rows, an epic's children counted and its own line not, then the priorities among them: `⏳ queued 18 (🔺 2)`, `🔗 waiting 17 (🚨 1 🔺 9)`. A heading with no priority row draws its count alone, never `(🔺 0)`.
 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped; an unanswered probe leaves it running. A single frame that finds an idle lane waits out the window and reads again. A lane this run's record ended (`lane:close`) is stopped too.
 
