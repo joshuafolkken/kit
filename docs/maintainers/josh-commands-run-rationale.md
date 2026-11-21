@@ -279,7 +279,7 @@ The `implement read by call` table (`lane-implement-read-calls.ts`) splits the `
 - another Bash command: its leading word past a `cd`
 - a subagent: `Agent:<type>`; any other call: its tool name
 
-The gap table (`lane-gap-stats.ts`) times each wait on the lane machinery rather than on work. Its `start → first lane` row runs from a `backlogrun` session's `starting session` to its first `opening lane`, read off the run-event stream (`run_event_setup.first_lane_spans`); `run:board` draws the newest session's span as `🛫` on the header's first line, once that first opening began.
+The gap table (`lane-gap-stats.ts`) times each wait on the lane machinery rather than on work. Its `start → first lane` row runs from a `backlogrun` session's `starting session` to its first `opening lane`, read off the run-event stream (`run_event_setup.first_lane_spans`); `run:board` draws the newest session's span as `🛫` ending the processes rule, once that first opening began.
 
 Under its `yield → redispatch` row, four rows split each yield by where its wait went (`lane-yield-split.ts`, joshuafolkken/kit#5984):
 

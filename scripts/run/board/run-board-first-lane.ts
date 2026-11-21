@@ -1,9 +1,11 @@
 import type { RunActivity } from './run-board-activity'
+import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 
 // How long the run's newest session took from its start to its first `opening lane` stage
-// (`run_event_setup.first_lane_ms`, joshuafolkken/kit#5519), drawn at the right end of the processes rule
-// (joshuafolkken/kit#8474) once that stage is written — the opening began, not finished. Not `🚦`: that is a lane row's stage icon.
+// (`run_event_setup.first_lane_ms`, joshuafolkken/kit#5519), drawn at the right end of the
+// processes rule (joshuafolkken/kit#8474) once that stage is written — the opening began, not
+// finished. Not `🚦`: that is a lane row's stage icon.
 
 const ICON = '🛫'
 const LEGEND = `${ICON} to first lane`
@@ -16,9 +18,11 @@ function part(activity: RunActivity): string | undefined {
 		: `${ICON} ${run_board_labels.span_of(first_lane_ms)}`
 }
 
-// The legend names the icon only on a frame that draws it.
-function legend(activity: RunActivity): string | undefined {
-	return activity.first_lane_ms === undefined ? undefined : LEGEND
+// The legend names the icon only on a frame that draws it: the processes rule needs a usage read.
+function legend(header: Pick<BoardHeader, 'activity' | 'usages'>): string | undefined {
+	if (header.usages === undefined) return undefined
+
+	return part(header.activity) === undefined ? undefined : LEGEND
 }
 
 const run_board_first_lane = { ICON, LEGEND, legend, part }

@@ -61,6 +61,14 @@ describe('run_board processes rule -- time to first lane', () => {
 		expect(drawn).not.toContain(LEGEND)
 	})
 
+	it('draws neither the span nor its legend on a frame that read no usage', () => {
+		const activity = { ...BEATING, first_lane_ms: 2 * MINUTE }
+		const drawn = lines_of(header({ activity })).join('\n')
+
+		expect(drawn).not.toContain(ICON)
+		expect(drawn).not.toContain(LEGEND)
+	})
+
 	it('draws the span as `TO` at the rule end in the wargames theme', () => {
 		const rule = processes_rule(lines_with(2 * MINUTE))
 		const themed = stripVTControlCharacters(run_board_theme.restyle('wargames', rule))
