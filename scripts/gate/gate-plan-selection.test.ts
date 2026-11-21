@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { gate_labels } from './gate-labels'
@@ -17,6 +18,19 @@ function whole_tree_in(checks: ReadonlyArray<GateCheck>): ReadonlyArray<string> 
 	return labels(checks.filter((check) => check.is_whole_tree === true))
 }
 
+describe('gate_plan default options', () => {
+	it('defaults omitted options to the machine cores and a solo lane gate', () => {
+		const expected = gate_plan.resolve_gate_plan({
+			available_cores: availableParallelism(),
+			concurrent_runs: 1,
+			selection: {},
+		})
+
+		expect(gate_plan.resolve_gate_plan()).toEqual(expected)
+		expect(gate_plan.resolve_gate_plan({})).toEqual(expected)
+	})
+})
+
 describe('gate_plan without the unit suite', () => {
 	it('keeps the static checks and drops only the unit one', () => {
 		expect(gate_plan.select_gate_checks(false)).toEqual(gate_plan.STATIC_CHECKS)
@@ -33,17 +47,25 @@ describe('gate_plan without the unit suite', () => {
 	it.each(Object.keys(gate_static_group.STATIC_GROUPS))(
 		'admits every check of the %s leg on CI',
 		(group) => {
-			const plan = gate_plan.resolve_gate_plan(CI_CORES, 1, { is_unit_included: false })
+			const plan = gate_plan.resolve_gate_plan({
+				available_cores: CI_CORES,
+				selection: { is_unit_included: false },
+			})
 			const checks = gate_static_group.narrow_checks(plan.checks, group)
 
 			expect(gate_plan.resolve_concurrency(CI_CORES, 1, checks)).toBe(checks.length)
 		},
 	)
+})
 
+describe('gate_plan unit worker selection', () => {
 	// A worker cap is a number for a check this plan never starts, so it carries none — and the line
 	// says where the suite went rather than printing a blank or an inherited count.
 	it('carries no worker cap and says where the unit suite is', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, 1, { is_unit_included: false })
+		const plan = gate_plan.resolve_gate_plan({
+			available_cores: MEASURED_CORES,
+			selection: { is_unit_included: false },
+		})
 
 		expect(plan.unit_worker_cap).toBeUndefined()
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
@@ -54,8 +76,12 @@ describe('gate_plan without the unit suite', () => {
 	// The default keeps the unit suite on every entry point that does not ask otherwise: a flipped
 	// default would silently stop running the unit suite everywhere.
 	it('leaves every other caller the lane gate, unit suite included', () => {
-		expect(gate_plan.resolve_gate_plan(MEASURED_CORES).checks).toEqual(gate_plan.LANE_GATE_CHECKS)
-		expect(gate_plan.has_unit_check(gate_plan.resolve_gate_plan(CI_CORES).checks)).toBe(true)
+		expect(gate_plan.resolve_gate_plan({ available_cores: MEASURED_CORES }).checks).toEqual(
+			gate_plan.LANE_GATE_CHECKS,
+		)
+		expect(
+			gate_plan.has_unit_check(gate_plan.resolve_gate_plan({ available_cores: CI_CORES }).checks),
+		).toBe(true)
 	})
 })
 
@@ -69,13 +95,13 @@ describe('gate_plan the whole-tree checks', () => {
 
 	it.each([true, false])('runs them in the ship and CI gates (kit: %s)', (is_kit_repository) => {
 		const expected = gate_plan.whole_tree_labels(is_kit_repository)
-		const ship = gate_plan.resolve_gate_plan(MEASURED_CORES, 1, {
-			is_kit_repository,
-			is_whole_tree_included: true,
+		const ship = gate_plan.resolve_gate_plan({
+			available_cores: MEASURED_CORES,
+			selection: { is_kit_repository, is_whole_tree_included: true },
 		})
-		const ci = gate_plan.resolve_gate_plan(MEASURED_CORES, 1, {
-			is_kit_repository,
-			is_unit_included: false,
+		const ci = gate_plan.resolve_gate_plan({
+			available_cores: MEASURED_CORES,
+			selection: { is_kit_repository, is_unit_included: false },
 		})
 
 		expect(expected).toContain(gate_labels.EXPORTS_LABEL)

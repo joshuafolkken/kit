@@ -53,7 +53,7 @@ describe('run_gate_steps — the checks never reserve their cores twice', () => 
 	it('starts every check with the held mark set', async () => {
 		const marks = capture_child_marks()
 
-		await verification_gate.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET)
+		await verification_gate.run_gate_steps(SERIAL_PLAN, { budget: UNRESERVED_BUDGET })
 
 		expect(marks).toHaveLength(SERIAL_PLAN.checks.length)
 		expect(new Set(marks)).toEqual(new Set([core_budget.HELD_VALUE]))
@@ -62,7 +62,7 @@ describe('run_gate_steps — the checks never reserve their cores twice', () => 
 	it('clears the mark once the checks are done', async () => {
 		capture_child_marks()
 
-		await verification_gate.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET)
+		await verification_gate.run_gate_steps(SERIAL_PLAN, { budget: UNRESERVED_BUDGET })
 
 		expect(core_budget.is_held()).toBe(false)
 	})
