@@ -116,11 +116,16 @@ describe('lane_room.read — the lane state record', () => {
 })
 
 it('counts only readable seats toward seat capacity', async () => {
-	const lanes = [lane_of(PAUSED), { ...lane_of(RUNNING), seat: 1 }]
+	const lanes = [
+		lane_of(PAUSED),
+		{ ...lane_of(RUNNING), seat: 1 },
+		{ ...lane_of(IDLE), seat: 2, seat_held: false },
+	]
 
 	const room = await lane_room.read(lanes, async () => lane_process_table.parse(LISTING))
 
 	expect(room.use.seated).toBe(1)
+	expect(room.use.seat_holders).toEqual([RUNNING])
 })
 
 describe('lane_room.read', () => {

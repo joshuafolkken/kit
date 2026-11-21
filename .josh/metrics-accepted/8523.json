@@ -1,0 +1,7 @@
+{
+	"reason": "The trill stops itself at the typed-through time: a stop timer in the sound, left_ms in type-rows, the two callers passing it (#8523)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 38
+	}
+}

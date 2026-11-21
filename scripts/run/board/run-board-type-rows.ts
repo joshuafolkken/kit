@@ -200,6 +200,12 @@ function is_typing(typing: Typing, now_ms: number): boolean {
 	return typing.lines.some((line) => !is_typed(line, now_ms))
 }
 
+// How long after `now_ms` the last row types through; 0 once none types. The trill stops itself then,
+// so a redraw held up by a slow gather does not keep it ringing (joshuafolkken/kit#8523).
+function left_ms(typing: Typing, now_ms: number): number {
+	return Math.max(0, ...typing.lines.map((line) => typed_at(line) - now_ms))
+}
+
 // The share of its letters the row that types through last has typed by `now_ms`, so every effect that
 // follows the typing reads one progress (joshuafolkken/kit#8376); all once no row types.
 function progress(typing: Typing, now_ms: number): number {
@@ -217,6 +223,7 @@ const run_board_type_rows = {
 	NO_TYPING,
 	done_ms,
 	is_typing,
+	left_ms,
 	next,
 	progress,
 	type_bytes,

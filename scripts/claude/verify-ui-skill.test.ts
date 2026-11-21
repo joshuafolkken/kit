@@ -25,6 +25,16 @@ describe(`${SKILL_PATH} — refuses to pass without a capture`, () => {
 
 		expect(read_skill_file(SKILL_DIRECTORY)).toContain(header)
 	})
+
+	// joshuafolkken/kit#8502: an issue that deferred its look past the merge continues without a
+	// capture, but the branch records the look as unchecked and never reports the gate satisfied.
+	it('continues on run:prep post_merge_check with the look unchecked', () => {
+		const skill = read_skill_file(SKILL_DIRECTORY)
+
+		expect(skill).toContain('`post_merge_check: <where to look>`')
+		expect(skill).toContain('`behavior checked, look unchecked`')
+		expect(skill).toContain('This does not close the gate; never report it as\nsatisfied.')
+	})
 })
 
 describe.each(AI_DOCS)('%s — UI gate names the shipped skill', (document_path) => {

@@ -214,6 +214,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
   A hold that a session's driver restart ends, not a person, reads `driver restart pending — <sentence>`.
   A held seat with no candidate ends `— <sentence>`. The sentence says what holds the seat and who fills it, as `— open issues await your triage` for `hand-back:judge`.
   The ledger keeps the code (`backlog-hold-text.ts` translates it); an unknown code is shown as is. No seat line is drawn while a free row is about to take the seat, before the plan is read, once the run stopped, or for a single run; none counts as a lane row.
+- `🧵 seats 9/9` — port seats, not the limit, block a launch; on the lanes heading and queued rows. While a live run is handing off, watching or between stages, the header shows `🧵 waiting for seats 9/9`.
 - `🧠 <n>%` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate, `💾 <n>M/s` after the title; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
 - `⏳` with a blank column — no wait is read.
 

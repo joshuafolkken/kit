@@ -22,5 +22,11 @@ server driven from a throwaway script leaves a process running and nothing the n
 **Why one invocation for every route.** A single invocation keeps the build and the preview server to
 one start and one stop.
 
+**Why `post_merge_check:` continues without a capture.** An issue filed with a post-merge check
+already decided, at filing, that the look waits for the merge; a run that stops for it anyway parks
+work the filer released (joshuafolkken/kit#8502 — three `run:board` theme issues parked this way).
+The run reads the decision off `run:prep`'s answer line rather than the body, and still records the
+look as unchecked, so nothing reports the gate closed.
+
 **Why every image is opened.** The point of the gate is the look; a run that captures files without
 opening them has done nothing the tests did not already do.

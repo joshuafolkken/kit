@@ -83,6 +83,7 @@ type LocalHeader = Pick<
 	| 'lane_totals'
 	| 'lane_limit'
 	| 'occupied_count'
+	| 'lane_capacity'
 	| 'found'
 	| 'scheduler_provider'
 	| 'is_investigation_on'
@@ -100,6 +101,7 @@ function local_header(local: LocalRead): LocalHeader {
 		lane_totals: local.lane_totals,
 		lane_limit: local.lane_limit,
 		occupied_count: local.occupied_count,
+		lane_capacity: local.lane_capacity,
 		found: local.found,
 		scheduler_provider: local.scheduler_provider,
 		is_investigation_on: lane_investigation_switch.is_on(),

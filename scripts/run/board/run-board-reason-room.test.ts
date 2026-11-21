@@ -44,6 +44,17 @@ function reason(extra: Partial<ReasonRead>): RowReason | undefined {
 	return run_board_reason.reader(read)(ROW, [])
 }
 
+it('names seat exhaustion rather than execution occupancy (ac-7a16922e)', () => {
+	expect(
+		reason({
+			free_lanes: 0,
+			occupied_count: 1,
+			lane_limit: 6,
+			lane_capacity: { free: 0, bound: 'seats', seated: 9 },
+		}),
+	).toStrictEqual({ icon: WAIT_ICONS.lane, value: 'seats 9/9' })
+})
+
 // joshuafolkken/kit#4084: a row the driver holds for memory says so, with the figures it was held on.
 const PRESSED: MachineGauges = {
 	cpu_percent: undefined,

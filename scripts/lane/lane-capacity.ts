@@ -33,6 +33,12 @@ const NO_LANES = 0
 // The limit, or why it could not be read.
 type LimitChoice = PositiveSetting
 
+interface LaneAnswer {
+	free: number
+	bound: 'limit' | 'seats' | 'none'
+	seated: number
+}
+
 // **An invalid value is a hard error, never a silent fall back to the default** — the rule
 // `PORT_SEED` already holds to. `name` is what the problem names: `josh lane:limit` reads its argument
 // by the same rule.
@@ -77,21 +83,41 @@ function limit_room(limit: number, occupied: number): number {
 	return Math.max(NO_LANES, seated_limit(limit) - occupied)
 }
 
-function free_lanes(limit: number, occupied: number, seated = occupied): number {
-	const by_seats = lane_seed_policy.LAST_LANE_SEAT - seated
+function bound_of(free: number, by_limit: number, by_seats: number): LaneAnswer['bound'] {
+	if (free > NO_LANES) return 'none'
 
-	return Math.max(NO_LANES, Math.min(limit_room(limit, occupied), by_seats))
+	return by_limit <= by_seats ? 'limit' : 'seats'
+}
+
+function lane_answer(limit: number, occupied: number, seated = occupied): LaneAnswer {
+	const by_limit = limit_room(limit, occupied)
+	const by_seats = lane_seed_policy.LAST_LANE_SEAT - seated
+	const free = Math.max(NO_LANES, Math.min(by_limit, by_seats))
+
+	return { free, bound: bound_of(free, by_limit, by_seats), seated }
+}
+
+function free_lanes(limit: number, occupied: number, seated = occupied): number {
+	return lane_answer(limit, occupied, seated).free
+}
+
+function seat_text(answer: LaneAnswer | undefined): string | undefined {
+	if (answer?.bound !== 'seats') return undefined
+
+	return `seats ${String(answer.seated)}/${String(lane_seed_policy.LAST_LANE_SEAT)}`
 }
 
 const lane_capacity = {
 	LANE_LIMIT_KEY,
 	environment_limit,
 	free_lanes,
+	lane_answer,
 	lane_limit,
 	limit_room,
 	read_limit,
 	seated_limit,
+	seat_text,
 }
 
-export type { LimitChoice }
+export type { LaneAnswer, LimitChoice }
 export { lane_capacity }

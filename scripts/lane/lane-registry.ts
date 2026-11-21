@@ -277,11 +277,13 @@ async function has_lanes_in_flight(): Promise<boolean> {
 	return lanes.some((lane) => !lane.is_stranded)
 }
 
+function holds_seat(lane: LaneInfo): boolean {
+	return lane.seat_held !== false && lane.seat !== undefined
+}
+
 /** The seats live lanes hold — what a new lane's seat has to avoid. */
 function used_seats(lanes: ReadonlyArray<LaneInfo>): Array<number> {
-	return [
-		...new Set(lanes.filter((lane) => lane.seat_held !== false).flatMap((lane) => lane.seat ?? [])),
-	]
+	return [...new Set(lanes.filter((lane) => holds_seat(lane)).flatMap((lane) => lane.seat ?? []))]
 }
 
 /** The live lanes whose seat could not be read, which is what stops an allocation. */
@@ -320,6 +322,7 @@ const lane_registry = {
 	registered_directories,
 	unreadable_lanes,
 	used_seats,
+	holds_seat,
 	write_environment,
 	OWNER_ONLY_MODE,
 }
