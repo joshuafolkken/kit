@@ -7,7 +7,7 @@ import {
 	RUN_SOLO_LABEL,
 } from './issue-labels'
 import { issue_priority } from './issue-priority'
-import { issue_rank, type RankRow } from './issue-rank'
+import { issue_rank, type DependencyRow, type RankRow } from './issue-rank'
 
 // joshuafolkken/kit#2928: priority:high, then a verification-path defect, then dependents, then the
 // order the caller gave. joshuafolkken/kit#7912: any defect follows the verification-path defect.
@@ -25,6 +25,7 @@ function row(name: string, labels: ReadonlyArray<string> = [], dependents = 0): 
 		lost_minutes: 0,
 		gain_minutes: 0,
 		dependents,
+		blocked_priority: 0,
 	}
 }
 
@@ -285,12 +286,20 @@ describe('issue_rank.rank declared last', () => {
 	})
 })
 
+function dependency(
+	key: string,
+	blockers: ReadonlyArray<string>,
+	labels: ReadonlyArray<string> = [],
+): DependencyRow {
+	return { key, labels, blockers }
+}
+
 describe('issue_rank.count_dependents', () => {
 	it('counts each row that waits on a key once', () => {
 		const counts = issue_rank.count_dependents([
-			{ key: 'a', blockers: [] },
-			{ key: 'b', blockers: ['a', 'a'] },
-			{ key: 'c', blockers: ['a', 'b'] },
+			dependency('a', []),
+			dependency('b', ['a', 'a']),
+			dependency('c', ['a', 'b']),
 		])
 
 		expect(counts.get('a')).toBe(2)
@@ -301,9 +310,9 @@ describe('issue_rank.count_dependents', () => {
 	// joshuafolkken/kit#5506: a chain's head counts every row behind it.
 	it('counts the rows down a chain transitively', () => {
 		const counts = issue_rank.count_dependents([
-			{ key: 'a', blockers: [] },
-			{ key: 'b', blockers: ['a'] },
-			{ key: 'c', blockers: ['b'] },
+			dependency('a', []),
+			dependency('b', ['a']),
+			dependency('c', ['b']),
 		])
 
 		expect(counts.get('a')).toBe(2)
@@ -312,10 +321,7 @@ describe('issue_rank.count_dependents', () => {
 	})
 
 	it('stops on a cycle, counting each side once', () => {
-		const counts = issue_rank.count_dependents([
-			{ key: 'a', blockers: ['b'] },
-			{ key: 'b', blockers: ['a'] },
-		])
+		const counts = issue_rank.count_dependents([dependency('a', ['b']), dependency('b', ['a'])])
 
 		expect(counts.get('a')).toBe(1)
 		expect(counts.get('b')).toBe(1)
@@ -331,10 +337,10 @@ describe('issue_rank.rank chain head', () => {
 
 	it('puts the chain head ahead of an independent priority:high issue with a weekly gain', () => {
 		const dependents = issue_rank.count_dependents([
-			{ key: HEAD, blockers: [] },
-			{ key: 'second', blockers: [HEAD] },
-			{ key: 'third', blockers: ['second'] },
-			{ key: 'fourth', blockers: ['third'] },
+			dependency(HEAD, []),
+			dependency('second', [HEAD]),
+			dependency('third', ['second']),
+			dependency('fourth', ['third']),
 		])
 		const rows = [
 			{ ...gained(INDEPENDENT, GAIN_MINUTES), labels: [PRIORITY_HIGH_LABEL] },
