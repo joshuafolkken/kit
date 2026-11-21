@@ -11,6 +11,14 @@ const SPAN_UNITS = { hours: '°', minutes: '′', seconds: '″' } as const
 // The seconds a length rounded to its minute draws, which `minute_span_of` leaves off.
 const ZERO_SECONDS = `00${SPAN_UNITS.seconds}`
 
+// Which way a length drawn to its minute rounds: an elapsed time down, so it never claims time not yet
+// spent; a wait up, so one under a minute still reads as a wait.
+type SpanRounding = 'down' | 'up'
+const ROUNDING: Readonly<Record<SpanRounding, (value: number) => number>> = {
+	down: Math.floor,
+	up: Math.ceil,
+}
+
 const { two_digits } = figure_format
 
 // A length as its hours, and its minutes and seconds within the hour, each its count with the mark it
@@ -39,14 +47,29 @@ function span_of(ms: number): string {
 	return head + rest.map((field) => `${two_digits(field.value)}${field.unit}`).join('')
 }
 
-// A length rounded up to its minute, in `span_of`'s style without the seconds (`25′`, `1°05′`), never
-// under a minute: an estimate drawn to the second would claim a precision it does not have.
-function minute_span_of(ms: number): string {
-	const minutes = Math.max(1, Math.ceil(ms / MS_PER_MINUTE))
+// A length rounded `rounding` to its minute, in `span_of`'s style without the seconds (`25′`, `1°05′`),
+// never under a minute.
+function rounded_minute_span(ms: number, rounding: SpanRounding): string {
+	const minutes = Math.max(1, ROUNDING[rounding](ms / MS_PER_MINUTE))
 
 	return span_of(minutes * MS_PER_MINUTE).slice(0, -ZERO_SECONDS.length)
 }
 
-const run_board_length = { minute_span_of, span_of }
+// A length rounded up to its minute (`25′`, `1°05′`), never under a minute: an estimate drawn to the
+// second would claim a precision it does not have.
+function minute_span_of(ms: number): string {
+	return rounded_minute_span(ms, 'up')
+}
+
+// A length for a column `width` wide (joshuafolkken/kit#8481): `span_of`'s where it fits, else without
+// its seconds, rounded `rounding` to its minute (`17°03′34″` → `17°03′` down), so a long one never
+// pushes the columns after it right.
+function fitted_span_of(ms: number, width: number, rounding: SpanRounding): string {
+	const span = span_of(ms)
+
+	return span.length <= width ? span : rounded_minute_span(ms, rounding)
+}
+
+const run_board_length = { fitted_span_of, minute_span_of, span_of }
 
 export { run_board_length }
