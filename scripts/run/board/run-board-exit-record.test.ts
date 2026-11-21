@@ -114,7 +114,9 @@ describe('run_board_exit_record tick', () => {
 			pid: PID,
 		})
 	})
+})
 
+describe('run_board_exit_record release', () => {
 	it('takes its handlers off as the board leaves', async () => {
 		const board = fixture()
 		const guard = watching(board)
@@ -125,6 +127,20 @@ describe('run_board_exit_record tick', () => {
 
 		for (const event of GUARDED_EVENTS) expect(board.process.listenerCount(event)).toBe(0)
 		expect(board.stdout.listenerCount('error')).toBe(0)
+	})
+
+	it('runs the leave its exit listener held once as a redraw throws, so --timing still reports', async () => {
+		const board = fixture()
+		const guard = watching(board)
+
+		await expect(
+			run_board_exit_record.guarded(guard, async () => {
+				await Promise.reject(new Error('redraw'))
+			}),
+		).rejects.toThrow('redraw')
+		board.process.emit('exit', FAILURE)
+
+		expect(board.leaves).toStrictEqual(['left'])
 	})
 })
 

@@ -260,9 +260,17 @@ function guard(ports: ExitPorts): ExitGuard {
 
 	return {
 		on_exit: (leave) => {
-			const listeners = process_listeners(record, targets, once(leave))
+			const leave_once = once(leave)
+			const detach = attach(targets.process, process_listeners(record, targets, leave_once))
 
-			detached.push(attach(targets.process, listeners), attach(targets.stdout, stdout))
+			// The leave the `exit` listener would have run — `--timing`'s report with it — runs as it comes off.
+			detached.push(
+				() => {
+					leave_once()
+					detach()
+				},
+				attach(targets.stdout, stdout),
+			)
 		},
 		record,
 		release: () => {
