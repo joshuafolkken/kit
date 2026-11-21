@@ -53,6 +53,13 @@ describe('run_ship_planned.unplanned_of', () => {
 	it('holds every path under a planned directory', () => {
 		expect(run_ship_planned.unplanned_of(['scripts/gate/'], CHANGED)).toStrictEqual([])
 	})
+
+	// joshuafolkken/kit#8529: `lane:plan` records a glob as the pattern it writes.
+	it('holds every path a planned glob matches, and no other', () => {
+		expect(run_ship_planned.unplanned_of(['scripts/gate/*-s*.ts'], CHANGED)).toStrictEqual([
+			UNPLANNED,
+		])
+	})
 })
 
 // joshuafolkken/kit#5203: `check:related` reads the same answer, with the issue and the files it records.
