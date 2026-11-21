@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
 import { lane_await } from '#scripts/lane/lane-await'
@@ -109,8 +110,10 @@ async function read_at(
 	ports: GatherPorts,
 	at: SnapshotAt,
 ): Promise<GatherState> {
-	const local = await ports.read_local(at.table)
-	const idle_since = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], at.now_ms)
+	const fresh = await ports.read_local(at.table)
+	const local = isDeepStrictEqual(state.local, fresh) ? state.local : fresh
+	const idle = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], at.now_ms)
+	const idle_since = isDeepStrictEqual(state.idle_since, idle) ? state.idle_since : idle
 
 	return { ...state, local, read_ms: at.now_ms, idle_since }
 }
