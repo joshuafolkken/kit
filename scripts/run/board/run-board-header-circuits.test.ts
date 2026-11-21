@@ -6,6 +6,7 @@ import { run_board_labels } from './run-board-labels'
 import type { BoardLayout } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_spot } from './run-board-spot'
 import { run_board_theme } from './run-board-theme'
 import type { Theme } from './run-board-theme-defs'
 
@@ -49,9 +50,12 @@ function circuits(extra: Partial<BoardHeader> = {}): BoardHeader {
 	})
 }
 
+// The header as a live frame draws it: its placeholders drawn — the clocks' colons lit
+// (joshuafolkken/kit#8476) — then the theme.
 function drawn(board: BoardHeader, theme?: Theme): Array<string> {
 	return run_board_header
 		.header_lines({ ...board, theme })
+		.map((line) => run_board_spot.drawn(line, SPINNER))
 		.map((line) => stripVTControlCharacters(run_board_theme.restyle(theme, line)))
 }
 

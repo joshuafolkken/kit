@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_clocks, type ClockHeader } from './run-board-clocks'
 import { run_board_labels } from './run-board-labels'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#8478: the header's clock column — the finish over now over the start, all dated once
 // one falls on another day, the finish `--:--` where none is known and the end once the run ended, and a
@@ -61,5 +62,34 @@ describe('run_board_clocks.clocks_of finish and start', () => {
 		expect(clocks_of(header({ theme: 'wargames' }), undefined)[2]).toBe(`T0 ${start}`)
 		expect(clocks_of(header(), undefined)[2]).toBe(`🚀 ${start}`)
 		expect(clocks_of(header({ theme: 'wargames', form: 'chat' }), undefined)[2]).toBe(`🚀 ${start}`)
+	})
+})
+
+// joshuafolkken/kit#8476: a live screen's running clocks carry their colons as placeholders the spin
+// blinks; an ended run's, a chat's and a frame with no spinner keep them lit.
+const LIVE = { spinner: run_board_spot.SPOT }
+
+function marked(ms: number): string {
+	return minute_of(ms).split(':').join(run_board_spot.COLON)
+}
+
+describe('run_board_clocks.clocks_of colons', () => {
+	it('marks every running clock’s colon on a live screen, with no color of its own', () => {
+		const finish = NOW + HOUR
+
+		expect(clocks_of(header(LIVE), finish)).toStrictEqual([
+			`🎯 ${marked(finish)}`,
+			`🕒 ${marked(NOW)}`,
+			`🚀 ${marked(STARTED)}`,
+		])
+		expect(clocks_of(header(LIVE), finish).join('')).not.toContain('\u{1B}')
+	})
+
+	it('keeps the colons lit once the run ended, in a chat and with no spinner', () => {
+		const ended = clocks_of(header({ ...LIVE, ended_ms: NOW - MINUTE }), undefined)
+		const chat = clocks_of(header({ ...LIVE, form: 'chat' }), undefined)
+		const still = clocks_of(header(), undefined)
+
+		for (const clocks of [ended, chat, still]) expect(clocks[1]).toBe(`🕒 ${minute_of(NOW)}`)
 	})
 })

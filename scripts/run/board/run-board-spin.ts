@@ -1,6 +1,7 @@
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_codes, type RuleCell } from './run-board-codes'
+import { run_board_colon } from './run-board-colon'
 import type { DropScreen } from './run-board-drop-screen'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
@@ -26,8 +27,9 @@ import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-ty
 // row the frame was cut to the terminal's rows without is not on screen, so it records nothing. The
 // sweep under the third line's age (`run-board-sweep.ts`) is placed the same way, by its own placeholder.
 
-const { SPOT, TICK, spot_at } = run_board_spot
+const { COLON, SPOT, TICK, spot_at } = run_board_spot
 const { SWEEP_MS, sweep_bytes, sweep_index } = run_board_sweep
+const { colon_bytes } = run_board_colon
 const REDRAW_MS = MS_PER_SECOND
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
@@ -62,20 +64,25 @@ interface Turning {
 	strips?: ReadonlyArray<StripCell> | undefined
 	// The frame's cells a drop falls down in place of the sweep (`run-board-rain-drop.ts`).
 	drop?: DropScreen | undefined
+	// The header clocks' colons, blinked every half second (`run-board-colon.ts`).
+	colons?: ReadonlyArray<Spot> | undefined
 }
 
-// What changed since the last turn was written: the spinner's frame, the sweep's cell, and the moment
-// the lamps were last written at — none to write every lamp.
+// What changed since the last turn was written: the spinner's frame, the sweep's cell, the colons'
+// half second, and the moment the lamps were last written at — none to write every lamp.
 interface Turned {
 	is_turned: boolean
 	is_swept: boolean
+	is_blinked?: boolean | undefined
 	since: LampMoment | undefined
 }
 
-// The spinner's frame, the sweep's cell and the lamps' moment, compared turn to turn.
+// The spinner's frame, the sweep's cell, whether the colons are lit and the lamps' moment, compared turn
+// to turn.
 interface Moment {
 	frame: string
 	cell: number
+	is_lit: boolean
 	lamps: LampMoment
 }
 
@@ -84,10 +91,20 @@ type SpinPorts = Pick<
 	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'typing_sound'
 >
 
-function line_spots(line: string, row: number, columns: number): Array<Spot> {
-	return [...line.matchAll(new RegExp(SPOT, 'gu'))].map((match) =>
-		spot_at(line, match.index, row, columns),
-	)
+// Each `mark` placeholder's spot in `lines`, on screen.
+function marks_in(
+	lines: ReadonlyArray<string>,
+	mark: string,
+	starts: ReadonlyArray<number>,
+	size: { rows: number; columns: number },
+): Array<Spot> {
+	return lines
+		.flatMap((line, index) =>
+			[...line.matchAll(new RegExp(mark, 'gu'))].map((match) =>
+				spot_at(line, match.index, starts[index] ?? 1, size.columns),
+			),
+		)
+		.filter((spot) => spot.row <= size.rows)
 }
 
 // The row on screen each line starts on, after the lines above it wrap.
@@ -154,7 +171,6 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 	const columns = Math.max(1, size?.columns ?? Infinity)
 	const rows = size?.rows ?? Infinity
 	const starts = starts_of(lines, columns)
-	const spots = lines.flatMap((line, index) => line_spots(line, starts[index] ?? 1, columns))
 	const drawn = keyed_of(lines, frame, starts)
 	const lamps = run_board_lamp_spots
 		.lamps_in(lines, starts, columns)
@@ -165,7 +181,7 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 
 	return {
 		lines: drawn.lines,
-		spots: spots.filter((spot) => spot.row <= rows),
+		spots: marks_in(lines, SPOT, starts, { rows, columns }),
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
 		sweep: sweep_in(lines, starts, { rows, columns }),
 		lamps,
@@ -175,6 +191,15 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 		rules,
 		strips: run_board_strip.strip_cells(lines, starts, { lamps, rules }),
 	}
+}
+
+// The header clocks' colon placeholders' spots in `lines` — the frame as the theme draws it, so each
+// spot's style carries the color its colon is darkened from (`run-board-colon.ts`).
+function colons_in(lines: ReadonlyArray<string>, size?: TerminalSize): Array<Spot> {
+	const columns = Math.max(1, size?.columns ?? Infinity)
+	const bounds = { rows: size?.rows ?? Infinity, columns }
+
+	return marks_in(lines, COLON, starts_of(lines, columns), bounds)
 }
 
 // One spinner frame at every spot: the cursor moved there, the spot's colors, the frame, then a reset.
@@ -201,6 +226,10 @@ function traces_of(turning: Turning): ReadonlyArray<Spot> {
 	return turning.traces ?? []
 }
 
+function colons_of(turning: Turning): ReadonlyArray<Spot> {
+	return turning.colons ?? []
+}
+
 function has_effects(turning: Turning): boolean {
 	const is_falling = turning.sweep !== undefined || turning.drop !== undefined
 
@@ -214,8 +243,12 @@ function sweep_boundary(turning: Turning, now_ms: number): number {
 	return is_moving ? boundary_after(now_ms, SWEEP_MS) : Infinity
 }
 
+// The next step the TRACE field blinks or the colons turn on.
 function trace_boundary(turning: Turning, now_ms: number): number {
-	return traces_of(turning).length > 0 ? run_board_header_trace.boundary_after(now_ms) : Infinity
+	const trace_ms =
+		traces_of(turning).length > 0 ? run_board_header_trace.boundary_after(now_ms) : Infinity
+
+	return Math.min(trace_ms, run_board_colon.colon_boundary(colons_of(turning), now_ms))
 }
 
 // The rules run code only where the lamp panel blinks, so its gate is theirs (joshuafolkken/kit#8375).
@@ -245,9 +278,10 @@ function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 	const spin = turned.is_turned ? spin_bytes(turning.spots, spinner_of(at_ms)) : ''
 	const { sweep } = turning
 	const swept = sweep !== undefined && turned.is_swept ? sweep_bytes(sweep, at_ms) : ''
+	const blinked = turned.is_blinked === true ? colon_bytes(colons_of(turning), at_ms) : ''
 
 	return run_board_screen.synced(
-		`${spin}${swept}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`,
+		`${spin}${swept}${blinked}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`,
 	)
 }
 
@@ -304,11 +338,21 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 }
 
 function moment_of(turning: Turning, at_ms: number): Moment {
-	return { frame: spinner_of(at_ms), cell: sweep_index(at_ms), lamps: lamp_moment(turning, at_ms) }
+	return {
+		frame: spinner_of(at_ms),
+		cell: sweep_index(at_ms),
+		is_lit: run_board_colon.is_lit(at_ms),
+		lamps: lamp_moment(turning, at_ms),
+	}
 }
 
 function turned_since(last: Moment, at: Moment): Turned {
-	return { is_turned: at.frame !== last.frame, is_swept: at.cell !== last.cell, since: last.lamps }
+	return {
+		is_turned: at.frame !== last.frame,
+		is_swept: at.cell !== last.cell,
+		is_blinked: at.is_lit !== last.is_lit,
+		since: last.lamps,
+	}
 }
 
 // The sweep and every lamp written where the frame has them, so they show on the second before the first
@@ -341,9 +385,12 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 	})
 }
 
-// A frame with no spinner, sweep, typing row or blinking lamp writes nothing between redraws.
+// A frame with no spinner, sweep, typing row, blinking lamp or clock colon writes nothing between
+// redraws; the colons, drawn lit with the frame, need no write before their first half second.
 function is_still(turning: Turning): boolean {
-	return turning.spots.length === 0 && turning.typing.lines.length === 0 && !has_effects(turning)
+	const is_bare = turning.spots.length === 0 && colons_of(turning).length === 0
+
+	return is_bare && turning.typing.lines.length === 0 && !has_effects(turning)
 }
 
 // Waits for the next second, turning the spinners, moving the sweep and typing the rows until then; a
@@ -361,7 +408,7 @@ async function spin_to_second(turning: Turning, ports: SpinPorts): Promise<void>
 	await turn_until(turning, ports, second_ms)
 }
 
-const run_board_spin = { REDRAW_MS, SPOT, spin_bytes, spin_to_second, spun }
+const run_board_spin = { REDRAW_MS, SPOT, colons_in, spin_bytes, spin_to_second, spun }
 
 export { run_board_spin }
 export type { Spun, Turning }

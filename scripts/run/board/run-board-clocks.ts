@@ -1,4 +1,5 @@
 import { run_board_labels } from './run-board-labels'
+import { run_board_spot } from './run-board-spot'
 import type { Theme } from './run-board-theme-defs'
 
 // The header's clock column (`run-board-header.ts`, joshuafolkken/kit#8478): when the run should finish
@@ -14,6 +15,7 @@ const START_ICON = '🚀'
 // keeps 🚀 as the starting stage's `GO`.
 const THEMED_START = 'T0'
 const UNKNOWN_TIME = '--:--'
+const { COLON } = run_board_spot
 
 // What the clocks read off the header (`BoardHeader`).
 interface ClockHeader {
@@ -22,6 +24,17 @@ interface ClockHeader {
 	ended_ms: number | undefined
 	theme?: Theme | undefined
 	form: 'screen' | 'chat'
+	// Set only on a live board's terminal (`run-board-tick-draw.ts`).
+	spinner?: string | undefined
+}
+
+// joshuafolkken/kit#8476: a live board's running clocks carry their colons as placeholders the spin
+// blinks between redraws (`run-board-colon.ts`); an ended run's and a one-shot frame's stay lit.
+function colons_of(header: ClockHeader, time: string): string {
+	const is_live = header.spinner !== undefined && header.form === 'screen'
+	const is_blinking = is_live && header.ended_ms === undefined
+
+	return is_blinking ? time.split(':').join(COLON) : time
 }
 
 function is_one_day(times: ReadonlyArray<number>): boolean {
@@ -42,7 +55,9 @@ function clocks_of(header: ClockHeader, finish_ms: number | undefined): Array<st
 	return icons.map((icon, row) => {
 		const ms = times[row]
 
-		return `${icon} ${ms === undefined ? UNKNOWN_TIME.padStart(width) : format(ms)}`
+		const time = ms === undefined ? UNKNOWN_TIME.padStart(width) : format(ms)
+
+		return `${icon} ${colons_of(header, time)}`
 	})
 }
 
