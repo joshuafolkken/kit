@@ -41,7 +41,7 @@ afterEach(() => {
 describe('rule_value_cache.emit — the loop head never measures', () => {
 	it('prints the stored reading to stderr', () => {
 		rule_value_cache.store(READING, context.cwd)
-		rule_value_cache.emit(context.cwd, ports())
+		rule_value_cache.emit({ cwd: context.cwd, ports: ports() })
 
 		expect(context.stderr).toStrictEqual([`${READING}\n`])
 	})
@@ -49,7 +49,7 @@ describe('rule_value_cache.emit — the loop head never measures', () => {
 	it('prints nothing and starts a refresh when no reading is stored yet', () => {
 		const start_refresh = vi.fn()
 
-		rule_value_cache.emit(context.cwd, ports(start_refresh))
+		rule_value_cache.emit({ cwd: context.cwd, ports: ports(start_refresh) })
 
 		expect(context.stderr).toStrictEqual([])
 		expect(start_refresh).toHaveBeenCalledExactlyOnceWith(context.cwd)
@@ -58,8 +58,8 @@ describe('rule_value_cache.emit — the loop head never measures', () => {
 	it('starts no second refresh inside the interval', () => {
 		const start_refresh = vi.fn()
 
-		rule_value_cache.emit(context.cwd, ports(start_refresh))
-		rule_value_cache.emit(context.cwd, ports(start_refresh))
+		rule_value_cache.emit({ cwd: context.cwd, ports: ports(start_refresh) })
+		rule_value_cache.emit({ cwd: context.cwd, ports: ports(start_refresh) })
 
 		expect(start_refresh).toHaveBeenCalledOnce()
 	})
@@ -67,9 +67,9 @@ describe('rule_value_cache.emit — the loop head never measures', () => {
 	it('starts a refresh again once the interval has passed', () => {
 		const start_refresh = vi.fn()
 
-		rule_value_cache.emit(context.cwd, ports(start_refresh))
+		rule_value_cache.emit({ cwd: context.cwd, ports: ports(start_refresh) })
 		file_aged(rule_value_cache.STAMP_FILE, rule_value_cache.REFRESH_MS)
-		rule_value_cache.emit(context.cwd, ports(start_refresh))
+		rule_value_cache.emit({ cwd: context.cwd, ports: ports(start_refresh) })
 
 		expect(start_refresh).toHaveBeenCalledTimes(2)
 	})
@@ -80,7 +80,7 @@ describe('rule_value_cache.emit — the loop head never measures', () => {
 		})
 
 		expect(() => {
-			rule_value_cache.emit(context.cwd, ports(start_refresh))
+			rule_value_cache.emit({ cwd: context.cwd, ports: ports(start_refresh) })
 		}).not.toThrow()
 	})
 })
@@ -137,7 +137,7 @@ describe('rule_value_cache — a lane never writes the main checkout reading', (
 	it('starts no refresh and writes no stamp from a linked work tree', () => {
 		const start_refresh = vi.fn()
 
-		rule_value_cache.emit(context.cwd, ports(start_refresh))
+		rule_value_cache.emit({ cwd: context.cwd, ports: ports(start_refresh) })
 
 		expect(start_refresh).not.toHaveBeenCalled()
 		expect(existsSync(rule_value_cache.cache_path(context.cwd, rule_value_cache.STAMP_FILE))).toBe(

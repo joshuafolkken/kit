@@ -41,7 +41,7 @@ async function mark_once(issue: string): Promise<void> {
 }
 
 async function mark_implement(
-	directory: string = process.cwd(),
+	directory: string,
 	source: MarkerSource = process.env,
 ): Promise<void> {
 	const issue = lane_child_marker.marked_issue(source)

@@ -122,27 +122,29 @@ describe('the round-one-check-related delivery in a lane child — refused', () 
 	beforeEach(enter_lane_child)
 
 	it('refuses check:related on a fixed round before the join', () => {
-		expect(delivered_rules.delivery(payload_of('open', CHECK, OPEN_ROUND))).toBe(REASON)
+		expect(delivered_rules.delivery(payload_of('open', CHECK, OPEN_ROUND), Date.now())).toBe(REASON)
 	})
 
 	// joshuafolkken/kit#5784: the touched run is exempt from repeat-check-related only.
 	it('refuses check:related --touched on a fixed round before the join', () => {
 		const payload = payload_of('touched', `${CHECK} --touched`, OPEN_ROUND)
 
-		expect(delivered_rules.delivery(payload)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(REASON)
 	})
 
 	it('refuses the `cr` alias on every occurrence', () => {
 		const payload = payload_of('alias', 'pnpm josh cr', OPEN_ROUND)
 
-		expect(delivered_rules.delivery(payload)).toBe(REASON)
-		expect(delivered_rules.delivery(payload)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(REASON)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(REASON)
 	})
 
 	it('refuses check:related behind `set -o pipefail` and in front of a pipe', () => {
 		const command = 'set -o pipefail; pnpm josh check:related 2>&1 | grep -E "error"'
 
-		expect(delivered_rules.delivery(payload_of('piped', command, OPEN_ROUND))).toBe(REASON)
+		expect(delivered_rules.delivery(payload_of('piped', command, OPEN_ROUND), Date.now())).toBe(
+			REASON,
+		)
 	})
 })
 
@@ -152,16 +154,20 @@ describe('the round-one-check-related delivery — let through', () => {
 
 		const tail = `${OPEN_ROUND}\n${JOIN_LINE}`
 
-		expect(delivered_rules.delivery(payload_of('joined', CHECK, tail))).toBeUndefined()
+		expect(delivered_rules.delivery(payload_of('joined', CHECK, tail), Date.now())).toBeUndefined()
 	})
 
 	it('lets check:related through on a round with no fix', () => {
 		enter_lane_child()
 
-		expect(delivered_rules.delivery(payload_of('unfixed', CHECK, BRIEF_LINE))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('unfixed', CHECK, BRIEF_LINE), Date.now()),
+		).toBeUndefined()
 	})
 
 	it('lets check:related through outside a lane child', () => {
-		expect(delivered_rules.delivery(payload_of('person', CHECK, OPEN_ROUND))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('person', CHECK, OPEN_ROUND), Date.now()),
+		).toBeUndefined()
 	})
 })

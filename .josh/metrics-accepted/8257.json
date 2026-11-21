@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #8257 specifies shared ROW_INDENT alignment and title padding logic across run:board sections (+73 code lines, mostly new tests' sources)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 73
-	}
-}

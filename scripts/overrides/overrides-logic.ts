@@ -158,7 +158,10 @@ function extract_overridden_package_names(overrides: Record<string, string>): Ar
 // `SyntaxKind`, crashing the type-aware ESLint stack (typescript-eslint, eslint-plugin-sonarjs,
 // ts-api-utils) at rule-load time. Hold at 6.x until that stack supports the native API, then
 // remove this entry to fix forward (kit #658).
-const HELD_BACK_PACKAGE_NAMES: Array<string> = ['typescript']
+// `eslint-plugin-unicorn`: 80 adds `unicorn/prefer-options-parameter` to the recommended set, which
+// errors at 106 sites in existing code and turns every unrelated run's gate red. Hold at 79 until
+// the v80 migration Issue fixes those sites, then remove this entry to fix forward (kit #8406).
+const HELD_BACK_PACKAGE_NAMES: Array<string> = ['typescript', 'eslint-plugin-unicorn']
 
 // The union of built-in held-back packages and every overridden package — the dependency names
 // `pnpm update --latest` must skip. Deduped so a package that is both held back and overridden is
@@ -200,6 +203,7 @@ const overrides_check = {
 	list_excluded_package_names,
 	read_dependency_names,
 	build_update_command,
+	HELD_BACK_PACKAGE_NAMES,
 	WORKSPACE_YAML_PATH,
 	SNAPSHOT_PATH,
 }

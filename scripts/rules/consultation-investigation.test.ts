@@ -56,7 +56,7 @@ function delivered(
 ): string | undefined {
 	const payload = { transcript_path: transcript_on(model), tool_name, tool_input }
 
-	return delivered_rules.delivery(JSON.stringify(payload))
+	return delivered_rules.delivery(JSON.stringify(payload), Date.now())
 }
 
 // A call as a delegated unit's arrives: `agent_id` naming the fork, whose own file — like the parent's —
@@ -75,6 +75,7 @@ function unit_delivered(
 
 	return delivered_rules.delivery(
 		JSON.stringify({ transcript_path, agent_id, tool_name, tool_input }),
+		Date.now(),
 	)
 }
 
@@ -86,7 +87,7 @@ function codex_delivered(payload_model: string, command: string): string | undef
 		model: payload_model,
 	}
 
-	return delivered_rules.delivery(JSON.stringify(payload))
+	return delivered_rules.delivery(JSON.stringify(payload), Date.now())
 }
 
 function dispatch(input: Record<string, unknown>): Record<string, unknown> {

@@ -1,0 +1,91 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_cli } from './run-board-cli'
+import { run_board_fixture } from './run-board-fixture'
+import { run_board_live } from './run-board-live'
+
+// joshuafolkken/kit#8401: every live refresh keeps the wargames rules dimmed — the theme restyles the
+// board's own lines before the screen's control bytes are put in front of them.
+
+const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
+const ESC = '\u{1B}'
+const SYNC_START = `${ESC}[?2026h`
+const SYNC_END = `${ESC}[?2026l`
+const REFRESH_START = `${SYNC_START}${ESC}[H${ESC}[K`
+const ERASE_LINE = `\n${ESC}[K`
+const DIM_RULE_TRUE_COLOR = `${ESC}[38;2;31;118;113m-`
+const DIM_RULE_NAMED = `${ESC}[2m-`
+const THEMED = ['--theme', 'wargames']
+// Enough board time for the opening, its reveal and a few redraws on the second to pass.
+const STOP_AFTER_MS = 5000
+
+// A sleep that moves the board's clock on by what it waits, and stops the board once enough has passed.
+function clocked(clock: { now_ms: number }): (ms: number) => Promise<void> {
+	const stop_at = clock.now_ms + STOP_AFTER_MS
+
+	return async (ms) => {
+		clock.now_ms += ms
+		if (clock.now_ms > stop_at) throw STOPPED
+	}
+}
+
+async function instant(): Promise<void> {
+	await Promise.resolve()
+}
+
+type Ports = ReturnType<typeof harness>['ports']
+
+async function watched(ports: Ports): Promise<unknown> {
+	return await run_board_live.watch(ports, 'wargames')
+}
+
+// The frames the redraw wrote after the opening reveal, each between the screen's own control bytes.
+async function refreshes(
+	force_color: string,
+	run: (ports: Ports) => Promise<unknown> = watched,
+): Promise<Array<string>> {
+	vi.stubEnv('FORCE_COLOR', force_color)
+	const { ports, frames, clock } = harness(LOCAL, [plan_titled('a')])
+
+	await expect(run({ ...ports, sleep: clocked(clock), intro_sleep: instant })).rejects.toBe(STOPPED)
+
+	return frames.filter((frame) => frame.startsWith(REFRESH_START))
+}
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
+describe('run_board_live.watch wargames refresh', () => {
+	it('dims the rules on every refresh in 24-bit color', async () => {
+		const written = await refreshes('3')
+
+		expect(written.length).toBeGreaterThan(0)
+		for (const frame of written) expect(frame).toContain(DIM_RULE_TRUE_COLOR)
+	})
+
+	it('dims the rules on every refresh in named color', async () => {
+		const written = await refreshes('2')
+
+		expect(written.length).toBeGreaterThan(0)
+		for (const frame of written) expect(frame).toContain(DIM_RULE_NAMED)
+	})
+
+	it('dims the rules on every refresh of the board run --theme wargames draws', async () => {
+		vi.stubEnv('JOSH_BOARD_THEME', undefined)
+		const written = await refreshes('3', async (ports) => await run_board_cli.run(THEMED, ports))
+
+		expect(written.length).toBeGreaterThan(0)
+		for (const frame of written) expect(frame).toContain(DIM_RULE_TRUE_COLOR)
+	})
+
+	it('still puts the screen control bytes on every refresh', async () => {
+		const written = await refreshes('3')
+
+		expect(written.length).toBeGreaterThan(0)
+
+		for (const frame of written) {
+			expect(frame).toContain(ERASE_LINE)
+			expect(frame.endsWith(SYNC_END)).toBe(true)
+		}
+	})
+})

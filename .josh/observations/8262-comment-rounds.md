@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/hooks/implementation-shell.ts:196 | 2026-11-20 | #8262 | - | edge-input
+- rf:tests | medium | scripts/hooks/implementation-authority.test.ts:118 | 2026-11-20 | #8262 | - | untested-branch

@@ -1,7 +1,0 @@
-{
-	"reason": "run:merge's decision-park and kept-lane comments gain Japanese and English prose tables in a new run-merge-prose module (#7699)",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 35
-	}
-}

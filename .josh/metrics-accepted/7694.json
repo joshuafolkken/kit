@@ -1,7 +1,0 @@
-{
-	"reason": "#7694: board ignores a lane end before the row's run started; progress counts the work-tree holder despite a parked label",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

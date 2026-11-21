@@ -203,7 +203,7 @@ async function write_cut(target: string, request: CutRequest): Promise<number | 
 	}
 	// The checkout, not `target`: the record lives in the temp root, and the transcript is filed by checkout.
 	const checkout = await run_cut.worktree_directory()
-	const spec = run_cut.with_digest(base, () => run_cut_digest.own_digest(checkout))
+	const spec = run_cut.with_digest(base, () => run_cut_digest.own_digest(checkout ?? process.cwd()))
 
 	const spec_note =
 		spec_refusal(spec) ?? (await run_cut_review.unrecorded_refusal(request, loaded.handoff))

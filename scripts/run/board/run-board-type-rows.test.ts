@@ -116,6 +116,52 @@ describe('run_board_type_rows.is_typing', () => {
 	})
 })
 
+// joshuafolkken/kit#8375: the rules' lock starts once the row that types through last is done.
+describe('run_board_type_rows.done_ms', () => {
+	it('is the moment the row typing through last is done, with rows typing together', () => {
+		const short = line_of('#2', 1, 'x'.repeat(10))
+		const typing = after_base(frame_of([line_of('#1', 0)]), [
+			line_of('#1', 0),
+			short,
+			line_of('#3', 2),
+		])
+
+		expect(run_board_type_rows.done_ms(typing)).toBe(START + SECOND + (ROW.length - 1) * LETTER_MS)
+	})
+
+	it('is none before any row has typed', () => {
+		expect(run_board_type_rows.done_ms(NO_TYPING)).toBeUndefined()
+	})
+
+	it('is kept across the redraw that drops the rows typed through', () => {
+		const typing = after_base(frame_of([line_of('#1', 0)]), [line_of('#1', 0), line_of('#2', 1)])
+		const later = next(
+			typing,
+			frame_of([line_of('#1', 0), line_of('#2', 1)]),
+			START + 9 * SECOND,
+			true,
+		)
+
+		expect(later.lines).toStrictEqual([])
+		expect(run_board_type_rows.done_ms(later)).toBe(run_board_type_rows.done_ms(typing))
+	})
+})
+
+// joshuafolkken/kit#8376: the lamp strips fill with the row that types through last.
+describe('run_board_type_rows.progress', () => {
+	it('is the share the row typing through last has typed, with rows typing together', () => {
+		const short = line_of('#2', 1, 'x'.repeat(10))
+		const typing = after_base(frame_of([]), [short, line_of('#3', 2)])
+		const at_ms = START + SECOND + (ROW.length / 2 - 1) * LETTER_MS
+
+		expect(run_board_type_rows.progress(typing, at_ms)).toBe(1 / 2)
+	})
+
+	it('is all once no row types', () => {
+		expect(run_board_type_rows.progress(NO_TYPING, START)).toBe(1)
+	})
+})
+
 describe('run_board_type_rows — what is written', () => {
 	it('draws a row on a redraw as typed so far with the block after it, the rest of the frame as drawn', () => {
 		const typing = after_base(frame_of([]), [line_of('done:7', 1)])
@@ -127,10 +173,10 @@ describe('run_board_type_rows — what is written', () => {
 
 	it('types two rows that appear together side by side, each with its own block, at its own row', () => {
 		const typing = after_base(frame_of([]), [line_of('done:7', 2), line_of('done:9', 4)])
-		const bytes = type_bytes(typing, START + SECOND + LETTER_MS)
+		const bytes = type_bytes(typing, START + SECOND + 6 * LETTER_MS)
 
 		expect(bytes).toBe(
-			`${ESC}[3;1Hxx${RESET}${CURSOR}${ESC}[K${ESC}[5;1Hxx${RESET}${CURSOR}${ESC}[K`,
+			`${ESC}[3;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K${ESC}[5;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K`,
 		)
 	})
 
@@ -153,13 +199,30 @@ describe('run_board_type_rows — what is written', () => {
 	})
 })
 
+// joshuafolkken/kit#8402: the block stays lit at every moment a row types — no blank beat.
+describe('run_board_type_rows — the steady block', () => {
+	it.each([0, 1, 2, 3, 6, 7, 9, 13])(
+		'lights every typing row’s block %i letters in, the letters kept',
+		(letters) => {
+			const typing = after_base(frame_of([]), [line_of('done:7', 2), line_of('done:9', 4)])
+			const shown = 'x'.repeat(letters + 1)
+
+			expect(type_bytes(typing, START + SECOND + letters * LETTER_MS)).toBe(
+				`${ESC}[3;1H${shown}${RESET}${CURSOR}${ESC}[K${ESC}[5;1H${shown}${RESET}${CURSOR}${ESC}[K`,
+			)
+		},
+	)
+})
+
 describe('run_board_type_rows — the header’s now line (joshuafolkken/kit#8103)', () => {
 	it('types the now line’s new words after its prefix, the prefix drawn whole', () => {
 		const typing = after_base(frame_of([now_of('#1 · READ')]), [now_of(WORDS)])
-		const at_ms = START + SECOND + 2 * LETTER_MS
+		const at_ms = START + SECOND + 6 * LETTER_MS
 
 		expect(keys_of(typing)).toStrictEqual([`now:${WORDS}`])
-		expect(type_bytes(typing, at_ms)).toBe(`${ESC}[3;1H${NOW_PREFIX}#80${RESET}${CURSOR}${ESC}[K`)
+		expect(type_bytes(typing, at_ms)).toBe(
+			`${ESC}[3;1H${NOW_PREFIX}#8093 ·${RESET}${CURSOR}${ESC}[K`,
+		)
 	})
 
 	it('writes the now line whole once its words are typed through', () => {

@@ -1,7 +1,0 @@
-{
-	"reason": "Start reader threaded through budget_waits/live_reservations and the board read_waits port (+16 lines)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

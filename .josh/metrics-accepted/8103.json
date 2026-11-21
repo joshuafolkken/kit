@@ -1,7 +1,0 @@
-{
-	"reason": "#8103 adds the header now line's key, its prefix width and its known key — a feature, not duplication",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}

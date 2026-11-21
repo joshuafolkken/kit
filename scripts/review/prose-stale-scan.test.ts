@@ -5,7 +5,8 @@ import { prose_stale_scan, type Reference, type Term } from './prose-stale-scan'
 
 const CODE = 'scripts/a.ts'
 const DOC = 'docs/a.md'
-const NONE: ReadonlySet<string> = new Set()
+type Names = ReadonlySet<string>
+const NONE: Names = new Set()
 const OLD_COMMAND = 'old:command'
 const OLD_LIMIT_LINE = 'const OLD_LIMIT = 3'
 const OTHER_CODE = 'scripts/b.ts'
@@ -20,7 +21,10 @@ function hunk(file: string, old_lines: Array<string>, new_lines: Array<string> =
 	return { file, new_start: 1, new_count: new_lines.length, old_lines, new_lines }
 }
 
-function terms(hunks: Array<Hunk>, registered = NONE, surviving = NONE): Array<Term> {
+function terms(
+	hunks: Array<Hunk>,
+	{ registered = NONE, surviving = NONE }: { registered?: Names; surviving?: Names } = {},
+): Array<Term> {
 	return prose_stale_scan.stale_terms(hunks, registered, { surviving, deleted: NONE })
 }
 
@@ -92,7 +96,7 @@ describe('prose_stale_scan.stale_terms — a word the diff still writes is kept'
 			['see josh kept:command'],
 		)
 
-		expect(terms([reworded], new Set(['live:command']))).toEqual([])
+		expect(terms([reworded], { registered: new Set(['live:command']) })).toEqual([])
 	})
 
 	it('drops a heading an added .md line still titles, but not one only its words survive in', () => {
@@ -119,7 +123,7 @@ describe('prose_stale_scan.stale_terms — a name the working tree still declare
 			hunk(OTHER_CODE, [`// josh ${OLD_COMMAND}`]),
 		]
 
-		expect(terms(removed, NONE, new Set(['OLD_LIMIT', 'old_name']))).toEqual([COMMAND])
+		expect(terms(removed, { surviving: new Set(['OLD_LIMIT', 'old_name']) })).toEqual([COMMAND])
 	})
 })
 

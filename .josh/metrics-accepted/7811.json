@@ -1,9 +1,0 @@
-{
-	"reason": "#7811: run:handoff hands each child its own scratch directory (scratch_directory, the prompt line, the CLI's make_directory port) and shell-body.md / kickoff.md point at it",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 21,
-		"rules.lines": 2,
-		"ai_cost.on_demand_bytes": 294
-	}
-}

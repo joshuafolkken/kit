@@ -44,7 +44,7 @@ function is_board_entry(entry: LedgerEntry): boolean {
 
 // joshuafolkken/kit#8206: the window grown by the appended lines alone, not read backward again on each
 // append; its start moves on with the clock, so it slides.
-const board_windows = lane_ledger.window_store(is_board_entry, { slides: true })
+const board_windows = lane_ledger.window_store({ is_kept: is_board_entry, slides: true })
 const wholes = lane_ledger.tail_store(is_board_entry)
 
 function covers(entries: ReadonlyArray<LedgerEntry>, now_ms: number): boolean {

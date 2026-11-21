@@ -96,7 +96,7 @@ describe('run_event_stream_emit.emit — the caller’s instant', () => {
 		const at = new Date('2026-10-08T09:10:00.000Z')
 
 		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
-		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, '#7 merged', at)
+		await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, '#7 merged', { at })
 
 		expect(await events_of_kind(run_event_stream.EVENT_KIND.MERGE)).toStrictEqual([
 			expect.objectContaining({ at: at.toISOString() }),

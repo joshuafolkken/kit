@@ -1,8 +1,0 @@
-{
-	"reason": "#7755 adds the imperative-request rule and the filing-plan format: one consult-vs-execute line and one filing-plan section, the rule's own text",
-	"date": "2026-11-17",
-	"growth": {
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 803
-	}
-}

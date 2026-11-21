@@ -1,7 +1,0 @@
-{
-	"reason": "the ship lap now counts the files each check of the scoped pair was handed and the own edits a merge's names took in, so a synced pair's cost can be read per check (#7846)",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}

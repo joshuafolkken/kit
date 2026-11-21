@@ -1,7 +1,0 @@
-{
-	"reason": "run:split gains --chain passthrough and a pre-set-aside refusal (#7996); +26 code lines are the requested feature",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 32
-	}
-}

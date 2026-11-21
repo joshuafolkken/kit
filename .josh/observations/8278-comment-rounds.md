@@ -1,0 +1,6 @@
+- rf:comments | low | scripts/rules/early-heartbeat.ts:184 | 2026-11-20 | #8278 | - | stale-comment
+- rf:assumptions | low | scripts/rules/early-heartbeat.ts:190 | 2026-11-20 | #8278 | - | untested-branch
+- rf:tests | low | scripts/rules/early-heartbeat.test.ts:72 | 2026-11-20 | #8278 | - | untested-branch
+- rf:comments | low | scripts/rules/early-heartbeat.ts:184 | 2026-11-20 | #8278 | - | stale-comment
+- rf:assumptions | low | scripts/rules/early-heartbeat.ts:190 | 2026-11-20 | #8278 | - | untested-branch
+- rf:tests | low | scripts/rules/early-heartbeat.test.ts:72 | 2026-11-20 | #8278 | - | untested-branch

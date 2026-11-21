@@ -113,12 +113,17 @@ function lanes_root_of(checkout: string, environment: LaneEnvironment = process.
 	return path.dirname(resolved)
 }
 
+interface IssueHereOptions {
+	readonly directory?: string
+	readonly environment?: LaneEnvironment
+}
+
 // The lane `directory` (this process's own by default) sits in, as a number; `undefined` outside a
 // lane — the `issue` a ledger row written from inside a lane carries.
-function issue_here(
-	directory: string = process.cwd(),
-	environment: LaneEnvironment = process.env,
-): number | undefined {
+function issue_here({
+	directory = process.cwd(),
+	environment = process.env,
+}: IssueHereOptions = {}): number | undefined {
 	const lane = lane_issue_of(directory, environment)
 
 	return lane === undefined ? undefined : Number(lane)

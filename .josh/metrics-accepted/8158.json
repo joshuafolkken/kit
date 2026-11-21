@@ -1,7 +1,0 @@
-{
-	"reason": "BoardDisplay/assemble_display split the frame's assembly out of draw_run (#8158 stage b): the new module's types, imports and the narrowed MarkHeader/SoundHeader types add 32 lines; the logic itself only moved",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 32
-	}
-}

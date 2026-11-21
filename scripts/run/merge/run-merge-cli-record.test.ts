@@ -94,7 +94,7 @@ describe('run_merge_cli.merge_child — putting a merged child on record', () =>
 	it('writes the merge event and the ledger entry for a merge not yet on record', async () => {
 		await run_merge_cli.merge_child(context())
 
-		expect(emit_mock).toHaveBeenCalledWith('merge', MERGE_TEXT, CONFIRMED_AT)
+		expect(emit_mock).toHaveBeenCalledWith('merge', MERGE_TEXT, { at: CONFIRMED_AT })
 		expect(record_merge_mock).toHaveBeenCalledWith(Number(CHILD), CONFIRMED_AT)
 	})
 
@@ -128,7 +128,7 @@ describe('run_merge_cli.merge_child — putting a merged child on record', () =>
 
 		await run_merge_cli.merge_child(context())
 
-		expect(emit_mock).toHaveBeenCalledWith('merge', MERGE_TEXT, reported)
+		expect(emit_mock).toHaveBeenCalledWith('merge', MERGE_TEXT, { at: reported })
 		expect(record_merge_mock).toHaveBeenCalledWith(Number(CHILD), reported)
 	})
 })
