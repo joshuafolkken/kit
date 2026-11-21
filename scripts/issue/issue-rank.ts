@@ -14,8 +14,8 @@ import {
 // undeclared one, so a wide-reach upgrade queues behind the rest of its pool (joshuafolkken/kit#5310);
 // declared ones rank among themselves by the keys below.
 //
-// Then, in order: the priority class (`priority:critical`, then `priority:high`, then neither), then a defect on the verification path
-// (`bug` with `run:solo`, or `route:interrupt`), then any defect (`is_defect`, which the caller reads
+// Then, in order: the priority class (`priority:critical`, then `priority:high`, then neither), then
+// a defect on the verification path (`bug` with `run:solo`, or `route:interrupt`), then any defect (`is_defect`, which the caller reads
 // from `defect_rate.is_defect`, so a defect waits behind no feature of its priority
 // (joshuafolkken/kit#7912)), then resumable work (an owned stash, a pause comment or a linked open PR),
 // then the minutes its cause lost (`issue_priority.lost_minutes`: the body's

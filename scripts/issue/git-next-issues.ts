@@ -43,15 +43,15 @@ function compare_oldest_first(first: OpenIssueData, second: OpenIssueData): numb
 	return first.createdAt < second.createdAt ? -1 : 1
 }
 
-// A row's blockers by number. **Lossy across repositories**: a blocker elsewhere sharing a number
-// with a row here counts as one of its dependents, and so does every row upstream of it, since the
-// count is transitive. The listings this ranks are one repository's own, and `backlog:next` re-ranks
-// its offer from the qualified graph (`backlog-rank.ts`), so the cost is runnable rows reordered rather
-// than a run started early.
 function label_names(issue: OpenIssueData): Array<string> {
 	return (issue.labels ?? []).map((label) => label.name)
 }
 
+// A row's blockers by number. **Lossy across repositories**: a blocker elsewhere sharing a number
+// with a row here counts as one of its dependents and takes its priority class, and so does every row
+// upstream of it, since both are transitive. The listings this ranks are one repository's own, and
+// `backlog:next` re-ranks its offer from the qualified graph (`backlog-rank.ts`), so the cost is
+// runnable rows reordered rather than a blocked run started early.
 function dependency_row(issue: OpenIssueData): DependencyRow {
 	return {
 		key: String(issue.number),
