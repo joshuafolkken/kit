@@ -99,7 +99,7 @@ async function run_gate(is_forced = false, body = ''): Promise<[number, string]>
 }
 
 function record_green(files: Record<string, string>, base?: string): void {
-	review_stamps.gate_stamp.write(files, STAMP_PATH, base)
+	review_stamps.gate_stamp.write(files, { target: STAMP_PATH, base })
 }
 
 function check_count(): number {

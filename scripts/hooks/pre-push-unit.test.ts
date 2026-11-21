@@ -100,7 +100,7 @@ const COMMAND_NAME = 'pre-push-unit'
 const STAMP_PATH = path.join(tmpdir(), `josh-pre-push-unit-stamp-${String(process.pid)}.json`)
 
 function record_green(files: Record<string, string>, base?: string): void {
-	review_stamps.gate_stamp.write(files, STAMP_PATH, base)
+	review_stamps.gate_stamp.write(files, { target: STAMP_PATH, base })
 }
 
 async function run_hook(extra_arguments: ReadonlyArray<string> = []): Promise<[number, string]> {

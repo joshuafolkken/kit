@@ -15,7 +15,7 @@ async function run(issue: string, review: () => Promise<StepResult>): Promise<St
 		return { code: 0, out: 'final round 2 reused on the reviewed tree', is_skipped: true }
 	}
 
-	stamp.write(tree.files, undefined, tree.base)
+	stamp.write(tree.files, { base: tree.base })
 	const result = await review()
 
 	run_ship_tree_stamp.complete(stamp, tree, result.code)

@@ -127,7 +127,7 @@ async function record(
 	root?: string,
 ): Promise<void> {
 	try {
-		review_stamps.round_one_code_stamp.write(await read(paths, root), target, base)
+		review_stamps.round_one_code_stamp.write(await read(paths, root), { target, base })
 	} catch {
 		review_stamps.clear_round_one_code(target)
 	}
