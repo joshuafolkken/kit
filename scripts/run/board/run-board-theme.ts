@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import { CacheableMemory } from '@cacheable/memory'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
@@ -19,6 +20,7 @@ const THEME_ENV = 'JOSH_BOARD_THEME'
 const { THEMES, THEME_DEFS } = run_board_theme_defs
 const THEME_NAMES: ReadonlySet<string> = new Set(THEMES)
 const RULE = '─'
+const RULE_RUN = /─+/gu
 const DASH = '-'
 // The escapes that end a color and fall back to the terminal's default foreground: the default
 // foreground itself, and a reset.
@@ -172,12 +174,33 @@ function remembered(open: string, rule: Paint | undefined, line: string): string
 	return drawn
 }
 
+// Only heading rules take the gauge's dim; restoring intensity keeps a surrounding bold heading.
+function default_line(line: string): string {
+	const plain = stripVTControlCharacters(run_board_label_pair.untitled(line))
+
+	if (run_board_label_pair.heading_lead(plain) === undefined) return line
+
+	return run_board_theme_glyphs.mapped(line, (text, open) =>
+		text.replaceAll(RULE_RUN, (rule) => {
+			const drawn = run_board_labels.painted('dim', rule)
+
+			return drawn === rule ? rule : drawn + open.intensity
+		}),
+	)
+}
+
 // A frame is drawn a line at a time: the transforms change only text within a line, and a render
 // module closes every color on the line it opens it (`styleText`), so the color `textual` reads
 // across a line's end is the default it reads at a line's start. Its titles keep their marks, for
 // the reveal that writes a title as one block (joshuafolkken/kit#8224).
 function marked(theme: Theme | undefined, frame: string): string {
-	if (theme === undefined) return frame
+	if (theme === undefined) {
+		return frame
+			.split('\n')
+			.map((line) => default_line(line))
+			.join('\n')
+	}
+
 	const open = phosphor(theme)
 	const { rule }: ThemeDefinition = THEME_DEFS[theme]
 
@@ -203,8 +226,6 @@ function themed<P extends Pick<BoardPorts, 'write' | 'theme' | 'write_drawn'>>(
 	ports: P,
 	theme: Theme | undefined,
 ): P {
-	if (theme === undefined) return ports
-
 	return {
 		...ports,
 		theme,

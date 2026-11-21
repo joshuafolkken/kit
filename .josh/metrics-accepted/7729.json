@@ -1,9 +1,0 @@
-{
-	"reason": "#7729 adds the pre-first-edit split judgement (lane-tree-edit, --single reason, the investigator's Files to edit list) and its split-assessment/lane docs",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 112,
-		"ai_cost.on_demand_bytes": 220,
-		"prose.excess_bold": 3
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7749 adds the queued-notice reading the Stop hook needs to keep a lane's hold",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 45
-	}
-}

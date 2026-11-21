@@ -1,7 +1,0 @@
-{
-	"reason": "Moving the frame drawing into its own module adds that module's import lines and export object; run-board-tick.ts drops from 300 to 147 code lines",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Review lows: read misses only for keys the cache did not hold, and label a missing entry apart in lane:breakdown",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 64
-	}
-}

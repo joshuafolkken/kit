@@ -1,8 +1,0 @@
-{
-	"reason": "#7963 adds the one classification line its acceptance criteria require to issue-template.md",
-	"date": "2026-11-18",
-	"growth": {
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 451
-	}
-}

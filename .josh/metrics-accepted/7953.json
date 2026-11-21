@@ -1,7 +1,0 @@
-{
-	"reason": "New s-key sound switch on the live board (#7953): toggle, save, launch-on-enable and cue gating",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 45
-	}
-}

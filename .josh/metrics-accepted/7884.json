@@ -1,7 +1,0 @@
-{
-	"reason": "Section-level rubric delivery adds review-rubric-sections.ts and review-rubric-file.ts (#7884)",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 112
-	}
-}

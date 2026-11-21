@@ -1,7 +1,0 @@
-{
-	"reason": "run:board --timing gains a per-tick and per-turn draw timer and its report rows (#8126)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 67
-	}
-}
