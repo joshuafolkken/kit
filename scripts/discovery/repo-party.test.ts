@@ -47,20 +47,20 @@ describe('repo_party.placeholder_owners', () => {
 		['a bare owner/repo', 'sveltejs/svelte'],
 		['a host prefix', 'github.com/sveltejs/svelte'],
 	])('answers only the GH_REPO owner given as %s', (_name, gh_repo) => {
-		expect(repo_party.placeholder_owners(process.cwd(), { GH_REPO: gh_repo })).toStrictEqual([
+		expect(repo_party.placeholder_owners({ environment: { GH_REPO: gh_repo } })).toStrictEqual([
 			'sveltejs',
 		])
 	})
 
 	it('answers an unreadable candidate for a malformed GH_REPO', () => {
-		expect(repo_party.placeholder_owners(process.cwd(), { GH_REPO: 'svelte' })).toStrictEqual([
+		expect(repo_party.placeholder_owners({ environment: { GH_REPO: 'svelte' } })).toStrictEqual([
 			undefined,
 		])
 	})
 
 	// With no GH_REPO, the candidates are the kit checkout's own remotes — all joshuafolkken's.
 	it('answers every remote owner when GH_REPO is unset', () => {
-		expect(repo_party.placeholder_owners(process.cwd(), {})).toContain('joshuafolkken')
+		expect(repo_party.placeholder_owners({ environment: {} })).toContain('joshuafolkken')
 	})
 })
 
@@ -77,12 +77,12 @@ const KIT = { owner: 'joshuafolkken', repo: 'kit' }
 describe('repo_party.current_repository', () => {
 	// This suite runs in the kit checkout, whose remotes all name joshuafolkken/kit.
 	it('reads the kit checkout as joshuafolkken/kit', () => {
-		expect(repo_party.current_repository(process.cwd(), {})).toStrictEqual(KIT)
+		expect(repo_party.current_repository({ environment: {} })).toStrictEqual(KIT)
 	})
 
 	it('answers the GH_REPO repository, which overrides the remotes', () => {
 		expect(
-			repo_party.current_repository(process.cwd(), { GH_REPO: 'github.com/sveltejs/kit' }),
+			repo_party.current_repository({ environment: { GH_REPO: 'github.com/sveltejs/kit' } }),
 		).toStrictEqual({ owner: 'sveltejs', repo: 'kit' })
 	})
 })

@@ -77,7 +77,7 @@ describe('implementation cut session identity', () => {
 
 		implementation_cut.session_verdict(OPENAI_TRANSCRIPT, CWD, source)
 
-		expect(read).toHaveBeenCalledWith(CWD, source)
+		expect(read).toHaveBeenCalledWith({ cwd: CWD, environment: source })
 	})
 
 	it('preserves an exported Claude session id, as a unit pricing its parent has', () => {
@@ -86,7 +86,7 @@ describe('implementation cut session identity', () => {
 
 		implementation_cut.session_verdict(NEW_TRANSCRIPT, CWD, source)
 
-		expect(read).toHaveBeenCalledWith(CWD, source)
+		expect(read).toHaveBeenCalledWith({ cwd: CWD, environment: source })
 	})
 
 	it('prices the hook transcript when deciding whether an edit needs a cut', () => {
@@ -100,10 +100,10 @@ describe('implementation cut session identity', () => {
 		}
 
 		expect(implementation_cut.ROW.decide(call, run, true, 0)).toBe(true)
-		expect(read).toHaveBeenCalledWith(
-			CWD,
-			expect.objectContaining({ CLAUDE_CODE_SESSION_ID: NEW_SESSION }),
-		)
+		expect(read).toHaveBeenCalledWith({
+			cwd: CWD,
+			environment: expect.objectContaining({ CLAUDE_CODE_SESSION_ID: NEW_SESSION }),
+		})
 	})
 })
 

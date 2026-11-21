@@ -369,11 +369,14 @@ function is_runnable(
 	return !exclude.includes(issue.number) && is_ready(issue, options)
 }
 
+interface PickOptions extends RunnableOptions {
+	tracked?: ReadonlyMap<number, number>
+	exclude?: ReadonlyArray<number> | undefined
+}
+
 function pick_next(
 	issues: ReadonlyArray<OpenIssueData>,
-	tracked: ReadonlyMap<number, number> = new Map(),
-	exclude: ReadonlyArray<number> = [],
-	options: RunnableOptions = {},
+	{ tracked = new Map(), exclude = [], ...options }: PickOptions = {},
 ): OpenIssueData | undefined {
 	return git_next_issues
 		.order(issues)
@@ -424,7 +427,7 @@ interface PickupContext extends RunnableOptions {
 
 function report(context: PickupContext): number {
 	const { issues } = context
-	const next = pick_next(issues, context.tracked, context.exclude, context)
+	const next = pick_next(issues, context)
 
 	warn_gaps(context, next !== undefined)
 

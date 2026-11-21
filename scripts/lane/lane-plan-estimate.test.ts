@@ -144,7 +144,7 @@ describe('historical scope calibration', () => {
 
 			expect(plan.estimated_size).toEqual({ files: sample.files, lines: sample.lines })
 			expect(
-				split_assess.assess(sample.rows.join('\n'), undefined, new Set(sample.added)),
+				split_assess.assess(sample.rows.join('\n'), { added: new Set(sample.added) }),
 			).toMatchObject({
 				...plan.estimated_size,
 			})
