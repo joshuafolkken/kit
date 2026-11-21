@@ -56,6 +56,7 @@ const UNRECORDED = {
 	roots: { supervisor: undefined, parent: undefined },
 	stuck: new Map(),
 	closing: new Set(),
+	review_stops: new Map(),
 	carry: undefined,
 	is_session_active: false,
 	kit_version: undefined,
