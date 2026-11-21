@@ -151,6 +151,7 @@ function header_of(
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
 		plan_failed_ms: state.failed_ms,
+		plan_error: state.plan_error,
 		read_failed_ms: state.read_failed_ms,
 		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,

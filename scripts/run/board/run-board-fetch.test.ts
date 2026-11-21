@@ -26,10 +26,10 @@ describe('run_board_fetch.launch', () => {
 		expect(fetch.answer()).toEqual({ value: 'plan' })
 	})
 
-	it('answers the failed value for a rejected read without rejecting', async () => {
+	it('answers the failed value and the rejection’s reason for a rejected read without rejecting', async () => {
 		const fetch = launch(rejecting, FAILED)
 
 		await expect(fetch.landed).resolves.toBeUndefined()
-		expect(fetch.answer()).toEqual({ value: FAILED })
+		expect(fetch.answer()).toEqual({ value: FAILED, error: 'offline' })
 	})
 })

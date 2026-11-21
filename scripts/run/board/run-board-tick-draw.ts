@@ -9,6 +9,7 @@ import type { BoardNote } from './run-board-notes'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_spin, type Spun } from './run-board-spin'
+import { run_board_standing } from './run-board-standing'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme_defs, type LiveDefs, type ThemeDefinition } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
@@ -155,10 +156,11 @@ function decoded_of(
 	}
 }
 
-// The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
+// The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen;
+// its findings carry why the reads under it fail (`run-board-standing.ts`).
 function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Drawn {
 	const bounds = bounds_of(redraw.ports)
-	const { notes } = display
+	const notes = [...display.notes, ...run_board_standing.notes_of(header)]
 	const lines = run_board_render.render({
 		header,
 		notes,

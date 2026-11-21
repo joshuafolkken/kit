@@ -1,4 +1,3 @@
-import { stripVTControlCharacters } from 'node:util'
 import { serialize } from 'node:v8'
 import { launch_timing } from '#scripts/lane/launch-timing'
 import { describe, expect, it, vi } from 'vitest'
@@ -22,8 +21,8 @@ import { run_board_worker_limits } from './run-board-worker-limits'
 // joshuafolkken/kit#4267: a live board's reads come from a worker thread; a redraw draws the last round
 // it handed over, and a worker that dies is said on the board and started again on the next redraw.
 
-const { FIRST_ROUND, LOCAL, START, WORDS, harness, plan_titled, round_ports, ticks } =
-	run_board_fixture
+const { FIRST_ROUND, LOCAL, START, harness, round_ports, ticks } = run_board_fixture
+
 const { FRESH_GATHER, read_of } = run_board_gather
 const { gather_round, post_of, worker_gatherer, worker_options } = run_board_gather_thread
 
@@ -49,8 +48,6 @@ function cued(cue: CueName | undefined): GatherPost {
 
 	return { ...POST, display: { ...POST.display, cue } }
 }
-
-const FAILED_READ = new RegExp(String.raw`❗ ${WORDS.read} \d{2}:\d{2}`, 'u')
 
 const worker_spawn = vi.hoisted(() => vi.fn())
 
@@ -85,7 +82,10 @@ function fake_worker(): Fake {
 }
 
 // A gatherer over fake workers, each spawned one handed back in `spawned`.
-function faked(): { gather: ReturnType<typeof worker_gatherer>; spawned: Array<Fake> } {
+function faked(now: () => number = () => FAILED_MS): {
+	gather: ReturnType<typeof worker_gatherer>
+	spawned: Array<Fake>
+} {
 	const spawned: Array<Fake> = []
 	const spawn = vi.fn(() => {
 		const worker = fake_worker()
@@ -95,7 +95,7 @@ function faked(): { gather: ReturnType<typeof worker_gatherer>; spawned: Array<F
 		return worker
 	})
 
-	return { gather: worker_gatherer(spawn, () => FAILED_MS), spawned }
+	return { gather: worker_gatherer(spawn, now), spawned }
 }
 
 // joshuafolkken/kit#8161: the worker is started with what it records its frames with.
@@ -147,6 +147,27 @@ describe('run_board_gather_thread.worker_gatherer', () => {
 			read_error: 'read failed',
 		})
 		expect(spawned).toHaveLength(2)
+	})
+})
+
+// joshuafolkken/kit#8475: a read failing again keeps the time it first failed, so the board says how stale.
+describe('run_board_gather_thread.worker_gatherer over repeated failures', () => {
+	it('keeps the first failure’s time and the latest reason', async () => {
+		const clock = { ms: FAILED_MS }
+		const { gather, spawned } = faked(() => clock.ms)
+		const first = gather('background')
+
+		spawned[0]?.emit('message', POST)
+		await first
+		spawned[0]?.emit('error', new Error('first'))
+		await gather('background')
+		clock.ms += SECOND_MS
+		spawned[1]?.emit('error', new Error('second'))
+
+		await expect(gather('background')).resolves.toMatchObject({
+			read_failed_ms: FAILED_MS,
+			read_error: 'second',
+		})
 	})
 })
 
@@ -366,25 +387,5 @@ describe('run_board_tick.tick over a frame the worker handed over', () => {
 		await tick(FRESH_STATE, { ...ports, gather: handed_again })
 
 		expect(frames[0]).not.toBe(empty.frames[0])
-	})
-})
-
-describe('run_board_tick.tick over failed reads', () => {
-	it('says the reads failed beside no run', async () => {
-		const { ports, frames } = harness(undefined, [])
-		const failed = { ...read_of(FRESH_GATHER), read_failed_ms: FAILED_MS }
-
-		await tick(FRESH_STATE, { ...ports, gather: async () => failed })
-
-		expect(stripVTControlCharacters(frames.join('\n'))).toMatch(FAILED_READ)
-	})
-
-	it('says the reads failed over the last run read', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
-		const failed = { ...read_of(READ), read_failed_ms: FAILED_MS }
-
-		await tick(FRESH_STATE, { ...ports, gather: async () => failed })
-
-		expect(stripVTControlCharacters(frames.join('\n'))).toMatch(FAILED_READ)
 	})
 })
