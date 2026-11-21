@@ -1,14 +1,17 @@
 import type { KeyReading } from './run-board-keys'
+import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_reveal_blocks, type Beat } from './run-board-reveal-blocks'
 import type { BoardPorts, Pace } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
-import { run_board_theme_defs, type IntroDefinition } from './run-board-theme-defs'
+import { run_board_theme_defs, type IntroDefinition, type IntroLeads } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
 // The line a live board in a theme types before its first frame, a letter at a time with a block cursor after
 // the last letter typed, then holds without the cursor — the first frame's read runs meanwhile, and the
-// frame is drawn over the line once both are done. A key skips the rest; the key is spent on the skip,
-// not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last written.
+// frame is drawn over the line once both are done. A theme with lead lines types and erases each first,
+// then shows its line at once (joshuafolkken/kit#8441). A key skips the rest; the key is spent on the
+// skip, not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last
+// written.
 
 const { LINE_MS: REVEAL_LINE_MS, beats_of } = run_board_reveal_blocks
 const LINE_START = '\r'
@@ -89,12 +92,56 @@ async function letters(
 	}
 }
 
+// The line rewritten as `text` in `paint`; no text erases it.
+function shown(paint: Paint | undefined, text: string): string {
+	return `${LINE_START}${run_board_labels.painted(paint, text)}${ERASE_LINE_END}`
+}
+
+// joshuafolkken/kit#8441: a lead line typed a letter at a time with the cursor after every letter, as
+// the approved demo draws it, held with the cursor, then erased and followed by its gap.
+function lead_beats(line: string, letter_ms: number, leads: IntroLeads): Array<Beat> {
+	const typing = Array.from(line, (_letter, index) => ({
+		text: shown(leads.paint, `${line.slice(0, index + 1)}${run_board_typing.CURSOR}`),
+		ms: letter_ms,
+	}))
+
+	return [
+		...typing,
+		{ text: '', ms: leads.hold_ms },
+		{ text: shown(undefined, ''), ms: leads.gap_ms },
+	]
+}
+
+// The lead lines, then the theme's line shown at once and held; a key ends the whole of it. No trill
+// sounds, and where stdout draws no color nothing plays.
+async function lead_in(
+	ports: IntroPorts,
+	keys: KeyReading,
+	intro: IntroDefinition,
+	leads: IntroLeads,
+): Promise<void> {
+	const line = shown(leads.paint, intro.line)
+
+	if (line === shown(undefined, intro.line)) return
+	const typed = leads.lines.flatMap((lead) => lead_beats(lead, intro.letter_ms, leads))
+
+	await listen([...typed, { text: line, ms: intro.hold_ms }], ports, keys)
+}
+
 // The theme's letters, then its hold, silent, unless a key skipped the letters.
-async function play(ports: IntroPorts, keys: KeyReading, theme: Theme): Promise<void> {
-	const { intro } = run_board_theme_defs.THEME_DEFS[theme]
+async function type_in(ports: IntroPorts, keys: KeyReading, intro: IntroDefinition): Promise<void> {
 	const rest = await letters(ports, keys, intro)
 
 	if (rest.length === 0) await listen([{ text: '', ms: intro.hold_ms }], ports, keys)
+}
+
+// The theme's lead lines where it has them (joshuafolkken/kit#8441), else its typed line.
+async function play(ports: IntroPorts, keys: KeyReading, theme: Theme): Promise<void> {
+	const { intro }: { intro: IntroDefinition } = run_board_theme_defs.THEME_DEFS[theme]
+
+	await (intro.leads === undefined
+		? type_in(ports, keys, intro)
+		: lead_in(ports, keys, intro, intro.leads))
 }
 
 // A line's beats, each line after the first led by the line break before it.
