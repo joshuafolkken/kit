@@ -122,7 +122,7 @@ function is_shared_document(path: string): boolean {
 	return path.startsWith(DOCS_DIRECTORY) && (path.endsWith(SEPARATOR) || path.endsWith(MARKDOWN))
 }
 
-// A path under the scratch directory (`.josh/tmp/scratch/`). Git ignores it, so no lane's change
+// A path under the untracked scratch directory (`.josh/tmp/`). Git ignores it, so no lane's change
 // carries it and two lanes naming it never conflict — yet the children of joshuafolkken/kit#8428
 // named it in one shared acceptance line and ran one at a time (joshuafolkken/kit#8495).
 function is_scratch(path: string): boolean {
