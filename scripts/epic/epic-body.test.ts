@@ -209,7 +209,7 @@ describe('epic_body.format_added_order', () => {
 		const reasons = [{ chain: [101, 103], reason: 'uses #101' }]
 
 		expect(epic_body.format_added_order([[101, 103]], reasons)).toBe(
-			'- Order: `#101 -> #103`, declared by `josh epic --add --chain` when these children were added.\n- Reasoning: uses #101',
+			'- Order: `#101 -> #103`, declared by `josh epic --add` when these children were added.\n- Reasoning: uses #101',
 		)
 	})
 

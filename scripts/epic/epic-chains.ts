@@ -428,6 +428,9 @@ function insert_children(
 }
 
 const epic_chains = {
+	// Exported so `epic --add` can name the chain a `--before` / `--after` writes and demand its
+	// `--order-reason` before anything is written.
+	chain_for,
 	render_chains,
 	links_of,
 	diff_links,
