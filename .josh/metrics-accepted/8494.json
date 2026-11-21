@@ -1,0 +1,7 @@
+{
+	"reason": "post-conflict trigger judgment module for #8494 (new feature, +36 code lines)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 36
+	}
+}

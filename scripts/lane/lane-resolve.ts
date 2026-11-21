@@ -30,11 +30,19 @@ function is_resolution(comment: IssueComment): boolean {
 	return comment.is_trusted === true && comment.body.trimStart().startsWith(RESOLUTION_HEADING)
 }
 
-async function resolution_count(issue: string): Promise<number | undefined> {
+// The Issue's resolution comments, oldest first, or `undefined` when its comments cannot be read —
+// the step-back's count and the post-conflict review trigger (joshuafolkken/kit#8494) read the same list.
+async function resolutions(issue: string): Promise<ReadonlyArray<IssueComment> | undefined> {
 	const json = await git_gh_issue_read.issue_list_comments(issue)
 	const comments = await issue_read.parse_comments(json)
 
-	return comments?.filter((comment) => is_resolution(comment)).length
+	return comments?.filter((comment) => is_resolution(comment))
+}
+
+async function resolution_count(issue: string): Promise<number | undefined> {
+	const found = await resolutions(issue)
+
+	return found?.length
 }
 
 async function side_diff(base: string, side: string, file: string): Promise<string> {
@@ -116,7 +124,7 @@ function verdict_line(outcome: Exclude<ResolveOutcome, { kind: 'refused' }>): st
 	return [...words, ...outcome.files].join(' ')
 }
 
-const lane_resolve = { RESOLUTION_HEADING, resolve, verdict_line, wrong_branch }
+const lane_resolve = { RESOLUTION_HEADING, resolutions, resolve, verdict_line, wrong_branch }
 
 export { lane_resolve }
 export type { ResolveOutcome }
