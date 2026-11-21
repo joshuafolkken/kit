@@ -14,6 +14,7 @@ const OTHER_REPO = 'joshuafolkken/app-kit'
 const EPIC = 858
 const NESTED_EPIC_MESSAGE = '#1 is itself an epic'
 const AUTO_CLOSE = 'auto-close'
+const EPIC_BLOCKER_MESSAGE = '#8355 waits on #8352, which is itself an epic'
 
 function child(number: number, labels: ReadonlyArray<string> = [], repo = REPO): AuditChild {
 	return { number, repo, state: 'OPEN', labels, blocked_by: [], body: undefined }
@@ -83,6 +84,44 @@ describe('epic_audit_checks.find_nested_epics', () => {
 
 		expect(findings).toHaveLength(1)
 		expect(messages(findings)).toContain(`${OTHER_REPO}#1`)
+	})
+})
+
+describe('epic_audit_checks.find_epic_blockers', () => {
+	it('warns on #8352 -> #8355 when #8352 carries the epic label', () => {
+		const pair = { blocker: child(8352, [EPIC_LABEL]), blocked: child(8355) }
+		const findings = epic_audit_checks.find_epic_blockers([pair], REPO)
+
+		expect(findings).toHaveLength(1)
+		expect(findings[0]?.level).toBe('warning')
+		expect(findings[0]?.check).toBe(epic_audit_checks.EPIC_BLOCKER)
+		expect(messages(findings)).toContain(EPIC_BLOCKER_MESSAGE)
+		expect(messages(findings)).toContain('--apply 8355 --unblock 8352')
+		expect(messages(findings)).toContain('--blocked-by <the needed child>')
+	})
+
+	it('warns when the blocker carries both epic and run:lane', () => {
+		const pair = { blocker: child(8352, [EPIC_LABEL, 'run:lane']), blocked: child(8355) }
+
+		expect(epic_audit_checks.find_epic_blockers([pair], REPO)).toHaveLength(1)
+	})
+
+	it('leaves an order whose blocker is not an epic alone', () => {
+		const pair = { blocker: child(8352, ['run:lane']), blocked: child(8355, [EPIC_LABEL]) }
+
+		expect(epic_audit_checks.find_epic_blockers([pair], REPO)).toEqual([])
+	})
+
+	it('is a warning through the composition, so the exit code stays 0', () => {
+		const blocker = child(8352, [EPIC_LABEL])
+		const blocked = child(8355)
+		const result = epic_audit_cli.audit({
+			...audit_input([blocker, blocked]),
+			order_pairs: [{ blocker, blocked }],
+		})
+
+		expect(result.exit_code).toBe(0)
+		expect(messages(result.findings)).toContain(EPIC_BLOCKER_MESSAGE)
 	})
 })
 

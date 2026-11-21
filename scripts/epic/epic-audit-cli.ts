@@ -171,6 +171,7 @@ function epic_findings(input: AuditInput): Array<AuditFinding> {
 			comments: input.order_comments,
 			current_repo: input.repo,
 		}),
+		...epic_audit_checks.find_epic_blockers(input.order_pairs, input.repo),
 		...epic_audit_orphans.search_findings(input.claiming),
 		...epic_audit_checks.find_orphans(
 			input.tracked,

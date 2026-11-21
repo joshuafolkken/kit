@@ -149,14 +149,15 @@ function format_chain_record(
 	return reasoning === undefined ? [order] : [order, `- Reasoning: ${reasoning}`]
 }
 
-// The record `epic --add` folds into its decision for the chains its `--chain` declared, so an order
-// added later carries its reason as one declared at creation does; `undefined` with no chain.
+// The record `epic --add` folds into its decision for the chains its `--chain`, `--before` or `--after`
+// declared, so an order added later carries its reason as one declared at creation does; `undefined`
+// with no chain.
 function format_added_order(
 	chains: ReadonlyArray<Chain>,
 	reasons: ReadonlyArray<OrderReason>,
 ): string | undefined {
 	const records = chains.flatMap((chain) =>
-		format_chain_record(chain, '--add --chain', reasons, 'when these children were added'),
+		format_chain_record(chain, '--add', reasons, 'when these children were added'),
 	)
 
 	return records.length === 0 ? undefined : records.join('\n')

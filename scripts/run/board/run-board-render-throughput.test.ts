@@ -208,4 +208,12 @@ describe('run_board_render_throughput.throughput_part', () => {
 		expect(labels).toStrictEqual(['24h', '7d'])
 		expect(part?.summary).toBe('24h 4.4/h · 7d 3.9/h')
 	})
+
+	// joshuafolkken/kit#8513: the themed screen's alert level rides the rule's right end.
+	it('carries the tail it is handed to its rule, and none where it is handed none', () => {
+		const rows = [day_row(ramp(24))]
+
+		expect(run_board_render_throughput.throughput_part(rows, false, 'TRACE')?.tail).toBe('TRACE')
+		expect(run_board_render_throughput.throughput_part(rows)?.tail).toBeUndefined()
+	})
 })

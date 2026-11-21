@@ -135,8 +135,8 @@ A split found mid-run in one call: the run set aside as `run:pause` sets it asid
 release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
 already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
 that epic audited with `epic:audit`. Each `--chain` and `--order-reason` goes to `epic` (creation or
-`--add`) as given; under `--after <issue>` no chain is declared, so the `--ordered` reason is read but not
-passed. The last line is `epic #<E>`. An epic listing that cannot tell
+`--add`) as given; `--after <issue>` writes `<issue> -> <children…>`, the chain `--ordered` declares, so
+its `--order-reason` goes with it. The last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
 `needs-decision`. Without `--title` and with no tracking epic, or with a `--chain` `epic` refuses
 (`--chain` beside `--ordered`, a malformed line, a number outside `<issue>` and the children, a cycle
@@ -145,7 +145,7 @@ failed step keeps the hold. A rerun whose tracking epic already lists every chil
 again and goes on to the audit.
 
 `--prerequisite <P>` is `run:pause <issue> --for <P>` with the placement: the relation's own
-`epic --add --before` places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
+`epic --add`'s insertion, called in process with `--before <issue>` (no `--order-reason` read), places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
 <issue> --ordered` (its `--order-reason` cites `<P>`) is created and the relation recorded inside it. The audit, the
 `needs-decision` park and the `--title` refusal are as above.
 

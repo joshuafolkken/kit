@@ -1,0 +1,7 @@
+{
+	"reason": "New epic:audit warning for an order whose blocker is an epic (#8532)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

@@ -140,12 +140,14 @@ describe('run_split.split — an epic already tracks the issue', () => {
 		expect(state.calls).toStrictEqual(SET_ASIDE_AND_PLACE)
 	})
 
-	it('chains an ordered split after the issue with `--after`', async () => {
+	it('chains an ordered split after the issue with `--after` and its `--order-reason`', async () => {
 		tracking_with.mockResolvedValue(TRACKED)
 
 		await run_split.split(ORDERED)
 
-		expect(epic_run).toHaveBeenCalledWith(['--add', '20', '11', '12', '--after', '10'])
+		const placement = ['--after', '10', ORDER_REASON, ...ORDERED.order_reasons]
+
+		expect(epic_run).toHaveBeenCalledWith(['--add', '20', ...CHILDREN, ...placement])
 	})
 
 	it('passes each `--chain` to `epic --add` as given', async () => {

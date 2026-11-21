@@ -17,6 +17,8 @@ const CALM = 5
 const WIDE = { rows: 24, columns: 80 }
 const SPOT = { row: 1, column: 1, style: '' }
 const ALERT_TEXT = 'TRACE ■■■■■'
+// The alert ends the throughput rule (joshuafolkken/kit#8513), so the read carries a row.
+const THROUGHPUT_LOCAL = { ...run_board_fixture.LOCAL, throughput: [run_board_fixture.IDLE_ROW] }
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -133,12 +135,12 @@ describe('run_board_tick_draw TRACE integration', () => {
 		[undefined, true, 0],
 	] as const)('carries the rendered field for theme %s and alert %s', (theme, is_alert, count) => {
 		vi.stubEnv('FORCE_COLOR', '0')
-		const { LOCAL, START, drawn_from, harness } = run_board_fixture
-		const { ports, frames } = harness(LOCAL, [])
+		const { START, drawn_from, harness } = run_board_fixture
+		const { ports, frames } = harness(THROUGHPUT_LOCAL, [])
 		const state = { ...run_board_tick.FRESH_STATE, read_failed_ms: is_alert ? START : undefined }
-		const layout = run_board_tick.layout_for(state, LOCAL, START)
+		const layout = run_board_tick.layout_for(state, THROUGHPUT_LOCAL, START)
 		const redraw = { ports: { ...ports, theme }, now_ms: START }
-		const drawn = drawn_from(state, LOCAL, redraw, layout)
+		const drawn = drawn_from(state, THROUGHPUT_LOCAL, redraw, layout)
 
 		expect(drawn.traces).toHaveLength(count)
 		expect(frames.join('').includes(ALERT_TEXT)).toBe(count > 0)

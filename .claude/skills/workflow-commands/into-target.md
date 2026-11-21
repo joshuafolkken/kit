@@ -20,7 +20,8 @@ kickoff new into joshuafolkken/kit#<E>
   split, and it is the epic. The children belong to that epic, not to the target.
 - **Insert as soon as the artifact exists** — before implementation in `fullrun new`, before the plan
   comment in `kickoff new`.
-- **The insertion always goes through `pnpm josh epic --add <E> <N> [--before <M> | --after <M>]`.**
+- **The insertion always goes through `pnpm josh epic --add <E> <N> [--before <M> | --after <M>]
+  --order-reason "<chain>: <reason>"`** (the chain `--before` / `--after` writes needs its reason).
   Never hand-edit the epic body: the declaration and the `blocked-by` relations then disagree,
   `epic:next` answers `error`, and an unattended run stops.
 - **Decide the position, then record why** — in the target epic's body or as an Issue comment. The
