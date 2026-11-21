@@ -91,6 +91,7 @@ async function pause_lane(world: World, issue: string): Promise<void> {
 
 async function resume_lane(world: World, issue: string): Promise<void> {
 	await signalled(world, issue, 'running')
+	if (world.run.has_carry) lane_of(world, issue).launch_run = world.run.id
 }
 
 // A lane child's pre-gate cut: its session ends and writes the cut; its record stays running.
