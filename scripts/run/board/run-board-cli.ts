@@ -17,9 +17,10 @@ import { run_board_live } from './run-board-live'
 import { run_board_saved_state } from './run-board-saved-state'
 import { run_board_screen } from './run-board-screen'
 import { run_board_sound_player } from './run-board-sound-player'
-import { run_board_sound_typing } from './run-board-sound-typing'
+import { run_board_sound_typing, type TypingSound } from './run-board-sound-typing'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
 
@@ -111,12 +112,23 @@ function gather_ports(is_live: boolean, theme?: Theme): Pick<BoardPorts, 'gather
 	return { gather, worker_heap: heap }
 }
 
+// The trill in the theme row's voice at its letter pace (joshuafolkken/kit#8365); a board in no theme
+// keeps the default, which no draw sounds (`run-board-live.ts` → `trill_of`).
+function typing_sound_of(theme: Theme | undefined): TypingSound {
+	if (theme === undefined) return run_board_sound_typing.typing_sound()
+	const { typing, intro } = run_board_theme_defs.THEME_DEFS[theme]
+
+	return run_board_sound_typing.typing_sound(
+		run_board_sound_typing.voiced(() => typing(intro.letter_ms)),
+	)
+}
+
 // A live board reads and records its frames on its worker thread, so neither stops its spinner, and
 // sounds its cues and the trill (joshuafolkken/kit#8250); a single frame has no spinner to stop, reads
 // where it draws, and stays silent.
 function live_ports(is_live: boolean, theme?: Theme): BoardPorts {
 	const cue = is_live ? run_board_sound_player.play_cue : undefined
-	const typing_sound = is_live ? run_board_sound_typing.typing_sound() : undefined
+	const typing_sound = is_live ? typing_sound_of(theme) : undefined
 
 	// Kept off `LIVE_PORTS`, so the profile that spreads them always reads from scratch.
 	return {

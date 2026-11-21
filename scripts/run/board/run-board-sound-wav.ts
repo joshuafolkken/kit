@@ -97,31 +97,56 @@ function file_name_of(name: string, notes: ReadonlyArray<Note>): string {
 	return `${name}-${digest}.wav`
 }
 
-function written_wav(name: string, notes: ReadonlyArray<Note>, directory: string): string {
-	const target = path.join(directory, file_name_of(name, notes))
-
-	if (existsSync(target)) return target
-	const wav = wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE)
-
-	atomic_write.replace_file(target, wav)
-
-	return target
-}
-
-// The sound's WAV path, written on the first call only; `undefined` when synthesis or the write
-// fails, so a bad note or a failing disk silences the cue rather than taking the board down.
-function cached_wav(
-	name: string,
-	notes: ReadonlyArray<Note>,
-	directory = usage_state_path.sounds(),
+// The WAV at `file_name` in `directory`, rendered and written only when the file is not there yet;
+// `undefined` when rendering or the write fails, so a bad sound or a failing disk silences it rather
+// than taking the board down.
+function cached_file(
+	directory: string,
+	file_name: () => string,
+	render: () => Buffer,
 ): string | undefined {
 	try {
-		return written_wav(name, notes, directory)
+		const target = path.join(directory, file_name())
+
+		if (!existsSync(target)) atomic_write.replace_file(target, render())
+
+		return target
 	} catch {
 		return undefined
 	}
 }
 
-const run_board_sound_wav = { SAMPLE_RATE, HEADER_BYTES, cached_wav, wav_of }
+// The notes' WAV path, written on the first call only.
+function cached_wav(
+	name: string,
+	notes: ReadonlyArray<Note>,
+	directory = usage_state_path.sounds(),
+): string | undefined {
+	return cached_file(
+		directory,
+		() => file_name_of(name, notes),
+		() => wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE),
+	)
+}
+
+// Rendered samples' WAV path at their own rate (joshuafolkken/kit#8365), named after the WAV's bytes:
+// the same samples reuse their file and different ones get another.
+function cached_samples(
+	name: string,
+	samples: Int16Array,
+	sample_rate: number,
+	directory = usage_state_path.sounds(),
+): string | undefined {
+	const wav = wav_of(samples, sample_rate)
+	const digest = createHash('sha256').update(wav).digest('hex').slice(0, DIGEST_LENGTH)
+
+	return cached_file(
+		directory,
+		() => `${name}-${digest}.wav`,
+		() => wav,
+	)
+}
+
+const run_board_sound_wav = { SAMPLE_RATE, HEADER_BYTES, cached_samples, cached_wav, wav_of }
 
 export { run_board_sound_wav }

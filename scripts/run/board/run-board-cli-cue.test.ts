@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type GatherRead } from './run-board-gather'
@@ -11,12 +11,15 @@ import {
 import type { LocalRead } from './run-board-read'
 import type { CueName } from './run-board-sound-cues'
 import { run_board_sound_player } from './run-board-sound-player'
+import { run_board_sound_typing } from './run-board-sound-typing'
 import type { BoardPorts, BoardState } from './run-board-state'
+import { run_board_theme_defs } from './run-board-theme-defs'
 
 // joshuafolkken/kit#7951: the live board alone sounds a lane's launch; a single frame — `--once`,
 // `--chat`, `--every` — stays silent.
 
 const { FIRST_ROUND, LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
+const { THEME_DEFS } = run_board_theme_defs
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 // Enough waits for a few live frames, their spinners turned between them.
 const SLEEPS = 40
@@ -187,6 +190,17 @@ describe('run_board_cli.live_ports cue', () => {
 	it('passes the trill to the live board alone', () => {
 		expect(run_board_cli.live_ports(true).typing_sound).toBeDefined()
 		expect(run_board_cli.live_ports(false).typing_sound).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#8365: the trill sounds the theme row's voice at the row's letter pace.
+	it('voices the trill with the theme row typing at its letter pace', () => {
+		const voiced = vi.spyOn(run_board_sound_typing, 'voiced')
+		const typing = vi.spyOn(THEME_DEFS.matrix, 'typing').mockReturnValue('click.wav')
+
+		run_board_cli.live_ports(true, 'matrix')
+		expect(voiced.mock.calls[0]?.[0]()).toBe('click.wav')
+		expect(typing).toHaveBeenCalledWith(THEME_DEFS.matrix.intro.letter_ms)
+		vi.restoreAllMocks()
 	})
 
 	// joshuafolkken/kit#8339: `--timing` reads the heap of the worker a live board gathers on.
