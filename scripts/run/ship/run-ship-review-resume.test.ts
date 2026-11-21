@@ -37,6 +37,9 @@ vi.mock('#scripts/review/review-reviewed-tree', () => ({
 	review_reviewed_tree: { mark_stopped: vi.fn() },
 }))
 vi.mock('#scripts/review/review-stop-log', () => ({ review_stop_log: { record: vi.fn() } }))
+vi.mock('#scripts/review/review-post-conflict', () => ({
+	review_post_conflict: { trigger: async () => undefined },
+}))
 vi.mock('#scripts/lane/lane-ledger-write', () => ({
 	lane_ledger_write: { record_round_one: vi.fn(), record_round_two: vi.fn() },
 }))
