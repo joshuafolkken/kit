@@ -74,6 +74,18 @@ beforeEach(() => {
 	worktree_mock.mockReset().mockResolvedValue('/git/6510')
 })
 
+describe('package_scout_reuse.check — unavailable judgment', () => {
+	it('fails without recording when the judgment is unavailable', async () => {
+		judge_mock.mockResolvedValue({ kind: 'unavailable', cause: 'usage limit', retry: 'Retry' })
+
+		const outcome = await package_scout_reuse.check(REQUEST)
+
+		expect(outcome.kind).toBe('failed')
+		expect(package_scout_reuse.is_failure(outcome)).toBe(true)
+		expect(comment_mock).not.toHaveBeenCalled()
+	})
+})
+
 describe('package_scout_reuse.check — a reuse the Issue decides', () => {
 	it('records the Auto-decided comment with its evidence and reads as recorded', async () => {
 		const outcome = await package_scout_reuse.check(REQUEST)
