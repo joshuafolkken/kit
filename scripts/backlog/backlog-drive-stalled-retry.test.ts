@@ -3,6 +3,7 @@ import { git_gh_pr_snapshot } from '#scripts/gh/git-gh-pr-snapshot'
 import { REQUIRED_CHECKS } from '#scripts/gh/git-pr-checks-eval'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_add_issue } from '#scripts/run/add/run-add-issue'
 import { run_board_ending_reason } from '#scripts/run/board/run-board-ending-reason'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -79,6 +80,7 @@ function mock_stream(events: ReadonlyArray<RunEvent>, history = events): void {
 }
 
 beforeEach(() => {
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	vi.spyOn(run_event_stream_emit, 'current_events')
 	vi.spyOn(run_event_stream_emit, 'all_events')
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
@@ -98,6 +100,24 @@ async function next_sweep(): Promise<void> {
 	clock.now += backlog_budget.OFFER_INTERVAL_MS
 	await backlog_drive_stalled_retry.sweep(clock.now)
 }
+
+describe('backlog_drive_stalled_retry.sweep — an adopted PR', () => {
+	it('checks the registered slug PR before retrying (ac-8429)', async () => {
+		const branch = `${String(PARKED)}-legacy-implementation`
+
+		vi.mocked(lane_registry.find_open_lane).mockResolvedValue(
+			lane_registry.parse_block(
+				`worktree /lanes/${String(PARKED)}\nbranch refs/heads/${branch}`,
+				'/lanes',
+			),
+		)
+
+		await next_sweep()
+
+		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(branch)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+	})
+})
 
 describe('backlog_drive_stalled_retry.sweep — the cause cleared', () => {
 	it('retries a mechanical followup park through run:add --retry (ac-765f9d97)', async () => {

@@ -1,12 +1,18 @@
 import type { TimingAnswer } from '#scripts/ci/ci-timing'
 import type { TimingRow } from '#scripts/ci/ci-timing-table'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_registry } from './lane-registry'
 import { lane_why_ci } from './lane-why-ci'
 
 // joshuafolkken/kit#6124: `josh lane:why`'s followup CI cell names the longest job of the lane's runs
 // and that job's longest step, blank when `ci:timing` is unreadable.
 
 const mocks = vi.hoisted(() => ({ timing_of: vi.fn() }))
+const find_lane = vi.spyOn(lane_registry, 'find_open_lane')
+
+beforeEach(() => {
+	find_lane.mockResolvedValue(undefined)
+})
 
 vi.mock(import('#scripts/ci/ci-timing'), async (import_original) => {
 	const { ci_timing } = await import_original()
@@ -61,6 +67,18 @@ describe('lane_why_ci.cell', () => {
 })
 
 describe('lane_why_ci.read', () => {
+	it('reads CI for the registered slug branch (ac-8429)', async () => {
+		const slug = '6050-legacy-implementation'
+
+		find_lane.mockResolvedValue(
+			lane_registry.parse_block(`worktree /lanes/6050\nbranch refs/heads/${slug}`, '/lanes'),
+		)
+		mocks.timing_of.mockResolvedValue(TIMED)
+
+		await expect(lane_why_ci.read(6050)).resolves.toBe(TIMED)
+		expect(mocks.timing_of).toHaveBeenCalledWith(slug)
+	})
+
 	it('reads the lane branch through ci_timing.timing_of', async () => {
 		mocks.timing_of.mockResolvedValue(TIMED)
 

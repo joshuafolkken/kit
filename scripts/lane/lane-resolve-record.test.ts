@@ -3,6 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_registry } from './lane-registry'
 import { lane_resolve_record } from './lane-resolve-record'
 
 // joshuafolkken/kit#5922: `josh lane:resolve --record` posts the resolution comment step-back
@@ -21,6 +22,7 @@ const head_commit = vi.spyOn(git_command, 'head_commit')
 const ls_remote = vi.spyOn(git_worktree, 'ls_remote_branch')
 const git_read = vi.spyOn(git_spawn, 'read')
 const issue_comment = vi.spyOn(git_gh_command, 'issue_comment')
+const find_lane = vi.spyOn(lane_registry, 'find_open_lane')
 
 async function refusal(): Promise<string> {
 	const outcome = await lane_resolve_record.record(ISSUE, PATHS)
@@ -31,6 +33,7 @@ async function refusal(): Promise<string> {
 }
 
 beforeEach(() => {
+	find_lane.mockResolvedValue(undefined)
 	branch.mockResolvedValue(LANE)
 	head_commit.mockResolvedValue(HEAD_SHA)
 	ls_remote.mockResolvedValue(`${HEAD_SHA}\trefs/heads/${LANE}`)
@@ -39,6 +42,22 @@ beforeEach(() => {
 })
 
 describe('lane_resolve_record.record on a pushed lane', () => {
+	it('checks origin for the registered slug branch (ac-8429)', async () => {
+		const slug = `${ISSUE}-legacy-implementation`
+
+		find_lane.mockResolvedValue(
+			lane_registry.parse_block(`worktree /lanes/${ISSUE}\nbranch refs/heads/${slug}`, '/lanes'),
+		)
+		branch.mockResolvedValue(slug)
+		ls_remote.mockResolvedValue(`${HEAD_SHA}\trefs/heads/${slug}`)
+
+		await expect(lane_resolve_record.record(ISSUE, PATHS)).resolves.toStrictEqual({
+			kind: 'recorded',
+			url: URL,
+		})
+		expect(ls_remote).toHaveBeenCalledWith(slug)
+	})
+
 	it('posts the resolution heading and the paths', async () => {
 		await expect(lane_resolve_record.record(ISSUE, PATHS)).resolves.toStrictEqual({
 			kind: 'recorded',

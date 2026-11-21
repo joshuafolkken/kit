@@ -1,3 +1,4 @@
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -27,8 +28,7 @@ import { shell_segments } from './shell-segments'
 // property of any branch the primary work tree holds, not of the literal `main`, and the default branch
 // differs per repository — so hardcoding `main` would both miss a renamed default and need an async
 // `get_default_branch`. A lane child belongs on its own `<issue>-lane` branch; a `git switch` to anything
-// else is the misfire. Its own branch is read synchronously from the checkout path
-// (`lane_paths.lane_issue_of`), the weaker-but-synchronous lane test a guard is bound to.
+// else is the misfire. Its own branch is read synchronously from the lane checkout.
 // `git switch` alone is covered — it never means a pathspec, so there is no
 // ambiguity — and `git checkout -- <path>` stays `worktree-guard.ts`'s.
 //
@@ -82,12 +82,16 @@ function switch_targets(command: string): ReadonlyArray<string> {
 		.filter((target): target is string => target !== undefined)
 }
 
-// The lane's own branch — `<issue>-lane` — read from the checkout path, or `undefined` when the checkout
-// is not a lane. A lane child is always in a lane, so this resolves whenever the mark below does.
+// Read the actual head, including an adopted PR slug; an unreadable head keeps the default name.
 function own_lane_branch(directory: string): string | undefined {
 	const issue = lane_paths.lane_issue_of(directory)
+	if (issue === undefined) return undefined
+	const branch = git_spawn_sync.read(
+		['branch', '--show-current'],
+		git_spawn_sync.located(directory),
+	)
 
-	return issue === undefined ? undefined : lane_paths.lane_branch(issue)
+	return branch?.startsWith(`${issue}-`) === true ? branch : lane_paths.lane_branch(issue)
 }
 
 // True when this session is a dispatched lane child switching to a branch that is not its own. The
