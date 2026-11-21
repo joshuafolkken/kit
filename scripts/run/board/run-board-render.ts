@@ -148,11 +148,6 @@ function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 	return [kept_section(pair(STATE_ICONS.waiting, WORDS.queued), lines)]
 }
 
-// The rows the queued heading counts: each row entry's, and every epic's children, never its own line.
-function queued_rows(layout: BoardLayout): Array<BoardRow> {
-	return layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
-}
-
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
 // ones waiting on a person's decision — a child parked on one and an untouched plan row alike
 // (joshuafolkken/kit#4099).
@@ -192,7 +187,7 @@ function below_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 	const waiting = waiting_section(layout, conditioned)
 
 	return [
-		...keyed('queued', planned(header, queued), tally_of(queued_rows(layout))),
+		...keyed('queued', planned(header, queued), tally_of(run_board_layout.queued_rows(layout))),
 		...keyed('waiting', planned(header, waiting), tally_of(layout.unreached)),
 		...done_section(done, (row) => row_line(ROW_INDENT, row, { ...conditioned, section: 'done' })),
 	]

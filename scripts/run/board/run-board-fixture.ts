@@ -217,8 +217,7 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 	return { ...reads, ...recorded, gathering, ports }
 }
 
-// The plan read's loading spinner after its ⏳, not the waiting count the same line draws after its own
-// ⏳.
+// The plan read's loading spinner after its ⏳, not a `⏳ -` or `⏳ <count>` (joshuafolkken/kit#8511).
 const SPINNING = /⏳ [^\d-]/u
 // A worker's state before its first round (`run-board-gather-thread.ts`).
 const FIRST_ROUND: RoundState = run_board_gather_thread.first_round()

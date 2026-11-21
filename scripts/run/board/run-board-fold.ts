@@ -69,7 +69,7 @@ function headed<Part extends Headed>(part: Part, label: string, summary: string 
 	return { ...part, head: folded_head(label, summary), is_folded: true }
 }
 
-// A folded section counts its rows.
+// A folded section counts its rows, the priorities among them after the count.
 function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): PlanSection {
 	const { key, label } = section
 
@@ -77,9 +77,9 @@ function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): Pl
 	if (key === undefined) return { ...section, head: lone_head(section.head, label) }
 	if (!folded.has(key)) return headed(section, label, undefined)
 
-	const count = row_count(section.lines)
+	const summary = `${String(row_count(section.lines))}${section.tally ?? ''}`
 
-	return { ...headed(section, label, String(count)), lines: [] }
+	return { ...headed(section, label, summary), lines: [] }
 }
 
 // The findings count every one there is, the ones past the section's limit too; with none there is no

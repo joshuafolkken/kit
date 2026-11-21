@@ -9,6 +9,7 @@ import {
 	type BoardRow,
 } from './run-board-layout'
 import { run_board_priority } from './run-board-priority'
+import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 import { run_board_theme } from './run-board-theme'
@@ -179,5 +180,19 @@ describe('run_board_render.render — the headings’ priorities', () => {
 
 		expect(text).toContain('⏳ queued 1 ─')
 		expect(text).not.toContain('(🔺')
+	})
+})
+
+describe('run_board_render.render — a folded heading’s priorities', () => {
+	it('keeps the priorities after the count on a folded heading', () => {
+		const layout = { ...queued([row(HIGH, 'high')]), unreached: [row(CRITICAL, 'critical')] }
+		const folded = new Set(['queued', 'waiting'] as const)
+		const text = run_board_render
+			.render({ header: header({ layout }), notes: [], folded })
+			.map((line) => stripVTControlCharacters(line))
+			.join('\n')
+
+		expect(text).toContain('▸ ⏳ queued ── 1 (🔺 1) ──')
+		expect(text).toContain('▸ 🔗 waiting ── 1 (🚨 1) ──')
 	})
 })
