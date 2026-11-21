@@ -7,6 +7,8 @@ const lock_mock = vi.hoisted(() => vi.fn())
 const branch_mock = vi.hoisted(() => vi.fn<() => Promise<string>>())
 const record_mock = vi.hoisted(() => vi.fn<(record: PreflightLedgerRecord) => Promise<void>>())
 const merge_ahead_mock = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
+const PREPARED_CHILDREN = vi.hoisted(() => 'prepared-children')
+const prepared_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: {
@@ -41,6 +43,9 @@ vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } 
 vi.mock('./run-ship-planned', () => ({
 	run_ship_planned: { PRECONDITION: 'unplanned', problems: vi.fn().mockResolvedValue([]) },
 }))
+vi.mock('./run-ship-prepared-children', () => ({
+	run_ship_prepared_children: { PRECONDITION: PREPARED_CHILDREN, problems: prepared_mock },
+}))
 vi.mock('./run-ship-body-draft', () => ({
 	run_ship_body_draft: { existing: vi.fn().mockResolvedValue(undefined) },
 }))
@@ -68,6 +73,7 @@ const ASKED = [
 	'removed-tests',
 	'lock',
 	'unplanned',
+	PREPARED_CHILDREN,
 ]
 
 beforeEach(() => {
@@ -77,6 +83,27 @@ beforeEach(() => {
 	branch_mock.mockReset().mockResolvedValue(`${String(ISSUE)}-lane`)
 	record_mock.mockReset().mockResolvedValue()
 	merge_ahead_mock.mockReset().mockResolvedValue(false)
+	prepared_mock.mockReset().mockResolvedValue([])
+})
+
+// joshuafolkken/kit#8542: a prepared child the lane filed and left unpublished stops the ship before
+// the gate; `run:chain`'s judgments never ask it, since a planned child is published.
+describe('run_ship_preflight — the prepared children the lane filed', () => {
+	it('stops the ship before the scoped pair, naming the child', async () => {
+		prepared_mock.mockResolvedValue(['Prepared #8512 has no plan record'])
+
+		const result = await run_ship_preflight.stage(REQUEST)
+
+		expect(result).toMatchObject({ code: FAILED, preconditions: [PREPARED_CHILDREN] })
+		expect(result.out).toContain('  - Prepared #8512 has no plan record')
+		expect(scoped_mock).not.toHaveBeenCalled()
+	})
+
+	it('is not asked by the chain judgments', async () => {
+		await run_ship_preflight.chain_problems()
+
+		expect(prepared_mock).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#8304: a default branch the sync stage will merge leaves the pair to the merged

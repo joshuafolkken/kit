@@ -20,6 +20,7 @@ import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_planned } from './run-ship-planned'
 import { run_ship_preflight_reuse, type PreflightKey } from './run-ship-preflight-reuse'
+import { run_ship_prepared_children } from './run-ship-prepared-children'
 import { run_ship_scoped } from './run-ship-scoped'
 
 // `josh ship`'s first stage. The commit stage (`git -y`'s preflight) and the merge (`followup`'s
@@ -47,6 +48,7 @@ const PRECONDITION = {
 	LOCK: 'lock',
 	SCOPED: 'scoped',
 	UNPLANNED: run_ship_planned.PRECONDITION,
+	PREPARED_CHILDREN: run_ship_prepared_children.PRECONDITION,
 	UNREADABLE: 'unreadable',
 } as const
 // The kinds `asked_problems` asks; `unreadable` is a failed read, not a precondition asked.
@@ -57,6 +59,7 @@ const ASKED_KINDS = [
 	PRECONDITION.REMOVED_TESTS,
 	PRECONDITION.LOCK,
 	PRECONDITION.UNPLANNED,
+	PRECONDITION.PREPARED_CHILDREN,
 ]
 const DEFERRED: PreflightResult = {
 	code: SUCCESS_EXIT_CODE,
@@ -174,6 +177,10 @@ async function planned_problems(): Promise<Array<Unmet>> {
 	return of_kind(PRECONDITION.UNPLANNED, await run_ship_planned.problems())
 }
 
+async function prepared_children_problems(): Promise<Array<Unmet>> {
+	return of_kind(PRECONDITION.PREPARED_CHILDREN, await run_ship_prepared_children.problems())
+}
+
 type TreeParts = [Array<Unmet>, Array<Unmet>, Array<Unmet>, Array<Unmet>]
 
 // The judgments read off the Issue, the body and the tree alone — the git preflight with its
@@ -267,7 +274,16 @@ async function reuse_key(request: PreflightRequest): Promise<PreflightKey | unde
 	return { issue, inputs: `${request.title}\n${body ?? ''}` }
 }
 
+// The prepared children are asked ahead of the reuse: a child filed after a pass leaves the tree
+// unmoved, so a reused pass would ship past it unpublished (joshuafolkken/kit#8542). Only the ship
+// asks them, never `run:chain`: a planned one is published, which a check must not do.
 async function stage(request: PreflightRequest): Promise<PreflightResult> {
+	const prepared = await caught(prepared_children_problems())
+
+	if (prepared.length > 0) {
+		return await recorded(refusal(prepared), [PRECONDITION.PREPARED_CHILDREN])
+	}
+
 	const key = await reuse_key(request)
 
 	return await run_ship_preflight_reuse.run(key, async () => await asked_stage(request))
