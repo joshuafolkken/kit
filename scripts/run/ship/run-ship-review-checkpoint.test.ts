@@ -151,6 +151,12 @@ it('passes no retry when the attestation holds, rerunning only the unfinished st
 	expect(phases[3]).toHaveBeenLastCalledWith(undefined)
 })
 
+it('reuses every step of a completed run on an unchanged tree, rerunning none', async () => {
+	await run()
+	expect(await run()).toHaveProperty('code', 0)
+	for (const phase of phases) expect(phase).toHaveBeenCalledOnce()
+})
+
 it('passes no retry to the provider of a stale rerun', async () => {
 	vi.mocked(review_attest.check_here).mockResolvedValue({ status: 'missing' })
 	await run(true)
