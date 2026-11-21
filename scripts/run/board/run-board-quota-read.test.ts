@@ -110,7 +110,9 @@ describe('run_board_quota_read.claude_reading', () => {
 			claude_reading(`${claude_line(0.5).slice(10)}\n{"type":"rate_limit_event"`),
 		).toBeUndefined()
 	})
+})
 
+describe('run_board_quota_read.claude_reading time', () => {
 	it('keeps the timestamp of the last usage event across unrelated later lines', () => {
 		const text = [
 			claude_line(0.1, undefined, EARLIER),
