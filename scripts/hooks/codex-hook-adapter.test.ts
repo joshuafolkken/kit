@@ -229,11 +229,9 @@ describe('Codex pre-tool hook ledger', () => {
 
 		await codex_hook_adapter.write_pretool_outcome(raw_payload)
 
-		expect(record).toHaveBeenCalledWith(
-			codex_hook_adapter.pretool_payload(raw_payload),
-			outcome,
-			codex_hook_adapter.session_context(raw_payload),
-		)
+		expect(record).toHaveBeenCalledWith(codex_hook_adapter.pretool_payload(raw_payload), outcome, {
+			context: codex_hook_adapter.session_context(raw_payload),
+		})
 	})
 })
 

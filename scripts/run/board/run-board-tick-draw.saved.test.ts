@@ -44,3 +44,44 @@ describe('run_board_tick_draw.draw_display saved plan', () => {
 		expect(header_over(START - SECOND, undefined)).not.toContain('🕘')
 	})
 })
+
+// joshuafolkken/kit#8457: where the board types rows, the frame the live plan lands on types every line
+// the saved plan's frame drew faint over its saved text at once.
+describe('run_board_tick_draw.draw_display saved plan typed over', () => {
+	const OPENED = START + SECOND
+	const LANDED = START + 2 * SECOND
+
+	// The typing a board opened at `OPENED` holds after a frame over the saved plan, then one over a plan
+	// read after it opened, its rows typing where `types_rows` says.
+	function landed(types_rows: boolean): BoardState['typing'] {
+		const { ports } = harness(LOCAL, [])
+		const typed_ports = { ...ports, opened_ms: OPENED, types_rows, theme: 'wargames' as const }
+		const saved = fetched_at(START)
+		const base = drawn_from(
+			saved,
+			LOCAL,
+			{ ports: typed_ports, now_ms: OPENED },
+			layout_for(saved, LOCAL, OPENED),
+		)
+		const live = { ...base, fetched_ms: LANDED }
+
+		return drawn_from(
+			live,
+			LOCAL,
+			{ ports: typed_ports, now_ms: LANDED },
+			layout_for(live, LOCAL, LANDED),
+		).typing
+	}
+
+	it('types the progress line over its saved text from the frame the live plan lands on', () => {
+		const lines = landed(true).lines.filter((line) => line.under !== undefined)
+
+		expect(lines.map((line) => [line.key.split(':', 1)[0], line.start_ms])).toStrictEqual([
+			['plan', LANDED],
+		])
+	})
+
+	it('types nothing where the board types no rows', () => {
+		expect(landed(false).lines).toStrictEqual([])
+	})
+})

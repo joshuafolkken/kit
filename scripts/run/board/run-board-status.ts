@@ -76,6 +76,9 @@ interface ItemStatus {
 	written_ms?: number | undefined
 	// A running open lane of this run's not yet read idle for the re-confirm window: not confirmed stopped.
 	is_live?: boolean | undefined
+	// A lane this run took over from an ended run (joshuafolkken/kit#8455): its time began under that run,
+	// so the 🎯 estimate leaves it out.
+	is_adopted?: boolean | undefined
 }
 
 const KIND = run_event_stream.EVENT_KIND

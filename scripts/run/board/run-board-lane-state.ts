@@ -102,6 +102,11 @@ function with_result(status: ItemStatus, read: LaneRead, lane: string): ItemStat
 	return { ...status, result: transcript.result, written_ms: transcript.written_ms }
 }
 
+// A lane a later run took over keeps that on its row (`adopted_at`, joshuafolkken/kit#8455).
+function with_adoption(status: ItemStatus, record: LaneStateRecord): ItemStatus {
+	return record.adopted_at === undefined ? status : { ...status, is_adopted: true }
+}
+
 function place(read: LaneRead, lane: string, sorted: BoardLanes): BoardLanes {
 	const record = read.records.get(lane)
 
@@ -112,7 +117,7 @@ function place(read: LaneRead, lane: string, sorted: BoardLanes): BoardLanes {
 
 	if (status === undefined) return sorted
 
-	const entry = [Number(lane), with_result(status, read, lane)] as const
+	const entry = [Number(lane), with_adoption(with_result(status, read, lane), record)] as const
 
 	return is_own(record, read.started_ms)
 		? { ...sorted, own: new Map([...sorted.own, entry]) }
