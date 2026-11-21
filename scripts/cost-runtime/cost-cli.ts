@@ -275,13 +275,13 @@ function figures_of(measurement: OverMeasurement | undefined): SessionFigures {
 	return { verdict, cost, threshold: cut_threshold(measurement) }
 }
 
-// The `--cut` verdict and its figures as a value, printing nothing. `run:report --handoff` quotes the
-// figures in the hand-off report; `session_verdict` reads the verdict alone.
 interface SessionScope {
 	cwd?: string | undefined
 	environment?: Environment | undefined
 }
 
+// The `--cut` verdict and its figures as a value, printing nothing. `run:report --handoff` quotes the
+// figures in the hand-off report; `session_verdict` reads the verdict alone.
 function session_figures({
 	cwd = process.cwd(),
 	environment = process.env,

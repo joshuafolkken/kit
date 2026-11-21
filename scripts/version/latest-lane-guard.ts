@@ -18,13 +18,13 @@ const LANE_SCOPE_REASON = `inside a lane — ${STAMP_NOTE}; ${PRIMARY_NOTE}`
 const LANE_REFUSAL = `josh latest is refused inside a lane — ${STAMP_NOTE}; ${PRIMARY_NOTE}`
 const REFUSAL_EXIT_CODE = 1
 
-// The path test that needs no git, so it is safe in a synchronous CLI: `lane_issue_of` reads the
-// lane number off the directory name rather than parsing `git worktree list`.
 interface LaneScope {
 	cwd?: string | undefined
 	environment?: LaneEnvironment | undefined
 }
 
+// The path test that needs no git, so it is safe in a synchronous CLI: `lane_issue_of` reads the
+// lane number off the directory name rather than parsing `git worktree list`.
 function is_lane({ cwd = process.cwd(), environment = process.env }: LaneScope = {}): boolean {
 	return lane_paths.lane_issue_of(cwd, environment) !== undefined
 }
