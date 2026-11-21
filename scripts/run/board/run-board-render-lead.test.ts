@@ -16,6 +16,7 @@ const { ELAPSED_START, LANE_INDENT, TIME_WIDTH, USAGE_START, lead_of } = run_boa
 const LANE = 4267
 const SPINNER = '⠧'
 const SECOND = 1000
+const HOUR = 60 * MINUTE
 
 function lane(state: BoardRow['state'] = 'running'): BoardRow {
 	const status = {
@@ -26,6 +27,16 @@ function lane(state: BoardRow['state'] = 'running'): BoardRow {
 	}
 
 	return { number: LANE, title: 'Lane', kind: undefined, state, status, waits: [] }
+}
+
+// A running lane past ten hours at its phase and in all: `10°05′40″` and `17°03′34″` drawn in full
+// would take nine columns.
+function long_lane(): BoardRow {
+	const row = lane()
+	const started_ms = NOW - (17 * HOUR + 3 * MINUTE + 34 * SECOND)
+	const phase_ms = NOW - (10 * HOUR + 5 * MINUTE + 40 * SECOND)
+
+	return { ...row, status: { ...row.status, state: row.state, started_ms, phase_ms } }
 }
 
 function wait(extra: Partial<BudgetWait> = {}): BudgetWait {
@@ -89,13 +100,23 @@ describe('run_board_render_lead.lead_of — a stopped single run', () => {
 
 describe('run_board_render_lead.lead_of — columns', () => {
 	it('ends every lead where the usage cells start less one blank', () => {
-		const leads = [lead(lane()), lead(lane(), [wait()]), lead(lane('stopped'))]
+		const leads = [lead(lane()), lead(lane(), [wait()]), lead(lane('stopped')), lead(long_lane())]
 
 		expect(leads.map((text) => width(text))).toStrictEqual([
 			USAGE_START - 1,
 			USAGE_START - 1,
 			USAGE_START - 1,
+			USAGE_START - 1,
 		])
+	})
+
+	// joshuafolkken/kit#8481: a time of ten hours and more drops its seconds rather than pushing the
+	// columns after it right.
+	it('draws a phase and a run of ten hours and more without their seconds, in the same columns', () => {
+		const text = lead(long_lane())
+
+		expect(text).toBe(`${SPINNER}  🚦   10°05′   17°03′`)
+		expect(width(text)).toBe(USAGE_START - 1)
 	})
 
 	// joshuafolkken/kit#7866: a lane row draws its time net of the host's sleep, without the bracket,

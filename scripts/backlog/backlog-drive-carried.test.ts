@@ -14,6 +14,8 @@ const UNDISPATCHED = '3871'
 const DIRECTORY = '/repository/.git'
 const STARTED_AT = '2026-11-21T04:00:00.000Z'
 const OWNER = 12_844
+const NEW_OWNER = 56_029
+const LATER_STARTED_AT = '2026-11-21T09:00:00.000Z'
 const SEATS = 9
 const RESUMED = 'lane resumed'
 const RESUME_COMMAND = 'lane:resume'
@@ -22,6 +24,7 @@ const NO_CHILD = 'no child process running'
 const read_state = vi.spyOn(lane_state, 'read_state')
 const directory = vi.spyOn(run_carry, 'repository_directory')
 const has_ended = vi.spyOn(run_carry_ended, 'has_ended')
+const read_carry = vi.spyOn(run_carry, 'read_carry')
 const is_same_process = vi.spyOn(process_identity, 'is_same_process')
 const josh_run = vi.spyOn(josh_command, 'josh_run')
 
@@ -47,6 +50,7 @@ beforeEach(() => {
 	read_state.mockResolvedValue(undefined)
 	directory.mockResolvedValue(DIRECTORY)
 	has_ended.mockReturnValue(false)
+	read_carry.mockReturnValue({ kind: 'none' })
 	is_same_process.mockReturnValue(undefined)
 	josh_run.mockResolvedValue({ code: 0, out: RESUMED })
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
@@ -120,6 +124,59 @@ describe('carrying paused lanes', () => {
 			lanes.map((item) => [[RESUME_COMMAND, item.issue], true]),
 		)
 	})
+})
+
+describe('judging the owning run by the current carry', () => {
+	it.each([
+		{ name: 'a hand-off of the same run', started_at: STARTED_AT, resumes: false },
+		{ name: 'a later run', started_at: LATER_STARTED_AT, resumes: true },
+	])(
+		'handles $name under a dead owner pid (ac-3bca067a, ac-6e00e331, ac-7418d4e5)',
+		async ({ started_at, resumes }) => {
+			read_state.mockResolvedValue(paused())
+			read_carry.mockReturnValue({
+				kind: 'carried',
+				carry: run_carry.fresh_carry('backlogrun', { pid: NEW_OWNER }, new Date(started_at)),
+			})
+			is_same_process.mockReturnValue(false)
+
+			await backlog_drive_carried.carried([lane(CLAIMED, '/t/a.log')])
+
+			expect(josh_run.mock.calls).toStrictEqual(resumes ? [[[RESUME_COMMAND, CLAIMED], true]] : [])
+		},
+	)
+
+	it('resumes an ended run even while the carry keeps its start (ac-6e00e331)', async () => {
+		read_state.mockResolvedValue(paused())
+		read_carry.mockReturnValue({
+			kind: 'carried',
+			carry: run_carry.fresh_carry('backlogrun', { pid: NEW_OWNER }, new Date(STARTED_AT)),
+		})
+		has_ended.mockReturnValue(true)
+
+		await backlog_drive_carried.carried([lane(CLAIMED, '/t/a.log')])
+
+		expect(josh_run.mock.calls).toStrictEqual([[[RESUME_COMMAND, CLAIMED], true]])
+	})
+})
+
+describe('judging the owning run without a carry', () => {
+	it.each([
+		{ kind: 'none' as const, live: false, resumes: true },
+		{ kind: 'unreadable' as const, live: false, resumes: true },
+		{ kind: 'unreadable' as const, live: true, resumes: false },
+	])(
+		'falls back to the owner pid on a $kind carry, live $live (ac-6d6023cf)',
+		async ({ kind, live, resumes }) => {
+			read_state.mockResolvedValue(paused())
+			read_carry.mockReturnValue({ kind })
+			is_same_process.mockReturnValue(live)
+
+			await backlog_drive_carried.carried([lane(CLAIMED, '/t/a.log')])
+
+			expect(josh_run.mock.calls).toHaveLength(resumes ? 1 : 0)
+		},
+	)
 })
 
 describe('preserving other lanes', () => {
