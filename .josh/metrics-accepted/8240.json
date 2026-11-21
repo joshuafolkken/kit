@@ -1,7 +1,0 @@
-{
-	"reason": "New run:board header sweep (#8240): a sweep module and its 50 ms wake in the spinner loop",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 85
-	}
-}

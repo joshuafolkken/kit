@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/run/board/run-board-gather-worker.ts:14 | 2026-11-19 | #8160 | - | stale-comment

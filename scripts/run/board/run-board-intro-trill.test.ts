@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyReading } from './run-board-keys'
+import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme_defs } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8250: the trill sounds while the opening line types and stops once the letters end —
@@ -92,5 +93,40 @@ describe('run_board_intro.play trill', () => {
 
 		await play(ports, NO_KEYS, THEME)
 		expect(events).toStrictEqual([])
+	})
+})
+
+describe('run_board_intro.play sound preparation', () => {
+	it('finishes first-time generation and starts the player before the first letter (ac-80d8c293)', async () => {
+		const { events, ports } = trilling(vi.fn().mockResolvedValue(undefined))
+		const sound = run_board_sound_typing.typing_sound({
+			file: () => {
+				events.push('generated')
+
+				return 'prepared.wav'
+			},
+			start: () => {
+				events.push('started')
+			},
+		})
+
+		await play({ ...ports, typing_sound: sound }, NO_KEYS, THEME)
+
+		expect(events.slice(0, 3)).toStrictEqual(['generated', 'started', 'write'])
+	})
+
+	it('continues the opening when generation fails (ac-5f93dd5e)', async () => {
+		const { events, ports } = trilling(vi.fn().mockResolvedValue(undefined))
+		const sound = run_board_sound_typing.typing_sound({
+			file: () => undefined,
+			start: () => {
+				events.push('started')
+			},
+		})
+
+		await play({ ...ports, typing_sound: sound }, NO_KEYS, THEME)
+
+		expect(events).not.toContain('started')
+		expect(events).toHaveLength(LINE.length + 1)
 	})
 })

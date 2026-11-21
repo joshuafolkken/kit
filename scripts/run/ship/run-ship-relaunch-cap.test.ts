@@ -53,12 +53,9 @@ function parked(reason: string, cause: string, blocked?: string): ParkedStop {
 
 // joshuafolkken/kit#6864: the park event keeps its text and records the ship stop beside it.
 function expect_park_event(cause: string, stop: ParkedStop['stop']): void {
-	expect(emit_mock).toHaveBeenCalledWith(
-		'park',
-		`#${ISSUE} parked (run:stalled: ${cause})`,
-		expect.any(Date),
-		{ stop },
-	)
+	expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (run:stalled: ${cause})`, {
+		stop,
+	})
 }
 
 beforeEach(() => {

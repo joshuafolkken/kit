@@ -1,7 +1,0 @@
-{
-	"reason": "The no-filing production exception adds the subagent-call schema and transcript read the feature needs (#7761)",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "#8026 adds the decision section's blocker rows (run-board-decision-rows.ts, need/blocker reading) and documents the new row meaning on the board page",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 111,
-		"prose.long_paragraphs": 1
-	}
-}

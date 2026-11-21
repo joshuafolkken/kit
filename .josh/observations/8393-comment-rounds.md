@@ -1,0 +1,4 @@
+- rf:bug-risks | low | .claude/skills/board-theme/demo-template.md:130 | 2026-11-20 | #8393 | false-positive | edge-input
+- rf:bug-risks | low | scripts/document/ai-document-fixture.ts:109 | 2026-11-20 | #8393 | false-positive | parse-boundary
+- rf:tests | low | scripts/build/package-config.test.ts:13 | 2026-11-20 | #8393 | false-positive | untested-branch
+- rf:comments | low | .claude/skills/board-theme/demo-template.md:115 | 2026-11-20 | #8393 | - | stale-comment

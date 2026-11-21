@@ -94,7 +94,7 @@ function mode_in_lane_child(id: string): LaneGuardMode {
 // guard the enumeration would actually change, never on every call.
 function mode_here(
 	id: string,
-	directory: string = process.cwd(),
+	directory: string,
 	source: MarkerSource = process.env,
 ): LaneGuardMode {
 	const lane_mode = mode_in_lane_child(id)
@@ -109,7 +109,7 @@ function mode_here(
 // `permissionDecision`, so this must not answer `true` for it.
 function is_suppressed_here(
 	id: string,
-	directory: string = process.cwd(),
+	directory: string,
 	source: MarkerSource = process.env,
 ): boolean {
 	return mode_here(id, directory, source) === OFF_MODE

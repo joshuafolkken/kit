@@ -30,6 +30,11 @@ interface Classification {
 	human: ReadonlyArray<EpicChild>
 }
 
+interface ClassifyOptions {
+	resolve?: ResolveDependency | undefined
+	running?: ReadonlySet<string> | undefined
+}
+
 const CLOSED = 'CLOSED'
 
 // The default resolver: a closed blocker is resolved, anything else defers to the blocker itself.
@@ -258,23 +263,21 @@ function fill_memo(children: ReadonlyArray<EpicChild>, context: ClassifyContext)
 // graphs, or a backlog, passes the whole set so a blocker in another of them waits rather than stops.
 function new_context(
 	children: ReadonlyArray<EpicChild>,
-	resolve: ResolveDependency = resolve_by_state,
-	running: ReadonlySet<string> = epic_outside_blocker.running_keys(children),
+	options: ClassifyOptions,
 ): ClassifyContext {
 	return {
 		index: epic_graph.index_children(children),
-		resolve,
+		resolve: options.resolve ?? resolve_by_state,
 		memo: new Map<string, ChildCategory>(),
-		running,
+		running: options.running ?? epic_outside_blocker.running_keys(children),
 	}
 }
 
 function classify_children(
 	children: ReadonlyArray<EpicChild>,
-	resolve?: ResolveDependency,
-	running?: ReadonlySet<string>,
+	options: ClassifyOptions = {},
 ): Classification {
-	const context = new_context(children, resolve, running)
+	const context = new_context(children, options)
 	const buckets: Record<'runnable' | 'time' | 'human', Array<EpicChild>> = {
 		runnable: [],
 		time: [],

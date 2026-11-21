@@ -1,0 +1,4 @@
+- rf:assumptions | low | tools/metrics/run-board-profile-main.ts:80 | 2026-11-19 | #8136 | - | other
+- rf:assumptions | low | tools/metrics/run-board-profile-main.ts:39 | 2026-11-19 | #8136 | - | edge-input
+- rf:comments | low | tools/metrics/run-board-profile-main.ts:96 | 2026-11-19 | #8136 | - | other
+- rf:none | none | - | 2026-11-19 | #8136

@@ -75,20 +75,20 @@ describe('unit_lane_count.live_lane_count — lane directories', () => {
 	it('counts the issue-number directories under the lanes root, read from a main checkout', () => {
 		const checkout = path.join(lanes_fixture(), REPOSITORY)
 
-		expect(unit_lane_count.live_lane_count(checkout, {})).toBe(LANES.length)
+		expect(unit_lane_count.live_lane_count({ checkout, environment: {} })).toBe(LANES.length)
 	})
 
 	it('counts the same lanes from inside one of them', () => {
 		const lane = path.join(lanes_fixture(), LANES_ROOT, FIRST)
 
-		expect(unit_lane_count.live_lane_count(lane, {})).toBe(LANES.length)
+		expect(unit_lane_count.live_lane_count({ checkout: lane, environment: {} })).toBe(LANES.length)
 	})
 
 	// No lanes root — CI, a repository that never opened a lane — leaves the division to the run count.
 	it('answers no lane when the lanes root cannot be read', () => {
 		const checkout = path.join(probe_directory(), REPOSITORY)
 
-		expect(unit_lane_count.live_lane_count(checkout, {})).toBe(0)
+		expect(unit_lane_count.live_lane_count({ checkout, environment: {} })).toBe(0)
 	})
 })
 
@@ -98,7 +98,7 @@ describe('unit_lane_count.live_lane_count — lane-state records', () => {
 
 		write_record(run_state(common), common, FIRST, record_of(FIRST, state))
 
-		expect(unit_lane_count.live_lane_count(checkout, {})).toBe(1)
+		expect(unit_lane_count.live_lane_count({ checkout, environment: {} })).toBe(1)
 	})
 
 	it('counts an open or running lane and one with no record', () => {
@@ -107,7 +107,7 @@ describe('unit_lane_count.live_lane_count — lane-state records', () => {
 		write_record(run_state(common), common, FIRST, record_of(FIRST, 'open'))
 		write_record(run_state(common), common, SECOND, record_of(SECOND, 'running'))
 
-		expect(unit_lane_count.live_lane_count(checkout, {})).toBe(3)
+		expect(unit_lane_count.live_lane_count({ checkout, environment: {} })).toBe(3)
 	})
 
 	it('counts a lane whose record cannot be read as one', () => {
@@ -115,7 +115,7 @@ describe('unit_lane_count.live_lane_count — lane-state records', () => {
 
 		write_record(run_state(common), common, FIRST, '{ not json')
 
-		expect(unit_lane_count.live_lane_count(checkout, {})).toBe(1)
+		expect(unit_lane_count.live_lane_count({ checkout, environment: {} })).toBe(1)
 	})
 
 	it('counts a lane directory that is no work tree', () => {
@@ -123,7 +123,7 @@ describe('unit_lane_count.live_lane_count — lane-state records', () => {
 
 		mkdirSync(path.join(path.dirname(checkout), LANES_ROOT, FIRST), { recursive: true })
 
-		expect(unit_lane_count.live_lane_count(checkout, {})).toBe(1)
+		expect(unit_lane_count.live_lane_count({ checkout, environment: {} })).toBe(1)
 	})
 
 	it('reads the records under the temp-root override the environment names', () => {
@@ -132,7 +132,9 @@ describe('unit_lane_count.live_lane_count — lane-state records', () => {
 
 		write_record(path.join(override, 'josh-state'), common, FIRST, record_of(FIRST, 'paused'))
 
-		expect(unit_lane_count.live_lane_count(checkout, { JOSH_TEMP_ROOT: override })).toBe(0)
+		expect(
+			unit_lane_count.live_lane_count({ checkout, environment: { JOSH_TEMP_ROOT: override } }),
+		).toBe(0)
 	})
 })
 
@@ -145,6 +147,6 @@ describe('unit_lane_count.live_lane_count — the asking lane', () => {
 		write_record(run_state(common), common, FIRST, idle)
 		write_record(run_state(common), common, SECOND, record_of(SECOND, 'ended'))
 
-		expect(unit_lane_count.live_lane_count(inside, {})).toBe(1)
+		expect(unit_lane_count.live_lane_count({ checkout: inside, environment: {} })).toBe(1)
 	})
 })

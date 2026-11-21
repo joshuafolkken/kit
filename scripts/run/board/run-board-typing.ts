@@ -1,6 +1,7 @@
 // One beat of a line being typed: the part typed so far, trailed by a block that reads as a cursor
 // while typing goes on and is gone once the whole line is out. The caller cuts `shown`, so a colored
 // line cut with its colors kept reads the same.
+// joshuafolkken/kit#8402: the block stays lit the whole time a line types — it does not blink.
 
 const CURSOR = '█'
 

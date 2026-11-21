@@ -1,5 +1,7 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
+import type { Writable } from 'node:stream'
 import { run_board_sound_cues, type CueName } from './run-board-sound-cues'
+import { run_board_sound_stream } from './run-board-sound-stream'
 import { run_board_sound_wav } from './run-board-sound-wav'
 
 // **A WAV file plays through the OS's own player, with the terminal bell as the fallback** (#7945).
@@ -10,6 +12,9 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 // `windowsHide` keeps the detached PowerShell from opening a console window over the board.
 const BEL = '\u{7}'
 const SPAWN_OPTIONS = { detached: true, stdio: 'ignore', windowsHide: true } as const
+const POWERSHELL_OPTIONS = ['-NoProfile', '-Command']
+const RAW_RATE = '--rate=44100'
+const RAW_CHANNELS = '--channels=1'
 
 interface Player {
 	command: string
@@ -19,6 +24,7 @@ interface Player {
 // A started player: `exit` and `kill` let a sound that plays while something lasts be ended
 // (joshuafolkken/kit#8250).
 interface Playing {
+	stdin?: Writable | null
 	on: (event: 'error' | 'exit', listener: (code?: number | null) => void) => unknown
 	unref: () => unknown
 	kill: () => unknown
@@ -44,8 +50,7 @@ function powershell_literal(file: string): string {
 
 function powershell_args(file: string): Array<string> {
 	return [
-		'-NoProfile',
-		'-Command',
+		...POWERSHELL_OPTIONS,
 		`(New-Object System.Media.SoundPlayer ${powershell_literal(file)}).PlaySync()`,
 	]
 }
@@ -106,6 +111,60 @@ function start(
 	start_first(file, players_for(platform), { ports, handlers })
 }
 
+function mac_loop_args(file: string): Array<string> {
+	const script = [
+		'ObjC.import("AVFoundation");',
+		'function run(argv) {',
+		'const player = $.AVAudioPlayer.alloc.initWithContentsOfURLError($.NSURL.fileURLWithPath(argv[0]), null);',
+		'player.numberOfLoops = -1;',
+		'if (!player.play) throw new Error("Audio playback failed");',
+		'$.NSRunLoop.currentRunLoop.run;',
+		'}',
+	].join('\n')
+
+	return ['-l', 'JavaScript', '-e', script, file]
+}
+
+function windows_loop_args(file: string): Array<string> {
+	return [
+		...POWERSHELL_OPTIONS,
+		`$player = New-Object System.Media.SoundPlayer ${powershell_literal(file)}; $player.Load(); $player.PlayLooping(); Wait-Event`,
+	]
+}
+
+const LOOP_PLAYERS: Partial<Record<NodeJS.Platform, Array<Player>>> = {
+	darwin: [{ command: 'osascript', args: mac_loop_args }],
+	win32: [{ command: 'powershell', args: windows_loop_args }],
+	linux: [
+		{ command: 'paplay', args: () => ['--raw', '--format=s16le', RAW_RATE, RAW_CHANNELS] },
+		{
+			command: 'pw-play',
+			args: () => ['--raw', '--format=s16', RAW_RATE, RAW_CHANNELS, '-'],
+		},
+		{ command: 'aplay', args: () => ['-t', 'raw', '-f', 'S16_LE', '-r', '44100', '-c', '1'] },
+	],
+}
+
+function loop_players(platform: NodeJS.Platform): Array<Player> {
+	return LOOP_PLAYERS[platform] ?? []
+}
+
+// Loop inside one audio stream, without closing the output between WAV boundaries.
+function loop(
+	file: string,
+	handlers: StartHandlers,
+	platform: NodeJS.Platform = process.platform,
+	ports: SoundPorts = DEFAULT_PORTS,
+): void {
+	try {
+		const output = platform === 'linux' ? run_board_sound_stream.ports_for(file, ports) : ports
+
+		start_first(file, loop_players(platform), { ports: output, handlers })
+	} catch {
+		handlers.failed()
+	}
+}
+
 function play(
 	file: string,
 	platform: NodeJS.Platform = process.platform,
@@ -144,6 +203,7 @@ const run_board_sound_player = {
 	players_for,
 	play,
 	play_cue,
+	loop,
 	start,
 }
 

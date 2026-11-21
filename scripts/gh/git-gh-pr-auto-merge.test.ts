@@ -96,7 +96,7 @@ describe('git_gh_pr_auto_merge.pr_enable_auto_merge', () => {
 	})
 
 	it('refuses a pull request that carries no node id rather than sending an empty one', async () => {
-		mocked_api.mockImplementation(gh_api_routes(pr_routes()))
+		mocked_api.mockImplementation(gh_api_routes(pr_routes({})))
 
 		await expect(git_gh_pr_auto_merge.pr_enable_auto_merge(PR_BRANCH, PUSHED_SHA)).rejects.toThrow(
 			'node_id',

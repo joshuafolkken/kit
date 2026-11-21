@@ -1,0 +1,7 @@
+{
+	"reason": "new run-ship-review-prompts.ts module carries its own imports and export object; a pure move otherwise",
+	"date": "2026-11-20",
+	"growth": {
+		"scripts.code_lines": 10
+	}
+}

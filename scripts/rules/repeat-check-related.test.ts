@@ -159,12 +159,14 @@ describe('the repeat-check-related delivery in a lane child', () => {
 	it('refuses a mid-run full-reach check:related on every occurrence', () => {
 		const payload = payload_of('repeat', CHECK, CHECKED_AND_FIXED)
 
-		expect(delivered_rules.delivery(payload)).toBe(REASON)
-		expect(delivered_rules.delivery(payload)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(REASON)
+		expect(delivered_rules.delivery(payload, Date.now())).toBe(REASON)
 	})
 
 	it('lets the first check:related through', () => {
-		expect(delivered_rules.delivery(payload_of('first', CHECK, FIX_LINE))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('first', CHECK, FIX_LINE), Date.now()),
+		).toBeUndefined()
 	})
 
 	// joshuafolkken/kit#5784: the touched run is the mid-run check the refusal points to.
@@ -172,7 +174,7 @@ describe('the repeat-check-related delivery in a lane child', () => {
 		const command = 'pnpm josh check:related --touched'
 
 		expect(
-			delivered_rules.delivery(payload_of('touched-check', command, CHECKED_AND_FIXED)),
+			delivered_rules.delivery(payload_of('touched-check', command, CHECKED_AND_FIXED), Date.now()),
 		).toBeUndefined()
 		expect(REASON).toContain('`pnpm josh check:related --touched`')
 	})
@@ -183,20 +185,24 @@ describe('the repeat-check-related delivery in a lane child', () => {
 			time_transcript_fixture.result_line(2, BRANCH, CHECK_ID),
 		].join('\n')
 
-		expect(delivered_rules.delivery(payload_of('after-touched', CHECK, touched))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('after-touched', CHECK, touched), Date.now()),
+		).toBeUndefined()
 	})
 
 	it('lets a by-name test:related --touched through', () => {
 		const command = 'pnpm josh test:related --touched'
 
 		expect(
-			delivered_rules.delivery(payload_of('touched', command, CHECKED_AND_FIXED)),
+			delivered_rules.delivery(payload_of('touched', command, CHECKED_AND_FIXED), Date.now()),
 		).toBeUndefined()
 	})
 })
 
 describe('the repeat-check-related delivery outside a lane child', () => {
 	it('lets a repeated check:related through', () => {
-		expect(delivered_rules.delivery(payload_of('person', CHECK, CHECKED_AND_FIXED))).toBeUndefined()
+		expect(
+			delivered_rules.delivery(payload_of('person', CHECK, CHECKED_AND_FIXED), Date.now()),
+		).toBeUndefined()
 	})
 })

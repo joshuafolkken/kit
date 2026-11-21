@@ -305,7 +305,7 @@ async function record_started(issue: string, start: DispatchStart): Promise<void
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
 		`${issue_cite.plain_for('program', issue)} dispatched`,
-		now,
+		{ at: now },
 	)
 	await lane_ledger_write.record_dispatch(Number(issue))
 	await lane_state.record_change(

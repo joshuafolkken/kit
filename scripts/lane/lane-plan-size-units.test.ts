@@ -31,10 +31,10 @@ function declared(file_count: number): Array<OpenIssueData> {
 	return [{ number: ISSUE, title: 'lane', createdAt: PLANNED_AT, labels: [], body }]
 }
 
-function oversize_of(paths: Array<string>, file_count = 1, signals = SIGNALS): unknown {
+function oversize_of(paths: Array<string>, signals = SIGNALS): unknown {
 	const plan: LanePlan = { issue: ISSUE, paths, planned_at: PLANNED_AT }
 
-	return lane_plan_size.oversize(plan, declared(file_count), undefined, signals)
+	return lane_plan_size.oversize(plan, declared(1), undefined, signals)
 }
 
 // joshuafolkken/kit#6724: the split notice groups on the same units, so the two cannot drift.
@@ -57,7 +57,7 @@ describe('lane_plan_size.oversize on a new scripts module', () => {
 	it('still splits on the pair alone without a base listing', () => {
 		const unlisted = { ...SIGNALS, base_files: undefined }
 
-		expect(oversize_of([MODULE, MODULE_TEST, IMPORTER], 1, unlisted)).toMatchObject({
+		expect(oversize_of([MODULE, MODULE_TEST, IMPORTER], unlisted)).toMatchObject({
 			reason: 'files',
 			split_off: [IMPORTER],
 		})
@@ -88,7 +88,7 @@ describe('lane_plan_size.oversize pairing a new scripts module with its importer
 		const unrelated = 'scripts/lane/lane-unrelated.ts'
 		const listed = { ...SIGNALS, base_files: new Set([IMPORTER, unrelated]) }
 
-		expect(oversize_of([unrelated, MODULE, IMPORTER], 1, listed)).toMatchObject({
+		expect(oversize_of([unrelated, MODULE, IMPORTER], listed)).toMatchObject({
 			kept: [unrelated],
 			split_off: [MODULE, IMPORTER],
 		})

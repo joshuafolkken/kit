@@ -6,7 +6,8 @@ import { run_cut_cli_fixture } from './run-cut-cli-fixture'
 // joshuafolkken/kit#5040: the digest is derived from the checkout's transcript, not from the record's
 // temp path, and carried in the implementation cut's record.
 
-const { ISSUE, REPOSITORY, WITH_HANDOFF, own_digest, target } = run_cut_cli_fixture
+const { ISSUE, REPOSITORY, WITH_HANDOFF, own_digest, target, worktree_directory } =
+	run_cut_cli_fixture
 
 run_cut_cli_fixture.install()
 
@@ -22,6 +23,15 @@ describe('the implementation cut carries the session digest', () => {
 
 		expect(own_digest).toHaveBeenCalledWith(REPOSITORY)
 		expect(read.kind === 'carried' ? read.cut.digest : undefined).toStrictEqual(DIGEST)
+	})
+
+	it('derives it from the working directory when the checkout cannot be read', async () => {
+		// The first read locates the cut record; the second is the one the digest falls back from.
+		worktree_directory.mockResolvedValueOnce(REPOSITORY).mockResolvedValueOnce(undefined)
+
+		await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect(own_digest).toHaveBeenCalledWith(process.cwd())
 	})
 
 	it('derives none for the pre-gate cut', async () => {

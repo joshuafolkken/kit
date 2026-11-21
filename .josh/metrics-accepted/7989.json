@@ -1,7 +1,0 @@
-{
-	"reason": "New feature: the WarGames theme's DEFCON alert level adds one new module (run-board-header-defcon.ts) and its header wiring",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 78
-	}
-}
