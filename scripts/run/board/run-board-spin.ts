@@ -244,7 +244,7 @@ function sweep_boundary(turning: Turning, now_ms: number): number {
 }
 
 // The next step the TRACE field blinks or the colons turn on.
-function trace_boundary(turning: Turning, now_ms: number): number {
+function blink_boundary(turning: Turning, now_ms: number): number {
 	const trace_ms =
 		traces_of(turning).length > 0 ? run_board_header_trace.boundary_after(now_ms) : Infinity
 
@@ -267,7 +267,7 @@ function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	const { typing, cells } = coded(turning)
 	const is_coding = run_board_codes.is_coding(typing, cells, now_ms)
 	const code_ms = is_coding ? boundary_after(now_ms, run_board_codes.CODE_MS) : Infinity
-	const effect_ms = Math.min(sweep_boundary(turning, now_ms), trace_boundary(turning, now_ms))
+	const effect_ms = Math.min(sweep_boundary(turning, now_ms), blink_boundary(turning, now_ms))
 
 	return Math.min(turn_ms, letter_ms, code_ms, effect_ms, until_ms)
 }
@@ -364,9 +364,10 @@ function start_sweep(turning: Turning, ports: SpinPorts): void {
 }
 
 // joshuafolkken/kit#8123: a wake for a letter or the sweep between frame boundaries writes no spinner,
-// so each frame is written once, on its boundary; the sweep is written likewise once per cell.
+// so each frame is written once, on its boundary; the sweep is written likewise once per cell. The
+// frame drew its colons lit, so a frame finished past the half second darkens them on the first wake.
 async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number): Promise<void> {
-	let last = moment_of(turning, ports.now())
+	let last = { ...moment_of(turning, ports.now()), is_lit: true }
 
 	start_sweep(turning, ports)
 	await poll.poll_until(() => ports.now() >= until_ms, {

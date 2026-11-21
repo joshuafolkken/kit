@@ -114,6 +114,17 @@ describe('run_board_spin.spin_to_second colons', () => {
 		expect(ports.now()).toBe(START + REDRAW_MS)
 	})
 
+	it('darkens the lit colons of a frame finished past the half second on the first wake', async () => {
+		const { ports, writes } = colon_ports(START + COLON_MS + 100)
+		const typing = run_board_type_rows.NO_TYPING
+
+		await spin_to_second({ spots: [], typing, colons: COLONS }, ports)
+
+		const wake_ms = START + 8 * SPINNER_INTERVAL_MS
+
+		expect(writes).toStrictEqual([{ at_ms: wake_ms, text: colon_bytes(COLONS, wake_ms) }])
+	})
+
 	it('turns the spinner every 80 ms to the second as it did with no colon', async () => {
 		const { ports, writes } = colon_ports(START)
 

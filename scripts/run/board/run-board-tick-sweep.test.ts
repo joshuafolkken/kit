@@ -1,5 +1,5 @@
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import type { BoardRow } from './run-board-layout'
 import { run_board_spot } from './run-board-spot'
@@ -52,15 +52,39 @@ describe('run_board_tick — the sweep (joshuafolkken/kit#8240)', () => {
 
 // joshuafolkken/kit#8391: a no-run frame keeps no blinking cell from the run frame before it.
 describe('run_board_tick — the blinking cells of a no-run frame (joshuafolkken/kit#8391)', () => {
-	it('drops the last frame’s lamps and TRACE field when it draws no run', async () => {
+	it('drops the last frame’s lamps, TRACE field and clock colons when it draws no run', async () => {
 		const { ports } = harness(undefined, [plan_titled('a')])
 		const trace = { row: 1, column: 1, style: '' }
 		const lamp = { row: 2, column: 2, panel_row: 0, group: 0, lamp: 0 }
-		const drawn = await tick({ ...FRESH_STATE, lamps: [lamp], traces: [trace] }, ports)
+		const blinking = { ...FRESH_STATE, lamps: [lamp], traces: [trace], colons: [trace] }
+		const drawn = await tick(blinking, ports)
 
 		expect(drawn.lamps).toBeUndefined()
 		expect(drawn.traces).toBeUndefined()
+		expect(drawn.colons).toBeUndefined()
 	})
+})
+
+// joshuafolkken/kit#8476: a live run frame records its clocks' colons in the theme's 24-bit colors.
+describe('run_board_tick — the clock colons of a run frame (joshuafolkken/kit#8476)', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it.each(['matrix', 'wargames'] as const)(
+		'records %s’s three colons in its 24-bit color',
+		(theme) => {
+			vi.stubEnv('FORCE_COLOR', '3')
+			const { ports } = harness(LOCAL, [])
+			const state: BoardState = { ...FRESH_STATE, run_started_ms: LOCAL.started_ms }
+			const redraw = { ports: { ...ports, theme, size: () => PANE }, now_ms: START + AGED_MS }
+			const drawn = drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
+			const styles = (drawn.colons ?? []).map(({ style }) => style)
+
+			expect(styles).toHaveLength(3)
+			expect(styles.filter((style) => !style.includes('[38;2;'))).toStrictEqual([])
+		},
+	)
 })
 
 // joshuafolkken/kit#8404, #8425: waiting runs keep their heartbeat only in wargames.
