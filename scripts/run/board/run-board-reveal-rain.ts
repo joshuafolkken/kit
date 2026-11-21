@@ -137,14 +137,29 @@ function row_of(columns: ReadonlyArray<Column>, cells: ReadonlyArray<RainCell>):
 	return `${texts.join('')}${closed(is_shown)}`
 }
 
+function same(cell: RainCell): RainCell {
+	return cell
+}
+
 // Every frame of one pass of the rain over the drawn frame, each a beat `RAIN_MS` long that rewrites
-// the screen from its top-left corner; made one at a time, so a skipped pass makes no more.
-function* beats_of(frame: string, random: Random): Generator<Beat> {
+// the screen from its top-left corner; made one at a time, so a skipped pass makes no more. `read`
+// turns each rain cell into what the frame shows under it: the frame behind the rain as it is, or
+// another reading of it (`run-board-exit-rain.ts`).
+function* beats_of(
+	frame: string,
+	random: Random,
+	read: (cell: RainCell) => RainCell = same,
+): Generator<Beat> {
 	const grid = grid_of(frame)
 	const size = { width: grid[0]?.length ?? 0, height: grid.length }
 
 	for (const cells of run_board_rain.passes(size, random)) {
-		const rows = grid.map((columns, y) => row_of(columns, cells[y] ?? []))
+		const rows = grid.map((columns, y) =>
+			row_of(
+				columns,
+				(cells[y] ?? []).map((cell) => read(cell)),
+			),
+		)
 
 		yield { text: `${CURSOR_HOME}${rows.join('\n')}`, ms: run_board_rain.RAIN_MS }
 	}
