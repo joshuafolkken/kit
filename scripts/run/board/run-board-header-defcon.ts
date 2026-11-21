@@ -4,7 +4,7 @@ import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import type { QuotaHold } from './run-board-render-quota'
 
-// The alert level a themed board draws at the end of the header's first line, `DEFCON 5 4 [3] 2 1`:
+// The alert level a themed board draws at the end of the throughput rule, `DEFCON 5 4 [3] 2 1`:
 // 5 is calm, 1 the worst, and the lowest level whose condition holds is the one lit. A full set of lanes
 // with a `P1` waiting behind them is the usual board, so it stays calm: only a `P1` waiting beside a free
 // lane, or more lanes running than the limit, raises the level (joshuafolkken/kit#7989).
