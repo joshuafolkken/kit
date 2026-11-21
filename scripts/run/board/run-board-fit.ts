@@ -62,6 +62,8 @@ interface PlanSection extends Foldable {
 	key?: SectionKey | undefined
 	// The priorities among its rows after its count, ` (🔺 2)`, open or folded (joshuafolkken/kit#8511).
 	tally?: string | undefined
+	// Drawn at the right end of its rule, open or folded (joshuafolkken/kit#8512).
+	tail?: string | undefined
 }
 
 // The newest notes shown, and how many older ones are already past the section's limit.

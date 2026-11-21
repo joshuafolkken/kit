@@ -44,6 +44,7 @@ interface FrameBounds {
 interface Headed {
 	head: ReadonlyArray<string>
 	is_folded?: boolean | undefined
+	tail?: string | undefined
 }
 
 function flipped(folded: ReadonlySet<SectionKey>, section: SectionKey): ReadonlySet<SectionKey> {
@@ -121,11 +122,11 @@ function fold_parts(parts: FrameParts, folded: ReadonlySet<SectionKey>): FramePa
 }
 
 function widened_part<Part extends Headed>(part: Part, width: number): Part {
-	return { ...part, head: widened(part.head, width) }
+	return { ...part, head: widened(part.head, width, part.tail) }
 }
 
 function widened_detail(part: DetailPart | undefined, width: number): DetailPart | undefined {
-	return part === undefined ? undefined : { ...part, head: widened(part.head, width, part.tail) }
+	return part === undefined ? undefined : widened_part(part, width)
 }
 
 // Every rule run on to the lane rows' title column, folded or open (joshuafolkken/kit#5520).

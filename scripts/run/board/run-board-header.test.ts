@@ -212,15 +212,22 @@ describe('run_board_header.header_lines plan warning', () => {
 	})
 })
 
-// joshuafolkken/kit#3455: a plan read in flight turns the spinner after ⏳, on a terminal only.
-describe('run_board_header.header_lines plan loading', () => {
+// joshuafolkken/kit#3455: a plan read in flight turns the spinner after ⏳, on a terminal only — on the
+// queued rule's end, not the first line (joshuafolkken/kit#8512).
+describe('run_board_header.queued_tail plan loading', () => {
+	const { queued_tail } = run_board_header
+
 	it('turns the spinner after ⏳ while the plan read is in flight', () => {
-		expect(title_of(header({ is_plan_loading: true, spinner: '⠙' }))).toMatch(/💤 0 {2}⏳ ⠙$/u)
+		expect(queued_tail(header({ is_plan_loading: true, spinner: '⠙' }))).toBe('⏳ ⠙')
 	})
 
 	it('draws nothing for it once the read landed or where there is no spinner', () => {
-		expect(title_of(header({ is_plan_loading: false, spinner: '⠙' }))).not.toContain('⏳ ⠙')
-		expect(title_of(header({ is_plan_loading: true, spinner: undefined }))).toMatch(/💤 0$/u)
+		expect(queued_tail(header({ is_plan_loading: false, spinner: '⠙' }))).toBeUndefined()
+		expect(queued_tail(header({ is_plan_loading: true, spinner: undefined }))).toBeUndefined()
+	})
+
+	it('draws no spinner on the first line', () => {
+		expect(title_of(header({ is_plan_loading: true, spinner: '⠙' }))).toMatch(/💤 0$/u)
 	})
 })
 
@@ -263,19 +270,29 @@ describe('run_board_header.header_lines progress', () => {
 	})
 })
 
-// joshuafolkken/kit#8219: a saved plan's age ends the progress line until a fresh plan lands.
-describe('run_board_header.header_lines saved plan', () => {
+// joshuafolkken/kit#8219: a saved plan's age is drawn until a fresh plan lands — on the queued rule's
+// end, after a plan read in flight, not on the first line (joshuafolkken/kit#8512).
+describe('run_board_header.queued_tail saved plan', () => {
+	const { queued_tail } = run_board_header
 	const saved = header({ plan_saved_ms: NOW - 2 * MINUTE })
 
-	it('ends the progress line on 🕘 and the saved plan’s age, the text before it unchanged', () => {
-		const plain = title_of(header())
+	it('says 🕘 and the saved plan’s age', () => {
+		expect(queued_tail(saved)).toMatch(/^🕘 \S+$/u)
+	})
 
-		expect(title_of(saved)).toMatch(/ {2}🕘 \S+$/u)
-		expect(title_of(saved).startsWith(plain)).toBe(true)
+	it('draws the spinner first, then the age', () => {
+		const both = header({ plan_saved_ms: NOW - 2 * MINUTE, is_plan_loading: true, spinner: '⠋' })
+
+		expect(queued_tail(both)).toMatch(/^⏳ ⠋ {2}🕘 \S+$/u)
 	})
 
 	it('draws no 🕘 for a fresh plan', () => {
-		expect(title_of(header())).not.toContain('🕘')
+		expect(queued_tail(header())).toBeUndefined()
+	})
+
+	it('draws no 🕘 on the first line', () => {
+		expect(title_of(saved)).not.toContain('🕘')
+		expect(title_of(saved)).toMatch(/💤 0$/u)
 	})
 })
 

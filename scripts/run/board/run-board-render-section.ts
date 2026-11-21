@@ -109,14 +109,16 @@ function counted_head(section: PlanSection): Array<string> {
 }
 
 // The sections a person folds with the key named `key`, each rule saying how many rows it holds,
-// `tally` (`run_board_priority.tally_of`) after the count, folded or not (joshuafolkken/kit#8511).
+// `tally` (`run_board_priority.tally_of`) after the count, folded or not (joshuafolkken/kit#8511), and
+// `tail` at the rule's right end (joshuafolkken/kit#8512).
 function keyed(
 	key: SectionKey,
 	sections: ReadonlyArray<PlanSection>,
 	tally?: string,
+	tail?: string,
 ): Array<PlanSection> {
 	return sections.map((section) => {
-		const tallied = { ...section, key, tally }
+		const tallied = { ...section, key, tally, tail }
 
 		return { ...tallied, head: counted_head(tallied) }
 	})

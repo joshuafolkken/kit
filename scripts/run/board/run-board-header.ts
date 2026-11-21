@@ -276,13 +276,21 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string 
 	]
 }
 
-// How long ago the saved plan drawn was read, last on the line, so nothing moves as it goes.
+// How long ago the saved plan drawn was read, last on the queued rule, so nothing moves as it goes.
 function saved_part(header: BoardHeader): string | undefined {
 	const { plan_saved_ms } = header
 
 	return plan_saved_ms === undefined
 		? undefined
 		: `${SAVED_ICON} ${run_board_length.span_of(header.now_ms - plan_saved_ms)}`
+}
+
+// A plan read in flight, then the saved plan's age, at the right end of the queued rule rather than on
+// the header's first line, which a narrow pane cuts (joshuafolkken/kit#8512); none when neither is.
+function queued_tail(header: BoardHeader): string | undefined {
+	const parts = [loading_part(header), saved_part(header)].filter((part) => part !== undefined)
+
+	return parts.length === 0 ? undefined : parts.join(GAP)
 }
 
 // The alert level a themed screen draws at the right end of the throughput rule (joshuafolkken/kit#8513),
@@ -295,14 +303,12 @@ function alert_part(header: BoardHeader): string | undefined {
 	)
 }
 
-// The run's progress, then a plan read in flight; a failing read is said in the notice slot
-// (`run-board-standing.ts`).
+// The run's progress, then the issue count; a plan read in flight and a saved plan's age are drawn on
+// the queued rule (`queued_tail`), a failing read in the notice slot (`run-board-standing.ts`).
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
-		loading_part(header),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
-		saved_part(header),
 	]
 
 	return run_board_header_parts.keyed_progress(
@@ -418,6 +424,7 @@ const run_board_header = {
 	now_icon,
 	now_key,
 	now_legend,
+	queued_tail,
 	run_mark_of,
 	warning_of,
 }
