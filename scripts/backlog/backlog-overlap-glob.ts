@@ -1,8 +1,8 @@
 import { path_glob } from '#scripts/gate/path-glob'
 
 // joshuafolkken/kit#8529: a glob a body declares stays a pattern rather than widening to its directory.
-// `scripts/run/run-board-cli*.test.ts` had read as `scripts/run/`, so it waited behind a lane that
-// named only `scripts/run/run-board-reveal-rain.ts` and two lanes of six ran. A pattern is matched
+// `scripts/run/board/run-board-cli*.test.ts` had read as `scripts/run/board/`, so it waited behind a
+// lane that named only `scripts/run/board/run-board-reveal-rain.ts` and two lanes of six ran. A pattern is matched
 // against the other path instead of expanded to tracked files, so a glob for files not yet written
 // still meets the file another lane names.
 const GLOB = '*'

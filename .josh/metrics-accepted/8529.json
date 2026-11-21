@@ -2,6 +2,6 @@
 	"reason": "glob claims are matched as patterns by a new backlog-overlap-glob module (#8529)",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 30
+		"scripts.code_lines": 33
 	}
 }

@@ -1,3 +1,4 @@
+import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -208,13 +209,14 @@ function earlier_cleared(
 // Matched by the ship's `unplanned` rule — a claim ending in `/` holds every file under it — against a
 // wider set: this plan's files and a path an earlier clear of this lane held count as planned too, while
 // the ship's stop reads the recorded `paths` alone (joshuafolkken/kit#5672, joshuafolkken/kit#5679).
-// A directory this plan claims is left out: the files axis counts it as one file, so it passed nothing.
+// A directory or glob this plan claims is left out: the files axis counts it as one file, so it passed
+// nothing.
 function unplanned_hunks(
 	signals: PlanSignals,
 	plan: LanePlan,
 	recorded: LanePlan | undefined,
 ): number {
-	const listed = plan.paths.filter((path) => !path.endsWith('/'))
+	const listed = plan.paths.filter((path) => backlog_overlap.is_file_claim(path))
 	const planned = [...listed, ...(recorded?.paths ?? []), ...earlier_cleared(recorded, signals)]
 
 	return run_ship_planned.unplanned_of(planned, signals.hunk_files).length
