@@ -132,8 +132,9 @@ const SYMBOLS: Glyphs = new Map<string, Glyph>([
 	['✗', ['X', 'alert']],
 ])
 
-// The spinner turns a line through `│ ╱ ─ ╲` instead of the braille dots, each frame the turn
-// its place in the dots' cycle falls on, so one cycle of the dots is one turn.
+// The spinner steps through its theme's glyphs (`spinner` in the theme table: wargames' `│ ╱ ─ ╲`,
+// matrix's kana) instead of the braille dots, each frame the glyph its place in the dots' cycle
+// falls on, so one cycle of the dots is one pass through the glyphs.
 const { THEMES, THEME_DEFS } = run_board_theme_defs
 const TURN = THEME_DEFS.wargames.spinner
 const UNKNOWN: Glyph = ['?', 'info']
