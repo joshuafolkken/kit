@@ -1,5 +1,6 @@
 import { run_board_fit } from './run-board-fit'
 import { run_board_labels, type Paint } from './run-board-labels'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
 // joshuafolkken/kit#7988: the WarGames theme draws the board as a text terminal would, so every icon is
@@ -133,7 +134,8 @@ const SYMBOLS: Glyphs = new Map<string, Glyph>([
 
 // The spinner turns a line through `│ ╱ ─ ╲` instead of the braille dots, each frame the turn
 // its place in the dots' cycle falls on, so one cycle of the dots is one turn.
-const TURN = ['│', '╱', '─', '╲'] as const
+const { THEMES, THEME_DEFS } = run_board_theme_defs
+const TURN = THEME_DEFS.wargames.spinner
 const UNKNOWN: Glyph = ['?', 'info']
 const VARIATION_SELECTOR = '\u{FE0F}'
 const ESC = '\u{1B}'
@@ -145,23 +147,28 @@ const DEFAULT_CODES: ReadonlySet<string> = new Set(['', '0', '39'])
 const INTENSITY = /^[12]$/u
 const INTENSITY_ENDS: ReadonlySet<string> = new Set(['', '0', '22'])
 
-function turn_of(index: number, count: number): string {
-	return TURN[Math.floor((index * TURN.length) / count)] ?? TURN[0]
+function turn_of(turn: string, index: number, count: number): string {
+	return turn[Math.floor((index * turn.length) / count)] ?? ''
 }
 
-function spinner_turns(): Array<[string, Glyph]> {
+function spinner_turns(theme: Theme): Array<[string, Glyph]> {
 	const frames = run_board_labels.SPINNER_FRAMES
+	const turn = THEME_DEFS[theme].spinner
 
-	return frames.map((frame, index) => [frame, [turn_of(index, frames.length), 'info']])
+	return frames.map((frame, index) => [frame, [turn_of(turn, index, frames.length), 'info']])
 }
 
-const SINGLES: Glyphs = new Map([...SYMBOLS, ...spinner_turns()])
-const SINGLE_CLASS = [...SINGLES.keys()].join('')
+const SINGLES = new Map(
+	THEMES.map((theme) => [theme, new Map([...SYMBOLS, ...spinner_turns(theme)])]),
+)
+const SINGLE_CLASS = [...SYMBOLS.keys(), ...run_board_labels.SPINNER_FRAMES].join('')
 const PICTOGRAPHIC = String.raw`\p{Extended_Pictographic}`
 const GLYPH = new RegExp(`${PICTOGRAPHIC}${VARIATION_SELECTOR}?|[${SINGLE_CLASS}]`, 'gu')
 
-function entry_of(glyph: string): Glyph {
-	return SINGLES.get(glyph) ?? EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
+function entry_of(glyph: string, theme: Theme): Glyph {
+	return (
+		SINGLES.get(theme)?.get(glyph) ?? EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
+	)
 }
 
 // What a render module left open where a glyph is drawn: a foreground color, and the escapes of the
@@ -184,15 +191,15 @@ function toned_text(text: string, tone: Tone, open: Open, idle: Paint): string {
 
 // An emoji, with its variation selector, as its text in its tone's color padded to the width it took;
 // one the table misses as `?`, so no emoji is ever drawn.
-function text_of(glyph: string, open: Open, idle: Paint): string {
-	const [text, tone] = entry_of(glyph)
+function text_of(glyph: string, open: Open, theme: Theme): string {
+	const [text, tone] = entry_of(glyph, theme)
 	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
 
-	return toned_text(text, tone, open, idle) + padding
+	return toned_text(text, tone, open, THEME_DEFS[theme].idle) + padding
 }
 
-function glyphs_as_text(text: string, open: Open, idle: Paint): string {
-	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open, idle))
+function glyphs_as_text(text: string, open: Open, theme: Theme): string {
+	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open, theme))
 }
 
 // The first code of the color escape a segment starts with; `undefined` for any other segment.
@@ -239,8 +246,8 @@ function mapped(frame: string, draw: (text: string, open: Open) => string): stri
 	return drawn.join(ESC)
 }
 
-function textual(frame: string, idle: Paint = run_board_theme_tones.IDLE_PAINT): string {
-	return mapped(frame, (text, open) => glyphs_as_text(text, open, idle))
+function textual(frame: string, theme: Theme = 'wargames'): string {
+	return mapped(frame, (text, open) => glyphs_as_text(text, open, theme))
 }
 
 const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, mapped, textual }
