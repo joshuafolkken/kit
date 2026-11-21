@@ -3,7 +3,6 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_theme_defs } from './run-board-theme-defs'
-import type { ThroughputRow } from './run-board-throughput'
 import { run_board_typing } from './run-board-typing'
 
 const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
@@ -11,7 +10,7 @@ const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
 // joshuafolkken/kit#7934: a board a person watches takes the theme; the chat's frame never does. How
 // the theme draws a frame is `run-board-theme.test.ts`'s.
 
-const { LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
+const { IDLE_ROW, LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 const THEMED = ['--theme', 'wargames']
 const RULE = '─'
@@ -265,16 +264,6 @@ describe('run_board_cli.run --theme refused', () => {
 		stderr.mockRestore()
 	})
 })
-
-const IDLE_ROW: ThroughputRow = {
-	label: '24h',
-	cells: [],
-	active_ms: 0,
-	done: 0,
-	per_hour: undefined,
-	peak: undefined,
-	now: undefined,
-}
 
 // The frame of a read carrying the throughput rows.
 async function throughput_frame(argv: Array<string>): Promise<string> {
