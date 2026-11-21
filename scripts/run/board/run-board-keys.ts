@@ -143,8 +143,9 @@ function read_keys(input: KeyInput | undefined, cue?: Cue, trill?: Trill): KeyRe
 		intercept: (on_key) => {
 			held.taker = on_key
 
+			// A reveal ending under the exit wipe leaves the wipe's taker in place.
 			return () => {
-				held.taker = undefined
+				if (held.taker === on_key) held.taker = undefined
 			}
 		},
 	}

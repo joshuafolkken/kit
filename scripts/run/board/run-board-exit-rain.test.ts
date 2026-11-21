@@ -12,7 +12,7 @@ import type { Theme } from './run-board-theme'
 // has passed blank, the screen erased before it is left, a key leaving at once, and a signal leaving
 // without the wipe.
 
-const { beats_of, wipe } = run_board_exit_rain
+const { beats_of, gated, wipe } = run_board_exit_rain
 const { harness, plan_titled } = run_board_fixture
 const SCREEN = run_board_screen.screen_of('live')
 const ESC = '\u{1B}'
@@ -172,6 +172,31 @@ describe('run_board_exit_rain.wipe — what plays and what ends it', () => {
 	})
 })
 
+describe('run_board_exit_rain.exit_of — the exit before the live board sets its wipe', () => {
+	it('opens its gate and wipes nothing', async () => {
+		const exit = run_board_exit_rain.exit_of()
+
+		await expect(exit.wipe()).resolves.toBeUndefined()
+		expect(exit.gate.is_open).toBe(true)
+	})
+})
+
+describe('run_board_exit_rain.gated — the board silenced once the wipe begins', () => {
+	it('keeps the typing trill off once the gate shuts', () => {
+		const heard: Array<boolean> = []
+		const { ports } = harness(undefined, [plan_titled('Matrix')])
+		const typing_sound = {
+			set: (is_on: boolean) => {
+				heard.push(is_on)
+			},
+			stop: () => undefined,
+		}
+
+		gated({ ...ports, typing_sound }, { is_open: false }).typing_sound?.set(true)
+		expect(heard).toEqual([false])
+	})
+})
+
 describe('run_board_live.watch — Ctrl-C wipes the matrix board before it leaves', () => {
 	beforeEach(() => {
 		vi.stubEnv('FORCE_COLOR', FULL_COLOR)
@@ -227,6 +252,29 @@ describe('run_board_live.watch — what ends the matrix wipe early', () => {
 			expect(interrupts).toHaveLength(1)
 		})
 		expect(frames.at(-1)).toContain(SCREEN.leave)
+	})
+
+	it('leaves at once when Ctrl-C is pressed again during the rain', async () => {
+		const { frames, pace, interrupts, type } = live_board('matrix')
+
+		await opened(frames)
+		pace.sleep = never
+		type(CTRL_C)
+		type(CTRL_C)
+		await vi.waitFor(() => {
+			expect(interrupts).toHaveLength(1)
+		})
+		expect(frames.at(-1)).toContain(SCREEN.leave)
+	})
+})
+
+describe('run_board_live.watch — a signal during the matrix wipe', () => {
+	beforeEach(() => {
+		vi.stubEnv('FORCE_COLOR', FULL_COLOR)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
 	})
 
 	it('puts the terminal back at once when a signal exits during the rain', async () => {

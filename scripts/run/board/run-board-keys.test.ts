@@ -136,6 +136,25 @@ describe('run_board_keys.read_keys intercept', () => {
 	})
 })
 
+// joshuafolkken/kit#8355: the reveal released under the exit wipe leaves keys with the wipe.
+describe('run_board_keys.read_keys intercept release', () => {
+	it('leaves keys going to a later taker when an earlier intercept is released', () => {
+		const keys = fake_keys()
+		const taken: Array<string> = []
+		const reading = read_keys(keys.input)
+		const release_first = reading.intercept?.(() => {
+			taken.push('first')
+		})
+
+		reading.intercept?.(() => {
+			taken.push('second')
+		})
+		release_first?.()
+		keys.type('q')
+		expect([taken, reading.folded?.().size]).toStrictEqual([['second'], 0])
+	})
+})
+
 // joshuafolkken/kit#7953: `s` flips the sound, saving each flip; switching it on plays launch once, and
 // while it is off the board's cue plays nothing.
 interface SoundRig {

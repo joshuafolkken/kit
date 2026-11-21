@@ -2,6 +2,6 @@
 	"reason": "New matrix exit-wipe effect (#8355): exit-rain module and its wiring in the live loop",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 120
+		"scripts.code_lines": 130
 	}
 }

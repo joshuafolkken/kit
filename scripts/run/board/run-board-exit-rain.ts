@@ -3,6 +3,7 @@ import type { KeyInput, KeyReading } from './run-board-keys'
 import { run_board_rain, type RainCell, type Random } from './run-board-rain'
 import type { Beat } from './run-board-reveal-blocks'
 import { run_board_reveal_rain } from './run-board-reveal-rain'
+import type { TypingSound } from './run-board-sound-typing'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 
@@ -88,13 +89,25 @@ function shut(write: Write, gate: Gate): Write {
 	}
 }
 
-// The board's ports with their writes dropped once the wipe begins, so no redraw lands over it.
+// The trill silenced once the wipe begins: the spinner's next turn sets it off, rows no longer drawn.
+function hushed(sound: TypingSound, gate: Gate): TypingSound {
+	return {
+		set: (is_on, left_ms) => {
+			sound.set(is_on && gate.is_open, left_ms)
+		},
+		stop: sound.stop,
+	}
+}
+
+// The board's ports with their writes dropped and their trill silenced once the wipe begins, so no
+// redraw lands over it.
 function gated(ports: BoardPorts, gate: Gate): BoardPorts {
-	const { write_drawn } = ports
+	const { write_drawn, typing_sound } = ports
 
 	return {
 		...ports,
 		write: shut(ports.write, gate),
+		...(typing_sound !== undefined && { typing_sound: hushed(typing_sound, gate) }),
 		...(write_drawn !== undefined && { write_drawn: shut(write_drawn, gate) }),
 	}
 }
