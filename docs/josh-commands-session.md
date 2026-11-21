@@ -292,6 +292,13 @@ A session-kind row also gives each period's session count and cost per session, 
 
 Under the cost per merge, `lane-child density` gives the lane children's tool calls per request and their share of single-call requests, beside the period before.
 
+`Reviewer runs by trigger` (`tools/cost-audit/cost-audit-review-trigger.ts`) gives the `reviewer` and `reviewer-verification` units' cost, runs and cost per merge by why each was started, beside the period before; every row shows, a zero one included:
+
+- a prompt's `trigger: <word>` line places the run under that word (`scripts/review/review-prompt-level.ts`);
+- a run without one is placed by its prompt — the interaction brief's path under `interaction`, the paired review's wording under `paired`, a `reviewer-verification` unit under `round-2`, else `initial` — and a second run of the same pass in the same Issue under `retry (unknown cause)`;
+- a run outside a lane checkout is `unknown`, and every run of an Issue the lane ledger records no merge of is `unmerged`, whatever its trigger;
+- when the ledger cannot be read, the `unmerged` row is left out and a line says so.
+
 Before the closing line, `Lane children by phase` gives the lane children's cost and four token kinds for the current period by the stage `lane_breakdown` places each request in, the implementation split into read, edit, check and review-fix; it is not marked for regressions.
 
 `Lane subagents by agent type` follows in the same shape, keyed by the `agentType` of each unit's `agent-<id>.meta.json`, a unit without one under its kind.

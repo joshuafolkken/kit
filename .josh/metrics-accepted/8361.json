@@ -1,0 +1,7 @@
+{
+	"reason": "New reviewer-by-trigger table in cost:audit: one classification module (#8361)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 144
+	}
+}
