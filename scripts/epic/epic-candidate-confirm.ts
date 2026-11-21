@@ -104,7 +104,7 @@ function is_still_runnable(
 	const key = epic_graph.key_of(child)
 
 	return epic_classify
-		.classify_children(children, context.resolve, context.running)
+		.classify_children(children, { resolve: context.resolve, running: context.running })
 		.runnable.some((candidate) => epic_graph.key_of(candidate) === key)
 }
 
@@ -244,7 +244,10 @@ function withheld_verdict(
 	context: ConfirmContext,
 ): EpicVerdict {
 	return epic_report.decide_verdict(
-		epic_classify.classify_children(children, context.resolve, context.running),
+		epic_classify.classify_children(children, {
+			resolve: context.resolve,
+			running: context.running,
+		}),
 		NO_ANOMALIES,
 	)
 }
