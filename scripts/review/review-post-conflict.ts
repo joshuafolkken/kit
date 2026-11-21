@@ -31,7 +31,7 @@ async function is_post_conflict(issue: number): Promise<boolean> {
 		const resolved = await lane_resolve.resolutions(String(issue))
 		const since = last_round_one(await ledger_entries(), issue)
 
-		return (resolved ?? []).some((comment) => Date.parse(comment.created_at) > since)
+		return resolved?.some((comment) => Date.parse(comment.created_at) > since) === true
 	} catch {
 		return false
 	}

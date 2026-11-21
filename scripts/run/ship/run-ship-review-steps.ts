@@ -240,9 +240,10 @@ function round_one_provider(
 	return reviewed_together(round_one_opens(slots, unpinned_ok), prompt_of, issue, ROUND_ONE)
 }
 
-// The provider step: the round's own cause — a resolved conflict or a stale record — names its
-// launches, else the retry the checkpoint reruns the step under, if any (joshuafolkken/kit#8492,
-// joshuafolkken/kit#8494).
+// The provider step: a rerun the checkpoint drives names its retry; the first launch names the round's
+// own cause — a resolved conflict or a stale record — if any. The ledger's round-one record lands only
+// once the round ends, so a relaunch still reads as post-conflict and the retry must win
+// (joshuafolkken/kit#8492, joshuafolkken/kit#8494).
 function round_one_phase(
 	issue: string,
 	slots: ReadonlyArray<ReviewSlot>,
@@ -250,7 +251,7 @@ function round_one_phase(
 	cause: RetryTrigger | undefined,
 ): RetryPhase {
 	return async (retry) =>
-		await run_phases(round_one_provider(issue, slots, unpinned_ok, cause ?? retry))
+		await run_phases(round_one_provider(issue, slots, unpinned_ok, retry ?? cause))
 }
 
 // A recorded round 1 attested on this branch, its tree held or moved only where round 2 reads: the

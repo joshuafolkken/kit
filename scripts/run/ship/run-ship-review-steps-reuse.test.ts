@@ -76,6 +76,7 @@ const HIGH = 'bug-risks:high:a.ts:4'
 const UNSETTLED = 'unsettled'
 const MEDIUM = 'bug-risks:medium:a.ts:7'
 const LOW = 'tests:low:a.ts'
+const RESOLVED = [{ created_at: '2026-11-02T00:00:00Z', body: '## Lane conflict resolved' }]
 
 type JoshRun = (argv: ReadonlyArray<string>) => Promise<{ code: number; out: string }>
 
@@ -193,8 +194,6 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 // joshuafolkken/kit#8379: the rerun of a stale issue says so on its launch prompt; joshuafolkken/kit#8494:
 // so does the round after a conflict resolution, over the stale rerun.
 describe('run_ship_review_steps.review_stage — the launch trigger of round 1', () => {
-	const RESOLVED = [{ created_at: '2026-11-02T00:00:00Z', body: '## Lane conflict resolved' }]
-
 	it.each([
 		[true, [], review_prompt_level.RETRY.STALE],
 		[false, [], 'initial'],
@@ -213,13 +212,16 @@ describe('run_ship_review_steps.review_stage — the launch trigger of round 1',
 })
 
 // joshuafolkken/kit#8492: a provider the checkpoint reruns on a missing or mismatched attestation says
-// so on its launch prompt; one it runs with no retry keeps the first launch's trigger.
+// so on its launch prompt; one it runs with no retry keeps the first launch's trigger. A relaunch after
+// a conflict resolution stays an attestation rerun (joshuafolkken/kit#8494).
 describe('run_ship_review_steps.review_stage — an attestation rerun of round 1', () => {
 	it.each([
-		[review_prompt_level.RETRY.ATTEST, review_prompt_level.RETRY.ATTEST],
-		[undefined, 'initial'],
-	])('names the launch trigger when the checkpoint passes %s', async (retry, trigger) => {
+		[review_prompt_level.RETRY.ATTEST, [], review_prompt_level.RETRY.ATTEST],
+		[review_prompt_level.RETRY.ATTEST, RESOLVED, review_prompt_level.RETRY.ATTEST],
+		[undefined, [], 'initial'],
+	])('names the launch trigger when the checkpoint passes %s', async (retry, resolved, trigger) => {
 		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		resolutions_mock.mockResolvedValueOnce(resolved)
 		vi.spyOn(run_ship_review_checkpoint, 'run').mockImplementationOnce(
 			async (_issue, _stage, phases) => {
 				const [, provider] = phases.find(([name]) => name === 'provider') ?? []

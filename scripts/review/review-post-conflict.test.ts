@@ -49,7 +49,15 @@ describe('review_post_conflict.is_post_conflict', () => {
 	})
 
 	it('counts any resolution when the Issue has no round-one record', async () => {
-		read_entries.mockReturnValue([round_one(OTHER_ISSUE)])
+		const round_two: LedgerEntry = {
+			kind: 'round-two',
+			at: AFTER,
+			issue: ISSUE,
+			verdict: 'skip',
+			code: 'held',
+		}
+
+		read_entries.mockReturnValue([round_one(OTHER_ISSUE), round_two])
 		resolutions.mockResolvedValue([resolution(BEFORE)])
 		expect(await review_post_conflict.is_post_conflict(ISSUE)).toBe(true)
 	})
