@@ -87,6 +87,8 @@ Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in eve
 
 **Output / exit codes:** `lane:open` prints its directory on stdout, reasons on stderr; refusal exits non-zero with empty stdout. Seats `1..9` (main: 0) are claimed atomically. Install or `josh.lane.setup` failure fails; warming is best-effort. `lane:list`: one row per lane — issue, seat, ports, branch, state, directory, output path, profile.
 
+`lane:limit`: when port seats block a launch, its status line appends `seats 9/9 held by` and the issues holding seats.
+
 **`in-progress` / lane:** `lane:list` reports label/lane mismatches on stderr without changing labels.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune` in detail".

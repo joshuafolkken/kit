@@ -1,5 +1,6 @@
 import { styleText } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
+import type { LaneAnswer } from '#scripts/lane/lane-capacity'
 import type { RunActivity } from './run-board-activity'
 import { run_board_estimate } from './run-board-estimate'
 import { run_board_faint } from './run-board-faint'
@@ -122,6 +123,7 @@ interface BoardHeader
 	lane_limit?: number | undefined
 	// The slots occupied according to the same capacity read that supplies the limit.
 	occupied_count?: number | undefined
+	lane_capacity?: LaneAnswer | undefined
 	// What explains the seats no lane holds (`run-board-seat.ts`).
 	seats?: SeatRead | undefined
 	// What each done row says after its time (`run-board-found.ts`); none where nothing was read.
@@ -330,6 +332,7 @@ function now_line(counts: BoardCounts, header: BoardHeader): NowLine | undefined
 		now_ms: header.now_ms,
 		ended_ms: header.ended_ms,
 		activity: header.activity,
+		lane_capacity: header.lane_capacity,
 		operations: header.operations,
 		children: running_issues(layout_of(header)),
 		running: counts.running,

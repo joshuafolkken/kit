@@ -263,7 +263,10 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 		run_board_strip.write_strips(striped, ports, at_ms, turned.since?.ms)
 		run_board_trace_spot.write_traces(traces_of(turning), ports, at_ms, turned.since?.ms)
 	})
-	ports.typing_sound?.set(run_board_type_rows.is_typing(turning.typing, at_ms))
+	ports.typing_sound?.set(
+		run_board_type_rows.is_typing(turning.typing, at_ms),
+		run_board_type_rows.left_ms(turning.typing, at_ms),
+	)
 }
 
 function moment_of(turning: Turning, at_ms: number): Moment {
