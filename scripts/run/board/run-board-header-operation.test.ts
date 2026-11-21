@@ -87,6 +87,39 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 	})
 })
 
+// joshuafolkken/kit#8482: the root checkout's single run beside the lanes weighs in with their newest.
+describe('run_board_header.header_lines with a root checkout’s single run', () => {
+	const ROOT_ISSUE = 12
+
+	function root_layout(state: BoardRow['state']): BoardLayout {
+		return { ...LAYOUT, root: { name: 'fullrun', row: row(ROOT_ISSUE, state) } }
+	}
+
+	function with_root(age_ms: number): SessionOperations {
+		const operation = { kind: 'Read', target: 'run-hold.ts', at_ms: NOW - age_ms } as const
+
+		return { ...OPERATIONS, lanes: [...OPERATIONS.lanes, { issue: ROOT_ISSUE, operation }] }
+	}
+
+	it('writes the running single run’s operation where it is newer than the lanes’', () => {
+		const third = third_of({ layout: root_layout('running'), operations: with_root(2 * SECOND) })
+
+		expect(third).toBe(`${NAME_BLANK}           2″  🔧 #12 · Read run-hold.ts`)
+	})
+
+	it('keeps the lane’s operation where the single run’s is older', () => {
+		const third = third_of({ layout: root_layout('running'), operations: with_root(MINUTE) })
+
+		expect(third).toBe(STILL_LINE)
+	})
+
+	it('reads no operation of a single run not drawn as running', () => {
+		const third = third_of({ layout: root_layout('stopped'), operations: with_root(SECOND) })
+
+		expect(third).toBe(STILL_LINE)
+	})
+})
+
 // joshuafolkken/kit#8103: where the board types rows, the third line's words carry a key of their own.
 describe('run_board_header — the third line’s key', () => {
 	const GATE_KEY = 'now:#7 · Bash pnpm josh gate'

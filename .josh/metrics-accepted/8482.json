@@ -1,0 +1,7 @@
+{
+	"reason": "Root single runs' operations join the run:board header's newest: the hold records its transcript and the board reads it as one more operation source (#8482)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 26
+	}
+}
