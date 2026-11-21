@@ -1,7 +1,0 @@
-{
-	"reason": "touched test:related adds the read map's listers of a directory whose entries changed (#8275): listing_keys/listing_readers_of and the added/removed-file filter",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 39
-	}
-}

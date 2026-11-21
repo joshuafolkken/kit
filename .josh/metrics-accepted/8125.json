@@ -1,7 +1,0 @@
-{
-	"reason": "Synchronized output wrap and per-line overwrite for run:board frames (#8125), within the planned ~20-line estimate",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}

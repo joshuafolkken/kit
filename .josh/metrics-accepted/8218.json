@@ -1,7 +1,0 @@
-{
-	"reason": "run:board --timing gains the plan-read step, gh-count, screen-enter and code-load phases the issue asks for (#8218)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 73
-	}
-}

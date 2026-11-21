@@ -1,9 +1,0 @@
-{
-	"reason": "#7882 adds the branch-arm probe to test:pinned (new scripts/test/test-pinned-branches.ts) and a rubric line naming what test:pinned now checks",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 145,
-		"rules.lines": 2,
-		"ai_cost.on_demand_bytes": 166
-	}
-}

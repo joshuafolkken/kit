@@ -1,7 +1,0 @@
-{
-	"reason": "#8383 adds the merged-issue set cost:audit reads off the lane ledger (new feature, +15 code lines)",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "prose.long_paragraphs +28: translating docs/backlog-measurement.md to English turns dense Japanese paragraphs into English ones past the 400-character threshold without changing meaning; scripts.code_lines +4: the docs-wide language test and link-target quoting in ai-document-fixture.ts",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 4,
-		"prose.long_paragraphs": 28
-	}
-}

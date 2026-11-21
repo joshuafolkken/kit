@@ -1,7 +1,0 @@
-{
-	"reason": "Sliding-window pruning for the live board's incremental ledger read (#8206)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

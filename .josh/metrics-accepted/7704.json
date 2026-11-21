@@ -1,7 +1,0 @@
-{
-	"reason": "Japanese yield-cap Next line names both resume commands from run_stalled.resume_of instead of embedding the English next_step clause (review i18n finding)",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

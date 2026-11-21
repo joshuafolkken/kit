@@ -1,8 +1,0 @@
-{
-	"reason": "the refusal guard (+17 code lines) and the backlogrun-steps pointer to the new provenance paragraph (+76 on-demand bytes) are the fix itself (#7856)",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 17,
-		"ai_cost.on_demand_bytes": 76
-	}
-}
