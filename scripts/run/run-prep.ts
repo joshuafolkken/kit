@@ -100,7 +100,8 @@ function summary(parts: PrepParts): string {
 function state_body(parts: PrepParts): string {
 	const state =
 		parts.state === undefined ? parts.state_failure : issue_state.format_issue_state(parts.state)
-	const post_merge_check = parts.post_merge_check ?? `${issue_post_merge_check.LABEL}${UNKNOWN}`
+	const post_merge_check =
+		parts.post_merge_check ?? `${issue_post_merge_check.LABEL}${issue_post_merge_check.UNKNOWN}`
 
 	return `${state}\n${post_merge_check}`
 }

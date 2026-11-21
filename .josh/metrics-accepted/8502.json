@@ -2,10 +2,10 @@
 	"reason": "#8502 adds the post_merge_check reader and run:prep line, the /verify-ui branch on it, and one pointer clause in CLAUDE.md and both issue templates",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 30,
+		"scripts.code_lines": 47,
 		"rules.lines": 2,
 		"ai_cost.resident_bytes": 39,
-		"ai_cost.on_demand_bytes": 840,
+		"ai_cost.on_demand_bytes": 847,
 		"prose.long_paragraphs": 2,
 		"prose.excess_bold": 2
 	}
