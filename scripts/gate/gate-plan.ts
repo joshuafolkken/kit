@@ -322,15 +322,20 @@ function plan_of(
 	return { checks, concurrency, unit_worker_cap }
 }
 
-//
+interface PlanOptions {
+	available_cores?: number | undefined
+	concurrent_runs?: number | undefined
+	selection?: CheckSelection | undefined
+}
+
 // **The worker cap follows the checks rather than the machine.** A plan with no unit step has no
 // unit suite to size, so it carries no cap — leaving one on would print a worker count for a check
 // this run never starts.
-function resolve_gate_plan(
-	available_cores: number = availableParallelism(),
-	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
-	selection: CheckSelection = {},
-): GatePlan {
+function resolve_gate_plan({
+	available_cores = availableParallelism(),
+	concurrent_runs = unit_worker_share.SOLO_RUNS,
+	selection = {},
+}: PlanOptions = {}): GatePlan {
 	const checks = selected_checks(selection)
 
 	return {

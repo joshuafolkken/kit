@@ -187,9 +187,10 @@ function announce_gate_plan(
 		unit_worker_share.live_lane_count(),
 	)
 	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
-	const resolved = gate_plan.resolve_gate_plan(available_cores, concurrent_runs, {
-		...selection,
-		is_kit_repository,
+	const resolved = gate_plan.resolve_gate_plan({
+		available_cores,
+		concurrent_runs,
+		selection: { ...selection, is_kit_repository },
 	})
 	const plan = {
 		...resolved,
@@ -361,7 +362,7 @@ async function run_checked_gate(
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run.
 	async function run_and_settle(): Promise<number> {
-		const fixed = await gate_run_steps.run_gate_steps(plan, budget, reused)
+		const fixed = await gate_run_steps.run_gate_steps(plan, { budget, reused })
 		const records = check_records_of(plan, options)
 		const project = await project_gate_steps.run_for(options, { tree, records }, budget)
 		const results = [...fixed, ...project]
