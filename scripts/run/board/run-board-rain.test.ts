@@ -79,7 +79,7 @@ describe('run_board_rain cells', () => {
 		const head = { at: 8.4, speed: SLOW }
 		const column = Array.from({ length: 10 }, (_row, y) => cell_of(head, { x: 0, y }, () => HALF))
 
-		expect(GLYPHS.join('')).toBe(DEMO_GLYPHS)
+		expect(GLYPHS).toBe(DEMO_GLYPHS)
 		expect(
 			FADE.map((paint) => (typeof paint === 'object' && 'rgb' in paint ? paint.rgb : paint)),
 		).toEqual(DEMO_FADE)

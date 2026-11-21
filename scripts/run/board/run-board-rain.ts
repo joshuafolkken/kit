@@ -4,9 +4,10 @@ import type { Paint } from './run-board-labels'
 // joshuafolkken/kit#8442: the matrix board's code rain, one part every rain effect draws through — the
 // first frame's reveal (joshuafolkken/kit#8519), the idle rain and the exit wipe. Each column of the
 // screen has a head falling at its own speed from its own start; a cell at the head is a fresh white-green
-// glyph, the seven cells above it fade through the trace greens, and the cells above those the rain has
-// passed (`ahead` / `behind`). What a passed or a not-yet-reached cell shows is the caller's: a reveal
-// leaves its frame behind the rain, a wipe leaves blanks. The random source is injected, so a test pins every glyph and speed.
+// glyph, the seven cells above it fade through the trace greens; the cells above those the rain has
+// passed (`behind`), and the cells below the head it has not reached (`ahead`). What those show is the
+// caller's: a reveal leaves its frame behind the rain, a wipe leaves blanks. The random source is
+// injected, so a test pins every glyph and speed.
 
 type Random = () => number
 
@@ -36,17 +37,15 @@ interface Size {
 }
 
 const RAIN_MS = 45
-// A column starts up to this many rows above the screen, and falls at least `least` rows a frame and
-// up to `spread` more.
+// A column's head starts on the top row or up to one fewer than this many rows above it, and falls
+// at least `least` rows a frame and up to `spread` more.
 const START_ROWS = 24
 const SPEED = { least: 0.55, spread: 0.75 }
 // The odds a tail cell rerolls its glyph on a frame, else it keeps the glyph its place settles on.
 const REROLL = 0.08
 const SETTLE = { x: 31, y: 17 }
-const GLYPHS: ReadonlyArray<string> = Array.from(
-	new Intl.Segmenter().segment('ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789Z:.=*+<>'),
-	(part) => part.segment,
-)
+// Half-width katakana, digits and signs, each one UTF-16 unit and one terminal column.
+const GLYPHS = 'ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789Z:.=*+<>'
 const { SHADES } = run_board_header_trace
 // The tail's paint by its distance above the head, nearest first.
 const FADE: ReadonlyArray<Paint> = [
@@ -64,7 +63,7 @@ function pick(limit: number, random: Random): number {
 }
 
 function glyph_at(index: number): string {
-	return GLYPHS[index % GLYPHS.length] ?? ' '
+	return GLYPHS.charAt(index % GLYPHS.length)
 }
 
 function fresh(random: Random): string {
