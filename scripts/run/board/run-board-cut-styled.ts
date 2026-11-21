@@ -83,7 +83,42 @@ function tail_styled(line: string, columns: number): string {
 	return `${kept.join('')}${RESET}`
 }
 
-const run_board_cut_styled = { LINK_CLOSE, RESET, cut_styled, pieces_of, tail_styled }
+// A drawn line's character with the color escapes that hold at it (joshuafolkken/kit#8367).
+interface StyledPiece extends Piece {
+	style: string
+}
+
+const SGR_START = `${ESC}[`
+
+// The color escapes holding after `escape`: a reset clears them, a link's escape leaves them.
+function style_after(style: string, escape: string): string {
+	if (!escape.startsWith(SGR_START)) return style
+
+	return escape === RESET || escape === `${SGR_START}m` ? '' : `${style}${escape}`
+}
+
+// The line's characters, each with the color escapes written since the last reset before it — the
+// same split `cut_styled` cuts by.
+function styled_pieces(line: string): Array<StyledPiece> {
+	let style = ''
+	const styled: Array<StyledPiece> = []
+
+	for (const piece of pieces_of(line)) {
+		if (piece.text.startsWith(ESC)) style = style_after(style, piece.text)
+		else styled.push({ ...piece, style })
+	}
+
+	return styled
+}
+
+const run_board_cut_styled = {
+	LINK_CLOSE,
+	RESET,
+	cut_styled,
+	pieces_of,
+	styled_pieces,
+	tail_styled,
+}
 
 export { run_board_cut_styled }
-export type { Piece }
+export type { Piece, StyledPiece }

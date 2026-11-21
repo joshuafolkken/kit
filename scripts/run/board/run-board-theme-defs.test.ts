@@ -19,6 +19,7 @@ const PHOSPHOR_RGB = '62;236;225'
 const IDLE_RGB = '31;118;113'
 const OFF_LIVE: LiveDefinition = {
 	sweep: false,
+	drop: false,
 	types_rows: false,
 	trill: false,
 	codes: false,
@@ -27,13 +28,15 @@ const OFF_LIVE: LiveDefinition = {
 	rain: false,
 }
 // joshuafolkken/kit#8356: the matrix board's new rows decode and its panel's cells run the idle rain;
-// its typing sounds the key click (joshuafolkken/kit#8365).
+// its typing sounds the key click (joshuafolkken/kit#8365); a drop falls down it every second in place
+// of the sweep (joshuafolkken/kit#8367).
 const MATRIX_LIVE: LiveDefinition = {
 	...OFF_LIVE,
 	types_rows: true,
 	trill: true,
 	decode: true,
 	rain: true,
+	drop: true,
 }
 const AMBER: ThemeDefinition = {
 	paint: { rgb: '255;176;0', named: 'yellow' },

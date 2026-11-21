@@ -32,9 +32,11 @@ interface IntroDefinition {
 // above each rule by typing progress where the rules run code (`run-board-strip.ts`; joshuafolkken/kit#8376)
 // — off in every theme for now, kept to switch back on (joshuafolkken/kit#8398) — and whether each row
 // decodes from code rather than types (`run-board-decode.ts`) and the lamp panel's cells run the idle rain
-// rather than blink (`run-board-idle-rain.ts`; joshuafolkken/kit#8356).
+// rather than blink (`run-board-idle-rain.ts`; joshuafolkken/kit#8356), and whether a drop falls down the
+// whole board every second in place of the sweep (`run-board-rain-drop.ts`; joshuafolkken/kit#8367).
 interface LiveDefinition {
 	sweep: boolean
+	drop: boolean
 	types_rows: boolean
 	trill: boolean
 	codes: boolean
@@ -80,6 +82,7 @@ const THEME_DEFS = {
 		spinner: '│╱─╲',
 		live: {
 			sweep: true,
+			drop: false,
 			types_rows: true,
 			trill: true,
 			codes: true,
@@ -112,6 +115,7 @@ const THEME_DEFS = {
 		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 		live: {
 			sweep: false,
+			drop: true,
 			types_rows: true,
 			trill: true,
 			codes: false,
@@ -145,6 +149,7 @@ type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
 
 const NO_LIVE: LiveDefinition = {
 	sweep: false,
+	drop: false,
 	types_rows: false,
 	trill: false,
 	codes: false,

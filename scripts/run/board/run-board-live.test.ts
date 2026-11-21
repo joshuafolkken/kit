@@ -19,6 +19,7 @@ const NO_LIVE = {
 	strip: false,
 	decode: false,
 	rain: false,
+	drop: false,
 }
 const ESCAPE = '\u{1B}'
 const DIM_RULE = new RegExp(`${ESCAPE}\\[2m─+${ESCAPE}\\[22m`, 'u')
@@ -46,13 +47,15 @@ describe('run_board_live.live_of', () => {
 	})
 
 	// joshuafolkken/kit#8356: the matrix board's rows decode and its lamp panel runs the idle rain.
-	it('reads the decoded rows and the idle rain from the matrix definition', () => {
+	// joshuafolkken/kit#8367: a raindrop falls down the whole matrix board in place of the sweep.
+	it('reads the decoded rows, the idle rain and the board drop from the matrix definition', () => {
 		expect(run_board_live.live_of('matrix')).toStrictEqual({
 			...NO_LIVE,
 			types_rows: true,
 			trill: true,
 			decode: true,
 			rain: true,
+			drop: true,
 		})
 	})
 

@@ -2,6 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { RuleCell } from './run-board-codes'
 import type { BoardDisplay } from './run-board-display'
+import type { DropScreen } from './run-board-drop-screen'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameStore } from './run-board-frame-store'
@@ -164,6 +165,8 @@ interface BoardView {
 	lamps?: ReadonlyArray<Lamp> | undefined
 	// Whether those cells run the idle rain in place of the lamps (`run-board-idle-rain.ts`).
 	is_rain?: boolean | undefined
+	// The last frame's cells on screen where a drop falls down it between redraws (`run-board-rain-drop.ts`).
+	drop?: DropScreen | undefined
 	// Where the last frame drew its worst-level TRACE field, blinked between redraws (`run-board-trace-spot.ts`).
 	traces?: ReadonlyArray<Spot> | undefined
 	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).
