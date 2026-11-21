@@ -93,7 +93,7 @@ beforeEach(() => {
 
 describe('epic_fetch.fetch_children — read through GraphQL', () => {
 	it('reads two hundred children in two queries and no REST read', async () => {
-		const fetched = await epic_fetch.fetch_children(numbers_to(CHILD_COUNT), REPO, REPO)
+		const fetched = await epic_fetch.fetch_children(numbers_to(CHILD_COUNT), REPO, { scope: REPO })
 
 		expect(fetched.children).toHaveLength(CHILD_COUNT)
 		expect(mocked_api).toHaveBeenCalledTimes(QUERY_COUNT)
@@ -101,17 +101,17 @@ describe('epic_fetch.fetch_children — read through GraphQL', () => {
 	})
 
 	it('answers what the REST read answers', async () => {
-		const graphql = await epic_fetch.fetch_children(numbers_to(CHILD_COUNT), REPO, REPO)
+		const graphql = await epic_fetch.fetch_children(numbers_to(CHILD_COUNT), REPO, { scope: REPO })
 
 		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
-		const rest = await epic_fetch.fetch_children(numbers_to(CHILD_COUNT), REPO, REPO)
+		const rest = await epic_fetch.fetch_children(numbers_to(CHILD_COUNT), REPO, { scope: REPO })
 
 		expect(graphql).toEqual(rest)
 	})
 
 	it('reads a child the query left unanswered through REST', async () => {
 		mocked_api.mockRejectedValue(new Error('timeout'))
-		const fetched = await epic_fetch.fetch_children([2, 3], REPO, REPO)
+		const fetched = await epic_fetch.fetch_children([2, 3], REPO, { scope: REPO })
 
 		expect(fetched.children.map((child) => child.number)).toEqual([2, 3])
 		expect(git_gh_command[GET_CHILD]).toHaveBeenCalledTimes(2)
@@ -121,7 +121,7 @@ describe('epic_fetch.fetch_children — read through GraphQL', () => {
 describe('epic_fetch.fetch_children — a session on REST', () => {
 	it('sends no query and reads every child through REST', async () => {
 		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
-		await epic_fetch.fetch_children([2, 3], REPO, REPO)
+		await epic_fetch.fetch_children([2, 3], REPO, { scope: REPO })
 
 		expect(mocked_api).not.toHaveBeenCalled()
 		expect(git_gh_command[GET_CHILD]).toHaveBeenCalledTimes(2)

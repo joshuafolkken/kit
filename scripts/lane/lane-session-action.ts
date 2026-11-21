@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { agent_argv } from '#scripts/agent/agent-argv'
+import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import type { AgentProvider } from '#scripts/agent/agent-provider'
 import { api_auth } from '#scripts/agent/api-auth'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { core_priority } from '#scripts/gate/core-priority'
 import { distributed_paths } from '#scripts/init/distributed-paths'
 import { outer_command } from '#scripts/josh/outer-command'
@@ -164,14 +165,20 @@ function reviewer_environment(lane: LaneInfo): LaunchEnvironment {
 	}
 }
 
+function reviewer_argv(lane: LaneInfo, action: ReviewAction, slot: ReviewSlot): AgentArgvResult {
+	const prompt = review_prompt(lane, action, slot)
+	const environment = backlogrun_launch.chosen_environment(provider_of(lane))
+
+	return agent_argv.review_in(prompt, Number(action.round), lane.directory, environment)
+}
+
 async function launch_review(
 	lane: LaneInfo,
 	action: ReviewAction,
 	slot: ReviewSlot,
 ): Promise<BrokerAnswer> {
 	const target = review_paths(lane.directory, slot)
-	const prompt = review_prompt(lane, action, slot)
-	const built = agent_argv.review_in(prompt, Number(action.round), lane.directory)
+	const built = reviewer_argv(lane, action, slot)
 	if (built.kind === 'rejected') return failure(`the reviewer profile was rejected: ${built.note}`)
 
 	if (built.profile.provider !== provider_of(lane)) {
