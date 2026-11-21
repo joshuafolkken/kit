@@ -83,6 +83,7 @@ function tail_styled(line: string, columns: number): string {
 	return `${kept.join('')}${RESET}`
 }
 
-const run_board_cut_styled = { cut_styled, tail_styled }
+const run_board_cut_styled = { LINK_CLOSE, RESET, cut_styled, pieces_of, tail_styled }
 
 export { run_board_cut_styled }
+export type { Piece }
