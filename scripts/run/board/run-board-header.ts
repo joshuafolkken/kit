@@ -3,7 +3,6 @@ import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { RunActivity } from './run-board-activity'
 import { run_board_estimate } from './run-board-estimate'
 import { run_board_faint } from './run-board-faint'
-import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
 import { run_board_header_defcon } from './run-board-header-defcon'
@@ -304,7 +303,6 @@ function alert_part(header: BoardHeader): string | undefined {
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
-		run_board_first_lane.part(header.activity),
 		loading_part(header),
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
 		alert_part(header),

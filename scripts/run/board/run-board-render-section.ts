@@ -15,6 +15,7 @@ const GAP = '  '
 const { ROW_INDENT } = run_board_fit
 const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
+const TRAILING_RULE = new RegExp(`${RULE}+$`, 'u')
 const RULE_WIDTH = 50
 const OPEN_MARK = '▾'
 const FOLDED_MARK = '▸'
@@ -112,16 +113,27 @@ function keyed(key: SectionKey, sections: ReadonlyArray<PlanSection>): Array<Pla
 	return sections.map((section) => ({ ...section, key, head: counted_head(section) }))
 }
 
+// A rule with `tail` right-aligned at its end: the rule gives up the tail's columns and one blank,
+// keeping at least `RULE_LEAD` before it (joshuafolkken/kit#8474).
+function tailed(rule: string, tail: string | undefined): string {
+	if (tail === undefined) return rule
+
+	const body = rule.replace(TRAILING_RULE, '')
+	const room = rule.length - body.length - run_board_fit.width_of(tail) - 1
+
+	return `${body}${RULE.repeat(Math.max(RULE_LEAD.length, room))} ${tail}`
+}
+
 // A head whose rule runs on to `width`, the column the lane rows' titles end in
-// (joshuafolkken/kit#5520); a head drawn under a blank line alone stays as it is.
-function widened(head: ReadonlyArray<string>, width: number): Array<string> {
+// (joshuafolkken/kit#5520), `tail` at its end; a head drawn under a blank line alone stays as it is.
+function widened(head: ReadonlyArray<string>, width: number, tail?: string): Array<string> {
 	const rule = head.at(-1) ?? ''
 
 	if (rule === '') return [...head]
 
 	const fill = RULE.repeat(Math.max(0, width - run_board_fit.width_of(rule)))
 
-	return [...head.slice(0, -1), `${rule}${fill}`]
+	return [...head.slice(0, -1), tailed(`${rule}${fill}`, tail)]
 }
 
 // Where an open head draws the rule character its ▾ gives up: in the first run of rules longer than
@@ -215,6 +227,7 @@ const run_board_render_section = {
 	open_head,
 	plan_section,
 	row_count,
+	tailed,
 	tight_columns_rule,
 	widened,
 }

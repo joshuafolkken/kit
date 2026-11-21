@@ -2,8 +2,8 @@ import type { RunActivity } from './run-board-activity'
 import { run_board_labels } from './run-board-labels'
 
 // How long the run's newest session took from its start to its first `opening lane` stage
-// (`run_event_setup.first_lane_ms`, joshuafolkken/kit#5519), drawn on the header's first line once that
-// stage is written — the opening began, not finished. Not `🚦`: that is a lane row's stage icon.
+// (`run_event_setup.first_lane_ms`, joshuafolkken/kit#5519), drawn at the right end of the processes rule
+// (joshuafolkken/kit#8474) once that stage is written — the opening began, not finished. Not `🚦`: that is a lane row's stage icon.
 
 const ICON = '🛫'
 const LEGEND = `${ICON} to first lane`
