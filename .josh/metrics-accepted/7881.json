@@ -1,9 +1,0 @@
-{
-	"reason": "prose-stale gains a value/flag detector (prose-stale-values.ts) and one rubric/doc line pointing at it",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 176,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 141
-	}
-}

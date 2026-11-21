@@ -303,7 +303,7 @@ describe('run_board_theme.restyle cache bounds', () => {
 })
 
 describe('run_board_theme.themed', () => {
-	it('puts every write through the theme, and leaves the ports as they are with none', () => {
+	it('puts every write through the theme, keeping plain text with none', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 		const frames: Array<string> = []
 		const ports = {
@@ -313,9 +313,9 @@ describe('run_board_theme.themed', () => {
 		}
 
 		run_board_theme.themed(ports, 'wargames').write('─')
+		run_board_theme.themed(ports, undefined).write('─')
 
-		expect(frames).toStrictEqual(['-'])
-		expect(run_board_theme.themed(ports, undefined)).toBe(ports)
+		expect(frames).toStrictEqual(['-', '─'])
 	})
 
 	// joshuafolkken/kit#8224: the reveal writes a line it drew already, past the theme.

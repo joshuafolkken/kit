@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/run/board/run-board-tick-draw.ts:134 | 2026-11-20 | #8375 | - | other
+- rf:project-conventions | low | scripts/run/board/run-board-codes.ts:129 | 2026-11-20 | #8375 | - | other

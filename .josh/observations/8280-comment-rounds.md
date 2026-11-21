@@ -1,0 +1,4 @@
+- rf:bug-risks | medium | scripts/run/board/run-board-render-section.ts:49 | 2026-11-20 | #8280 | fixed | edge-input
+- rf:comments | low | scripts/run/board/run-board-render-section.ts:108 | 2026-11-20 | #8280 | fixed | stale-comment
+- rf:comments | low | scripts/run/board/run-board-render-throughput.ts:38 | 2026-11-20 | #8280 | fixed | stale-comment
+- rf:none | none | - | 2026-11-20 | #8280

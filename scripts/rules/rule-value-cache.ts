@@ -103,6 +103,12 @@ function start_refresh_default(cwd: string): void {
 
 const DEFAULT_PORTS: CachePorts = { now: Date.now, start_refresh: start_refresh_default }
 
+// Where `emit` reads and refreshes, and the ports it does so through; each defaults to the real one.
+interface EmitPlace {
+	cwd?: string
+	ports?: CachePorts
+}
+
 // A linked work tree — a lane — measures its own transcripts alone, so it never writes the main
 // checkout's reading or its stamp: either would stand in for the whole repository's for an interval.
 function is_linked_work_tree(cwd: string): boolean {
@@ -116,17 +122,20 @@ function refresh_if_due(cwd: string, ports: CachePorts): void {
 	ports.start_refresh(cwd)
 }
 
-// The loop-head call: the last reading to stderr, then a refresh when one is due.
-function emit(cwd: string = process.cwd(), ports: CachePorts = DEFAULT_PORTS): void {
-	const cached = read_cached(cwd)
-
-	if (cached !== undefined) process.stderr.write(cached)
-
+function refresh_quietly(cwd: string, ports: CachePorts): void {
 	try {
 		refresh_if_due(cwd, ports)
 	} catch {
 		// A refresh that could not be recorded or started leaves the last reading in place.
 	}
+}
+
+// The loop-head call: the last reading to stderr, then a refresh when one is due.
+function emit({ cwd = process.cwd(), ports = DEFAULT_PORTS }: EmitPlace = {}): void {
+	const cached = read_cached(cwd)
+
+	if (cached !== undefined) process.stderr.write(cached)
+	refresh_quietly(cwd, ports)
 }
 
 // The detached refresh's body: the reading written whole, so a reader never sees half of one.

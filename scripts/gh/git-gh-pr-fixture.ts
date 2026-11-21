@@ -172,7 +172,7 @@ function gh_api_routes(
 
 // The routes every branch-keyed read needs: the branch lookup and the detail read.
 function pr_routes(
-	pull: Record<string, unknown> = {},
+	pull: Record<string, unknown>,
 	extra: Record<string, GhApiAnswer> = {},
 ): Record<string, GhApiAnswer> {
 	return {

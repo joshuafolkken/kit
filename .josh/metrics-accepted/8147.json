@@ -1,7 +1,0 @@
-{
-	"reason": "Two profiler pieces #8147 asks for: the redraw after a new events array and the frame-record draws",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 36
-	}
-}

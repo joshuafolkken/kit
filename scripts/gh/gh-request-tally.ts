@@ -112,7 +112,7 @@ function count_not_modified(kind: string): void {
 }
 
 // A window that refilled between the readings makes the difference meaningless, so it is none.
-function to_delta(start?: CoreUsage, end?: CoreUsage): number | undefined {
+function to_delta(start: CoreUsage | undefined, end?: CoreUsage): number | undefined {
 	if (start === undefined || start.reset_ms !== end?.reset_ms) return undefined
 
 	return end.used - start.used

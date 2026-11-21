@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/run/board/run-board-rule-width.ts:142 | 2026-11-19 | #8247 | - | stale-comment

@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/lane/lane-plan-size.ts:389 | 2026-11-19 | #8120 | - | stale-comment

@@ -1,7 +1,0 @@
-{
-	"reason": "opening() gathers the theme-gated intro and reveal in run-board-intro.ts (#8029); watch shrinks by the ternary it replaced",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

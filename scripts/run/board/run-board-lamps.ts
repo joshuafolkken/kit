@@ -112,6 +112,16 @@ function lamp_text(row: number, is_on: boolean, text = LAMP_MARK): string {
 	return out_text(text)
 }
 
+// How a lamp outside the panel is lit: in the panel's yellow or red, or out as the panel's are
+// (joshuafolkken/kit#8376).
+type LampLook = 'yellow' | 'red' | 'out'
+
+function look_text(look: LampLook): string {
+	if (look === 'out') return out_text(LAMP_MARK)
+
+	return painted(look === 'red' ? red : yellow, LAMP_MARK)
+}
+
 // Lamps are drawn only where stdout draws color — a `■` with none would never go out.
 function is_colored(): boolean {
 	return painted(shade_of(0), LAMP_MARK) !== LAMP_MARK
@@ -166,10 +176,12 @@ const run_board_lamps = {
 	is_colored,
 	is_lit,
 	lamp_text,
+	look_text,
+	mixed,
 	place_of,
 	start_column,
 	start_of,
 }
 
 export { run_board_lamps }
-export type { PanelSpan }
+export type { LampLook, PanelSpan }

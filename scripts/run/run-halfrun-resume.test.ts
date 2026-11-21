@@ -82,7 +82,7 @@ describe('run_halfrun_resume.mark_stop_at — the stop keeps the run’s start',
 	const STARTED = new Date('2026-11-17T01:00:00.000Z')
 
 	it('keeps the claim’s moment as the start, through a second stop', () => {
-		run_hold.create_hold(TARGET, ISSUE, STARTED)
+		run_hold.create_hold(TARGET, ISSUE, { now: STARTED })
 
 		run_halfrun_resume.mark_stop_at(TARGET, ISSUE)
 		expect(started_at()).toBe(STARTED.toISOString())

@@ -143,7 +143,7 @@ function cap_cause(park: RunEvent): string {
 async function restate(park: RunEvent, text: string): Promise<void> {
 	const { stop } = park
 
-	await run_event_stream_emit.emit(PARK, text, new Date(), { ...(stop && { stop }) })
+	await run_event_stream_emit.emit(PARK, text, { ...(stop && { stop }) })
 }
 
 // The park restated with the cap note and its cause, so the board row hands it to a person.

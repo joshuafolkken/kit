@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/lane/lane-plan-approval.ts:107 | 2026-11-19 | #8119 | - | state-reasoning
+- rf:bug-risks | low | scripts/lane/lane-plan-signals.ts:44 | 2026-11-19 | #8119 | - | naming-callers

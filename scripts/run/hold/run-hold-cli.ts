@@ -95,7 +95,7 @@ function report_hold(): number {
 // A record already here is never overwritten by a claim: overwriting is what the guard exists to
 // prevent, and the person who knows the other run has ended clears it with `run:release --force`.
 function take_free_tree(target: string, request: ClaimRequest): number {
-	const is_taken = run_hold.create_hold(target, request.issue, new Date(), request.mark)
+	const is_taken = run_hold.create_hold(target, request.issue, request.mark)
 
 	if (is_taken) return report_hold()
 

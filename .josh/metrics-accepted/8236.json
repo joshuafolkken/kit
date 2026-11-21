@@ -1,7 +1,0 @@
-{
-	"reason": "New WOPR lamp panel feature (#8236): two new modules and wiring, within the Issue's ~160-line estimate",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 197
-	}
-}

@@ -61,25 +61,69 @@ describe('run_board_header_time.now_text', () => {
 	})
 })
 
-// joshuafolkken/kit#8240: the third line's `″` is drawn as the sweep's placeholder only where the spinner
-// turns — on a terminal, while the run works.
+const THIRD_NOW = { icon: '>', age_ms: 16_000, text: 'WRITE' }
+const OUTAGE_MS = 60_000
+
+// The header's third line, drawn with `spinner` for a run at `mark`.
+function third(
+	spinner: string | undefined,
+	mark: RunMark,
+	overrides: Partial<Parameters<typeof time_parts>[0]> = {},
+): string {
+	return (
+		time_parts(
+			{ ...header_of(undefined, spinner), theme: 'wargames', ...overrides },
+			mark,
+			THIRD_NOW,
+		)[2] ?? ''
+	)
+}
+
+// joshuafolkken/kit#8240, #8404: the third line's `″` is drawn as the sweep's placeholder on a terminal
+// in wargames for a run neither stopped nor ended; the spinner turns only while the run works.
 describe('run_board_header_time.time_parts — the sweep’s placeholder', () => {
-	const NOW = { icon: '>', age_ms: 16_000, text: 'WRITE' }
-
-	function third(spinner: string | undefined, mark: RunMark): string {
-		return time_parts(header_of(undefined, spinner), mark, NOW)[2] ?? ''
-	}
-
 	it('marks the `″` with the placeholder while a running or setting-up run’s spinner turns', () => {
 		expect(third(SPOT, 'running')).toContain(TICK)
 		expect(third(SPOT, 'setup')).toContain(TICK)
+		expect(third(SPOT, 'running')).toContain(SPOT)
 		expect(third(SPOT, 'running')).not.toContain(SECONDS_MARK)
 	})
 
-	it('leaves the `″` as it is with no spinner or a run that has stopped', () => {
+	it('marks the `″` of a watching or waiting run, its spinner column left blank', () => {
+		for (const mark of ['idle', 'human'] as const) {
+			expect(third(SPOT, mark)).toContain(TICK)
+			expect(third(SPOT, mark)).not.toContain(SPOT)
+			expect(third(SPOT, mark)).toMatch(/^ +\d/u)
+		}
+	})
+
+	it('marks the `″` of a waiting run while the network is down', () => {
+		const outage = { from_ms: NOW_MS - OUTAGE_MS, down_ms: NOW_MS }
+		const activity = { last_event_ms: NOW_MS, outage, is_stopped: false }
+
+		expect(third(SPOT, 'idle', { activity })).toContain(TICK)
+	})
+
+	it('leaves the `″` as it is with no spinner, or for a run that has stopped or ended', () => {
 		expect(third(undefined, 'running')).not.toContain(TICK)
+		expect(third(undefined, 'idle')).not.toContain(TICK)
 		expect(third(undefined, 'running')).toContain(SECONDS_MARK)
 		expect(third(SPOT, 'stopped')).not.toContain(TICK)
-		expect(third(SPOT, 'idle')).not.toContain(TICK)
+		expect(third(SPOT, 'idle', { ended_ms: NOW_MS })).not.toContain(TICK)
+		expect(third(SPOT, 'idle', { ended_ms: NOW_MS })).toContain(SECONDS_MARK)
+	})
+})
+
+describe('run_board_header_time.time_parts — frames without a sweep', () => {
+	it.each([undefined, 'matrix'] as const)('leaves the seconds mark in theme %s', (theme) => {
+		for (const mark of ['running', 'setup', 'idle', 'human'] as const) {
+			expect(third(SPOT, mark, { theme })).not.toContain(TICK)
+			expect(third(SPOT, mark, { theme })).toContain(SECONDS_MARK)
+		}
+	})
+
+	it('leaves the seconds mark in once and chat frames in wargames', () => {
+		expect(third(undefined, 'running', { form: 'screen' })).not.toContain(TICK)
+		expect(third(undefined, 'running', { form: 'chat' })).not.toContain(TICK)
 	})
 })

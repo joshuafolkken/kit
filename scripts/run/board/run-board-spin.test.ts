@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
+import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing, type TypingLine } from './run-board-type-rows'
 
@@ -64,7 +65,15 @@ function typing_with(line: Pick<TypingLine, 'key' | 'row' | 'text' | 'start_ms'>
 	return { seen: new Set(), lines: [{ index: line.row - 1, prefix_columns: 0, ...line }] }
 }
 
-const UNMARKED = { lines: ['▶ run'], spots: [], keyed: [], sweep: undefined, lamps: [] }
+const UNMARKED = {
+	lines: ['▶ run'],
+	spots: [],
+	keyed: [],
+	sweep: undefined,
+	lamps: [],
+	rules: [],
+	strips: [],
+}
 
 describe('run_board_spin.spun', () => {
 	it('records the title’s, a running row’s and a loading spinner’s spots by display width', () => {
@@ -156,6 +165,38 @@ describe('run_board_spin.spin_to_second', () => {
 
 		expect(writes).toHaveLength(0)
 		expect(sleeps).toStrictEqual([REDRAW_MS - 300])
+	})
+})
+
+// joshuafolkken/kit#8376: a lamp strip on the blank line above a rule, in the panel's columns.
+const PANEL_LAMPS = Array.from({ length: 8 }, () => run_board_spot.LAMP).join(' ')
+const STRIP_FRAME = [
+	'',
+	`── THROUGHPUT ${'─'.repeat(40)}`,
+	`  24H  ${PANEL_LAMPS}`,
+	`       ${PANEL_LAMPS}`,
+	`── USAGE ${'─'.repeat(40)}`,
+]
+
+describe('run_board_spin — the lamp strips (joshuafolkken/kit#8376)', () => {
+	const drawn = spun(STRIP_FRAME, '⠋', WIDE)
+
+	it('records a strip above the throughput rule only, in the panel’s first row’s columns', () => {
+		const panel = drawn.lamps.filter((lamp) => lamp.panel_row === 0).map((lamp) => lamp.column)
+
+		expect(new Set(drawn.strips.map((cell) => cell.row))).toStrictEqual(new Set([1]))
+		expect(drawn.strips.map((cell) => cell.column)).toStrictEqual(panel)
+	})
+
+	it('writes the strip between redraws while a row types', async () => {
+		const { ports, writes } = spin_ports(START)
+		const typing = typing_with({ key: 'a', row: 3, text: 'x'.repeat(40), start_ms: START })
+
+		await spin_to_second({ ...drawn, typing }, ports)
+
+		const [strip] = drawn.strips
+
+		expect(writes.some(({ text }) => text.includes(`[1;${String(strip?.column)}H`))).toBe(true)
 	})
 })
 
