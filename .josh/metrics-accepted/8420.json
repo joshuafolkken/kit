@@ -1,0 +1,7 @@
+{
+	"reason": "Optional positional arguments are now named options; the net three code lines retain regression tests for omitted options, empty running sets, checkout paths and outside running blockers without disabling rules or changing dependencies.",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

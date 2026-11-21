@@ -154,11 +154,12 @@ function is_order_declared(body: string | undefined, links: ReadonlyArray<unknow
 	return links.length > 0 || epic_parse.has_unordered_declaration(body)
 }
 
-function decide(
-	snapshot: EpicSnapshot,
-	paths: ReadonlyMap<string, string> = new Map(),
-	running?: ReadonlySet<string>,
-): EpicNextResult {
+interface DecideOptions {
+	paths?: ReadonlyMap<string, string>
+	running?: ReadonlySet<string>
+}
+
+function decide(snapshot: EpicSnapshot, options: DecideOptions = {}): EpicNextResult {
 	const links = epic_parse.parse_dependency_links(snapshot.body)
 	const unreadable = body_anomaly(snapshot) ?? unreadable_anomaly(snapshot)
 	const anomalies =
@@ -172,13 +173,12 @@ function decide(
 			: [unreadable]
 	// The cross-repository resolver, not the default one: a blocker in another repository is not
 	// finished when it closes, only when its release is published.
-	const classification = epic_classify.classify_children(
-		snapshot.children,
-		epic_cross_repo.resolve_cross_repo,
-		running,
-	)
+	const classification = epic_classify.classify_children(snapshot.children, {
+		resolve: epic_cross_repo.resolve_cross_repo,
+		running: options.running,
+	})
 
-	return epic_report.build_result(classification, anomalies, paths)
+	return epic_report.build_result(classification, anomalies, options.paths ?? new Map())
 }
 
 // A refusal: the reason on stderr, where every other explanation this command prints goes.
@@ -374,7 +374,7 @@ function views_of(
 		reads.map((read) => ({
 			...read,
 			running: settled,
-			result: decide(read.snapshot, paths, settled),
+			result: decide(read.snapshot, { paths, running: settled }),
 		})),
 	)
 }
