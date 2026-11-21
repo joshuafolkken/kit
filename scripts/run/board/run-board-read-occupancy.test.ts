@@ -14,6 +14,22 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+it('reads seat exhaustion independently of occupied workers', async () => {
+	arrange({ kind: 'carried', carry: CARRY }, undefined)
+	const lanes = Array.from({ length: 9 }, (_, index) => ({
+		...lane(String(index + 1)),
+		seat: index + 1,
+	}))
+
+	vi.mocked(lane_registry.list_lanes).mockResolvedValue(lanes)
+	vi.mocked(lane_spent.idle_lanes).mockReturnValue(lanes.slice(1).map((one) => one.issue))
+
+	await expect(run_board_read.read_local()).resolves.toMatchObject({
+		free_lanes: 0,
+		lane_capacity: { free: 0, bound: 'seats', seated: 9 },
+	})
+})
+
 describe('run_board_read.read_local worker occupancy', () => {
 	it('reads occupied identities beside the count from the same snapshot', async () => {
 		arrange({ kind: 'carried', carry: CARRY }, undefined)
