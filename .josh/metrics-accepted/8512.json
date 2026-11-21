@@ -2,6 +2,6 @@
 	"reason": "the queued rule's tail (queued_tail and its plumbing through keyed and widened_part) moves the spinner and saved-plan age off the header's first line; planned at ~40 lines in #8512",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 7
+		"scripts.code_lines": 8
 	}
 }
