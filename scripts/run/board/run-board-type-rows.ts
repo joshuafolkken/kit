@@ -59,6 +59,12 @@ interface TypingFrame {
 	is_decoding?: boolean | undefined
 }
 
+// A stretch a row types over, `to_ms` the first moment it is typed through.
+interface TypingSpan {
+	from_ms: number
+	to_ms: number
+}
+
 // Where a row starts typing and the saved line it types over, if any.
 type TypingStart = Pick<TypingLine, 'start_ms' | 'under'>
 
@@ -210,10 +216,16 @@ function type_bytes(typing: Typing, now_ms: number): string {
 		.join('')
 }
 
+// Each typing row's span, from its start to the moment it types through: the one source of whether a row
+// types, read by the lamps' burst and the matrix board's pour (joshuafolkken/kit#8369).
+function spans_of(typing: Typing): Array<TypingSpan> {
+	return typing.lines.map((line) => ({ from_ms: line.start_ms, to_ms: typed_at(line) }))
+}
+
 // Whether any row is still typing at `now_ms` — by the clock, since a row typed through stays in
 // `lines` until the next redraw drops it (joshuafolkken/kit#8250).
 function is_typing(typing: Typing, now_ms: number): boolean {
-	return typing.lines.some((line) => !is_typed(line, now_ms))
+	return spans_of(typing).some((span) => now_ms < span.to_ms)
 }
 
 // How long after `now_ms` the last row types through; 0 once none types. The trill stops itself then,
@@ -242,9 +254,10 @@ const run_board_type_rows = {
 	left_ms,
 	next,
 	progress,
+	spans_of,
 	type_bytes,
 	typed_lines,
 }
 
 export { run_board_type_rows }
-export type { KeyedLine, Typing, TypingFrame, TypingLine }
+export type { KeyedLine, Typing, TypingFrame, TypingLine, TypingSpan }
