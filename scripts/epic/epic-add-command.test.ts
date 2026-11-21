@@ -89,6 +89,16 @@ describe('epic_command.run — --add --before / --after need an --order-reason',
 		expect(add_children).not.toHaveBeenCalled()
 	})
 
+	it('refuses a reason naming a chain other than the one --after writes', async () => {
+		const reason = [ORDER_REASON, `${JOIN}: the wrong chain`]
+
+		expect(await epic_command.run(['--add', '893', '894', '--after', '890', ...reason])).toBe(
+			FAILURE,
+		)
+		expect(printed()).toContain('`--before` or `--after` declared')
+		expect(add_children).not.toHaveBeenCalled()
+	})
+
 	it.each([
 		['--after', '890', '#890 -> #894'],
 		['--before', '891', JOIN],
