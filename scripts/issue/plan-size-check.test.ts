@@ -90,6 +90,20 @@ describe('plan_size_check.problem_of — the plan’s estimate is judged by the 
 	})
 })
 
+describe('plan_size_check.problem_of — the lane measurements', () => {
+	it('judges with the lane measurements as the guide’s rates', async () => {
+		const guide_problem = vi.spyOn(size_estimate, 'guide_problem')
+
+		await plan_size_check.problem_of('7', plan_of([WITHIN]))
+
+		expect(guide_problem).toHaveBeenCalledWith(expect.any(String), undefined, {
+			rate: undefined,
+			growth: {},
+		})
+		guide_problem.mockRestore()
+	})
+})
+
 describe('plan_size_check.next_steps — the split assessment’s steps', () => {
 	it('names the question, the split path and the reason to declare', () => {
 		const steps = plan_size_check.next_steps('7')
