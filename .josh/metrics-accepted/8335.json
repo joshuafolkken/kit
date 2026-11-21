@@ -1,7 +1,7 @@
 {
-	"reason": "前回保存した共通の変化判定入力の保持と保存実行結果の返却に必要な6行。判定は既存モジュールを共用する。",
+	"reason": "round-2 の stale-cache 修正として既存の受け渡し判定を共用し、保存フレームの gauges・usages・quotas・budget_waits の値比較を追加する。ライブ画面への受け渡し頻度を維持するため記録用の判定を分ける。",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 6
+		"scripts.code_lines": 20
 	}
 }

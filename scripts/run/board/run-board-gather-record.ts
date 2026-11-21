@@ -87,7 +87,7 @@ function record_ports(setup: RecordSetup, ports: Pick<BoardPorts, 'now' | 'frame
 
 // What the worker calls after each round: its frames recorded at most every `RECORD_EVERY_MS`
 // (`run-board-every.ts`), and only from a round whose inputs changed since the last record
-// (joshuafolkken/kit#8335), judged as the board's hand-over is (`run-board-round-change.ts`). A frame is
+// (joshuafolkken/kit#8335), including its samples (`run-board-round-change.ts`). A frame is
 // dated when its plan was read, so drawing an unchanged round again would not keep it fresh any longer;
 // a new plan read is a change, and so is a new minute.
 function round_recorder(
@@ -99,9 +99,9 @@ function round_recorder(
 
 	return (round) => {
 		const state = state_of(round)
-		const next = run_board_round_change.inputs_of(round.data, ports.now())
+		const next = run_board_round_change.inputs_of(state, ports.now())
 
-		if (run_board_round_change.is_unchanged(recorded.last, next, state)) return
+		if (run_board_round_change.is_record_unchanged(recorded.last, next, state)) return
 		if (did_record(state)) recorded.last = next
 	}
 }

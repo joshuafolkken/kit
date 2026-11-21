@@ -3,9 +3,11 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_every } from './run-board-every'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
-import { run_board_gather } from './run-board-gather'
+import { run_board_gather, type GatherRead } from './run-board-gather'
 import { run_board_gather_record, type RecordSetup } from './run-board-gather-record'
 import type { RoundState, WorkerSeed } from './run-board-gather-thread'
+import type { MachineGauges } from './run-board-machine'
+import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_state } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 
@@ -114,6 +116,72 @@ describe('run_board_gather_record.round_recorder over unchanged rounds', () => {
 
 		expect(saves).toStrictEqual(saved_keys(2))
 		expect(store.load(CHAT_KEY)?.saved_ms).toBe(reread_ms)
+	})
+})
+
+const GAUGES: MachineGauges = {
+	cpu_percent: 20,
+	memory_percent: 37,
+	swap_mb_per_s: 0,
+	memory_pressure: undefined,
+}
+
+describe('run_board_gather_record.round_recorder over sampled rounds', () => {
+	it.each<Partial<GatherRead>>([
+		{ gauges: { ...GAUGES, memory_percent: 90 } },
+		{ usages: run_board_render_fixture.board_usage(new Map()) },
+		{ quotas: { claude: { windows: [], taken_ms: START }, codex: undefined } },
+		{
+			budget_waits: [
+				{
+					lane: '8335',
+					elsewhere: undefined,
+					command: 'gate',
+					waited_ms: SECOND_MS,
+					reason: 'memory',
+				},
+			],
+		},
+	])('records changed samples: %j', (sample) => {
+		const round = round_of(START)
+		const initial = { ...round.gather, gauges: GAUGES }
+		const { saves } = recorded(SETUP, (second) => ({
+			...round,
+			gather: second < 6 ? initial : { ...initial, ...sample },
+		}))
+
+		expect(saves).toStrictEqual(saved_keys(2))
+	})
+})
+
+describe('run_board_gather_record.round_recorder over equal samples', () => {
+	it('records equal samples once even when rebuilt each round', () => {
+		const round = round_of(START)
+		const { saves } = recorded(SETUP, () => ({
+			...round,
+			gather: { ...round.gather, gauges: { ...GAUGES }, budget_waits: [] },
+		}))
+
+		expect(saves).toStrictEqual(saved_keys(1))
+	})
+})
+
+describe('run_board_cli.run over changed worker samples', () => {
+	it.each([
+		['--chat', CHAT_KEY],
+		['--once', TERMINAL_ONCE],
+	])('answers %s with the latest memory sample within the same minute', async (option, key) => {
+		const round = round_of(START)
+		const { store } = recorded(SETUP, (second) => ({
+			...round,
+			gather: { ...round.gather, gauges: { ...GAUGES, memory_percent: second < 6 ? 37 : 90 } },
+		}))
+		const { ports, frames } = harness(LOCAL, [])
+
+		await run_board_cli.run([option], { ...ports, frames: store })
+
+		expect(store.load(key)?.text).toContain('90%')
+		expect(frames.join('')).toContain('90%')
 	})
 })
 
