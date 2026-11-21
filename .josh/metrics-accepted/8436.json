@@ -1,0 +1,7 @@
+{
+	"reason": "#8436 adds usage-limit classification and park audit propagation while retaining fail-closed handling for other failures; the shared Claude schema removes duplication from quota reading. Net growth is 58 code lines, within the issue plan estimate of 90 non-test lines.",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 58
+	}
+}

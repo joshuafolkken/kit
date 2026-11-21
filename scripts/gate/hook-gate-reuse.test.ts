@@ -156,7 +156,7 @@ describe('hook_gate_reuse.is_index_matching_worktree — what a commit carries',
 // hook, so each of these refuses a record that the gate itself would have reused.
 describe(REUSE_CALL, () => {
 	beforeEach(() => {
-		review_stamps.gate_stamp.write(TREE.files, stamp_path, BASE)
+		review_stamps.gate_stamp.write(TREE.files, { target: stamp_path, base: BASE })
 	})
 
 	it('reuses a record covering a tree the git operation carries', () => {
@@ -179,7 +179,7 @@ describe(REUSE_CALL, () => {
 	})
 
 	it('refuses with the gate reason when the merge base moved under the record', () => {
-		review_stamps.gate_stamp.write(TREE.files, stamp_path, 'e5f6a7b8')
+		review_stamps.gate_stamp.write(TREE.files, { target: stamp_path, base: 'e5f6a7b8' })
 
 		expect(reusable()).toStrictEqual({
 			miss: `the merge base moved since the green gate (e5f6a7b8 → ${BASE})`,
@@ -196,7 +196,7 @@ function kind_of(reuse: ReturnType<typeof hook_gate_reuse.hook_reuse>): string |
 
 describe('hook_gate_reuse.miss_kind', () => {
 	beforeEach(() => {
-		review_stamps.gate_stamp.write(TREE.files, stamp_path, BASE)
+		review_stamps.gate_stamp.write(TREE.files, { target: stamp_path, base: BASE })
 	})
 
 	it('classifies the hook refusals by their own kinds', () => {
@@ -211,7 +211,7 @@ describe('hook_gate_reuse.miss_kind', () => {
 	})
 
 	it('hands a gate refusal on to the gate classification', () => {
-		review_stamps.gate_stamp.write(TREE.files, stamp_path, 'e5f6a7b8')
+		review_stamps.gate_stamp.write(TREE.files, { target: stamp_path, base: 'e5f6a7b8' })
 
 		expect(kind_of(reusable())).toBe('base-moved')
 	})

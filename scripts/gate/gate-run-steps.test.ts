@@ -51,7 +51,7 @@ describe('run_gate_steps — the start order', () => {
 	it('starts the zero-weight checks first and reports in declaration order', async () => {
 		const plan = gate_plan.plan_of(1, undefined, gate_plan.select_gate_checks(false, true, false))
 
-		const results = await gate_run_steps.run_gate_steps(plan, UNRESERVED_BUDGET)
+		const results = await gate_run_steps.run_gate_steps(plan, { budget: UNRESERVED_BUDGET })
 		const started = mocked_execa.mock.calls.map((call) => JSON.stringify(call[1]))
 
 		expect(started[0]).toContain('behavior')
@@ -87,7 +87,9 @@ describe('run_gate_steps — the type-program checks', () => {
 			}),
 		)
 
-		await gate_run_steps.run_gate_steps(gate_plan.plan_of(MEASURED_CORES), UNRESERVED_BUDGET)
+		await gate_run_steps.run_gate_steps(gate_plan.plan_of(MEASURED_CORES), {
+			budget: UNRESERVED_BUDGET,
+		})
 
 		expect(events).toStrictEqual([
 			`start:${gate_labels.LINT_LABEL}`,
@@ -107,7 +109,10 @@ describe('run_gate_steps — a reused check', () => {
 	it('starts no process for a reused check and reports when it last passed', async () => {
 		const reused = new Map([[gate_labels.LINT_LABEL, TAKEN_AT]])
 
-		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET, reused)
+		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, {
+			budget: UNRESERVED_BUDGET,
+			reused,
+		})
 		const lint = results.find((result) => result.label === gate_labels.LINT_LABEL)
 
 		expect(mocked_execa).toHaveBeenCalledTimes(SERIAL_PLAN.checks.length - 1)
@@ -115,7 +120,7 @@ describe('run_gate_steps — a reused check', () => {
 	})
 
 	it('runs every check when none is reused', async () => {
-		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET)
+		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, { budget: UNRESERVED_BUDGET })
 
 		expect(mocked_execa).toHaveBeenCalledTimes(SERIAL_PLAN.checks.length)
 		expect(results.every((result) => result.reused_at === undefined)).toBe(true)
@@ -139,7 +144,9 @@ describe('run_gate_steps — a unit claim admitted narrowed', () => {
 				async (_weight, run) => await run({ overflow: undefined, granted: GRANTED }, ''),
 			)
 
-		await gate_run_steps.run_gate_steps(SERIAL_PLAN, { ...UNRESERVED_BUDGET, is_reserved: true })
+		await gate_run_steps.run_gate_steps(SERIAL_PLAN, {
+			budget: { ...UNRESERVED_BUDGET, is_reserved: true },
+		})
 		const marks = reservation.mock.calls.map((call) => [call[2]?.command, call[2]?.is_unit])
 		const unit_args = mocked_execa.mock.calls
 			.map((call) => JSON.stringify(call[1]))
@@ -169,7 +176,7 @@ describe('run_gate_steps — the free memory', () => {
 	it('runs the unit step at the workers the free memory holds when they are fewer', async () => {
 		stub_memory_workers(MEMORY_WORKERS)
 
-		await gate_run_steps.run_gate_steps(CAPPED_PLAN, RESERVED_BUDGET)
+		await gate_run_steps.run_gate_steps(CAPPED_PLAN, { budget: RESERVED_BUDGET })
 
 		expect(unit_step_args()).toContain(`${UNIT_WORKER_FLAG}=${String(Math.floor(MEMORY_WORKERS))}"`)
 	})
@@ -177,7 +184,7 @@ describe('run_gate_steps — the free memory', () => {
 	it('keeps the plan cap where the memory could not be read', async () => {
 		stub_memory_workers(undefined)
 
-		await gate_run_steps.run_gate_steps(CAPPED_PLAN, RESERVED_BUDGET)
+		await gate_run_steps.run_gate_steps(CAPPED_PLAN, { budget: RESERVED_BUDGET })
 
 		expect(unit_step_args()).toContain(`${UNIT_WORKER_FLAG}=${String(PLAN_CAP)}"`)
 	})
@@ -203,7 +210,7 @@ describe('run_gate_steps — each check claim', () => {
 		)
 		vi.spyOn(gate_plan, 'check_weight').mockReturnValue(ASKED)
 
-		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, RESERVED_BUDGET)
+		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, { budget: RESERVED_BUDGET })
 
 		expect(results[0]?.claim).toStrictEqual({
 			requested: ASKED,
@@ -218,7 +225,7 @@ describe('run_gate_steps — each check claim', () => {
 		)
 		vi.spyOn(gate_plan, 'check_weight').mockReturnValue(ASKED)
 
-		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, RESERVED_BUDGET)
+		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, { budget: RESERVED_BUDGET })
 
 		expect(results[0]?.claim).toStrictEqual({ requested: ASKED, granted: ASKED, waited_ms: 0 })
 	})
@@ -237,7 +244,10 @@ describe('run_gate_steps — each check CPU', () => {
 		vi.spyOn(check_cpu, 'check_cpu_reader').mockReturnValue(() => CHECK_CPU_MS)
 		const reused = new Map([[gate_labels.LINT_LABEL, TAKEN_AT]])
 
-		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET, reused)
+		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, {
+			budget: UNRESERVED_BUDGET,
+			reused,
+		})
 		const ran = results.filter((result) => result.label !== gate_labels.LINT_LABEL)
 		const lint = results.find((result) => result.label === gate_labels.LINT_LABEL)
 

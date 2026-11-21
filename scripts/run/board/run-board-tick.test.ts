@@ -131,6 +131,7 @@ describe('run_board_tick.tick machine', () => {
 })
 
 describe('run_board_tick.tick reads', () => {
+	// joshuafolkken/kit#8475: the warning stands in the notice slot, stale since the plan last landed.
 	it('keeps the previous plan and warns when a read failed', async () => {
 		const { ports, frames, clock } = harness(LOCAL, [plan_titled('kept'), undefined])
 		const first = await tick(FRESH_STATE, ports)
@@ -140,7 +141,7 @@ describe('run_board_tick.tick reads', () => {
 
 		expect(second.plan?.context.titles.get(1)).toBe('kept')
 		expect(second.fetched_ms).toBe(START)
-		expect(frames.at(-1)).toContain(`❗ ${WORDS.plan}`)
+		expect(stripVTControlCharacters(frames.at(-1) ?? '')).toMatch(/❗ stale \S+ · retrying/u)
 	})
 
 	it('draws no run and reads nothing from GitHub when no run has started', async () => {

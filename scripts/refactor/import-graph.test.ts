@@ -7,6 +7,12 @@ const FILE_B = '/repo/scripts/b.ts'
 const FILE_C = '/repo/scripts/lib/c.ts'
 // One hop longer than `MAX_STAGES` reaches, so a capped walk and an uncapped one tell apart.
 const LONG_CHAIN = ['/repo/0.ts', '/repo/1.ts', '/repo/2.ts', '/repo/3.ts', '/repo/4.ts']
+// A hub file imported by more files than the scope cap admits, as a widely shared module is.
+const HUB = '/repo/scripts/hub.ts'
+const HUB_IMPORTERS = Array.from(
+	{ length: import_graph.MAX_SCOPE_FILES },
+	(_unused, index) => `/repo/scripts/importer-${String(index)}.ts`,
+)
 
 function graph(entries: ReadonlyArray<readonly [string, ReadonlyArray<string>]>): FileGraph {
 	return new Map(entries.map(([file, targets]) => [file, new Set(targets)]))
@@ -62,14 +68,17 @@ describe('import_graph.expand', () => {
 		const forward = chain_graph([FILE_A, FILE_B, FILE_C])
 		const expanded = import_graph.expand([FILE_A], forward, import_graph.invert(forward))
 
-		expect(expanded).toStrictEqual(new Set([FILE_A, FILE_B, FILE_C]))
+		expect(expanded).toStrictEqual({
+			files: new Set([FILE_A, FILE_B, FILE_C]),
+			stopped_at: undefined,
+		})
 	})
 
 	it('follows importer edges backward from the seed', () => {
 		const forward = graph([[FILE_A, [FILE_C]]])
 		const expanded = import_graph.expand([FILE_C], forward, import_graph.invert(forward))
 
-		expect(expanded).toStrictEqual(new Set([FILE_C, FILE_A]))
+		expect(expanded.files).toStrictEqual(new Set([FILE_C, FILE_A]))
 	})
 
 	it('stops at MAX_STAGES hops', () => {
@@ -80,7 +89,31 @@ describe('import_graph.expand', () => {
 			import_graph.invert(forward),
 		)
 
-		expect(expanded.size).toBe(import_graph.MAX_STAGES + 1)
+		expect(expanded.files.size).toBe(import_graph.MAX_STAGES + 1)
+	})
+})
+
+describe('import_graph.expand file cap', () => {
+	it('does not take the stage that passes the cap through a hub file', () => {
+		const forward = graph([[FILE_A, [HUB]], ...HUB_IMPORTERS.map((file) => [file, [HUB]] as const)])
+		const expanded = import_graph.expand([FILE_A], forward, import_graph.invert(forward))
+
+		expect(expanded).toStrictEqual({ files: new Set([FILE_A, HUB]), stopped_at: 2 })
+	})
+
+	it('keeps every seed even when the seeds alone pass the cap', () => {
+		const forward = graph([[FILE_A, [HUB]]])
+		const seed = [FILE_A, ...HUB_IMPORTERS]
+		const expanded = import_graph.expand(seed, forward, import_graph.invert(forward))
+
+		expect(expanded).toStrictEqual({ files: new Set(seed), stopped_at: 1 })
+	})
+
+	it('does not report a stop when a stage adds nothing to seeds above the cap', () => {
+		const seed = [FILE_A, ...HUB_IMPORTERS]
+		const expanded = import_graph.expand(seed, graph([]), graph([]))
+
+		expect(expanded).toStrictEqual({ files: new Set(seed), stopped_at: undefined })
 	})
 })
 

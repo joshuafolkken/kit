@@ -56,12 +56,16 @@ async function hint_of(
 	return `cite the pull request that closed it: ${session_cite.issue(closing)}`
 }
 
+interface SourceOptions {
+	repo?: string | undefined
+	ports?: SourcePorts
+}
+
 // The refusal for a pull request condition citing an issue, or `undefined` when it cites a pull
 // request, cites nothing, uses the issue form, or cannot be read.
 async function problem(
 	body: string,
-	repo?: string,
-	ports: SourcePorts = DEFAULT_PORTS,
+	{ repo, ports = DEFAULT_PORTS }: SourceOptions = {},
 ): Promise<string | undefined> {
 	const number = issue_sample_gate.cited_via(body, 'pull')
 

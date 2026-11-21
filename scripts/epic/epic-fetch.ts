@@ -263,8 +263,7 @@ async function recheck_blockers(
 async function fetch_children(
 	child_numbers: ReadonlyArray<number>,
 	repo: string,
-	scope?: string,
-	source?: ChildSource,
+	{ scope, source }: { scope?: string | undefined; source?: ChildSource | undefined } = {},
 ): Promise<FetchedChildren> {
 	const limited = child_numbers.slice(0, CHILD_LIMIT)
 	const now_ms = Date.now()
@@ -425,8 +424,7 @@ async function to_snapshot(
 async function fetch_epic(
 	epic_number: number,
 	repo: string,
-	current_repo: string = repo,
-	source?: ChildSource,
+	{ current_repo = repo, source }: { current_repo?: string; source?: ChildSource | undefined } = {},
 ): Promise<EpicSnapshot> {
 	const scope = scope_for(repo, current_repo)
 	const epic_body = await fetch_epic_body(epic_number, scope)
@@ -434,7 +432,7 @@ async function fetch_epic(
 	// runs in. Derived from the epic's own repository instead, a qualified reference to somebody else's
 	// epic would make their whole organization readable.
 	const owner = epic_cross_repo.owner_of(current_repo)
-	const local = await fetch_children(epic_body.child_numbers, repo, scope, source)
+	const local = await fetch_children(epic_body.child_numbers, repo, { scope, source })
 	const remote = await fetch_external_children(epic_body.external, owner)
 
 	return await to_snapshot(epic_body, { repo, current_repo }, local, remote)

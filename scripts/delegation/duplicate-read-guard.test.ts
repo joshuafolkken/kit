@@ -110,7 +110,7 @@ describe('duplicate_read_refusal — the unchanged re-read', () => {
 	it('refuses a second read of a path whose content has not changed', () => {
 		const target = subject_file(BEFORE_READ_MS)
 		const transcript = read_once('unchanged', target)
-		const refusal = duplicate_read_refusal(payload_of(transcript, target), NOW_MS)
+		const refusal = duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS })
 
 		expect(refusal).toBe(duplicate_reads.REASON)
 	})
@@ -119,7 +119,9 @@ describe('duplicate_read_refusal — the unchanged re-read', () => {
 		const target = subject_file(AFTER_READ_MS)
 		const transcript = read_once('changed', target)
 
-		expect(duplicate_read_refusal(payload_of(transcript, target), NOW_MS)).toBeUndefined()
+		expect(
+			duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 
 	it('allows the first read, with no earlier read of the path in the run', () => {
@@ -129,7 +131,9 @@ describe('duplicate_read_refusal — the unchanged re-read', () => {
 			target_turn_lines(FIRST_READ_MINUTE, ['other.ts']),
 		)
 
-		expect(duplicate_read_refusal(payload_of(transcript, target), NOW_MS)).toBeUndefined()
+		expect(
+			duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 
 	it('allows a paginated re-read, which reads a different region', () => {
@@ -137,7 +141,7 @@ describe('duplicate_read_refusal — the unchanged re-read', () => {
 		const transcript = read_once('paginated', target)
 		const paginated = payload_of(transcript, target, { offset: 100, limit: 50 })
 
-		expect(duplicate_read_refusal(paginated, NOW_MS)).toBeUndefined()
+		expect(duplicate_read_refusal(paginated, { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -148,7 +152,9 @@ describe('duplicate_read_refusal — every failure allows the call', () => {
 
 		rmSync(target, { force: true })
 
-		expect(duplicate_read_refusal(payload_of(transcript, target), NOW_MS)).toBeUndefined()
+		expect(
+			duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 
 	it('says nothing for a call that is not a Read', () => {
@@ -160,11 +166,11 @@ describe('duplicate_read_refusal — every failure allows the call', () => {
 			tool_input: { command: 'cat scripts/x.ts' },
 		})
 
-		expect(duplicate_read_refusal(bash, NOW_MS)).toBeUndefined()
+		expect(duplicate_read_refusal(bash, { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing when the payload is not JSON', () => {
-		expect(duplicate_read_refusal('not json', NOW_MS)).toBeUndefined()
+		expect(duplicate_read_refusal('not json', { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing when the switch is off', () => {
@@ -173,7 +179,9 @@ describe('duplicate_read_refusal — every failure allows the call', () => {
 
 		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
 
-		expect(duplicate_read_refusal(payload_of(transcript, target), NOW_MS)).toBeUndefined()
+		expect(
+			duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 })
 
@@ -184,8 +192,10 @@ describe('duplicate_read_refusal — one refusal per accumulation', () => {
 		const target = subject_file(BEFORE_READ_MS)
 		const transcript = read_once('once', target)
 
-		expect(duplicate_read_refusal(payload_of(transcript, target), NOW_MS)).toBeDefined()
-		expect(duplicate_read_refusal(payload_of(transcript, target), NOW_MS)).toBeUndefined()
+		expect(duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS })).toBeDefined()
+		expect(
+			duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 
 	// A fresh successful read of the target after the refusal is a new redundant episode, so the guard
@@ -199,8 +209,10 @@ describe('duplicate_read_refusal — one refusal per accumulation', () => {
 
 		expect(SECOND_READ_MS).toBeGreaterThan(EARLIER_REFUSAL_MS)
 		expect(LAST_READ_MS).toBeLessThan(SECOND_READ_MS)
-		expect(duplicate_read_refusal(payload_of(transcript, target), EARLIER_REFUSAL_MS)).toBeDefined()
-		expect(duplicate_read_refusal(payload_of(transcript, target), NOW_MS)).toBeDefined()
+		expect(
+			duplicate_read_refusal(payload_of(transcript, target), { now_ms: EARLIER_REFUSAL_MS }),
+		).toBeDefined()
+		expect(duplicate_read_refusal(payload_of(transcript, target), { now_ms: NOW_MS })).toBeDefined()
 	})
 })
 
@@ -221,7 +233,7 @@ describe('duplicate_read_outcome — a dispatched lane child is nudged, not kill
 	it('raises a notice instead of a refusal for an unchanged re-read', () => {
 		const target = subject_file(BEFORE_READ_MS)
 		const transcript = read_once('lane-notice', target)
-		const result = duplicate_read_outcome(payload_of(transcript, target), NOW_MS)
+		const result = duplicate_read_outcome(payload_of(transcript, target), { now_ms: NOW_MS })
 
 		expect(result.reason).toBeUndefined()
 		expect(result.notice).toBe(duplicate_reads.NOTICE)
@@ -239,7 +251,8 @@ describe('duplicate_read_outcome — the per-call context, not the process', () 
 	const LANE_CONTEXT = context_of(LANE_DIRECTORY, { [lane_child_marker.KEY]: LANE_ISSUE })
 
 	it('nudges a lane child the context names under a main-line process', () => {
-		const result = duplicate_read_outcome(unchanged_reread('context-lane'), NOW_MS, LANE_CONTEXT)
+		const options = { now_ms: NOW_MS, context: LANE_CONTEXT }
+		const result = duplicate_read_outcome(unchanged_reread('context-lane'), options)
 
 		expect(result.reason).toBeUndefined()
 		expect(result.notice).toBe(duplicate_reads.NOTICE)
@@ -247,19 +260,18 @@ describe('duplicate_read_outcome — the per-call context, not the process', () 
 
 	it('reads its switch from the context environment', () => {
 		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
+		const options = { now_ms: NOW_MS, context: off }
 
-		expect(
-			duplicate_read_outcome(unchanged_reread('context-off'), NOW_MS, off).reason,
-		).toBeUndefined()
+		expect(duplicate_read_outcome(unchanged_reread('context-off'), options).reason).toBeUndefined()
 	})
 
 	it('refuses when only the process environment switches it off', () => {
 		process.env[SWITCH_ENV_KEY] = 'off'
 		const on = context_of(process.cwd(), {})
+		const options = { now_ms: NOW_MS, context: on }
+		const result = duplicate_read_outcome(unchanged_reread('context-on'), options)
 
-		expect(duplicate_read_outcome(unchanged_reread('context-on'), NOW_MS, on).reason).toBe(
-			duplicate_reads.REASON,
-		)
+		expect(result.reason).toBe(duplicate_reads.REASON)
 	})
 
 	// A relative path names a file of the call's checkout; the process's checkout holds no such file.
@@ -267,16 +279,18 @@ describe('duplicate_read_outcome — the per-call context, not the process', () 
 		const target = subject_file(BEFORE_READ_MS)
 		const payload = payload_of(read_once('context-root', target), path.basename(target))
 		const work = context_of(WORK_DIRECTORY, {})
+		const result = duplicate_read_outcome(payload, { now_ms: NOW_MS, context: work })
 
-		expect(duplicate_read_outcome(payload, NOW_MS, work).reason).toBe(duplicate_reads.REASON)
+		expect(result.reason).toBe(duplicate_reads.REASON)
 	})
 
 	it('does not resolve a relative read against the process directory', () => {
 		const target = subject_file(BEFORE_READ_MS)
 		const payload = payload_of(read_once('process-root', target), path.basename(target))
 		const here = context_of(process.cwd(), {})
+		const options = { now_ms: NOW_MS, context: here }
 
-		expect(duplicate_read_outcome(payload, NOW_MS, here).reason).toBeUndefined()
+		expect(duplicate_read_outcome(payload, options).reason).toBeUndefined()
 	})
 })
 

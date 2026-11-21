@@ -78,6 +78,23 @@ function players_for(platform: NodeJS.Platform): Array<Player> {
 	return PLAYERS[platform] ?? []
 }
 
+// A spawn that throws as it starts (EMFILE, EAGAIN) is a candidate that failed, as one emitting `error`
+// is, so it never ends the board drawing it (joshuafolkken/kit#8381).
+function spawned(player: Player, file: string, ports: SoundPorts): Playing | undefined {
+	try {
+		return ports.spawner(player.command, player.args(file), SPAWN_OPTIONS)
+	} catch {
+		return undefined
+	}
+}
+
+// A started candidate: one that fails to start goes on to `next`.
+function begin(child: Playing, next: () => void, handlers: StartHandlers): void {
+	child.on('error', next)
+	handlers.started(child)
+	child.unref()
+}
+
 function start_first(
 	file: string,
 	players: Array<Player>,
@@ -91,13 +108,14 @@ function start_first(
 		return
 	}
 
-	const child = launch.ports.spawner(player.command, player.args(file), SPAWN_OPTIONS)
-
-	child.on('error', () => {
+	function next(): void {
 		start_first(file, rest, launch)
-	})
-	launch.handlers.started(child)
-	child.unref()
+	}
+
+	const child = spawned(player, file, launch.ports)
+
+	if (child === undefined) next()
+	else begin(child, next, launch.handlers)
 }
 
 // The file started on the platform's first working candidate, each start and the failure of every

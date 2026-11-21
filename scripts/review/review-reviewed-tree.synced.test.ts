@@ -152,6 +152,6 @@ describe('review_reviewed_tree.record of the blobs a sync carries', () => {
 		await review_reviewed_tree.record()
 
 		expect(capture_mock).toHaveBeenCalledWith([FILE, DOC])
-		expect(write_mock).toHaveBeenCalledWith(STAMP.files, undefined, STAMP.base, BLOBS)
+		expect(write_mock).toHaveBeenCalledWith(STAMP.files, { base: STAMP.base, blobs: BLOBS })
 	})
 })

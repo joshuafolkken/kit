@@ -36,6 +36,10 @@ describe('cost_audit_read.session_of — one transcript read into a session', ()
 		expect(read.kind).toBe('fullrun')
 	})
 
+	it('keeps the opening prompt for the reviewer trigger table', () => {
+		expect(read.prompt).toBe(FULLRUN_PROMPT)
+	})
+
 	it('folds the lines of one request into one record', () => {
 		expect(read.records.map((one) => one.request_id)).toStrictEqual(['r1', 'r2'])
 	})

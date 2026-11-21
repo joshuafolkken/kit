@@ -36,7 +36,7 @@ const IMPLEMENTATION: Record<string, string> = { [SOURCE]: IMPLEMENTED }
 const AFTER_FIXES: Record<string, string> = { [SOURCE]: FIXED, [ADDED_TEST]: FIXED }
 
 function plant(files: Record<string, string>): void {
-	review_stamps.round_one_stamp.write(files, RECORD_PATH, BASE)
+	review_stamps.round_one_stamp.write(files, { target: RECORD_PATH, base: BASE })
 }
 
 function recorded_files(): Record<string, string> | undefined {
@@ -199,7 +199,10 @@ describe('the round-2 decision after a round-1 brief is re-run over the fixed tr
 describe('review_stamps.clear_round_one — the record lives for one run', () => {
 	it('clears the record so the next run records its own round 1', () => {
 		plant(IMPLEMENTATION)
-		review_stamps.round_one_code_stamp.write(IMPLEMENTATION, CODE_RECORD_PATH, BASE)
+		review_stamps.round_one_code_stamp.write(IMPLEMENTATION, {
+			target: CODE_RECORD_PATH,
+			base: BASE,
+		})
 
 		review_stamps.clear_round_one(RECORD_PATH, CODE_RECORD_PATH)
 

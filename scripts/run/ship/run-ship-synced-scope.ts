@@ -68,8 +68,7 @@ async function moved_files(
 ): Promise<MovedParts | undefined> {
 	const parts = await Promise.all(
 		checks.map(
-			async (check) =>
-				await since_green.read_moved_parts(check.stamp, check.label, undefined, tree),
+			async (check) => await since_green.read_moved_parts(check.stamp, check.label, { tree }),
 		),
 	)
 	const known = parts.filter((part) => part !== undefined)

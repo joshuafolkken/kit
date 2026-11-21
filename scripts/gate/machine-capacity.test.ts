@@ -72,6 +72,30 @@ describe('machine_capacity.machine_budget — the budget the ledger admits again
 	})
 })
 
+// joshuafolkken/kit#8473: an ESLint claim under its declared peak was added back whole, and the budget
+// passed the machine.
+describe('machine_capacity.machine_budget — claims under their declared memory', () => {
+	const total_mb = 18_432
+	const available_mb = 9400
+	const reading = { busy_cores: 0, available_mb, total_mb }
+
+	it('adds back no more than the memory in use, and never past the machine', () => {
+		const ledger = { cores: 0, memory_mb: 8590 + 2900 }
+		const { memory_mb } = machine_capacity.machine_budget(CORES, reading, ledger)
+
+		expect(memory_mb).toBeLessThanOrEqual(total_mb)
+		expect(memory_mb).toBeLessThanOrEqual(available_mb + (total_mb - available_mb))
+	})
+
+	it('adds back the whole ledger while it is within the memory in use', () => {
+		const ledger = { cores: 0, memory_mb: LEDGER_MEMORY_MB }
+
+		expect(machine_capacity.machine_budget(CORES, reading, ledger).memory_mb).toBe(
+			available_mb + LEDGER_MEMORY_MB,
+		)
+	})
+})
+
 // joshuafolkken/kit#4361: lanes took the 11-core machine to a load average of 25–34 while the first
 // waiter ignored outside load. A run queue past twice the cores beyond the ledger now holds it too.
 describe('machine_capacity.machine_budget — a run queue past twice the cores', () => {

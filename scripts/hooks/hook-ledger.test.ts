@@ -5,6 +5,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
+import type { HookContext } from './hook-context'
 import { hook_ledger } from './hook-ledger'
 
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
@@ -16,11 +17,17 @@ const TRANSCRIPT = '/sessions/a.jsonl'
 const COMMAND = 'pnpm josh gate'
 const CONTEXT_ROLE = 'context-role'
 const BATCHING_REASON = '⛔ batching: 3 single-call turns in a row. Reissue this.'
+const STOP_REFUSAL = { hook: 'stop-guard', reason: 'held', raw_payload: '{}' }
 const BASH_PAYLOAD = JSON.stringify({
 	tool_name: 'Bash',
 	tool_input: { command: COMMAND },
 	transcript_path: TRANSCRIPT,
 })
+
+// The ledger at `directory`, written from a call carrying no environment.
+function at(directory: string): { directory: string; context: HookContext } {
+	return { directory, context: hook_context_fixture.of(scratch, {}) }
+}
 
 function lines_in(directory: string): Array<string> {
 	const day = new Date().toISOString().slice(0, 10)
@@ -37,7 +44,7 @@ describe('hook_ledger.record', () => {
 
 		await hook_ledger.record(
 			{ hook: HOOK, reason: BATCHING_REASON, raw_payload: BASH_PAYLOAD },
-			directory,
+			at(directory),
 		)
 		const lines = lines_in(directory)
 
@@ -56,7 +63,7 @@ describe('hook_ledger.record', () => {
 		vi.mocked(git_spawn.read).mockResolvedValue('main')
 		const directory = path.join(scratch, 'stop')
 
-		await hook_ledger.record({ hook: 'stop-guard', reason: 'held', raw_payload: '{}' }, directory)
+		await hook_ledger.record(STOP_REFUSAL, at(directory))
 
 		const entry: unknown = JSON.parse(lines_in(directory)[0] ?? '')
 
@@ -80,8 +87,10 @@ describe('hook_ledger.record call context', () => {
 
 		await hook_ledger.record(
 			{ hook: HOOK, reason: BATCHING_REASON, raw_payload: BASH_PAYLOAD },
-			directory,
-			hook_context_fixture.of(scratch, { [agent_session_role.KEY]: CONTEXT_ROLE }),
+			{
+				directory,
+				context: hook_context_fixture.of(scratch, { [agent_session_role.KEY]: CONTEXT_ROLE }),
+			},
 		)
 
 		expect(JSON.parse(lines_in(directory)[0] ?? '')).toMatchObject({ role: CONTEXT_ROLE })
@@ -94,7 +103,7 @@ describe('hook_ledger.record payload fields', () => {
 		const directory = path.join(scratch, 'null-transcript')
 		const raw_payload = `{"tool_name":"Bash","tool_input":{"command":"${COMMAND}"},"transcript_path":null}`
 
-		await hook_ledger.record({ hook: HOOK, reason: BATCHING_REASON, raw_payload }, directory)
+		await hook_ledger.record({ hook: HOOK, reason: BATCHING_REASON, raw_payload }, at(directory))
 
 		expect(JSON.parse(lines_in(directory)[0] ?? '')).toMatchObject({
 			tool: 'Bash',

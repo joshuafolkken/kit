@@ -1,32 +1,33 @@
-import { stripVTControlCharacters, styleText } from 'node:util'
+import { stripVTControlCharacters } from 'node:util'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import string_width from 'string-width'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 
 // joshuafolkken/kit#3430: the board's top lines — which state wins, what the plan line says when a
 // fetch has failed, and how the progress counts are drawn from the layout. joshuafolkken/kit#3444: two
-// lines of symbols, no `updated` line, and a heartbeat colored by how stale the stream is.
+// lines of symbols, no `updated` line. joshuafolkken/kit#8475: a quiet heartbeat said in the slot.
 // joshuafolkken/kit#3508: the run's state with its progress, then the time with the machine.
 // joshuafolkken/kit#3692: three columns — the name, the time, then the progress over the machine.
 
 const { minute_of } = run_board_labels
-const { HEADER_ICONS, WORDS } = run_board_labels
+const { HEADER_ICONS } = run_board_labels
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 // The third line's name column where no repository is read, and the second line's where no kit
 // version is: `-` under the board's name.
 const NAME_BLANK = ' '.repeat('⏸ josh-board'.length)
 const VERSION_CELL = '  -'.padEnd(NAME_BLANK.length)
 const TIME_BLANK = ' '.repeat('⏰ 30′00″'.length + 1)
-const RUNNING_CLOCK = `${VERSION_CELL}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
+// The notice slot before any notice, where nothing holds (joshuafolkken/kit#8475).
+const SLOT_BLANK = '  —'
+const RUNNING_CLOCK = `${VERSION_CELL}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}${SLOT_BLANK}`
 // joshuafolkken/kit#3749: the third line — the repository's cell alone where the stream holds no
 // event (its indent where no repository is read), else what the run is doing now: its time under the
 // second column, its icon and words under the third.
 const NOW_BLANK = '  '
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
-const STALE_BEAT = '💓 40′00″'
 const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
@@ -38,11 +39,6 @@ function row(number: number, state: BoardRow['state']): BoardRow {
 }
 
 const RUNNING_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(1, 'running')] }
-
-// Read the alarming heartbeat at the call, after the case has forced color on.
-function alarmed(): string {
-	return styleText('red', STALE_BEAT)
-}
 
 function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 	return {
@@ -79,13 +75,6 @@ function clock_line_of(board: BoardHeader): string {
 	return lines_of(board)[1] ?? ''
 }
 
-// The raw second line, colors kept, of a running run whose newest event is `age_ms` old.
-function aged_beat(age_ms: number): string {
-	const activity = { last_event_ms: NOW - age_ms, is_stopped: false }
-
-	return run_board_header.header_lines(header({ layout: RUNNING_LAYOUT, activity }))[1] ?? ''
-}
-
 describe('run_board_header.header_lines state', () => {
 	it('draws an ended run as ended even with a child still marked running', () => {
 		const activity = { last_event_ms: undefined, is_stopped: true }
@@ -109,7 +98,7 @@ describe('run_board_header.header_lines state', () => {
 
 		expect(lines_of(board)).toStrictEqual([
 			`■ josh-board  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}`,
+			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}${SLOT_BLANK}`,
 			NOW_BLANK,
 		])
 	})
@@ -120,13 +109,13 @@ describe('run_board_header.header_lines state', () => {
 })
 
 describe('run_board_header.header_lines shape', () => {
-	// joshuafolkken/kit#3692: the run's age over the heartbeat, in one column.
-	it('draws the run’s age then the progress on the first line, the heartbeat under the age', () => {
+	// joshuafolkken/kit#3692, #8475: the run's age over a blank cell, the heartbeat said in the slot.
+	it('draws the run’s age then the progress on the first line, a blank cell under the age', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
 			`⏸ josh-board  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${VERSION_CELL}  💓  1′00″  ${MACHINE_UNKNOWN}`,
+			RUNNING_CLOCK,
 			NOW_BLANK,
 		])
 	})
@@ -152,7 +141,7 @@ describe('run_board_header.header_lines shape', () => {
 		}
 
 		expect(clock_line_of(header({ machine }))).toBe(
-			`${VERSION_CELL}  ${TIME_BLANK}  💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
+			`${VERSION_CELL}  ${TIME_BLANK}  💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────${SLOT_BLANK}`,
 		)
 	})
 })
@@ -199,7 +188,7 @@ describe('run_board_header.header_lines chat', () => {
 		}
 
 		expect(clock_line_of(header({ machine, form: 'chat' }))).toBe(
-			`${VERSION_CELL}  ${TIME_BLANK}  🧠  37% ■■■■──────`,
+			`${VERSION_CELL}  ${TIME_BLANK}  🧠  37% ■■■■──────${SLOT_BLANK}`,
 		)
 	})
 })
@@ -209,10 +198,12 @@ describe('run_board_header.header_lines plan warning', () => {
 		expect(title_of(header({ plan_fetched_ms: NOW }))).not.toContain(HEADER_ICONS.warning)
 	})
 
-	it('warns with the minute of a failed plan read', () => {
+	// joshuafolkken/kit#8475: a failed plan read is said in the notice slot, not on the first line.
+	it('says a failed plan read in the notice slot, stale since the plan last landed', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(new RegExp(`💤 0  ❗ ${WORDS.plan} ${minute_of(NOW)}$`, 'u'))
+		expect(title_of(board)).toMatch(/💤 0$/u)
+		expect(clock_line_of(board)).toMatch(/ {2}❗ stale 1′00″ · retrying$/u)
 	})
 
 	// joshuafolkken/kit#4223: ⚠ is counted one column wide but drawn two, over the blank after it.
@@ -233,26 +224,14 @@ describe('run_board_header.header_lines plan loading', () => {
 	})
 })
 
-describe('run_board_header.header_lines heartbeat color', () => {
-	afterEach(() => {
-		vi.unstubAllEnvs()
-	})
+// joshuafolkken/kit#8475: a quiet heartbeat is said in the notice slot, waiting or working alike.
+describe('run_board_header.header_lines heartbeat', () => {
+	it('says no heartbeat in the slot once the run is quiet past its interval and half again', () => {
+		const quiet = { last_event_ms: NOW - 40 * MINUTE, is_stopped: false }
+		const beating = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
-	it('leaves a fresh heartbeat plain, then yellow past 15 minutes and red past 30', () => {
-		vi.stubEnv('FORCE_COLOR', '1')
-
-		expect(aged_beat(MINUTE)).toContain(' 💓  1′00″')
-		expect(aged_beat(20 * MINUTE)).toContain(styleText('yellow', '💓 20′00″'))
-		expect(aged_beat(40 * MINUTE)).toContain(alarmed())
-	})
-
-	it('leaves a stale heartbeat plain while the run is not running', () => {
-		vi.stubEnv('FORCE_COLOR', '1')
-		const activity = { last_event_ms: NOW - 40 * MINUTE, is_stopped: false }
-		const beat = run_board_header.header_lines(header({ activity }))[1] ?? ''
-
-		expect(beat).toContain(STALE_BEAT)
-		expect(beat).not.toContain(alarmed())
+		expect(clock_line_of(header({ activity: quiet }))).toMatch(/ {2}❗ no heartbeat 40′$/u)
+		expect(clock_line_of(header({ activity: beating }))).toBe(RUNNING_CLOCK)
 	})
 })
 

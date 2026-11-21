@@ -1,5 +1,6 @@
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_header_notice } from './run-board-header-notice'
+import { run_board_header_parts } from './run-board-header-parts'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render_notes } from './run-board-render-notes'
@@ -9,6 +10,9 @@ import { run_board_seat } from './run-board-seat'
 // joshuafolkken/kit#8003: the issue rows of each keyed section, as the frame draws them
 // (`run-board-render.ts`), and every one of their keys — drawn or not, so a row a fold or the pane's fit
 // hid is not new when it shows again.
+
+// The sections drawn faint while the plan drawn is a saved one (joshuafolkken/kit#8219).
+const FAINT_SECTIONS: ReadonlySet<KeySection> = new Set(['decision', 'queued', 'waiting'])
 
 // The done section's rows: the run's own rows that finished.
 function done_rows(layout: BoardLayout): Array<BoardRow> {
@@ -61,7 +65,11 @@ function note_keys_of(notes: ReadonlyArray<BoardNote>): Array<string> {
 // adds puts its keys here.
 function known_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Set<string> {
 	const known = keys_of(header.layout)
-	const header_keys = [run_board_header.now_key(header), run_board_header_notice.key_of(header)]
+	const header_keys = [
+		run_board_header.now_key(header),
+		run_board_header_notice.key_of(header),
+		run_board_header_parts.plan_key(header),
+	]
 	const keys = [...epic_keys_of(header.layout), ...seat_keys_of(header), ...note_keys_of(notes)]
 
 	for (const key of keys) known.add(key)
@@ -70,6 +78,23 @@ function known_of(header: BoardHeader, notes: ReadonlyArray<BoardNote>): Set<str
 	return known
 }
 
-const run_board_row_sections = { done_rows, keys_of, known_of }
+// joshuafolkken/kit#8457: the keys a frame drawn from a saved plan draws faint — the decision, queued
+// and waiting rows (`run-board-render.ts`) and the header's progress line — none on a live frame.
+function faint_keys_of(header: BoardHeader): Set<string> | undefined {
+	const { layout } = header
+
+	if (layout === undefined || header.plan_saved_ms === undefined) return undefined
+
+	const rows = sections_of(layout).filter(([section]) => FAINT_SECTIONS.has(section))
+	const keys = rows.flatMap(([section, drawn]) =>
+		drawn.map((row) => run_board_row_key.key_of(section, row.number)),
+	)
+	const plan = run_board_header_parts.plan_key(header)
+	const epics = epic_keys_of(layout)
+
+	return new Set(plan === undefined ? [...keys, ...epics] : [...keys, ...epics, plan])
+}
+
+const run_board_row_sections = { done_rows, faint_keys_of, keys_of, known_of }
 
 export { run_board_row_sections }

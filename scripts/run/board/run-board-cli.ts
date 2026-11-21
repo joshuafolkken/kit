@@ -5,6 +5,7 @@ import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_read } from '#scripts/run/progress/run-progress-read'
 import { run_board_data_ports } from './run-board-data-ports'
 import { run_board_every } from './run-board-every'
+import { run_board_exit_record } from './run-board-exit-record'
 import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
@@ -36,8 +37,7 @@ const EVERY_FLAG = '--every'
 const FRESH_FLAG = '--fresh'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
-const SIGINT_EXIT_CODE = 130
-const SIGTERM_EXIT_CODE = 143
+const { SIGINT_EXIT_CODE, SIGTERM_EXIT_CODE } = run_board_exit_record
 const USAGE =
 	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--timing]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
@@ -197,6 +197,35 @@ function ports_for(ports: BoardPorts | undefined, is_live: boolean, theme?: Them
 	return ports ?? live_ports(is_live, theme)
 }
 
+// A live board on the process's own ports records why it ends (`run-board-exit-record.ts`); one on a
+// test's ports holds no process handler. It says its timing as it leaves its screen: `watch` only ever
+// returns by throwing.
+async function watch(
+	ports: BoardPorts | undefined,
+	theme: Theme | undefined,
+	is_timing: boolean,
+): Promise<void> {
+	const exits = ports === undefined ? run_board_exit_record.start() : undefined
+	const live = ports_for(ports, true, theme)
+	const leaving = exits?.on_exit ?? live.on_exit
+	const board = run_board_timing.timed({ ...live, on_exit: leaving }, is_timing)
+
+	await run_board_exit_record.guarded(exits, async () => {
+		await run_board_live.watch(board, theme, exits?.failed)
+	})
+}
+
+async function draw_still(
+	ports: BoardPorts | undefined,
+	theme: Theme | undefined,
+	is_timing: boolean,
+): Promise<void> {
+	const board = run_board_timing.timed(ports_for(ports, false, theme), is_timing)
+
+	await still(board, theme)
+	run_board_timing.say(board, is_timing)
+}
+
 // A board a person watches, in the theme; the chat's frame and `--every`'s are passed on as they are,
 // so they never take it. With `--timing`, the phases are said once the board is done
 // (`run-board-timing.ts`).
@@ -214,12 +243,9 @@ async function draw(
 
 	const { is_tty } = ports ?? LIVE_PORTS
 	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
-	const board = run_board_timing.timed(ports_for(ports, mode === 'live', theme), is_timing)
 
-	// A live board says it as it leaves its screen: `watch` only ever returns by throwing.
-	if (mode === 'live') await run_board_live.watch(board, theme)
-	else await still(board, theme)
-	run_board_timing.say(board, is_timing)
+	if (mode === 'live') await watch(ports, theme, is_timing)
+	else await draw_still(ports, theme, is_timing)
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {

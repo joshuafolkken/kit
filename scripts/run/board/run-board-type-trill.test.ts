@@ -66,7 +66,7 @@ function heard_over(
 		heard.cues.push(name)
 	}
 
-	const heard_ports = { ...ports, cue, typing_sound, types_rows: true }
+	const heard_ports = { ...ports, cue, typing_sound, types_rows: true, opened_ms: START }
 
 	return drawn_from(state, LOCAL, { ports: heard_ports, now_ms }, run_layout)
 }
@@ -108,6 +108,16 @@ describe('run_board_tick_draw.draw_display trill', () => {
 
 		heard_over(appeared, running(), START + TYPED_MS, heard)
 		expect(heard.trill).toStrictEqual([false])
+	})
+
+	// joshuafolkken/kit#8457
+	it('switches the trill on as the live plan lands on the saved one’s frame', () => {
+		const heard: Heard = { cues: [], trill: [] }
+		const saved = { ...planned(), fetched_ms: START - SECOND }
+		const base = heard_over(saved, [], START, { cues: [], trill: [] })
+
+		heard_over({ ...base, fetched_ms: START + SECOND }, [], START + SECOND, heard)
+		expect(heard.trill).toStrictEqual([true])
 	})
 })
 

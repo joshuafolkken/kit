@@ -118,6 +118,38 @@ describe('Codex event normalization', () => {
 	})
 })
 
+describe('usage-limit events', () => {
+	it.each([
+		[
+			{
+				type: 'rate_limit_event',
+				rate_limit_info: { status: 'allowed', overageStatus: 'rejected' },
+			},
+			undefined,
+		],
+		[{ type: 'rate_limit_event', rate_limit_info: { status: 'rejected' } }, true],
+		[{ type: 'error', error: { code: 'rate_limit_error' } }, true],
+		[{ type: 'error', error: { type: 'usage_limit_reached' } }, true],
+		[{ type: 'error', error: { message: 'usage_limit_reached' } }, undefined],
+		[{ type: 'assistant', error: 'authentication_error' }, undefined],
+		[{ type: 'rate_limit_event', rate_limit_info: 'malformed' }, undefined],
+	])('detects only structured usage rejection %j', (event, expected) => {
+		expect(agent_event.read(lines(event)).is_usage_limited).toBe(expected)
+	})
+
+	it('keeps rejection through a terminal result and resets at a launch header', () => {
+		const transcript = lines(
+			{ type: 'assistant', error: 'rate_limit', message: { content: [] } },
+			{ type: 'result', subtype: 'success', is_error: true, result: 'Limit reached' },
+		)
+
+		expect(agent_event.read(transcript).is_usage_limited).toBe(true)
+		const header = '=== 2026-11-21T00:00:00Z · started by process 42 · claude ==='
+
+		expect(agent_event.read(`${transcript}\n${header}`).is_usage_limited).toBeUndefined()
+	})
+})
+
 describe('malformed event output', () => {
 	it('reads only the latest appended launch', () => {
 		const transcript = [

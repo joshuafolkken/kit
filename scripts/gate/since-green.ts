@@ -82,8 +82,7 @@ function narrowed_verdict(label: string, parts: MovedParts | undefined): MovedVe
 async function read_verdict(
 	stamp: FileMapStampAccess,
 	label: string,
-	source?: string,
-	tree?: GateTree,
+	{ source, tree }: { source?: string | undefined; tree?: GateTree | undefined } = {},
 ): Promise<MovedVerdict> {
 	const record = stamp.read(source)
 
@@ -100,10 +99,9 @@ async function read_verdict(
 async function read_moved_parts(
 	stamp: FileMapStampAccess,
 	label: string,
-	source?: string,
-	tree?: GateTree,
+	{ source, tree }: { source?: string | undefined; tree?: GateTree | undefined } = {},
 ): Promise<MovedParts | undefined> {
-	const verdict = await read_verdict(stamp, label, source, tree)
+	const verdict = await read_verdict(stamp, label, { source, tree })
 
 	return 'parts' in verdict ? verdict.parts : undefined
 }

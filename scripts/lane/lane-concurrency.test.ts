@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_gh_pr_auto_merge } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { git_worktree } from '#scripts/git/git-worktree'
@@ -155,6 +156,7 @@ async function park_both_lanes(): Promise<void> {
 }
 
 function stub_what_the_fixture_cannot_do(): void {
+	vi.spyOn(git_gh_pr_auto_merge, 'pr_list_open_with_head_prefix').mockResolvedValue([])
 	vi.spyOn(lane_install, 'install_dependencies').mockResolvedValue({
 		is_installed: true,
 		output: '',

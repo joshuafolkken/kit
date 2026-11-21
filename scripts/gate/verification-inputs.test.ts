@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { gate_labels } from './gate-labels'
@@ -153,7 +154,7 @@ describe('verification_inputs.fingerprint', () => {
 	})
 
 	function of(label: string, environment: Record<string, string> = {}): string {
-		return verification_inputs.fingerprint([label], root, environment)
+		return verification_inputs.fingerprint([label], { root, environment })
 	}
 
 	it('moves when a declared tool is reinstalled at another version', () => {
@@ -181,10 +182,32 @@ describe('verification_inputs.fingerprint', () => {
 
 	it('answers the whole gate from the union of every declaration', () => {
 		const labels = verification_inputs.DECLARED_LABELS
-		const before = verification_inputs.fingerprint(labels, root, {})
+		const before = verification_inputs.fingerprint(labels, { root, environment: {} })
 
 		install(root, 'vitest', '3.0.0')
 
-		expect(verification_inputs.fingerprint(labels, root, {})).not.toBe(before)
+		expect(verification_inputs.fingerprint(labels, { root, environment: {} })).not.toBe(before)
+	})
+})
+
+describe('verification_inputs.fingerprint defaults', () => {
+	it.each([undefined, { root: undefined, environment: undefined }])(
+		'uses the project root and process environment with default options %j',
+		(options) => {
+			const labels = [gate_labels.TYPE_CHECK_LABEL]
+
+			expect(verification_inputs.fingerprint(labels, options)).toBe(
+				verification_inputs.fingerprint(labels, { root: PROJECT_ROOT, environment: process.env }),
+			)
+		},
+	)
+
+	it('inherits the process environment when only the root is supplied', () => {
+		const labels = [gate_labels.TYPE_CHECK_LABEL]
+		const root = make_directory('verification-input-defaults-')
+
+		expect(verification_inputs.fingerprint(labels, { root })).toBe(
+			verification_inputs.fingerprint(labels, { root, environment: process.env }),
+		)
 	})
 })

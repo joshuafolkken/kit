@@ -28,10 +28,13 @@ const RECORDED: GateTree = { files: { [SOURCE]: 'digest-a', [FIXED]: 'digest-b' 
 const LABEL = 'josh test:related'
 const { LINT_LABEL, UNIT_LABEL } = gate_labels
 
-function record_at(name: string, tree: GateTree = RECORDED, writer = stamp): string {
+function record_at(
+	name: string,
+	{ tree = RECORDED, writer = stamp }: { tree?: GateTree; writer?: typeof stamp } = {},
+): string {
 	const target = path.join(scratch, `${name}.json`)
 
-	writer.write(tree.files, target, tree.base)
+	writer.write(tree.files, { target, base: tree.base })
 
 	return target
 }
@@ -58,7 +61,7 @@ describe('since_green.read_moved_parts — what it narrows to', () => {
 		tree_now({ [SOURCE]: 'digest-a', [FIXED]: 'digest-b2' })
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, record_at('edited')),
+			since_green.read_moved_parts(stamp, LINT_LABEL, { source: record_at('edited') }),
 		).resolves.toStrictEqual(changed_only(FIXED))
 	})
 
@@ -66,7 +69,9 @@ describe('since_green.read_moved_parts — what it narrows to', () => {
 		tree_now({ [SOURCE]: 'digest-a', [FIXED]: 'digest-b2' }, 'base-b')
 		base_moved(FROM_MAIN)
 
-		const moved = await since_green.read_moved_parts(stamp, LINT_LABEL, record_at('synced'))
+		const moved = await since_green.read_moved_parts(stamp, LINT_LABEL, {
+			source: record_at('synced'),
+		})
 
 		expect(moved).toStrictEqual({ changed: [FIXED], synced: [FROM_MAIN] })
 		expect(read_git).toHaveBeenCalledWith(expect.arrayContaining(['base-a', 'base-b']))
@@ -77,7 +82,7 @@ describe('since_green.read_moved_parts — what it narrows to', () => {
 		const tree = { files: { [SOURCE]: 'digest-a', [FIXED]: 'digest-b2' }, base: 'base-a' }
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, record_at('handed'), tree),
+			since_green.read_moved_parts(stamp, LINT_LABEL, { source: record_at('handed'), tree }),
 		).resolves.toStrictEqual(changed_only(FIXED))
 		expect(read_tree).not.toHaveBeenCalled()
 	})
@@ -87,7 +92,7 @@ describe('since_green.read_moved_parts — what it narrows to', () => {
 		tree_now({ ...RECORDED.files, [ESLINT_CONFIG]: 'digest-e' })
 
 		await expect(
-			since_green.read_moved_parts(stamp, UNIT_LABEL, record_at('unit-eslint')),
+			since_green.read_moved_parts(stamp, UNIT_LABEL, { source: record_at('unit-eslint') }),
 		).resolves.toStrictEqual(changed_only(ESLINT_CONFIG))
 	})
 })
@@ -99,7 +104,7 @@ describe('since_green.read_moved_parts — the main sync kept apart', () => {
 		base_moved(FROM_MAIN)
 
 		await expect(
-			since_green.read_moved_parts(stamp, UNIT_LABEL, record_at('parts')),
+			since_green.read_moved_parts(stamp, UNIT_LABEL, { source: record_at('parts') }),
 		).resolves.toStrictEqual({
 			changed: [FIXED],
 			synced: [FROM_MAIN],
@@ -111,7 +116,7 @@ describe('since_green.read_moved_parts — the main sync kept apart', () => {
 		base_moved(MANIFEST)
 
 		await expect(
-			since_green.read_moved_parts(stamp, UNIT_LABEL, record_at('synced-manifest')),
+			since_green.read_moved_parts(stamp, UNIT_LABEL, { source: record_at('synced-manifest') }),
 		).resolves.toBeUndefined()
 	})
 })
@@ -121,7 +126,9 @@ describe('since_green.read_moved_parts — when it reads the whole branch instea
 		tree_now({ [FIXED]: 'digest-b2' })
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, path.join(scratch, 'absent.json')),
+			since_green.read_moved_parts(stamp, LINT_LABEL, {
+				source: path.join(scratch, 'absent.json'),
+			}),
 		).resolves.toBeUndefined()
 	})
 
@@ -129,7 +136,7 @@ describe('since_green.read_moved_parts — when it reads the whole branch instea
 		tree_now(RECORDED.files)
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, record_at('unmoved')),
+			since_green.read_moved_parts(stamp, LINT_LABEL, { source: record_at('unmoved') }),
 		).resolves.toStrictEqual(changed_only())
 	})
 
@@ -137,7 +144,7 @@ describe('since_green.read_moved_parts — when it reads the whole branch instea
 		tree_now({ ...RECORDED.files, [MANIFEST]: 'digest-p' })
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, record_at('manifest')),
+			since_green.read_moved_parts(stamp, LINT_LABEL, { source: record_at('manifest') }),
 		).resolves.toBeUndefined()
 	})
 
@@ -145,7 +152,7 @@ describe('since_green.read_moved_parts — when it reads the whole branch instea
 		tree_now({ ...RECORDED.files, [ESLINT_CONFIG]: 'digest-e' })
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, record_at('eslint')),
+			since_green.read_moved_parts(stamp, LINT_LABEL, { source: record_at('eslint') }),
 		).resolves.toBeUndefined()
 	})
 })
@@ -156,11 +163,9 @@ describe('since_green.read_moved_parts — when the record cannot be compared', 
 		tree_now(RECORDED.files)
 
 		await expect(
-			since_green.read_moved_parts(
-				stamp,
-				LINT_LABEL,
-				record_at('other-inputs', RECORDED, other_inputs),
-			),
+			since_green.read_moved_parts(stamp, LINT_LABEL, {
+				source: record_at('other-inputs', { writer: other_inputs }),
+			}),
 		).resolves.toBeUndefined()
 	})
 
@@ -169,7 +174,7 @@ describe('since_green.read_moved_parts — when the record cannot be compared', 
 		read_git.mockRejectedValue(new Error('bad revision'))
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, record_at('unreadable')),
+			since_green.read_moved_parts(stamp, LINT_LABEL, { source: record_at('unreadable') }),
 		).resolves.toBeUndefined()
 	})
 
@@ -177,7 +182,7 @@ describe('since_green.read_moved_parts — when the record cannot be compared', 
 		read_tree.mockResolvedValue({ files: { [FIXED]: 'digest-b2' }, base: undefined })
 
 		await expect(
-			since_green.read_moved_parts(stamp, LINT_LABEL, record_at('no-base')),
+			since_green.read_moved_parts(stamp, LINT_LABEL, { source: record_at('no-base') }),
 		).resolves.toBeUndefined()
 	})
 })
@@ -188,14 +193,18 @@ describe('since_green.read_verdict — the fallback reason', () => {
 
 	it('answers no-record with no green record', async () => {
 		await expect(
-			since_green.read_verdict(stamp, LINT_LABEL, path.join(scratch, 'absent-verdict.json')),
+			since_green.read_verdict(stamp, LINT_LABEL, {
+				source: path.join(scratch, 'absent-verdict.json'),
+			}),
 		).resolves.toStrictEqual({ fallback: FALLBACK.NO_RECORD })
 	})
 
 	it('answers input-mismatch for a record written under other inputs', async () => {
-		const target = record_at('verdict-inputs', RECORDED, other_inputs)
+		const target = record_at('verdict-inputs', { writer: other_inputs })
 
-		await expect(since_green.read_verdict(stamp, LINT_LABEL, target)).resolves.toStrictEqual({
+		await expect(
+			since_green.read_verdict(stamp, LINT_LABEL, { source: target }),
+		).resolves.toStrictEqual({
 			fallback: FALLBACK.INPUT_MISMATCH,
 		})
 	})
@@ -204,7 +213,7 @@ describe('since_green.read_verdict — the fallback reason', () => {
 		read_tree.mockResolvedValue({ files: RECORDED.files, base: undefined })
 
 		await expect(
-			since_green.read_verdict(stamp, LINT_LABEL, record_at('verdict-base')),
+			since_green.read_verdict(stamp, LINT_LABEL, { source: record_at('verdict-base') }),
 		).resolves.toStrictEqual({ fallback: FALLBACK.NO_BASE })
 	})
 
@@ -212,15 +221,17 @@ describe('since_green.read_verdict — the fallback reason', () => {
 		tree_now({ ...RECORDED.files, [ESLINT_CONFIG]: 'digest-e' })
 
 		await expect(
-			since_green.read_verdict(stamp, LINT_LABEL, record_at('verdict-config')),
+			since_green.read_verdict(stamp, LINT_LABEL, { source: record_at('verdict-config') }),
 		).resolves.toStrictEqual({ fallback: FALLBACK.CONFIG_FILE })
 	})
+})
 
+describe('since_green.read_verdict — comparable record', () => {
 	it('answers the moved parts when it can narrow', async () => {
 		tree_now({ [SOURCE]: 'digest-a', [FIXED]: 'digest-b2' })
 
 		await expect(
-			since_green.read_verdict(stamp, LINT_LABEL, record_at('verdict-parts')),
+			since_green.read_verdict(stamp, LINT_LABEL, { source: record_at('verdict-parts') }),
 		).resolves.toStrictEqual({ parts: changed_only(FIXED) })
 	})
 })

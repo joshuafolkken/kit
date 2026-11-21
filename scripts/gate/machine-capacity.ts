@@ -370,13 +370,26 @@ function is_overloaded(
 // the ledger's declared cores cover it. The caller passes every admitted claim's cores but only the
 // memory of claims past `core_admission.RAMP_UP_MS`, whose tools have had time to allocate.
 // Memory that could not be read is no limit at all, the behavior before memory was read.
+//
+// **The ledger's memory is added back only as far as it is gone from the free figure** — the memory in
+// use, `total − available`. A claim whose footprint sits under its declared peak (compressed, swapped)
+// took less than it declares, and adding back the declaration lifted the budget past the machine and
+// let a second ESLint claim through (joshuafolkken/kit#8473). An unread total adds the ledger back whole.
+function memory_budget(reading: MachineReading, ledger_mb: number): number {
+	const { available_mb, total_mb } = reading
+
+	if (available_mb === undefined) return Infinity
+	if (total_mb === undefined) return available_mb + ledger_mb
+
+	return available_mb + Math.min(ledger_mb, Math.max(0, total_mb - available_mb))
+}
+
 function machine_budget(cores: number, reading: MachineReading, ledger: LedgerLoad): MachineBudget {
 	const busy_excess = external_cores(reading.busy_cores, ledger.cores)
 
 	return {
 		cores: Math.max(0, cores - busy_excess),
-		memory_mb:
-			reading.available_mb === undefined ? Infinity : reading.available_mb + ledger.memory_mb,
+		memory_mb: memory_budget(reading, ledger.memory_mb),
 		memory_pressured: reading.memory_pressured,
 		busy_excess,
 		is_overloaded: is_overloaded(reading.run_queue, ledger.cores, cores),

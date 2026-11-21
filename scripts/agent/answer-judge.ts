@@ -118,6 +118,19 @@ function report_note(note: string): void {
 	console.error(note)
 }
 
+function exit_failure(
+	log_path: string,
+	exit_code: number | null,
+	ports: JudgePorts,
+): AnswerVerdict {
+	const transcript = ports.read_log(log_path)
+	const cause = `the judgment exited ${String(exit_code)} (log: ${log_path})`
+
+	return transcript !== undefined && agent_event.read(transcript).is_usage_limited === true
+		? answer_verdict.unavailable(`usage limit: ${cause}`)
+		: answer_verdict.failed(cause)
+}
+
 async function transcript_of(
 	resolved: ResolvedArgv,
 	directory: string,
@@ -132,9 +145,7 @@ async function transcript_of(
 	}
 
 	if (launched.exit_code !== SUCCESS_EXIT_CODE) {
-		return answer_verdict.failed(
-			`the judgment exited ${String(launched.exit_code)} (log: ${log_path})`,
-		)
+		return exit_failure(log_path, launched.exit_code, ports)
 	}
 
 	return (

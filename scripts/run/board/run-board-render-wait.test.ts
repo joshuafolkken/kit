@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#3689: the header is written the same while the run works and while it waits. The
-// wait is read off the mark and the `💓` that counts on from the run's last event, and neither line
-// gains a part for it. joshuafolkken/kit#3692: the `💓` stands under the run's `⏰`, in one column.
+// wait is read off the mark, and neither line gains a part for it. joshuafolkken/kit#8475: a run quiet
+// past its heartbeat says so in the notice slot, not in a time cell under the run's `⏰`.
 // What these cases pin is the header in each of the four states a run can be in: waiting, running,
 // waiting on a person, and ended.
 
@@ -17,12 +18,15 @@ const EMPTY_BAR = '─'.repeat(10)
 const COUNTS = `✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`
 // The second line's name column with no kit version recorded: `-` under the board's name.
 const VERSION_CELL = '  -'.padEnd('⏸ josh-board'.length)
-const BEAT_LINE = `${VERSION_CELL}  💓 5°35′49″  ${MACHINE_UNKNOWN}`
-// The run's last event is 5°35′49″ old: the wait has gone on that long, and the `💓` says so.
+// The time cell a running run leaves blank, as wide as the `⏰ 2°10′00″` over it.
+const BLANK_TIME = ' '.repeat(run_board_fit.width_of('⏰ 2°10′00″'))
+const SLOT_BLANK = '—'
+// The run's last event is 5°35′49″ old: the wait has gone on past any heartbeat, and the slot says so.
 const WAITED_MINUTES = 335
 const WAITED_SECONDS = 49
 const WAITED = WAITED_MINUTES * MINUTE + WAITED_SECONDS * SECOND
 const WAITING = { last_event_ms: NOW - WAITED, is_stopped: false }
+const BEAT_LINE = `${VERSION_CELL}  ${BLANK_TIME}  ${MACHINE_UNKNOWN}  ❗ no heartbeat ${WAITED_MINUTES}′`
 const WAIT_GLYPHS = /[⏸⌛]/u
 
 function row(number: number, state: BoardRow['state']): BoardRow {
@@ -37,7 +41,7 @@ function clock_of(layout: BoardLayout): string | undefined {
 }
 
 describe('run_board_render.render — the header while the run waits', () => {
-	it('draws the wait as the mark and, under the run’s age, the age of the last event', () => {
+	it('draws the wait as the mark and the missed heartbeat in the notice slot', () => {
 		expect(lines_of(header({ activity: WAITING })).slice(0, 2)).toStrictEqual([
 			`⏸ josh-board  ⏰ 2°10′00″  ${COUNTS}`,
 			BEAT_LINE,
@@ -45,13 +49,15 @@ describe('run_board_render.render — the header while the run waits', () => {
 	})
 
 	it.each([
-		['under an hour', 3 * MINUTE + 58 * SECOND, '💓    3′58″'],
-		['a second short of an hour', 59 * MINUTE + 59 * SECOND, '💓   59′59″'],
-		['over an hour', WAITED, '💓 5°35′49″'],
-	])('draws the age as the ⏰ is drawn, padded to its width, %s', (_span, waited, drawn) => {
+		['a few minutes', 3 * MINUTE + 58 * SECOND, SLOT_BLANK],
+		['a second short of an hour', 59 * MINUTE + 59 * SECOND, '❗ no heartbeat 59′'],
+		['over an hour', WAITED, `❗ no heartbeat ${WAITED_MINUTES}′`],
+	])('says the heartbeat in the notice slot after %s', (_span, waited, drawn) => {
 		const activity = { last_event_ms: NOW - waited, is_stopped: false }
 
-		expect(lines_of(header({ activity }))[1]).toContain(`${VERSION_CELL}  ${drawn}  `)
+		expect(lines_of(header({ activity }))[1]).toBe(
+			`${VERSION_CELL}  ${BLANK_TIME}  ${MACHINE_UNKNOWN}  ${drawn}`,
+		)
 	})
 
 	it('draws the second line of a waiting run as it draws a running run’s', () => {
@@ -78,14 +84,14 @@ describe('run_board_render.render — the header while the run waits', () => {
 })
 
 describe('run_board_render.render — the header once the run has ended', () => {
-	it('draws the minute an ended run ended under its length, where the 💓 stood', () => {
+	it('draws the minute an ended run ended under its length, and no heartbeat', () => {
 		const ended_ms = STARTED + 3 * MINUTE + 25 * SECOND
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms }))
 
 		expect(lines.slice(0, 2)).toStrictEqual([
 			`■ josh-board  ⏰ 3′25″  ${COUNTS}`,
-			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}`,
+			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}  ${SLOT_BLANK}`,
 		])
 	})
 })

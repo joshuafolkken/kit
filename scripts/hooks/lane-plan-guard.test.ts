@@ -14,6 +14,7 @@ const ROOT = make_suite_directory('lane-plan-guard-')
 const ISSUE = '4864'
 const LANE = path.join(ROOT, '.kit-lanes', ISSUE)
 const CHILD = { JOSH_LANE_CHILD: ISSUE }
+const AT_CHILD = { directory: LANE, source: CHILD }
 const RUNTIME_FILE = 'scripts/lane/lane-overrun.ts'
 const DOC_FILE = 'docs/why.md'
 const APPROVAL_FILE = `.josh/tmp/size-approval-${ISSUE}.json`
@@ -38,14 +39,14 @@ beforeEach(() => {
 
 describe('lane_plan_guard.reason', () => {
 	it("refuses a lane child's runtime edit before its plan is recorded", () => {
-		const reason = lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)
+		const reason = lane_plan_guard.reason(edit_of(RUNTIME_FILE), AT_CHILD)
 
 		expect(reason).toContain(`pnpm josh lane:plan ${ISSUE}`)
 	})
 
 	// joshuafolkken/kit#6676: `lane:plan` is documented on the lane page, split out of the run page.
 	it('points the refusal at the lane command page', () => {
-		const reason = lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)
+		const reason = lane_plan_guard.reason(edit_of(RUNTIME_FILE), AT_CHILD)
 
 		expect(reason).toContain('`docs/josh-commands-lane.md` → "`josh lane:plan`"')
 	})
@@ -55,24 +56,26 @@ describe('lane_plan_guard.reason', () => {
 	it('keeps refusing while the recorded plan is uncleared, naming the yield', () => {
 		lane_plan.record(PLAN, LANE)
 
-		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)).toContain('on `yield` end')
+		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), AT_CHILD)).toContain('on `yield` end')
 	})
 
 	it('lets the edit through once the plan is cleared', () => {
 		lane_plan.record({ ...PLAN, cleared: true }, LANE)
 
-		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)).toBeUndefined()
+		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), AT_CHILD)).toBeUndefined()
 	})
 
 	it('stays silent on a document edit', () => {
-		expect(lane_plan_guard.reason(edit_of(DOC_FILE), LANE, CHILD)).toBeUndefined()
+		expect(lane_plan_guard.reason(edit_of(DOC_FILE), AT_CHILD)).toBeUndefined()
 	})
 
 	it('stays silent in a session that is not the dispatched lane child', () => {
-		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, {})).toBeUndefined()
+		const other = { directory: LANE, source: { JOSH_LANE_CHILD: '4858' } }
+
 		expect(
-			lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, { JOSH_LANE_CHILD: '4858' }),
+			lane_plan_guard.reason(edit_of(RUNTIME_FILE), { ...AT_CHILD, source: {} }),
 		).toBeUndefined()
+		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), other)).toBeUndefined()
 	})
 })
 
@@ -82,7 +85,7 @@ describe('lane_plan_guard — Codex approval scratch records (#7398)', () => {
 		(tool_name) => {
 			const payload = patch_of([APPROVAL_FILE], tool_name)
 
-			expect(lane_plan_guard.reason(payload, LANE, CHILD)).toBeUndefined()
+			expect(lane_plan_guard.reason(payload, AT_CHILD)).toBeUndefined()
 		},
 	)
 
@@ -92,6 +95,6 @@ describe('lane_plan_guard — Codex approval scratch records (#7398)', () => {
 	])('refuses a mixed patch starting with %s before planning', (...paths) => {
 		const payload = patch_of(paths, 'apply_patch')
 
-		expect(lane_plan_guard.reason(payload, LANE, CHILD)).toContain('pnpm josh lane:plan')
+		expect(lane_plan_guard.reason(payload, AT_CHILD)).toContain('pnpm josh lane:plan')
 	})
 })

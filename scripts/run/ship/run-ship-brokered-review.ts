@@ -1,11 +1,13 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
 import {
 	lane_session_action,
+	type BrokerAction,
 	type BrokerAnswer,
 	type ReviewRound,
 } from '#scripts/lane/lane-session-action'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import type { RetryTrigger } from '#scripts/review/review-prompt-level'
 
 // A lane child's reviewers started by the lane's broker (`run-ship-reviewer.ts`). `/code-review` alone
 // omits `slots`, so a broker still on the code before them reads the request.
@@ -15,8 +17,19 @@ import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 // meets a broker that never learned them (joshuafolkken/kit#4672). Each slot then goes in turn as a
 // `/code-review` request — its brief staged at the code slot's file, its findings moved to its own — and
 // the code slot goes last, with its own brief put back.
+//
+// **A broker that cannot read `retry` still reviews**: the request is resent without it, so the rerun
+// launches under the slot's own trigger word (joshuafolkken/kit#8379).
 
 const { CODE } = review_attest.REVIEW_SLOT
+
+// The review a broker is asked for: its round, and the rerun cause its round-1 prompt names.
+interface ReviewCall {
+	round: ReviewRound
+	retry?: RetryTrigger | undefined
+}
+
+type ReviewAction = Extract<BrokerAction, { kind: 'review' }>
 
 function copy_stamp(source: string, target: string): void {
 	const text = stamp_file.read_stamp_text(source)
@@ -24,25 +37,29 @@ function copy_stamp(source: string, target: string): void {
 	if (text !== undefined) stamp_file.write_text_stamp(target, text)
 }
 
+function review_action({ round, retry }: ReviewCall): ReviewAction {
+	return retry === undefined ? { kind: 'review', round } : { kind: 'review', round, retry }
+}
+
 async function code_request(
 	directory: string,
 	issue: string,
-	round: ReviewRound,
+	review: ReviewCall,
 ): Promise<BrokerAnswer> {
-	return await lane_session_broker.request(directory, issue, { kind: 'review', round })
+	return await lane_session_broker.request(directory, issue, review_action(review))
 }
 
 async function staged_review(
 	directory: string,
 	issue: string,
-	round: ReviewRound,
+	review: ReviewCall,
 	slot: ReviewSlot,
 ): Promise<BrokerAnswer> {
 	const code = lane_session_broker.review_paths(directory)
 	const own = lane_session_broker.review_paths(directory, slot)
 
 	copy_stamp(own.brief, code.brief)
-	const answer = await code_request(directory, issue, round)
+	const answer = await code_request(directory, issue, review)
 
 	copy_stamp(code.findings, own.findings)
 	stamp_file.remove_stamp(code.findings)
@@ -54,51 +71,63 @@ async function staged_review(
 async function staged_reviews(
 	directory: string,
 	issue: string,
-	round: ReviewRound,
+	review: ReviewCall,
 	slots: ReadonlyArray<ReviewSlot>,
 ): Promise<ReadonlyArray<BrokerAnswer>> {
 	const [slot, ...rest] = slots
 	if (slot === undefined) return []
 
-	const answer = await staged_review(directory, issue, round, slot)
+	const answer = await staged_review(directory, issue, review, slot)
 
-	return [answer, ...(await staged_reviews(directory, issue, round, rest))]
+	return [answer, ...(await staged_reviews(directory, issue, review, rest))]
 }
 
 async function in_turn(
 	directory: string,
 	issue: string,
-	round: ReviewRound,
+	review: ReviewCall,
 	slots: ReadonlyArray<ReviewSlot>,
 ): Promise<BrokerAnswer> {
 	const code_brief = lane_session_broker.review_paths(directory).brief
 	const kept = stamp_file.read_stamp_text(code_brief)
 	const others = slots.filter((slot) => slot !== CODE)
-	const answers = [...(await staged_reviews(directory, issue, round, others))]
+	const answers = [...(await staged_reviews(directory, issue, review, others))]
 
 	if (kept !== undefined) stamp_file.write_text_stamp(code_brief, kept)
-	if (slots.includes(CODE)) answers.push(await code_request(directory, issue, round))
+	if (slots.includes(CODE)) answers.push(await code_request(directory, issue, review))
 
 	return answers.find((answer) => !answer.is_success) ?? lane_session_action.SUCCESS
 }
 
-async function request(
+async function slot_request(
 	directory: string,
 	issue: string,
-	round: ReviewRound,
+	review: ReviewCall,
 	slots: ReadonlyArray<ReviewSlot>,
 ): Promise<BrokerAnswer> {
-	if (slots.length === 1 && slots[0] === CODE) return await code_request(directory, issue, round)
+	if (slots.length === 1 && slots[0] === CODE) return await code_request(directory, issue, review)
 
 	const answer = await lane_session_broker.request(directory, issue, {
-		kind: 'review',
-		round,
+		...review_action(review),
 		slots,
 	})
 
 	if (!lane_session_broker.is_unreadable(answer)) return answer
 
-	return await in_turn(directory, issue, round, slots)
+	return await in_turn(directory, issue, review, slots)
+}
+
+async function request(
+	directory: string,
+	issue: string,
+	review: ReviewCall,
+	slots: ReadonlyArray<ReviewSlot>,
+): Promise<BrokerAnswer> {
+	const answer = await slot_request(directory, issue, review, slots)
+
+	if (review.retry === undefined || !lane_session_broker.is_unreadable(answer)) return answer
+
+	return await slot_request(directory, issue, { round: review.round }, slots)
 }
 
 const run_ship_brokered_review = { request }

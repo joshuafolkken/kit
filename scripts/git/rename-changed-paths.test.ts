@@ -135,7 +135,7 @@ describe('a green gate record taken while a file was renamed away', () => {
 			const base = await git_command.change_base_commit()
 			const recorded = await review_tree.read_changed_tree()
 
-			review_stamps.gate_stamp.write(recorded, fixture.stamp_path, base)
+			review_stamps.gate_stamp.write(recorded, { target: fixture.stamp_path, base })
 			await git(fixture.repository_root, ['checkout', base, '--', MODULE_FILE])
 
 			const restored = await review_tree.read_changed_tree()
@@ -156,7 +156,7 @@ describe('a green gate record taken while a file was renamed away', () => {
 			const base = await git_command.change_base_commit()
 			const tree = await review_tree.read_changed_tree()
 
-			review_stamps.gate_stamp.write(tree, fixture.stamp_path, base)
+			review_stamps.gate_stamp.write(tree, { target: fixture.stamp_path, base })
 
 			const other_base = await git_command.head_commit()
 
@@ -173,7 +173,7 @@ describe('a green gate record taken while a file was renamed away', () => {
 			const base = await git_command.change_base_commit()
 			const tree = await review_tree.read_changed_tree()
 
-			review_stamps.gate_stamp.write(tree, fixture.stamp_path, base)
+			review_stamps.gate_stamp.write(tree, { target: fixture.stamp_path, base })
 
 			expect(gate_skip.reusable_green_gate(tree, base, fixture.stamp_path)).toBeDefined()
 		},

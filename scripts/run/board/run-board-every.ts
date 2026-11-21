@@ -146,16 +146,18 @@ function record(
 // What a live board's worker thread calls after each round (`run-board-gather-record.ts`): records its
 // frames at most once every `RECORD_EVERY_MS`, from the first state whose plan read has settled. Drawn
 // in place, they take no read, and the store writes them without being awaited, so the next round waits
-// on neither.
-function recorder(ports: RecordPorts, theme: Theme | undefined): (state: BoardState) => void {
+// on neither. Answers whether it recorded.
+function recorder(ports: RecordPorts, theme: Theme | undefined): (state: BoardState) => boolean {
 	let next_ms = -Infinity
 
 	return (state) => {
 		const now_ms = ports.now()
 
-		if (ports.frames === undefined || read_ms(state) === undefined || now_ms < next_ms) return
+		if (ports.frames === undefined || read_ms(state) === undefined || now_ms < next_ms) return false
 		next_ms = now_ms + RECORD_EVERY_MS
 		record(state, ports, theme, now_ms)
+
+		return true
 	}
 }
 

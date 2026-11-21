@@ -4,6 +4,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { main_merge } from '#scripts/git/main-merge'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_registry } from './lane-registry'
 import { lane_resolve } from './lane-resolve'
 
 // joshuafolkken/kit#5837: `josh lane:resolve` answers `resolved`, `conflict <paths>` or
@@ -23,6 +24,7 @@ const parse_comments = vi.spyOn(issue_read, 'parse_comments')
 const merge = vi.spyOn(main_merge, 'merge')
 const git_read = vi.spyOn(git_spawn, 'read')
 const branch = vi.spyOn(git_command, 'branch')
+const find_lane = vi.spyOn(lane_registry, 'find_open_lane')
 
 function comment(body: string, is_trusted: boolean): IssueComment {
 	return { author: 'joshuafolkken', created_at: '2026-11-02T00:00:00Z', body, is_trusted }
@@ -40,6 +42,12 @@ async function fake_git(arguments_: Array<string>): Promise<string> {
 }
 
 beforeEach(() => {
+	find_lane.mockResolvedValue(
+		lane_registry.parse_block(
+			`worktree /lanes/${ISSUE}\nbranch refs/heads/${ISSUE}-lane`,
+			'/lanes',
+		),
+	)
 	list_comments.mockResolvedValue('[]')
 	parse_comments.mockResolvedValue([])
 	git_read.mockImplementation(fake_git)
@@ -47,6 +55,19 @@ beforeEach(() => {
 })
 
 describe('lane_resolve.resolve on the branch', () => {
+	it('merges on the registered slug branch (ac-8429)', async () => {
+		const slug = `${ISSUE}-legacy-implementation`
+
+		find_lane.mockResolvedValue(
+			lane_registry.parse_block(`worktree /lanes/${ISSUE}\nbranch refs/heads/${slug}`, '/lanes'),
+		)
+		branch.mockResolvedValue(slug)
+		merge.mockResolvedValue({ kind: 'merged', branch: 'main' })
+
+		await expect(lane_resolve.resolve(ISSUE)).resolves.toStrictEqual({ kind: 'resolved' })
+		expect(merge).toHaveBeenCalled()
+	})
+
 	it('refuses on another branch before any comment read or merge', async () => {
 		branch.mockResolvedValue('main')
 

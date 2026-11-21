@@ -205,7 +205,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🔒 <N>` — running or parked `run:solo` issue `<N>`: nothing starts until it merges, closes or loses the label; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, the parked half `epic_solo_parked`'s.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and waits …".
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
-- `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
+- `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title (a `docs/*.md` path or one under `.josh/tmp/` never counts); `backlog:next` answers "waits: its `<file>` overlaps …".
 - `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, an earlier run's too; an unread limit leaves it blank.
   An empty seat draws a `💺` line under the lanes rule: the first `blocked: #<N>: <cause>` while the newest launch was refused, the rest `no issue ready to start` when no waiting row is free to start, `held — <sentence>` while the ledger's open hold stops one that is.
   A hold that a session's driver restart ends, not a person, reads `driver restart pending — <sentence>`.
@@ -225,6 +225,14 @@ While the run is at its `planning` stage, the one row it launches next — a nam
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 
 **Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
+
+The live board writes why it ended to `.josh/tmp/run-board-exit.json` in the checkout.
+
+- Kinds: `tick` (the live loop threw outside a redraw), `uncaught`, `rejection`, `signal` (SIGHUP or SIGTERM) and `stdout` (a stdout `error`, such as a closed pipe). The first reason wins; Ctrl+C writes nothing.
+- A redraw that throws does not end the board: it redraws the last frame with a `redraw` warning on its last line and keeps going. It is written as kind `redraw`; the same failure again (same message and stack) only raises `count` and moves `last_at`, so the file stays one record long. Another failure replaces it, and an exit replaces it too.
+- Fields: the kind, the message, the stack, the time, the uptime and the pid; a `redraw` record also has `count` and `last_at`.
+- The next live board prints it as one line on stderr before it enters its screen, then removes the file: `run:board: the last live board exited abnormally …`, or for a `redraw` record `run:board: the last live board's redraw failed N time(s) (<reason>), from <time> to <last time>`.
+- An uncaught failure or a stdout error exits 1; SIGHUP exits 129.
 
 A running `fullrun #N`, `halfrun #N` or `prrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane.
 

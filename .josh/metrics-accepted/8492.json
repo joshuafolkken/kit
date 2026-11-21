@@ -1,0 +1,7 @@
+{
+	"reason": "the attest-retry trigger needs a Resume record and a provider phase builder (#8492)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}

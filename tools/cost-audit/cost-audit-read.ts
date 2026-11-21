@@ -38,6 +38,8 @@ interface AuditSession {
 	agent_type?: string | undefined
 	// Why a `resume` session was started (`cost-audit-resume.ts`); absent for every other kind.
 	trigger?: string | undefined
+	// The opening prompt's first text, which the reviewer trigger table reads (joshuafolkken/kit#8361).
+	prompt?: string | undefined
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
 	// issued none.
@@ -115,6 +117,7 @@ function session_of(text: string, is_delegated: boolean, is_lane = false): Audit
 		kind,
 		is_lane: is_lane && !is_delegated,
 		trigger,
+		prompt: parts.prompt,
 		records: cost_usage.dedupe(parts.records),
 		categories: parts.categories,
 		lines: parts.lines,

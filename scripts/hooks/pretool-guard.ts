@@ -106,17 +106,20 @@ function authority_outcome(raw_payload: string, context: HookContext): GuardOutc
 }
 
 function lane_plan_outcome(raw_payload: string, context: HookContext): GuardOutcome {
-	const reason = lane_plan_guard.reason(raw_payload, context.cwd, context.env)
+	const reason = lane_plan_guard.reason(raw_payload, {
+		directory: context.cwd,
+		source: context.env,
+	})
 
 	return { reason, notice: undefined, fault: undefined }
 }
 
-// The transcript guards take a clock before the context, so the call is judged at the wall clock.
+// The transcript guards default to the wall clock and read the call's own context.
 function clocked(
 	outcome: TranscriptGuard['outcome'],
 ): (raw_payload: string, context: HookContext) => GuardOutcome {
 	return function clocked_outcome(raw_payload: string, context: HookContext): GuardOutcome {
-		return outcome(raw_payload, Date.now(), context)
+		return outcome(raw_payload, { context })
 	}
 }
 
@@ -272,8 +275,10 @@ function rule_envelope(
 function emit(
 	raw_payload: string,
 	outcome: GuardOutcome,
-	rewrite?: RuleRewrite,
-	context: HookContext = hook_context.from_process(),
+	{
+		rewrite,
+		context = hook_context.from_process(),
+	}: { rewrite?: RuleRewrite | undefined; context?: HookContext | undefined } = {},
 ): void {
 	const is_lane_child = lane_child_marker.is_child_of.bind(undefined, context.cwd, context.env)
 	const envelope =
@@ -290,8 +295,10 @@ function emit(
 async function record_refusal(
 	judged_payload: string,
 	outcome: GuardOutcome,
-	context: HookContext = hook_context.from_process(),
-	demoted: ReadonlySet<string> = hook_demoted.rules(context.env),
+	{
+		context,
+		demoted = hook_demoted.rules(context.env),
+	}: { context: HookContext; demoted?: ReadonlySet<string> | undefined },
 ): Promise<void> {
 	const refusal = outcome.reason ?? hook_demoted.refusal_of(outcome.notice, demoted)
 
@@ -314,8 +321,8 @@ async function respond(
 	bash_revert.stamp(judged, context.cwd)
 	const outcome = await pretool_outcome_async(judged, context)
 
-	emit(judged, outcome, rewrite, context)
-	await record_refusal(judged, outcome, context)
+	emit(judged, outcome, { rewrite, context })
+	await record_refusal(judged, outcome, { context })
 }
 
 const pretool_guard = {
