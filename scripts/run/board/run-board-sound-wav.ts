@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, readSync } from 'node:fs'
 import path from 'node:path'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { usage_state_path } from '#scripts/usage/usage-state-path'
@@ -11,6 +11,8 @@ import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 
 const SAMPLE_RATE = 44_100
 const HEADER_BYTES = 44
+// The fmt chunk's sample rate: after the RIFF tag, size, WAVE tag, fmt tag, chunk size, format and channels.
+const RATE_OFFSET = 24
 // The RIFF size counts the bytes after its own field: the header less the `RIFF` tag and the size.
 const RIFF_UNCOUNTED_BYTES = 8
 const FMT_CHUNK_BYTES = 16
@@ -147,6 +149,28 @@ function cached_samples(
 	)
 }
 
-const run_board_sound_wav = { SAMPLE_RATE, HEADER_BYTES, cached_samples, cached_wav, wav_of }
+// The sample rate a WAV file's fmt chunk records, read from its header alone, so a raw-PCM player
+// plays each file at its own rate (joshuafolkken/kit#8365); throws when the file cannot be read.
+function rate_of(file: string): number {
+	const header = Buffer.alloc(HEADER_BYTES)
+	const descriptor = openSync(file, 'r')
+
+	try {
+		readSync(descriptor, header, 0, HEADER_BYTES, 0)
+	} finally {
+		closeSync(descriptor)
+	}
+
+	return header.readUInt32LE(RATE_OFFSET)
+}
+
+const run_board_sound_wav = {
+	SAMPLE_RATE,
+	HEADER_BYTES,
+	cached_samples,
+	cached_wav,
+	rate_of,
+	wav_of,
+}
 
 export { run_board_sound_wav }

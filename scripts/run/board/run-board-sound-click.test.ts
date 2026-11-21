@@ -97,6 +97,15 @@ describe('run_board_sound_click.typing_samples (ac-4fc27476)', () => {
 		expect(samples.slice(unit, unit + key.length)).toStrictEqual(key)
 		expect(samples.slice(key.length, unit).every((value) => value === 0)).toBe(true)
 	})
+
+	it('cuts each click off at the next one at a pace faster than the click', () => {
+		const fast_ms = 2
+		const unit = samples_in(fast_ms * LETTERS_PER_CLICK)
+		const samples = typing_samples(fast_ms)
+
+		expect(samples).toHaveLength(unit * CLICKS)
+		expect(samples.slice(unit, unit + unit)).toStrictEqual(samples.slice(0, unit))
+	})
 })
 
 describe('run_board_sound_click.typing_wav', () => {

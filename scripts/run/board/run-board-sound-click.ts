@@ -70,12 +70,13 @@ function click(random: Random = seeded()): Array<number> {
 	})
 }
 
-// `CLICKS` units of one click then silence, each `LETTERS_PER_CLICK` letters long, as 16-bit samples.
+// `CLICKS` units of one click then silence, each `LETTERS_PER_CLICK` letters long, as 16-bit samples;
+// a pace faster than the click cuts each click off at the next.
 function typing_samples(letter_ms: number): Int16Array {
 	const unit = Math.round((letter_ms * LETTERS_PER_CLICK * SAMPLE_RATE) / MS_PER_SECOND)
 	const key = Int16Array.from(click(), (value) =>
 		Math.round(value * run_board_sound_synth.FULL_SCALE),
-	)
+	).subarray(0, unit)
 	const samples = new Int16Array(unit * CLICKS)
 
 	for (let index = 0; index < CLICKS; index++) samples.set(key, index * unit)

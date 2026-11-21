@@ -150,6 +150,20 @@ describe('run_board_sound_wav.cached_samples', () => {
 	})
 })
 
+// joshuafolkken/kit#8365: a raw-PCM player plays each WAV at the rate its header records.
+describe('run_board_sound_wav.rate_of', () => {
+	it('reads each file’s rate back from its header', () => {
+		const RATE = 48_000
+		const directory = create_directory(DIRECTORY_PREFIX)
+		const click = cached_samples('click', SAMPLES, RATE, directory) ?? ''
+		const cue = cached_wav('cue', NOTES, directory) ?? ''
+
+		expect(run_board_sound_wav.rate_of(click)).toBe(RATE)
+		expect(run_board_sound_wav.rate_of(cue)).toBe(SAMPLE_RATE)
+		expect(() => run_board_sound_wav.rate_of(path.join(directory, 'missing.wav'))).toThrow()
+	})
+})
+
 describe('run_board_sound_wav persistent cache', () => {
 	it('skips synthesis when a fresh module reuses persistent audio (ac-68d0a7ed)', async () => {
 		const directory = create_directory(DIRECTORY_PREFIX)

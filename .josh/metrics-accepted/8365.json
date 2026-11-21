@@ -2,6 +2,6 @@
 	"reason": "#8365 adds the matrix key-click synthesizer (run-board-sound-click.ts), its cached WAV and theme wiring",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 149
+		"scripts.code_lines": 175
 	}
 }
