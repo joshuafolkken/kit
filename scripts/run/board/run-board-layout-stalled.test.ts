@@ -92,6 +92,33 @@ describe('run_board_layout stop and decision reasons', () => {
 	})
 })
 
+// joshuafolkken/kit#8525: a child that parked itself through `run:park` leaves a bare `#N parked`
+// event; its `needs-decision` label alone makes it a 🙋 row with the park comment's next action.
+describe('run_board_layout — a bare park on a decision label', () => {
+	const PARKED = 8478
+	const OUTCOME = 'pnpm josh lane:launch 8478 parent: file A/B/C splits first'
+	const bare = new Map<number, ItemStatus>([[PARKED, { state: 'parked', started_ms: 1 }]])
+
+	it('draws it as a 🙋 row whose tail keeps the park outcome (ac-4aaa35aa, ac-f666ee01)', () => {
+		const labels = new Map([[PARKED, ['enhancement', NEEDS_DECISION_LABEL]]])
+		const pause_reasons = new Map([[PARKED, { summary: OUTCOME, url: undefined, at_ms: 2 }]])
+		const layout = run_board_layout.layout_of({ ...plan_of([], labels), pause_reasons }, bare)
+		const [row] = layout.active
+
+		expect(row?.state).toBe('human')
+		expect(row?.reason?.tail).toContain(OUTCOME)
+		expect(run_board_layout.people_of(layout).map((item) => item.number)).toStrictEqual([PARKED])
+		expect(run_board_layout.listed_parks(layout).has(PARKED)).toBe(false)
+	})
+
+	it('keeps a bare park without a human-stop label a 💤 row (ac-19f5f4a1)', () => {
+		const labels = new Map([[PARKED, [RUN_STALLED_LABEL]]])
+		const [row] = run_board_layout.layout_of(plan_of([], labels), bare).active
+
+		expect(row?.state).toBe('parked')
+	})
+})
+
 describe('run_board_layout live backlog retry', () => {
 	it('draws live retry on plan and unexplained touched rows (ac-26bb1f1e)', () => {
 		const labels = new Map([[STALLED, [RUN_STALLED_LABEL]]])

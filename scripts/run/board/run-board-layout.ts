@@ -18,6 +18,7 @@ import type {
 	RowRead,
 	RowReason,
 } from './run-board-layout-types'
+import { run_board_parked_decision } from './run-board-parked-decision'
 import { run_board_retry_wait } from './run-board-retry-wait'
 import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
@@ -93,7 +94,7 @@ function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'
 // A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
 // child does; its tail names the decision that resumes it.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
-	const is_asked = status.state === 'parked' && run_board_human.is_decision(status.reason)
+	const is_asked = run_board_parked_decision.is_parked_decision(number, status, read)
 	const labels = read.labels.get(number)
 
 	return {
