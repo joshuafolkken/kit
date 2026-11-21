@@ -59,11 +59,16 @@ function lane_time_of(row: BoardRow, now_ms: number): LaneTime | undefined {
 	return recorded(row) ?? counted(row.status, end_of(row, now_ms))
 }
 
-// The net time alone, for a column of a fixed width — a lane row's (`run-board-render-lead.ts`).
-function net_of(row: BoardRow, now_ms: number): string | undefined {
-	const time = lane_time_of(row, now_ms)
+// The net time's length alone, for a column of a fixed width — a lane row's (`run-board-render-lead.ts`).
+function net_ms_of(row: BoardRow, now_ms: number): number | undefined {
+	return lane_time_of(row, now_ms)?.elapsed_ms
+}
 
-	return time === undefined ? undefined : span_of(time.elapsed_ms)
+// The net time alone.
+function net_of(row: BoardRow, now_ms: number): string | undefined {
+	const elapsed_ms = net_ms_of(row, now_ms)
+
+	return elapsed_ms === undefined ? undefined : span_of(elapsed_ms)
 }
 
 // The net time, with the host's stops it left out beside it where there were any:
@@ -103,6 +108,7 @@ function stops_width(header: BoardHeader): number {
 }
 
 const run_board_render_time = {
+	net_ms_of,
 	net_of,
 	stops_length,
 	stops_width,

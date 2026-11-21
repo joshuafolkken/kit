@@ -11,6 +11,10 @@ import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 // The open lanes an earlier invocation dispatched that still claim their issue: `in-progress`, and not
 // stopped for a person's review. Their unit may have died across the hand-off, so the drive collects
 // them; a lane parked or held for review is a person's and is left alone.
+// A paused lane is resumed only when its owning run has ended: an ended record matches its
+// `started_at`, or the current carry holds a different `started_at` (a later run). A supervisor
+// hand-off keeps `started_at` and swaps only the owner pid, so a person's `lane:pause` inside the
+// same run survives it. With no readable carry, a dead owner pid decides.
 
 const RESUME_COMMAND = 'lane:resume'
 
@@ -22,13 +26,21 @@ async function is_claimed(issue: string): Promise<boolean> {
 	return has_label_name(read.state.labels, IN_PROGRESS_LABEL) && !read.state.is_human_review
 }
 
-function is_ended(run: LaneRun, directory: string): boolean {
-	if (run_carry_ended.has_ended(run_carry_ended.ended_path(directory), run.started_at)) return true
-
+function is_owner_dead(run: LaneRun): boolean {
 	return (
 		run.owner_pid !== undefined &&
 		process_identity.is_same_process(run.owner_pid, undefined) === false
 	)
+}
+
+function is_ended(run: LaneRun, directory: string): boolean {
+	if (run_carry_ended.has_ended(run_carry_ended.ended_path(directory), run.started_at)) return true
+
+	const read = run_carry.read_carry(run_carry.carry_path(directory))
+
+	if (read.kind === 'carried') return read.carry.started_at !== run.started_at
+
+	return is_owner_dead(run)
 }
 
 async function resume_stopped(issue: string, directory: string): Promise<void> {
