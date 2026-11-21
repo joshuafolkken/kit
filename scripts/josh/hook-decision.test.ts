@@ -201,7 +201,7 @@ describe('hook_decision — a fault is reported instead of being swallowed', () 
 		mkdirSync(UNREADABLE_TRANSCRIPT, { recursive: true })
 
 		const raw = payload_text(UNREADABLE_TRANSCRIPT)
-		const { reason, fault } = guard_over(STAMP_PREFIX, true).outcome(raw, NOW_MS)
+		const { reason, fault } = guard_over(STAMP_PREFIX, true).outcome(raw, { now_ms: NOW_MS })
 
 		expect(reason).toBeUndefined()
 		expect(fault).toContain(OTHER_SWITCH_KEY)
@@ -213,7 +213,7 @@ describe('hook_decision — a fault is reported instead of being swallowed', () 
 	it('stays silent where the transcript does not exist yet', () => {
 		const raw = payload_text(MISSING_TRANSCRIPT)
 
-		expect(guard_over(STAMP_PREFIX, true).outcome(raw, NOW_MS).fault).toBeUndefined()
+		expect(guard_over(STAMP_PREFIX, true).outcome(raw, { now_ms: NOW_MS }).fault).toBeUndefined()
 	})
 
 	// The refusal-only shape is what the other two guards still call, so it has to keep answering
@@ -223,7 +223,7 @@ describe('hook_decision — a fault is reported instead of being swallowed', () 
 
 		const raw = payload_text(UNREADABLE_TRANSCRIPT)
 
-		expect(guard_over(STAMP_PREFIX, true).refusal(raw, NOW_MS)).toBeUndefined()
+		expect(guard_over(STAMP_PREFIX, true).refusal(raw, { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	// The refusal rests on the stamp: without one the same call could be refused again and wedge the
@@ -236,7 +236,7 @@ describe('hook_decision — a fault is reported instead of being swallowed', () 
 
 		mkdirSync(guard.refusal_path(TRANSCRIPT), { recursive: true })
 
-		expect(guard.outcome(payload_text(), NOW_MS).fault).toBe(
+		expect(guard.outcome(payload_text(), { now_ms: NOW_MS }).fault).toBe(
 			hook_decision.stamp_fault(OTHER_SWITCH_KEY),
 		)
 	})
@@ -308,10 +308,9 @@ describe('hook_decision — the optional notice disposition emits a notice', () 
 	beforeEach(clear_notify_records)
 
 	it('returns a notice, not a reason, where the notify rule fires and the block rule does not', () => {
-		const { reason, notice } = notify_guard(false, true).outcome(
-			payload_text(NOTIFY_TRANSCRIPT),
-			NOW_MS,
-		)
+		const { reason, notice } = notify_guard(false, true).outcome(payload_text(NOTIFY_TRANSCRIPT), {
+			now_ms: NOW_MS,
+		})
 
 		expect(reason).toBeUndefined()
 		expect(notice).toBe(NOTICE_TEXT)
@@ -322,16 +321,15 @@ describe('hook_decision — the optional notice disposition emits a notice', () 
 		const guard = notify_guard(false, true)
 		const raw = payload_text(NOTIFY_TRANSCRIPT)
 
-		expect(guard.outcome(raw, NOW_MS).notice).toBe(NOTICE_TEXT)
-		expect(guard.outcome(raw, NOW_MS).notice).toBeUndefined()
+		expect(guard.outcome(raw, { now_ms: NOW_MS }).notice).toBe(NOTICE_TEXT)
+		expect(guard.outcome(raw, { now_ms: NOW_MS }).notice).toBeUndefined()
 	})
 
 	// The block path decides first, so a call both rules would fire on is refused, not merely noticed.
 	it('prefers the refusal where both rules would fire', () => {
-		const { reason, notice } = notify_guard(true, true).outcome(
-			payload_text(NOTIFY_TRANSCRIPT),
-			NOW_MS,
-		)
+		const { reason, notice } = notify_guard(true, true).outcome(payload_text(NOTIFY_TRANSCRIPT), {
+			now_ms: NOW_MS,
+		})
 
 		expect(reason).toBe(REASON)
 		expect(notice).toBeUndefined()
@@ -346,14 +344,15 @@ describe('hook_decision — the notice does not disturb the refusal', () => {
 	it('leaves the refusal free to fire after a notice has fired', () => {
 		const raw = payload_text(NOTIFY_TRANSCRIPT)
 
-		expect(notify_guard(false, true).outcome(raw, NOW_MS).notice).toBe(NOTICE_TEXT)
-		expect(notify_guard(true, false).outcome(raw, NOW_MS).reason).toBe(REASON)
+		expect(notify_guard(false, true).outcome(raw, { now_ms: NOW_MS }).notice).toBe(NOTICE_TEXT)
+		expect(notify_guard(true, false).outcome(raw, { now_ms: NOW_MS }).reason).toBe(REASON)
 	})
 
 	// A guard that supplies no notify spec is unchanged: the notice is simply never set.
 	it('never sets a notice for a guard with no notify spec', () => {
 		expect(
-			guard_over(STAMP_PREFIX, false).outcome(payload_text(NOTIFY_TRANSCRIPT), NOW_MS).notice,
+			guard_over(STAMP_PREFIX, false).outcome(payload_text(NOTIFY_TRANSCRIPT), { now_ms: NOW_MS })
+				.notice,
 		).toBeUndefined()
 	})
 })

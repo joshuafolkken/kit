@@ -334,7 +334,7 @@ function delivery(
 	context: HookContext = hook_context.from_process(),
 ): string | undefined {
 	for (const guard of GUARDS.values()) {
-		const reason = guard.refusal(raw_payload, now_ms, context)
+		const reason = guard.refusal(raw_payload, { now_ms, context })
 
 		if (reason !== undefined) return reason
 	}

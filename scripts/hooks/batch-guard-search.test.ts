@@ -56,19 +56,25 @@ describe('batch_refusal — the search chain a lane child is still refused for',
 	it('refuses a third single-call search while the investigation guard stays silent', () => {
 		process.env[INVESTIGATION_SWITCH] = SWITCHED_OFF
 
-		expect(batch_refusal(payload_of('lane-search', SEARCHES), NOW_MS)).toContain('batching')
+		expect(batch_refusal(payload_of('lane-search', SEARCHES), { now_ms: NOW_MS })).toContain(
+			'batching',
+		)
 	})
 
 	// Only one reason surfaces per call; the investigation refusal is the one that names delegation, so
 	// the search refusal steps aside rather than spend that guard's stamp unseen.
 	it('stands aside where the investigation guard refuses the same call', () => {
-		expect(batch_refusal(payload_of('lane-search-investigated', SEARCHES), NOW_MS)).toBeUndefined()
+		expect(
+			batch_refusal(payload_of('lane-search-investigated', SEARCHES), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 
 	it('lets a chain through when an earlier turn read a file rather than searched', () => {
 		process.env[INVESTIGATION_SWITCH] = SWITCHED_OFF
 		const commands = ['cat scripts/hooks/batch-guard.ts', SEARCHES[1] ?? GREP]
 
-		expect(batch_refusal(payload_of('lane-read-then-search', commands), NOW_MS)).toBeUndefined()
+		expect(
+			batch_refusal(payload_of('lane-read-then-search', commands), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 })
