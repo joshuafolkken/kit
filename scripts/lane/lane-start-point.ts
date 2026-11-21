@@ -17,9 +17,8 @@ import { git_remote_branch } from '#scripts/git/git-remote-branch'
 
 const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
 
-// A fetch *failure* is reported and stepped over rather than raised. `lane:open` has to keep working
-// with no network at all — offline, and on a clone with no `origin` — and what it degrades to is
-// whatever `origin/<default>` already holds, which is still never *behind* the local branch. A
+// A default-branch fetch failure is reported and stepped over after PR resolution has established
+// that a new branch is safe. It degrades to whatever `origin/<default>` already holds. A
 // connection that hangs rather than failing degrades the same way: `fetch_branch` runs through
 // `git_spawn.read_remote`, whose budget ends the wait as a failure.
 async function refresh_default_branch(default_branch: string): Promise<void> {
@@ -151,12 +150,18 @@ async function remote_reference_for(branch_name: string): Promise<string | undef
  * **Nothing here deletes a branch to simplify the call.** That is what would lose the commits this
  * function exists to keep.
  */
-async function resolve_for_branch(branch_name: string): Promise<string | undefined> {
+async function resolve_for_branch(
+	branch_name: string,
+	is_pull_request = false,
+): Promise<string | undefined> {
 	if (await git_command.branch_exists(branch_name)) {
 		report_reuse(branch_name, 'local')
 
 		return undefined
 	}
+
+	// An open PR proves the head exists: never replace an unreadable head with main.
+	if (is_pull_request) return await present_reference(branch_name)
 
 	const remote_reference = await remote_reference_for(branch_name)
 

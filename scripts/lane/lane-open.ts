@@ -11,10 +11,10 @@ import { lane_environment } from './lane-environment'
 import { lane_install, type InstallResult } from './lane-install'
 import { lane_leftover } from './lane-leftover'
 import { lane_paths } from './lane-paths'
+import { lane_pr_branch, type LaneBranch } from './lane-pr-branch'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seat, type SeatReservation } from './lane-seat'
 import { lane_setup } from './lane-setup'
-import { lane_start_point } from './lane-start-point'
 import { lane_state } from './lane-state'
 import { lane_state_record } from './lane-state-record'
 
@@ -27,6 +27,7 @@ import { lane_state_record } from './lane-state-record'
 
 interface LanePlan {
 	lane: LaneInfo
+	start_point: string | undefined
 	environment_content: string
 	// The seat lock covers creation and installation; dispatch acquires its own lease.
 	reservation: SeatReservation
@@ -102,6 +103,7 @@ async function build_plan(
 	repository_root: string,
 	root: string,
 	issue: string,
+	branch: LaneBranch,
 ): Promise<LanePlan | undefined> {
 	const root_content = read_root_environment(repository_root)
 	const reservation = await lane_seat.reserve(root, issue)
@@ -111,16 +113,18 @@ async function build_plan(
 	const environment_content = lane_environment.lane_file_content(root_content, reservation.seat)
 
 	return {
-		lane: build_lane(root, issue, reservation.seat, environment_content),
+		lane: {
+			...build_lane(root, issue, reservation.seat, environment_content),
+			branch: branch.branch,
+		},
+		start_point: branch.start_point,
 		environment_content,
 		reservation,
 	}
 }
 
-async function add_worktree(lane: LaneInfo): Promise<void> {
+async function add_worktree(lane: LaneInfo, start_point: string | undefined): Promise<void> {
 	mkdirSync(path.dirname(lane.directory), { recursive: true })
-
-	const start_point = await lane_start_point.resolve_for_branch(lane.branch)
 
 	await git_worktree.worktree_add(lane.directory, lane.branch, start_point)
 	await git_worktree.set_upstream(lane.branch)
@@ -151,7 +155,7 @@ async function add_worktree(lane: LaneInfo): Promise<void> {
 async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 	// Keep the reservation until installation ends, including its failure paths.
 	try {
-		await add_worktree(plan.lane)
+		await add_worktree(plan.lane, plan.start_point)
 		lane_registry.write_environment(plan.lane.directory, plan.environment_content)
 		lane_cache.seed_caches(source_root, plan.lane.directory)
 		lane_cache.seed_hook_bundles(source_root, plan.lane.directory)
@@ -184,6 +188,14 @@ async function opened(lane: LaneInfo): Promise<OpenOutcome> {
 	return { kind: 'opened', lane }
 }
 
+async function finish_plan(plan: LanePlan | undefined, source_root: string): Promise<OpenOutcome> {
+	if (plan === undefined) return FULL_OUTCOME
+
+	await materialize(plan, source_root)
+
+	return await opened(plan.lane)
+}
+
 /**
  * Open the lane for `issue`, or say why it was not opened.
  *
@@ -198,6 +210,7 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 	const repository_root = await lane_registry.main_repository_root()
 	const lanes = await lane_registry.list_lanes()
 	const existing = lane_registry.find_lane(lanes, issue)
+	const branch = await lane_pr_branch.resolve(issue, existing)
 
 	if (existing !== undefined) return { kind: 'already-open', lane: existing }
 
@@ -205,13 +218,9 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 
 	await clear_the_way(root, issue, lanes)
 
-	const plan = await build_plan(repository_root, root, issue)
+	const plan = await build_plan(repository_root, root, issue, branch)
 
-	if (plan === undefined) return FULL_OUTCOME
-
-	await materialize(plan, repository_root)
-
-	return await opened(plan.lane)
+	return await finish_plan(plan, repository_root)
 }
 
 const lane_open = {

@@ -3,6 +3,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { git_worktree } from '#scripts/git/git-worktree'
+import { lane_registered_branch } from './lane-registered-branch'
 import { lane_resolve } from './lane-resolve'
 
 // `josh lane:resolve <issue> --record [<path>...]` — step 4 of `backlogrun-recovery.md`'s
@@ -34,7 +35,7 @@ async function origin_commit(branch: string): Promise<string> {
 
 async function unpushed(issue: string): Promise<string | undefined> {
 	if (await is_merging()) return 'the merge is not concluded — conclude and push it first'
-	const branch = `${issue}${lane_resolve.LANE_BRANCH_SUFFIX}`
+	const branch = await lane_registered_branch.read(issue)
 	const [head, origin] = await Promise.all([git_command.head_commit(), origin_commit(branch)])
 
 	if (head === origin) return undefined

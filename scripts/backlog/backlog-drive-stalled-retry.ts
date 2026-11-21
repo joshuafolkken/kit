@@ -9,7 +9,7 @@ import { absent_required } from '#scripts/gh/git-pr-checks-missing'
 import { parse_pr_state_snapshot } from '#scripts/gh/git-pr-checks-parse'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
-import { lane_paths } from '#scripts/lane/lane-paths'
+import { lane_registered_branch } from '#scripts/lane/lane-registered-branch'
 import { run_add } from '#scripts/run/add/run-add'
 import { run_add_issue } from '#scripts/run/add/run-add-issue'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
@@ -52,7 +52,7 @@ interface SweepContext {
 // would only time out again. No pull request, or one that cannot be read, is not shown cleared.
 async function is_followup_clear(issue: number): Promise<boolean> {
 	try {
-		const branch = lane_paths.lane_branch(String(issue))
+		const branch = await lane_registered_branch.read(String(issue))
 		const { snapshot_json } = await git_gh_pr_snapshot.pr_get_checks_snapshot(branch)
 		const snapshot = parse_pr_state_snapshot(snapshot_json)
 
