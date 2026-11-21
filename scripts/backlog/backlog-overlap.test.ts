@@ -20,8 +20,7 @@ const THIRD = 3303
 const RUNNING = 3304
 const SHARED = 'scripts/run/ship/run-ship.ts'
 const IDLE: BusyRead = { kind: 'idle' }
-// The directory the glob `scripts/lines/**` names.
-const LINES_DIRECTORY = 'scripts/lines/'
+const LINES_GLOB = 'scripts/lines/**'
 const RUN_DIRECTORY = 'scripts/run/'
 
 // The paths joshuafolkken/kit#3582 and joshuafolkken/kit#3586 declared, abridged.
@@ -81,12 +80,15 @@ describe('backlog_overlap.declared_paths', () => {
 		)
 	})
 
-	it('reads a directory glob as the directory it names', () => {
+	it('keeps a glob as the pattern it writes, never as a file', () => {
 		const body = '`scripts/lines/**`, `tools/metrics/*.ts` and `.github/workflows/`'
+		const declared = backlog_overlap.declared_paths(body)
 
-		expect(backlog_overlap.declared_paths(body)).toStrictEqual(
-			new Set([LINES_DIRECTORY, 'tools/metrics/', '.github/workflows/']),
+		expect(declared).toStrictEqual(
+			new Set([LINES_GLOB, 'tools/metrics/*.ts', '.github/workflows/']),
 		)
+		expect([...declared].filter((path) => backlog_overlap.is_file_claim(path))).toStrictEqual([])
+		expect(backlog_overlap.is_file_claim(SHARED)).toBe(true)
 	})
 
 	it('drops a directory one segment deep and an issue reference', () => {
@@ -302,7 +304,7 @@ describe('backlog_overlap.running_clash', () => {
 	it('answers the path a candidate declares inside what a running issue declares', () => {
 		expect(backlog_overlap.running_clash(child(FIRST), DECLARED, HOLDING)).toStrictEqual({
 			path: 'scripts/lines/effective-limit.ts',
-			claimed: LINES_DIRECTORY,
+			claimed: LINES_GLOB,
 			holder: RUNNING,
 		})
 	})
