@@ -5,8 +5,9 @@ import { process_identity } from '#scripts/josh/process-identity'
 import type { LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { LaneRun } from '#scripts/lane/lane-state-record'
-import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
+import { backlog_drive_named } from './backlog-drive-named'
 
 // The open lanes an earlier invocation dispatched that still claim their issue: `in-progress`, and not
 // stopped for a person's review. Their unit may have died across the hand-off, so the drive collects
@@ -79,13 +80,23 @@ async function carried(lanes: ReadonlyArray<LaneInfo>): Promise<ReadonlyArray<st
 	const dispatched = lanes.filter((lane) => lane.output !== undefined).map((lane) => lane.issue)
 	const claims = await Promise.all(dispatched.map(async (issue) => await is_claimed(issue)))
 
-	const claimed = dispatched.filter((_issue, index) => claims[index] === true)
-
-	await resume_carried(claimed)
-
-	return claimed
+	return dispatched.filter((_issue, index) => claims[index] === true)
 }
 
-const backlog_drive_carried = { carried }
+// The run settles which carried lanes it owns first, then adopts only those: a `--only` run leaves a
+// lane it does not name paused for the next draining run (joshuafolkken/kit#8460).
+async function adopt_owned(
+	carry: RunCarry,
+	candidates: ReadonlyArray<string>,
+	is_only: boolean,
+): Promise<ReadonlyArray<string>> {
+	const owned = backlog_drive_named.own_carried(carry, candidates, is_only)
+
+	await resume_carried(owned)
+
+	return owned
+}
+
+const backlog_drive_carried = { carried, resume_carried, adopt_owned }
 
 export { backlog_drive_carried }
