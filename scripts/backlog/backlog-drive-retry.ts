@@ -45,7 +45,9 @@ async function park_protected(issue: number, cause: number, label: string): Prom
 
 // Every automatic re-offer goes through `run:add --retry`, which records the `retry #N` attempt.
 async function add_retry(issue: number, what: string): Promise<void> {
-	const result = await josh_command.josh_run(['run:add', String(issue), '--retry'], true)
+	const result = await josh_command.josh_run(['run:add', String(issue), '--retry'], {
+		should_forward_stderr: true,
+	})
 
 	if (result.code !== 0) throw new Error(`Could not retry ${what}.`)
 }

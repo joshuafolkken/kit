@@ -180,7 +180,7 @@ describe('backlog_drive_stalled_retry.sweep — an escalation park', () => {
 		expect(git_gh_issue_write.issue_add_label).toHaveBeenCalledWith(String(ISSUE), SONNET_LABEL)
 		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
 			['run:add', String(ISSUE), '--retry'],
-			true,
+			{ should_forward_stderr: true },
 		)
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 	})

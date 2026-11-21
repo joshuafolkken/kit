@@ -62,9 +62,9 @@ async function measured<T>(cycle: () => Promise<T>): Promise<T> {
  */
 async function offer_run(argv: ReadonlyArray<string>): Promise<JoshResult> {
 	return await measured(async () => {
-		await josh_command.josh_run([PRUNE_COMMAND], true)
+		await josh_command.josh_run([PRUNE_COMMAND], { should_forward_stderr: true })
 
-		return await josh_command.josh_run(argv, true)
+		return await josh_command.josh_run(argv, { should_forward_stderr: true })
 	})
 }
 

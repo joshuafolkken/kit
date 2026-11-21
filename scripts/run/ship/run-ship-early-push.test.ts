@@ -31,7 +31,7 @@ describe('run_ship_early_push.push', () => {
 
 		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
 			['git', '-y', '--skip-commit', ...ARGS.body, ARGS.title],
-			true,
+			{ should_forward_stderr: true },
 		)
 		expect(early_push_record.record).toHaveBeenCalledWith('ship', 'pushed')
 	})

@@ -94,7 +94,7 @@ async function read(
 		async () => {
 			run_startup.metric('cache', 'fill', `${NEXT_CACHE.prefix}:${key}`)
 
-			return await josh_command.josh_run(argv, should_forward_stderr, timeout_ms)
+			return await josh_command.josh_run(argv, { should_forward_stderr, timeout_ms })
 		},
 		{ edge_of },
 	)

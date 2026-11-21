@@ -125,7 +125,9 @@ describe('backlog:drive with the real epic command and local capacity', () => {
 
 		await backlog_drive.run_pass(backlog_drive_fixture.state([RUNNING]), true, epic_ports)
 
-		expect(josh_command.josh_run).toHaveBeenCalledWith(['epic:next', ...ARGV], true)
+		expect(josh_command.josh_run).toHaveBeenCalledWith(['epic:next', ...ARGV], {
+			should_forward_stderr: true,
+		})
 		expect(calls).toContain(`launch ${CHILD}`)
 	})
 })

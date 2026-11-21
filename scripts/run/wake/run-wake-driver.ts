@@ -248,7 +248,7 @@ async function run_driver(
 	args: ReadonlyArray<string>,
 	remaining: number,
 ): Promise<JoshResult | undefined> {
-	const result = await josh_command.josh_run(args, true)
+	const result = await josh_command.josh_run(args, { should_forward_stderr: true })
 
 	run_wake_resume.remember(pass.target, pass.carry, result)
 	if (is_verdict(result, [WINDOW_VERDICT])) return undefined
