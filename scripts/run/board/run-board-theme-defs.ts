@@ -39,6 +39,8 @@ interface ThemeDefinition {
 	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
 	// joshuafolkken/kit#8359).
 	lamps: boolean
+	// Glyphs spread over the board spinner's cycle, in order (joshuafolkken/kit#8366).
+	spinner: string
 	live: LiveDefinition
 }
 
@@ -55,6 +57,7 @@ const THEME_DEFS = {
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
+		spinner: '│╱─╲',
 		live: { sweep: true, types_rows: true, trill: true, codes: true, strip: false },
 	},
 	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening and live
@@ -66,6 +69,7 @@ const THEME_DEFS = {
 		intro: { line: '', letter_ms: 0, hold_ms: 0 },
 		alert: run_board_header_trace.field_of,
 		lamps: false,
+		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 		live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
