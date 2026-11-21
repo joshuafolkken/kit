@@ -20,6 +20,7 @@ import type {
 } from './run-board-layout-types'
 import { run_board_parked_decision } from './run-board-parked-decision'
 import { run_board_retry_wait } from './run-board-retry-wait'
+import { run_board_review_stop } from './run-board-review-stop'
 import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -46,10 +47,12 @@ function is_blocked(child: EpicChild, overlay: Overlay): boolean {
 	return child.blocked_by.some((edge) => run_board_standing_waits.is_waiting_on(edge, overlay))
 }
 
-// What a person does for a row waiting on one: merge its pull request (🔏), or decide.
+// What a person does for a row waiting on one: merge its pull request (🔏), review a review stop's
+// changes, or decide.
 function human_reason(child: EpicChild, plan: BoardPlan): RowReason | undefined {
 	return (
 		run_board_human_merge.reason_of(child, plan) ??
+		run_board_review_stop.reason_of(child, plan) ??
 		run_board_decision.plan_reason(child.number, plan)
 	)
 }
@@ -139,10 +142,13 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 	return !overlay.statuses.has(child.number)
 }
 
-// A plan row waits, unless it waits on a person — a decision, or a merge drawn with 🔏 — or the run
-// stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as a decision.
-function plan_state(child: EpicChild): ItemState {
-	if (run_board_human.is_human(child.labels)) return 'human'
+// A plan row waits, unless it waits on a person — a decision, a merge drawn with 🔏, or a review stop
+// — or the run stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as
+// a decision.
+function plan_state(child: EpicChild, plan: BoardPlan): ItemState {
+	if (run_board_human.is_human(child.labels) || run_board_review_stop.is_stopped(child, plan)) {
+		return 'human'
+	}
 
 	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
 }
@@ -153,7 +159,7 @@ function queued_entries(queue: ReadonlyArray<EpicChild>, overlay: Drawn): Array<
 	const entries: Array<QueuedEntry> = []
 
 	for (const child of queue) {
-		const row = plan_row(child, plan_state(child), overlay)
+		const row = plan_row(child, plan_state(child, overlay.plan), overlay)
 		const epic = overlay.plan.tracked.get(child.number)
 
 		if (epic === undefined) entries.push({ kind: 'row', row })
@@ -166,7 +172,7 @@ function queued_entries(queue: ReadonlyArray<EpicChild>, overlay: Drawn): Array<
 function unreached_rows(overlay: Drawn, is_people: boolean): Array<BoardRow> {
 	return overlay.plan.waves.unreached
 		.filter((child) => is_untouched(child, overlay))
-		.map((child) => plan_row(child, plan_state(child), overlay))
+		.map((child) => plan_row(child, plan_state(child, overlay.plan), overlay))
 		.filter((row) => (row.state === 'human') === is_people)
 		.toSorted(run_board_layout_order.start_order)
 }
@@ -180,7 +186,7 @@ function children_of(plan: BoardPlan): Array<EpicChild> {
 // it is neither parked for a decision nor stalled.
 function waiting_children(overlay: Overlay): Array<EpicChild> {
 	return children_of(overlay.plan).filter(
-		(child) => is_untouched(child, overlay) && plan_state(child) === 'waiting',
+		(child) => is_untouched(child, overlay) && plan_state(child, overlay.plan) === 'waiting',
 	)
 }
 

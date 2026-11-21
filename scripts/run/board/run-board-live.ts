@@ -1,4 +1,5 @@
 import { poll } from '#scripts/lib/poll'
+import { run_board_exit_rain } from './run-board-exit-rain'
 import { run_board_fold } from './run-board-fold'
 import { run_board_header } from './run-board-header'
 import { run_board_intro, type Reveal } from './run-board-intro'
@@ -21,6 +22,7 @@ const REDRAW_WORD = 'redraw'
 const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
 const { live_of } = run_board_theme_defs
+const { gated, quitter } = run_board_exit_rain
 const SCREEN = run_board_screen.screen_of('live')
 
 // How a frame reaches the screen: the bytes put around its text, and where they are written.
@@ -38,6 +40,14 @@ type Step = (state: BoardState) => Promise<BoardState>
 
 // Told of a tick that threw.
 type Failed = (cause: unknown) => void
+
+// What the redraws start from: the first frame's reveal, where the last frame drawn is kept for the
+// failure warning and the exit wipe, and who is told of a failed tick.
+interface Start {
+	reveal: Reveal | undefined
+	last: LastFrame
+	failed?: Failed | undefined
+}
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
@@ -108,12 +118,12 @@ function trill_of(
 async function revealed_tick(
 	state: BoardState,
 	ports: BoardPorts,
-	screen: Screen,
+	wrap: (text: string) => string,
 	reveal: Reveal,
 ): Promise<BoardState> {
 	const held: Array<string> = []
 	const holding = framed(ports, {
-		wrap: screen.held,
+		wrap,
 		sink: (frame) => {
 			held.push(frame)
 		},
@@ -178,16 +188,13 @@ function surviving(step: Step, fail: Failed): Step {
 
 // A tick drawing each frame, the plan read in the background so the first is drawn without waiting on
 // GitHub. Where the board reveals, the first frame is revealed; every later one is written as drawn.
-function ticker(
-	ports: BoardPorts,
-	screen: Screen,
-	reveal: Reveal | undefined,
-	failed?: Failed,
-): Step {
-	let opening = reveal
-	const last: LastFrame = { text: undefined }
+function ticker(ports: BoardPorts, screen: Screen, start: Start): Step {
+	const { last, failed } = start
+	let opening = start.reveal
 	const framing = on_screen(ports, screen)
 	const drawing = framed(ports, remembered(framing, last))
+	// The revealed frame is kept too, so a board closed before its second frame has one to wipe.
+	const held_wrap = remembered({ wrap: screen.held, sink: framing.sink }, last).wrap
 
 	return surviving(
 		async (state) => {
@@ -197,7 +204,7 @@ function ticker(
 
 			if (revealing === undefined) return await tick(state, drawing, 'background')
 
-			return await revealed_tick(state, ports, screen, revealing)
+			return await revealed_tick(state, ports, held_wrap, revealing)
 		},
 		on_failure(ports, framing, last, failed),
 	)
@@ -207,13 +214,8 @@ function ticker(
 // written past the frame's own control bytes, each to its spot on the screen the frame drew. The frames
 // `--chat` and `--once` answer from are recorded on the worker thread (`run-board-gather-record.ts`),
 // so this thread only draws. Each stage is marked as it is entered, for `--timing`'s stalls.
-async function redraw_forever(
-	ports: BoardPorts,
-	screen: Screen,
-	reveal: Reveal | undefined,
-	failed?: Failed,
-): Promise<void> {
-	const step = ticker(ports, screen, reveal, failed)
+async function redraw_forever(ports: BoardPorts, screen: Screen, start: Start): Promise<void> {
+	const step = ticker(ports, screen, start)
 	let state = FRESH_STATE
 
 	await poll.wait_for(
@@ -246,24 +248,46 @@ function live_ports(ports: BoardPorts, keys: KeyReading, live: LiveDefinition): 
 	}
 }
 
+// The keys read with Ctrl-C's first press wiping the last frame drawn (`run-board-exit-rain.ts`), and
+// the ports the redraws write through, shut once the wipe begins, and where the last frame is kept.
+function exiting(
+	ports: BoardPorts,
+	theme: Theme | undefined,
+): { keys: KeyReading; drawn: BoardPorts; last: LastFrame } {
+	const last: LastFrame = { text: undefined }
+	const exit = run_board_exit_rain.exit_of()
+	const keys = run_board_keys.read_keys(quitter(ports.keys, exit), ports.cue, ports.typing_sound)
+
+	exit.wipe = async () => {
+		await run_board_exit_rain.wipe(last.text, ports, keys, theme)
+	}
+
+	return { keys, drawn: gated(ports, exit.gate), last }
+}
+
 // A signal leaves through `on_exit`; a failure outside the redraws leaves before its error is printed, so
 // the error lands on the normal screen rather than vanishing with the alternate one, and a failed redraw
 // is told to `failed` and drawn on past (`surviving`). Only a board in a theme types
 // its opening line, reveals its first frame a block at a time and types each row that appears after it;
 // one in none draws it whole at once. The board arrives without its theme and is themed here, where
 // each frame is restyled before its screen control bytes are added (`on_screen`).
+// Ctrl-C's first press wipes the last frame where the theme rains (`exiting`).
 async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Failed): Promise<void> {
 	const ports = run_board_theme.themed(board, theme)
-	const keys = run_board_keys.read_keys(ports.keys, ports.cue, ports.typing_sound)
+	const { keys, drawn, last } = exiting(ports, theme)
 	const leave = leaver(ports, SCREEN, keys)
-	const live = live_ports(ports, keys, live_of(theme))
+	const live = live_ports(drawn, keys, live_of(theme))
 
 	ports.write(SCREEN.enter)
 	ports.on_exit(leave)
 	const { gather, reveal } = run_board_intro.opening(ports.gather, live, keys, theme)
 
 	try {
-		await redraw_forever({ ...live, gather, opened_ms: ports.now() }, SCREEN, reveal, failed)
+		await redraw_forever({ ...live, gather, opened_ms: ports.now() }, SCREEN, {
+			reveal,
+			last,
+			failed,
+		})
 	} finally {
 		leave()
 	}

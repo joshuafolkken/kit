@@ -14,6 +14,12 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // request, publish its prepared filing, or take it into a run.
 type BlockerNeed = 'decide' | 'merge' | 'publish' | 'take'
 
+// A review stop's lane (joshuafolkken/kit#8527): when it stopped, and its directory.
+interface ReviewStop {
+	stopped_ms: number
+	directory: string
+}
+
 // A blocker the run's withheld children stop at, followed through their blockers as the plan was
 // read — the issue a person acts on, with the children it holds.
 interface DecisionBlocker {
@@ -31,6 +37,9 @@ interface BoardPlan extends PauseRead, RetryClock {
 	decision_blockers?: ReadonlyArray<DecisionBlocker> | undefined
 	is_backlog_live?: boolean | undefined
 	human_merge_prs?: ReadonlyMap<number, number> | undefined
+	// Each stopped lane of the repository, by issue, from its lane state record
+	// (`run-board-review-stop.ts`).
+	review_stops?: ReadonlyMap<number, ReviewStop> | undefined
 	// The same snapshot's worker identities that the header counts as occupied seats.
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	waves: WavePlan
@@ -141,6 +150,7 @@ export type {
 	Overlay,
 	QueuedEntry,
 	ReasonOf,
+	ReviewStop,
 	RowRead,
 	RowReason,
 }

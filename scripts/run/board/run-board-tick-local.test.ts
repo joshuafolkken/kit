@@ -169,7 +169,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
 
-		expect(lines[0]).toMatch(/ {2}✅ {2}0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
+		expect(lines[0]).toMatch(/ {2}✅ {2}0\/- ─+ {2}🔄 1 {2}💤 0/u)
 		expect(lines[1]).toContain('🧠')
 		expect(lines[2]?.trimStart()).toMatch(/^\S {6}🔄 1 running$/u)
 		expect(lines[3]).toBe('')

@@ -67,6 +67,7 @@ function plan_here(plan: BoardPlan, state: BoardState, local: LocalRead): BoardP
 		labels,
 		is_backlog_live: is_backlog_live(local),
 		occupied_lanes: local.occupied_lanes,
+		review_stops: local.review_stops,
 	}
 }
 
