@@ -1,0 +1,2 @@
+- rf:none | none | - | 2026-11-21 | #8392
+- rf:performance | medium | scripts/run/board/run-board-gather.ts:114 | 2026-11-21 | #8392 | - | state-reasoning
