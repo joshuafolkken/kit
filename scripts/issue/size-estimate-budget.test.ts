@@ -59,7 +59,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	})
 
 	it('refuses an unreasoned estimate over the guide projecting past the budget', () => {
-		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, { rate: SLOW }) ?? ''
+		const problem = problem_at(OVER_GUIDE, SLOW) ?? ''
 
 		for (const part of BUDGET_REFUSAL_PARTS) {
 			expect(problem).toContain(part)
@@ -84,7 +84,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	})
 
 	it('passes an estimate under the measured guide within the budget', () => {
-		expect(size_estimate.guide_problem(UNDER_GUIDE, undefined, { rate: SLOW })).toBeUndefined()
+		expect(problem_at(UNDER_GUIDE, SLOW)).toBeUndefined()
 	})
 })
 
@@ -112,9 +112,7 @@ describe('size_estimate.guide_problem — the cap and the projection', () => {
 	it('keeps the cap refusal ahead of the projection', () => {
 		const body = body_with(estimate(30, 900))
 
-		expect(size_estimate.guide_problem(body, undefined, { rate: SLOW })).toContain(
-			'exceeds the cap',
-		)
+		expect(problem_at(body, SLOW)).toContain('exceeds the cap')
 	})
 })
 
@@ -152,7 +150,7 @@ describe('size_estimate.over_budget', () => {
 describe('size_estimate.guide_problem — the size bar', () => {
 	it('passes the budget on an estimate projecting past it within twice it', () => {
 		const projected = lane_implement_rate.minutes_for(GROWN_OVER_GUIDE_LINES, BETWEEN)
-		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, { rate: BETWEEN })
+		const problem = problem_at(OVER_GUIDE, BETWEEN)
 
 		expect(projected).toBeGreaterThan(lane_stage_budget.BUDGET_MINUTES.implement)
 		expect(problem).toContain(EXCEEDS_GUIDE)
