@@ -10,29 +10,34 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 // fetch has failed, and how the progress counts are drawn from the layout. joshuafolkken/kit#3444: two
 // lines of symbols, no `updated` line. joshuafolkken/kit#8475: a quiet heartbeat said in the slot.
 // joshuafolkken/kit#3508: the run's state with its progress, then the time with the machine.
-// joshuafolkken/kit#3692: three columns — the name, the time, then the progress over the machine.
+// joshuafolkken/kit#8478: three lines in four columns, the time circuits — the names; the finish over
+// now over the start; what is left over the run's age over the spinner and the third line's age; the
+// machine over the notice slot over what the run is doing now.
 
 const { minute_of } = run_board_labels
 const { HEADER_ICONS } = run_board_labels
+const MINUTE = MS_PER_MINUTE
+const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
+const NOW = STARTED + 30 * MINUTE
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 // The third line's name column where no repository is read, and the second line's where no kit
 // version is: `-` under the board's name.
 const NAME_BLANK = ' '.repeat('⏸ josh-board'.length)
 const VERSION_CELL = '  -'.padEnd(NAME_BLANK.length)
-const TIME_BLANK = ' '.repeat('⏰ 30′00″'.length + 1)
+// A time cell: one sign — or the spinner — then eight columns.
+const TIME_WIDTH = 9
+const TIME_BLANK = ' '.repeat(TIME_WIDTH)
 // The notice slot before any notice, where nothing holds (joshuafolkken/kit#8475).
 const SLOT_BLANK = '  —'
-const RUNNING_CLOCK = `${VERSION_CELL}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}${SLOT_BLANK}`
-// joshuafolkken/kit#3749: the third line — the repository's cell alone where the stream holds no
-// event (its indent where no repository is read), else what the run is doing now: its time under the
-// second column, its icon and words under the third.
-const NOW_BLANK = '  '
-// The first line of a running run: its mark and name, then its age; the tallies are the lanes rule's.
-const RUNNING_TITLE = '▶ josh-board  ⏰ 30′00″'
-const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
-const MINUTE = MS_PER_MINUTE
-const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
-const NOW = STARTED + 30 * MINUTE
+// The first line where no finish is estimated: the finish and what is left unknown, then the machine.
+const UNKNOWN_FINISH = '🎯 --:--  -  --′--″'
+const IDLE_TITLE = `⏸ josh-board  ${UNKNOWN_FINISH}  ${MACHINE_UNKNOWN}`
+const RUNNING_TITLE = `▶ josh-board  ${UNKNOWN_FINISH}  ${MACHINE_UNKNOWN}`
+const RUNNING_CLOCK = `${VERSION_CELL}  🕒 ${minute_of(NOW)}  +  30′00″${SLOT_BLANK}`
+// joshuafolkken/kit#3749: the third line — the start alone where the stream holds no event, else
+// what the run is doing now: its time under the signed column, its icon and words after it.
+const NOW_BLANK = `${NAME_BLANK}  🚀 ${minute_of(STARTED)}`
+const ONE_RUNNING = `${NOW_BLANK}  ${TIME_BLANK}  🔄 1 running`
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 
 function row(number: number, state: BoardRow['state']): BoardRow {
@@ -90,16 +95,18 @@ describe('run_board_header.header_lines state', () => {
 		expect(title_of(header())).toMatch(/^⏸ josh-board/u)
 	})
 
-	// joshuafolkken/kit#3439, joshuafolkken/kit#3450
+	// joshuafolkken/kit#3439, joshuafolkken/kit#3450; joshuafolkken/kit#8478: the finish is when it
+	// ended, none left, its age stopped at its end, and `—` in the third time cell.
 	it('draws an ended run with how long it took and the minute it ended, and no heartbeat', () => {
 		const ended_ms = STARTED + 90 * MINUTE
+		const now_ms = ended_ms + 10 * MINUTE
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
-		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
+		const board = header({ activity, ended_ms, now_ms })
 
 		expect(lines_of(board)).toStrictEqual([
-			'■ josh-board  ⏰ 1°30′00″',
-			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}${SLOT_BLANK}`,
-			NOW_BLANK,
+			`■ josh-board  🎯 ${minute_of(ended_ms)}  -      0″  ${MACHINE_UNKNOWN}`,
+			`${VERSION_CELL}  🕒 ${minute_of(now_ms)}  +1°30′00″${SLOT_BLANK}`,
+			`${NOW_BLANK}  ${'—'.padStart(TIME_WIDTH)}`,
 		])
 	})
 
@@ -109,15 +116,12 @@ describe('run_board_header.header_lines state', () => {
 })
 
 describe('run_board_header.header_lines shape', () => {
-	// joshuafolkken/kit#3692, #8475: the run's age over a blank cell, the heartbeat said in the slot.
-	it('draws the run’s age on the first line, a blank cell under the age', () => {
+	// joshuafolkken/kit#8478: what is left over the run's age, the start alone under them while the
+	// stream holds no event; the heartbeat is said in the slot (#8475).
+	it('draws what is left over the run’s age, the start alone on the third line', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
-		expect(lines_of(header({ activity }))).toStrictEqual([
-			'⏸ josh-board  ⏰ 30′00″',
-			RUNNING_CLOCK,
-			NOW_BLANK,
-		])
+		expect(lines_of(header({ activity }))).toStrictEqual([IDLE_TITLE, RUNNING_CLOCK, NOW_BLANK])
 	})
 
 	// joshuafolkken/kit#3486: two lines in every state, a machine not sampled yet drawn as `-`;
@@ -128,8 +132,8 @@ describe('run_board_header.header_lines shape', () => {
 		expect(lines_of(header({ layout }))).toStrictEqual([RUNNING_TITLE, RUNNING_CLOCK, ONE_RUNNING])
 	})
 
-	// joshuafolkken/kit#3450
-	it('draws the machine gauges under the progress', () => {
+	// joshuafolkken/kit#3450; joshuafolkken/kit#8478: at the first line's end, its bars five cells.
+	it('draws the machine gauges at the first line’s end', () => {
 		const machine = {
 			cpu_percent: 15,
 			memory_percent: 37,
@@ -137,22 +141,20 @@ describe('run_board_header.header_lines shape', () => {
 			memory_pressure: undefined,
 		}
 
-		expect(clock_line_of(header({ machine }))).toBe(
-			`${VERSION_CELL}  ${TIME_BLANK}  💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────${SLOT_BLANK}`,
+		expect(title_of(header({ machine }))).toBe(
+			`⏸ josh-board  ${UNKNOWN_FINISH}  💪  15% ■────  🧠  37% ■■───  💾 3.1M/s ■────`,
 		)
 	})
 })
 
 describe('run_board_header.header_lines spinner', () => {
 	// joshuafolkken/kit#3452, joshuafolkken/kit#3767: the mark stands still in every state; the spinner
-	// turns on the third line, under the `⏰`.
+	// turns on the third line, in the signs' column (joshuafolkken/kit#8478).
 	it('turns the spinner on the third line of a running run, never in place of its mark', () => {
 		const board = header({ layout: RUNNING_LAYOUT, spinner: '⠙' })
 
 		expect(title_of(board)).toMatch(/^▶ josh-board/u)
-		expect(lines_of(board)[2]).toBe(
-			`${NAME_BLANK}  ⠙${' '.repeat(TIME_BLANK.length - 1)}  🔄 1 running`,
-		)
+		expect(lines_of(board)[2]).toBe(`${NOW_BLANK}  ⠙${' '.repeat(TIME_WIDTH - 1)}  🔄 1 running`)
 	})
 })
 
@@ -173,7 +175,7 @@ describe('run_board_header.header_lines before the plan is read', () => {
 
 // joshuafolkken/kit#3456: a figure read once means nothing, so a chat's machine line is its memory.
 describe('run_board_header.header_lines chat', () => {
-	it('draws the memory alone under the progress of a chat', () => {
+	it('draws the memory alone at the first line’s end of a chat', () => {
 		const machine = {
 			cpu_percent: 15,
 			memory_percent: 37,
@@ -181,8 +183,8 @@ describe('run_board_header.header_lines chat', () => {
 			memory_pressure: undefined,
 		}
 
-		expect(clock_line_of(header({ machine, form: 'chat' }))).toBe(
-			`${VERSION_CELL}  ${TIME_BLANK}  🧠  37% ■■■■──────${SLOT_BLANK}`,
+		expect(title_of(header({ machine, form: 'chat' }))).toBe(
+			`⏸ josh-board  ${UNKNOWN_FINISH}  🧠  37% ■■───`,
 		)
 	})
 })
@@ -196,7 +198,7 @@ describe('run_board_header.header_lines plan warning', () => {
 	it('says a failed plan read in the notice slot, stale since the plan last landed', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(/⏰ 30′00″$/u)
+		expect(title_of(board)).toBe(IDLE_TITLE)
 		expect(clock_line_of(board)).toMatch(/ {2}❗ stale 1′00″ · retrying$/u)
 	})
 
@@ -221,7 +223,7 @@ describe('run_board_header.queued_tail plan loading', () => {
 	})
 
 	it('draws no spinner on the first line', () => {
-		expect(title_of(header({ is_plan_loading: true, spinner: '⠙' }))).toMatch(/⏰ 30′00″$/u)
+		expect(title_of(header({ is_plan_loading: true, spinner: '⠙' }))).toBe(IDLE_TITLE)
 	})
 })
 
@@ -294,8 +296,7 @@ describe('run_board_header.queued_tail saved plan', () => {
 	})
 
 	it('draws no 🕘 on the first line', () => {
-		expect(title_of(saved)).not.toContain('🕘')
-		expect(title_of(saved)).toMatch(/⏰ 30′00″$/u)
+		expect(title_of(saved)).toBe(IDLE_TITLE)
 	})
 })
 

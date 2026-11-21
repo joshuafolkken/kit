@@ -196,7 +196,7 @@ function drift_of(drift_ms: number): string {
 	return minutes > 0 ? `+${String(minutes)}′` : `−${String(-minutes)}′`
 }
 
-// A running row's finish as its stamp and its drift, `🎯 ~14:52` and `+21′` (joshuafolkken/kit#7920)
+// A running row's finish as its stamp and its drift, `🎯 14:52` and `+21′` (joshuafolkken/kit#7920)
 // — the run's finish read for this lane alone, so it moves as the lane does; `🎯 —` and no drift where
 // no lane total is measured; `undefined` where the row draws no finish.
 function finish_of(row: BoardRow, header: BoardHeader): Finish | undefined {

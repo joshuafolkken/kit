@@ -11,7 +11,8 @@ import { run_board_machine, type MachineMark } from './run-board-machine'
 
 const { gauges_of, line_of } = run_board_machine
 const SECOND = 1000
-const BAR_WIDTH = 10
+// joshuafolkken/kit#8478: half the board's other gauges, the header's first line also holds the clocks.
+const BAR_WIDTH = 5
 const WARNING = 2
 const GREEN_RGB = '48;209;88'
 const YELLOW_RGB = '255;214;10'
@@ -104,21 +105,23 @@ describe('run_board_machine.gauges_of', () => {
 
 describe('run_board_machine.line_of', () => {
 	// joshuafolkken/kit#3508: two spaces between the gauges, as between the header's parts.
-	it('draws each gauge as icon, right-aligned figure, then bar, two spaces apart', () => {
+	it('draws each gauge as icon, figure, then a 5-cell bar, two spaces apart', () => {
 		const gauges = { ...UNREAD, cpu_percent: 15, memory_percent: 37, swap_mb_per_s: 3.1 }
 
-		expect(plain(gauges)).toBe('💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────')
+		expect(plain(gauges)).toBe('💪  15% ■────  🧠  37% ■■───  💾 3.1M/s ■────')
 	})
 
-	it('stops the bar full past the gauge’s end, keeping the figure the same width', () => {
+	it('stops the bar full past the gauge’s end, the rate at its own width', () => {
 		const gauges = { ...UNREAD, cpu_percent: 100, swap_mb_per_s: 42 }
 
-		expect(plain(gauges)).toBe(`💪 100% ${'■'.repeat(10)}  💾  42M/s ${'■'.repeat(10)}`)
+		expect(plain(gauges)).toBe(
+			`💪 100% ${'■'.repeat(BAR_WIDTH)}  💾 42M/s ${'■'.repeat(BAR_WIDTH)}`,
+		)
 	})
 
 	it('leaves out an unread gauge, and the whole line when none was read', () => {
-		expect(plain({ ...UNREAD, memory_percent: 37 })).toBe('🧠  37% ■■■■──────')
-		expect(plain({ ...UNREAD, swap_mb_per_s: 0 })).toBe(`💾 0.0M/s ${'─'.repeat(10)}`)
+		expect(plain({ ...UNREAD, memory_percent: 37 })).toBe('🧠  37% ■■───')
+		expect(plain({ ...UNREAD, swap_mb_per_s: 0 })).toBe(`💾 0.0M/s ${'─'.repeat(BAR_WIDTH)}`)
 		expect(line_of(UNREAD)).toBeUndefined()
 		expect(line_of(undefined)).toBeUndefined()
 	})
@@ -132,37 +135,37 @@ describe('run_board_machine.line_of colors', () => {
 	it('colors swap yellow from 1 MB/s and red from 10 MB/s, and leaves a quiet swap uncolored', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(swap_line(0.5)).toBe(`💾 0.5M/s ${styleText('dim', '─'.repeat(10))}`)
-		expect(swap_line(3)).toBe(`💾 ${styleText('yellow', '3.0M/s')} ${bar(2, 'yellow')}`)
-		expect(swap_line(12)).toBe(`💾 ${styleText('red', ' 12M/s')} ${bar(6, 'red')}`)
+		expect(swap_line(0.5)).toBe(`💾 0.5M/s ${styleText('dim', '─'.repeat(BAR_WIDTH))}`)
+		expect(swap_line(3)).toBe(`💾 ${styleText('yellow', '3.0M/s')} ${bar(1, 'yellow')}`)
+		expect(swap_line(12)).toBe(`💾 ${styleText('red', '12M/s')} ${bar(3, 'red')}`)
 	})
 
 	it('draws a quiet CPU green and colors it yellow and red past its thresholds', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`💪  30% ${bar(3, 'green')}`)
+		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`💪  30% ${bar(2, 'green')}`)
 		expect(line_of({ ...UNREAD, cpu_percent: 75 })).toBe(
-			`💪 ${styleText('yellow', ' 75%')} ${bar(8, 'yellow')}`,
+			`💪 ${styleText('yellow', ' 75%')} ${bar(4, 'yellow')}`,
 		)
 		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toBe(
-			`💪 ${styleText('red', ' 95%')} ${bar(10, 'red')}`,
+			`💪 ${styleText('red', ' 95%')} ${bar(5, 'red')}`,
 		)
 	})
 
 	it('colors memory by the kernel pressure verdict 1 / 2 / 4 whatever its share', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(memory_line(90, 1)).toBe(`🧠  90% ${bar(9, 'green')}`)
-		expect(memory_line(50, 2)).toBe(`🧠 ${styleText('yellow', ' 50%')} ${bar(5, 'yellow')}`)
-		expect(memory_line(50, 4)).toBe(`🧠 ${styleText('red', ' 50%')} ${bar(5, 'red')}`)
+		expect(memory_line(90, 1)).toBe(`🧠  90% ${bar(5, 'green')}`)
+		expect(memory_line(50, 2)).toBe(`🧠 ${styleText('yellow', ' 50%')} ${bar(3, 'yellow')}`)
+		expect(memory_line(50, 4)).toBe(`🧠 ${styleText('red', ' 50%')} ${bar(3, 'red')}`)
 	})
 
 	it('falls back to the memory thresholds where no known verdict was read', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(memory_line(30, undefined)).toBe(`🧠  30% ${bar(3, 'green')}`)
-		expect(memory_line(75, undefined)).toBe(`🧠 ${styleText('yellow', ' 75%')} ${bar(8, 'yellow')}`)
-		expect(memory_line(90, 3)).toBe(`🧠 ${styleText('red', ' 90%')} ${bar(9, 'red')}`)
+		expect(memory_line(30, undefined)).toBe(`🧠  30% ${bar(2, 'green')}`)
+		expect(memory_line(75, undefined)).toBe(`🧠 ${styleText('yellow', ' 75%')} ${bar(4, 'yellow')}`)
+		expect(memory_line(90, 3)).toBe(`🧠 ${styleText('red', ' 90%')} ${bar(5, 'red')}`)
 	})
 })
 
@@ -175,9 +178,9 @@ describe('run_board_machine.line_of in 24-bit color', () => {
 	it('draws the CPU gauge in its 24-bit green, yellow and red where the output has them', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`💪  30% ${rgb_bar(3, GREEN_RGB)}`)
+		expect(line_of({ ...UNREAD, cpu_percent: 30 })).toBe(`💪  30% ${rgb_bar(2, GREEN_RGB)}`)
 		expect(line_of({ ...UNREAD, cpu_percent: 75 })).toBe(
-			`💪 ${rgb(YELLOW_RGB, ' 75%')} ${rgb_bar(8, YELLOW_RGB)}`,
+			`💪 ${rgb(YELLOW_RGB, ' 75%')} ${rgb_bar(4, YELLOW_RGB)}`,
 		)
 		expect(line_of({ ...UNREAD, cpu_percent: 95 })).toBe(
 			`💪 ${rgb(RED_RGB, ' 95%')} ${rgb(RED_RGB, '■'.repeat(BAR_WIDTH))}`,

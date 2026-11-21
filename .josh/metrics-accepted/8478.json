@@ -1,0 +1,7 @@
+{
+	"reason": "#8478 adds run-board-clocks.ts for the 3x4 time-circuit header; the clocks column is new behavior",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 42
+	}
+}

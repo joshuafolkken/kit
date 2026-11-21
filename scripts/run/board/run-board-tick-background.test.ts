@@ -94,8 +94,9 @@ describe('run_board_tick.tick in the background', () => {
 		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, live, 'background')
 
-		expect(frames[0]).toContain('⏰ 0″')
-		expect(frames[1]).toContain('⏰ 1″')
+		// joshuafolkken/kit#8478: the run's age after `+`, padded to its column.
+		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/\+ +0″/u)
+		expect(stripVTControlCharacters(frames[1] ?? '')).toMatch(/\+ +1″/u)
 		expect(read_plan).toHaveBeenCalledOnce()
 	})
 })

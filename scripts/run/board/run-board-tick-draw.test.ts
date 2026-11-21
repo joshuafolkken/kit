@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_display } from './run-board-display'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { CueName } from './run-board-sound-cues'
 import type { BoardState } from './run-board-state'
@@ -11,6 +12,7 @@ import { run_board_tick_draw } from './run-board-tick-draw'
 const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const { bounds_of } = run_board_tick_draw
+const { minute_of } = run_board_labels
 const SIZE = { rows: 15, columns: 80 }
 const FOOTER = ['footer']
 const HEADER_LINES = 3
@@ -114,13 +116,15 @@ function header_drawn({ is_on, state = planned(), rows }: SoundDraw): SoundDrawn
 }
 
 // joshuafolkken/kit#7952, #8107: the live header ends its second line on the sound switch and the
-// last notice.
+// last notice. joshuafolkken/kit#8478: the machine sits on the first line, the time circuits before it.
 describe('run_board_tick_draw.draw_display sound mark', () => {
 	it('draws 🔊 and — at the end of the second line while the sound is on, none on the first', () => {
+		const clock = minute_of(START)
+
 		expect(header_drawn({ is_on: true }).lines).toStrictEqual([
-			'⏸ josh-board  ⏰ 0″',
-			'  -                  💪 -  🧠 -  💾 -  🔊 —',
-			'  kit',
+			'⏸ josh-board  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -',
+			`  -           🕒 ${clock}  +      0″  🔊 —`,
+			`  kit         🚀 ${clock}`,
 		])
 	})
 
@@ -158,7 +162,7 @@ describe('run_board_tick_draw.draw_display machine samples', () => {
 		const lines = stripVTControlCharacters(frames.join('')).split('\n')
 
 		expect(display.header.machine).toBeUndefined()
-		expect(lines[1]).toContain(`${String(CPU_PERCENT)}%`)
+		expect(lines[0]).toContain(`${String(CPU_PERCENT)}%`)
 	})
 })
 

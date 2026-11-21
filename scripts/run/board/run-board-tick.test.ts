@@ -55,8 +55,9 @@ describe('run_board_tick.tick speeds', () => {
 		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, ports)
 
-		expect(frames[0]).toContain('⏰ 0″')
-		expect(frames[1]).toContain('⏰ 1″')
+		// joshuafolkken/kit#8478: the run's age after `+`, padded to its column.
+		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/\+ +0″/u)
+		expect(stripVTControlCharacters(frames[1] ?? '')).toMatch(/\+ +1″/u)
 	})
 
 	it('reads the plan at most once per retry interval while redrawing every tick', async () => {
@@ -105,9 +106,12 @@ describe('run_board_tick.tick machine', () => {
 		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, ports)
 
-		const [first_machine, second_machine] = frames.map((frame) => frame.split('\n', 2)[1] ?? '')
+		// joshuafolkken/kit#8478: the machine ends the first line, after what is left.
+		const [first_machine, second_machine] = frames.map(
+			(frame) => stripVTControlCharacters(frame).split('\n', 1)[0] ?? '',
+		)
 
-		expect(first_machine).toMatch(/^ {2}- +🧠 /u)
+		expect(first_machine).toMatch(/″ {2}🧠 /u)
 		expect(first_machine).not.toContain('💾')
 		expect(second_machine).toContain('💾')
 	})
@@ -168,7 +172,8 @@ describe('run_board_tick.tick — an ended run', () => {
 		await tick(first, ports)
 
 		expect(read_plan).toHaveBeenCalledOnce()
-		expect(frames.at(-1)).toContain('🔚')
+		// joshuafolkken/kit#8478: an ended run draws its mark and nothing left.
+		expect(stripVTControlCharacters(frames.at(-1) ?? '')).toMatch(/^■ josh-board .+ -\s+0″/u)
 	})
 
 	it('drops the ended run’s plan and baseline the moment the next run begins', async () => {
@@ -264,8 +269,11 @@ describe('run_board_tick.tick spinner', () => {
 		// joshuafolkken/kit#3767: the header's spinner turns on its third line, the mark standing still.
 		const nows = frames.map((frame) => stripVTControlCharacters(frame).split('\n', 3)[2] ?? '')
 
-		expect(nows[0]).toMatch(new RegExp(String.raw`^ +\S+ +${spinner_of(START)} `, 'u'))
-		expect(nows[1]).toMatch(new RegExp(String.raw`^ +\S+ +${spinner_of(START + REDRAW_MS)} `, 'u'))
+		// joshuafolkken/kit#8478: in the signs' column, after the start's clock.
+		const at = String.raw`^ +\S+ +🚀 \d{2}:\d{2} {2}`
+
+		expect(nows[0]).toMatch(new RegExp(`${at}${spinner_of(START)} `, 'u'))
+		expect(nows[1]).toMatch(new RegExp(`${at}${spinner_of(START + REDRAW_MS)} `, 'u'))
 		expect(nows[0]).not.toBe(nows[1])
 	})
 
