@@ -1,17 +1,14 @@
 import { issue_human_stops } from '#scripts/issue/issue-human-stops'
-import {
-	ALREADY_DONE_LABEL,
-	has_label_name,
-	NEEDS_HUMAN_REVIEW_LABEL,
-} from '#scripts/issue/issue-labels'
+import { ALREADY_DONE_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 
 // joshuafolkken/kit#7097: the board's 🙋 state (`human`) — a stop waiting on a person — is read from the
 // human-stop registry (`issue-human-stops.ts`), so a stop added there is drawn as one without a board
 // change. A registry label the board draws elsewhere is named here with where. A merge wait is one of
-// them: its row leads the 🙋 decision section with 🔏 (joshuafolkken/kit#8026).
+// them: its row leads the 🙋 decision section with 🔏 (joshuafolkken/kit#8026). A review stop is a
+// person's row too: it withholds the commit and leaves its lane's changes uncommitted under
+// `in-progress`, so it holds the lane and the children waiting on it (joshuafolkken/kit#8527).
 const DRAWN_ELSEWHERE: ReadonlyMap<string, string> = new Map([
 	[ALREADY_DONE_LABEL, 'the done section (joshuafolkken/kit#7095)'],
-	[NEEDS_HUMAN_REVIEW_LABEL, 'nowhere: it withholds the commit, not the lane'],
 ])
 
 function human_labels(): ReadonlyArray<string> {

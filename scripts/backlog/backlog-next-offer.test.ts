@@ -6,7 +6,12 @@ import {
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { IN_PROGRESS_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_HUMAN_REVIEW_LABEL,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/issue/issue-labels'
 import type { OfferRecord } from '#scripts/lane/lane-ledger-schema-offer'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -128,6 +133,14 @@ describe('backlog:next — the offer record of an answer that starts nothing', (
 		expect(recorded()).toMatchObject([
 			{ verdict: 'wait', seen: [EPIC_NUMBER], excluded: [{ issue: CHILD, reason: 'wait' }] },
 		])
+	})
+
+	it('records a person for the in-progress child held at a review stop', async () => {
+		epic_backlog([IN_PROGRESS_LABEL, NEEDS_HUMAN_REVIEW_LABEL])
+
+		await backlog_next.run([])
+
+		expect(recorded()).toMatchObject([{ excluded: [{ issue: CHILD, reason: 'person' }] }])
 	})
 
 	it('records none for a backlog nobody opted into', async () => {

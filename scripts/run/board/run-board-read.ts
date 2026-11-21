@@ -25,6 +25,7 @@ import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
 import { run_board_read_local } from './run-board-read-local'
 import { run_board_records } from './run-board-records'
+import { run_board_review_stop } from './run-board-review-stop'
 import { run_board_run_fields, type RunSpan } from './run-board-run-fields'
 import type { EndedRoot, RootRun } from './run-board-single'
 import { run_board_span_read } from './run-board-span-read'
@@ -59,6 +60,8 @@ interface LocalRead {
 	// The open lanes as their lane state records sort them — this run's, an earlier run's and the ones
 	// with no record — with what each is doing (`run-board-lane-state.ts`).
 	lane_states: BoardLanes
+	// When each paused or review-stopped lane stopped, by issue (`run-board-review-stop.ts`).
+	review_stops?: ReadonlyMap<number, number> | undefined
 	// The session a stopped run is resumed from; `undefined` otherwise.
 	resume: string | undefined
 	// The run is carried but nothing drives it — its owner and its supervisor are both gone
@@ -172,11 +175,12 @@ function lanes_here(
 	repository: string,
 	events: ReadonlyArray<RunEvent>,
 	started_ms: number,
-): Pick<LocalRead, 'lane_states' | 'closing' | 'stuck'> {
+): Pick<LocalRead, 'lane_states' | 'review_stops' | 'closing' | 'stuck'> {
 	const records = run_board_records.read_records(repository)
 
 	return {
 		lane_states: sorted_here(lanes, records, events, started_ms),
+		review_stops: run_board_review_stop.stops_of(records),
 		...unfinished_here(records),
 	}
 }

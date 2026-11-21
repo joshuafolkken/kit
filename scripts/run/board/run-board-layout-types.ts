@@ -11,8 +11,9 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // The board layout's row types (`run-board-layout.ts`), which every board module reads.
 
 // What a person does for a blocker that waits on one (joshuafolkken/kit#8026): decide it, merge its pull
-// request, publish its prepared filing, or take it into a run.
-type BlockerNeed = 'decide' | 'merge' | 'publish' | 'take'
+// request, publish its prepared filing, review the changes a review stop left in its lane
+// (joshuafolkken/kit#8527), or take it into a run.
+type BlockerNeed = 'decide' | 'merge' | 'publish' | 'review' | 'take'
 
 // A blocker the run's withheld children stop at, followed through their blockers as the plan was
 // read — the issue a person acts on, with the children it holds.
@@ -31,6 +32,9 @@ interface BoardPlan extends PauseRead, RetryClock {
 	decision_blockers?: ReadonlyArray<DecisionBlocker> | undefined
 	is_backlog_live?: boolean | undefined
 	human_merge_prs?: ReadonlyMap<number, number> | undefined
+	// When each review stop's lane stopped, by issue, from its lane state record
+	// (`run-board-review-stop.ts`).
+	review_stops?: ReadonlyMap<number, number> | undefined
 	// The same snapshot's worker identities that the header counts as occupied seats.
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	waves: WavePlan

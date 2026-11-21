@@ -87,6 +87,7 @@ describe('run_board_decision_rows.rows_of (joshuafolkken/kit#8026)', () => {
 		['publish', '→ publish (blocks #8030)'],
 		['take', '→ take into a run (blocks #8030)'],
 		['decide', '→ decide (blocks #8030)'],
+		['review', '→ review the uncommitted changes in .kit-lanes/8031 (blocks #8030)'],
 	] as const)('says what a person does for a %s blocker with no pull request', (need, tail) => {
 		expect(prepared_tail(need)).toStrictEqual([tail])
 	})

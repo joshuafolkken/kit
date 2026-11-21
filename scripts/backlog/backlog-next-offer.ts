@@ -1,5 +1,7 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
+import { issue_human_stops } from '#scripts/issue/issue-human-stops'
+import { has_label_name } from '#scripts/issue/issue-labels'
 import type { OfferExclusion, OfferRecord } from '#scripts/lane/lane-ledger-schema-offer'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import type { OptedIn, PoolContext } from './backlog-gate-scope'
@@ -61,8 +63,16 @@ function withheld_of(outcome: GateOutcome, repo: string): Set<number> {
 	)
 }
 
+// A child held at a stop the human-stop registry names waits on a person, not on the run: an
+// `in-progress` review stop keeps its lane's changes uncommitted until a person reviews them
+// (joshuafolkken/kit#8527).
+function is_person_stop(child: EpicChild): boolean {
+	return [...issue_human_stops.labels()].some((label) => has_label_name(child.labels, label))
+}
+
 function waiting_reason(child: EpicChild, withheld: ReadonlySet<number>): string {
 	if (withheld.has(child.number)) return SOLO_REASON
+	if (is_person_stop(child)) return PERSON_REASON
 
 	return backlog_wait_cause.cause_of(child) ?? WAIT_REASON
 }

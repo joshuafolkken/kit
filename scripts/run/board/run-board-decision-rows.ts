@@ -2,13 +2,15 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind } from './run-board-kind'
 import type { BoardPlan, BoardRow, DecisionBlocker, RowReason } from './run-board-layout-types'
+import { run_board_review_stop } from './run-board-review-stop'
 
 // joshuafolkken/kit#8026: the 🙋 decision section draws the issue a person acts on, one row per
 // blocker, with what the person does and the run's children it holds. A blocker the board already
 // draws as a person's row gains the children it holds; one outside the run's scope gets a row of its
 // own. The children it holds stay waiting rows, drawn as any other blocked row.
 
-function need_reason(blocker: DecisionBlocker): RowReason {
+function need_reason(blocker: DecisionBlocker, plan: BoardPlan): RowReason {
+	if (blocker.need === 'review') return run_board_review_stop.reason_of(blocker.number, plan)
 	if (blocker.need === 'publish') return { tail: '→ publish' }
 	if (blocker.need === 'take') return { tail: '→ take into a run' }
 	const detail = blocker.detail === undefined ? '' : ` (${blocker.detail})`
@@ -18,11 +20,12 @@ function need_reason(blocker: DecisionBlocker): RowReason {
 
 // An open pull request is what a person merges, whatever else the blocker waits on; a merge wait keeps
 // its 🔏 and says to find the pull request when the listing pairs none.
-function action_of(blocker: DecisionBlocker, prs: BoardPlan['human_merge_prs']): RowReason {
+function action_of(blocker: DecisionBlocker, plan: BoardPlan): RowReason {
+	const prs = plan.human_merge_prs
 	if (blocker.need === 'merge') return run_board_human_merge.pr_reason(blocker.number, prs)
 	const pr = prs?.get(blocker.number)
 
-	return pr === undefined ? need_reason(blocker) : run_board_human_merge.merge_reason(pr)
+	return pr === undefined ? need_reason(blocker, plan) : run_board_human_merge.merge_reason(pr)
 }
 
 function blocks_note(blocks: ReadonlyArray<number>): string {
@@ -55,7 +58,7 @@ function blocker_row(blocker: DecisionBlocker, plan: BoardPlan): BoardRow {
 		state: 'human',
 		status: undefined,
 		waits: [],
-		reason: action_of(blocker, plan.human_merge_prs),
+		reason: action_of(blocker, plan),
 	}
 
 	return with_blocks(row, blocker.blocks)

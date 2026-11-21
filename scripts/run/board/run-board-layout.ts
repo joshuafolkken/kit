@@ -20,6 +20,7 @@ import type {
 } from './run-board-layout-types'
 import { run_board_parked_decision } from './run-board-parked-decision'
 import { run_board_retry_wait } from './run-board-retry-wait'
+import { run_board_review_stop } from './run-board-review-stop'
 import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -46,10 +47,12 @@ function is_blocked(child: EpicChild, overlay: Overlay): boolean {
 	return child.blocked_by.some((edge) => run_board_standing_waits.is_waiting_on(edge, overlay))
 }
 
-// What a person does for a row waiting on one: merge its pull request (🔏), or decide.
+// What a person does for a row waiting on one: merge its pull request (🔏), review a review stop's
+// changes, or decide.
 function human_reason(child: EpicChild, plan: BoardPlan): RowReason | undefined {
 	return (
 		run_board_human_merge.reason_of(child, plan) ??
+		run_board_review_stop.labelled_reason(child.number, child.labels, plan) ??
 		run_board_decision.plan_reason(child.number, plan)
 	)
 }

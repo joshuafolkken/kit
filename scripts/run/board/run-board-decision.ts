@@ -1,5 +1,9 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { has_label_name, NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
+import {
+	has_label_name,
+	NEEDS_HUMAN_MERGE_LABEL,
+	NEEDS_HUMAN_REVIEW_LABEL,
+} from '#scripts/issue/issue-labels'
 import { issue_publication_state } from '#scripts/issue/issue-publication-state'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { run_park_body } from '#scripts/run/park/run-park-body'
@@ -101,10 +105,12 @@ function plan_reason(number: number, plan: BoardPlan): RowReason | undefined {
 }
 
 // What a person does for a blocker the walk stopped at: a merge wait merges, a prepared filing is
-// published, another stop the registry names is decided, and an issue outside the run is taken in.
+// published, a review stop's changes are reviewed, another stop the registry names is decided, and an
+// issue outside the run is taken in.
 function need_of(node: DecisionNode): BlockerNeed {
 	if (has_label_name(node.labels, NEEDS_HUMAN_MERGE_LABEL)) return 'merge'
 	if (issue_publication_state.is_pending(node.body)) return 'publish'
+	if (has_label_name(node.labels, NEEDS_HUMAN_REVIEW_LABEL)) return 'review'
 
 	return run_board_human.is_human(node.labels) ? 'decide' : 'take'
 }
