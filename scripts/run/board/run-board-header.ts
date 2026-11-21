@@ -315,9 +315,11 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	)
 }
 
-// The children drawn as running: only their operations are the run's newest.
+// The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):
+// only their operations are the run's newest.
 function running_issues(layout: BoardLayout): ReadonlySet<number> {
-	const running = layout.active.filter((row) => row.state === 'running')
+	const rows = layout.root === undefined ? layout.active : [...layout.active, layout.root.row]
+	const running = rows.filter((row) => row.state === 'running')
 
 	return new Set(running.map((row) => row.number))
 }
