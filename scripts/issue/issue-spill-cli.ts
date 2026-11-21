@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { epic_add } from '#scripts/epic/epic-add'
+import { epic_body } from '#scripts/epic/epic-body'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_run } from '#scripts/epic/epic-run'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
@@ -229,7 +230,7 @@ async function place(issue: SpillIssue, follow_up: number): Promise<number> {
 
 	if (exit_code !== SUCCESS_EXIT_CODE) {
 		console.error(
-			`✖ ${session_cite.issue(follow_up)} was not placed — place it with \`pnpm josh epic --add <E> ${String(follow_up)} --after ${String(issue.issue_number)}\`.`,
+			`✖ ${session_cite.issue(follow_up)} was not placed — place it with \`pnpm josh epic --add <E> ${String(follow_up)} --after ${String(issue.issue_number)} --order-reason "${epic_body.format_chain([issue.issue_number, follow_up])}: <reason>"\`.`,
 		)
 	}
 
