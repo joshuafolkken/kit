@@ -802,7 +802,7 @@ In scope, run the `lane:plan` command the stop prints (every path) and comment t
 
 `check:related`, `run:review --join` and a lane child's `review:record` print the same notice ahead of the ship, so a file a fix added is planned first.
 
-`prepared-children` publishes the prepared children the lane filed; one unplanned refuses.
+`prepared-children`, never reused, publishes the lane's children; one unplanned refuses.
 
 A re-run resumes: a per-issue stage record, honored only where git state corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 

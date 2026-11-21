@@ -200,17 +200,15 @@ async function tree_parts(
 }
 
 // The lock file is asked here too, so a drift stops the ship before the gate
-// rather than being rewritten by the pre-push hook's install under the push. The prepared children
-// are asked only here, never by `run:chain`: a planned one is published, which a check must not do.
+// rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> {
-	const [[preflight, evidence, removed, planned], acceptance, lock, prepared] = await Promise.all([
+	const [[preflight, evidence, removed, planned], acceptance, lock] = await Promise.all([
 		tree_parts(request.title, request.body_path),
 		caught(acceptance_problems(request.body_path)),
 		caught(lock_problems()),
-		caught(prepared_children_problems()),
 	])
 
-	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned, ...prepared]
+	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned]
 }
 
 // The tree judgments `run:chain` asks before the review, of the body the ship will read when
@@ -276,7 +274,16 @@ async function reuse_key(request: PreflightRequest): Promise<PreflightKey | unde
 	return { issue, inputs: `${request.title}\n${body ?? ''}` }
 }
 
+// The prepared children are asked ahead of the reuse: a child filed after a pass leaves the tree
+// unmoved, so a reused pass would ship past it unpublished (joshuafolkken/kit#8542). Only the ship
+// asks them, never `run:chain`: a planned one is published, which a check must not do.
 async function stage(request: PreflightRequest): Promise<PreflightResult> {
+	const prepared = await caught(prepared_children_problems())
+
+	if (prepared.length > 0) {
+		return await recorded(refusal(prepared), [PRECONDITION.PREPARED_CHILDREN])
+	}
+
 	const key = await reuse_key(request)
 
 	return await run_ship_preflight_reuse.run(key, async () => await asked_stage(request))
