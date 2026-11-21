@@ -79,7 +79,7 @@ async function record_green_gate(
 
 		if (JSON.stringify(after) !== JSON.stringify(before)) return
 
-		review_stamps.gate_stamp.write(after, target, base)
+		review_stamps.gate_stamp.write(after, { target, base })
 	} catch {
 		/* no record is the safe answer */
 	}
@@ -100,7 +100,7 @@ async function record_green_gate(
 // there and whatever the operating system later does with that pid. The next gate overwrites it.
 function mark_gate_running(before: Record<string, string>, target?: string): void {
 	try {
-		review_stamps.in_flight_stamp.write(before, target)
+		review_stamps.in_flight_stamp.write(before, { target })
 	} catch {
 		/* no marker is the safe answer */
 	}

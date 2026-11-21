@@ -39,7 +39,7 @@ async function run(
 
 	if (run_ship_tree_stamp.is_reusable(access, tree)) return { code: 0, out: REUSED }
 	// Cleared before asking, so a refused or interrupted ask never leaves an older pass to reuse.
-	access.write(tree.files, undefined, tree.base)
+	access.write(tree.files, { base: tree.base })
 	const result = await ask()
 
 	run_ship_tree_stamp.complete(access, tree, result.code)

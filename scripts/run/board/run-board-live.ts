@@ -1,6 +1,7 @@
 import { styleText } from 'node:util'
 import { poll } from '#scripts/lib/poll'
 import { run_board_fold } from './run-board-fold'
+import { run_board_header } from './run-board-header'
 import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
@@ -17,6 +18,7 @@ import { run_board_tick } from './run-board-tick'
 // chooses the board and hands a live one here.
 
 const TRAILING_NEWLINE = /\n$/u
+const REDRAW_WORD = 'redraw'
 const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
 const { live_of } = run_board_theme_defs
@@ -27,6 +29,16 @@ interface Framing {
 	wrap: (text: string) => string
 	sink: (bytes: string) => void
 }
+
+// The text of the last frame drawn, none before the first.
+interface LastFrame {
+	text: string | undefined
+}
+
+type Step = (state: BoardState) => Promise<BoardState>
+
+// Told of a tick that threw.
+type Failed = (cause: unknown) => void
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
@@ -114,26 +126,82 @@ async function revealed_tick(
 	return next
 }
 
+// The last frame's text a framing wrapped, kept to draw again over a failed tick.
+function remembered(framing: Framing, last: LastFrame): Framing {
+	return {
+		wrap: (text) => {
+			last.text = text
+
+			return framing.wrap(text)
+		},
+		sink: framing.sink,
+	}
+}
+
+// The last frame with its last line — the footer's, the first to give way to a short pane — given to
+// the warning, so the frame keeps its height and never scrolls.
+function warned(text: string, warning: string): string {
+	return [...text.split('\n').slice(0, -1), warning].join('\n')
+}
+
+// The first line of what a failure says.
+function reason_of(error: unknown): string {
+	const [first = ''] = (error instanceof Error ? error.message : String(error)).split('\n', 1)
+
+	return first
+}
+
+// A failed tick is told to `failed` (`run-board-exit-record.ts`), and the last frame drawn is drawn
+// again with the failure said as a failed read is (`run-board-header.ts`), until a tick draws again.
+function on_failure(ports: BoardPorts, framing: Framing, last: LastFrame, failed?: Failed): Failed {
+	return (error) => {
+		failed?.(error)
+		if (last.text === undefined) return
+		const warning = run_board_header.warning_of(REDRAW_WORD, ports.now(), reason_of(error))
+
+		framing.sink(framing.wrap(warned(last.text, warning ?? '')))
+	}
+}
+
+// A tick that throws is survived (joshuafolkken/kit#8381): `fail` is told, and the state before it is
+// kept, so the board goes on to the next second with its spinners where they were.
+function surviving(step: Step, fail: Failed): Step {
+	return async (state) => {
+		try {
+			return await step(state)
+		} catch (error) {
+			fail(error)
+
+			return state
+		}
+	}
+}
+
 // A tick drawing each frame, the plan read in the background so the first is drawn without waiting on
 // GitHub. Where the board reveals, the first frame is revealed; every later one is written as drawn.
 function ticker(
 	ports: BoardPorts,
 	screen: Screen,
 	reveal: Reveal | undefined,
-): (state: BoardState) => Promise<BoardState> {
+	failed?: Failed,
+): Step {
 	let opening = reveal
+	const last: LastFrame = { text: undefined }
+	const framing = on_screen(ports, screen)
+	const drawing = framed(ports, remembered(framing, last))
 
-	return async (state) => {
-		const revealing = opening
+	return surviving(
+		async (state) => {
+			const revealing = opening
 
-		opening = undefined
+			opening = undefined
 
-		if (revealing === undefined) {
-			return await tick(state, framed(ports, on_screen(ports, screen)), 'background')
-		}
+			if (revealing === undefined) return await tick(state, drawing, 'background')
 
-		return await revealed_tick(state, ports, screen, revealing)
-	}
+			return await revealed_tick(state, ports, screen, revealing)
+		},
+		on_failure(ports, framing, last, failed),
+	)
 }
 
 // A frame on the second, its spinners turned until the next: the turns are
@@ -144,8 +212,9 @@ async function redraw_forever(
 	ports: BoardPorts,
 	screen: Screen,
 	reveal: Reveal | undefined,
+	failed?: Failed,
 ): Promise<void> {
-	const step = ticker(ports, screen, reveal)
+	const step = ticker(ports, screen, reveal, failed)
 	let state = FRESH_STATE
 
 	await poll.wait_for(
@@ -178,12 +247,13 @@ function live_ports(ports: BoardPorts, keys: KeyReading, live: LiveDefinition): 
 	}
 }
 
-// A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error
-// lands on the normal screen rather than vanishing with the alternate one. Only a board in a theme types
+// A signal leaves through `on_exit`; a failure outside the redraws leaves before its error is printed, so
+// the error lands on the normal screen rather than vanishing with the alternate one, and a failed redraw
+// is told to `failed` and drawn on past (`surviving`). Only a board in a theme types
 // its opening line, reveals its first frame a block at a time and types each row that appears after it;
 // one in none draws it whole at once. The board arrives without its theme and is themed here, where
 // each frame is restyled before its screen control bytes are added (`on_screen`).
-async function watch(board: BoardPorts, theme: Theme | undefined): Promise<void> {
+async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Failed): Promise<void> {
 	const ports = run_board_theme.themed(board, theme)
 	const keys = run_board_keys.read_keys(ports.keys, ports.cue, ports.typing_sound)
 	const leave = leaver(ports, SCREEN, keys)
@@ -194,7 +264,7 @@ async function watch(board: BoardPorts, theme: Theme | undefined): Promise<void>
 	const { gather, reveal } = run_board_intro.opening(ports.gather, live, keys, theme)
 
 	try {
-		await redraw_forever({ ...live, gather, opened_ms: ports.now() }, SCREEN, reveal)
+		await redraw_forever({ ...live, gather, opened_ms: ports.now() }, SCREEN, reveal, failed)
 	} finally {
 		leave()
 	}

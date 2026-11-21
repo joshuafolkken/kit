@@ -27,8 +27,8 @@ function plant_both(base: string = BASE): ScopedSources {
 		is_unit_skipped: false,
 	}
 
-	review_stamps.lint_related_stamp.write({ [SOURCE]: DIGEST }, planted.lint, base)
-	review_stamps.test_related_stamp.write({ [SOURCE]: DIGEST }, planted.test, base)
+	review_stamps.lint_related_stamp.write({ [SOURCE]: DIGEST }, { target: planted.lint, base })
+	review_stamps.test_related_stamp.write({ [SOURCE]: DIGEST }, { target: planted.test, base })
 
 	return planted
 }

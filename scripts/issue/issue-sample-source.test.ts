@@ -44,7 +44,7 @@ describe('issue_sample_source.problem — an issue number', () => {
 	it('reads another repository’s number there, with no closing pull request looked up', async () => {
 		cited_as({ number: CITED })
 
-		const problem = await issue_sample_source.problem(GATED_BODY, THERE)
+		const problem = await issue_sample_source.problem(GATED_BODY, { repo: THERE })
 
 		expect(problem).toContain(`${THERE}/issues/${String(CITED)}`)
 		expect(problem).toContain(PLAIN_HINT)

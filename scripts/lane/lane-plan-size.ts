@@ -235,7 +235,7 @@ function hunks_over(
 // count. With no measured rate the bar is the guide's fallback lines, which the filing refuses past too.
 function lines_limit(signals: PlanSignals): number {
 	const growth = ratios_of(signals)
-	const bar = size_estimate.declared_lines_bar(signals.implement_rate, growth)
+	const bar = size_estimate.declared_lines_bar({ rate: signals.implement_rate, growth })
 
 	return bar ?? Math.floor(guide_of(signals).lines / declared_growth.factor(growth, 'lines'))
 }
