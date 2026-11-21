@@ -1,11 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import type { BoardRow } from './run-board-layout'
 import type { CueName } from './run-board-sound-cues'
-import type { TypingSound } from './run-board-sound-typing'
+import { run_board_sound_typing, type TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
 import type { BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_type_rows } from './run-board-type-rows'
 
 // joshuafolkken/kit#8250: a redraw that brings a row to type switches the trill on, apart from the cue
 // it may sound on the same frame; the spinner's turns keep it on while a row types and switch it off
@@ -21,6 +22,21 @@ const TYPED_MS = 10 * SECOND
 interface Heard {
 	cues: Array<CueName>
 	trill: Array<boolean>
+	// A trill that sounds, in place of the one that only records its switches.
+	sound?: TypingSound
+}
+
+// The trill as the board sounds it, its player faked; the stop timer runs on vitest's fake timers.
+function sounding(): { sound: TypingSound; kill: Mock<() => unknown> } {
+	const kill = vi.fn<() => unknown>()
+	const sound = run_board_sound_typing.typing_sound({
+		file: () => 'teletype.wav',
+		start: (_file, handlers) => {
+			handlers.started({ on: () => undefined, unref: () => undefined, kill })
+		},
+	})
+
+	return { sound, kill }
 }
 
 function planned(): BoardState {
@@ -60,7 +76,7 @@ function heard_over(
 ): BoardState {
 	const { ports } = harness(LOCAL, [])
 	const run_layout = { ...layout_for(state, LOCAL, START), active: rows }
-	const typing_sound = trill_of(heard)
+	const typing_sound = heard.sound ?? trill_of(heard)
 
 	function cue(name: CueName): void {
 		heard.cues.push(name)
@@ -72,25 +88,54 @@ function heard_over(
 }
 
 // The trill switches the spinner's turns make from `now_ms` to the next second.
-async function turned_from(state: BoardState, now_ms: number): Promise<Array<boolean>> {
-	const heard: Heard = { cues: [], trill: [] }
-	const clock = { now_ms }
-
+// The spinner's turns from `clock.now_ms` to the next second over `typing_sound`; each sleep moves
+// vitest's fake timers with the board's clock.
+async function spun_from(
+	state: BoardState,
+	clock: { now_ms: number },
+	typing_sound: TypingSound,
+): Promise<void> {
 	await spin_to_second(
 		{ spots: [], typing: state.typing },
 		{
 			now: () => clock.now_ms,
 			sleep: async (ms) => {
 				clock.now_ms += ms
+				vi.advanceTimersByTime(ms)
 				await Promise.resolve()
 			},
 			write: () => undefined,
-			typing_sound: trill_of(heard),
+			typing_sound,
 		},
 	)
+}
+
+function appeared_at(now_ms: number): BoardState {
+	const base = heard_over(planned(), [], START, { cues: [], trill: [] })
+
+	return heard_over(base, running(), now_ms, { cues: [], trill: [] })
+}
+
+// When the rows `state` types finish, read at `now_ms`.
+function typed_through(state: BoardState, now_ms: number): number {
+	return now_ms + run_board_type_rows.left_ms(state.typing, now_ms)
+}
+
+async function turned_from(state: BoardState, now_ms: number): Promise<Array<boolean>> {
+	const heard: Heard = { cues: [], trill: [] }
+
+	await spun_from(state, { now_ms }, trill_of(heard))
 
 	return heard.trill
 }
+
+beforeEach(() => {
+	vi.useFakeTimers()
+})
+
+afterEach(() => {
+	vi.useRealTimers()
+})
 
 describe('run_board_tick_draw.draw_display trill', () => {
 	it('switches the trill on as a row appears, with the cue on the same frame', () => {
@@ -131,5 +176,35 @@ describe('run_board_spin.spin_to_second trill', () => {
 		expect(typing.length).toBeGreaterThan(0)
 		expect(typing[0]).toBe(true)
 		expect(typed.every((is_on) => !is_on)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#8523: the gather the board waits on between seconds draws nothing, so the trill
+// stops by itself as the letters type through rather than at the next redraw.
+describe('run_board_type_trill held gather', () => {
+	it('stops the trill a redraw switched on once its letters type through, with no redraw after', () => {
+		const { sound, kill } = sounding()
+		const base = heard_over(planned(), [], START, { cues: [], trill: [] })
+		const appeared = heard_over(base, running(), START + SECOND, { cues: [], trill: [], sound })
+		const left_ms = typed_through(appeared, START + SECOND) - (START + SECOND)
+
+		vi.advanceTimersByTime(left_ms - 1)
+		expect(kill).not.toHaveBeenCalled()
+		vi.advanceTimersByTime(1)
+		expect(kill).toHaveBeenCalledOnce()
+	})
+
+	it('stops the trill as a line typing past the second ends, while the gather holds the redraw', async () => {
+		const { sound, kill } = sounding()
+		const appeared = appeared_at(START + SECOND)
+		const done_ms = typed_through(appeared, START + SECOND)
+		const clock = { now_ms: START + SECOND }
+
+		await spun_from(appeared, clock, sound)
+		expect(done_ms).toBeGreaterThan(clock.now_ms)
+		vi.advanceTimersByTime(done_ms - clock.now_ms - 1)
+		expect(kill).not.toHaveBeenCalled()
+		vi.advanceTimersByTime(1)
+		expect(kill).toHaveBeenCalledOnce()
 	})
 })
