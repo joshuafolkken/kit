@@ -8,6 +8,7 @@ import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
+import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_spin, type Spun } from './run-board-spin'
@@ -210,12 +211,22 @@ function has_drop(ports: LivePorts, defs: LiveDefs = THEME_DEFS): boolean {
 }
 
 // The frame's cells the drop falls down, where one falls — as the theme draws them, since the drop is
-// written past the theme and puts each cell it leaves back as it was on screen.
-function drop_of(ports: LivePorts, drawn: Drawn, typing: Typing): DropScreen | undefined {
+// written past the theme and puts each cell it leaves back as it was on screen — with the spans the rain
+// pours over: the last frame's carried on, this frame's rows typing added (joshuafolkken/kit#8369).
+function drop_of(
+	redraw: Redraw,
+	drawn: Drawn,
+	typing: Typing,
+	last: DropScreen | undefined,
+): DropScreen | undefined {
+	const { ports } = redraw
+
 	if (!has_drop(ports)) return undefined
 	const lines = drawn.lines.map((line) => run_board_theme.restyle(ports.theme, line))
+	const screen = run_board_drop_screen.screen_of({ ...drawn, lines }, typing, drawn.size)
+	const spans = [...(last?.pours ?? []), ...run_board_type_rows.spans_of(typing)]
 
-	return run_board_drop_screen.screen_of({ ...drawn, lines }, typing, drawn.size)
+	return run_board_rain_drop.poured(screen, spans, redraw.now_ms)
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
@@ -263,7 +274,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 
 	const { spots, sweep, lamps, traces } = drawn
 	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
-	const drop = drop_of(redraw.ports, drawn, typing)
+	const drop = drop_of(redraw, drawn, typing, state.drop)
 
 	return { ...state, ...display.carried, spots, sweep, lamps, traces, ...decoded, typing, drop }
 }

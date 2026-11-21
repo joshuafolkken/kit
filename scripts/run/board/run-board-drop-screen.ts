@@ -1,7 +1,7 @@
 import { run_board_cut_styled, type StyledPiece } from './run-board-cut-styled'
 import type { TerminalSize } from './run-board-fit'
 import type { Spot } from './run-board-spot'
-import type { Typing } from './run-board-type-rows'
+import type { Typing, TypingSpan } from './run-board-type-rows'
 
 // joshuafolkken/kit#8367: the last frame a live matrix board drew, cell by cell on screen — each cell's
 // character and the colors it was drawn in — so the drop falling down the board between redraws
@@ -22,6 +22,9 @@ interface DropScreen {
 	// the rows still typing.
 	skips: ReadonlySet<string>
 	typing_rows: ReadonlySet<number>
+	// The merged spans the rain pours over (`run-board-rain-pour.ts`), kept across redraws while a drop
+	// they sped up can still be on screen; none before a row types.
+	pours?: ReadonlyArray<TypingSpan> | undefined
 }
 
 interface ScreenPlace {
