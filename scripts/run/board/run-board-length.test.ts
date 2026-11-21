@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_length } from './run-board-length'
 
-const { minute_span_of, span_of } = run_board_length
+const { fitted_span_of, minute_span_of, span_of } = run_board_length
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
@@ -48,5 +48,25 @@ describe('run_board_length.minute_span_of', () => {
 	it('never draws less than a minute', () => {
 		expect(minute_span_of(0)).toBe('1′')
 		expect(minute_span_of(-MINUTE)).toBe('1′')
+	})
+})
+
+// joshuafolkken/kit#8481: a lane row's eight-column time pushed its row's columns right past ten hours.
+describe('run_board_length.fitted_span_of', () => {
+	const WIDTH = 8
+
+	it('draws a length that fits the width to its second', () => {
+		expect(fitted_span_of(HOUR + 14 * MINUTE + 58 * SECOND, WIDTH, 'down')).toBe('1°14′58″')
+		expect(fitted_span_of(26 * SECOND, WIDTH, 'up')).toBe('26″')
+	})
+
+	it('drops the seconds of a length past the width, rounded down', () => {
+		expect(fitted_span_of(17 * HOUR + 3 * MINUTE + 34 * SECOND, WIDTH, 'down')).toBe('17°03′')
+		expect(fitted_span_of(100 * HOUR + 5 * MINUTE + 59 * SECOND, WIDTH, 'down')).toBe('100°05′')
+	})
+
+	it('rounds a length past the width up when asked', () => {
+		expect(fitted_span_of(17 * HOUR + 3 * MINUTE + 34 * SECOND, WIDTH, 'up')).toBe('17°04′')
+		expect(fitted_span_of(10 * MINUTE + 5 * SECOND, 5, 'up')).toBe('11′')
 	})
 })
