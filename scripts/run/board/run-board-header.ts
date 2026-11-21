@@ -241,7 +241,7 @@ function planned(header: BoardHeader, part: string | undefined): string | undefi
 
 // What has settled of the plan, what runs, what is parked, then the repository's issue count, at the
 // right end of the lanes rule rather than on the header's first line, which a narrow pane cuts
-// (joshuafolkken/kit#8514).
+// (joshuafolkken/kit#8514). Keyed from its first figure where the board types rows (#8457).
 function lanes_tail(header: BoardHeader): string {
 	const counts = counts_of(layout_of(header))
 	const parts = [
@@ -251,7 +251,10 @@ function lanes_tail(header: BoardHeader): string {
 		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
 	]
 
-	return parts.filter((part) => part !== undefined).join(GAP)
+	return run_board_header_parts.keyed_progress(
+		header,
+		parts.filter((part) => part !== undefined).join(GAP),
+	)
 }
 
 // How long ago the saved plan drawn was read, last on the queued rule, so nothing moves as it goes.
@@ -285,7 +288,7 @@ function alert_part(header: BoardHeader): string | undefined {
 // plan read in flight and a saved plan's age on the queued rule (`queued_tail`), a failing read in the
 // notice slot (`run-board-standing.ts`).
 function progress_part(header: BoardHeader): string {
-	return run_board_header_parts.keyed_progress(header, planned(header, estimate_part(header)) ?? '')
+	return planned(header, estimate_part(header)) ?? ''
 }
 
 // The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):

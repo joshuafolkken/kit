@@ -1,8 +1,8 @@
 import { run_board_row_key } from './run-board-row-key'
 
-// joshuafolkken/kit#8457: the header's progress line keyed from its first figure the plan knows where the
-// board types rows, so the frame the live plan lands on types the line's faint figures over the saved
-// ones (`run-board-type-rows.ts`) as it types the faint rows. The line is never new otherwise: its key is
+// joshuafolkken/kit#8457: the progress tallies at the lanes rule's end (joshuafolkken/kit#8514) keyed from
+// their first figure the plan knows where the board types rows, so the frame the live plan lands on types
+// the faint figures over the saved ones (`run-board-type-rows.ts`) as it types the faint rows. The line is never new otherwise: its key is
 // always known (`run-board-row-sections.ts`).
 
 const PLAN_ID = 'progress'
