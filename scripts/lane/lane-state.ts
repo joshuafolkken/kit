@@ -54,7 +54,7 @@ const TRANSITIONS: Record<LaneState, ReadonlyArray<LaneState>> = {
 }
 
 // One command's change: the state it leaves the lane in, and whether it launched a child — a launch
-// stamps the launch time and the run that launched it, which every other change keeps.
+// stamps the launch time and its run; a resume transfers ownership to the current run.
 interface LaneChange {
 	issue: string
 	state: LaneState
@@ -104,6 +104,13 @@ function launch_fields(change: LaneChange, directory: string, now: Date): Partia
 	return { run: current_run(directory), launched_at: now.toISOString() }
 }
 
+function resume_fields(change: LaneChange, directory: string): Partial<LaneStateRecord> {
+	if (change.command !== 'lane:resume') return {}
+	const run = current_run(directory)
+
+	return run === undefined ? {} : { run }
+}
+
 function next_record(
 	change: LaneChange,
 	previous: LaneStateRecord | undefined,
@@ -125,6 +132,7 @@ function next_record(
 		changed_at: now.toISOString(),
 		changed_by: change.command,
 		...launch_fields(change, directory, now),
+		...resume_fields(change, directory),
 	}
 }
 

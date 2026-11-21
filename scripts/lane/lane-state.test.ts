@@ -81,6 +81,34 @@ describe('lane_state.record_change — each command leaves the record it names',
 	})
 })
 
+describe('lane_state.record_change — resumed ownership', () => {
+	it.each([true, false])(
+		'preserves a new pause after resume with a current run: %s',
+		async (has_current) => {
+			const previous = run_carry.fresh_carry('backlogrun', { pid: OWNER_PID }, CARRY_STARTED_AT)
+			const current = run_carry.fresh_carry('backlogrun', { pid: OWNER_PID }, PAUSED_AT)
+
+			vi.spyOn(run_carry, 'read_carry')
+				.mockReturnValueOnce({ kind: 'carried', carry: previous })
+				.mockReturnValue(has_current ? { kind: 'carried', carry: current } : { kind: 'none' })
+
+			await record_at(change_of('running', DISPATCH, { is_launch: true }), LAUNCHED_AT)
+			await record_at(change_of('paused', PAUSE), PAUSED_AT)
+			await record_at(change_of('running', 'lane:resume'), PAUSED_AT)
+			await record_at(change_of('paused', PAUSE), PAUSED_AT)
+
+			expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({
+				state: 'paused',
+				launched_at: LAUNCHED_AT.toISOString(),
+				run: {
+					started_at: (has_current ? PAUSED_AT : CARRY_STARTED_AT).toISOString(),
+					owner_pid: OWNER_PID,
+				},
+			})
+		},
+	)
+})
+
 describe('lane_state.record_change — a launch outlives the changes after it', () => {
 	it('keeps the launch through a pause and moves only the state and its change', async () => {
 		await record_at(change_of('running', DISPATCH, { is_launch: true }), LAUNCHED_AT)

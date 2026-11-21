@@ -23,6 +23,8 @@ import { backlogrun_launch } from './backlogrun-launch'
 //
 // **Lanes are counted, never stopped**: a child killed mid-change leaves a tree nobody can resume.
 // `josh lane:pause --all` is the way to suspend them without discarding anything.
+// The next backlogrun resumes claimed paused lanes whose owning run ended or died; a live owner's
+// pauses stay in place.
 //
 // **`--restart` stops the same processes and keeps the record** (`stop_keeping_record`), so the run's
 // budget, counters and named list carry over to the supervisor started after it.

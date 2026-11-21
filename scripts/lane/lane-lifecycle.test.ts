@@ -15,6 +15,8 @@ import { lane_lifecycle_view } from './lane-lifecycle-view-fixture'
 
 const MAX_STEPS = 40
 const NUM_RUNS = 150
+// Open, start, launch, end, start, pause, resume: the minimized CI counterexample.
+const RESUMED_IN_NEXT_RUN = [0, 2, 0, 6, 3, 0, 0]
 
 async function expect_agreement(world: World, trace: ReadonlyArray<string>): Promise<void> {
 	const read = await lane_lifecycle_view.read_world(world)
@@ -61,6 +63,10 @@ async function walk(choices: ReadonlyArray<number>): Promise<void> {
 }
 
 describe('lane and run lifecycle combinations — the readers agree at every step', () => {
+	it('transfers a resumed lane from the ended run to the current run', async () => {
+		await walk(RESUMED_IN_NEXT_RUN)
+	})
+
 	it('answers one state on run:board, in the backlog count and from run:liveness', async () => {
 		const steps = { minLength: 1, maxLength: MAX_STEPS, size: 'max' } as const
 		const choices = fc.noBias(fc.array(fc.nat(), steps))
