@@ -1,0 +1,84 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_board_drop_screen } from './run-board-drop-screen'
+import { run_board_rain_drop } from './run-board-rain-drop'
+import { run_board_spin } from './run-board-spin'
+import { run_board_sweep } from './run-board-sweep'
+import { run_board_type_rows } from './run-board-type-rows'
+
+// joshuafolkken/kit#8367: the drop falls between redraws on the sweep's step, writing only the
+// cells that changed since the last turn.
+
+const { REDRAW_MS, spin_to_second } = run_board_spin
+const { NO_TYPING } = run_board_type_rows
+const { DROP_MS, drop_bytes } = run_board_rain_drop
+const START = Date.parse('2026-10-08T09:00:00.000Z')
+const SYNC_ON = '\u{1B}[?2026h'
+const SYNC_OFF = '\u{1B}[?2026l'
+const SIZE = { rows: 24, columns: 40 }
+const SCREEN = run_board_drop_screen.screen_of(
+	{ lines: Array.from({ length: SIZE.rows }, () => 'x'.repeat(SIZE.columns)), spots: [] },
+	NO_TYPING,
+	SIZE,
+)
+
+interface Written {
+	at_ms: number
+	text: string
+}
+
+// A clock each sleep moves forward and every write it saw, without its synchronized output.
+function drop_ports(now_ms: number): {
+	ports: Parameters<typeof spin_to_second>[1]
+	writes: Array<Written>
+} {
+	const clock = { now_ms }
+	const writes: Array<Written> = []
+	const ports = {
+		now: () => clock.now_ms,
+		write: (raw: string) => {
+			writes.push({ at_ms: clock.now_ms, text: raw.replace(SYNC_ON, '').replace(SYNC_OFF, '') })
+		},
+		sleep: async (ms: number) => {
+			clock.now_ms += ms
+		},
+	}
+
+	return { ports, writes }
+}
+
+beforeEach(() => {
+	vi.stubEnv('FORCE_COLOR', '3')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
+describe('run_board_spin — the drop between redraws (joshuafolkken/kit#8367)', () => {
+	it('falls on the sweep’s step', () => {
+		expect(DROP_MS).toBe(run_board_sweep.SWEEP_MS)
+	})
+
+	it('writes every lit cell on the second, then what changed on each step after', async () => {
+		const { ports, writes } = drop_ports(START)
+
+		await spin_to_second({ spots: [], typing: NO_TYPING, drop: SCREEN }, ports)
+
+		expect(writes[0]).toStrictEqual({ at_ms: START, text: drop_bytes(SCREEN, START, undefined) })
+		const stepped = writes.slice(1).filter(({ text }) => text !== '')
+
+		expect(stepped.length).toBeGreaterThan(0)
+		expect(stepped.every(({ at_ms }) => (at_ms - START) % DROP_MS === 0)).toBe(true)
+		expect(ports.now()).toBe(START + REDRAW_MS)
+	})
+
+	it('writes exactly the drop’s change from the step before', async () => {
+		const { ports, writes } = drop_ports(START)
+
+		await spin_to_second({ spots: [], typing: NO_TYPING, drop: SCREEN }, ports)
+		const at_ms = START + DROP_MS * 10
+		const written = writes.find((write) => write.at_ms === at_ms)
+
+		expect(written?.text).toBe(drop_bytes(SCREEN, at_ms, at_ms - DROP_MS))
+	})
+})

@@ -45,9 +45,15 @@ function share(column: number, salt: number): number {
 	return (mixed([column, salt]) % SCALE) / SCALE
 }
 
+// A drop's idle pace in rows a frame, `fraction` (`0`..`1`) of the way through the spread — the one pace
+// the board's falling drop shares (`run-board-rain-drop.ts`; joshuafolkken/kit#8367).
+function pace_of(fraction: number): number {
+	return SPEED.least + fraction * SPEED.spread
+}
+
 // The rows the column's drop falls a frame: its own pace idle, one faster pace for every drop pouring.
 function speed_of(column: number, at: RainMoment): number {
-	return at.is_burst ? POUR_SPEED : SPEED.least + share(column, SALT.speed) * SPEED.spread
+	return at.is_burst ? POUR_SPEED : pace_of(share(column, SALT.speed))
 }
 
 // The row the column's drop is on at `at`, fractional, within its cycle of panel, trail and gap.
@@ -79,7 +85,7 @@ function cell_text(place: RainPlace, at: RainMoment): string {
 	return run_board_labels.painted(paint, glyph)
 }
 
-const run_board_idle_rain = { SPEED, cell_text, row_at, speed_of }
+const run_board_idle_rain = { SPEED, cell_text, never, pace_of, row_at, speed_of }
 
 export { run_board_idle_rain }
 export type { RainMoment, RainPlace }

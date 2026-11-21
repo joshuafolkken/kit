@@ -7,7 +7,7 @@ import { run_board_tick_draw } from './run-board-tick-draw'
 // joshuafolkken/kit#8356: the matrix board draws its lamp panel as the idle rain, and its new rows decode
 // on a terminal drawing color; elsewhere they type or show at once.
 
-const { entry_of, has_lamps, has_rain } = run_board_tick_draw
+const { entry_of, has_drop, has_lamps, has_rain } = run_board_tick_draw
 const MATRIX = { types_rows: true, theme: 'matrix', is_tty: true } as const
 const WARGAMES = { ...MATRIX, theme: 'wargames' } as const
 const ONCE = '--once, --chat and a pipe'
@@ -44,6 +44,32 @@ describe('run_board_tick_draw.has_rain', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(has_rain(MATRIX)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8367: a drop falls down the matrix board every second, on the lamps' gate.
+describe('run_board_tick_draw.has_drop', () => {
+	it('drops one down the live matrix board on a terminal drawing color', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(has_drop(MATRIX)).toBe(true)
+	})
+
+	it.each([
+		['the wargames board', WARGAMES],
+		['a board in no theme', { ...MATRIX, theme: undefined }],
+		[ONCE, { ...MATRIX, is_tty: false }],
+		[EVERY, { ...MATRIX, types_rows: false }],
+	])('drops none on %s', (_, ports) => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(has_drop(ports)).toBe(false)
+	})
+
+	it('drops none on a terminal drawing no color', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+
+		expect(has_drop(MATRIX)).toBe(false)
 	})
 })
 

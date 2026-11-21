@@ -1,4 +1,6 @@
 import type { BoardDisplay } from './run-board-display'
+import { run_board_drop_screen, type DropScreen } from './run-board-drop-screen'
+import type { TerminalSize } from './run-board-fit'
 import type { FrameBounds } from './run-board-fold'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -107,8 +109,9 @@ function bounds_of(ports: DrawPorts): FrameBounds {
 	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
-// A drawn frame and every note it was drawn from — shown or not (joshuafolkken/kit#8117).
-type Drawn = Spun & { notes: ReadonlyArray<BoardNote> }
+// A drawn frame, every note it was drawn from — shown or not (joshuafolkken/kit#8117) — and the pane it
+// was kept within.
+type Drawn = Spun & { notes: ReadonlyArray<BoardNote>; size: TerminalSize | undefined }
 
 // The theme rows whose lamp choice the panel reads.
 type LampDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'lamps'>>>>
@@ -194,7 +197,22 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 	})
 	const spun = run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
 
-	return { ...spun, notes }
+	return { ...spun, notes, size: bounds.size }
+}
+
+// Whether a drop falls down the board between redraws: a live board on a terminal drawing color, in a
+// theme whose live board drops one (joshuafolkken/kit#8367) — the lamps' gate, by the theme's own switch.
+function has_drop(ports: LivePorts, defs: LiveDefs = THEME_DEFS): boolean {
+	if (ports.types_rows !== true || !live_of(ports.theme, defs).drop) return false
+
+	return is_colored_tty(ports)
+}
+
+// The frame's cells the drop falls down, where one falls.
+function drop_of(ports: LivePorts, drawn: Drawn, typing: Typing): DropScreen | undefined {
+	if (!has_drop(ports)) return undefined
+
+	return run_board_drop_screen.screen_of(drawn, typing, drawn.size)
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
@@ -242,8 +260,9 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 
 	const { spots, sweep, lamps, traces } = drawn
 	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
+	const drop = drop_of(redraw.ports, drawn, typing)
 
-	return { ...state, ...display.carried, spots, sweep, lamps, traces, ...decoded, typing }
+	return { ...state, ...display.carried, spots, sweep, lamps, traces, ...decoded, typing, drop }
 }
 
 const run_board_tick_draw = {
@@ -252,6 +271,7 @@ const run_board_tick_draw = {
 	draw,
 	draw_display,
 	entry_of,
+	has_drop,
 	has_lamps,
 	has_rain,
 	has_strip,
