@@ -144,8 +144,7 @@ describe('test_related_reuse fallbacks', () => {
 		expect(since_green.read_verdict).toHaveBeenCalledWith(
 			review_stamps.test_related_stamp,
 			gate_labels.UNIT_LABEL,
-			undefined,
-			TREE,
+			{ tree: TREE },
 		)
 	})
 })
@@ -286,8 +285,7 @@ describe('test_related_reuse.carried', () => {
 		expect(since_green.read_moved_parts).toHaveBeenCalledWith(
 			review_stamps.test_related_red_stamp,
 			gate_labels.UNIT_LABEL,
-			undefined,
-			TREE,
+			{ tree: TREE },
 		)
 	})
 	it('carries nothing once a shared source the tests reach changed', async () => {

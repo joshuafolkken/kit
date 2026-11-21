@@ -276,8 +276,10 @@ function entries_of(
 // reuse matches all three. One label answers a check's record; every declared label the whole gate's.
 function fingerprint(
 	labels: ReadonlyArray<string>,
-	root: string = PROJECT_ROOT,
-	environment: Environment = process.env,
+	{
+		root = PROJECT_ROOT,
+		environment = process.env,
+	}: { root?: string | undefined; environment?: Environment | undefined } = {},
 ): string {
 	const declarations = labels.flatMap((label) => DECLARATIONS.get(label) ?? [])
 	const entries = new Set(

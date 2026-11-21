@@ -80,8 +80,10 @@ function wait_of(
 async function record_admitted(
 	claim: AdmittedClaim,
 	now: number,
-	sink: WaitSink = to_ledger,
-	admission?: Admission,
+	{
+		sink = to_ledger,
+		admission,
+	}: { sink?: WaitSink | undefined; admission?: Admission | undefined } = {},
 ): Promise<void> {
 	const wait = wait_of(claim, now, admission)
 

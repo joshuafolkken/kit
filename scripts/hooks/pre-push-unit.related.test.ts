@@ -98,7 +98,7 @@ describe('a push the gate record does not cover runs the related tests', () => {
 	})
 
 	it('still reuses a gate record that covers the push', async () => {
-		review_stamps.gate_stamp.write(CHANGED_TREE, GATE_PATH, BASE)
+		review_stamps.gate_stamp.write(CHANGED_TREE, { target: GATE_PATH, base: BASE })
 
 		await run_hook()
 
@@ -106,7 +106,7 @@ describe('a push the gate record does not cover runs the related tests', () => {
 	})
 
 	it('runs the whole suite when the escape hatch is set too', async () => {
-		review_stamps.test_related_stamp.write(CHANGED_TREE, TEST_PATH, BASE)
+		review_stamps.test_related_stamp.write(CHANGED_TREE, { target: TEST_PATH, base: BASE })
 		vi.stubEnv(pre_push_unit.FORCE_ENV, '1')
 
 		await run_hook()
@@ -118,7 +118,7 @@ describe('a push the gate record does not cover runs the related tests', () => {
 
 describe('a push with test:related green on the pushed tree', () => {
 	it('reuses that record instead of re-running the related tests', async () => {
-		review_stamps.test_related_stamp.write(CHANGED_TREE, TEST_PATH, BASE)
+		review_stamps.test_related_stamp.write(CHANGED_TREE, { target: TEST_PATH, base: BASE })
 
 		const [code, text] = await run_hook()
 
@@ -130,7 +130,7 @@ describe('a push with test:related green on the pushed tree', () => {
 	})
 
 	it('re-runs them when the record describes another tree', async () => {
-		review_stamps.test_related_stamp.write(MOVED_TREE, TEST_PATH, BASE)
+		review_stamps.test_related_stamp.write(MOVED_TREE, { target: TEST_PATH, base: BASE })
 
 		const [, text] = await run_hook()
 
@@ -140,7 +140,7 @@ describe('a push with test:related green on the pushed tree', () => {
 	})
 
 	it('re-runs them when the record was written on another base', async () => {
-		review_stamps.test_related_stamp.write(CHANGED_TREE, TEST_PATH, 'e5f6a7b8')
+		review_stamps.test_related_stamp.write(CHANGED_TREE, { target: TEST_PATH, base: 'e5f6a7b8' })
 
 		await run_hook()
 
@@ -148,7 +148,7 @@ describe('a push with test:related green on the pushed tree', () => {
 	})
 
 	it('re-runs them when the push does not carry the working tree', async () => {
-		review_stamps.test_related_stamp.write(CHANGED_TREE, TEST_PATH, BASE)
+		review_stamps.test_related_stamp.write(CHANGED_TREE, { target: TEST_PATH, base: BASE })
 		repository.status = ` M ${CHANGED_PATH}`
 
 		await run_hook()

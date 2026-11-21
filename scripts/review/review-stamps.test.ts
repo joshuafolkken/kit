@@ -112,7 +112,7 @@ describe('the record round trip', () => {
 	it('reads back the tree it wrote, with a timestamp', () => {
 		const files = { [FILE_A]: DIGEST }
 
-		review_stamps.gate_stamp.write(files, target())
+		review_stamps.gate_stamp.write(files, { target: target() })
 
 		const stamp = review_stamps.gate_stamp.read(target())
 
@@ -135,7 +135,7 @@ describe('the record round trip', () => {
 	// The in-flight marker means something only while it exists, so removing it is half the mechanism
 	// (joshuafolkken/kit#1242). A record nobody removes goes on saying a gate is running after it ended.
 	it('reads a removed record as undefined again', () => {
-		review_stamps.in_flight_stamp.write({ [FILE_A]: DIGEST }, target())
+		review_stamps.in_flight_stamp.write({ [FILE_A]: DIGEST }, { target: target() })
 		review_stamps.in_flight_stamp.remove(target())
 
 		expect(review_stamps.in_flight_stamp.read(target())).toBeUndefined()
@@ -325,7 +325,7 @@ describe('verification_gate.record_green_gate — never reaches the gate verdict
 		expect(() => {
 			review_stamps.gate_stamp.write(
 				{ [FILE_A]: 'x' },
-				path.join(directory(), MISSING_DIRECTORY, STAMP_FILE),
+				{ target: path.join(directory(), MISSING_DIRECTORY, STAMP_FILE) },
 			)
 		}).toThrow()
 	})
