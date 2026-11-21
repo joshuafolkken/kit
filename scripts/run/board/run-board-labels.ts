@@ -14,8 +14,6 @@ import type { ItemState } from './run-board-status'
 // heartbeat has run — is degree-minute-second style (`1°15′57″`), so `:` is a time of day alone and
 // the board never reads a length as a moment.
 
-// Every gauge is this wide — the plan, the machine and a row's phase.
-const BAR_WIDTH = 10
 // A centered square done and a thin line left: the shapes alone tell the two apart where no color is
 // drawn, and a terminal dims the line so the gauge does not read heavy. The square, not a full block,
 // leaves a gap between stacked bars at line height 1.
@@ -371,7 +369,7 @@ function painted(color: Paint | undefined, text: string): string {
 function bar_of(
 	done: number,
 	total: number,
-	width: number = BAR_WIDTH,
+	width: number,
 	color: Paint | undefined = BAR_DONE_COLOR,
 ): string {
 	const filled = total === 0 ? 0 : Math.round((Math.min(done, total) / total) * width)
