@@ -107,6 +107,12 @@ describe('run_board_header_defcon.level_of', () => {
 })
 
 describe('run_board_header_defcon.level_of on held seats and blocked P1s', () => {
+	it('raises nothing when seats prevent a waiting P1 from launching', () => {
+		const lane_capacity = { free: 0, bound: 'seats', seated: 9 } as const
+
+		expect(level({ active: ONE, queued: P1_QUEUED }, { lane_capacity })).toBe(CALM)
+	})
+
 	it('counts an earlier run lane as a held seat', () => {
 		expect(level({ active: ONE, queued: P1_QUEUED }, { occupied_count: LANES })).toBe(CALM)
 		expect(level({ active: ONE }, { occupied_count: LANES + 1 })).toBe(OVER_LIMIT)

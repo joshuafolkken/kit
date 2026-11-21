@@ -1,5 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
@@ -24,6 +26,7 @@ const LAUNCH = {
 const DRAIN = { pos: 2, at: LAUNCH.at, kind: 'drain', text: 'backlog drained' }
 const REPO = 'joshuafolkken/kit'
 const SHORT = { rows: 15, columns: 80 }
+const LANES_WITH_WAIT = 3
 
 // A read that never answers, as a plan read still in flight.
 async function never(): Promise<never> {
@@ -62,6 +65,30 @@ async function loading(events: ReadonlyArray<typeof LAUNCH>): Promise<Array<stri
 }
 
 describe('run_board_tick.tick capacity', () => {
+	it('draws the local seat wait in the heading and queued row', async () => {
+		const plan = long_plan(1)
+		for (const child of plan.waves.waves.flat()) child.labels = [RUN_LANE_LABEL]
+		const local = {
+			...LOCAL,
+			lanes: [String(CHILD)],
+			events: [LAUNCH, { ...DRAIN, kind: 'setup', text: run_event_setup.STAGE.HANDING_OFF }],
+			occupied_count: 1,
+			lane_limit: 6,
+			free_lanes: 0,
+			lane_capacity: { free: 0, bound: 'seats', seated: 9 } as const,
+		}
+		const { ports, frames } = harness(local, [plan])
+
+		await tick(FRESH_STATE, ports)
+
+		const frame = stripVTControlCharacters(frames.at(-1) ?? '')
+
+		expect(frame).toContain('🧵 seats 9/9')
+		expect(frame).toContain('waiting for seats 9/9')
+		expect(frame).not.toContain(run_event_setup.STAGE.HANDING_OFF)
+		expect(frame.match(/seats 9\/9/gu), frame).toHaveLength(LANES_WITH_WAIT)
+	})
+
 	it('refreshes occupied slots and the live limit independently of visible running rows', async () => {
 		const local = { ...LOCAL, events: [LAUNCH], occupied_count: 2, lane_limit: 6 }
 		const { ports, frames, read_local, clock } = harness(local, [])

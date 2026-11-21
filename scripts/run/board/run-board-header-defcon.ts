@@ -1,3 +1,4 @@
+import type { LaneAnswer } from '#scripts/lane/lane-capacity'
 import type { RunActivity } from './run-board-activity'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
@@ -21,6 +22,7 @@ interface DefconRead {
 	lane_limit?: number | undefined
 	// Lanes holding a place under the limit, an earlier run's included.
 	occupied_count?: number | undefined
+	lane_capacity?: LaneAnswer | undefined
 }
 
 function layout_of(read: DefconRead): BoardLayout {
@@ -65,7 +67,10 @@ function is_ready_critical(row: BoardRow): boolean {
 function is_critical_idle(read: DefconRead): boolean {
 	const queued = run_board_layout.queued_rows(layout_of(read))
 
-	return spare_lanes(read) > 0 && queued.some((row) => is_ready_critical(row))
+	return (
+		(read.lane_capacity?.free ?? spare_lanes(read)) > 0 &&
+		queued.some((row) => is_ready_critical(row))
+	)
 }
 
 // 4: more lanes run than the limit allows.

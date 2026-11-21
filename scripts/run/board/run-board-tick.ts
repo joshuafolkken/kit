@@ -74,6 +74,7 @@ type RoomRead = Pick<
 	ReasonRead,
 	| 'free_lanes'
 	| 'occupied_count'
+	| 'lane_capacity'
 	| 'lane_limit'
 	| 'usage_reset_ms'
 	| 'usage_cause'
@@ -87,6 +88,7 @@ function room_of(state: BoardState, local: LocalRead): RoomRead {
 	return {
 		free_lanes: local.free_lanes,
 		occupied_count: local.occupied_count,
+		lane_capacity: local.lane_capacity,
 		lane_limit: local.lane_limit,
 		usage_reset_ms: local.usage_reset_ms,
 		usage_cause: local.usage_cause,

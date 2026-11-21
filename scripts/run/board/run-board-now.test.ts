@@ -46,6 +46,32 @@ function line_of(extra: Partial<NowRead> = {}): string {
 	return run_board_now_fixture.drawn(run_board_now.line_of(read(extra)))
 }
 
+it('replaces stale handoff with a seat wait while no seat is free (ac-1666bb37)', () => {
+	const activity = standing(STAGE.HANDING_OFF, SECOND)
+
+	expect(
+		line_of({
+			activity,
+			running: 1,
+			waiting: 2,
+			lane_capacity: { free: 0, bound: 'seats', seated: 9 },
+		}),
+	).toContain('🧵 waiting for seats 9/9')
+})
+
+describe('run_board_now.line_of active stages with exhausted seats', () => {
+	it.each([STAGE.PLANNING, STAGE.SESSION, run_event_setup.dispatching('8')])(
+		'keeps active stage %s while seats are exhausted',
+		(setup) => {
+			const activity = standing(setup, SECOND)
+
+			expect(
+				line_of({ activity, waiting: 1, lane_capacity: { free: 0, bound: 'seats', seated: 9 } }),
+			).toContain(setup)
+		},
+	)
+})
+
 describe('run_board_now.line_of at a stage', () => {
 	it('writes the stage under its icon, how long the run has stood there, then what is left', () => {
 		const activity = standing(STAGE.SESSION, 72 * SECOND)
@@ -132,6 +158,14 @@ describe('run_board_now.line_of with no stage', () => {
 
 describe('run_board_now.line_of once the run has stopped', () => {
 	const STOPPED = { ...after('backlog drained', WATCHED_MS), is_stopped: true }
+
+	it('keeps the latest event when stopped during a seat wait', () => {
+		const activity = { ...STOPPED, setup: STAGE.HANDING_OFF }
+
+		expect(
+			line_of({ activity, waiting: 1, lane_capacity: { free: 0, bound: 'seats', seated: 9 } }),
+		).toBe(DRAINED_LINE)
+	})
 
 	it('keeps the newest thing the run did, aged to now while no end is recorded', () => {
 		expect(line_of({ activity: STOPPED })).toBe(DRAINED_LINE)

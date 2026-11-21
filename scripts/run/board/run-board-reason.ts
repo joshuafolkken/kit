@@ -7,6 +7,7 @@ import { has_label_name, has_parked_label, IN_PROGRESS_LABEL } from '#scripts/is
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { lane_capacity, type LaneAnswer } from '#scripts/lane/lane-capacity'
 import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
@@ -53,6 +54,7 @@ interface ReasonRead extends Overlay {
 	free_lanes: number | undefined
 	// How many lanes hold a place under the limit, counted after `🧵`.
 	occupied_count?: number | undefined
+	lane_capacity?: LaneAnswer | undefined
 	// The limit those lanes fill; `undefined` where it could not be read.
 	lane_limit?: number | undefined
 	// The reset a Claude usage limit holds launches until (`run-merge-usage-limit.ts`), if one does.
@@ -188,6 +190,9 @@ function overlap_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason |
 // waiting row repeated the same breakdown of them, so the row counts them and names none (#4111).
 function no_lane_of(read: ReasonRead): RowReason {
 	const { occupied_count = 0, lane_limit } = read
+	const seats = lane_capacity.seat_text(read.lane_capacity)
+
+	if (seats !== undefined) return { icon: WAIT_ICONS.lane, value: seats }
 
 	if (lane_limit === undefined) return { icon: WAIT_ICONS.lane }
 

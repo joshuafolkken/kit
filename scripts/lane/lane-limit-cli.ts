@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { backlog_ready, type LaneUse } from '#scripts/backlog/backlog-ready'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { lane_capacity, type LimitChoice } from './lane-capacity'
+import { lane_capacity, type LaneAnswer, type LimitChoice } from './lane-capacity'
 import { lane_limit_history } from './lane-limit-history'
 import { lane_limit_override } from './lane-limit-override'
 import { lane_state } from './lane-state'
@@ -115,12 +115,20 @@ function unknown_text(unknown: ReadonlyArray<string>): string {
 	return ` · ${issues}: ${lane_state.NO_STATE_HINT}`
 }
 
+function seats_text(answer: LaneAnswer, use: LaneUse): string {
+	const text = lane_capacity.seat_text(answer)
+	if (text === undefined) return ''
+	const holders = (use.seat_holders ?? []).map((issue) => session_cite.issue(issue)).join(' ')
+
+	return ` · ${text} held by ${holders}`
+}
+
 function status_line(status: LimitStatus): string {
 	const source = status.override === undefined ? lane_capacity.LANE_LIMIT_KEY : OVERRIDE_SOURCE
 	const { occupied, seated } = status.use
-	const free = lane_capacity.free_lanes(status.limit, occupied, seated)
+	const answer = lane_capacity.lane_answer(status.limit, occupied, seated)
 
-	return `lane limit ${limit_text(status.limit)} (${source}) · in use ${String(occupied)} · free ${String(free)}${unknown_text(status.use.unknown)}`
+	return `lane limit ${limit_text(status.limit)} (${source}) · in use ${String(occupied)} · free ${String(answer.free)}${seats_text(answer, status.use)}${unknown_text(status.use.unknown)}`
 }
 
 async function show(ports: LimitPorts): Promise<number> {

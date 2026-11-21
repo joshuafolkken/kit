@@ -1,6 +1,7 @@
 import { backlog_drive_memory } from '#scripts/backlog/backlog-drive-memory'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
+import { lane_capacity, type LaneAnswer } from '#scripts/lane/lane-capacity'
 import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
@@ -86,6 +87,7 @@ interface LocalRead {
 	// How many lanes hold a place under the limit (`backlog-occupied.ts`), counted beside a row that
 	// waits for a free lane.
 	occupied_count?: number | undefined
+	lane_capacity?: LaneAnswer | undefined
 	// The same snapshot's occupied identities, so row selection can use the heading's exact lanes.
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
@@ -205,6 +207,7 @@ type LaneRoomRead = Pick<
 	| 'free_lanes'
 	| 'lane_limit'
 	| 'occupied_count'
+	| 'lane_capacity'
 	| 'occupied_lanes'
 	| 'earlier_occupied'
 	| 'idle_lanes'
@@ -225,6 +228,10 @@ async function lane_room_of(
 		free_lanes: count?.free,
 		lane_limit: count?.limit,
 		occupied_count: occupied.length,
+		lane_capacity:
+			count === undefined
+				? undefined
+				: lane_capacity.lane_answer(count.limit, occupied.length, room.use.seated),
 		occupied_lanes: occupied,
 		earlier_occupied: run_board_lane_state.earlier_occupied(occupied, sorted),
 		idle_lanes: room.idle,

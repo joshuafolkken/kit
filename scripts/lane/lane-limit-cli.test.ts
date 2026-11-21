@@ -62,6 +62,17 @@ async function run_capturing(
 	return { code, output }
 }
 
+it('names exhausted seats and their holders when only one lane runs (ac-8062edc1)', async () => {
+	const ports = ports_of(live_run())
+	const seat_holders = ['8445', '8446', '8447', '8448', '8449', '8450', '8451', '8452', '8453']
+
+	ports.lane_use = vi.fn(async () => ({ occupied: 1, seated: 9, unknown: [], seat_holders }))
+	const result = await run_capturing('info', [], ports)
+
+	expect(result.output).toContain('in use 1 · free 0 · seats 9/9 held by ')
+	for (const issue of seat_holders) expect(result.output).toContain(session_cite.issue(issue))
+})
+
 describe('lane_limit_cli.run — changing the limit', () => {
 	it('writes a raise and emits the event that wakes the watcher', async () => {
 		const ports = ports_of(live_run())

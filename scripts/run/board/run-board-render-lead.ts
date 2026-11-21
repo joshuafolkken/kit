@@ -1,3 +1,4 @@
+import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { run_board_earlier } from './run-board-earlier'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
@@ -51,6 +52,8 @@ function root_label(run_name: string): string {
 
 function lane_label(header: BoardHeader): string {
 	if (header.run_name !== undefined) return root_label(header.run_name)
+	const seats = lane_capacity.seat_text(header.lane_capacity)
+	if (seats !== undefined) return `${run_board_labels.LANES_ICON} ${seats}`
 	if (header.occupied_count === undefined) return LANES_LABEL
 
 	return `${LANES_LABEL} ${String(header.occupied_count)}/${String(header.lane_limit ?? '—')}`
