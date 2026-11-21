@@ -239,23 +239,28 @@ function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	return Math.min(turn_ms, letter_ms, code_ms, effect_ms, until_ms)
 }
 
-// The sweep's cell when it moved, or the drops' cells that changed since the last turn.
-function fall_bytes(turning: Turning, at_ms: number, turned: Turned): string {
-	const { sweep, drop } = turning
-	const swept = sweep !== undefined && turned.is_swept ? sweep_bytes(sweep, at_ms) : ''
-
-	return `${swept}${run_board_rain_drop.drop_bytes(drop, at_ms, turned.since?.ms)}`
-}
-
-// The spinners turned when their frame changed, the sweep or the drops, then the rows typing written
-// over them, in one synchronized write (joshuafolkken/kit#8125).
+// The spinners turned when their frame changed, the sweep when its cell did, then the rows typing
+// written over them, in one synchronized write (joshuafolkken/kit#8125).
 function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 	const spin = turned.is_turned ? spin_bytes(turning.spots, spinner_of(at_ms)) : ''
-	const fall = fall_bytes(turning, at_ms, turned)
+	const { sweep } = turning
+	const swept = sweep !== undefined && turned.is_swept ? sweep_bytes(sweep, at_ms) : ''
 
 	return run_board_screen.synced(
-		`${spin}${fall}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`,
+		`${spin}${swept}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`,
 	)
+}
+
+// The drops' cells that changed since the last turn, written past the theme like the lamps: the
+// screen holds each cell as the theme drew it, so a cell put back keeps a rule's own paint
+// (joshuafolkken/kit#8367).
+function write_drop(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
+	const bytes = run_board_rain_drop.drop_bytes(turning.drop, at_ms, turned.since?.ms)
+
+	if (bytes === '') return
+	const write = ports.write_drawn ?? ports.write
+
+	write(run_board_screen.synced(bytes))
 }
 
 // The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
@@ -278,6 +283,7 @@ function lamp_moment(turning: Turning, at_ms: number): LampMoment {
 function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
 	run_board_timing.drawn(ports, 'turn', () => {
 		ports.write(turn_bytes(turning, at_ms, turned))
+		write_drop(turning, ports, at_ms, turned)
 		run_board_lamp_spots.write_lamps(
 			blinking(turning),
 			ports,

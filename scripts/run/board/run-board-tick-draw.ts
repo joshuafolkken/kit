@@ -13,6 +13,7 @@ import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_standing } from './run-board-standing'
 import type { BoardPorts, BoardState } from './run-board-state'
+import { run_board_theme } from './run-board-theme'
 import { run_board_theme_defs, type LiveDefs, type ThemeDefinition } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
@@ -208,11 +209,13 @@ function has_drop(ports: LivePorts, defs: LiveDefs = THEME_DEFS): boolean {
 	return is_colored_tty(ports)
 }
 
-// The frame's cells the drop falls down, where one falls.
+// The frame's cells the drop falls down, where one falls — as the theme draws them, since the drop is
+// written past the theme and puts each cell it leaves back as it was on screen.
 function drop_of(ports: LivePorts, drawn: Drawn, typing: Typing): DropScreen | undefined {
 	if (!has_drop(ports)) return undefined
+	const lines = drawn.lines.map((line) => run_board_theme.restyle(ports.theme, line))
 
-	return run_board_drop_screen.screen_of(drawn, typing, drawn.size)
+	return run_board_drop_screen.screen_of({ ...drawn, lines }, typing, drawn.size)
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
