@@ -46,6 +46,7 @@ const LANE_ROOM = {
 	free_lanes: FREE_LANES,
 	lane_limit: run_board_read_fixture.LANE_LIMIT,
 	occupied_count: 1,
+	lane_capacity: { free: FREE_LANES, bound: 'none', seated: 1 },
 	occupied_lanes: ['3432'],
 	earlier_occupied: [],
 }

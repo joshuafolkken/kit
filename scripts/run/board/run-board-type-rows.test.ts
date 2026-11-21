@@ -116,6 +116,22 @@ describe('run_board_type_rows.is_typing', () => {
 	})
 })
 
+// joshuafolkken/kit#8523: the trill stops itself as the last row types through.
+describe('run_board_type_rows.left_ms', () => {
+	it('runs out at the first moment no row types', () => {
+		const typing = after_base(frame_of([line_of('#1', 0)]), [line_of('#1', 0), line_of('#2', 1)])
+		const done_ms = START + SECOND + run_board_type_rows.left_ms(typing, START + SECOND)
+
+		expect(run_board_type_rows.is_typing(typing, done_ms - 1)).toBe(true)
+		expect(run_board_type_rows.is_typing(typing, done_ms)).toBe(false)
+		expect(run_board_type_rows.left_ms(typing, done_ms + SECOND)).toBe(0)
+	})
+
+	it('is 0 with no row typing', () => {
+		expect(run_board_type_rows.left_ms(NO_TYPING, START)).toBe(0)
+	})
+})
+
 // joshuafolkken/kit#8375: the rules' lock starts once the row that types through last is done.
 describe('run_board_type_rows.done_ms', () => {
 	it('is the moment the row typing through last is done, with rows typing together', () => {
