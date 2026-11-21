@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
-import type { BoardHeader } from './run-board-header'
+import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-// joshuafolkken/kit#4044: the estimated finish stands on the first line, the `⏰`/`💓` columns unmoved;
-// a frame with no estimate draws no legend. joshuafolkken/kit#7770: it draws the local finish time, from
+// joshuafolkken/kit#4044: the estimated finish stands on the first line; a frame with no estimate draws
+// no legend. joshuafolkken/kit#7770: it draws the local finish time, from
 // the lanes' dispatch-to-merge totals.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
@@ -123,5 +123,13 @@ describe('run_board_render legend for the estimated finish', () => {
 		const layout = { ...EMPTY_LAYOUT, queued: LAYOUT.queued }
 
 		expect(lines_with({ lane_totals: undefined, layout }).join('\n')).not.toContain(LEGEND)
+	})
+
+	// An ended run's 🎯 is when it ended, not an estimate, even where its activity never stopped.
+	it('names no estimate for an ended run whose activity is not stopped', () => {
+		const ended = header({ activity: BEATING, layout: LAYOUT, lane_totals: TOTALS, ended_ms: NOW })
+
+		expect(run_board_header.estimate_legend(ended)).toBeUndefined()
+		expect(run_board_header.estimate_legend({ ...ended, ended_ms: undefined })).toBe(LEGEND)
 	})
 })

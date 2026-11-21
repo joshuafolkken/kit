@@ -97,7 +97,7 @@ function remaining_of(header: TimeHeader, left_ms: number | undefined): string {
 	return left_ms === undefined ? UNKNOWN_SPAN : span_of(left_ms)
 }
 
-// An age in the `⏰`'s format, blank where there is none to draw — no event gave it a time.
+// An age in the board's span format (`1°15′57″`), blank where there is none to draw — no event gave it a time.
 function span_or_blank(age: number | undefined): string {
 	return age === undefined ? '' : span_of(age)
 }
