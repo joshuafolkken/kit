@@ -84,9 +84,10 @@ Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in eve
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
 - `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 4); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
-- When port seats block a launch, `josh lane:limit` appends `seats 9/9 held by` and the issues holding seats to its status line.
 
 **Output / exit codes:** `lane:open` prints its directory on stdout, reasons on stderr; refusal exits non-zero with empty stdout. Seats `1..9` (main: 0) are claimed atomically. Install or `josh.lane.setup` failure fails; warming is best-effort. `lane:list`: one row per lane — issue, seat, ports, branch, state, directory, output path, profile.
+
+`lane:limit`: when port seats block a launch, its status line appends `seats 9/9 held by` and the issues holding seats.
 
 **`in-progress` / lane:** `lane:list` reports label/lane mismatches on stderr without changing labels.
 

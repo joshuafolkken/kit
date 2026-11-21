@@ -73,6 +73,16 @@ it('names exhausted seats and their holders when only one lane runs (ac-8062edc1
 	for (const issue of seat_holders) expect(result.output).toContain(session_cite.issue(issue))
 })
 
+it('names exhausted seats without a dangling holder list when no holder is read', async () => {
+	const ports = ports_of(live_run())
+
+	ports.lane_use = vi.fn(async () => ({ occupied: 1, seated: 9, unknown: [] }))
+	const result = await run_capturing('info', [], ports)
+
+	expect(result.output).toContain('in use 1 · free 0 · seats 9/9')
+	expect(result.output).not.toContain('held by')
+})
+
 describe('lane_limit_cli.run — changing the limit', () => {
 	it('writes a raise and emits the event that wakes the watcher', async () => {
 		const ports = ports_of(live_run())

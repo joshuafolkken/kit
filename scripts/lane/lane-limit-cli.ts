@@ -119,6 +119,7 @@ function seats_text(answer: LaneAnswer, use: LaneUse): string {
 	const text = lane_capacity.seat_text(answer)
 	if (text === undefined) return ''
 	const holders = (use.seat_holders ?? []).map((issue) => session_cite.issue(issue)).join(' ')
+	if (holders === '') return ` · ${text}`
 
 	return ` · ${text} held by ${holders}`
 }
