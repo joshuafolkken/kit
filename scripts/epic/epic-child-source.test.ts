@@ -108,7 +108,7 @@ function reads_of(number: number): number {
 }
 
 async function scan(source?: ChildSource): Promise<EpicSnapshot> {
-	return await epic_fetch.fetch_epic(EPIC, REPO, REPO, source)
+	return await epic_fetch.fetch_epic(EPIC, REPO, { source })
 }
 
 beforeEach(() => {
