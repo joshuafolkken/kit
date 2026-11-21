@@ -196,13 +196,13 @@ describe('issue_spill.follow_up_body and the implement budget', () => {
 		const body = issue_spill.follow_up_body(reasoned, [over_budget])
 
 		expect(body).not.toContain(REASON)
-		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, SLOW)).toContain(OVER_BUDGET)
+		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, { rate: SLOW })).toContain(OVER_BUDGET)
 	})
 
 	it('files an over-budget spill with the caller reason line', () => {
 		const body = issue_spill.follow_up_body(SUBJECT, [over_budget, REASON])
 
 		expect(body).toContain(`${over_budget}\n${REASON}\n`)
-		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, SLOW)).toBeUndefined()
+		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, { rate: SLOW })).toBeUndefined()
 	})
 })
