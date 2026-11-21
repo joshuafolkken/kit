@@ -1,5 +1,5 @@
-import { styleText } from 'node:util'
 import { run_board_labels, type Paint } from './run-board-labels'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#8354: the `matrix` theme's palette and its alert field, `TRACE ■■■■-`, drawn where
 // `wargames` draws `DEFCON`. The level is the one every theme shares (`run-board-header-defcon.ts` →
@@ -11,6 +11,9 @@ const FILLED = '■'
 const EMPTY = '-'
 const CELLS = 5
 const WORST = 1
+const PERIOD_MS = 560
+const LIT_MS = 350
+const ALERT_TEXT = `${LABEL} ${FILLED.repeat(CELLS)}`
 
 // The green phosphor in 24-bit color, from the brightest to the darkest, and the white-green of a
 // leading character; where stdout has no 24-bit color each falls back to the palette's green.
@@ -36,13 +39,27 @@ function gauge_of(level: number): string {
 	return `${painted(SHADES.bright, FILLED.repeat(filled))}${painted(SHADES.dark, EMPTY.repeat(CELLS - filled))}`
 }
 
-// The field at a level; the worst level in red, blinking.
+function is_lit(at_ms: number): boolean {
+	return at_ms % PERIOD_MS < LIT_MS
+}
+
+function alert_at(at_ms: number): string {
+	return painted(is_lit(at_ms) ? GAUGE_SHADES.red : SHADES.darkest, ALERT_TEXT)
+}
+
+function boundary_after(at_ms: number): number {
+	const phase = at_ms % PERIOD_MS
+
+	return at_ms - phase + (phase < LIT_MS ? LIT_MS : PERIOD_MS)
+}
+
+// The worst field starts with a one-column marker, drawn back as T in every frame.
 function field_of(level: number): string {
 	if (level > WORST) return `${LABEL} ${gauge_of(level)}`
 
-	return styleText('blink', painted(GAUGE_SHADES.red, `${LABEL} ${FILLED.repeat(CELLS)}`))
+	return painted(GAUGE_SHADES.red, `${run_board_spot.TRACE}${ALERT_TEXT.slice(1)}`)
 }
 
-const run_board_header_trace = { SHADES, field_of }
+const run_board_header_trace = { SHADES, alert_at, boundary_after, field_of, is_lit }
 
 export { run_board_header_trace }

@@ -160,6 +160,7 @@ interface BoardView {
 	sweep?: Sweep | undefined
 	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
+	traces?: ReadonlyArray<Spot> | undefined
 	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).
 	rules?: ReadonlyArray<RuleCell> | undefined
 	// Where the last frame has a lamp strip above a section rule, filled as a row types (`run-board-strip.ts`).
