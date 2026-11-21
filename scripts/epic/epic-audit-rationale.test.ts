@@ -163,8 +163,8 @@ describe('find_unjustified_orders — a native blocked-by the body does not decl
 	it('reports it as an error, naming the triage command that removes it', () => {
 		const [finding] = findings_of({ pairs: native_pairs() })
 
-		expect(finding).toContain('error:')
-		expect(finding).toContain('#8513 -> #8514')
+		// "order", not "declared order": the body never declared this one.
+		expect(finding).toContain('error: The order #8513 -> #8514 has no recorded reason')
 		expect(finding).toContain('josh backlog:triage --apply 8514 --unblock 8513')
 		expect(finding).toContain('path-overlap check')
 	})
