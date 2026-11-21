@@ -27,6 +27,7 @@ const has_ended = vi.spyOn(run_carry_ended, 'has_ended')
 const read_carry = vi.spyOn(run_carry, 'read_carry')
 const is_same_process = vi.spyOn(process_identity, 'is_same_process')
 const josh_run = vi.spyOn(josh_command, 'josh_run')
+const record_transfer = vi.spyOn(lane_state, 'record_transfer')
 
 const STATES = new Map([
 	[CLAIMED, { labels: IN_PROGRESS, is_human_review: false }],
@@ -53,6 +54,7 @@ beforeEach(() => {
 	read_carry.mockReturnValue({ kind: 'none' })
 	is_same_process.mockReturnValue(undefined)
 	josh_run.mockResolvedValue({ code: 0, out: RESUMED })
+	record_transfer.mockResolvedValue({ kind: 'skipped', reason: 'stubbed' })
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 })
 
@@ -200,8 +202,57 @@ describe('preserving other lanes', () => {
 	})
 })
 
+// joshuafolkken/kit#8455: a lane whose owning run ended becomes the adopting run's own.
+const ADOPTIONS = [
+	{
+		name: 'a running lane of an ended run',
+		state: 'running',
+		ended: true,
+		live: true,
+		adopts: true,
+	},
+	{ name: 'a paused lane of an ended run', state: 'paused', ended: true, live: true, adopts: true },
+	{
+		name: 'a running lane of a dead owner',
+		state: 'running',
+		ended: false,
+		live: false,
+		adopts: true,
+	},
+	{
+		name: 'a lane another live run owns',
+		state: 'running',
+		ended: false,
+		live: true,
+		adopts: false,
+	},
+] as const
+
+describe('adopting an ended run’s lanes', () => {
+	it.each(ADOPTIONS)('handles $name', async ({ state, ended, live, adopts }) => {
+		read_state.mockResolvedValue({ ...paused(), state })
+		has_ended.mockReturnValue(ended)
+		is_same_process.mockReturnValue(live)
+
+		await backlog_drive_carried.carried([lane(CLAIMED, '/t/a.log')])
+
+		expect(record_transfer.mock.calls).toStrictEqual(
+			adopts ? [[CLAIMED, { directory: DIRECTORY }]] : [],
+		)
+	})
+
+	it('leaves a lane with no owning run unadopted', async () => {
+		read_state.mockResolvedValue({ ...paused(), run: undefined })
+		has_ended.mockReturnValue(true)
+
+		await backlog_drive_carried.carried([lane(CLAIMED, '/t/a.log')])
+
+		expect(record_transfer).not.toHaveBeenCalled()
+	})
+})
+
 describe('resume failures and reports', () => {
-	it('reports a failed resume instead of carrying a lane as resumed', async () => {
+	it('reports a failed resume instead of carrying a lane as resumed, leaving it to retry', async () => {
 		read_state.mockResolvedValue(paused())
 		has_ended.mockReturnValue(true)
 		josh_run.mockResolvedValue({ code: 1, out: NO_CHILD })
@@ -209,6 +260,7 @@ describe('resume failures and reports', () => {
 		await expect(backlog_drive_carried.carried([lane(CLAIMED, '/t/a.log')])).rejects.toThrow(
 			NO_CHILD,
 		)
+		expect(record_transfer).not.toHaveBeenCalled()
 	})
 
 	it('relays the resume report on stderr, preserving the driver stdout', async () => {
