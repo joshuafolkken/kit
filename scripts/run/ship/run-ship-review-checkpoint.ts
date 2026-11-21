@@ -4,14 +4,23 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { review_attest } from '#scripts/review/review-attest'
+import { review_prompt_level, type RetryTrigger } from '#scripts/review/review-prompt-level'
 import { run_ship_scoped, type Phase } from './run-ship-scoped'
 
-type NamedPhase = readonly [name: string, phase: Phase]
+// A step's phase; a rerun step receives the retry that reruns it, when one names it.
+type RetryPhase = (retry?: RetryTrigger) => Promise<JoshResult>
+type NamedPhase = readonly [name: string, phase: RetryPhase]
 
 interface Checkpoint {
 	name: string
-	phase: Phase
+	phase: RetryPhase
 	stamp: FileMapStampAccess
+}
+
+// How many leading steps are reused, and the retry the rest rerun under.
+interface Resume {
+	count: number
+	retry: RetryTrigger | undefined
 }
 
 function checkpoints(
@@ -43,13 +52,17 @@ function matches(stamp: FileMapStampAccess, tree: GateTree): boolean {
 	)
 }
 
-async function attested_prefix(entries: ReadonlyArray<Checkpoint>, count: number): Promise<number> {
+// A provider rerun because its attestation is missing or mismatched names that retry to the phases it
+// reruns, so the relaunched reviewers' prompts say why they run (joshuafolkken/kit#8492).
+async function attested_prefix(entries: ReadonlyArray<Checkpoint>, count: number): Promise<Resume> {
 	const provider = entries.findIndex(({ name }) => name === 'provider')
 
-	if (provider === -1 || provider >= count) return count
+	if (provider === -1 || provider >= count) return { count, retry: undefined }
 	const { status } = await review_attest.check_here()
 
-	return status === 'missing' || status === 'mismatch' ? provider : count
+	return status === 'missing' || status === 'mismatch'
+		? { count: provider, retry: review_prompt_level.RETRY.ATTEST }
+		: { count, retry: undefined }
 }
 
 // Only a completed prefix survives: rerunning a provider replaces its brief and nonce, so a later
@@ -58,13 +71,13 @@ async function reusable_prefix(
 	entries: ReadonlyArray<Checkpoint>,
 	tree: GateTree,
 	is_stale: boolean,
-): Promise<number> {
+): Promise<Resume> {
 	const missing = entries.findIndex(({ stamp }) => is_stale || !matches(stamp, tree))
-	const count = await attested_prefix(entries, missing === -1 ? entries.length : missing)
+	const resume = await attested_prefix(entries, missing === -1 ? entries.length : missing)
 
-	for (const { stamp } of entries.slice(count)) stamp.remove()
+	for (const { stamp } of entries.slice(resume.count)) stamp.remove()
 
-	return count
+	return resume
 }
 
 async function recorded(
@@ -95,18 +108,18 @@ async function run(
 	}
 
 	const entries = checkpoints(issue, stage, phases, await git_command.head_commit())
-	const count = await reusable_prefix(entries, tree, is_stale)
+	const { count, retry } = await reusable_prefix(entries, tree, is_stale)
 
 	return await run_ship_scoped.run_phases(
 		entries.map(({ name, phase, stamp }, index) => async () => {
 			if (index < count) return { code: 0, out: `review step ${name}: reused` }
 
-			return await recorded(phase, stamp, tree)
+			return await recorded(async () => await phase(retry), stamp, tree)
 		}),
 	)
 }
 
 const run_ship_review_checkpoint = { run }
 
-export type { NamedPhase }
+export type { NamedPhase, RetryPhase }
 export { run_ship_review_checkpoint }
