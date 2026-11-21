@@ -1,6 +1,7 @@
 import type { JudgeRequest } from '#scripts/agent/answer-judge'
 import type { AnswerVerdict } from '#scripts/agent/answer-verdict'
 import type { IssueSource, SourcesRead } from '#scripts/issue/issue-sources'
+import { session_language } from '#scripts/josh/session-language'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_answered } from './run-park-answered'
 
@@ -50,6 +51,23 @@ beforeEach(() => {
 })
 
 describe('run_park_answered.refusal_of', () => {
+	it.each([
+		['ja', '答え済みかの判断を省きました'],
+		['en', 'existing-answer check was skipped'],
+	])('annotates an unavailable judgment in %s', async (lang, expected) => {
+		vi.stubEnv(session_language.ENV_KEY, lang)
+		const cause = 'usage limit: log'
+
+		judge_mock.mockResolvedValue({ kind: 'unavailable', cause, retry: 'Retry' })
+
+		const note = await run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)
+
+		expect(note).toEqual({ note: expect.stringContaining(expected) })
+		expect(note).toEqual({ note: expect.stringContaining(cause) })
+		expect(console.error).not.toHaveBeenCalled()
+		vi.unstubAllEnvs()
+	})
+
 	it('lets an unanswered question park, judging it on the trusted sources', async () => {
 		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toBeUndefined()
 		expect(judge_mock).toHaveBeenCalledWith({
@@ -63,7 +81,9 @@ describe('run_park_answered.refusal_of', () => {
 	it('refuses an answered question, printing the quote with its source and origin', async () => {
 		judge_mock.mockResolvedValue(ANSWERED)
 
-		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toBe(1)
+		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toEqual({
+			exit_code: 1,
+		})
 		expect(printed()).toContain('already answers this question — Reuse issue_sources (reuse)')
 		expect(printed()).toContain(`- ${COMMENT.id} (joshuafolkken 2026-11-07T00:00:00Z): "${QUOTE}"`)
 		expect(printed()).toContain('Auto-decided')
@@ -79,7 +99,9 @@ describe('run_park_answered.refusal_of failures', () => {
 			retry: 'Re-run',
 		})
 
-		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toBe(1)
+		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toEqual({
+			exit_code: 1,
+		})
 		expect(printed()).toContain(`Park failed: the judgment exited 2. ${NO_WRITE}`)
 		expect(printed()).toContain(
 			`Retry: Re-run (\`pnpm josh run:park ${ISSUE} --body-file <path> --outcome "<next action>"\`)`,
@@ -96,7 +118,9 @@ describe('run_park_answered.refusal_of failures', () => {
 	] as const)('refuses an unread Issue %j without judging', async (read, expected) => {
 		read_mock.mockResolvedValue(read)
 
-		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toBe(1)
+		await expect(run_park_answered.refusal_of(ISSUE, QUESTION, DIRECTORY)).resolves.toEqual({
+			exit_code: 1,
+		})
 		expect(judge_mock).not.toHaveBeenCalled()
 		expect(printed()).toContain(expected)
 	})

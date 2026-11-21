@@ -5,6 +5,7 @@ import { run_board_every, type RecordPorts } from './run-board-every'
 import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import type { RoundState } from './run-board-gather-thread'
+import { run_board_round_change, type RoundInputs } from './run-board-round-change'
 import { run_board_state, type BoardPorts, type BoardState } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 
@@ -84,16 +85,24 @@ function record_ports(setup: RecordSetup, ports: Pick<BoardPorts, 'now' | 'frame
 	}
 }
 
-// What the worker calls after each round: its frames recorded every `RECORD_EVERY_MS`
-// (`run-board-every.ts`).
+// What the worker calls after each round: its frames recorded at most every `RECORD_EVERY_MS`
+// (`run-board-every.ts`), and only from a round whose inputs changed since the last record
+// (joshuafolkken/kit#8335), including its samples (`run-board-round-change.ts`). A frame is
+// dated when its plan was read, so drawing an unchanged round again would not keep it fresh any longer;
+// a new plan read is a change, and so is a new minute.
 function round_recorder(
 	setup: RecordSetup,
 	ports: Pick<BoardPorts, 'now' | 'frames'>,
 ): (round: RoundState) => void {
-	const record = run_board_every.recorder(record_ports(setup, ports), setup.theme)
+	const did_record = run_board_every.recorder(record_ports(setup, ports), setup.theme)
+	const recorded: { last: RoundInputs | undefined } = { last: undefined }
 
 	return (round) => {
-		record(state_of(round))
+		const state = state_of(round)
+		const next = run_board_round_change.inputs_of(state, ports.now())
+
+		if (run_board_round_change.is_record_unchanged(recorded.last, next, state)) return
+		if (did_record(state)) recorded.last = next
 	}
 }
 
