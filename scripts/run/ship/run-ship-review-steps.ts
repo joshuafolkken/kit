@@ -3,6 +3,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
+import { review_prompt_level, type RetryTrigger } from '#scripts/review/review-prompt-level'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
 import { review_round } from '#scripts/review/review-round'
 import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-round-reuse'
@@ -69,6 +70,7 @@ const ROUND_ONE_RECORDED_NOTE =
 const { run_phases, scoped_pair } = run_ship_scoped
 const { CAUSE } = run_ship_stop_cause
 const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+const { STALE } = review_prompt_level.RETRY
 // `run:review` opens code's brief alone here: the interaction slot's is the ship's own open beside it.
 const ROUND_ONE_OPENS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
 	code: [RUN_REVIEW, run_review.CODE_ONLY_FLAG],
@@ -226,6 +228,18 @@ function round_one_opens(
 	}))
 }
 
+// Round 1's reviewers side by side, each launch naming `retry` when the round is a rerun.
+function round_one_provider(
+	issue: string,
+	slots: ReadonlyArray<ReviewSlot>,
+	unpinned_ok: ReadonlyArray<string>,
+	retry: RetryTrigger | undefined,
+): ReturnType<typeof reviewed_together> {
+	const prompt_of = run_ship_review.round_one_prompt(retry)
+
+	return reviewed_together(round_one_opens(slots, unpinned_ok), prompt_of, issue, ROUND_ONE)
+}
+
 // A recorded round 1 attested on this branch, its tree held or moved only where round 2 reads: the
 // stage is skipped, and the event stream says why (joshuafolkken/kit#5296).
 async function reused_round(issue: string, reused: ReuseAnswer): Promise<StepResult> {
@@ -247,10 +261,10 @@ async function round_one_stage(
 
 	if (reused.reuse !== review_round_reuse.REUSE.AGAIN) return await reused_round(issue, reused)
 
-	// A stale record narrows nothing: the next round reads the whole change under the new specification.
+	// A stale record narrows nothing: the next round reads the whole change under the new specification,
+	// and its launches name the stale rerun (joshuafolkken/kit#8379).
 	if (is_stale) review_reviewed_tree.discard()
-	const opens = round_one_opens(slots, unpinned_ok)
-	const provider = reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE)
+	const provider = round_one_provider(issue, slots, unpinned_ok, is_stale ? STALE : undefined)
 	const ran = await run_ship_review_checkpoint.run(
 		issue,
 		`one-${slots.join('-')}`,

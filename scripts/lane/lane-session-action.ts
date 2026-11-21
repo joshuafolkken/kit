@@ -12,6 +12,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_pair_session, type LaunchEnvironment } from '#scripts/review/review-pair-session'
+import { review_prompt_level, type RetryTrigger } from '#scripts/review/review-prompt-level'
 import { detached_launch, type AttachedLaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
@@ -49,7 +50,8 @@ const stop_schema = z
 	})
 	.strict()
 // `slots` is omitted for `/code-review` alone, so a supervisor still on the code before it reads the
-// request as before; it names the reviews a ship runs side by side (joshuafolkken/kit#4672).
+// request as before; it names the reviews a ship runs side by side (joshuafolkken/kit#4672). `retry`
+// is likewise sent only for a rerun, whose prompt names it (joshuafolkken/kit#8379).
 const slots_schema = z.array(z.enum(review_attest.REVIEW_SLOTS)).readonly()
 const action_schema = z.discriminatedUnion('kind', [
 	z
@@ -57,6 +59,7 @@ const action_schema = z.discriminatedUnion('kind', [
 			kind: z.literal('review'),
 			round: z.enum(['1', '2']),
 			slots: slots_schema.exactOptional(),
+			retry: z.enum(review_prompt_level.RETRY).exactOptional(),
 		})
 		.strict(),
 	z.object({ kind: z.literal('relaunch'), stop: stop_schema }).strict(),
@@ -70,6 +73,7 @@ interface ReviewAction {
 	kind: 'review'
 	round: ReviewRound
 	slots?: ReadonlyArray<ReviewSlot>
+	retry?: RetryTrigger
 }
 
 type BrokerAction = ReviewAction | { kind: 'relaunch'; stop: ShipStop }
@@ -129,7 +133,9 @@ function has_submit(directory: string): boolean {
 function review_prompt(lane: LaneInfo, action: ReviewAction, slot: ReviewSlot): string {
 	const { brief, findings } = review_paths(lane.directory, slot)
 	const round_prompt =
-		action.round === '1' ? run_ship_review.reviewer_prompt : run_ship_review.verification_prompt
+		action.round === '1'
+			? run_ship_review.round_one_prompt(action.retry)
+			: run_ship_review.verification_prompt
 	const prompt_of = run_ship_review.slot_prompt(round_prompt, slot, action_slots(action))
 	const tail = lane_child_invocation.review_invocation(lane.issue)
 	const findings_path = has_submit(lane.directory) ? undefined : findings

@@ -205,7 +205,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🔒 <N>` — running or parked `run:solo` issue `<N>`: nothing starts until it merges, closes or loses the label; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, the parked half `epic_solo_parked`'s.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and waits …".
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
-- `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
+- `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title (a `docs/*.md` path or one under `.josh/tmp/` never counts); `backlog:next` answers "waits: its `<file>` overlaps …".
 - `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, an earlier run's too; an unread limit leaves it blank.
   An empty seat draws a `💺` line under the lanes rule: the first `blocked: #<N>: <cause>` while the newest launch was refused, the rest `no issue ready to start` when no waiting row is free to start, `held — <sentence>` while the ledger's open hold stops one that is.
   A hold that a session's driver restart ends, not a person, reads `driver restart pending — <sentence>`.

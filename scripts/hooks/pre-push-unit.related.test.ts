@@ -57,7 +57,7 @@ async function run_hook(): Promise<[number, string]> {
 	const stdout = gate_test_fixture.capture_stdout()
 
 	try {
-		const code = await pre_push_unit.run_pre_push_unit([], GATE_PATH, SCOPED)
+		const code = await pre_push_unit.run_pre_push_unit({ source: GATE_PATH, scoped: SCOPED })
 
 		return [code, stdout.text()]
 	} finally {

@@ -1,3 +1,4 @@
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { review_round } from '#scripts/review/review-round'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -183,6 +184,22 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
 		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('blocking'))
 		expect(mark_stopped_mock).toHaveBeenCalledWith(Number(ISSUE), true)
+	})
+})
+
+// joshuafolkken/kit#8379: the rerun of a stale issue says so on its launch prompt.
+describe('run_ship_review_steps.review_stage — the launch trigger of round 1', () => {
+	it.each([
+		[true, review_prompt_level.RETRY.STALE],
+		[false, 'initial'],
+	])('names the launch trigger when stale is %s', async (is_stale, trigger) => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+
+		await run_ship_review_steps.review_stage(ISSUE, is_stale)
+
+		const [prompt] = review_in_mock.mock.calls[0] as [string]
+
+		expect(review_prompt_level.trigger_of(prompt)).toBe(trigger)
 	})
 })
 

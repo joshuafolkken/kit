@@ -107,7 +107,7 @@ async function run_hook(extra_arguments: ReadonlyArray<string> = []): Promise<[n
 	const stdout = capture_stdout()
 
 	try {
-		const code = await pre_push_unit.run_pre_push_unit(extra_arguments, STAMP_PATH)
+		const code = await pre_push_unit.run_pre_push_unit({ extra_arguments, source: STAMP_PATH })
 
 		return [code, stdout.text()]
 	} finally {

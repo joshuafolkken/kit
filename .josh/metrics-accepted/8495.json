@@ -1,0 +1,7 @@
+{
+	"reason": "#8495 adds the .josh/tmp scratch-directory exclusion to the lane path-overlap check (is_scratch / is_excluded)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}
