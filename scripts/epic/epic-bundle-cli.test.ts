@@ -345,7 +345,7 @@ describe('epic_bundle_cli.fetch_backlog — the title and the relations', () => 
 			.mockResolvedValue(listing)
 
 		return {
-			backlog: await epic_bundle_cli.fetch_backlog(REPO, new Map(), new Set(), options),
+			backlog: await epic_bundle_cli.fetch_backlog(REPO, new Map(), options),
 			relations,
 		}
 	}
