@@ -1,4 +1,5 @@
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { error_text } from '#scripts/lib/error-message'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_blocked_by_graphql } from './git-gh-blocked-by-graphql'
 import { git_gh_etag_read } from './git-gh-etag-read'
@@ -243,10 +244,14 @@ async function read_relations(
 // `is_unchanged` is `true` only where every REST page answered 304 (joshuafolkken/kit#7306), so
 // `backlog:next` can record whether its listing was the previous scan's. A GraphQL read carries no
 // ETag and answers `false`; it is absent on the failure path.
+//
+// `error` is gh's failure reason, set only on the failure path, so a caller that tells a person what
+// to fix (`run:board`'s notice slot, joshuafolkken/kit#8507) reads why the listing was not read.
 interface IssueListOutcome {
 	json: string | undefined
 	is_capped: boolean
 	is_unchanged?: boolean
+	error?: string
 }
 
 interface MappedListing {
@@ -328,8 +333,8 @@ async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> 
 			(await read_graphql(request, fields)) ?? (await read_rest(request, fields))
 
 		return { json: JSON.stringify(rows), is_capped, is_unchanged }
-	} catch {
-		return { json: undefined, is_capped: false }
+	} catch (error) {
+		return { json: undefined, is_capped: false, error: error_text.message_of(error) }
 	}
 }
 
