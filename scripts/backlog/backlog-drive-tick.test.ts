@@ -1,6 +1,7 @@
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_process_table, type ProcessTable } from '#scripts/lane/lane-process-table'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { backlog_arrival_added } from './backlog-arrival-added'
 import { backlog_drive_tick } from './backlog-drive-tick'
 
 // joshuafolkken/kit#7016: one process table read per tick answers every in-flight child, with the
@@ -88,15 +89,52 @@ describe('backlog_drive_tick.tick_share', () => {
 		const take = vi.fn(async () => await undefined)
 		const stream_read = vi.fn(async () => [])
 		const stream_begin = vi.fn()
-		const share = backlog_drive_tick.tick_share(
-			{ is_running: () => true, take },
-			{ read: stream_read, begin_tick: stream_begin },
-		)
+		const share = backlog_drive_tick.tick_share({
+			lanes: { is_running: () => true, take },
+			stream: { read: stream_read, begin_tick: stream_begin },
+		})
 
 		await share.begin_tick([ALIVE])
 
 		expect(stream_begin).toHaveBeenCalledTimes(1)
 		expect(take).toHaveBeenCalledWith([ALIVE])
 		expect(share.read).toBe(stream_read)
+	})
+})
+
+describe('backlog_drive_tick.tick_share defaults', () => {
+	it.each([undefined, {}])('uses the default readers for %s', async (options) => {
+		const table = vi.spyOn(lane_process_table, 'read_table').mockResolvedValue(ROWS)
+		const stream = vi.spyOn(backlog_arrival_added, 'tick_reader')
+		const share = backlog_drive_tick.tick_share(options)
+
+		await share.begin_tick([ALIVE])
+
+		expect(share.is_running(ALIVE)).toBe(true)
+		expect(table).toHaveBeenCalledOnce()
+		expect(stream).toHaveBeenCalledOnce()
+	})
+
+	it('defaults the stream when only lanes are supplied', async () => {
+		const take = vi.fn(async () => undefined)
+		const stream = vi.spyOn(backlog_arrival_added, 'tick_reader')
+		const share = backlog_drive_tick.tick_share({ lanes: { is_running: () => true, take } })
+
+		await share.begin_tick([ALIVE])
+
+		expect(take).toHaveBeenCalledExactlyOnceWith([ALIVE])
+		expect(stream).toHaveBeenCalledOnce()
+	})
+
+	it('defaults lanes when only the stream is supplied', async () => {
+		const table = vi.spyOn(lane_process_table, 'read_table').mockResolvedValue(ROWS)
+		const stream = { read: vi.fn(async () => []), begin_tick: vi.fn() }
+		const share = backlog_drive_tick.tick_share({ stream })
+
+		await share.begin_tick([ALIVE])
+
+		expect(table).toHaveBeenCalledOnce()
+		expect(stream.begin_tick).toHaveBeenCalledOnce()
+		expect(share.read).toBe(stream.read)
 	})
 })
