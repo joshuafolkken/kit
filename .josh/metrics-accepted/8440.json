@@ -2,6 +2,6 @@
 	"reason": "The 34 added runtime lines read paused-lane ownership and reuse lane:resume to restore stopped-run lanes without duplicating process signalling or state and event recording.",
 	"date": "2026-11-21",
 	"growth": {
-		"scripts.code_lines": 40
+		"scripts.code_lines": 41
 	}
 }
