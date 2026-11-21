@@ -27,8 +27,9 @@ const RUNNING_CLOCK = `${VERSION_CELL}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}${SLOT_
 // event (its indent where no repository is read), else what the run is doing now: its time under the
 // second column, its icon and words under the third.
 const NOW_BLANK = '  '
+// The first line of a running run: its mark and name, then its age; the tallies are the lanes rule's.
+const RUNNING_TITLE = '▶ josh-board  ⏰ 30′00″'
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
-const EMPTY_BAR = '─'.repeat(10)
 const MINUTE = MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 30 * MINUTE
@@ -47,7 +48,6 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		ended_ms: undefined,
 		activity: { last_event_ms: undefined, is_stopped: false },
 		layout: EMPTY_LAYOUT,
-		baseline_total: undefined,
 		plan_fetched_ms: NOW,
 		plan_failed_ms: undefined,
 		is_plan_loading: false,
@@ -97,7 +97,7 @@ describe('run_board_header.header_lines state', () => {
 		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
 
 		expect(lines_of(board)).toStrictEqual([
-			`■ josh-board  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  💤 0`,
+			'■ josh-board  ⏰ 1°30′00″',
 			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}${SLOT_BLANK}`,
 			NOW_BLANK,
 		])
@@ -110,25 +110,22 @@ describe('run_board_header.header_lines state', () => {
 
 describe('run_board_header.header_lines shape', () => {
 	// joshuafolkken/kit#3692, #8475: the run's age over a blank cell, the heartbeat said in the slot.
-	it('draws the run’s age then the progress on the first line, a blank cell under the age', () => {
+	it('draws the run’s age on the first line, a blank cell under the age', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
-			`⏸ josh-board  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  💤 0`,
+			'⏸ josh-board  ⏰ 30′00″',
 			RUNNING_CLOCK,
 			NOW_BLANK,
 		])
 	})
 
-	// joshuafolkken/kit#3486: two lines in every state, a machine not sampled yet drawn as `-`.
-	it('draws the state with the progress bar, then the machine, with no updated line', () => {
+	// joshuafolkken/kit#3486: two lines in every state, a machine not sampled yet drawn as `-`;
+	// joshuafolkken/kit#8514: the tallies are the lanes rule's, not the first line's.
+	it('draws the state, then the machine, with no tally and no updated line', () => {
 		const layout = { ...RUNNING_LAYOUT, unreached: [row(2, 'waiting')] }
 
-		expect(lines_of(header({ layout }))).toStrictEqual([
-			`▶ josh-board  ⏰ 30′00″  ✅  0/2 ${EMPTY_BAR}  🔄 1  💤 0`,
-			RUNNING_CLOCK,
-			ONE_RUNNING,
-		])
+		expect(lines_of(header({ layout }))).toStrictEqual([RUNNING_TITLE, RUNNING_CLOCK, ONE_RUNNING])
 	})
 
 	// joshuafolkken/kit#3450
@@ -163,13 +160,10 @@ describe('run_board_header.header_lines before the plan is read', () => {
 	// joshuafolkken/kit#3486: before the plan is read the run's own children are counted, and what only
 	// the plan knows — the total and what waits — is `-`, not a `0` that reads as nothing.
 	it('draws its lines, with - for what only the plan knows', () => {
-		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
+		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined })
 
-		expect(lines_of(board)).toStrictEqual([
-			`▶ josh-board  ⏰ 30′00″  ✅  0/- ${EMPTY_BAR}  🔄 1  💤 0`,
-			RUNNING_CLOCK,
-			ONE_RUNNING,
-		])
+		expect(lines_of(board)).toStrictEqual([RUNNING_TITLE, RUNNING_CLOCK, ONE_RUNNING])
+		expect(run_board_header.lanes_tail(board)).toBe('✅ 0/-  🔄 1  💤 0')
 	})
 
 	it('draws three lines with no layout at all', () => {
@@ -202,7 +196,7 @@ describe('run_board_header.header_lines plan warning', () => {
 	it('says a failed plan read in the notice slot, stale since the plan last landed', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(/💤 0$/u)
+		expect(title_of(board)).toMatch(/⏰ 30′00″$/u)
 		expect(clock_line_of(board)).toMatch(/ {2}❗ stale 1′00″ · retrying$/u)
 	})
 
@@ -227,7 +221,7 @@ describe('run_board_header.queued_tail plan loading', () => {
 	})
 
 	it('draws no spinner on the first line', () => {
-		expect(title_of(header({ is_plan_loading: true, spinner: '⠙' }))).toMatch(/💤 0$/u)
+		expect(title_of(header({ is_plan_loading: true, spinner: '⠙' }))).toMatch(/⏰ 30′00″$/u)
 	})
 })
 
@@ -242,31 +236,40 @@ describe('run_board_header.header_lines heartbeat', () => {
 	})
 })
 
-// The progress line of a plan with `settled` of its `total` rows merged and the rest waiting.
-function progress_of(settled: number, total: number): string {
-	const merged = Array.from({ length: settled }, (_, index) => row(index + 1, 'merged'))
-	const waiting = Array.from({ length: total - settled }, (_, index) => row(100 + index, 'waiting'))
-	const layout = { ...EMPTY_LAYOUT, active: merged, unreached: waiting }
+// The lanes rule's tail of a plan with `settled` of its `total` rows settled — one of them parked, the
+// rest merged — one running and the rest waiting.
+function tail_of(settled: number, total: number, extra: Partial<BoardHeader> = {}): string {
+	const merged = Array.from({ length: settled - 1 }, (_, index) => row(index + 1, 'merged'))
+	const waiting = Array.from({ length: total - settled - 1 }, (_, index) =>
+		row(100 + index, 'waiting'),
+	)
+	const active = [...merged, row(90, 'running'), row(91, 'parked')]
+	const layout = { ...EMPTY_LAYOUT, active, unreached: waiting }
 
-	return title_of(header({ layout })).replace(/^\S+ josh-board {2}⏰ \S+ {2}/u, '')
+	return stripVTControlCharacters(run_board_header.lanes_tail(header({ layout, ...extra })))
 }
 
-// joshuafolkken/kit#3473: icon, count, then bar, as the machine gauges; the done count drawn once.
-describe('run_board_header.header_lines progress', () => {
-	it('draws ✅, the count over the total, the bar, then running and parked', () => {
-		expect(progress_of(9, 12)).toBe(`✅  9/12 ${'■'.repeat(8)}${'─'.repeat(2)}  🔄 0  💤 0`)
+// joshuafolkken/kit#8514: what has settled, what runs, what is parked, then the issue count, at the
+// lanes rule's end; no bar and no `(+N)`.
+describe('run_board_header.lanes_tail', () => {
+	it('draws ✅ the count over the total, then running and parked, with no bar', () => {
+		expect(tail_of(9, 12)).toBe('✅ 9/12  🔄 1  💤 1')
 	})
 
-	it('starts the bar in one column as the count gains a digit', () => {
-		const short = progress_of(9, 12)
-		const long = progress_of(12, 12)
+	it('draws the issue count last', () => {
+		const issue_count = { open: 78, closed: 4489 }
 
-		expect(short.indexOf('■')).toBe(long.indexOf('■'))
-		expect(long).toMatch(/^✅ 12\/12 ■/u)
+		expect(tail_of(7, 47, { repo: 'o/r', issue_count })).toBe('✅ 7/47  🔄 1  💤 1  📮 78/4,489')
 	})
 
-	it('draws the done count once', () => {
-		expect(progress_of(9, 12).split('✅')).toHaveLength(2)
+	it('draws the total as - before the plan is read', () => {
+		expect(tail_of(1, 3, { plan_fetched_ms: undefined })).toBe('✅ 1/-  🔄 1  💤 1')
+	})
+
+	it('draws no tally on the first line', () => {
+		expect(title_of(header({ repo: 'o/r', issue_count: { open: 1, closed: 2 } }))).not.toMatch(
+			/[✅🔄💤📮]/u,
+		)
 	})
 })
 
@@ -292,7 +295,7 @@ describe('run_board_header.queued_tail saved plan', () => {
 
 	it('draws no 🕘 on the first line', () => {
 		expect(title_of(saved)).not.toContain('🕘')
-		expect(title_of(saved)).toMatch(/💤 0$/u)
+		expect(title_of(saved)).toMatch(/⏰ 30′00″$/u)
 	})
 })
 

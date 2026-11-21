@@ -6,8 +6,9 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-// joshuafolkken/kit#4044: the estimated finish stands right after the progress bar and before `🔄`, the
-// `⏰`/`💓` and `✅`/`🧠` columns unmoved; a frame with no estimate draws neither it nor its legend.
+// joshuafolkken/kit#4044: the estimated finish stands on the first line, the `⏰`/`💓` columns unmoved;
+// a frame with no estimate draws neither it nor its legend. joshuafolkken/kit#8514: the tallies and the
+// bar it once followed moved to the lanes rule, so it stands right after the run's age, over the `💪`.
 // joshuafolkken/kit#7770: it draws the local finish time, from the lanes' dispatch-to-merge totals.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
@@ -65,18 +66,18 @@ function start_of(line: string | undefined, text: string): number {
 }
 
 describe('run_board_header.header_lines estimated finish', () => {
-	it('draws 🎯 ~HH:MM after the bar and before 🔄', () => {
+	it('draws 🎯 ~HH:MM last on the first line, right after the run’s age', () => {
 		const [first] = lines_with()
 
 		// 15′ left of the running child, then 20′ for the waiting one on the one lane.
-		expect(first).toMatch(new RegExp(`[■─] {2}${estimate_at(35)} {2}🔄 1`, 'u'))
+		expect(first).toMatch(new RegExp(String.raw`⏰ \S+ {2}${estimate_at(35)}$`, 'u'))
 	})
 
 	// The machine line before a gauge is read leads with 💪, where a chat's leads with 🧠.
-	it('keeps the ✅/💪 columns aligned', () => {
+	it('keeps the 🎯/💪 columns aligned', () => {
 		const [first, second] = lines_with()
 
-		expect(start_of(first, '✅')).toBe(start_of(second, '💪'))
+		expect(start_of(first, '🎯')).toBe(start_of(second, '💪'))
 	})
 
 	// joshuafolkken/kit#4319: a 🔗 child waits for its blocker however many lanes are free.

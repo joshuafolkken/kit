@@ -6,8 +6,8 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#3692: the header's lines stand in columns. The run's `⏰`, the cell under it and
 // the third line's spinner start in one column, whatever stands before them — a repository's name
-// shorter or longer than the run's, or none — and the progress bar and the first machine gauge start in
-// one column whatever the count and the percent before them are. A column is counted as the terminal
+// shorter or longer than the run's, or none — and the first machine gauge starts in one column whatever
+// the count and the percent are (joshuafolkken/kit#8514). A column is counted as the terminal
 // draws it, an emoji two wide, never as a count of characters. A running run leaves the cell under the
 // `⏰` blank: its heartbeat is said in the notice slot (joshuafolkken/kit#8475).
 
@@ -80,7 +80,7 @@ describe('run_board_header.header_lines — the time column', () => {
 	it('draws the run’s age after its name and leaves the cell under it blank while it runs', () => {
 		const [first, second] = header_of({ repo: KIT })
 
-		expect(first).toMatch(/^⏸ josh-board {2}⏰ 2°10′00″ {2}✅/u)
+		expect(first).toBe('⏸ josh-board  ⏰ 2°10′00″')
 		expect(second).toMatch(/^ {2}- +💪/u)
 		expect(second).not.toContain('💓')
 	})
@@ -92,18 +92,10 @@ describe('run_board_header.header_lines — the time column once the run has end
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms, repo: KIT }))
 
-		expect(lines[0]).toMatch(/^■ josh-board {2}⏰ 1°30′00″ {2}✅/u)
+		expect(lines[0]).toBe('■ josh-board  ⏰ 1°30′00″')
 		expect(lines[1]).toMatch(/^ {2}- {11}🔚 \d{2}:\d{2} {5}\S/u)
 		expect(lines[2]).toBe('  kit')
 		expect(lines.join('\n')).not.toContain('💓')
-	})
-
-	it('starts an ended run’s progress bar and its first machine gauge in one column', () => {
-		const ended_ms = STARTED + 90 * MINUTE
-		const activity = { last_event_ms: ended_ms, is_stopped: true }
-		const lines = lines_of(header({ activity, ended_ms, repo: KIT, machine: machine(9) }))
-
-		expect(bar_start_of(lines[1], '💪')).toBe(bar_start_of(lines[0], '✅'))
 	})
 })
 
@@ -164,27 +156,22 @@ describe('run_board_header.header_lines — the board’s name and the kit versi
 	})
 })
 
+// joshuafolkken/kit#8514: the tallies moved to the lanes rule, so the gauge's column answers to
+// nothing above it and stays put whatever the count and the percent are.
 describe('run_board_header.header_lines — the gauge column', () => {
-	it.each([
-		[1, 2, 9],
-		[1, 2, 100],
-		[10, 12, 9],
-		[10, 12, 100],
-		[100, 120, 100],
-	])('starts both bars in one column at %i/%i over %i%%', (settled, total, cpu) => {
-		const [first, second] = header_of({ layout: plan(settled, total), machine: machine(cpu) })
-
-		expect(first).toContain(`${String(settled)}/${String(total)} `)
-		expect(second).toContain(`${String(cpu)}% `)
-		expect(bar_start_of(second, '💪')).toBe(bar_start_of(first, '✅'))
-	})
-
-	it('keeps the progress bar where it is as the count and the percent gain a digit', () => {
+	it('keeps the first machine bar where it is as the count and the percent gain a digit', () => {
+		const counts: Array<[number, number]> = [
+			[1, 2],
+			[10, 12],
+			[100, 120],
+		]
 		const starts = [9, 100].flatMap((cpu) =>
-			[1, 2].map((settled) => {
-				const [first] = header_of({ layout: plan(settled, 2), machine: machine(cpu) })
+			counts.map(([settled, total]) => {
+				const [, second] = header_of({ layout: plan(settled, total), machine: machine(cpu) })
 
-				return bar_start_of(first, '✅')
+				expect(second).toContain(`${String(cpu)}% `)
+
+				return bar_start_of(second, '💪')
 			}),
 		)
 
@@ -193,34 +180,23 @@ describe('run_board_header.header_lines — the gauge column', () => {
 })
 
 // A chat draws the memory alone, and a board before its first sample no gauge at all: the times
-// stand where a screen's do, and what is drawn of the machine starts under the progress.
+// stand where a screen's do, and what is drawn of the machine starts where a screen's does.
 describe('run_board_header.header_lines — with marks left out', () => {
-	it('keeps the times of a chat where a screen draws them, the 🧠 bar under the progress bar', () => {
+	it('keeps the times of a chat where a screen draws them, the 🧠 bar where a screen’s 💪 bar starts', () => {
 		const screen = header_of({ machine: machine(11), repo: KIT })
 		const chat = header_of({ machine: machine(11), repo: KIT, form: 'chat' })
 
 		expect(chat[1]).not.toContain('💪')
 		expect(start_of(chat[0], '⏰')).toBe(start_of(screen[0], '⏰'))
-		expect(bar_start_of(chat[1], '🧠')).toBe(bar_start_of(chat[0], '✅'))
-	})
-
-	// A tally wider than a percent: the 🧠's own width no longer reaches the progress bar's column.
-	it.each([
-		[10, 12],
-		[100, 120],
-	])('starts the 🧠 bar of a chat under the progress bar at %i/%i', (settled, total) => {
-		const layout = plan(settled, total)
-		const [first, second] = header_of({ layout, machine: machine(11), form: 'chat' })
-
-		expect(second).not.toContain('💪')
-		expect(bar_start_of(second, '🧠')).toBe(bar_start_of(first, '✅'))
+		expect(bar_start_of(chat[1], '🧠')).toBe(bar_start_of(screen[1], '💪'))
 	})
 
 	it('keeps the machine in its column with no heartbeat and no machine read', () => {
 		const activity = { last_event_ms: undefined, is_stopped: false }
-		const [first, second] = header_of({ activity })
+		const [, unread] = header_of({ activity })
+		const [, read] = header_of({ machine: machine(9) })
 
-		expect(second).not.toContain('💓')
-		expect(start_of(second, '💪')).toBe(start_of(first, '✅'))
+		expect(unread).not.toContain('💓')
+		expect(start_of(unread, '💪')).toBe(start_of(read, '💪'))
 	})
 })

@@ -11,7 +11,7 @@ import { run_board_spot } from './run-board-spot'
 // joshuafolkken/kit#3696: the header while the run is at a stage of its own. joshuafolkken/kit#3767:
 // the mark stands still; the spinner turns on the third line, before the stage's time and icon.
 // joshuafolkken/kit#3749: the stage stands on the third line, its time under the second column, whenever the run
-// is at one; the first line is the progress in every state.
+// is at one. joshuafolkken/kit#8514: the progress is on the lanes rule (`lanes_tail`) in every state.
 
 const SECOND = 1000
 const STARTED = Date.parse('2026-10-12T09:00:00.000Z')
@@ -25,7 +25,9 @@ const STAGE_AGE_MS = 151 * SECOND
 // The third line's repository under the board's name, padded to it, then the gap before its words.
 const NOW_INDENT = '  app-kit'.padEnd('▶ josh-board'.length + 2)
 const NOW_PREFIX = /^ +app-kit +/u
-const PROGRESS_0_OF_1 = /^▶ josh-board {2}⏰ 10″ {2}✅ +0\/1 /u
+// joshuafolkken/kit#8514: the first line ends on the run's age; the progress is on the lanes rule.
+const WORKING_TITLE = '▶ josh-board  ⏰ 10″'
+const PROGRESS_0_OF_1 = /^✅ 0\/1 /u
 const JUDGING_LINE = '⠋  2′31″  🤔 waiting on judgment — 1 waiting'
 
 function row(number: number, state: BoardRow['state']): BoardRow {
@@ -64,7 +66,6 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		ended_ms: undefined,
 		activity: standing(STAGE.STARTING),
 		layout: undefined,
-		baseline_total: undefined,
 		plan_fetched_ms: undefined,
 		plan_failed_ms: undefined,
 		is_plan_loading: false,
@@ -94,6 +95,11 @@ function lines_of(board: BoardHeader): Array<string> {
 
 function title_of(board: BoardHeader): string {
 	return lines_of(board)[0] ?? ''
+}
+
+// The run's progress as the lanes rule ends on it.
+function progress_of(board: BoardHeader): string {
+	return stripVTControlCharacters(run_board_header.lanes_tail(board))
 }
 
 // The third line's words, past the repository under the name.
@@ -136,8 +142,8 @@ describe('run_board_header.header_lines before the first child launches', () => 
 	it('draws the progress, and turns the spinner beside the stage on the third line', () => {
 		const [first, second, third] = lines_of(header())
 
-		expect(first).toMatch(/^▶ josh-board {2}⏰ 10″ {2}✅ +0\/- /u)
-		expect(first).not.toContain(STAGE.STARTING)
+		expect(first).toBe(WORKING_TITLE)
+		expect(progress_of(header())).toMatch(/^✅ 0\/- /u)
 		expect(second).toMatch(/^ {2}- +💪 /u)
 		expect(third).toBe(`${NOW_INDENT}⠋   0″  🚀 starting session`)
 	})
@@ -146,10 +152,11 @@ describe('run_board_header.header_lines before the first child launches', () => 
 		expect(title_of(header({ spinner: undefined }))).toMatch(/^▶ josh-board /u)
 	})
 
-	it('draws the progress bar on the first line once the plan is read', () => {
+	it('draws the plan’s total in the progress once the plan is read', () => {
 		const board = planned(ONE_PLANNED, standing(STAGE.HANDING_OFF))
 
-		expect(title_of(board)).toMatch(PROGRESS_0_OF_1)
+		expect(title_of(board)).toBe(WORKING_TITLE)
+		expect(progress_of(board)).toMatch(PROGRESS_0_OF_1)
 		expect(now_of(board)).toBe('⠋   0″  🤝 handing off — 1 waiting')
 	})
 
@@ -205,14 +212,16 @@ describe('run_board_header.header_lines once a child has launched', () => {
 	it('writes how many children run on the third line', () => {
 		const board = planned(ONE_RUNNING, merged())
 
-		expect(title_of(board)).toMatch(PROGRESS_0_OF_1)
+		expect(title_of(board)).toBe(WORKING_TITLE)
+		expect(progress_of(board)).toMatch(PROGRESS_0_OF_1)
 		expect(now_of(board)).toBe(`⠋${' '.repeat(7)}🔄 1 running`)
 	})
 
 	it('turns the spinner and writes the stage while a lane opens for a later child', () => {
 		const board = planned(NEXT_OPENING, standing(OPENING, SECOND))
 
-		expect(title_of(board)).toMatch(/^▶ josh-board {2}⏰ 10″ {2}✅ +1\/2 /u)
+		expect(title_of(board)).toBe(WORKING_TITLE)
+		expect(progress_of(board)).toMatch(/^✅ 1\/2 /u)
 		expect(now_of(board)).toBe('⠋   1″  🚪 opening lane #278 — 1 waiting')
 	})
 
@@ -226,7 +235,8 @@ describe('run_board_header.header_lines once a child has launched', () => {
 	it('stands idle between children, and writes how long it has watched and why', () => {
 		const board = planned(NEXT_OPENING, merged(STAGE_AGE_MS))
 
-		expect(title_of(board)).toMatch(/^⏸ josh-board .*✅ +1\/2 /u)
+		expect(title_of(board)).toMatch(/^⏸ josh-board /u)
+		expect(progress_of(board)).toMatch(/^✅ 1\/2 /u)
 		expect(now_of(board)).toBe('2′31″  🔭 watching — 1 waiting')
 	})
 })
@@ -259,7 +269,8 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 		const activity = { ...standing(STAGE.PLANNING), ...merged(SECOND), is_stopped: true }
 		const board = planned(ONE_PLANNED, activity)
 
-		expect(title_of(board)).toMatch(/^■ josh-board .*✅ +0\/1 /u)
+		expect(title_of(board)).toMatch(/^■ josh-board /u)
+		expect(progress_of(board)).toMatch(PROGRESS_0_OF_1)
 		expect(now_of(board)).toBe('1″  🔚 #278 merged')
 	})
 
@@ -282,7 +293,7 @@ describe('run_board_header.header_lines marks a setup does not change', () => {
 	it('draws a run at a stage as working, though all its plan has left waits on a person', () => {
 		const board = planned(PEOPLE, standing(STAGE.SESSION))
 
-		expect(title_of(board)).toMatch(/^▶ josh-board .*✅ /u)
+		expect(title_of(board)).toMatch(/^▶ josh-board /u)
 	})
 
 	it('says no heartbeat of a setup that has gone quiet, as of a running run', () => {

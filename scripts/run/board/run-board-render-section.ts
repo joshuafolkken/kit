@@ -125,26 +125,38 @@ function keyed(
 }
 
 // A rule with `tail` right-aligned at its end: the rule gives up the tail's columns and one blank,
-// keeping at least `RULE_LEAD` before it (joshuafolkken/kit#8474).
-function tailed(rule: string, tail: string | undefined): string {
+// keeping at least `RULE_LEAD` before it (joshuafolkken/kit#8474), so a tail too wide for the rule runs
+// past it. A tail that would run past the pane's `columns` is left out, so the rule still ends at the
+// pane edge (joshuafolkken/kit#8514).
+function tailed(rule: string, tail: string | undefined, columns = Infinity): string {
 	if (tail === undefined) return rule
 
 	const body = rule.replace(TRAILING_RULE, '')
-	const room = rule.length - body.length - run_board_fit.width_of(tail) - 1
+	const room = Math.max(
+		RULE_LEAD.length,
+		rule.length - body.length - run_board_fit.width_of(tail) - 1,
+	)
+	const line = `${body}${RULE.repeat(room)} ${tail}`
 
-	return `${body}${RULE.repeat(Math.max(RULE_LEAD.length, room))} ${tail}`
+	return run_board_fit.width_of(line) > columns ? rule : line
 }
 
 // A head whose rule runs on to `width`, the column the lane rows' titles end in
-// (joshuafolkken/kit#5520), `tail` at its end; a head drawn under a blank line alone stays as it is.
-function widened(head: ReadonlyArray<string>, width: number, tail?: string): Array<string> {
+// (joshuafolkken/kit#5520), `tail` at its end unless it would pass the pane's `columns`; a head drawn
+// under a blank line alone stays as it is.
+function widened(
+	head: ReadonlyArray<string>,
+	width: number,
+	tail?: string,
+	columns?: number,
+): Array<string> {
 	const rule = head.at(-1) ?? ''
 
 	if (rule === '') return [...head]
 
 	const fill = RULE.repeat(Math.max(0, width - run_board_fit.width_of(rule)))
 
-	return [...head.slice(0, -1), tailed(`${rule}${fill}`, tail)]
+	return [...head.slice(0, -1), tailed(`${rule}${fill}`, tail, columns)]
 }
 
 // Where an open head draws the rule character its ▾ gives up: in the first run of rules longer than

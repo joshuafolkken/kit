@@ -1,42 +1,43 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import type { BoardHeader } from './run-board-header'
+import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_link, type Link } from './run-board-link'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
-// joshuafolkken/kit#7088: the first line ends on the repository's open and closed issues, on a screen
-// and in a chat alike, once the plan names the repository and the count has been read.
+// joshuafolkken/kit#7088: the repository's open and closed issues end the progress, on a screen and in
+// a chat alike, once the plan names the repository and the count has been read. joshuafolkken/kit#8514:
+// at the lanes rule's end (`lanes_tail`), no longer on the first line.
 
 const { header, lines_of } = run_board_render_fixture
 const REPO = 'joshuafolkken/kit'
 const COUNT = { open: 87, closed: 6912 }
 const CHIP = '📮 87/6,912'
 
-function first_of(extra: Partial<BoardHeader>): string {
-	return lines_of(header(extra))[0] ?? ''
+function tail_of(extra: Partial<BoardHeader>): string {
+	return stripVTControlCharacters(run_board_header.lanes_tail(header(extra)))
 }
 
-describe('run_board_header.header_lines issue count', () => {
-	it('ends the first line on the open and closed counts', () => {
-		expect(first_of({ repo: REPO, issue_count: COUNT })).toBe(
-			`⏸ josh-board  ⏰ 2°10′00″  ✅  0/0 ──────────  🔄 0  💤 0  ${CHIP}`,
-		)
+describe('run_board_header.lanes_tail issue count', () => {
+	it('ends the lanes rule on the open and closed counts, none on the first line', () => {
+		expect(tail_of({ repo: REPO, issue_count: COUNT })).toBe(`✅ 0/0  🔄 0  💤 0  ${CHIP}`)
+		expect(lines_of(header({ repo: REPO, issue_count: COUNT }))[0]).not.toContain('📮')
 	})
 
 	it('draws the same chip in a chat', () => {
-		expect(first_of({ repo: REPO, issue_count: COUNT, form: 'chat' })).toMatch(
+		expect(tail_of({ repo: REPO, issue_count: COUNT, form: 'chat' })).toMatch(
 			/💤 0 {2}📮 87\/6,912$/u,
 		)
 	})
 
-	it('draws no chip, and the line otherwise unchanged, where no count was read', () => {
-		const plain = first_of({ repo: REPO })
+	it('draws no chip, and the tail otherwise unchanged, where no count was read', () => {
+		const plain = tail_of({ repo: REPO })
 
 		expect(plain).not.toContain('📮')
 		expect(plain).toMatch(/💤 0$/u)
 	})
 
 	it('draws no chip before a plan names the repository', () => {
-		expect(first_of({ repo: undefined, issue_count: COUNT })).toMatch(/💤 0$/u)
+		expect(tail_of({ repo: undefined, issue_count: COUNT })).toMatch(/💤 0$/u)
 	})
 })
 
@@ -61,7 +62,9 @@ function linked_by(repo: string | undefined, link: Link): Array<string> {
 
 describe('run_board_header.header_lines repository links', () => {
 	it('links the open count to the open issues and the closed count to the closed ones', () => {
-		expect(linked_by(REPO, bracketed)[0]).toContain(
+		const links = run_board_link.links_of(REPO, bracketed)
+
+		expect(tail_of({ repo: REPO, issue_count: COUNT, ...links })).toContain(
 			`📮 [87](${ISSUES}open)/[6,912](${ISSUES}closed)`,
 		)
 	})
