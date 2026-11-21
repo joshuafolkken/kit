@@ -3,7 +3,8 @@ import type { AuditChild } from './epic-audit-checks'
 import { epic_graph, type IssueReference } from './epic-graph'
 import type { DependencyLink } from './epic-parse'
 
-// Check 6 — a declared order between two open children that nobody wrote a reason for.
+// Check 6 — an order between two open children, declared in the body or recorded only as a native
+// blocked-by, that nobody wrote a reason for.
 //
 // **Every other check looks the other way.** They report a dependency the epic *omitted* — prose or
 // acceptance criteria naming a sibling with nothing ordering the two. Not one of them reads the

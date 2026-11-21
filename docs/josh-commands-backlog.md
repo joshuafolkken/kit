@@ -864,7 +864,7 @@ pnpm josh epic:audit 858
 | Nested epic          | warning   | A task-list row points at another epic.                                                                        |
 | Orphan child         | warning   | An issue names this epic as parent but the task list does not track it.                                        |
 | Orphan search        | **error** | The open-backlog search could not be read — re-run the audit.                                                  |
-| Unjustified order    | **error** | The body declares an order between two open children and nothing records why.                                  |
+| Unjustified order    | **error** | The body or a native blocked-by orders two open children and nothing records why.                              |
 
 An open-backlog search that stopped before the end (only the newest 500 issues, or 50 bodies, were covered) is a warning. Cycle and declaration checks are reused from `epic:next`. A forward reference the other child already depends on is not reported, and a pair is demoted to a warning only when the closed state is confirmed (any state but `CLOSED` normalizes to `OPEN`).
 

@@ -224,7 +224,7 @@ function fetch_anomalies(
 	]
 }
 
-// The comments on the ends of the declared orders check 6 asks about — and on nothing else. Most
+// The comments on the ends of the orders check 6 asks about — and on nothing else. Most
 // epics declare no order at all, so this reads nothing; an epic that declares a chain pays one
 // listing per issue in it.
 //
