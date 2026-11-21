@@ -1,7 +1,0 @@
-{
-	"reason": "New synth module for the board sound epic (#7943): ~80 code lines the Issue asks for, no existing code to remove",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 80
-	}
-}

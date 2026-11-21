@@ -211,7 +211,7 @@ async function watch(
 	const board = run_board_timing.timed({ ...live, on_exit: leaving }, is_timing)
 
 	await run_board_exit_record.guarded(exits, async () => {
-		await run_board_live.watch(run_board_theme.themed(board, theme), theme)
+		await run_board_live.watch(board, theme)
 	})
 }
 

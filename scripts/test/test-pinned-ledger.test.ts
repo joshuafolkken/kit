@@ -18,8 +18,8 @@ afterEach(() => {
 
 describe('test_pinned_ledger.record snapshot context', () => {
 	it('keeps the initial checkout lane when a probe runs from a snapshot', async () => {
-		vi.spyOn(lane_paths, 'issue_here').mockImplementation((directory) =>
-			directory === PROJECT_ROOT ? 5078 : undefined,
+		vi.spyOn(lane_paths, 'issue_here').mockImplementation((options) =>
+			options?.directory === PROJECT_ROOT ? 5078 : undefined,
 		)
 		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 

@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/lane/lane-phases.ts:112 | 2026-11-20 | #8287 | - | edge-input

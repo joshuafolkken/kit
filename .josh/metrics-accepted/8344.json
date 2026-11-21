@@ -1,7 +1,0 @@
-{
-	"reason": "the live board worker's launch choice and its build entry are new code (#8344)",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

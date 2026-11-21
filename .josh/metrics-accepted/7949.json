@@ -1,7 +1,0 @@
-{
-	"reason": "New pure module picking the run:board sound cue from frame transitions (#7949), with its feature code",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 93
-	}
-}

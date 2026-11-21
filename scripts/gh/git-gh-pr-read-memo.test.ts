@@ -164,7 +164,7 @@ describe('a failed detail read the listing does not stand in for', () => {
 
 describe('the detail read is remembered for the command', () => {
 	it('reads one pull request once for every reader', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await git_gh_pr_read.pr_get_url(PR_BRANCH)
 		await git_gh_pr_read.pr_get_body(PR_BRANCH)
@@ -173,7 +173,7 @@ describe('the detail read is remembered for the command', () => {
 	})
 
 	it('shares one request between readers in the same tick', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await Promise.all([git_gh_pr_read.pr_get_url(PR_BRANCH), git_gh_pr_read.pr_get_body(PR_BRANCH)])
 
@@ -181,7 +181,7 @@ describe('the detail read is remembered for the command', () => {
 	})
 
 	it('reads again after the memo is cleared', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await git_gh_pr_read.pr_get_body(PR_BRANCH)
 		forget_pr_numbers()
@@ -204,7 +204,7 @@ describe('what the detail memo does not keep', () => {
 	// `josh ship` asks it again after each merge it pushes, so a remembered answer would keep
 	// reporting the conflict that merge resolved.
 	it('reads the merge state fresh every time', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 
 		await git_gh_pr_read.pr_get_body(PR_BRANCH)
 		await git_gh_pr_read.pr_get_merge_state(PR_BRANCH)
@@ -216,7 +216,7 @@ describe('what the detail memo does not keep', () => {
 	// `josh git -y` reads the body at its preflight and the state only after its commit and push, so
 	// a remembered answer would report a pull request merged in between as still open.
 	it('reports a merge made after an earlier read of the same pull request', async () => {
-		stub(pr_routes())
+		stub(pr_routes({}))
 		await git_gh_pr_read.pr_get_body(PR_BRANCH)
 		stub(pr_routes({ state: 'closed', merged_at: MERGED_AT }))
 

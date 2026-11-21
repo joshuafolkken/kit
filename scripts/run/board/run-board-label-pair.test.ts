@@ -22,6 +22,24 @@ describe('run_board_label_pair.pair', () => {
 	})
 })
 
+describe('run_board_label_pair.heading_lead', () => {
+	it('is the opening word of a section rule, the open arrow, the folded arrow or a lone rule', () => {
+		const { heading_lead } = run_board_label_pair
+
+		expect(heading_lead('── queued ──')).toBe('── ')
+		expect(heading_lead('▾ lanes ──')).toBe('▾ ')
+		expect(heading_lead('▸ done ──')).toBe('▸ ')
+		expect(heading_lead('─ usage ──')).toBe('─ ')
+	})
+
+	it('is nothing on a line that does not open on a heading lead', () => {
+		const { heading_lead } = run_board_label_pair
+
+		expect(heading_lead('     OK 63/76 ■■■■----')).toBeUndefined()
+		expect(heading_lead('──── no blank')).toBeUndefined()
+	})
+})
+
 describe('run_board_label_pair.settled', () => {
 	const lines = [`── ${pair('⏳', 'queued')} ──`]
 

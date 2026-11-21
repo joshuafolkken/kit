@@ -1,9 +1,0 @@
-{
-	"reason": "#8222 adds the prepared-blocker refusal and publish to backlog:triage's two wait paths via a shared module, plus its docs pointer",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 57,
-		"ai_cost.on_demand_bytes": 338,
-		"prose.long_paragraphs": 1
-	}
-}

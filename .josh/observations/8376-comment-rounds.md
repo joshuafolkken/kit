@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/run/board/run-board-strip.ts:77 | 2026-11-20 | #8376 | - | other
+- rf:project-conventions | low | scripts/run/board/run-board-strip.ts:107 | 2026-11-20 | #8376 | - | other

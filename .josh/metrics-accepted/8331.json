@@ -1,7 +1,0 @@
-{
-	"reason": "two new lane:stats tables (held by cause, held behind) for #8331",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 38
-	}
-}

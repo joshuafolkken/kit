@@ -1,7 +1,0 @@
-{
-	"reason": "the shared host_gaps memo and the length-and-tail reread comparison replace two whole-stream walks per worker read (#8135)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

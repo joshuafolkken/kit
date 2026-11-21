@@ -204,7 +204,6 @@ describe('backlog_drive_stalled_retry.sweep — the cap (ac-bc44aff6, ac-328f94e
 		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
 			PARK,
 			`#${String(PARKED)} parked (${RUN_STALLED_LABEL}: ${CAP_NOTE} — ship-stop cap)`,
-			expect.any(Date),
 			{ stop: FOLLOWUP_STOP },
 		)
 	})
@@ -278,7 +277,6 @@ describe('backlog_drive_stalled_retry.sweep — a yield-cap park (ac-1737b91a)',
 		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
 			PARK,
 			`#${String(PARKED)} parked (${RUN_STALLED_LABEL}: ${CAP_NOTE} — ${backlog_yield_cap.TRIP_CAUSE})`,
-			expect.any(Date),
 			{},
 		)
 	})

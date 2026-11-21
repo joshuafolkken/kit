@@ -1,7 +1,0 @@
-{
-	"reason": "unasked-filing reads the person's prompt past the transcript tail (#7781): one reach function",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

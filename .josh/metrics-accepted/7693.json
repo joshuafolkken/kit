@@ -1,7 +1,0 @@
-{
-	"reason": "Per-entry keep-back for a stable range moved onto a prerelease (new latest-prerelease.ts), required by the review: a whole-tree rollback would block every josh latest while a latest dist-tag points at a prerelease",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 57
-	}
-}

@@ -1,0 +1,4 @@
+- rf:tests | low | scripts/run/board/run-board-round-change.ts:40 | 2026-11-20 | #8330 | - | untested-branch
+- rf:bug-risks | low | scripts/run/board/run-board-saved-state.ts:85 | 2026-11-20 | #8330 | - | stale-cache
+- rf:bug-risks | low | scripts/run/board/run-board-saved-state.ts:85 | 2026-11-20 | #8330 | - | state-reasoning
+- rf:tests | low | scripts/run/board/run-board-round-change.ts:33 | 2026-11-20 | #8330 | - | untested-branch

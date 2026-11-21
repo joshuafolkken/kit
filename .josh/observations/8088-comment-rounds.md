@@ -1,0 +1,2 @@
+- rf:none | none | - | 2026-11-19 | #8088
+- rf:assumptions | low | scripts/issue/issue-spill-cli.ts:228 | 2026-11-19 | #8088 | - | other

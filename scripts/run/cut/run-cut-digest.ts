@@ -112,7 +112,7 @@ function own_transcript(cwd: string, environment: NodeJS.ProcessEnv): string | u
 // The running session's own digest, or `undefined` when its transcript cannot be found — a cut is
 // never refused for want of one.
 function own_digest(
-	cwd: string = process.cwd(),
+	cwd: string,
 	environment: NodeJS.ProcessEnv = process.env,
 ): SessionDigest | undefined {
 	const text = own_transcript(cwd, environment)

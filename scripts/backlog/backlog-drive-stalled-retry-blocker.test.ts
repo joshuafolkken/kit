@@ -114,11 +114,6 @@ describe('backlog_drive_stalled_retry.sweep — a blocked park left as it is', (
 		given([blocker()])
 		await next_sweep()
 
-		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
-			PARK,
-			PARK_TEXT,
-			expect.any(Date),
-			{},
-		)
+		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(PARK, PARK_TEXT, {})
 	})
 })
