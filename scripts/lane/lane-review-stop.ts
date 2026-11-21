@@ -5,20 +5,17 @@ import type { LaneStateRecord } from './lane-state-record'
 // a person reviews them. `needs-human-review` alone is not one: a person puts it on an issue before its
 // run (docs/how-to/run-backlog.md), and `run:hold --human-review-stop` changes no label — it writes
 // the lane record's `human-review` state. So a review stop is the label on an issue whose lane record
-// says its lane stopped.
+// says its lane stopped there.
 
-// A lane stopped where its record was last changed to a held state: `run:hold --human-review-stop`
-// writes `human-review`, and a lane a person labelled by hand after `lane:pause` stays `paused`.
-const STOPPED_STATES: ReadonlySet<LaneStateRecord['state']> = new Set<LaneStateRecord['state']>([
-	'human-review',
-	'paused',
-])
+// The lane state `run:hold --human-review-stop` writes. A `paused` lane is no review stop: the label
+// stays on the issue for the whole run, so a lane paused for any other reason would read as one.
+const REVIEW_STOP_STATE: LaneStateRecord['state'] = 'human-review'
 
-// When each stopped lane stopped, by issue, from the lane records given.
+// When each lane stopped for review stopped, by issue, from the lane records given.
 function stops_of(records: ReadonlyArray<LaneStateRecord>): ReadonlyMap<number, number> {
 	return new Map(
 		records
-			.filter((record) => STOPPED_STATES.has(record.state))
+			.filter((record) => record.state === REVIEW_STOP_STATE)
 			.map((record) => [Number(record.issue), Date.parse(record.changed_at)]),
 	)
 }

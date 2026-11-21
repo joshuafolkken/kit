@@ -61,7 +61,7 @@ interface LocalRead {
 	// The open lanes as their lane state records sort them — this run's, an earlier run's and the ones
 	// with no record — with what each is doing (`run-board-lane-state.ts`).
 	lane_states: BoardLanes
-	// Each paused or review-stopped lane, by issue: when it stopped and its directory
+	// Each review-stopped lane, by issue: when it stopped and its directory
 	// (`run-board-review-stop.ts`).
 	review_stops?: ReadonlyMap<number, ReviewStop> | undefined
 	// The session a stopped run is resumed from; `undefined` otherwise.

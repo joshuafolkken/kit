@@ -14,14 +14,17 @@ function record_of(issue: number, state: LaneStateRecord['state']): LaneStateRec
 }
 
 describe('lane_review_stop.stops_of', () => {
-	it.each(['human-review', 'paused'] as const)(
-		'keeps a %s lane with the time its record last changed, and no running lane',
-		(state) => {
-			const records = [record_of(STOPPED, state), record_of(OTHER, 'running')]
+	it('keeps a human-review lane with the time its record last changed', () => {
+		const records = [record_of(STOPPED, 'human-review'), record_of(OTHER, 'running')]
 
-			expect(lane_review_stop.stops_of(records)).toStrictEqual(new Map([[STOPPED, STOPPED_MS]]))
-		},
-	)
+		expect(lane_review_stop.stops_of(records)).toStrictEqual(new Map([[STOPPED, STOPPED_MS]]))
+	})
+
+	it('keeps no paused lane, as the label stands on it from before the run', () => {
+		const records = [record_of(STOPPED, 'paused')]
+
+		expect(lane_review_stop.stops_of(records)).toStrictEqual(new Map())
+	})
 })
 
 describe('lane_review_stop.is_review_stop', () => {

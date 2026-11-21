@@ -31,6 +31,7 @@ function plan_of(review_stops?: ReadonlyMap<number, ReviewStop>): BoardPlan {
 	}
 }
 
+const STOPPED_RECORD = record_of(STOPPED, 'human-review')
 const STOPS = new Map([[STOPPED, { stopped_ms: STOPPED_MS, directory: DIRECTORY }]])
 
 afterEach(() => {
@@ -40,14 +41,14 @@ afterEach(() => {
 describe('run_board_review_stop.stops_here', () => {
 	it('keeps each stopped lane with its directory under the lane root beside the repository', () => {
 		vi.stubEnv('JOSH_LANE_ROOT', '')
-		const records = [record_of(STOPPED, 'human-review'), record_of(OTHER, 'running')]
+		const records = [STOPPED_RECORD, record_of(OTHER, 'running')]
 
 		expect(run_board_review_stop.stops_here(records, REPOSITORY)).toStrictEqual(STOPS)
 	})
 
 	it('names the directory under the configured lane root', () => {
 		vi.stubEnv('JOSH_LANE_ROOT', LANE_ROOT)
-		const stops = run_board_review_stop.stops_here([record_of(STOPPED, 'paused')], REPOSITORY)
+		const stops = run_board_review_stop.stops_here([STOPPED_RECORD], REPOSITORY)
 
 		expect(stops.get(STOPPED)?.directory).toBe(path.join(LANE_ROOT, String(STOPPED)))
 	})
