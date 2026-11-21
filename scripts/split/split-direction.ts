@@ -102,8 +102,8 @@ function names_of(path: string): Array<string> {
 // The first name of each file `child_body` declares that the kept Issue's criteria name.
 function references(kept_body: string, child_body: string): Array<Reference> {
 	const kept = kept_names(kept_body)
-	const files = [...backlog_overlap.declared_paths(child_body)].filter(
-		(path) => !path.endsWith(SEPARATOR),
+	const files = [...backlog_overlap.declared_paths(child_body)].filter((path) =>
+		backlog_overlap.is_file_claim(path),
 	)
 
 	return files

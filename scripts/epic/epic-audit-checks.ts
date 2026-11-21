@@ -5,6 +5,7 @@ import {
 	type FindingLevel,
 	type ReferenceState,
 } from './epic-audit'
+import type { OrderPair } from './epic-audit-rationale'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_nested } from './epic-nested'
 
@@ -27,6 +28,7 @@ const ORDER_CONTRADICTION = 'order contradiction'
 const UNRESOLVED_REFERENCE = 'unresolved reference'
 const ORPHAN_CHILD = 'orphan child'
 const NESTED_EPIC = 'nested epic'
+const EPIC_BLOCKER = 'epic blocker'
 const CLOSED_EPIC_OPEN_CHILDREN = 'closed epic with open children'
 
 // A child with its body, which the graph type does not carry.
@@ -380,6 +382,39 @@ function find_nested_epics(
 		}))
 }
 
+// Check 5b — an order whose blocker is itself an epic. The blocked child then waits for every child
+// of that epic, including ones it does not need: `#8352 -> #8355` held `#8355` until an unrelated
+// grandchild closed, when the recorded reason needed one child only.
+//
+// **A warning**, for `order_level`'s reason: waiting on the whole epic is sometimes right, and the
+// machine cannot tell — the message names the way to re-point the order at the child it needs.
+// The pairs are check 6's, so an order whose ends already closed is not reported: it holds nothing.
+function epic_blocker_message(pair: OrderPair, current_repo: string): string {
+	const blocker = shown(pair.blocker, current_repo)
+	const blocked = shown(pair.blocked, current_repo)
+	const triage = `pnpm josh backlog:triage --apply ${String(pair.blocked.number)}`
+
+	return (
+		`${blocked} waits on ${blocker}, which is itself an epic, so it waits for every child of ` +
+		`${blocker} — including ones it does not need. If it needs only some of them, re-point it: ` +
+		`\`${triage} --unblock ${String(pair.blocker.number)} --reason "<why>"\`, then ` +
+		`\`${triage} --blocked-by <the needed child> --reason "<why>"\`.`
+	)
+}
+
+function find_epic_blockers(
+	pairs: ReadonlyArray<OrderPair>,
+	current_repo: string,
+): Array<AuditFinding> {
+	return pairs
+		.filter((pair) => epic_nested.is_nested_epic(pair.blocker))
+		.map((pair) => ({
+			level: 'warning' as const,
+			check: EPIC_BLOCKER,
+			message: epic_blocker_message(pair, current_repo),
+		}))
+}
+
 // Check 6 — the epic itself is closed while children it tracks are still open. Unlike the five
 // checks above, this one reads the *root's* state against its children rather than the children
 // against each other.
@@ -428,6 +463,7 @@ const epic_audit_checks = {
 	UNRESOLVED_REFERENCE,
 	ORPHAN_CHILD,
 	NESTED_EPIC,
+	EPIC_BLOCKER,
 	CLOSED_EPIC_OPEN_CHILDREN,
 	reported_pairs,
 	find_implicit_dependencies,
@@ -435,6 +471,7 @@ const epic_audit_checks = {
 	find_unresolved_references,
 	find_orphans,
 	find_nested_epics,
+	find_epic_blockers,
 	find_closed_epic_open_children,
 }
 

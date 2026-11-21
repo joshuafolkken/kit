@@ -157,35 +157,40 @@ describe('run_board_header_defcon.field_of', () => {
 	})
 })
 
-// joshuafolkken/kit#8107: the level ends the first line, leaving the second's end to the notice.
-describe('run_board_header.header_lines with the alert level', () => {
-	it('ends a themed screen header first line on the level, and draws none on the second', () => {
-		expect(header_line(0, WARGAMES)).toMatch(/ {2}DEFCON \[5\] 4 3 2 1$/u)
+function alert_of(extra: Partial<BoardHeader>): string | undefined {
+	const part = run_board_header.alert_part(board({}, extra))
+
+	return part === undefined ? undefined : stripVTControlCharacters(part)
+}
+
+// joshuafolkken/kit#8513: the level rides the throughput rule's right end; the header draws it on no line.
+describe('run_board_header.alert_part', () => {
+	it('draws the level on a themed screen alone, and on no header line', () => {
+		expect(alert_of(WARGAMES)).toBe('DEFCON [5] 4 3 2 1')
+		expect(alert_of({})).toBeUndefined()
+		expect(alert_of({ ...WARGAMES, form: 'chat' })).toBeUndefined()
+		expect(header_line(0, WARGAMES)).not.toContain('DEFCON')
 		expect(header_line(1, WARGAMES)).not.toContain('DEFCON')
 	})
 
-	it('leaves a header with no theme, and a chat frame, as it was', () => {
-		const plain = header_line(0, {})
-
-		expect(plain).not.toContain('DEFCON')
-		expect(header_line(0, { ...WARGAMES, form: 'chat' })).toBe(plain)
-		expect(header_line(0, WARGAMES).startsWith(plain)).toBe(true)
+	it('leaves the header of a themed screen as the plain one draws it', () => {
+		expect(header_line(0, WARGAMES)).toBe(header_line(0, {}))
 	})
 })
 
 // joshuafolkken/kit#8358: the theme's row picks how the level is drawn; the level stays shared.
-describe('run_board_header.header_lines with the theme row alert', () => {
+describe('run_board_header.alert_part with the theme row alert', () => {
 	it('draws the alert the theme row names, at the shared level', () => {
 		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert').mockReturnValue('ALERT')
 
-		expect(header_line(0, WARGAMES)).toMatch(/ {2}ALERT$/u)
+		expect(alert_of(WARGAMES)).toBe('ALERT')
 		expect(alert).toHaveBeenCalledWith(CALM)
 	})
 
 	it('draws no alert where no theme is drawn', () => {
 		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert')
 
-		header_line(0, {})
+		alert_of({})
 
 		expect(alert).not.toHaveBeenCalled()
 	})

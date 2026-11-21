@@ -39,8 +39,14 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
 				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
-				{ arguments: '--add 893 894 --before 891', note: '#894 must finish before #891' },
-				{ arguments: '--add 893 894 --after 890', note: '#894 starts once #890 is done' },
+				{
+					arguments: '--add 893 894 --before 891 --order-reason "<chain>: <reason>"',
+					note: '#894 must finish before #891',
+				},
+				{
+					arguments: '--add 893 894 --after 890 --order-reason "<chain>: <reason>"',
+					note: '#894 starts once #890 is done',
+				},
 				{
 					arguments: '--add 893 894 --decision-file .josh/tmp/why.md',
 					note: '…and record why, in one call',
@@ -66,7 +72,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--order-reason "#A -> #B: <reason>"'],
 					description:
-						'repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain` or `--ordered`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.',
+						'repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain`, `--ordered`, `--before` or `--after`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.',
 				},
 				{
 					names: ['--rationale-file <path|->'],

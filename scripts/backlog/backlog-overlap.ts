@@ -4,6 +4,7 @@ import type { SoloSelection } from '#scripts/epic/epic-solo'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state, type LaneRecords } from '#scripts/lane/lane-state'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
+import { backlog_overlap_glob } from './backlog-overlap-glob'
 
 // Which candidates may not run side by side because their bodies declare overlapping paths.
 // joshuafolkken/kit#3221 held back only a path both bodies named beside a move, split, rename or
@@ -11,8 +12,8 @@ import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 // joshuafolkken/kit#3582 named `scripts/lines/effective-limit.ts`, joshuafolkken/kit#3586 named
 // `scripts/lines/**`, and the two lanes met a content conflict that stopped the second ship
 // (joshuafolkken/kit#3617). So any overlap now holds the later one back — the same file named by
-// both, or a path inside the other's directory glob. A directory one segment deep (`scripts/`) is
-// too broad to count, and an issue reference (`owner/repo#N`) is not a path. A dotted token with no
+// both, a path inside the other's directory, or a path the other's glob matches
+// (`backlog-overlap-glob.ts`). A directory one segment deep (`scripts/`) is too broad to count, and an issue reference (`owner/repo#N`) is not a path. A dotted token with no
 // `/` is a file only when its extension is one this repository keeps at the root — otherwise
 // `session_cite.issue` or `process.env` would claim a path and serialize unrelated lanes. A document
 // under `docs/` and anything under the untracked scratch directory (`.josh/tmp/`) never count.
@@ -23,14 +24,14 @@ const FILE_EXTENSION = /\.[a-z]\w*$/iu
 // and neither declared (joshuafolkken/kit#5107).
 const ROOT_FILE_EXTENSION =
 	/\.(?:[cm]?[jt]sx?|svelte|jsonc?|md|ya?ml|css|html|sh|toml|txt|properties)$/u
-const GLOB = '*'
 const ISSUE_MARK = '#'
 const SEPARATOR = '/'
 const MIN_DIRECTORY_DEPTH = 2
 const DOCS_DIRECTORY = 'docs/'
 const MARKDOWN = '.md'
 
-// The paths each issue declares, by issue number. A directory ends in `/`; anything else is a file.
+// The paths each issue declares, by issue number. A directory ends in `/` and a glob holds a `*`;
+// anything else is a file.
 type Declared = ReadonlyMap<number, ReadonlySet<string>>
 
 interface DeclaringIssue {
@@ -38,14 +39,11 @@ interface DeclaringIssue {
 	body?: string | undefined
 }
 
-// `scripts/lines/**` and `scripts/lines/*.ts` declare `scripts/lines/`; a path with no glob is itself.
-function without_glob(path: string): string {
-	const glob = path.indexOf(GLOB)
+// A directory or glob whose fixed part is one segment deep (`scripts/`, `scripts/**`, `*.ts`) is too
+// broad to count.
+function is_narrow(area: string): boolean {
+	const directory = backlog_overlap_glob.directory_of(area)
 
-	return glob === -1 ? path : path.slice(0, path.lastIndexOf(SEPARATOR, glob) + 1)
-}
-
-function is_narrow(directory: string): boolean {
 	return directory.split(SEPARATOR).filter(Boolean).length >= MIN_DIRECTORY_DEPTH
 }
 
@@ -53,8 +51,14 @@ function is_file(path: string): boolean {
 	return (path.includes(SEPARATOR) ? FILE_EXTENSION : ROOT_FILE_EXTENSION).test(path)
 }
 
+// Whether a claim names one file — not a directory, and not a glob (`run-board-cli*.test.ts`) whose
+// extension would read as one. A reader keeping only files filters on this (joshuafolkken/kit#8529).
+function is_file_claim(path: string): boolean {
+	return !backlog_overlap_glob.is_area(path)
+}
+
 function claim_of(path: string): string | undefined {
-	if (path.endsWith(SEPARATOR)) return is_narrow(path) ? path : undefined
+	if (backlog_overlap_glob.is_area(path)) return is_narrow(path) ? path : undefined
 
 	return is_file(path) ? path : undefined
 }
@@ -63,7 +67,7 @@ function claim_of(path: string): string | undefined {
 function path_claims(tokens: ReadonlyArray<string>): ReadonlySet<string> {
 	const paths = tokens
 		.filter((token) => !token.includes(ISSUE_MARK))
-		.map((token) => claim_of(without_glob(token.replace(LINE_SUFFIX, ''))))
+		.map((token) => claim_of(token.replace(LINE_SUFFIX, '')))
 
 	return new Set(paths.filter((path) => path !== undefined))
 }
@@ -119,7 +123,7 @@ function contains(outer: string, inner: string): boolean {
 // back for it cost a whole lane each (joshuafolkken/kit#4926). `prompts/` and `.claude/` are the rules
 // themselves and still count.
 function is_shared_document(path: string): boolean {
-	return path.startsWith(DOCS_DIRECTORY) && (path.endsWith(SEPARATOR) || path.endsWith(MARKDOWN))
+	return path.startsWith(DOCS_DIRECTORY) && (!is_file_claim(path) || path.endsWith(MARKDOWN))
 }
 
 // A path under the untracked scratch directory (`.josh/tmp/`). Git ignores it, so no lane's change
@@ -133,10 +137,18 @@ function is_excluded(path: string): boolean {
 	return is_shared_document(path) || is_scratch(path)
 }
 
+// The one comparison of two claims — a glob on either side is matched as a pattern.
+function claims_meet(left: string, right: string): boolean {
+	if (backlog_overlap_glob.is_glob(left)) return backlog_overlap_glob.meets(left, right)
+	if (backlog_overlap_glob.is_glob(right)) return backlog_overlap_glob.meets(right, left)
+
+	return contains(left, right) || contains(right, left)
+}
+
 function overlaps(left: string, right: string): boolean {
 	if (is_excluded(left) || is_excluded(right)) return false
 
-	return contains(left, right) || contains(right, left)
+	return claims_meet(left, right)
 }
 
 interface SeparateContext {
@@ -286,8 +298,10 @@ function separate(
 
 const backlog_overlap = {
 	declared_of,
+	claims_meet,
 	declared_paths,
 	holds,
+	is_file_claim,
 	path_claims,
 	path_clash,
 	running_clash,

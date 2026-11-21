@@ -133,8 +133,8 @@ interface AuditInput {
 	// as errors — the acceptance criteria are part of the body, so every one of them would otherwise
 	// arrive twice.
 	contradictions: ReadonlyArray<AuditFinding>
-	// The declared orders check 6 may speak about, already resolved to children and narrowed to the
-	// open, local pairs.
+	// The orders check 6 may speak about — declared in the body or recorded only as a native
+	// blocked-by between children — already resolved to children and narrowed to the open, local pairs.
 	order_pairs: ReadonlyArray<OrderPair>
 	// The epic's `## Decisions` section, and the comments on those pairs' ends — the two places a
 	// placement decision is recorded, and therefore the whole of what check 6 reads.
@@ -171,6 +171,7 @@ function epic_findings(input: AuditInput): Array<AuditFinding> {
 			comments: input.order_comments,
 			current_repo: input.repo,
 		}),
+		...epic_audit_checks.find_epic_blockers(input.order_pairs, input.repo),
 		...epic_audit_orphans.search_findings(input.claiming),
 		...epic_audit_checks.find_orphans(
 			input.tracked,
@@ -224,7 +225,7 @@ function fetch_anomalies(
 	]
 }
 
-// The comments on the ends of the declared orders check 6 asks about — and on nothing else. Most
+// The comments on the ends of the orders check 6 asks about — and on nothing else. Most
 // epics declare no order at all, so this reads nothing; an epic that declares a chain pays one
 // listing per issue in it.
 //

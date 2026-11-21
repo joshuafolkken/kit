@@ -718,8 +718,8 @@ pnpm josh epic "Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: #B c
 pnpm josh epic "Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md
 pnpm josh epic --promote 858 101 102 103                                                                                           # turn an existing issue into an epic
 pnpm josh epic --add 893 894                                                                                                       # track #894, declaring no order for it
-pnpm josh epic --add 893 894 --before 891                                                                                          # #894 must finish before #891
-pnpm josh epic --add 893 894 --after 890                                                                                           # #894 starts once #890 is done
+pnpm josh epic --add 893 894 --before 891 --order-reason "<chain>: <reason>"                                                       # #894 must finish before #891
+pnpm josh epic --add 893 894 --after 890 --order-reason "<chain>: <reason>"                                                        # #894 starts once #890 is done
 pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                      # …and record why, in one call
 pnpm josh epic --reconcile 2184                                                                                                    # rewrite the body to match the recorded blocked-by, and record any order the body declared
 pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
@@ -730,7 +730,7 @@ pnpm josh epic --untrack 893 894                                                
 
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--chain "#A -> #B"` — repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.
-- `--order-reason "#A -> #B: <reason>"` — repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain` or `--ordered`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.
+- `--order-reason "#A -> #B: <reason>"` — repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain`, `--ordered`, `--before` or `--after`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.
 - `--rationale-file <path|->` — split rationale prose, written under `.josh/tmp/` (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
 - `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.
@@ -862,9 +862,10 @@ pnpm josh epic:audit 858
 | Order contradiction  | **error** | Acceptance criteria name another child with nothing ordering them (warning once either closes, or cross-repo). |
 | Unresolved reference | warning   | A body cites an issue that does not exist or is already closed.                                                |
 | Nested epic          | warning   | A task-list row points at another epic.                                                                        |
+| Epic blocker         | warning   | An open order's blocker is an epic, so it waits on every child — re-point it at the child it needs.            |
 | Orphan child         | warning   | An issue names this epic as parent but the task list does not track it.                                        |
 | Orphan search        | **error** | The open-backlog search could not be read — re-run the audit.                                                  |
-| Unjustified order    | **error** | The body declares an order between two open children and nothing records why.                                  |
+| Unjustified order    | **error** | The body or a native blocked-by orders two open children and nothing records why.                              |
 
 An open-backlog search that stopped before the end (only the newest 500 issues, or 50 bodies, were covered) is a warning. Cycle and declaration checks are reused from `epic:next`. A forward reference the other child already depends on is not reported, and a pair is demoted to a warning only when the closed state is confirmed (any state but `CLOSED` normalizes to `OPEN`).
 
@@ -963,7 +964,7 @@ Any other untriaged candidate is held alone, named on stderr. The triaged candid
 
 **Mechanism deferral**: new mechanisms go to the back among ranking ties only while the defect rate is above its baseline. Defects lead by a ranking key below.
 
-**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, verification-path defect, defect, resumable work (stash, pause comment or open PR), lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high` (both also inherited from blocked issues), verification-path defect, defect, resumable work (stash, pause comment or open PR), lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
 Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.

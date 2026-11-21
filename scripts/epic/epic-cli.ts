@@ -280,7 +280,8 @@ function to_add_arguments(parsed: EpicArgv): AddArguments | undefined {
 	const outcome = parse_position(parsed)
 	if (outcome.is_refused) return undefined
 
-	const chain_subject = { is_ordered: false, rival_flag: to_position_flag(outcome) }
+	const placed_chain = epic_cli_chain.to_placed_chain(subject.children, outcome)
+	const chain_subject = { is_ordered: false, rival_flag: to_position_flag(outcome), placed_chain }
 
 	return {
 		...subject,

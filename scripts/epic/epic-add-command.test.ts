@@ -15,7 +15,9 @@ vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { repo_get_name_w
 
 const CHAIN = '--chain'
 const JOIN = '#894 -> #891'
-const JOIN_REASON = ['--order-reason', `${JOIN}: #891 reads what #894 writes`]
+const ORDER_REASON = '--order-reason'
+const NO_REASON = 'has no `--order-reason'
+const JOIN_REASON = [ORDER_REASON, `${JOIN}: #891 reads what #894 writes`]
 const FAILURE = 1
 const TARGET_REPO = 'someone/other'
 const QUALIFIED_EPIC = `${TARGET_REPO}#893`
@@ -43,7 +45,7 @@ describe('epic_command.run — --add --chain', () => {
 
 	it('refuses a chain without its --order-reason without writing', async () => {
 		expect(await epic_command.run(['--add', '893', '894', CHAIN, JOIN])).toBe(FAILURE)
-		expect(printed()).toContain('has no `--order-reason')
+		expect(printed()).toContain(NO_REASON)
 		expect(add_children).not.toHaveBeenCalled()
 	})
 
@@ -66,9 +68,58 @@ describe('epic_command.run — --add --chain', () => {
 		await epic_command.run(['--add'])
 
 		expect(printed()).toContain(
-			'josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...]',
+			'josh epic --add <E> <N1> <N2> ... [--chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...]',
 		)
 	})
+
+	it('names the required --order-reason beside --before / --after in the usage', async () => {
+		await epic_command.run(['--add'])
+
+		expect(printed()).toContain('--before <M> | --after <M> --order-reason "<chain>: <reason>"')
+	})
+})
+
+describe('epic_command.run — --add --before / --after need an --order-reason', () => {
+	it.each([
+		['--after', '890'],
+		['--before', '891'],
+	])('refuses %s without its --order-reason, writing nothing', async (flag, target) => {
+		expect(await epic_command.run(['--add', '893', '894', flag, target])).toBe(FAILURE)
+		expect(printed()).toContain(NO_REASON)
+		expect(add_children).not.toHaveBeenCalled()
+	})
+
+	it('refuses a reason naming a chain other than the one --after writes', async () => {
+		const reason = [ORDER_REASON, `${JOIN}: the wrong chain`]
+
+		expect(await epic_command.run(['--add', '893', '894', '--after', '890', ...reason])).toBe(
+			FAILURE,
+		)
+		expect(printed()).toContain('`--before` or `--after` declared')
+		expect(add_children).not.toHaveBeenCalled()
+	})
+
+	it.each([
+		['--after', '890', '#890 -> #894'],
+		['--before', '891', JOIN],
+	])('records %s and its reason in the decision', async (flag, target, chain) => {
+		const reason = [ORDER_REASON, `${chain}: #894 extends the parser`]
+
+		expect(await epic_command.run(['--add', '893', '894', flag, target, ...reason])).toBe(0)
+
+		const decision = String(add_children.mock.calls[0]?.[0]?.decision)
+
+		expect(decision).toContain(`- Order: \`${chain}\`, declared by \`josh epic --add\``)
+		expect(decision).toContain('- Reasoning: #894 extends the parser')
+	})
+
+	it.each(['--order-after', '--order-before'])(
+		'moves the row with %s without any --order-reason',
+		async (flag) => {
+			expect(await epic_command.run(['--add', '893', '894', flag, '890'])).toBe(0)
+			expect(add_children).toHaveBeenCalledWith(expect.objectContaining({ decision: undefined }))
+		},
+	)
 })
 
 describe('epic_command.run — --add --chain records its reasons', () => {
@@ -80,7 +131,7 @@ describe('epic_command.run — --add --chain records its reasons', () => {
 
 		const decision = String(add_children.mock.calls[0]?.[0]?.decision)
 
-		expect(decision).toContain('- Order: `#894 -> #891`, declared by `josh epic --add --chain`')
+		expect(decision).toContain('- Order: `#894 -> #891`, declared by `josh epic --add`')
 		expect(decision).toContain(RECORD)
 	})
 
