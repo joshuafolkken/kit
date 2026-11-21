@@ -138,7 +138,7 @@ The header is three lines — the first two in three columns, the third the repo
 
 The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
-The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, the running and parked counts, `📮` open/closed issues. The queued and waiting counts are on their headings, not here.
+The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, the running and parked counts, `📮` open/closed issues. The queued and waiting counts are on their headings, not here, and so are a plan read in flight and a saved plan's age (the `⏳ queued` heading's right end).
 
 The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
@@ -168,6 +168,8 @@ A missing or broken file opens every section; an unknown section name is dropped
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
 
 The `⏳ queued` and `🔗 waiting` headings count their rows, an epic's children counted and its own line not, then the priorities among them: `⏳ queued 18 (🔺 2)`, `🔗 waiting 17 (🚨 1 🔺 9)`. A heading with no priority row draws its count alone, never `(🔺 0)`.
+
+The `⏳ queued` heading ends, open or folded, on `⏳ ⠋` while a plan read is in flight (a live terminal only) and `🕘 3′05″` the saved plan's age while the plan drawn is a saved one: `⏳ ⠋  🕘 3′05″` with both. Wargames draws them `HD` and `AG`. A board with no `⏳ queued` heading draws neither.
 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped; an unanswered probe leaves it running. A single frame that finds an idle lane waits out the window and reads again. A lane this run's record ended (`lane:close`) is stopped too.
 

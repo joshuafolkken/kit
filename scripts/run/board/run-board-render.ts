@@ -178,16 +178,18 @@ function waiting_section(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 }
 
 // The queued, waiting and done sections, the first two counting their priorities beside their rows
-// (joshuafolkken/kit#8511).
+// (joshuafolkken/kit#8511), the plan read in flight and the saved plan's age at the queued rule's end
+// (joshuafolkken/kit#8512).
 function below_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
 	const { header } = frame
 	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
 	const done = run_board_row_sections.done_rows(layout)
 	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
 	const waiting = waiting_section(layout, conditioned)
+	const queued_tally = tally_of(run_board_layout.queued_rows(layout))
 
 	return [
-		...keyed('queued', planned(header, queued), tally_of(run_board_layout.queued_rows(layout))),
+		...keyed('queued', planned(header, queued), queued_tally, run_board_header.queued_tail(header)),
 		...keyed('waiting', planned(header, waiting), tally_of(layout.unreached)),
 		...done_section(done, (row) => row_line(ROW_INDENT, row, { ...conditioned, section: 'done' })),
 	]

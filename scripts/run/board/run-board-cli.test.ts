@@ -271,7 +271,8 @@ describe('run_board_cli.run plan read', () => {
 
 		await expect(run_board_cli.run([], { ...ports, read_plan })).rejects.toBe(STOPPED)
 		expect(read_plan).toHaveBeenCalledOnce()
-		expect(frames[1]?.split('\n', 1)[0]).toMatch(SPINNING)
+		expect(frames[1]).toMatch(SPINNING)
+		expect(frames[1]?.split('\n', 1)[0]).not.toContain('⏳')
 	})
 
 	it('draws the plan in one plain frame, with no spinner', async () => {
@@ -281,7 +282,7 @@ describe('run_board_cli.run plan read', () => {
 
 		expect(frames).toHaveLength(1)
 		expect(frames[0]).toMatch(/✅ +\d+\/\d+/u)
-		expect(frames[0]?.split('\n', 1)[0]).not.toMatch(SPINNING)
+		expect(frames[0]).not.toMatch(SPINNING)
 	})
 })
 

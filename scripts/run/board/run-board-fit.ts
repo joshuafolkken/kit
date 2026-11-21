@@ -62,6 +62,8 @@ interface PlanSection extends Foldable {
 	key?: SectionKey | undefined
 	// The priorities among its rows after its count, ` (🔺 2)`, open or folded (joshuafolkken/kit#8511).
 	tally?: string | undefined
+	// Drawn at the right end of its rule, open or folded (joshuafolkken/kit#8512).
+	tail?: string | undefined
 }
 
 // The newest notes shown, and how many older ones are already past the section's limit.
@@ -204,8 +206,9 @@ function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<
 
 	const kept = kept_lines(section, cut)
 
-	// A section with every line cut goes; one drawn with none keeps its head (joshuafolkken/kit#7281).
-	if (kept.length === 0 && section.lines.length > 0) return []
+	// A section with every line cut goes; one drawn with none keeps its head (joshuafolkken/kit#7281),
+	// as does one with a tail, so the tail stays drawn (joshuafolkken/kit#8512).
+	if (kept.length === 0 && section.lines.length > 0 && section.tail === undefined) return []
 
 	return [...section.head, ...kept, ...fold_lines(section, cut)]
 }
@@ -213,7 +216,9 @@ function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<
 // Whether a section draws any of its rows, open or folded; a head kept with none draws no row, so the
 // plan's `more N` never reads as its hidden rows (joshuafolkken/kit#7281).
 function draws_row(section: PlanSection, cut: ReadonlySet<PlanLine>): boolean {
-	return section.lines.length > 0 && section_lines(section, cut).length > 0
+	if (section.lines.length === 0) return false
+
+	return section.is_folded === true || kept_lines(section, cut).length > 0
 }
 
 // The cut rows no folding section counts; a seat line is no row.
