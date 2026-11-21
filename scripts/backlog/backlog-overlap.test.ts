@@ -154,6 +154,36 @@ describe('backlog_overlap — a document under docs/', () => {
 	})
 })
 
+// joshuafolkken/kit#8495: the untracked scratch directory never reaches a lane's change.
+describe('backlog_overlap — the scratch directory', () => {
+	const SCRATCH = '- 一時検査は `.josh/tmp/scratch/` に置く'
+
+	it('holds no candidate back on the scratch directory a running lane declares', () => {
+		const selection = separate(
+			[
+				[FIRST, SCRATCH],
+				[RUNNING, SCRATCH],
+			],
+			busy(RUNNING),
+		)
+
+		expect(numbers(selection.offered)).toContain(FIRST)
+	})
+
+	it('still holds a candidate back on a code file both declare beside it', () => {
+		const body = `${SCRATCH} と \`${SHARED}\``
+		const selection = separate(
+			[
+				[FIRST, body],
+				[RUNNING, body],
+			],
+			busy(RUNNING),
+		)
+
+		expect(numbers(selection.withheld)).toStrictEqual([FIRST])
+	})
+})
+
 describe('backlog_overlap.separate', () => {
 	it('offers only the first of two candidates that name one file', () => {
 		const selection = separate([

@@ -3,6 +3,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { SoloSelection } from '#scripts/epic/epic-solo'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state, type LaneRecords } from '#scripts/lane/lane-state'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 
 // Which candidates may not run side by side because their bodies declare overlapping paths.
 // joshuafolkken/kit#3221 held back only a path both bodies named beside a move, split, rename or
@@ -13,7 +14,8 @@ import { lane_state, type LaneRecords } from '#scripts/lane/lane-state'
 // both, or a path inside the other's directory glob. A directory one segment deep (`scripts/`) is
 // too broad to count, and an issue reference (`owner/repo#N`) is not a path. A dotted token with no
 // `/` is a file only when its extension is one this repository keeps at the root — otherwise
-// `session_cite.issue` or `process.env` would claim a path and serialize unrelated lanes.
+// `session_cite.issue` or `process.env` would claim a path and serialize unrelated lanes. A document
+// under `docs/` and anything under the untracked scratch directory (`.josh/tmp/`) never count.
 const CODE_SPAN = /`([^`\s]+)`/gu
 const LINE_SUFFIX = /:\d+(?:[-:]\d+)?$/u
 const FILE_EXTENSION = /\.[a-z]\w*$/iu
@@ -120,8 +122,19 @@ function is_shared_document(path: string): boolean {
 	return path.startsWith(DOCS_DIRECTORY) && (path.endsWith(SEPARATOR) || path.endsWith(MARKDOWN))
 }
 
+// A path under the scratch directory (`.josh/tmp/scratch/`). Git ignores it, so no lane's change
+// carries it and two lanes naming it never conflict — yet the children of joshuafolkken/kit#8428
+// named it in one shared acceptance line and ran one at a time (joshuafolkken/kit#8495).
+function is_scratch(path: string): boolean {
+	return path.startsWith(`${JOSH_TMP_DIRECTORY}${SEPARATOR}`)
+}
+
+function is_excluded(path: string): boolean {
+	return is_shared_document(path) || is_scratch(path)
+}
+
 function overlaps(left: string, right: string): boolean {
-	if (is_shared_document(left) || is_shared_document(right)) return false
+	if (is_excluded(left) || is_excluded(right)) return false
 
 	return contains(left, right) || contains(right, left)
 }
