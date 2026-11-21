@@ -13,7 +13,8 @@ import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 const { EMOJI, SYMBOLS, TURN, textual } = run_board_theme_glyphs
 const BOARD = import.meta.dirname
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/gu
-const PRINTABLE_ASCII = /^[ -~]+$/u
+// Printable ASCII, or one box-drawing character as the rules and gauges the theme keeps (#8505).
+const TEXT_GLYPH = /^(?:[ -~]+|[\u{2500}-\u{257F}])$/u
 const ESCAPE = '\u{1B}'
 const RED = `${ESCAPE}[31m`
 const DEFAULT_FOREGROUND = `${ESCAPE}[39m`
@@ -23,14 +24,46 @@ const BOLD = `${ESCAPE}[1m`
 const INTENSITY_OFF = `${ESCAPE}[22m`
 // The tone of each text the Issue's table names; `▾` reads as `V` too, but is a disclosure mark.
 const TABLE: Readonly<Record<Tone, ReadonlyArray<string>>> = {
-	alert: ['P1', 'FL', 'ST', 'XX', '!!', 'XP', 'RL', 'BL', 'NO', 'HT', 'X'],
-	caution: ['P2', '??', 'JG', 'LO', 'LC', 'T+', '!', 'RT'],
-	human: ['DC', 'HU', 'Q?'],
-	done: ['OK', 'FN', 'MG', 'SH', 'GO', 'AC', '+', 'V'],
-	running: ['RN', 'IV', 'PL', 'BD', 'RV', 'CM', 'R2', 'RP'],
-	idle: ['ZZ', 'HD', 'PS', 'AD', 'OF', 'MU', 'WT', 'LK', 'NB'],
-	info: ['HB', 'MM', 'DK', 'CP', 'FT', 'BG', 'EP'],
+	alert: ['P1', 'FL', '[]', 'XX', '!!', 'XP', 'RL', '##', 'NO', 'HT', 'X'],
+	caution: ['P2', '??', 'JG', '[_', 'LC', 'T+', '!', '<<'],
+	human: [String.raw`\O`, 'HU', 'Q?'],
+	done: ['OK', '|>', 'MG', 'SH', '^^', 'AC', '+', 'V'],
+	running: ['>>', 'IV', 'PL', 'BD', 'RV', 'CM', 'R2', 'RP'],
+	idle: ['ZZ', '..', '||', '>|', 'OF', '<X', 'OO', '<-', '>=', '║'],
+	info: ['<3', 'MM', 'DK', 'CP', '**', 'BG', '[+', '->', '//', '<)', '__', '-|', '><', '1.', 'O-'],
 }
+// The icons #8505 draws as shapes, by the shape each takes.
+const SHAPES: ReadonlyArray<readonly [string, string]> = [
+	['🧊', '||'],
+	['🛑', '[]'],
+	['🔄', '>>'],
+	['⏩', '>|'],
+	['⏳', '..'],
+	['🎯', '->'],
+	['💓', '<3'],
+	['📂', '//'],
+	['🔊', '<)'],
+	['🔇', '<X'],
+	['✨', '**'],
+	['🔗', '<-'],
+	['💺', '__'],
+	['🏁', '|>'],
+	['🔚', '-|'],
+	['🤝', '><'],
+	['📥', String.raw`\/`],
+	['📤', '/\\'],
+	['⏸', '║'],
+	['📅', '>='],
+	['🙋', String.raw`\O`],
+	['📁', '[+'],
+	['🔭', 'OO'],
+	['🔁', '<<'],
+	['🚧', '##'],
+	['🪫', '[_'],
+	['📋', '1.'],
+	['🚀', '^^'],
+	['🔑', 'O-'],
+]
 const DISCLOSURE = '▾'
 const KANA = 'ｦｱｳｴｵｶｷｹｺｻ'
 const TEXTUAL = 'run_board_theme_glyphs.textual'
@@ -68,13 +101,18 @@ describe('run_board_theme_glyphs table', () => {
 	})
 
 	it.each([...EMOJI, ...SYMBOLS])(
-		'draws %s as ASCII of its width in a tone',
+		'draws %s as ASCII or a rule of its width in a tone, unchanged by capitals',
 		(glyph, [text, tone]) => {
-			expect(text).toMatch(PRINTABLE_ASCII)
+			expect(text).toMatch(TEXT_GLYPH)
+			expect(text.toUpperCase()).toBe(text)
 			expect(run_board_fit.width_of(text)).toBe(run_board_fit.width_of(glyph))
 			expect(run_board_theme_tones.TONES).toContain(tone)
 		},
 	)
+
+	it.each(SHAPES)('draws %s as the shape %s (#8505)', (glyph, shape) => {
+		expect(EMOJI.get(glyph)?.[0]).toBe(shape)
+	})
 
 	it.each(table_rows())('gives %s the %s tone', (text, tone) => {
 		const tones = tones_of(text)
@@ -93,6 +131,10 @@ describe(TEXTUAL, () => {
 		const emoji = '⚠\u{FE0F}'
 
 		expect(textual(`${emoji}|🚨\u{FE0F}|`)).toBe(`${'!'.padEnd(run_board_fit.width_of(emoji))}|P1|`)
+	})
+
+	it('draws the running, waiting and paused icons as shapes in their columns (#8505)', () => {
+		expect(textual('🔄|🔗|⏸|')).toBe('>>|<-|║|')
 	})
 
 	it('draws an emoji the table misses as `?` of its width', () => {
@@ -119,6 +161,13 @@ describe('run_board_theme_glyphs themed spinners', () => {
 		expect(turns.join('')).toBe(KANA)
 		expect(turns.map((glyph) => run_board_fit.width_of(glyph))).toStrictEqual(turns.map(() => 1))
 	})
+
+	it.each(['wargames', 'matrix'] as const)(
+		'draws a waiting run as `║` and a running one as `>>` on the %s board (#8505)',
+		(theme) => {
+			expect(run_board_theme.restyle(theme, '⏸ SITE 🔄 1')).toBe('║ SITE >> 1')
+		},
+	)
 
 	it('keeps spinner frames unchanged with no theme (ac-97dd53ee)', () => {
 		const frames = run_board_labels.SPINNER_FRAMES.join('')
@@ -164,10 +213,10 @@ describe('run_board_theme_glyphs.textual in color', () => {
 		const expected = [
 			run_board_theme_tones.toned('alert', 'FL'),
 			run_board_theme_tones.toned('done', 'OK'),
-			run_board_theme_tones.toned('human', 'DC'),
-			run_board_theme_tones.toned('running', 'RN'),
+			run_board_theme_tones.toned('human', String.raw`\O`),
+			run_board_theme_tones.toned('running', '>>'),
 			run_board_theme_tones.toned('idle', 'ZZ'),
-			'HB|',
+			'<3|',
 		]
 
 		expect(toned).toBe(expected.join(' '))
@@ -193,7 +242,7 @@ describe('run_board_theme_glyphs.textual in bold or dim', () => {
 	it('turns a dim or bold the line has on back on after a tone that ends it', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const line = `${DIM}🔄 a ${BOLD}💤${INTENSITY_OFF} 🔄`
-		const running = run_board_theme_tones.toned('running', 'RN')
+		const running = run_board_theme_tones.toned('running', '>>')
 
 		expect(textual(line)).toBe(
 			`${DIM}${running}${DIM} a ${BOLD}${run_board_theme_tones.toned('idle', 'ZZ')}${DIM}${BOLD}${INTENSITY_OFF} ${running}`,
