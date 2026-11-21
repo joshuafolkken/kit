@@ -5,6 +5,7 @@ import type { BoardHeader } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
+import { run_board_length } from './run-board-length'
 import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_time } from './run-board-render-time'
@@ -18,9 +19,10 @@ import { run_board_render_waits } from './run-board-render-waits'
 const { BUDGET_ICON, held_of, held_time } = run_board_render_waits
 const { phase_time } = run_board_render_tail
 const { state_icon } = run_board_render_icon
-const { net_of } = run_board_render_time
+const { net_ms_of } = run_board_render_time
 const { WAIT_ICONS } = run_board_labels
-// The widest span a time column draws: `1°14′58″`.
+const { fitted_span_of } = run_board_length
+// The widest span a time column draws with its seconds: `1°14′58″`; a longer one drops them (`17°03′`).
 const TIME_WIDTH = 8
 const LANE_INDENT = '  '
 // The progress column: an emoji two columns wide, or the spinner and a blank.
@@ -98,7 +100,8 @@ function whole_of(row: BoardRow, header: BoardHeader): string {
 
 	if (held !== undefined) return held_time(held, TIME_WIDTH)
 
-	const time = net_of(row, header.now_ms) ?? ''
+	const elapsed_ms = net_ms_of(row, header.now_ms)
+	const time = elapsed_ms === undefined ? '' : fitted_span_of(elapsed_ms, TIME_WIDTH, 'down')
 	const fresh = running_fresh(row, time, row.status?.started_ms, header)
 
 	return run_board_fresh.padded(time, TIME_WIDTH, fresh)
