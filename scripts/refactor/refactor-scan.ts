@@ -21,9 +21,15 @@ const CLEAR = 'clear'
 const CANDIDATES = 'candidates'
 const ERROR = 'error'
 
-interface ScanResult {
+// The scope line's facts: how many files seeded the walk, how many it reached, and the stage the scope
+// cap kept it from taking (`undefined` when every stage fit).
+interface ScopeCounts {
 	seed_count: number
 	scope_count: number
+	stopped_at: number | undefined
+}
+
+interface ScanResult extends ScopeCounts {
 	categories: ReadonlyArray<CategoryResult>
 	verdict: string
 	diagnostic?: string
@@ -41,8 +47,14 @@ function verdict_token(categories: ReadonlyArray<CategoryResult>): string {
 	return convergence_candidates(categories) === 0 ? CLEAR : CANDIDATES
 }
 
-function scope_line(seed_count: number, scope_count: number): string {
-	return `scope: ${String(scope_count)} files (seed ${String(seed_count)}, expanded via import graph, max ${String(import_graph.MAX_STAGES)} stages)`
+function scope_limit(stopped_at: number | undefined): string {
+	if (stopped_at === undefined) return `max ${String(import_graph.MAX_STAGES)} stages`
+
+	return `stopped before stage ${String(stopped_at)}: cap ${String(import_graph.MAX_SCOPE_FILES)} files`
+}
+
+function scope_line(counts: ScopeCounts): string {
+	return `scope: ${String(counts.scope_count)} files (seed ${String(counts.seed_count)}, expanded via import graph, ${scope_limit(counts.stopped_at)})`
 }
 
 function category_header(category: CategoryResult): string {
@@ -63,37 +75,36 @@ function verdict_line(categories: ReadonlyArray<CategoryResult>): string {
 	return total === 0 ? `verdict: ${CLEAR}` : `verdict: ${CANDIDATES} (${String(total)} high/medium)`
 }
 
-function render(
-	categories: ReadonlyArray<CategoryResult>,
-	seed_count: number,
-	scope_count: number,
-): string {
+function render(categories: ReadonlyArray<CategoryResult>, counts: ScopeCounts): string {
 	const blocks = categories.map((category) => category_block(category))
 
-	return [scope_line(seed_count, scope_count), ...blocks, verdict_line(categories)].join('\n')
+	return [scope_line(counts), ...blocks, verdict_line(categories)].join('\n')
 }
 
 // The failure report: the scope line and an `error` verdict, so a scan that could not run says so
 // rather than printing empty categories that would read as `clear`.
-function error_output(seed_count: number, scope_count: number, diagnostic?: string): string {
-	return [scope_line(seed_count, scope_count), diagnostic, `verdict: ${ERROR} (scan could not run)`]
+function error_output(counts: ScopeCounts, diagnostic?: string): string {
+	return [scope_line(counts), diagnostic, `verdict: ${ERROR} (scan could not run)`]
 		.filter(Boolean)
 		.join('\n')
 }
 
 function render_result(result: ScanResult): string {
-	if (result.verdict === ERROR) {
-		return error_output(result.seed_count, result.scope_count, result.diagnostic)
-	}
+	if (result.verdict === ERROR) return error_output(result, result.diagnostic)
 
-	return render(result.categories, result.seed_count, result.scope_count)
+	return render(result.categories, result)
 }
 
 async function scan(root: string): Promise<ScanResult> {
 	const seed = await refactor_targets.collect_targets(root)
 	const universe = await line_targets.lint_target_files(root)
-	const scope = [...import_graph.expand_scope(seed, universe, root)]
-	const counts = { seed_count: seed.length, scope_count: scope.length }
+	const expansion = import_graph.expand_scope(seed, universe, root)
+	const scope = [...expansion.files]
+	const counts = {
+		seed_count: seed.length,
+		scope_count: scope.length,
+		stopped_at: expansion.stopped_at,
+	}
 
 	try {
 		const categories = await refactor_lint.scan_categories(scope, root)
@@ -119,6 +130,7 @@ const refactor_scan = {
 	render,
 	render_result,
 	run_scan,
+	scope_line,
 	convergence_candidates,
 	verdict_line,
 	verdict_token,
@@ -127,5 +139,5 @@ const refactor_scan = {
 	ERROR,
 }
 
-export type { ScanResult }
+export type { ScanResult, ScopeCounts }
 export { refactor_scan }

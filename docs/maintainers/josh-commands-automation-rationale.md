@@ -56,6 +56,9 @@ the behavior.
 
 Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 describes, run as a command: it picks the target files (branch diff plus untracked, or `scripts/`; excluding `demo`, `src/routes/stories`, `/* @refactor-ignore */`), expands the scope along the import graph, asks the project's own eslint for the §4.2 categories, and answers `verdict: clear` / `verdict: candidates`. Completed scans exit zero; execution failures retain diagnostics, report `verdict: error` and exit non-zero.
 
+- **The scope stops before the first stage that would pass `MAX_SCOPE_FILES`** (500, `scripts/refactor/import-graph.ts`) and keeps every target file. The whole scope goes to one type-aware eslint process, and a widely imported file let three stages reach most of the repository (joshuafolkken/kit#8471).
+- Not a split run or fewer rules: splitting keeps the total CPU time; fewer rules break the count parity with the gate's eslint (`refactor-lint-parity.test.ts`).
+
 ## `josh format:edited` in detail
 
 - **Reports the problems `eslint --fix` could not fix** on the same `additionalContext`, lifted from the `--fix` pass's own stdout (no extra process) — file, `line:col` and rule name, so they are seen on the edit rather than deferred to the gate. What eslint fixed is applied silently; a file that runs prettier alone (`.md` / `.yml`) reports nothing. The block is cut to a bounded length and marked when a lint dump would be large. It never sets `permissionDecision`, so the edit is not turned into a failure.

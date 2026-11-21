@@ -52,7 +52,7 @@ The old lockfile's integrity is not carried over. Never disable checksums or rew
 
 This assumes every `@joshuafolkken` package in the lockfile is on npm. A project that depends on a package not on npm (`npm view <name> --registry https://registry.npmjs.org/` returns 404) cannot migrate with these steps either.
 
-1. Edit `packageManager` and `devEngines.packageManager` in `package.json` by hand to the same pnpm 12.17.0 pin as kit's `package.json`. Check that `pnpm --version` returns `12.17.0`.
+1. Edit `packageManager` and `devEngines.packageManager` in `package.json` by hand to the pnpm 12.17.0 pin `pnpm@12.17.0+sha512.b8d223ebec04b580a89ed206daa71d1bccb6a1ee1d52efa95cc3b0db75271561df8f0d8e2c43add39c5ec08018af7a8a95108e7090f95a29f88727b7a40fd53d` (in `devEngines.packageManager.version`, the part after `pnpm@`). Check that `pnpm --version` returns `12.17.0`.
 2. Point the project's `.npmrc` at npm and remove the GitHub Packages token line.
 
    ```sh

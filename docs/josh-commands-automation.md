@@ -44,7 +44,7 @@ pnpm josh refactor:scan
 
 <!-- /usage -->
 
-The candidates are those of `prompts/refactoring.md` §4.1–§4.3, as `verdict: clear` / `verdict: candidates`. Completed scans exit zero; execution failures print a diagnostic and `verdict: error`, then exit non-zero.
+Candidates follow `prompts/refactoring.md` §4.1–§4.3. The scope stops before a stage passing 500 files; the `scope:` line names it. Completed scans exit zero; execution failures print a diagnostic and `verdict: error`, then exit non-zero.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh refactor:scan` in detail".
 

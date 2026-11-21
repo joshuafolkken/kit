@@ -8,7 +8,9 @@ import { refactor_targets } from './refactor-targets'
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/lines/line-targets', () => ({ line_targets: { lint_target_files: vi.fn() } }))
-vi.mock('./import-graph', () => ({ import_graph: { expand_scope: vi.fn(), MAX_STAGES: 3 } }))
+vi.mock('./import-graph', () => ({
+	import_graph: { expand_scope: vi.fn(), MAX_SCOPE_FILES: 500, MAX_STAGES: 3 },
+}))
 vi.mock('./refactor-targets', () => ({ refactor_targets: { collect_targets: vi.fn() } }))
 vi.mock('./refactor-lint', () => ({ refactor_lint: { scan_categories: vi.fn(), LOW: 'low' } }))
 
@@ -20,7 +22,10 @@ beforeEach(() => {
 	vi.mocked(git_command.repository_root).mockResolvedValue('/repo')
 	vi.mocked(refactor_targets.collect_targets).mockResolvedValue(FILES)
 	vi.mocked(line_targets.lint_target_files).mockResolvedValue(FILES)
-	vi.mocked(import_graph.expand_scope).mockReturnValue(new Set(FILES))
+	vi.mocked(import_graph.expand_scope).mockReturnValue({
+		files: new Set(FILES),
+		stopped_at: undefined,
+	})
 	vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 })
 
@@ -56,6 +61,20 @@ describe('refactor scan exit status', () => {
 		expect(await refactor_scan.run_scan()).toBe(0)
 		expect(process.stdout.write).toHaveBeenCalledWith(
 			expect.stringContaining('verdict: candidates'),
+		)
+	})
+})
+
+describe('refactor scan scope line', () => {
+	it('reports the stage the scope cap stopped', async () => {
+		vi.mocked(import_graph.expand_scope).mockReturnValue({ files: new Set(FILES), stopped_at: 2 })
+		vi.mocked(refactor_lint.scan_categories).mockResolvedValue([])
+
+		expect(await refactor_scan.run_scan()).toBe(0)
+		expect(process.stdout.write).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'scope: 1 files (seed 1, expanded via import graph, stopped before stage 2: cap 500 files)',
+			),
 		)
 	})
 })

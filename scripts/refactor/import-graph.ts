@@ -22,8 +22,19 @@ const RELATIVE_PREFIX = '.'
 const CANDIDATE_SUFFIXES: ReadonlyArray<string> = ['', '.ts', '.js', '/index.ts', '/index.js']
 // §4.3: at most three stages, and a stage that adds nothing ends the walk early.
 const MAX_STAGES = 3
+// A hub file many modules import lets three stages reach most of the repository, and the scan lints
+// its whole scope in one type-aware eslint process; the cap keeps that process to the change's
+// neighborhood. The value and its measurement are recorded on #8471.
+const MAX_SCOPE_FILES = 500
 
 type FileGraph = ReadonlyMap<string, ReadonlySet<string>>
+
+// The expanded scope, and the stage that was not taken because it would pass `MAX_SCOPE_FILES`
+// (`undefined` when every stage fit).
+interface Expansion {
+	files: ReadonlySet<string>
+	stopped_at: number | undefined
+}
 
 function specifiers_of(source: string, pattern: RegExp): ReadonlyArray<string> {
 	const matches = [...source.matchAll(pattern)]
@@ -138,23 +149,32 @@ function next_frontier(
 	return [...found]
 }
 
-// The seed set plus every file reachable within `MAX_STAGES` import hops in either direction. A stage
-// that adds nothing leaves the next `next_frontier` empty, so the walk converges within the cap.
-function expand(
-	seed: ReadonlyArray<string>,
-	forward: FileGraph,
-	reverse: FileGraph,
-): ReadonlySet<string> {
+// A stage whose new files would push the scope past `MAX_SCOPE_FILES` is not taken. A stage that adds
+// nothing never counts, so seeds alone above the cap do not read as a stop.
+function over_cap(included: ReadonlySet<string>, frontier: ReadonlyArray<string>): boolean {
+	return frontier.length > 0 && included.size + frontier.length > MAX_SCOPE_FILES
+}
+
+function include_all(included: Set<string>, frontier: ReadonlyArray<string>): void {
+	for (const file of frontier) included.add(file)
+}
+
+// The seed set plus every file reachable within `MAX_STAGES` import hops in either direction, stopping
+// before the first stage that would pass `MAX_SCOPE_FILES`. Seeds are always kept. A stage that adds
+// nothing leaves the next `next_frontier` empty, so the walk converges within the stage cap.
+function expand(seed: ReadonlyArray<string>, forward: FileGraph, reverse: FileGraph): Expansion {
 	const included = new Set<string>(seed)
 	let frontier: ReadonlyArray<string> = seed
 
-	for (let stage = 0; stage < MAX_STAGES; stage++) {
+	for (let stage = 1; stage <= MAX_STAGES; stage++) {
 		frontier = next_frontier(frontier, { forward, reverse }, included)
 
-		for (const file of frontier) included.add(file)
+		if (over_cap(included, frontier)) return { files: included, stopped_at: stage }
+
+		include_all(included, frontier)
 	}
 
-	return included
+	return { files: included, stopped_at: undefined }
 }
 
 // Every file `entry` reaches through its own imports, `entry` included, with no stage cap — the whole
@@ -178,7 +198,7 @@ function expand_scope(
 	seed: ReadonlyArray<string>,
 	universe: ReadonlyArray<string>,
 	root: string,
-): ReadonlySet<string> {
+): Expansion {
 	const forward = build_forward(universe, root)
 
 	return expand(seed, forward, invert(forward))
@@ -192,8 +212,9 @@ const import_graph = {
 	parse_imports,
 	reachable,
 	resolve_spec,
+	MAX_SCOPE_FILES,
 	MAX_STAGES,
 }
 
-export type { FileGraph }
+export type { Expansion, FileGraph }
 export { import_graph }
