@@ -55,11 +55,21 @@ function after(ms: number, fire: () => void): () => void {
 	}
 }
 
+// The teletype trill's WAV path, the wargames theme's typing voice (joshuafolkken/kit#8365).
+function teletype_wav(): string | undefined {
+	return run_board_sound_wav.cached_wav(NAME, NOTES)
+}
+
 const DEFAULT_PORTS: TypingPorts = {
-	file: () => run_board_sound_wav.cached_wav(NAME, NOTES),
+	file: teletype_wav,
 	start: (file, handlers) => {
 		run_board_sound_player.loop(file, handlers)
 	},
+}
+
+// The default ports sounding another voice's WAV: a theme row's `typing` (joshuafolkken/kit#8365).
+function voiced(file: () => string | undefined): TypingPorts {
+	return { ...DEFAULT_PORTS, file }
 }
 
 // An ended loop stays silent, including a clean exit: restarting would reintroduce the gap.
@@ -152,7 +162,15 @@ function typing_sound(ports: TypingPorts = DEFAULT_PORTS): TypingSound {
 	}
 }
 
-const run_board_sound_typing = { NAME, NOTES, TELETYPE, TRILL_PAIRS, typing_sound }
+const run_board_sound_typing = {
+	NAME,
+	NOTES,
+	TELETYPE,
+	TRILL_PAIRS,
+	teletype_wav,
+	typing_sound,
+	voiced,
+}
 
 export { run_board_sound_typing }
 export type { TypingPorts, TypingSound }

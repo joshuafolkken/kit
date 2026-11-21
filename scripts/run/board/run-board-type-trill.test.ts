@@ -5,6 +5,7 @@ import type { CueName } from './run-board-sound-cues'
 import { run_board_sound_typing, type TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
 import type { BoardState } from './run-board-state'
+import type { Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
 import { run_board_type_rows } from './run-board-type-rows'
 
@@ -24,6 +25,8 @@ interface Heard {
 	trill: Array<boolean>
 	// A trill that sounds, in place of the one that only records its switches.
 	sound?: TypingSound
+	// The board's theme, none by default (joshuafolkken/kit#8365).
+	theme?: Theme
 }
 
 // The trill as the board sounds it, its player faked; the stop timer runs on vitest's fake timers.
@@ -82,7 +85,14 @@ function heard_over(
 		heard.cues.push(name)
 	}
 
-	const heard_ports = { ...ports, cue, typing_sound, types_rows: true, opened_ms: START }
+	const heard_ports = {
+		...ports,
+		cue,
+		typing_sound,
+		types_rows: true,
+		opened_ms: START,
+		theme: heard.theme,
+	}
 
 	return drawn_from(state, LOCAL, { ports: heard_ports, now_ms }, run_layout)
 }
@@ -162,6 +172,27 @@ describe('run_board_tick_draw.draw_display trill', () => {
 		const base = heard_over(saved, [], START, { cues: [], trill: [] })
 
 		heard_over({ ...base, fetched_ms: START + SECOND }, [], START + SECOND, heard)
+		expect(heard.trill).toStrictEqual([true])
+	})
+})
+
+// joshuafolkken/kit#8365: on the matrix board a new row decodes rather than types, and the key click
+// sounds through the decode as the teletype sounds through a typed row.
+describe('run_board_tick_draw.draw_display matrix trill', () => {
+	beforeEach(() => {
+		vi.stubEnv('FORCE_COLOR', '3')
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('switches the trill on as a row appears to decode (ac-57e6668c)', () => {
+		const heard: Heard = { cues: [], trill: [], theme: 'matrix' }
+		const base = heard_over(planned(), [], START, { cues: [], trill: [], theme: 'matrix' })
+		const appeared = heard_over(base, running(), START + SECOND, heard)
+
+		expect(appeared.typing.is_decoding).toBe(true)
 		expect(heard.trill).toStrictEqual([true])
 	})
 })

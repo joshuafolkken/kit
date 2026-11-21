@@ -188,6 +188,25 @@ describe('run_board_sound_typing.typing_sound default ports', () => {
 		expect(start).toHaveBeenCalledWith(WAV, expect.anything())
 		vi.restoreAllMocks()
 	})
+
+	// joshuafolkken/kit#8365: the wargames voice is the teletype WAV the trill always sounded.
+	it('voices the teletype as the same cached notes WAV (ac-0f2189dd)', () => {
+		const cached = vi.spyOn(run_board_sound_wav, 'cached_wav').mockReturnValue(WAV)
+
+		expect(run_board_sound_typing.teletype_wav()).toBe(WAV)
+		expect(cached).toHaveBeenCalledExactlyOnceWith(NAME, NOTES)
+		vi.restoreAllMocks()
+	})
+
+	it('plays another voice through the sound player, keeping the switch rules', () => {
+		const start = vi.spyOn(run_board_sound_player, 'loop').mockReturnValue(undefined)
+		const sound = typing_sound(run_board_sound_typing.voiced(() => 'click.wav'))
+
+		sound.set(true)
+		sound.set(true)
+		expect(start).toHaveBeenCalledExactlyOnceWith('click.wav', expect.anything())
+		vi.restoreAllMocks()
+	})
 })
 
 describe('run_board_sound_typing.typing_sound exited player', () => {

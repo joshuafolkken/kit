@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, readSync } from 'node:fs'
 import path from 'node:path'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { usage_state_path } from '#scripts/usage/usage-state-path'
@@ -11,6 +11,8 @@ import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 
 const SAMPLE_RATE = 44_100
 const HEADER_BYTES = 44
+// The fmt chunk's sample rate: after the RIFF tag, size, WAVE tag, fmt tag, chunk size, format and channels.
+const RATE_OFFSET = 24
 // The RIFF size counts the bytes after its own field: the header less the `RIFF` tag and the size.
 const RIFF_UNCOUNTED_BYTES = 8
 const FMT_CHUNK_BYTES = 16
@@ -97,31 +99,78 @@ function file_name_of(name: string, notes: ReadonlyArray<Note>): string {
 	return `${name}-${digest}.wav`
 }
 
-function written_wav(name: string, notes: ReadonlyArray<Note>, directory: string): string {
-	const target = path.join(directory, file_name_of(name, notes))
-
-	if (existsSync(target)) return target
-	const wav = wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE)
-
-	atomic_write.replace_file(target, wav)
-
-	return target
-}
-
-// The sound's WAV path, written on the first call only; `undefined` when synthesis or the write
-// fails, so a bad note or a failing disk silences the cue rather than taking the board down.
-function cached_wav(
-	name: string,
-	notes: ReadonlyArray<Note>,
-	directory = usage_state_path.sounds(),
+// The WAV at `file_name` in `directory`, rendered and written only when the file is not there yet;
+// `undefined` when rendering or the write fails, so a bad sound or a failing disk silences it rather
+// than taking the board down.
+function cached_file(
+	directory: string,
+	file_name: () => string,
+	render: () => Buffer,
 ): string | undefined {
 	try {
-		return written_wav(name, notes, directory)
+		const target = path.join(directory, file_name())
+
+		if (!existsSync(target)) atomic_write.replace_file(target, render())
+
+		return target
 	} catch {
 		return undefined
 	}
 }
 
-const run_board_sound_wav = { SAMPLE_RATE, HEADER_BYTES, cached_wav, wav_of }
+// The notes' WAV path, written on the first call only.
+function cached_wav(
+	name: string,
+	notes: ReadonlyArray<Note>,
+	directory = usage_state_path.sounds(),
+): string | undefined {
+	return cached_file(
+		directory,
+		() => file_name_of(name, notes),
+		() => wav_of(run_board_sound_synth.samples_of(notes, SAMPLE_RATE), SAMPLE_RATE),
+	)
+}
+
+// Rendered samples' WAV path at their own rate (joshuafolkken/kit#8365), named after the WAV's bytes:
+// the same samples reuse their file and different ones get another.
+function cached_samples(
+	name: string,
+	samples: Int16Array,
+	sample_rate: number,
+	directory = usage_state_path.sounds(),
+): string | undefined {
+	const wav = wav_of(samples, sample_rate)
+	const digest = createHash('sha256').update(wav).digest('hex').slice(0, DIGEST_LENGTH)
+
+	return cached_file(
+		directory,
+		() => `${name}-${digest}.wav`,
+		() => wav,
+	)
+}
+
+// The sample rate a WAV file's fmt chunk records, read from its header alone, so a raw-PCM player
+// plays each file at its own rate (joshuafolkken/kit#8365); throws when the file cannot be read.
+function rate_of(file: string): number {
+	const header = Buffer.alloc(HEADER_BYTES)
+	const descriptor = openSync(file, 'r')
+
+	try {
+		readSync(descriptor, header, 0, HEADER_BYTES, 0)
+	} finally {
+		closeSync(descriptor)
+	}
+
+	return header.readUInt32LE(RATE_OFFSET)
+}
+
+const run_board_sound_wav = {
+	SAMPLE_RATE,
+	HEADER_BYTES,
+	cached_samples,
+	cached_wav,
+	rate_of,
+	wav_of,
+}
 
 export { run_board_sound_wav }

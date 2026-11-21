@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
+import { run_board_sound_click } from './run-board-sound-click'
+import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme } from './run-board-theme'
 import {
 	run_board_theme_defs,
@@ -24,8 +26,15 @@ const OFF_LIVE: LiveDefinition = {
 	decode: false,
 	rain: false,
 }
-// joshuafolkken/kit#8356: the matrix board's new rows decode and its panel's cells run the idle rain.
-const MATRIX_LIVE: LiveDefinition = { ...OFF_LIVE, types_rows: true, decode: true, rain: true }
+// joshuafolkken/kit#8356: the matrix board's new rows decode and its panel's cells run the idle rain;
+// its typing sounds the key click (joshuafolkken/kit#8365).
+const MATRIX_LIVE: LiveDefinition = {
+	...OFF_LIVE,
+	types_rows: true,
+	trill: true,
+	decode: true,
+	rain: true,
+}
 const AMBER: ThemeDefinition = {
 	paint: { rgb: '255;176;0', named: 'yellow' },
 	rule: THEME_DEFS.wargames.rule,
@@ -35,6 +44,7 @@ const AMBER: ThemeDefinition = {
 	lamps: false,
 	spinner: '|',
 	live: OFF_LIVE,
+	typing: run_board_sound_typing.teletype_wav,
 }
 const WIDER = { ...THEME_DEFS, amber: AMBER }
 
@@ -86,7 +96,16 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			lamps: true,
 			spinner: '│╱─╲',
 			live: { ...OFF_LIVE, sweep: true, types_rows: true, trill: true, codes: true },
+			typing: run_board_sound_typing.teletype_wav,
 		})
+	})
+})
+
+// joshuafolkken/kit#8365: each row names the voice its typing loops.
+describe('run_board_theme_defs.THEME_DEFS typing', () => {
+	it('types wargames to the teletype trill and matrix to the key click', () => {
+		expect(THEME_DEFS.wargames.typing).toBe(run_board_sound_typing.teletype_wav)
+		expect(THEME_DEFS.matrix.typing).toBe(run_board_sound_click.typing_wav)
 	})
 })
 
@@ -113,6 +132,7 @@ describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 			lamps: true,
 			spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 			live: MATRIX_LIVE,
+			typing: run_board_sound_click.typing_wav,
 		})
 	})
 

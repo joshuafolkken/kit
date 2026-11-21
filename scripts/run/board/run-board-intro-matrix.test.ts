@@ -56,7 +56,7 @@ describe('run_board_intro.play matrix', () => {
 			bright('KNOCK, KNOCK, JOSH.'),
 		])
 		expect(written.at(-1)?.includes(CURSOR)).toBe(false)
-		expect(typing_sound.set).not.toHaveBeenCalled()
+		expect(typing_sound.set.mock.calls).toStrictEqual(LEADS.lines.flatMap(() => [[true], [false]]))
 	})
 
 	it('matrix preserves the approved opening timings and cursor', async () => {

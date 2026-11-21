@@ -1,6 +1,8 @@
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
+import { run_board_sound_click } from './run-board-sound-click'
+import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme_tones } from './run-board-theme-tones'
 
 // joshuafolkken/kit#8349: what each theme draws, one row per theme — a theme is added by adding its
@@ -57,6 +59,9 @@ interface ThemeDefinition {
 	// Glyphs spread over the board spinner's cycle, in order (joshuafolkken/kit#8366).
 	spinner: string
 	live: LiveDefinition
+	// The WAV a live board loops while letters type at `intro.letter_ms`, `undefined` when it cannot
+	// be written (joshuafolkken/kit#8365).
+	typing: (letter_ms: number) => string | undefined
 }
 
 const CYAN: Paint = { rgb: '62;236;225', named: 'cyan' }
@@ -82,6 +87,7 @@ const THEME_DEFS = {
 			decode: false,
 			rain: false,
 		},
+		typing: run_board_sound_typing.teletype_wav,
 	},
 	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening types three
 	// lines and shows the last at once (joshuafolkken/kit#8441); its new rows decode and the idle rain
@@ -107,12 +113,14 @@ const THEME_DEFS = {
 		live: {
 			sweep: false,
 			types_rows: true,
-			trill: false,
+			trill: true,
 			codes: false,
 			strip: false,
 			decode: true,
 			rain: true,
 		},
+		// A key click every two letters while the intro types and new rows decode (joshuafolkken/kit#8365).
+		typing: run_board_sound_click.typing_wav,
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 
