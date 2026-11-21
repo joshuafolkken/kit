@@ -39,11 +39,16 @@ interface VerdictFailure {
 
 type AnswerVerdict =
 	| VerdictFailure
+	| { kind: 'unavailable'; cause: string; retry: string }
 	| { kind: 'answered'; decision: string; decision_kind: DecisionKind; evidence: Array<Evidence> }
 	| { kind: 'unanswered'; reason: string }
 
 function failed(cause: string, retry: string = RETRY): VerdictFailure {
 	return { kind: 'failed', cause, retry }
+}
+
+function unavailable(cause: string): AnswerVerdict {
+	return { kind: 'unavailable', cause, retry: RETRY }
 }
 
 // A model may wrap its object in a fence or a sentence; the object is what lies between the braces.
@@ -116,7 +121,7 @@ function validate(raw: string, sources: ReadonlyArray<IssueSource>): AnswerVerdi
 	return answered(parsed, sources)
 }
 
-const answer_verdict = { RETRY, failed, validate }
+const answer_verdict = { RETRY, failed, unavailable, validate }
 
 export type { AnswerVerdict, DecisionKind, Evidence, VerdictFailure }
 export { answer_verdict }

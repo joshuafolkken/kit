@@ -29,6 +29,7 @@ const REUSE_REPLY = {
 	quotes: [{ source: COMMENT_ID, text: LATER }],
 }
 const COMPLETED: AttachedLaunchResult = { kind: 'completed', pid: 1, exit_code: 0 }
+const LIMITED_LOG = '{"type":"assistant","error":"rate_limit"}'
 const RULES = [
 	'期待結果',
 	'受け入れ条件',
@@ -149,6 +150,28 @@ describe('answer_judge launch', () => {
 		const verdict = await judged(reply_ports({ ...REUSE_REPLY, quotes }))
 
 		expect(verdict.kind).toBe('answered')
+	})
+})
+
+describe('answer_judge usage limits', () => {
+	it.each([
+		[{ kind: 'failed', note: 'launch refused' }, LIMITED_LOG],
+		[{ kind: 'completed', pid: 1, exit_code: 1 }, undefined],
+		[{ kind: 'completed', pid: 1, exit_code: 0 }, LIMITED_LOG],
+		[{ kind: 'completed', pid: 1, exit_code: 1 }, '{broken'],
+	] as const)('keeps fail-closed for %j', async (launch, log) => {
+		await expect(judged(ports_of(launch, log))).resolves.toMatchObject({ kind: 'failed' })
+	})
+
+	it.each([
+		{ type: 'assistant', error: 'rate_limit', message: { content: [] } },
+		{ type: 'rate_limit_event', rate_limit_info: { status: 'rejected' } },
+		{ type: 'error', error: { type: 'usage_limit_reached', message: 'Limit reached' } },
+		{ type: 'error', error: { status: 429, message: 'Too many requests' } },
+	])('reports unavailable for a non-zero usage-limit event %j (ac-2b06bc44)', async (event) => {
+		const ports = ports_of({ kind: 'completed', pid: 1, exit_code: 1 }, JSON.stringify(event))
+
+		await expect(judged(ports)).resolves.toMatchObject({ kind: 'unavailable' })
 	})
 })
 

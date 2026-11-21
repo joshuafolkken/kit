@@ -2,16 +2,19 @@ import { answer_judge } from '#scripts/agent/answer-judge'
 import type { AnswerVerdict, Evidence } from '#scripts/agent/answer-verdict'
 import { issue_sources, type SourcesRead } from '#scripts/issue/issue-sources'
 import { session_cite } from '#scripts/issue/session-cite'
+import { session_language } from '#scripts/josh/session-language'
 
 // **A park asks a person only what the Issue has not already decided** (joshuafolkken/kit#6531).
 // Before any write, `answer_judge` reads the question against the Issue's trusted sources: an answered
 // question is refused with the quotes that answer it, an unanswered one parks as before, and a read or
 // judgment that failed refuses too — a park is never written on a verdict nobody could read.
+// A confirmed usage limit alone permits parking: skipping the check can only ask a person twice.
 
 const FAILURE_EXIT_CODE = 1
 const NO_WRITE = 'Nothing was labelled, commented, recorded or released.'
 
 type Answered = Extract<AnswerVerdict, { kind: 'answered' }>
+type ParkCheck = { exit_code: number } | { note: string } | undefined
 
 function park_command(issue_number: string): string {
 	return `pnpm josh run:park ${issue_number} --body-file <path> --outcome "<next action>"`
@@ -57,22 +60,34 @@ function read_failure(
 	return failed(issue_number, `the Issue's sources could not be read (${read.kind}${hint})`, retry)
 }
 
-function outcome(issue_number: string, verdict: AnswerVerdict): number | undefined {
-	if (verdict.kind === 'unanswered') return undefined
-	if (verdict.kind === 'failed') return failed(issue_number, verdict.cause, verdict.retry)
+function unavailable_note(cause: string): string {
+	const { lang } = session_language.resolve_session_lang()
 
-	return answered(issue_number, verdict)
+	return session_language.is_japanese(lang)
+		? `使用量上限で判断プロセスが動かず、答え済みかの判断を省きました。理由: ${cause}`
+		: `The judgment hit a usage limit, so the existing-answer check was skipped. Cause: ${cause}`
 }
 
-// `undefined` lets the park go on; a number is the exit code of a park that stopped before any write.
+function outcome(issue_number: string, verdict: AnswerVerdict): ParkCheck {
+	if (verdict.kind === 'unanswered') return undefined
+	if (verdict.kind === 'unavailable') return { note: unavailable_note(verdict.cause) }
+
+	if (verdict.kind === 'failed') {
+		return { exit_code: failed(issue_number, verdict.cause, verdict.retry) }
+	}
+
+	return { exit_code: answered(issue_number, verdict) }
+}
+
+// A note annotates a permitted park; an exit code stops it before any write.
 async function refusal_of(
 	issue_number: string,
 	question: string,
 	directory: string,
-): Promise<number | undefined> {
+): Promise<ParkCheck> {
 	const read = await issue_sources.read_sources(issue_number)
 
-	if (read.kind !== 'sources') return read_failure(issue_number, read)
+	if (read.kind !== 'sources') return { exit_code: read_failure(issue_number, read) }
 
 	const verdict = await answer_judge.judge({ question, sources: read.sources, directory })
 
@@ -82,3 +97,4 @@ async function refusal_of(
 const run_park_answered = { refusal_of }
 
 export { run_park_answered }
+export type { ParkCheck }
