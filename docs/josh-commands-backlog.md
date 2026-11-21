@@ -748,7 +748,7 @@ It satisfies all four mechanical requirements by construction: `epic` label, tas
 
 `Execution` prints `pnpm josh backlogrun <E> --only`. A failed `blocked-by` write is reported as a count; the epic stays correct.
 
-Children that only touch the same file get no `--chain` or `--order-reason`: the path-overlap check handles them (`execution-waves.md` → "When a wave may be declared").
+Children that only touch the same file get no `--chain` or `--order-reason` (`execution-waves.md` → "When a wave may be declared"): `backlog:next` holds one whose declared path overlaps a running issue's (`scripts/backlog/backlog-overlap.ts`).
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
@@ -1037,7 +1037,7 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 
 The parent follows `--pass`'s stdout command; diagnostics go to stderr. Apply prints
 `triage #N — <label> · blocked by #M`; without `--clear`, the park stays. Touching the same file as
-`#M` is no `--blocked-by`: the path-overlap check handles it.
+`#M` is no `--blocked-by`: `backlog:next` holds it while `#M`'s declared path overlaps its own.
 
 `--blocked-by <M>` and `--done "filed #<M>"` share `run:pause`'s judgement (`prepared-prerequisite.ts`):
 a prepared (unpublished) `#M` with no recorded plan is refused before any write, exit 1, naming

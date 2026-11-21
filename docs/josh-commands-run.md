@@ -135,8 +135,8 @@ A split found mid-run in one call: the run set aside as `run:pause` sets it asid
 release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
 already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
 that epic audited with `epic:audit`. `--after <issue>` writes `<issue> -> <children…>`, the chain
-`--ordered` declares, so its `--order-reason` goes with it. Same-file children get no order: the
-path-overlap check handles them. The last line is `epic #<E>`. An epic listing that cannot tell
+`--ordered` declares, so its `--order-reason` goes with it. Same-file children get no order:
+`backlog:next` keeps overlapping paths apart. The last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
 `needs-decision`. Without `--title` and with no tracking epic, or with a `--chain` `epic` refuses
 (`--chain` beside `--ordered`, a malformed line, a number outside `<issue>` and the children, a cycle
