@@ -149,6 +149,38 @@ describe('run_board_sound_player.play fallbacks', () => {
 	})
 })
 
+// joshuafolkken/kit#8381: a spawn that throws as it starts never ends the board drawing it.
+function throwing(test: Harness): void {
+	test.spawner.mockImplementation(() => {
+		throw new Error('spawn EMFILE')
+	})
+}
+
+describe('run_board_sound_player.play a spawn that throws', () => {
+	it('rings the bell rather than throwing', () => {
+		const test = harness()
+
+		throwing(test)
+
+		expect(() => {
+			run_board_sound_player.play(WAV, 'darwin', test.ports)
+		}).not.toThrow()
+		expect(test.write).toHaveBeenCalledExactlyOnceWith(run_board_sound_player.BEL)
+	})
+
+	it('moves on to the next Linux candidate, as a failed start does', () => {
+		const test = harness()
+
+		test.spawner.mockImplementationOnce(() => {
+			throw new Error('spawn EAGAIN')
+		})
+		run_board_sound_player.play(WAV, 'linux', test.ports)
+
+		expect(test.spawner).toHaveBeenLastCalledWith('pw-play', [WAV], DETACHED)
+		expect(test.write).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_board_sound_player.play default ports', () => {
 	it('rings the bell on the terminal', () => {
 		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)

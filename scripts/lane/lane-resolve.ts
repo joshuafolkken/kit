@@ -4,6 +4,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { main_merge } from '#scripts/git/main-merge'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
+import { lane_registered_branch } from './lane-registered-branch'
 import { lane_resolve_hunks } from './lane-resolve-hunks'
 
 // `josh lane:resolve <issue>` — the merge-conflict path of `backlogrun-recovery.md` as one verdict
@@ -17,7 +18,6 @@ const OVERLAP_CONDITION = 2
 const REPEAT_CONDITION = 3
 const HEAD = 'HEAD'
 const MERGE_HEAD = 'MERGE_HEAD'
-const LANE_BRANCH_SUFFIX = '-lane'
 
 type ResolveOutcome =
 	| { kind: 'resolved' }
@@ -81,7 +81,7 @@ async function judge_merge(): Promise<ResolveOutcome> {
 // another checkout is refused rather than judged against one issue and merged into another.
 async function wrong_branch(issue: string): Promise<ResolveOutcome | undefined> {
 	const branch = await git_command.branch()
-	const expected = `${issue}${LANE_BRANCH_SUFFIX}`
+	const expected = await lane_registered_branch.read(issue)
 
 	if (branch === expected) return undefined
 
@@ -116,7 +116,7 @@ function verdict_line(outcome: Exclude<ResolveOutcome, { kind: 'refused' }>): st
 	return [...words, ...outcome.files].join(' ')
 }
 
-const lane_resolve = { RESOLUTION_HEADING, LANE_BRANCH_SUFFIX, resolve, verdict_line, wrong_branch }
+const lane_resolve = { RESOLUTION_HEADING, resolve, verdict_line, wrong_branch }
 
 export { lane_resolve }
 export type { ResolveOutcome }

@@ -54,7 +54,7 @@ const TRANSITIONS: Record<LaneState, ReadonlyArray<LaneState>> = {
 }
 
 // One command's change: the state it leaves the lane in, and whether it launched a child — a launch
-// stamps the launch time and the run that launched it, which every other change keeps.
+// stamps the launch time and its run; a resume transfers ownership to the current run.
 interface LaneChange {
 	issue: string
 	state: LaneState
@@ -101,7 +101,15 @@ function current_run(directory: string): LaneRun | undefined {
 function launch_fields(change: LaneChange, directory: string, now: Date): Partial<LaneStateRecord> {
 	if (change.is_launch !== true) return {}
 
-	return { run: current_run(directory), launched_at: now.toISOString() }
+	// A relaunch makes the lane wholly this run's own, so a hand-over it was adopted through ends here.
+	return { run: current_run(directory), launched_at: now.toISOString(), adopted_at: undefined }
+}
+
+function resume_fields(change: LaneChange, directory: string): Partial<LaneStateRecord> {
+	if (change.command !== 'lane:resume') return {}
+	const run = current_run(directory)
+
+	return run === undefined ? {} : { run }
 }
 
 function next_record(
@@ -125,6 +133,7 @@ function next_record(
 		changed_at: now.toISOString(),
 		changed_by: change.command,
 		...launch_fields(change, directory, now),
+		...resume_fields(change, directory),
 	}
 }
 
@@ -279,6 +288,37 @@ async function record_adopted(
 	return await settled(async () => await adopted_outcome(change, options))
 }
 
+function transfer_held(issue: string, directory: string, now: Date): RecordOutcome {
+	const previous = read_record(directory, issue)
+	const run = current_run(directory)
+
+	if (previous === undefined || run === undefined) {
+		return { kind: 'skipped', reason: 'no record or run' }
+	}
+
+	const record = { ...previous, run, adopted_at: now.toISOString() }
+
+	write_record(directory, record)
+
+	return { kind: 'written', record }
+}
+
+/**
+ * Hand the lane's record to the current run, leaving its state as it is: a run that adopts a lane its
+ * ended owner left behind counts it as its own (joshuafolkken/kit#8455).
+ */
+async function record_transfer(issue: string, options: StateOptions = {}): Promise<RecordOutcome> {
+	return await settled(async () => {
+		const directory = await resolve_directory(options.directory)
+
+		if (directory === undefined) return NO_DIRECTORY
+
+		const now = options.now ?? new Date()
+
+		return locked(directory, issue, () => transfer_held(issue, directory, now))
+	})
+}
+
 /** Each of `issues`' records, by issue; an issue with none is left out. */
 async function read_states(
 	issues: ReadonlyArray<string>,
@@ -320,6 +360,7 @@ const lane_state = {
 	record_adopted,
 	record_change,
 	record_stuck,
+	record_transfer,
 	recorded_issues,
 	state_path,
 }

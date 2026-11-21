@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #8429 adds existing pull-request head resolution and safe lane adoption; the shared resolver preserves the existing PR without duplicating branch selection logic.",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 85
+	}
+}

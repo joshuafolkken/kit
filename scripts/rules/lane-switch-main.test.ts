@@ -1,10 +1,11 @@
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_switch_main } from './lane-switch-main'
 
@@ -134,6 +135,21 @@ describe('is_switch_away_from_lane', () => {
 	})
 })
 
+function slug_head_delivery(): void {
+	vi.spyOn(git_spawn_sync, 'read').withImplementation(
+		() => `${ISSUE}-legacy-implementation`,
+		() => {
+			expect(
+				delivered_rules.delivery(
+					payload_of('lane-slug', `git switch ${ISSUE}-legacy-implementation`),
+					NOW_MS,
+				),
+			).toBeUndefined()
+			expect(delivered_rules.delivery(payload_of('slug-main', SWITCH_MAIN), NOW_MS)).toBe(REASON)
+		},
+	)
+}
+
 describe('delivered_rules.delivery — inside a lane checkout', () => {
 	const ORIGINAL_DIRECTORY = process.cwd()
 
@@ -168,6 +184,8 @@ describe('delivered_rules.delivery — inside a lane checkout', () => {
 	it(OWN_BRANCH_TITLE, () => {
 		expect(delivered_rules.delivery(payload_of('lane-own', SWITCH_OWN), NOW_MS)).toBeUndefined()
 	})
+
+	it('allows returning to the adopted slug head (ac-8429)', slug_head_delivery)
 
 	it('is claimed by exactly one rule in the enumeration', () => {
 		expect(rules_claiming(SWITCH_MAIN)).toBe(1)

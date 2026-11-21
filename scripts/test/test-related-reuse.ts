@@ -103,8 +103,7 @@ async function compare(
 	const verdict = await since_green.read_verdict(
 		review_stamps.test_related_stamp,
 		gate_labels.UNIT_LABEL,
-		undefined,
-		tree,
+		{ tree },
 	)
 	if ('fallback' in verdict) return empty(`${GREEN_MISS}${verdict.fallback}`)
 
@@ -180,7 +179,7 @@ async function still_passing(
 	tree: GateTree,
 	stamp: FileMapStampAccess,
 ): Promise<ReadonlyArray<string>> {
-	const parts = await since_green.read_moved_parts(stamp, gate_labels.UNIT_LABEL, undefined, tree)
+	const parts = await since_green.read_moved_parts(stamp, gate_labels.UNIT_LABEL, { tree })
 	if (!carries_over(parts)) return []
 
 	return await unchanged(root, stamp.read()?.blobs ?? {})

@@ -7,6 +7,7 @@ import type { BoardHeader } from './run-board-header'
 import { run_board_header_time } from './run-board-header-time'
 import { run_board_labels, type TextColor } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
+import { run_board_length } from './run-board-length'
 import { run_board_now, type TimedLine } from './run-board-now'
 import type { Phase } from './run-board-phase'
 import { run_board_render_checks } from './run-board-render-checks'
@@ -22,6 +23,7 @@ import { run_board_render_waits } from './run-board-render-waits'
 
 const { PHASE_ICONS, span_of } = run_board_labels
 const { is_live } = run_board_earlier
+const { fitted_span_of } = run_board_length
 const { check_of, held_of } = run_board_render_waits
 // A phase past twice its usual time is drawn as long, past three times as alarming.
 const LONG_FACTOR = 2
@@ -95,7 +97,7 @@ function phase_time(row: BoardRow, header: BoardHeader, width: number): string {
 	if (current === undefined || end === undefined) return ' '.repeat(width)
 
 	const elapsed = run_board_estimate.phase_spent(row.status, end) ?? 0
-	const text = span_of(elapsed).padStart(width)
+	const text = fitted_span_of(elapsed, width, 'down').padStart(width)
 
 	return tinted(text, phase_color(elapsed, header.usual?.get(current.phase)))
 }

@@ -125,6 +125,8 @@ interface BoardData extends GatherRead {
 	attempted_ms: number | undefined
 	fetched_ms: number | undefined
 	failed_ms: number | undefined
+	// Why the last plan read failed, while it does (joshuafolkken/kit#8475).
+	plan_error?: string | undefined
 	// The run's children read closed, kept for the run: a closed issue's answer does not change.
 	closed: ReadonlyMap<number, ClosedIssue>
 	closed_fetch: Fetch<ClosedAnswer> | undefined

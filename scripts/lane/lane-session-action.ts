@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { agent_argv } from '#scripts/agent/agent-argv'
+import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import type { AgentProvider } from '#scripts/agent/agent-provider'
 import { api_auth } from '#scripts/agent/api-auth'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { core_priority } from '#scripts/gate/core-priority'
 import { distributed_paths } from '#scripts/init/distributed-paths'
 import { outer_command } from '#scripts/josh/outer-command'
@@ -11,6 +12,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_pair_session, type LaunchEnvironment } from '#scripts/review/review-pair-session'
+import { review_prompt_level, type RetryTrigger } from '#scripts/review/review-prompt-level'
 import { detached_launch, type AttachedLaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
@@ -48,7 +50,8 @@ const stop_schema = z
 	})
 	.strict()
 // `slots` is omitted for `/code-review` alone, so a supervisor still on the code before it reads the
-// request as before; it names the reviews a ship runs side by side (joshuafolkken/kit#4672).
+// request as before; it names the reviews a ship runs side by side (joshuafolkken/kit#4672). `retry`
+// is likewise sent only for a rerun, whose prompt names it (joshuafolkken/kit#8379).
 const slots_schema = z.array(z.enum(review_attest.REVIEW_SLOTS)).readonly()
 const action_schema = z.discriminatedUnion('kind', [
 	z
@@ -56,6 +59,7 @@ const action_schema = z.discriminatedUnion('kind', [
 			kind: z.literal('review'),
 			round: z.enum(['1', '2']),
 			slots: slots_schema.exactOptional(),
+			retry: z.enum(review_prompt_level.RETRY).exactOptional(),
 		})
 		.strict(),
 	z.object({ kind: z.literal('relaunch'), stop: stop_schema }).strict(),
@@ -69,6 +73,7 @@ interface ReviewAction {
 	kind: 'review'
 	round: ReviewRound
 	slots?: ReadonlyArray<ReviewSlot>
+	retry?: RetryTrigger
 }
 
 type BrokerAction = ReviewAction | { kind: 'relaunch'; stop: ShipStop }
@@ -128,7 +133,9 @@ function has_submit(directory: string): boolean {
 function review_prompt(lane: LaneInfo, action: ReviewAction, slot: ReviewSlot): string {
 	const { brief, findings } = review_paths(lane.directory, slot)
 	const round_prompt =
-		action.round === '1' ? run_ship_review.reviewer_prompt : run_ship_review.verification_prompt
+		action.round === '1'
+			? run_ship_review.round_one_prompt(action.retry)
+			: run_ship_review.verification_prompt
 	const prompt_of = run_ship_review.slot_prompt(round_prompt, slot, action_slots(action))
 	const tail = lane_child_invocation.review_invocation(lane.issue)
 	const findings_path = has_submit(lane.directory) ? undefined : findings
@@ -164,14 +171,20 @@ function reviewer_environment(lane: LaneInfo): LaunchEnvironment {
 	}
 }
 
+function reviewer_argv(lane: LaneInfo, action: ReviewAction, slot: ReviewSlot): AgentArgvResult {
+	const prompt = review_prompt(lane, action, slot)
+	const environment = backlogrun_launch.chosen_environment(provider_of(lane))
+
+	return agent_argv.review_in(prompt, Number(action.round), lane.directory, environment)
+}
+
 async function launch_review(
 	lane: LaneInfo,
 	action: ReviewAction,
 	slot: ReviewSlot,
 ): Promise<BrokerAnswer> {
 	const target = review_paths(lane.directory, slot)
-	const prompt = review_prompt(lane, action, slot)
-	const built = agent_argv.review_in(prompt, Number(action.round), lane.directory)
+	const built = reviewer_argv(lane, action, slot)
 	if (built.kind === 'rejected') return failure(`the reviewer profile was rejected: ${built.note}`)
 
 	if (built.profile.provider !== provider_of(lane)) {
@@ -247,6 +260,7 @@ async function answer(lane: LaneInfo, action: BrokerAction): Promise<BrokerAnswe
 }
 
 const lane_session_action = {
+	BRIEF_PREFIX,
 	SUCCESS,
 	action_schema,
 	answer,

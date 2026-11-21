@@ -26,7 +26,7 @@ function is_reusable(stamp: FileMapStampAccess, tree: GateTree): boolean {
 // The tree read before the stage ran, so an edit made during it is never blessed.
 function complete(stamp: FileMapStampAccess, tree: GateTree, code: number): void {
 	if (code !== 0) return
-	stamp.write(tree.files, undefined, tree.base)
+	stamp.write(tree.files, { base: tree.base })
 	stamp.complete()
 }
 

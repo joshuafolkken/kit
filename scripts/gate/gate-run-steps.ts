@@ -208,6 +208,11 @@ async function run_lightest_first(
 	return finished.toSorted((left, right) => left.index - right.index).map(({ result }) => result)
 }
 
+interface RunOptions {
+	budget?: BudgetContext | undefined
+	reused?: ReusedChecks | undefined
+}
+
 // `bounded_pool` rather than a bare `Promise.all`, so the plan's `concurrency` is what decides how
 // many run at once. **The all-failures-in-one-pass property survives the
 // change** because no check ever rejects: `buffered_process` reports a non-zero exit as a value, so
@@ -217,8 +222,7 @@ async function run_lightest_first(
 // place in the machine-wide budget and waits while the budget is full.
 async function run_gate_steps(
 	plan: GatePlan,
-	budget: BudgetContext = default_budget(),
-	reused: ReusedChecks = new Map(),
+	{ budget = default_budget(), reused = new Map() }: RunOptions = {},
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(plan, budget.available_cores, reused)
 	const cpu = check_cpu.check_cpu_reader()

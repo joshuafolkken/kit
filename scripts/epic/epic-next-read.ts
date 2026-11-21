@@ -98,7 +98,10 @@ async function read_one(
 ): Promise<ReadOutcome> {
 	const epic_repo = epic_repo_of(reference, current_repo)
 	if (epic_repo === undefined) return { refusal: FOREIGN_EPIC }
-	const snapshot = await epic_fetch.fetch_epic(reference.number, epic_repo, current_repo, source)
+	const snapshot = await epic_fetch.fetch_epic(reference.number, epic_repo, {
+		current_repo,
+		source,
+	})
 
 	if (is_childless(snapshot)) return { notice: childless(reference) }
 

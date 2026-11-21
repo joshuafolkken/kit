@@ -3,6 +3,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { main_merge_guard } from '#scripts/git/main-merge-guard'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { lane_registry } from '#scripts/lane/lane-registry'
 
 // The set-aside on the run's own lane branch: a WIP commit there instead of a stash
 // (joshuafolkken/kit#5930). The branch carries the work — conflicts already resolved included — so the
@@ -19,7 +20,12 @@ const CLEAN_VERDICT = 'clean'
 const ALREADY = 'already'
 
 async function is_lane(issue: string): Promise<boolean> {
-	return (await git_command.branch()) === lane_paths.lane_branch(issue)
+	const branch = await git_command.branch()
+	if (branch === lane_paths.lane_branch(issue)) return true
+
+	const lane = lane_registry.find_lane(await lane_registry.list_lanes(), issue)
+
+	return lane?.branch === branch
 }
 
 function message_of(stash_message: string): string {

@@ -142,6 +142,21 @@ describe('run_board_every.recorder', () => {
 	})
 })
 
+// joshuafolkken/kit#8335: the worker keeps a round's inputs as the last record's only when it was.
+describe('run_board_every.recorder’s answer', () => {
+	it('answers whether it recorded', () => {
+		const { ports } = harness(LOCAL, PLANS)
+		const record = run_board_every.recorder(
+			{ ...ports, frames: run_board_frame_store.memory_store() },
+			undefined,
+		)
+
+		expect(record({ ...FRESH_STATE, local: LOCAL })).toBe(false)
+		expect(record({ ...FRESH_STATE, local: LOCAL, fetched_ms: START })).toBe(true)
+		expect(record({ ...FRESH_STATE, local: LOCAL, fetched_ms: START })).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#8124: the frames are written off the redraw, which never waits on the disk.
 describe('run_board_every.recorder on the file store', () => {
 	const root = `/run-board-every-test-${randomUUID()}`

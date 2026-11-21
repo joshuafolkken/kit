@@ -226,10 +226,12 @@ const HELD: HoldRead = {
 	kind: 'held',
 	hold: { issue: '2962', taken_at: '2026-10-03T00:00:00.000Z', pid: process.pid },
 }
+// A held stop on `HELD`, not handed off, whose notify sends, over an empty transcript tail.
+const HELD_CASE = { is_handed_off: false, is_send_failing: false, tail: '', read: HELD }
 
 // A quiet world on a tree held as `read`, whose transcript tail reads `tail`. The session is `en`
 // and not headless, so the English decision reply passes the language rule whatever launched the suite.
-function held_world(is_handed_off: boolean, tail: string, read: HoldRead): void {
+function held_world({ is_handed_off, tail, read }: typeof HELD_CASE): void {
 	quiet_world()
 	process.env[LANG_KEY] = 'en'
 	vi.stubEnv(agent_headless.KEY, undefined)
@@ -241,18 +243,14 @@ function held_world(is_handed_off: boolean, tail: string, read: HoldRead): void 
 	vi.spyOn(git_gh_repo, 'repo_get_name_with_owner').mockResolvedValue('joshuafolkken/kit')
 }
 
-// The stdout writes of one stop decision on a tree held as `read`, with the ship hand-off reading
-// `is_handed_off` and the hook's own notify sending, or failing when `is_send_failing`, over the
-// transcript `tail`. The reply names a decision, so a held stop of this session's own is announced.
-async function decide_held(
-	is_handed_off: boolean,
-	is_send_failing = false,
-	tail = '',
-	read: HoldRead = HELD,
-): Promise<string> {
-	held_world(is_handed_off, tail, read)
+// The stdout writes of one stop decision on `HELD_CASE` with `options` laid over it. The reply names
+// a decision, so a held stop of this session's own is announced.
+async function decide_held(options: Partial<typeof HELD_CASE> = {}): Promise<string> {
+	const held = { ...HELD_CASE, ...options }
+
+	held_world(held)
 	const send = vi.spyOn(telegram_test, 'send_values')
-	if (is_send_failing) send.mockRejectedValue(new Error('telegram down'))
+	if (held.is_send_failing) send.mockRejectedValue(new Error('telegram down'))
 	else send.mockResolvedValue(undefined)
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 	const message = stop_rules_fixture.DECISION_MESSAGE
@@ -267,12 +265,12 @@ async function decide_held(
 // joshuafolkken/kit#2962: the hand-off reading reaches the stop rule, so a handed-off lane stops quietly.
 describe('write_stop_decision — the ship hand-off is wired', () => {
 	it('lets a held lane handed to the detached ship stop without a notify', async () => {
-		expect(await decide_held(true)).toBe('')
+		expect(await decide_held({ is_handed_off: true })).toBe('')
 	})
 
 	// joshuafolkken/kit#3919: the hook sends it itself and lets the stop through.
 	it('sends the notify itself on a held tree that was not handed off', async () => {
-		const written: unknown = JSON.parse(await decide_held(false))
+		const written: unknown = JSON.parse(await decide_held())
 
 		const [values] = vi.mocked(telegram_test.send_values).mock.calls[0] ?? []
 
@@ -281,7 +279,7 @@ describe('write_stop_decision — the ship hand-off is wired', () => {
 	})
 
 	it('falls back to demanding the notify when the send fails', async () => {
-		expect(await decide_held(false, true)).toContain('mid-workflow stop notification')
+		expect(await decide_held({ is_send_failing: true })).toContain('mid-workflow stop notification')
 	})
 
 	// joshuafolkken/kit#7749: the notice is enqueued, then the turn ends before it is delivered (#7703).
@@ -295,7 +293,7 @@ describe('write_stop_decision — the ship hand-off is wired', () => {
 			content,
 		})
 
-		expect(await decide_held(false, false, enqueue)).toBe('')
+		expect(await decide_held({ tail: enqueue })).toBe('')
 		expect(telegram_test.send_values).not.toHaveBeenCalled()
 	})
 })
@@ -322,20 +320,20 @@ const QUOTED_MARKER_LINE = [
 // so the record reads absent while the hold stands — the cut is read off the turn instead.
 describe('write_stop_decision — a relaunched cut whose record the successor already cleared', () => {
 	it('sends no notify and demands none when this turn relaunched the successor', async () => {
-		const written = await decide_held(false, false, [PROMPT_LINE, RELAUNCHED_CUT_LINE].join('\n'))
+		const written = await decide_held({ tail: [PROMPT_LINE, RELAUNCHED_CUT_LINE].join('\n') })
 
 		expect(written).toBe('')
 		expect(telegram_test.send_values).not.toHaveBeenCalled()
 	})
 
 	it('still notifies when the relaunched cut belongs to an earlier turn', async () => {
-		await decide_held(false, false, [RELAUNCHED_CUT_LINE, PROMPT_LINE].join('\n'))
+		await decide_held({ tail: [RELAUNCHED_CUT_LINE, PROMPT_LINE].join('\n') })
 
 		expect(telegram_test.send_values).toHaveBeenCalledOnce()
 	})
 
 	it('still notifies when this turn only printed the marker outside a run:cut call', async () => {
-		await decide_held(false, false, [PROMPT_LINE, QUOTED_MARKER_LINE].join('\n'))
+		await decide_held({ tail: [PROMPT_LINE, QUOTED_MARKER_LINE].join('\n') })
 
 		expect(telegram_test.send_values).toHaveBeenCalledOnce()
 	})
@@ -352,7 +350,7 @@ describe('write_stop_decision — only this session’s unannounced pause is sen
 		const release = vi.spyOn(run_hold_cli, 'run').mockResolvedValue(0)
 		const foreign: HoldRead = { kind: 'held', hold: { ...HELD.hold, owner_pid: 1 } }
 
-		const written = await decide_held(false, false, PROMPT_LINE, foreign)
+		const written = await decide_held({ tail: PROMPT_LINE, read: foreign })
 
 		expect(written).toBe('')
 		expect(telegram_test.send_values).not.toHaveBeenCalled()
@@ -365,7 +363,7 @@ describe('write_stop_decision — only this session’s unannounced pause is sen
 			hold: { ...HELD.hold, notified_at: '2099-01-01T00:00:00.000Z' },
 		}
 
-		await decide_held(false, false, PROMPT_LINE, notified)
+		await decide_held({ tail: PROMPT_LINE, read: notified })
 
 		expect(telegram_test.send_values).not.toHaveBeenCalled()
 	})

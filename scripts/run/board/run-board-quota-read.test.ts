@@ -94,13 +94,25 @@ describe('run_board_quota_read.claude_reading', () => {
 		expect(claude_reading(claude_line(0.07))?.windows[0]?.used_percent).toBe(7)
 	})
 
+	it('ignores rejected events without windows and retains the preceding reading', () => {
+		const rejected = JSON.stringify({
+			type: 'rate_limit_event',
+			rate_limit_info: { status: 'rejected' },
+		})
+
+		expect(claude_reading(rejected)).toBeUndefined()
+		expect(claude_reading(`${claude_line(0.42)}\n${rejected}`)?.windows[0]?.used_percent).toBe(42)
+	})
+
 	it('reads a window the event leaves out as none, and a broken or cut line as no event', () => {
 		expect(claude_reading(claude_line(0.5))?.windows).toHaveLength(1)
 		expect(
 			claude_reading(`${claude_line(0.5).slice(10)}\n{"type":"rate_limit_event"`),
 		).toBeUndefined()
 	})
+})
 
+describe('run_board_quota_read.claude_reading time', () => {
 	it('keeps the timestamp of the last usage event across unrelated later lines', () => {
 		const text = [
 			claude_line(0.1, undefined, EARLIER),

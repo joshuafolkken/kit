@@ -23,6 +23,46 @@ function gather_of(plans: Array<BoardPlan | undefined>, pace: Pace): Gather {
 	return { ports: harness(LOCAL, plans).ports, local: LOCAL, now_ms: START, pace }
 }
 
+// joshuafolkken/kit#8475: the reason a plan read failed is kept for the notice slot and the findings.
+describe('run_board_github.gather_github over a failed plan read', () => {
+	const REASON = 'gh: not logged in'
+
+	it('keeps why a rejected plan read failed', async () => {
+		const gather = gather_of([], 'settled')
+		const read_plan = vi.fn(async () => {
+			throw new Error(`${REASON}\n  at`)
+		})
+		const state = await gather_github(FRESH_STATE, {
+			...gather,
+			ports: { ...gather.ports, read_plan },
+		})
+
+		expect(state.plan_error).toBe(REASON)
+	})
+
+	it('keeps the first failure’s time over repeated failed plan reads', async () => {
+		const first_ms = START - 1
+		const gather = gather_of([], 'settled')
+		const read_plan = vi.fn(async () => {
+			throw new Error(REASON)
+		})
+		const failed: BoardState = { ...FRESH_STATE, failed_ms: first_ms }
+		const state = await gather_github(failed, {
+			...gather,
+			ports: { ...gather.ports, read_plan },
+		})
+
+		expect(state.failed_ms).toBe(first_ms)
+	})
+
+	it('clears the kept reason once a plan read lands', async () => {
+		const failed: BoardState = { ...FRESH_STATE, plan_error: REASON }
+		const state = await gather_github(failed, gather_of([plan_titled('a')], 'settled'))
+
+		expect(state.plan_error).toBeUndefined()
+	})
+})
+
 describe('run_board_github.gather_github', () => {
 	it('waits for the plan and folds it in at the settled pace', async () => {
 		const state = await gather_github(FRESH_STATE, gather_of([plan_titled('a')], 'settled'))

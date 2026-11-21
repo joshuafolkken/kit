@@ -166,7 +166,7 @@ async function outcome_of(
 ): Promise<ReuseOutcome> {
 	const cited = session_cite.issue(issue)
 
-	if (verdict.kind === 'failed') {
+	if (verdict.kind === 'failed' || verdict.kind === 'unavailable') {
 		const note = `Reuse check: the judgment on ${cited} failed (${verdict.cause}). ${verdict.retry}`
 
 		return { kind: 'failed', note }

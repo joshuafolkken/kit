@@ -3,6 +3,7 @@ import { core_priority } from '#scripts/gate/core-priority'
 import { deferred_answer } from '#scripts/git/deferred-answer-fixture'
 import { outer_command } from '#scripts/josh/outer-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
@@ -82,6 +83,19 @@ describe('lane_session_action.answer — a review round', () => {
 		expect(error).toHaveBeenCalledWith(
 			'review round 2 · provider=anthropic role=reviewer model=opus effort=high',
 		)
+	})
+
+	// joshuafolkken/kit#8379: a brokered rerun names its cause, not the first run's word.
+	it('launches round 1 under the retry the request carries', async () => {
+		const { STALE } = review_prompt_level.RETRY
+		const action = { kind: 'review', round: '1', retry: STALE } as const
+
+		expect(lane_session_action.action_schema.safeParse(action).success).toBe(true)
+		await lane_session_action.answer(LANE, action)
+
+		const prompt = String(argv_mock.mock.calls[0]?.[0])
+
+		expect(review_prompt_level.trigger_of(prompt)).toBe(STALE)
 	})
 })
 

@@ -1,4 +1,5 @@
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pretool_outcome } from './pretool-guard'
 
@@ -39,6 +40,12 @@ const GUARDS = {
 
 const READ_GUARDS = ['batch', 'investigation', 'duplicate-read', 'large-read']
 const ALL_GUARDS = Object.keys(GUARDS)
+const TRANSCRIPT_GUARDS = [
+	batch_outcome,
+	investigation_outcome,
+	duplicate_read_outcome,
+	large_read_outcome,
+]
 
 beforeEach(() => {
 	vi.mocked(implementation_authority.reason).mockReturnValue(undefined)
@@ -65,6 +72,19 @@ function asked_guards(tool_name: string, raw_payload = payload(tool_name)): Read
 		.filter(([, guard]) => guard.mock.calls.length > 0)
 		.map(([name]) => name)
 }
+
+describe('pretool_outcome — transcript guard options', () => {
+	it('forwards the call context in options to every transcript guard', () => {
+		const context = hook_context_fixture.of('/call-context', {})
+		const raw_payload = payload('Read')
+
+		pretool_outcome(raw_payload, context)
+
+		for (const guard of TRANSCRIPT_GUARDS) {
+			expect(guard).toHaveBeenCalledExactlyOnceWith(raw_payload, { context })
+		}
+	})
+})
 
 describe('pretool_outcome — the guards a tool call reaches', () => {
 	it.each(['Read', 'Glob', 'Grep'])('asks only the read guards on %s', (tool_name) => {

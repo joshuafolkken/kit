@@ -1,3 +1,4 @@
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { review_round } from '#scripts/review/review-round'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -57,6 +58,7 @@ vi.mock('#scripts/review/review-reviewed-tree', () => ({
 }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
+const { run_ship_review_checkpoint } = await import('./run-ship-review-checkpoint')
 
 // joshuafolkken/kit#4620: a round 1 recorded before the ship is reused while the tree holds still, and
 // each round 1 the ship acts on leaves its verdict in the lane ledger.
@@ -183,6 +185,46 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
 		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('blocking'))
 		expect(mark_stopped_mock).toHaveBeenCalledWith(Number(ISSUE), true)
+	})
+})
+
+// joshuafolkken/kit#8379: the rerun of a stale issue says so on its launch prompt.
+describe('run_ship_review_steps.review_stage — the launch trigger of round 1', () => {
+	it.each([
+		[true, review_prompt_level.RETRY.STALE],
+		[false, 'initial'],
+	])('names the launch trigger when stale is %s', async (is_stale, trigger) => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+
+		await run_ship_review_steps.review_stage(ISSUE, is_stale)
+
+		const [prompt] = review_in_mock.mock.calls[0] as [string]
+
+		expect(review_prompt_level.trigger_of(prompt)).toBe(trigger)
+	})
+})
+
+// joshuafolkken/kit#8492: a provider the checkpoint reruns on a missing or mismatched attestation says
+// so on its launch prompt; one it runs with no retry keeps the first launch's trigger.
+describe('run_ship_review_steps.review_stage — an attestation rerun of round 1', () => {
+	it.each([
+		[review_prompt_level.RETRY.ATTEST, review_prompt_level.RETRY.ATTEST],
+		[undefined, 'initial'],
+	])('names the launch trigger when the checkpoint passes %s', async (retry, trigger) => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		vi.spyOn(run_ship_review_checkpoint, 'run').mockImplementationOnce(
+			async (_issue, _stage, phases) => {
+				const [, provider] = phases.find(([name]) => name === 'provider') ?? []
+
+				return (await provider?.(retry)) ?? { code: FAILED, out: 'no provider step' }
+			},
+		)
+
+		await run_ship_review_steps.review_stage(ISSUE, false)
+
+		const [prompt] = review_in_mock.mock.calls[0] as [string]
+
+		expect(review_prompt_level.trigger_of(prompt)).toBe(trigger)
 	})
 })
 

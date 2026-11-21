@@ -1139,6 +1139,8 @@ pnpm josh backlog:drive [--max <n>] [--idle <minutes>] [--only]
 
 An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags. A `run` that owes a judgment opens its lanes first, then hands `triage` back in the same pass.
 
+The next run resumes carried, paused `in-progress` lanes through `lane:resume` when their owning run has ended or its owner process has died. This restores `running` state and records the resume in the lane ledger and the board's event stream. Pauses with live or unknown owners, parked lanes and lanes held for human review stay paused.
+
 A drained `stop` that owes the retrospective starts one retrospective unit, a headless model child, and waits for it to exit; the board's now line reads `🔍 retrospective` meanwhile. The unit closes under the driver's `--owner`.
 
 A record the unit marked done lets the `stop` end the run; an unmarked record, at any exit code, hands `retrospective` back.

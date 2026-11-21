@@ -1,6 +1,6 @@
 import { ci_timing, type TimingAnswer } from '#scripts/ci/ci-timing'
 import type { JobTiming, TimingRow } from '#scripts/ci/ci-timing-table'
-import { lane_paths } from './lane-paths'
+import { lane_registered_branch } from './lane-registered-branch'
 
 // `josh lane:why`'s followup CI cell (joshuafolkken/kit#6124): the longest job of the lane's CI runs
 // and that job's longest step, read through `ci_timing.timing_of` — blank when the timing is
@@ -39,7 +39,7 @@ function cell(answer: TimingAnswer | undefined): string {
 // The lane branch's timing, `undefined` when `ci:timing` cannot read it.
 async function read(issue: number): Promise<TimingAnswer | undefined> {
 	try {
-		return await ci_timing.timing_of(lane_paths.lane_branch(String(issue)))
+		return await ci_timing.timing_of(await lane_registered_branch.read(String(issue)))
 	} catch {
 		return undefined
 	}

@@ -45,7 +45,7 @@ async function fetch_with(
 	vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue(listing)
 	const bodies = vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(listing)
 	const relations = vi.spyOn(git_gh_command, 'issue_get_state_and_relations')
-	const backlog = await epic_bundle_cli.fetch_backlog(REPO, new Map(), undefined, options)
+	const backlog = await epic_bundle_cli.fetch_backlog(REPO, new Map(), options)
 
 	return { backlog, relations, bodies }
 }
@@ -93,6 +93,32 @@ describe('epic_bundle_cli.fetch_backlog — relations from the listing', () => {
 		const { bodies } = await fetch_with([{ number: SUBJECT }], { include_relations: false })
 
 		expect(bodies).toHaveBeenCalledOnce()
+	})
+})
+
+describe('epic_bundle_cli.fetch_backlog — epic membership options', () => {
+	it.each([
+		['omitted', undefined],
+		['empty', {}],
+	])('reads relations with %s options', async (_, options) => {
+		const { bodies } = await fetch_with([{ number: SUBJECT }], options)
+
+		expect(bodies).not.toHaveBeenCalled()
+	})
+
+	it.each([
+		['omitted', undefined, true, false],
+		['empty', {}, true, false],
+		['explicit empty set', { epic_numbers: new Set<number>() }, false, false],
+		['explicit unpopulated epic', { epic_numbers: new Set([OTHER_EPIC]) }, false, true],
+	])('keeps %s membership (ac-c8da7f16)', async (_, options, is_epic, is_other_epic) => {
+		vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue(
+			listing_of([listing_row({ number: EPIC }), listing_row({ number: OTHER_EPIC })]),
+		)
+		const backlog = await epic_bundle_cli.fetch_backlog(REPO, new Map([[RELATED, EPIC]]), options)
+
+		expect(backlog.issues[0]?.is_epic).toBe(is_epic)
+		expect(backlog.issues[1]?.is_epic).toBe(is_other_epic)
 	})
 })
 

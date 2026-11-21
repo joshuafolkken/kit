@@ -14,7 +14,7 @@ pnpm josh refactor:scan
 ```
 
 - 対象ファイル: 作業ツリーの変更＋main との差分＋未追跡ファイル。いずれも無ければ `scripts/` 配下。`demo`・`src/routes/stories`・先頭に `/* @refactor-ignore */` を持つファイルは除外。
-- スコープ拡張: import グラフを双方向に最大3段階たどり、新規0件で止める。拡張後の集合を印字する。
+- スコープ拡張: import グラフを双方向に最大3段階たどり、新規0件で止める。足すと 500 ファイルを超える段は採らず、その前の段で止める（対象ファイルは必ず残す）。拡張後の集合と、上限で止めた段を範囲行に印字する。
 - **候補の集計**: eslint の件数と file:line — <!-- lint: refactor-scan-rules -->lines & complexity（`max-lines` / `max-lines-per-function` / `complexity` / `sonarjs/cognitive-complexity`）、type safety（`@typescript-eslint/no-explicit-any`）、namespace-object export（`local/namespace-object-export`）、duplicate code（`sonarjs/no-identical-functions`）、duplicate string（`sonarjs/no-duplicate-string`）、magic number（`@typescript-eslint/no-magic-numbers`）、variable naming（`@typescript-eslint/naming-convention`）、unused code（低優先度: `@typescript-eslint/no-unused-vars`）<!-- /lint -->。件数は `pnpm josh gate` の eslint と同一。
 - inline config: gate と同じ設定を使い、外部形式のキーなどに付けた有効な例外は候補に数えない。抑制されていない規約違反は引き続き報告する。
 - 収束判定: 高・中優先度の候補が0件なら `verdict: clear`、残れば `verdict: candidates`。低優先度は報告のみで数えない。

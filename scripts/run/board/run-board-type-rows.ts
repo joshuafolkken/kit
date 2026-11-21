@@ -30,25 +30,36 @@ interface KeyedLine {
 	prefix_columns: number
 }
 
+// joshuafolkken/kit#8457: a row typing over the saved frame's line of its key carries that line, drawn
+// as it was right of the block until the row is typed through.
 interface TypingLine extends KeyedLine {
 	start_ms: number
+	under?: string | undefined
 }
 
-// The keys the last frame's layout held — none before the base frame — the rows typing, and the moment
-// the last row typed through was done, kept across the redraws that drop it (joshuafolkken/kit#8375).
+// The keys the last frame's layout held — none before the base frame — the rows typing, the moment the
+// last row typed through was done, kept across the redraws that drop it (joshuafolkken/kit#8375), and
+// the saved frame's faint lines by key while the plan drawn is a saved one (joshuafolkken/kit#8457).
 interface Typing {
 	seen: ReadonlySet<string> | undefined
 	lines: ReadonlyArray<TypingLine>
 	done_ms?: number | undefined
+	saved?: ReadonlyMap<string, string> | undefined
 }
 
-// A frame's keyed rows that can type and the key of every row its layout holds.
+// A frame's keyed rows that can type, the key of every row its layout holds and, while the plan drawn
+// is a saved one, the keys it draws faint.
 interface TypingFrame {
 	keyed: ReadonlyArray<KeyedLine>
 	known: ReadonlySet<string>
+	faint?: ReadonlySet<string> | undefined
 }
 
+// Where a row starts typing and the saved line it types over, if any.
+type TypingStart = Pick<TypingLine, 'start_ms' | 'under'>
+
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
+const NO_SAVED: ReadonlyMap<string, string> = new Map()
 
 // The columns drawn by `now_ms`: the prefix, then one typed the moment a row starts and one more every
 // letter's pause.
@@ -76,6 +87,14 @@ function done_ms(typing: Typing): number | undefined {
 	return Number.isFinite(latest) ? latest : undefined
 }
 
+// The saved line right of the block while the row types over one; nothing once typed through, so the
+// part past a shorter live row goes with it.
+function under_of(line: TypingLine, now_ms: number): string {
+	if (line.under === undefined || is_typed(line, now_ms)) return ''
+
+	return run_board_cut_styled.tail_styled(line.under, columns_at(line, now_ms) + 1)
+}
+
 // The row as typed by `now_ms`, its colors kept and its spinners at their frame of that moment; whole,
 // without the block, once typed through.
 function shown(line: TypingLine, now_ms: number): string {
@@ -84,28 +103,59 @@ function shown(line: TypingLine, now_ms: number): string {
 		: run_board_cut_styled.cut_styled(line.text, columns_at(line, now_ms))
 
 	return run_board_spot.drawn(
-		run_board_typing.typed(line.text, part),
+		`${run_board_typing.typed(line.text, part)}${under_of(line, now_ms)}`,
 		run_board_labels.spinner_of(now_ms),
 	)
 }
 
-// The row as it types on this frame: from now for a key the last frame's layout did not hold, else from
-// where it started; none for a row not typing or typed through.
+// Where the row starts on this frame: now over its saved line on the frame the live plan lands on, now
+// for a key the last frame's layout did not hold, else where it started; none for a row not typing.
+function start_of(
+	line: KeyedLine,
+	last: Typing,
+	landing: ReadonlyMap<string, string>,
+	now_ms: number,
+): TypingStart | undefined {
+	const under = landing.get(line.key)
+
+	if (under !== undefined) return { start_ms: now_ms, under }
+	if (last.seen?.has(line.key) !== true) return { start_ms: now_ms }
+
+	const typed = last.lines.find((typing) => typing.key === line.key)
+
+	return typed === undefined ? undefined : { start_ms: typed.start_ms, under: typed.under }
+}
+
+// The row as it types on this frame; none for a row not typing or typed through.
 function typing_of(
 	line: KeyedLine,
-	seen: ReadonlySet<string>,
-	typing: ReadonlyArray<TypingLine>,
+	last: Typing,
+	landing: ReadonlyMap<string, string>,
 	now_ms: number,
 ): TypingLine | undefined {
-	const start_ms = seen.has(line.key)
-		? typing.find((typed) => typed.key === line.key)?.start_ms
-		: now_ms
+	const start = start_of(line, last, landing, now_ms)
 
-	if (start_ms === undefined) return undefined
+	if (start === undefined) return undefined
 
-	const typed = { ...line, start_ms }
+	const typed = { ...line, ...start }
 
 	return is_typed(typed, now_ms) ? undefined : typed
+}
+
+// The faint lines of a frame drawn from a saved plan, by key; none on a live frame.
+function saved_of(frame: TypingFrame): ReadonlyMap<string, string> | undefined {
+	const { faint } = frame
+
+	if (faint === undefined) return undefined
+
+	return new Map(
+		frame.keyed.filter((line) => faint.has(line.key)).map((line) => [line.key, line.text]),
+	)
+}
+
+// The first live frame after a saved one types every faint line over its saved text at once.
+function landing_of(typing: Typing, frame: TypingFrame): ReadonlyMap<string, string> {
+	return frame.faint === undefined ? (typing.saved ?? NO_SAVED) : NO_SAVED
 }
 
 // The rows typing on this frame; the first frame where typing is on is the base and types none, and
@@ -114,15 +164,16 @@ function typing_of(
 function next(typing: Typing, frame: TypingFrame, now_ms: number, is_on: boolean): Typing {
 	if (!is_on) return NO_TYPING
 
-	const last = typing.seen
+	const saved = saved_of(frame)
 
-	if (last === undefined) return { seen: frame.known, lines: [] }
+	if (typing.seen === undefined) return { seen: frame.known, lines: [], saved }
 
+	const landing = landing_of(typing, frame)
 	const lines = frame.keyed
-		.map((line) => typing_of(line, last, typing.lines, now_ms))
+		.map((line) => typing_of(line, typing, landing, now_ms))
 		.filter((line) => line !== undefined)
 
-	return { seen: frame.known, lines, done_ms: done_ms(typing) }
+	return { seen: frame.known, lines, done_ms: done_ms(typing), saved }
 }
 
 // The frame's lines, each typing row as typed by `now_ms`.

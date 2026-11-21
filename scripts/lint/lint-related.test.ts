@@ -341,8 +341,7 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 		expect(since_green.read_verdict).toHaveBeenCalledWith(
 			review_stamps.lint_related_stamp,
 			gate_labels.LINT_LABEL,
-			undefined,
-			BEFORE_TREE,
+			{ tree: BEFORE_TREE },
 		)
 		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
 		expect(eslint_arguments()).not.toContain(other_source)

@@ -43,6 +43,30 @@ beforeEach(() => {
 })
 beforeEach(lane_seat_fixture.mock_stop)
 
+describe('run_merge_steps — usage-limit park', () => {
+	it('does not count a usage-limit park with a sent confirmation as failure', async () => {
+		const confirmation = JSON.stringify({
+			type: 'item.completed',
+			item: {
+				type: 'command_execution',
+				command: 'pnpm josh notify --task-type confirmation --body-file .josh/tmp/question.md',
+				exit_code: 0,
+			},
+		})
+
+		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(
+			`${run_merge_decision_fixture.transcript('Park recorded; usage limit skipped the judgment.')}\n${confirmation}`,
+		)
+		const apply = vi.spyOn(run_carry, 'apply_change')
+
+		expect(await run_merge_steps.do_failed(CONTEXT)).toMatchObject({
+			is_parked: true,
+			cause: NEEDS_DECISION,
+		})
+		expect(apply).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_merge_steps — questions park as decisions', () => {
 	it.each(run_merge_decision_fixture.MESSAGES)(
 		'does not count failure (ac-449e2c86): %s',

@@ -1,0 +1,7 @@
+{
+	"reason": "任意の位置引数を第3引数のoptionsへまとめ、backlogの既定集合とfetch_epic呼び出しを分割代入で保つ計画内の純増3コード行。epic-fetch.tsの物理行数は2行減。",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

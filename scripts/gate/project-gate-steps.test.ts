@@ -59,13 +59,29 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('run_project_steps — default options', () => {
+	it('defaults omitted options to the current project directory', async () => {
+		const directory = project_root(steps_manifest([GODOT]))
+
+		vi.spyOn(process, 'cwd').mockReturnValue(directory)
+		const ran = stub_runs()
+
+		await project_gate_steps.run_project_steps()
+		await project_gate_steps.run_project_steps({})
+
+		expect(ran.map((step) => step.cwd)).toStrictEqual([directory, directory])
+	})
+})
+
 describe('run_project_steps — declared steps', () => {
 	it('runs nothing when the manifest declares no steps, or there is no manifest', async () => {
 		const ran = stub_runs()
 		const lane_only = project_root({ josh: { lane: { setup: 'x' } } })
 
-		expect(await project_gate_steps.run_project_steps(project_root())).toStrictEqual([])
-		expect(await project_gate_steps.run_project_steps(lane_only)).toStrictEqual([])
+		expect(await project_gate_steps.run_project_steps({ directory: project_root() })).toStrictEqual(
+			[],
+		)
+		expect(await project_gate_steps.run_project_steps({ directory: lane_only })).toStrictEqual([])
 		expect(ran).toStrictEqual([])
 	})
 
@@ -73,7 +89,7 @@ describe('run_project_steps — declared steps', () => {
 		const directory = project_root(steps_manifest([CARGO, GODOT]))
 		const ran = stub_runs()
 
-		const results = await project_gate_steps.run_project_steps(directory)
+		const results = await project_gate_steps.run_project_steps({ directory })
 
 		expect(ran).toStrictEqual([
 			{ label: CARGO.name, command_args: [...SHELL_ARGUMENTS, CARGO.command], cwd: directory },
@@ -89,7 +105,7 @@ describe('run_project_steps — declared steps', () => {
 		stub_runs([CARGO.name])
 		const directory = project_root(steps_manifest([CARGO, GODOT]))
 
-		const results = await project_gate_steps.run_project_steps(directory)
+		const results = await project_gate_steps.run_project_steps({ directory })
 
 		expect(outcomes(results)).toStrictEqual([
 			[CARGO.name, FAIL_EXIT_CODE],
@@ -111,7 +127,9 @@ describe('run_project_steps — invalid definitions', () => {
 	])('rejects %s as one failed definition result, running nothing', async (_case, steps, named) => {
 		const ran = stub_runs()
 
-		const results = await project_gate_steps.run_project_steps(project_root(steps_manifest(steps)))
+		const results = await project_gate_steps.run_project_steps({
+			directory: project_root(steps_manifest(steps)),
+		})
 
 		expect(ran).toStrictEqual([])
 		expect(outcomes(results)).toStrictEqual([[DEFINITION_LABEL, FAIL_EXIT_CODE]])
@@ -128,10 +146,10 @@ describe('run_project_steps — reuse', () => {
 		vi.spyOn(project_step_reuse, 'reusable_steps').mockResolvedValue(new Map([[CARGO.name, at]]))
 		const record = vi.spyOn(project_step_reuse, 'record_green_steps').mockResolvedValue()
 
-		const results = await project_gate_steps.run_project_steps(
-			project_root(steps_manifest([CARGO, GODOT])),
+		const results = await project_gate_steps.run_project_steps({
+			directory: project_root(steps_manifest([CARGO, GODOT])),
 			reuse,
-		)
+		})
 
 		expect(ran.map((step) => step.label)).toStrictEqual([GODOT.name])
 		expect(results.map((result) => result.reused_at)).toStrictEqual([at, undefined])

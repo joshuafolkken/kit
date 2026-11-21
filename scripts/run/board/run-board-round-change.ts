@@ -56,7 +56,26 @@ function is_unchanged(
 	return last.minute === next.minute && is_same_data(last.data, next.data)
 }
 
-const run_board_round_change = { inputs_of, is_unchanged }
+// Recorded frames include the samples the live board draws on its own thread.
+function samples_of(
+	data: BoardData,
+): Pick<BoardData, 'gauges' | 'usages' | 'quotas' | 'budget_waits'> {
+	const { gauges, usages, quotas, budget_waits } = data
+
+	return { gauges, usages, quotas, budget_waits }
+}
+
+function is_record_unchanged(
+	last: RoundInputs | undefined,
+	next: RoundInputs,
+	board: BoardState,
+): boolean {
+	if (last === undefined || !is_unchanged(last, next, board)) return false
+
+	return isDeepStrictEqual(samples_of(last.data), samples_of(next.data))
+}
+
+const run_board_round_change = { inputs_of, is_record_unchanged, is_unchanged }
 
 export { run_board_round_change }
 export type { RoundInputs }
