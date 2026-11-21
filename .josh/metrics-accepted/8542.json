@@ -1,0 +1,8 @@
+{
+	"reason": "New josh ship prepared-children precondition (#8542): its module, the origin field on the publication record, and its maintainer rationale paragraph",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 102,
+		"prose.long_paragraphs": 1
+	}
+}

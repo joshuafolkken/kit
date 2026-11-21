@@ -20,6 +20,7 @@ import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_planned } from './run-ship-planned'
 import { run_ship_preflight_reuse, type PreflightKey } from './run-ship-preflight-reuse'
+import { run_ship_prepared_children } from './run-ship-prepared-children'
 import { run_ship_scoped } from './run-ship-scoped'
 
 // `josh ship`'s first stage. The commit stage (`git -y`'s preflight) and the merge (`followup`'s
@@ -47,6 +48,7 @@ const PRECONDITION = {
 	LOCK: 'lock',
 	SCOPED: 'scoped',
 	UNPLANNED: run_ship_planned.PRECONDITION,
+	PREPARED_CHILDREN: run_ship_prepared_children.PRECONDITION,
 	UNREADABLE: 'unreadable',
 } as const
 // The kinds `asked_problems` asks; `unreadable` is a failed read, not a precondition asked.
@@ -57,6 +59,7 @@ const ASKED_KINDS = [
 	PRECONDITION.REMOVED_TESTS,
 	PRECONDITION.LOCK,
 	PRECONDITION.UNPLANNED,
+	PRECONDITION.PREPARED_CHILDREN,
 ]
 const DEFERRED: PreflightResult = {
 	code: SUCCESS_EXIT_CODE,
@@ -174,6 +177,10 @@ async function planned_problems(): Promise<Array<Unmet>> {
 	return of_kind(PRECONDITION.UNPLANNED, await run_ship_planned.problems())
 }
 
+async function prepared_children_problems(): Promise<Array<Unmet>> {
+	return of_kind(PRECONDITION.PREPARED_CHILDREN, await run_ship_prepared_children.problems())
+}
+
 type TreeParts = [Array<Unmet>, Array<Unmet>, Array<Unmet>, Array<Unmet>]
 
 // The judgments read off the Issue, the body and the tree alone — the git preflight with its
@@ -193,15 +200,17 @@ async function tree_parts(
 }
 
 // The lock file is asked here too, so a drift stops the ship before the gate
-// rather than being rewritten by the pre-push hook's install under the push.
+// rather than being rewritten by the pre-push hook's install under the push. The prepared children
+// are asked only here, never by `run:chain`: a planned one is published, which a check must not do.
 async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> {
-	const [[preflight, evidence, removed, planned], acceptance, lock] = await Promise.all([
+	const [[preflight, evidence, removed, planned], acceptance, lock, prepared] = await Promise.all([
 		tree_parts(request.title, request.body_path),
 		caught(acceptance_problems(request.body_path)),
 		caught(lock_problems()),
+		caught(prepared_children_problems()),
 	])
 
-	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned]
+	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned, ...prepared]
 }
 
 // The tree judgments `run:chain` asks before the review, of the body the ship will read when

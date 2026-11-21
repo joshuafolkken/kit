@@ -141,6 +141,8 @@ A `preflight` stage runs first: it asks every pull-request precondition at once 
 
 `--review` runs review round 1 beside the gate, after any scoped check not yet green. The round-1 reviewer fixes a small, local Medium in place and marks it `fixed `, counted once the scoped pair is green; a High, an unfixed Medium or a refusal stops the ship. After sync and round 1, `round-2` asks `review:round2 --record <N>` and, on `required`, runs the scoped pair, `review:brief --round 2`, a read-only reviewer, attest and record beside the gate. Both stages join before the commit opens the PR; a blocking round 2 follows the existing review-stop path. Sync finishes first because it changes HEAD, which checkout attestation pins.
 
+The `prepared-children` precondition closes the gap where a lane filed its split children with `issue:file --prepare` and shipped its own stage without `run:pause`, leaving them unpublished and owned by no one (joshuafolkken/kit#8474). A child a lane child files records the run Issue as its `origin` in the publication record; the ship asks for those listed by the run Issue or by an epic listing it. When every one has a plan, they are published through `issue:file --publish`'s own path; one without refuses the ship with the `issue:plan … --planned --no-notify` and `issue:file --publish <E>` commands. A child filed outside a lane has no origin and is left to `backlog:plan --pending-publication` (joshuafolkken/kit#8542).
+
 ## `josh ship:wait` in detail
 
 The lane session that detached a ship waits instead of ending its turn, so a stop in the gate or review round 1 comes back to the session that already holds the run rather than to a fresh one that re-reads it (joshuafolkken/kit#4711).
