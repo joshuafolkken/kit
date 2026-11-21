@@ -101,7 +101,8 @@ function current_run(directory: string): LaneRun | undefined {
 function launch_fields(change: LaneChange, directory: string, now: Date): Partial<LaneStateRecord> {
 	if (change.is_launch !== true) return {}
 
-	return { run: current_run(directory), launched_at: now.toISOString() }
+	// A relaunch makes the lane wholly this run's own, so a hand-over it was adopted through ends here.
+	return { run: current_run(directory), launched_at: now.toISOString(), adopted_at: undefined }
 }
 
 function resume_fields(change: LaneChange, directory: string): Partial<LaneStateRecord> {

@@ -91,3 +91,19 @@ describe('lane_state.record_transfer', () => {
 		expect(await transfer()).toStrictEqual({ kind: 'skipped', reason: 'ENOSPC' })
 	})
 })
+
+describe('lane_state.record_change after a transfer', () => {
+	it('drops the hand-over when the adopting run relaunches the lane', async () => {
+		await launch_under_earlier_run()
+		write_carry(CURRENT_START, CURRENT_OWNER)
+		await transfer()
+		await lane_state.record_change(
+			{ issue: ISSUE, state: 'running', command: 'lane:restart', is_launch: true },
+			{ directory: state.directory, now: ADOPTED_AT },
+		)
+
+		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.not.toHaveProperty(
+			'adopted_at',
+		)
+	})
+})
