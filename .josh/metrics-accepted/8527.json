@@ -1,0 +1,7 @@
+{
+	"reason": "#8527 adds the review-stop reader (run-board-review-stop.ts) and the person reason for review stops in backlog offers",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 89
+	}
+}
