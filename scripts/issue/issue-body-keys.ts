@@ -21,6 +21,7 @@ const KEYS = {
 	compatibility: { ja: '互換性', en: 'Compatibility' },
 	release: { ja: 'リリース分類', en: 'Release classification' },
 	judgement: { ja: '人の判断', en: 'Human judgement' },
+	post_merge_check: { ja: 'マージ後の確認', en: 'Post-merge check' },
 	decision_rule: { ja: '判定規則', en: 'Decision rule' },
 	close_condition: { ja: '中止条件', en: 'Close condition' },
 	priority: { ja: '優先度', en: 'Priority' },
