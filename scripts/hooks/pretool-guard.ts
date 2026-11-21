@@ -111,12 +111,12 @@ function lane_plan_outcome(raw_payload: string, context: HookContext): GuardOutc
 	return { reason, notice: undefined, fault: undefined }
 }
 
-// The transcript guards take a clock before the context, so the call is judged at the wall clock.
+// The transcript guards default to the wall clock and read the call's own context.
 function clocked(
 	outcome: TranscriptGuard['outcome'],
 ): (raw_payload: string, context: HookContext) => GuardOutcome {
 	return function clocked_outcome(raw_payload: string, context: HookContext): GuardOutcome {
-		return outcome(raw_payload, Date.now(), context)
+		return outcome(raw_payload, { context })
 	}
 }
 

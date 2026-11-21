@@ -234,11 +234,16 @@ interface GuardOutcome {
 
 const NO_OUTCOME: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
 
+interface GuardOptions {
+	now_ms?: number
+	context?: HookContext
+}
+
 interface TranscriptGuard {
 	is_enabled: (environment?: HookContext['env']) => boolean
 	refusal_path: (transcript_path: string) => string
-	refusal: (raw_payload: string, now_ms?: number, context?: HookContext) => string | undefined
-	outcome: (raw_payload: string, now_ms?: number, context?: HookContext) => GuardOutcome
+	refusal: (raw_payload: string, options?: GuardOptions) => string | undefined
+	outcome: (raw_payload: string, options?: GuardOptions) => GuardOutcome
 }
 
 interface FireResult {
@@ -383,11 +388,10 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	// being the same observation.
 	function outcome(
 		raw_payload: string,
-		now_ms: number = Date.now(),
-		hook: HookContext = hook_context.from_process(),
+		{ now_ms = Date.now(), context = hook_context.from_process() }: GuardOptions = {},
 	): GuardOutcome {
 		try {
-			return guard_outcome(parts, raw_payload, now_ms, hook)
+			return guard_outcome(parts, raw_payload, now_ms, context)
 		} catch (error) {
 			return { reason: undefined, notice: undefined, fault: fault_notice(spec.switch_key, error) }
 		}
