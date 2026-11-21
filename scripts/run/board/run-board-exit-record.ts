@@ -1,37 +1,24 @@
-import { readFileSync, rmSync } from 'node:fs'
-import path from 'node:path'
-import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { atomic_write } from '#scripts/lib/atomic-write'
-import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import {
+	run_board_exit_store,
+	type ExitKind,
+	type ExitRecord,
+	type RecordStore,
+} from './run-board-exit-store'
 
 // Why the live `josh run:board` ended (joshuafolkken/kit#8380): a redraw that threw, a signal, an
-// uncaught error or rejection, or a stdout that failed is written to one per-checkout file, and the next
-// live board says it on stderr before it enters its screen, then forgets it. Ctrl-C is a normal exit and
-// writes nothing. The first reason wins, so the error a failure causes on its way out never hides it.
+// uncaught error or rejection, or a stdout that failed is written to one per-checkout file
+// (`run-board-exit-store.ts`), and the next live board says it on stderr before it enters its screen,
+// then forgets it. Ctrl-C is a normal exit and writes nothing. The first reason wins, so the error a
+// failure causes on its way out never hides it. A failed redraw the board draws on past is kept there
+// too, until an exit replaces it (joshuafolkken/kit#8381).
 
 const FAILURE_EXIT_CODE = 1
 const SIGHUP_EXIT_CODE = 129
 const SIGINT_EXIT_CODE = 130
 const SIGTERM_EXIT_CODE = 143
-const RECORD_FILE = 'run-board-exit.json'
 
-type ExitKind = 'tick' | 'uncaught' | 'rejection' | 'signal' | 'stdout'
-
-interface ExitRecord {
-	kind: ExitKind
-	reason: string
-	stack?: string | undefined
-	at: string
-	uptime_ms: number
-	pid?: number | undefined
-}
-
-interface RecordStore {
-	read: () => string | undefined
-	write: (text: string) => void
-	remove: () => void
-}
+const { file_store, take, write_record } = run_board_exit_store
 
 interface ExitTargets {
 	process: NodeJS.EventEmitter
@@ -50,6 +37,8 @@ interface ExitPorts {
 interface ExitGuard {
 	on_exit: (leave: () => void) => void
 	record: (kind: ExitKind, cause: unknown) => void
+	// A redraw that failed and was survived.
+	failed: (cause: unknown) => void
 	release: () => void
 }
 
@@ -57,48 +46,11 @@ type Listener = (cause?: unknown) => void
 
 type Recorder = ExitGuard['record']
 
-const KINDS: ReadonlyArray<ExitKind> = ['tick', 'uncaught', 'rejection', 'signal', 'stdout']
-
-function text_of(value: unknown): string | undefined {
-	return typeof value === 'string' ? value : undefined
-}
-
-function number_of(value: unknown): number | undefined {
-	return typeof value === 'number' ? value : undefined
-}
-
-function quietly(action: () => void): void {
-	try {
-		action()
-	} catch {
-		// The board is on its way out; a record it cannot keep is lost, never a second failure.
-	}
-}
-
-function read_text(file: string): string | undefined {
-	try {
-		return readFileSync(file, 'utf8')
-	} catch {
-		return undefined
-	}
-}
-
-function file_store(root = PROJECT_ROOT): RecordStore {
-	const file = path.join(root, JOSH_TMP_DIRECTORY, RECORD_FILE)
-
-	return {
-		read: () => read_text(file),
-		write: (text) => {
-			quietly(() => {
-				atomic_write.replace_file(file, text)
-			})
-		},
-		remove: () => {
-			quietly(() => {
-				rmSync(file, { force: true })
-			})
-		},
-	}
+// What the board has recorded so far: an exit, after which nothing is written, and the last survived
+// failure, which the same failure again counts up.
+interface Recording {
+	has_ended: boolean
+	last?: ExitRecord | undefined
 }
 
 function record_of(
@@ -121,64 +73,62 @@ function record_of(
 	}
 }
 
-function fields(text: string): Readonly<Record<string, unknown>> {
-	try {
-		const value: unknown = JSON.parse(text)
+function failure_line(record: ExitRecord): string {
+	const times = String(record.count ?? 1)
+	const last_at = record.last_at ?? record.at
 
-		return typeof value === 'object' && value !== null ? { ...value } : {}
-	} catch {
-		return {}
-	}
-}
-
-// The fields a record says, or none where the file is broken or written by something else.
-function record_in(value: Readonly<Record<string, unknown>>): ExitRecord | undefined {
-	const kind = KINDS.find((name) => name === value['kind'])
-	const reason = text_of(value['reason'])
-	const at = text_of(value['at'])
-	const uptime_ms = number_of(value['uptime_ms'])
-
-	if (kind === undefined || reason === undefined || at === undefined || uptime_ms === undefined) {
-		return undefined
-	}
-
-	return {
-		kind,
-		reason,
-		stack: text_of(value['stack']),
-		at,
-		uptime_ms,
-		pid: number_of(value['pid']),
-	}
-}
-
-// The last abnormal exit, removed as it is read, so the launch after the next says nothing.
-function take(store: RecordStore): ExitRecord | undefined {
-	const text = store.read()
-
-	if (text === undefined) return undefined
-	store.remove()
-
-	return record_in(fields(text))
+	return `run:board: the last live board's redraw failed ${times} time(s) (${record.reason}), from ${record.at} to ${last_at}`
 }
 
 function line(record: ExitRecord): string {
+	if (record.kind === 'redraw') return failure_line(record)
 	const seconds = String(Math.round(record.uptime_ms / MS_PER_SECOND))
 	const cause = `${record.kind}: ${record.reason}`
 
 	return `run:board: the last live board exited abnormally (${cause}) at ${record.at}, after ${seconds}s`
 }
 
-// Records once, the first reason winning.
-function recorder(ports: ExitPorts, started_ms: number): ExitGuard['record'] {
-	let has_recorded = false
-
+// Records an exit once, the first reason winning; it replaces a survived failure written before it.
+function recorder(ports: ExitPorts, started_ms: number, recording: Recording): Recorder {
 	return (kind, cause) => {
-		if (has_recorded) return
-		has_recorded = true
-		quietly(() => {
-			ports.store.write(`${JSON.stringify(record_of(kind, cause, ports, started_ms))}\n`)
-		})
+		if (recording.has_ended) return
+		recording.has_ended = true
+		write_record(ports.store, record_of(kind, cause, ports, started_ms))
+	}
+}
+
+// The same failure as the last one, counted up to `fresh`'s time; none where it differs.
+function repeated(last: ExitRecord | undefined, fresh: ExitRecord): ExitRecord | undefined {
+	if (last?.reason !== fresh.reason || last.stack !== fresh.stack) return undefined
+
+	return { ...last, count: (last.count ?? 1) + 1, last_at: fresh.at, uptime_ms: fresh.uptime_ms }
+}
+
+// A failed redraw the board survived: the same failure again only counts up and moves its last time,
+// so one failing every second keeps the file one record long; another failure replaces it.
+function failure_recorder(
+	ports: ExitPorts,
+	started_ms: number,
+	recording: Recording,
+): ExitGuard['failed'] {
+	return (cause) => {
+		if (recording.has_ended) return
+		const fresh = record_of('redraw', cause, ports, started_ms)
+		const next = repeated(recording.last, fresh) ?? { ...fresh, count: 1, last_at: fresh.at }
+
+		recording.last = next
+		write_record(ports.store, next)
+	}
+}
+
+// The exit and the survived failures share one recording, so nothing is written past an exit.
+function recorders(ports: ExitPorts): Pick<ExitGuard, 'record' | 'failed'> {
+	const started_ms = ports.now()
+	const recording: Recording = { has_ended: false }
+
+	return {
+		record: recorder(ports, started_ms, recording),
+		failed: failure_recorder(ports, started_ms, recording),
 	}
 }
 
@@ -253,7 +203,7 @@ function attach(emitter: NodeJS.EventEmitter, listeners: Record<string, Listener
 // A live board's hold on the process: its handlers go on with the screen and come off with `release`,
 // so a `backlogrun` that drew the board keeps none of them.
 function guard(ports: ExitPorts): ExitGuard {
-	const record = recorder(ports, ports.now())
+	const { record, failed } = recorders(ports)
 	const detached: Array<() => void> = []
 	const { targets } = ports
 	const stdout = { error: ending(record, 'stdout', targets.exit, FAILURE_EXIT_CODE) }
@@ -273,6 +223,7 @@ function guard(ports: ExitPorts): ExitGuard {
 			)
 		},
 		record,
+		failed,
 		release: () => {
 			for (const detach of detached.splice(0)) detach()
 		},
@@ -302,7 +253,9 @@ function start(ports: ExitPorts = process_ports()): ExitGuard {
 	return guard(ports)
 }
 
-// A redraw that throws ends the board: its reason is recorded, then it is thrown on as before.
+// A failure the live loop does not survive — one outside its redraws, which it records through
+// `failed` and draws on past (`run-board-live.ts`) — ends the board: its reason is recorded, then it is
+// thrown on as before.
 async function guarded(exits: ExitGuard | undefined, body: () => Promise<void>): Promise<void> {
 	try {
 		await body()
@@ -325,4 +278,6 @@ const run_board_exit_record = {
 }
 
 export { run_board_exit_record }
-export type { ExitGuard, ExitKind, ExitPorts, ExitRecord, ExitTargets, RecordStore }
+export type { ExitGuard, ExitPorts, ExitTargets }
+
+export { type ExitKind, type ExitRecord, type RecordStore } from './run-board-exit-store'

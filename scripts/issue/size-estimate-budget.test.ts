@@ -40,13 +40,18 @@ function estimate(files: number, lines: number): string {
 	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト除く）`
 }
 
+// The filing refusal for a body with no route, judged at `rate`.
+function problem_at(body: string, rate: ImplementRate): string | undefined {
+	return size_estimate.guide_problem(body, undefined, { rate })
+}
+
 const OVER_GUIDE = body_with(estimate(2, 110))
 const OVER_GUIDE_EXCUSED = body_with(estimate(2, 110), REASON)
 const UNDER_GUIDE = body_with(estimate(1, 40))
 
 describe('size_estimate.guide_problem — the projected implement time', () => {
 	it('refuses an over-budget estimate within the floor without claiming a guide overrun', () => {
-		const problem = size_estimate.guide_problem(body_with(estimate(1, 70)), undefined, SLOW)
+		const problem = problem_at(body_with(estimate(1, 70)), SLOW)
 
 		expect(problem).toContain('28 implement minute(s)')
 		expect(problem).toContain(OVER_BUDGET)
@@ -54,7 +59,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	})
 
 	it('refuses an unreasoned estimate over the guide projecting past the budget', () => {
-		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, SLOW) ?? ''
+		const problem = problem_at(OVER_GUIDE, SLOW) ?? ''
 
 		for (const part of BUDGET_REFUSAL_PARTS) {
 			expect(problem).toContain(part)
@@ -63,12 +68,12 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 
 	// joshuafolkken/kit#6602: the declared reason is the pre-start decision, so it excuses the budget.
 	it('passes a reasoned estimate past or within the budget', () => {
-		expect(size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, SLOW)).toBeUndefined()
-		expect(size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, FAST)).toBeUndefined()
+		expect(problem_at(OVER_GUIDE_EXCUSED, SLOW)).toBeUndefined()
+		expect(problem_at(OVER_GUIDE_EXCUSED, FAST)).toBeUndefined()
 	})
 
 	it('keeps the guide refusal for an unreasoned estimate within the budget', () => {
-		const problem = size_estimate.guide_problem(body_with(estimate(6, 110)), undefined, FAST)
+		const problem = problem_at(body_with(estimate(6, 110)), FAST)
 
 		expect(problem).toContain(EXCEEDS_GUIDE)
 		expect(problem).not.toContain('implement budget')
@@ -79,25 +84,27 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	})
 
 	it('passes an estimate under the measured guide within the budget', () => {
-		expect(size_estimate.guide_problem(UNDER_GUIDE, undefined, SLOW)).toBeUndefined()
+		expect(problem_at(UNDER_GUIDE, SLOW)).toBeUndefined()
 	})
 })
 
 // joshuafolkken/kit#7005: the split route excuses the guide only.
 describe('size_estimate.guide_problem — a split filing and the budget', () => {
 	it('refuses a split filing projecting past the budget', () => {
-		const problem = size_estimate.guide_problem(OVER_GUIDE, SPLIT_ROUTE, SLOW)
+		const problem = size_estimate.guide_problem(OVER_GUIDE, SPLIT_ROUTE, { rate: SLOW })
 
 		expect(problem).toContain(OVER_BUDGET)
 		expect(problem).not.toContain('--route split')
 	})
 
 	it('passes a split filing over the guide within the budget', () => {
-		expect(size_estimate.guide_problem(OVER_GUIDE, SPLIT_ROUTE, FAST)).toBeUndefined()
+		expect(size_estimate.guide_problem(OVER_GUIDE, SPLIT_ROUTE, { rate: FAST })).toBeUndefined()
 	})
 
 	it('passes a reasoned split filing past the budget', () => {
-		expect(size_estimate.guide_problem(OVER_GUIDE_EXCUSED, SPLIT_ROUTE, SLOW)).toBeUndefined()
+		expect(
+			size_estimate.guide_problem(OVER_GUIDE_EXCUSED, SPLIT_ROUTE, { rate: SLOW }),
+		).toBeUndefined()
 	})
 })
 
@@ -105,7 +112,7 @@ describe('size_estimate.guide_problem — the cap and the projection', () => {
 	it('keeps the cap refusal ahead of the projection', () => {
 		const body = body_with(estimate(30, 900))
 
-		expect(size_estimate.guide_problem(body, undefined, SLOW)).toContain('exceeds the cap')
+		expect(problem_at(body, SLOW)).toContain('exceeds the cap')
 	})
 })
 
@@ -117,7 +124,10 @@ describe('size_estimate.over_budget', () => {
 		expect(size_estimate.over_budget(body, SLOW, { files: 9, lines: 1.5 })).toBeUndefined()
 		expect(size_estimate.over_budget(body, SLOW, { files: 1, lines: 1.6 })).toBeDefined()
 		expect(
-			size_estimate.guide_problem(body, undefined, SLOW, { files: 1, lines: 1.5 }),
+			size_estimate.guide_problem(body, undefined, {
+				rate: SLOW,
+				growth: { files: 1, lines: 1.5 },
+			}),
 		).toBeUndefined()
 	})
 
@@ -140,7 +150,7 @@ describe('size_estimate.over_budget', () => {
 describe('size_estimate.guide_problem — the size bar', () => {
 	it('passes the budget on an estimate projecting past it within twice it', () => {
 		const projected = lane_implement_rate.minutes_for(GROWN_OVER_GUIDE_LINES, BETWEEN)
-		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, BETWEEN)
+		const problem = problem_at(OVER_GUIDE, BETWEEN)
 
 		expect(projected).toBeGreaterThan(lane_stage_budget.BUDGET_MINUTES.implement)
 		expect(problem).toContain(EXCEEDS_GUIDE)
@@ -150,16 +160,21 @@ describe('size_estimate.guide_problem — the size bar', () => {
 	it.each([40, 50])('neither refuses nor bars %s declared lines at the measured rate', (lines) => {
 		const body = body_with(estimate(1, lines))
 
-		expect(size_estimate.guide_problem(body, undefined, MEASURED, MEASURED_GROWTH)).toBeUndefined()
+		expect(
+			size_estimate.guide_problem(body, undefined, { rate: MEASURED, growth: MEASURED_GROWTH }),
+		).toBeUndefined()
 		expect(size_estimate.over_budget(body, MEASURED, MEASURED_GROWTH)).toBeUndefined()
 	})
 
 	it('bars 60 declared lines at the measured rate and prints the 54-line bar', () => {
 		const body = body_with(estimate(1, 60))
-		const problem = size_estimate.guide_problem(body, undefined, MEASURED, MEASURED_GROWTH)
+		const problem = size_estimate.guide_problem(body, undefined, {
+			rate: MEASURED,
+			growth: MEASURED_GROWTH,
+		})
 
 		expect(size_estimate.over_budget(body, MEASURED, MEASURED_GROWTH)).toBeDefined()
-		expect(size_estimate.declared_lines_bar(MEASURED, MEASURED_GROWTH)).toBe(54)
+		expect(size_estimate.declared_lines_bar({ rate: MEASURED, growth: MEASURED_GROWTH })).toBe(54)
 		expect(problem).toContain('at most 54 declared line(s)')
 	})
 })

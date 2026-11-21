@@ -228,9 +228,10 @@ On a terminal it draws on the alternate screen, so redraws never grow the scroll
 
 The live board writes why it ended to `.josh/tmp/run-board-exit.json` in the checkout.
 
-- Kinds: `tick` (a redraw threw), `uncaught`, `rejection`, `signal` (SIGHUP or SIGTERM) and `stdout` (a stdout `error`, such as a closed pipe). The first reason wins; Ctrl+C writes nothing.
-- Fields: the kind, the message, the stack, the time, the uptime and the pid.
-- The next live board prints it as one `run:board: the last live board exited abnormally …` line on stderr before it enters its screen, then removes the file.
+- Kinds: `tick` (the live loop threw outside a redraw), `uncaught`, `rejection`, `signal` (SIGHUP or SIGTERM) and `stdout` (a stdout `error`, such as a closed pipe). The first reason wins; Ctrl+C writes nothing.
+- A redraw that throws does not end the board: it redraws the last frame with a `redraw` warning on its last line and keeps going. It is written as kind `redraw`; the same failure again (same message and stack) only raises `count` and moves `last_at`, so the file stays one record long. Another failure replaces it, and an exit replaces it too.
+- Fields: the kind, the message, the stack, the time, the uptime and the pid; a `redraw` record also has `count` and `last_at`.
+- The next live board prints it as one line on stderr before it enters its screen, then removes the file: `run:board: the last live board exited abnormally …`, or for a `redraw` record `run:board: the last live board's redraw failed N time(s) (<reason>), from <time> to <last time>`.
 - An uncaught failure or a stdout error exits 1; SIGHUP exits 129.
 
 A running `fullrun #N`, `halfrun #N` or `prrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane.
