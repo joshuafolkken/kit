@@ -63,10 +63,15 @@ async function beat_through(
 }
 
 // Beats played only where the ports carry their pauses, the beats left unwritten left in `beats`; the
-// key listened for goes back to folding once they end.
-async function listen(beats: Iterator<Beat>, ports: IntroPorts, keys: KeyReading): Promise<void> {
+// key listened for goes back to folding once they end. Whether all of them played, no key skipping
+// them.
+async function listen(
+	beats: Iterator<Beat>,
+	ports: IntroPorts,
+	keys: KeyReading,
+): Promise<boolean> {
 	const { intro_sleep } = ports
-	if (intro_sleep === undefined) return
+	if (intro_sleep === undefined) return false
 
 	const held: { is_pressed: boolean; release: (() => void) | undefined } = {
 		is_pressed: false,
@@ -85,25 +90,24 @@ async function listen(beats: Iterator<Beat>, ports: IntroPorts, keys: KeyReading
 	} finally {
 		held.release?.()
 	}
+
+	return !held.is_pressed
 }
 
-// The letters typed with the trill sounding (joshuafolkken/kit#8250), which stops however they end —
-// typed through or skipped by a key, and whether they typed through. Where the ports carry no pauses
-// nothing types, so no trill starts.
+// Letters typed with the trill sounding (joshuafolkken/kit#8250), which stops however they end — typed
+// through or skipped by a key, and whether they typed through. Where the ports carry no pauses nothing
+// types, so no trill starts.
 async function letters(
+	beats: ReadonlyArray<Beat>,
 	ports: IntroPorts,
 	keys: KeyReading,
-	intro: IntroDefinition,
 ): Promise<boolean> {
 	const trill = ports.intro_sleep === undefined ? undefined : ports.typing_sound
-	const beats = letter_beats(intro).values()
 
 	trill?.set(true)
 
 	try {
-		await listen(beats, ports, keys)
-
-		return beats.next().done === true
+		return await listen(beats.values(), ports, keys)
 	} finally {
 		trill?.set(false)
 	}
@@ -114,23 +118,52 @@ function shown(paint: Paint | undefined, text: string): string {
 	return `${LINE_START}${run_board_labels.painted(paint, text)}${ERASE_LINE_END}`
 }
 
+// The lead lines' pace and look: the theme's letter pause and its leads.
+interface LeadPace {
+	letter_ms: number
+	leads: IntroLeads
+}
+
 // joshuafolkken/kit#8441: a lead line typed a letter at a time with the cursor after every letter, as
-// the approved demo draws it, held with the cursor, then erased and followed by its gap.
-function lead_beats(line: string, letter_ms: number, leads: IntroLeads): Array<Beat> {
-	const typing = Array.from(line, (_letter, index) => ({
+// the approved demo draws it.
+function lead_letters(line: string, { letter_ms, leads }: LeadPace): Array<Beat> {
+	return Array.from(line, (_letter, index) => ({
 		text: shown(leads.paint, `${line.slice(0, index + 1)}${run_board_typing.CURSOR}`),
 		ms: letter_ms,
 	}))
+}
 
+// A typed lead line held with the cursor, then erased and followed by its gap.
+function lead_rest(leads: IntroLeads): Array<Beat> {
 	return [
-		...typing,
 		{ text: '', ms: leads.hold_ms },
 		{ text: shown(undefined, ''), ms: leads.gap_ms },
 	]
 }
 
-// The lead lines, then the theme's line shown at once and held; a key ends the whole of it. No trill
-// sounds, and where stdout draws no color nothing plays.
+// The lead lines in turn, each one's letters with the trill sounding (joshuafolkken/kit#8365) and its
+// hold and gap silent; whether all of them played, no key ending them.
+async function leads_played(
+	lines: ReadonlyArray<string>,
+	ports: IntroPorts,
+	keys: KeyReading,
+	pace: LeadPace,
+): Promise<boolean> {
+	const [lead, ...rest] = lines
+	if (lead === undefined) return true
+
+	if (
+		!(await letters(lead_letters(lead, pace), ports, keys)) ||
+		!(await listen(lead_rest(pace.leads).values(), ports, keys))
+	) {
+		return false
+	}
+
+	return await leads_played(rest, ports, keys, pace)
+}
+
+// The lead lines, then the theme's line shown at once and held; a key ends the whole of it. Where
+// stdout draws no color nothing plays.
 async function lead_in(
 	ports: IntroPorts,
 	keys: KeyReading,
@@ -140,14 +173,17 @@ async function lead_in(
 	const line = shown(leads.paint, intro.line)
 
 	if (line === shown(undefined, intro.line)) return
-	const typed = leads.lines.flatMap((lead) => lead_beats(lead, intro.letter_ms, leads))
+	const is_played = await leads_played(leads.lines, ports, keys, {
+		letter_ms: intro.letter_ms,
+		leads,
+	})
 
-	await listen([...typed, { text: line, ms: intro.hold_ms }].values(), ports, keys)
+	if (is_played) await listen([{ text: line, ms: intro.hold_ms }].values(), ports, keys)
 }
 
 // The theme's letters, then its hold, silent, unless a key skipped the letters.
 async function type_in(ports: IntroPorts, keys: KeyReading, intro: IntroDefinition): Promise<void> {
-	const is_typed = await letters(ports, keys, intro)
+	const is_typed = await letters(letter_beats(intro), ports, keys)
 
 	if (is_typed) await listen([{ text: '', ms: intro.hold_ms }].values(), ports, keys)
 }

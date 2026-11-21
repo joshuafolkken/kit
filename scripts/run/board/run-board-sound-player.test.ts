@@ -10,6 +10,7 @@ import {
 	type StartHandlers,
 } from './run-board-sound-player'
 import { run_board_sound_stream } from './run-board-sound-stream'
+import { run_board_sound_wav } from './run-board-sound-wav'
 
 const WAV = 'sounds/chime.wav'
 const QUOTED_WAV = "C:\\o'clock.wav"
@@ -20,6 +21,15 @@ const create_directory = temporary_directory()
 afterEach(() => {
 	vi.restoreAllMocks()
 })
+
+// A silent WAV file at `rate`, for the loop players that read the rate from its header.
+function rated_wav(rate: number): string {
+	const file = path.join(create_directory(DIRECTORY_PREFIX), 'loop.wav')
+
+	writeFileSync(file, run_board_sound_wav.wav_of(new Int16Array(1), rate))
+
+	return file
+}
 
 interface FakeChild extends Playing {
 	fail: () => void
@@ -229,10 +239,11 @@ describe('run_board_sound_player.loop', () => {
 	it('loops within one player without restarting at clip boundaries (ac-036747cc)', () => {
 		const test = harness()
 		const told = handlers()
+		const file = rated_wav(run_board_sound_wav.SAMPLE_RATE)
 
 		vi.spyOn(run_board_sound_stream, 'ports_for').mockReturnValue(test.ports)
 
-		run_board_sound_player.loop(WAV, told, 'linux', test.ports)
+		run_board_sound_player.loop(file, told, 'linux', test.ports)
 
 		expect(test.spawner).toHaveBeenCalledExactlyOnceWith(
 			'paplay',
@@ -251,7 +262,12 @@ describe('run_board_sound_player.loop', () => {
 
 		vi.spyOn(run_board_sound_stream, 'ports_for').mockReturnValue(test.ports)
 
-		run_board_sound_player.loop(WAV, told, 'linux', test.ports)
+		run_board_sound_player.loop(
+			rated_wav(run_board_sound_wav.SAMPLE_RATE),
+			told,
+			'linux',
+			test.ports,
+		)
 		fail_child(test, 0)
 		fail_child(test, 1)
 		fail_child(test, 2)

@@ -13,7 +13,6 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 const BEL = '\u{7}'
 const SPAWN_OPTIONS = { detached: true, stdio: 'ignore', windowsHide: true } as const
 const POWERSHELL_OPTIONS = ['-NoProfile', '-Command']
-const RAW_RATE = '--rate=44100'
 const RAW_CHANNELS = '--channels=1'
 
 interface Player {
@@ -150,16 +149,28 @@ function windows_loop_args(file: string): Array<string> {
 	]
 }
 
+// A raw-PCM player is told the file's own rate, since the WAV header it would read is stripped
+// (joshuafolkken/kit#8365: the matrix click is 48 kHz, the cues 44.1 kHz).
+function raw_rate(file: string): string {
+	return String(run_board_sound_wav.rate_of(file))
+}
+
 const LOOP_PLAYERS: Partial<Record<NodeJS.Platform, Array<Player>>> = {
 	darwin: [{ command: 'osascript', args: mac_loop_args }],
 	win32: [{ command: 'powershell', args: windows_loop_args }],
 	linux: [
-		{ command: 'paplay', args: () => ['--raw', '--format=s16le', RAW_RATE, RAW_CHANNELS] },
+		{
+			command: 'paplay',
+			args: (file) => ['--raw', '--format=s16le', `--rate=${raw_rate(file)}`, RAW_CHANNELS],
+		},
 		{
 			command: 'pw-play',
-			args: () => ['--raw', '--format=s16', RAW_RATE, RAW_CHANNELS, '-'],
+			args: (file) => ['--raw', '--format=s16', `--rate=${raw_rate(file)}`, RAW_CHANNELS, '-'],
 		},
-		{ command: 'aplay', args: () => ['-t', 'raw', '-f', 'S16_LE', '-r', '44100', '-c', '1'] },
+		{
+			command: 'aplay',
+			args: (file) => ['-t', 'raw', '-f', 'S16_LE', '-r', raw_rate(file), '-c', '1'],
+		},
 	],
 }
 

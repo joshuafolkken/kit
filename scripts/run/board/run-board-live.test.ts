@@ -50,6 +50,7 @@ describe('run_board_live.live_of', () => {
 		expect(run_board_live.live_of('matrix')).toStrictEqual({
 			...NO_LIVE,
 			types_rows: true,
+			trill: true,
 			decode: true,
 			rain: true,
 		})
@@ -270,6 +271,19 @@ describe('run_board_live.watch trill', () => {
 	})
 })
 
+// joshuafolkken/kit#8365: the matrix key click sounds through its intro and its decoding rows.
+describe('run_board_live.watch matrix trill', () => {
+	it('hands the matrix draws’ letters end through to the trill (ac-57e6668c)', () => {
+		const { ports } = harness(LOCAL, [])
+		const { ends, typing_sound } = trill_heard()
+		const live = run_board_live.live_of('matrix')
+		const trill = run_board_live.trill_of({ ...ports, typing_sound }, { folded: undefined }, live)
+
+		trill?.set(true, LEFT_MS)
+		expect(ends).toStrictEqual([LEFT_MS])
+	})
+})
+
 describe('run_board_live.watch trill and the sound switch', () => {
 	it('switches the trill off as s switches the sound off', async () => {
 		const { ports } = harness(undefined, [])
@@ -282,14 +296,29 @@ describe('run_board_live.watch trill and the sound switch', () => {
 		expect(switched).toStrictEqual(['off', 'stop'])
 	})
 
-	it('sounds no trill in the intro or the draws while the sound is off', async () => {
+	it('switches the matrix trill off as s switches the sound off (ac-57e6668c)', async () => {
 		const { ports } = harness(LOCAL, [plan_titled('a')])
 		const { switched, typing_sound } = trill_heard()
-		const { input } = sound_keys(false)
-		const sounding = { ...ports, typing_sound, keys: input, intro_sleep: instant }
+		const { input, type } = sound_keys(true)
+		const watching = run_board_live.watch({ ...ports, typing_sound, keys: input }, 'matrix')
 
-		await expect(run_board_live.watch(sounding, 'wargames')).rejects.toBe(STOPPED)
+		type('s')
+		await expect(watching).rejects.toBe(STOPPED)
+		expect(switched[0]).toBe('off')
 		expect(switched).not.toContain('on')
-		expect(switched.at(-1)).toBe('stop')
 	})
+
+	it.each(['wargames', 'matrix'] as const)(
+		'sounds no %s trill while the sound is off',
+		async (theme) => {
+			const { ports } = harness(LOCAL, [plan_titled('a')])
+			const { switched, typing_sound } = trill_heard()
+			const { input } = sound_keys(false)
+			const sounding = { ...ports, typing_sound, keys: input, intro_sleep: instant }
+
+			await expect(run_board_live.watch(sounding, theme)).rejects.toBe(STOPPED)
+			expect(switched).not.toContain('on')
+			expect(switched.at(-1)).toBe('stop')
+		},
+	)
 })
