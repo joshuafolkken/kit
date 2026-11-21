@@ -29,8 +29,9 @@ interface LiveDefinition {
 interface ThemeDefinition {
 	// The color the theme draws text no color is given in.
 	paint: Paint
-	// The color of a section rule's `─`, where it is not the text's (joshuafolkken/kit#8397).
-	rule?: Paint
+	// Section dashes and heading text, and the theme's idle glyphs (joshuafolkken/kit#8390).
+	rule: { dash: Paint; text: Paint }
+	idle: Paint
 	intro: IntroDefinition
 	// The alert field a screen's first line ends on, drawn from the level every theme shares
 	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
@@ -41,12 +42,16 @@ interface ThemeDefinition {
 	live: LiveDefinition
 }
 
+const CYAN: Paint = { rgb: '62;236;225', named: 'cyan' }
+const { IDLE_PAINT } = run_board_theme_tones
+
 const THEME_DEFS = {
 	wargames: {
 		// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
-		paint: { rgb: '62;236;225', named: 'cyan' },
+		paint: CYAN,
 		// The rules in the idle tone, behind the row typing (joshuafolkken/kit#8397).
-		rule: run_board_theme_tones.IDLE_PAINT,
+		rule: { dash: IDLE_PAINT, text: CYAN },
+		idle: IDLE_PAINT,
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
@@ -56,6 +61,8 @@ const THEME_DEFS = {
 	// effects come with the epic's later children, so it types no opening line yet.
 	matrix: {
 		paint: run_board_header_trace.SHADES.body,
+		rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
+		idle: run_board_header_trace.SHADES.mid,
 		intro: { line: '', letter_ms: 0, hold_ms: 0 },
 		alert: run_board_header_trace.field_of,
 		lamps: false,
