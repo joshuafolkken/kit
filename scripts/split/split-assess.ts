@@ -51,7 +51,11 @@ const { CAP_FACTOR, DEFAULT_CAP, FILE_CAP, FILE_GUIDE, LINE_CAP, LINE_GUIDE } = 
 const DEFAULT_GUIDE: SplitGuide = { files: FILE_GUIDE, lines: LINE_GUIDE, cap: DEFAULT_CAP }
 
 // Keep fractional thresholds: rounding would change the budget's strict comparison boundary.
-function guide_for(minutes: number, measured?: ImplementRate, growth?: SizeRatios): SplitGuide {
+function guide_for(
+	minutes: number,
+	measured: ImplementRate | undefined,
+	growth?: SizeRatios,
+): SplitGuide {
 	const lines = lane_implement_rate.lines_for(minutes, measured)
 	const correction = growth === undefined ? {} : { growth }
 
@@ -181,10 +185,14 @@ function is_over_cap(files: number, lines: number, guide: SplitGuide = DEFAULT_G
 }
 
 // `added` lists the files the branch adds, so a new module and its importer count as one file.
+interface MeasureOptions {
+	guide?: SplitGuide | undefined
+	added?: ReadonlySet<string> | undefined
+}
+
 function measure(
 	changes: ReadonlyArray<FileChange>,
-	guide?: SplitGuide,
-	added: ReadonlySet<string> = new Set(),
+	{ guide, added = new Set() }: MeasureOptions = {},
 ): SizeMeasurement {
 	const runtime = changes.filter((change) => is_deliverable(change))
 	const lines = runtime.reduce((total, change) => total + change.changed_lines, 0)
@@ -200,8 +208,8 @@ function measure(
 }
 
 // The size measurement of a raw `git diff --numstat`, the one call the CLI makes.
-function assess(raw: string, guide?: SplitGuide, added?: ReadonlySet<string>): SizeMeasurement {
-	return measure(parse_numstat(raw), guide, added)
+function assess(raw: string, options: MeasureOptions = {}): SizeMeasurement {
+	return measure(parse_numstat(raw), options)
 }
 
 const SPLIT_TAIL =
@@ -279,17 +287,25 @@ const QUESTION_SECTION = 'The question'
 const REASON_PREFIX = issue_body_keys.prefix('no_split_reason')
 const NOTICE_ACTION = `go on to the end; a started Issue is never split, and the merge records an overrun past the cap as a pre-split miss — split-assessment.md → "${NOTICE_SECTION}"`
 
+interface NoticeOptions {
+	declared?: DeclaredSize | undefined
+	guide?: SplitGuide | undefined
+}
+
+function is_within(measurement: SizeMeasurement, bar: NoticeBar): boolean {
+	return measurement.files <= bar.files && measurement.lines <= bar.lines
+}
+
 // The notice for a diff past `notice_bar` on either axis — strictly greater than, as the guide is — and
 // a diff at or under it gives none. A merge past the cap, not this bar, is recorded as a pre-split
 // miss (`lane-size-record.ts`, joshuafolkken/kit#7579); size alone never stops the run (joshuafolkken/kit#6602).
 function notice(
 	measurement: SizeMeasurement,
-	declared?: DeclaredSize,
-	guide: SplitGuide = measurement.guide ?? DEFAULT_GUIDE,
+	{ declared, guide = measurement.guide ?? DEFAULT_GUIDE }: NoticeOptions = {},
 ): string | undefined {
 	const bar = notice_bar(declared, guide)
 
-	if (measurement.files <= bar.files && measurement.lines <= bar.lines) return undefined
+	if (is_within(measurement, bar)) return undefined
 
 	return `split notice: ${counted(measurement)} (${bar.text}; ${policy_text(guide)}) — over the bar, a warning, not a stop: ${NOTICE_ACTION}`
 }

@@ -26,6 +26,10 @@ interface CheckoutOptions {
 	is_external_git?: boolean
 	// Name the checkout's root as Claude Code does; left out, the command runs as Codex runs it.
 	is_project_directory_named?: boolean
+	// Install the real launcher with one stub bundle in place of the built guards.
+	is_partial_install?: boolean
+	// Run the command from a subdirectory of the checkout rather than its root.
+	is_nested?: boolean
 }
 
 // The installed package as a hook command finds it: the real launcher, and one stub bundle in place of
@@ -104,19 +108,14 @@ function checkout_environment(temporary_root: string, options: CheckoutOptions):
 	return { ...git_environment, ...options.git_overrides }
 }
 
-function run_in_temporary_checkout(
-	command: string,
-	is_partial_install = false,
-	is_nested = false,
-	options: CheckoutOptions = {},
-): HookResult {
+function run_in_temporary_checkout(command: string, options: CheckoutOptions = {}): HookResult {
 	const temporary_root = make_directory('kit-hook-bootstrap-')
 	const hook_environment = checkout_environment(temporary_root, options)
 
-	if (is_partial_install) create_partial_install(temporary_root)
+	if (options.is_partial_install === true) create_partial_install(temporary_root)
 
 	const { status, stdout, stderr } = spawnSync('sh', ['-c', command], {
-		cwd: execution_directory(temporary_root, is_nested),
+		cwd: execution_directory(temporary_root, options.is_nested === true),
 		encoding: 'utf8',
 		env: hook_environment,
 	})

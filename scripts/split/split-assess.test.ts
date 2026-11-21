@@ -53,17 +53,17 @@ describe('split notice on lane:plan units', () => {
 	const declared = { files: 2, lines: 20 }
 
 	it('prints no notice when the new module and its importer count as one', () => {
-		const measurement = split_assess.assess(plan_diff, guide, new Set([new_module]))
+		const measurement = split_assess.assess(plan_diff, { guide, added: new Set([new_module]) })
 
 		expect(measurement.files).toBe(3)
-		expect(split_assess.notice(measurement, declared)).toBeUndefined()
+		expect(split_assess.notice(measurement, { declared })).toBeUndefined()
 	})
 
 	it('still counts each file alone when no file is added', () => {
-		const measurement = split_assess.assess(plan_diff, guide)
+		const measurement = split_assess.assess(plan_diff, { guide })
 
 		expect(measurement.files).toBe(4)
-		expect(split_assess.notice(measurement, declared)).toContain('split notice')
+		expect(split_assess.notice(measurement, { declared })).toContain('split notice')
 	})
 })
 
@@ -128,7 +128,7 @@ describe('measure excludes run records', () => {
 		const measurement = split_assess.assess(raw)
 
 		expect(measurement).toMatchObject({ files: 3, lines: 3 })
-		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeDefined()
+		expect(split_assess.notice(measurement, { declared: { files: 1, lines: 10 } })).toBeDefined()
 	})
 })
 
@@ -213,9 +213,9 @@ describe('notice', () => {
 		const declared = { files: 0, lines: 0 }
 
 		expect(
-			split_assess.notice({ files: 8, lines: 200, verdict: 'single' }, declared),
+			split_assess.notice({ files: 8, lines: 200, verdict: 'single' }, { declared }),
 		).toBeUndefined()
-		expect(split_assess.notice({ files: 9, lines: 10, verdict: 'split' }, declared)).toContain(
+		expect(split_assess.notice({ files: 9, lines: 10, verdict: 'split' }, { declared })).toContain(
 			GUIDE_TEXT,
 		)
 	})
@@ -226,19 +226,24 @@ describe('notice against a declared size', () => {
 	const DECLARED = { files: 3, lines: 40 }
 
 	it('fires at 7 files, past 3 declared files × 2', () => {
-		const notice = split_assess.notice({ files: 7, lines: 40, verdict: 'single' }, DECLARED)
+		const notice = split_assess.notice(
+			{ files: 7, lines: 40, verdict: 'single' },
+			{ declared: DECLARED },
+		)
 
 		expect(notice).toContain('declared 3 files / 40 lines; growth files × 2 (fallback)')
 		expect(notice).toContain('= 6 files / 80 lines')
 	})
 
 	it('fires at 81 lines, past 40 declared lines × 2', () => {
-		expect(split_assess.notice({ files: 1, lines: 81, verdict: 'single' }, DECLARED)).toBeDefined()
+		expect(
+			split_assess.notice({ files: 1, lines: 81, verdict: 'single' }, { declared: DECLARED }),
+		).toBeDefined()
 	})
 
 	it('prints nothing at the grown bar on both axes', () => {
 		expect(
-			split_assess.notice({ files: 6, lines: 80, verdict: 'single' }, DECLARED),
+			split_assess.notice({ files: 6, lines: 80, verdict: 'single' }, { declared: DECLARED }),
 		).toBeUndefined()
 	})
 })
@@ -248,7 +253,7 @@ describe('notice against a declaration grown past the guide', () => {
 	it('caps a declaration grown past the guide at the guide', () => {
 		const notice = split_assess.notice(
 			{ files: 9, lines: 40, verdict: 'split' },
-			{ files: 8, lines: 200 },
+			{ declared: { files: 8, lines: 200 } },
 		)
 
 		expect(notice).toContain(GUIDE_TEXT)
@@ -257,7 +262,7 @@ describe('notice against a declaration grown past the guide', () => {
 	it('caps only the axis grown past the guide', () => {
 		const notice = split_assess.notice(
 			{ files: 1, lines: 201, verdict: 'split' },
-			{ files: 3, lines: 150 },
+			{ declared: { files: 3, lines: 150 } },
 		)
 
 		expect(notice).toContain('lines × 2 (fallback), capped at the guide = 6 files / 200 lines')
@@ -265,7 +270,10 @@ describe('notice against a declaration grown past the guide', () => {
 
 	it('falls back to the guide for a declaration of zero lines', () => {
 		expect(
-			split_assess.notice({ files: 1, lines: 1, verdict: 'single' }, { files: 2, lines: 0 }),
+			split_assess.notice(
+				{ files: 1, lines: 1, verdict: 'single' },
+				{ declared: { files: 2, lines: 0 } },
+			),
 		).toBeUndefined()
 	})
 })
