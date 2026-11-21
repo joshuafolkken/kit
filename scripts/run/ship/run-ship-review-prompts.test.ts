@@ -79,6 +79,13 @@ describe('run_ship_review_prompts.round_one_prompt', () => {
 		expect(review_prompt_level.trigger_of(prompt_of(BRIEF, CODE, ISSUE))).toBe('initial')
 		expect(trigger_beside(prompt_of)).toBe('interaction')
 	})
+
+	it('reads back the retry a round prompt was built for', () => {
+		expect(run_ship_review_prompts.retry_of(run_ship_review_prompts.retried(STALE))).toBe(STALE)
+		expect(
+			run_ship_review_prompts.retry_of(run_ship_review_prompts.reviewer_prompt),
+		).toBeUndefined()
+	})
 })
 
 describe('run_ship_review_prompts.report_prompt and verification_prompt', () => {

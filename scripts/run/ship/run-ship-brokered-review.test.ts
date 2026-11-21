@@ -33,6 +33,7 @@ const INTERACTION = lane_session_broker.review_paths(DIRECTORY, 'interaction')
 const CODE_BRIEF = 'code brief'
 const INTERACTION_BRIEF = 'interaction brief'
 const BOTH = ['code', 'interaction'] as const
+const FIRST = { round: '1' } as const
 const STOPPED: BrokerAnswer = {
 	is_success: false,
 	reason: 'the broker stopped serving before it answered',
@@ -58,7 +59,7 @@ beforeEach(() => {
 
 describe('run_ship_brokered_review.request', () => {
 	it('asks for `/code-review` alone without slots', async () => {
-		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, '1', ['code'])).toBe(SUCCESS)
+		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, FIRST, ['code'])).toBe(SUCCESS)
 		expect(broker_request).toHaveBeenCalledExactlyOnceWith(DIRECTORY, ISSUE, {
 			kind: 'review',
 			round: '1',
@@ -66,7 +67,7 @@ describe('run_ship_brokered_review.request', () => {
 	})
 
 	it('asks for both slots in one request', async () => {
-		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, '1', BOTH)).toBe(SUCCESS)
+		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, FIRST, BOTH)).toBe(SUCCESS)
 		expect(broker_request).toHaveBeenCalledExactlyOnceWith(DIRECTORY, ISSUE, {
 			kind: 'review',
 			round: '1',
@@ -77,7 +78,7 @@ describe('run_ship_brokered_review.request', () => {
 	it('reviews each slot in turn through the code files when the broker cannot read slots', async () => {
 		review_as_older_broker()
 
-		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, '1', BOTH)).toStrictEqual(
+		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, FIRST, BOTH)).toStrictEqual(
 			SUCCESS,
 		)
 		expect(broker_request).toHaveBeenCalledTimes(3)
@@ -96,15 +97,38 @@ describe('run_ship_brokered_review.request — a failed answer', () => {
 			.mockResolvedValueOnce(failed)
 			.mockResolvedValueOnce(SUCCESS)
 
-		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, '1', BOTH)).toBe(failed)
+		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, FIRST, BOTH)).toBe(failed)
 		expect(files.has(INTERACTION.findings)).toBe(false)
 	})
 
 	it('answers any other failure as it is, without falling back', async () => {
 		broker_request.mockResolvedValue(STOPPED)
 
-		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, '1', BOTH)).toBe(STOPPED)
+		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, FIRST, BOTH)).toBe(STOPPED)
 		expect(broker_request).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#8379: a rerun's cause rides the request, and a broker before it still reviews.
+describe('run_ship_brokered_review.request — a rerun', () => {
+	const RERUN = { round: '1', retry: 'stale-retry' } as const
+
+	it('sends the retry on the action', async () => {
+		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, RERUN, ['code'])).toBe(SUCCESS)
+		expect(broker_request).toHaveBeenCalledExactlyOnceWith(DIRECTORY, ISSUE, {
+			kind: 'review',
+			...RERUN,
+		})
+	})
+
+	it('sends it again without the retry when the broker cannot read it', async () => {
+		broker_request.mockResolvedValueOnce(UNREADABLE).mockResolvedValueOnce(SUCCESS)
+
+		expect(await run_ship_brokered_review.request(DIRECTORY, ISSUE, RERUN, ['code'])).toBe(SUCCESS)
+		expect(broker_request).toHaveBeenLastCalledWith(DIRECTORY, ISSUE, {
+			kind: 'review',
+			round: '1',
+		})
 	})
 })
 

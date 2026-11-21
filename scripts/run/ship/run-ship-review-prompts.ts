@@ -171,8 +171,9 @@ function report_prompt(
 	return report_text(slot_opening(brief_path, slot), slot, issue, findings_path)
 }
 
-// The read-only prompt `retried` pairs with its round prompt, so the slot beside keeps the retry's trigger.
-const BESIDE_PROMPTS = new WeakMap<PromptOf, PromptOf>()
+// What `retried` keeps for each round prompt it builds: the read-only prompt it pairs with, so the slot
+// beside keeps the retry's trigger, and the retry, so a broker that rebuilds the prompt names it too.
+const RETRIED = new WeakMap<PromptOf, { beside: PromptOf; retry: RetryTrigger }>()
 
 function opened(text_of: PromptText, retry: RetryTrigger): PromptOf {
 	return function retried_prompt(brief_path, slot, issue, findings_path): string {
@@ -185,9 +186,14 @@ function opened(text_of: PromptText, retry: RetryTrigger): PromptOf {
 function retried(retry: RetryTrigger): PromptOf {
 	const prompt = opened(reviewer_text, retry)
 
-	BESIDE_PROMPTS.set(prompt, opened(report_text, retry))
+	RETRIED.set(prompt, { beside: opened(report_text, retry), retry })
 
 	return prompt
+}
+
+// The retry a round prompt was built for, `undefined` for a first run's.
+function retry_of(round_prompt: PromptOf): RetryTrigger | undefined {
+	return RETRIED.get(round_prompt)?.retry
 }
 
 // Round 1's prompt: a rerun's when it has a cause, the slot's own otherwise.
@@ -204,7 +210,7 @@ function slot_prompt(
 ): PromptOf {
 	if (slot === review_attest.REVIEW_SLOT.CODE || slots.length === 1) return round_prompt
 
-	return BESIDE_PROMPTS.get(round_prompt) ?? report_prompt
+	return RETRIED.get(round_prompt)?.beside ?? report_prompt
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
@@ -232,6 +238,7 @@ const run_ship_review_prompts = {
 	final_opening,
 	report_prompt,
 	retried,
+	retry_of,
 	reviewer_prompt,
 	round_one_opening,
 	round_one_prompt,

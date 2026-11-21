@@ -10,6 +10,7 @@ import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_pair } from '#scripts/review/review-pair'
 import { review_pair_session } from '#scripts/review/review-pair-session'
+import type { RetryTrigger } from '#scripts/review/review-prompt-level'
 import { review_round } from '#scripts/review/review-round'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_brokered_review } from './run-ship-brokered-review'
@@ -193,8 +194,14 @@ async function run_brokered(
 	issue: string,
 	round: Round,
 	slots: ReadonlyArray<ReviewSlot>,
+	retry: RetryTrigger | undefined,
 ): Promise<JoshResult> {
-	const answer = await run_ship_brokered_review.request(PROJECT_ROOT, issue, round, slots)
+	const answer = await run_ship_brokered_review.request(
+		PROJECT_ROOT,
+		issue,
+		{ round, retry },
+		slots,
+	)
 
 	return answer.is_success
 		? finished_session(slots)
@@ -232,7 +239,7 @@ async function run_sessions(
 	const [first] = sessions
 
 	if (first?.built.kind === 'argv' && is_brokered(first.built.profile, issue)) {
-		return await run_brokered(issue, round, slots)
+		return await run_brokered(issue, round, slots, run_ship_review.retry_of(prompt_of))
 	}
 
 	const results = await run_slots(sessions, round, slots)
