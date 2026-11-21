@@ -37,7 +37,7 @@ describe('run_board_tick — the sweep (joshuafolkken/kit#8240)', () => {
 			const redraw = { ports: { ...ports, theme, size: () => PANE }, now_ms: START + AGED_MS }
 			const drawn = drawn_from(state, local, redraw, layout_for(state, local, START))
 
-			expect(drawn.sweep).toStrictEqual(theme === 'wargames' ? { row: 4, left: 5 } : undefined)
+			expect(drawn.sweep).toStrictEqual(theme === 'wargames' ? { row: 4, left: 19 } : undefined)
 		},
 	)
 
