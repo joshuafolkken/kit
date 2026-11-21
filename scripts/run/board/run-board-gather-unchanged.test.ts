@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type GatherState } from './run-board-gather'
+import { run_board_gather_thread } from './run-board-gather-thread'
 import type { LocalRead } from './run-board-read'
 import { run_board_round_change } from './run-board-round-change'
 
-const { FIRST_ROUND, LOCAL, START, harness } = run_board_fixture
+const { FIRST_ROUND, LOCAL, START, harness, round_ports } = run_board_fixture
 const { FRESH_GATHER, LOCAL_READ_MS, gather } = run_board_gather
 const { inputs_of, is_unchanged } = run_board_round_change
 const IDLE: LocalRead = { ...LOCAL, idle_lanes: ['1'] }
@@ -67,4 +68,42 @@ describe('run_board_gather changed idle reads', () => {
 
 		expect(is_unchanged(before, after, FIRST_ROUND.board)).toBe(true)
 	})
+})
+
+async function posts_after_reread(changed: boolean): Promise<Array<unknown>> {
+	const board = harness(structuredClone(IDLE), [])
+	const { gather_round } = run_board_gather_thread
+	const first = await gather_round(FIRST_ROUND, round_ports(board), () => undefined)
+	const posts: Array<unknown> = []
+
+	board.clock.now_ms += LOCAL_READ_MS
+	board.read_local.mockResolvedValue(
+		changed ? { ...IDLE, is_memory_held: true } : structuredClone(IDLE),
+	)
+	const next = await gather_round(first, round_ports(board), (post) => {
+		posts.push(post)
+	})
+
+	expect(next.gather.read_ms).toBe(START + LOCAL_READ_MS)
+	expect(board.read_local).toHaveBeenCalledTimes(2)
+
+	return posts
+}
+
+describe('run_board_gather_thread equal local rereads', () => {
+	it.each([false, true])(
+		'posts early only when the due local read changes: %s',
+		async (changed) => {
+			const posts = await posts_after_reread(changed)
+
+			if (changed) {
+				expect(posts).toEqual([
+					expect.objectContaining({ display: expect.anything() }),
+					expect.objectContaining({ display: expect.anything(), phases: expect.anything() }),
+				])
+			} else {
+				expect(posts).toEqual([{ read: expect.anything(), phases: expect.anything() }])
+			}
+		},
+	)
 })
