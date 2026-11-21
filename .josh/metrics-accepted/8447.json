@@ -1,0 +1,7 @@
+{
+	"reason": "Options-object type annotations replacing positional optional parameters for unicorn 80 prefer-options-parameter (#8447)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

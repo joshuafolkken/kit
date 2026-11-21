@@ -130,8 +130,7 @@ async function append_line(entry: object, at: string, directory: string): Promis
 // refusal standing exactly as it was emitted.
 async function record(
 	refusal: Refusal,
-	directory: string | undefined = ledger_directory(),
-	context: HookContext = hook_context.from_process(),
+	{ directory, context }: { directory: string | undefined; context: HookContext },
 ): Promise<void> {
 	if (directory === undefined) return
 
@@ -154,7 +153,7 @@ async function record_reason(
 	context: HookContext = hook_context.from_process(),
 ): Promise<void> {
 	if (reason !== undefined) {
-		await record({ hook, reason, raw_payload }, ledger_directory(context), context)
+		await record({ hook, reason, raw_payload }, { directory: ledger_directory(context), context })
 	}
 }
 

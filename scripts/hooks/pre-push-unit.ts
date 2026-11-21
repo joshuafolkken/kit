@@ -232,11 +232,15 @@ async function run_miss(miss: PushMiss): Promise<number> {
 	return await run_reserved_suite(forwarded_arguments(miss.extra_arguments))
 }
 
-async function run_pre_push_unit(
-	extra_arguments: ReadonlyArray<string> = [],
-	source?: string,
-	scoped?: ScopedSources,
-): Promise<number> {
+async function run_pre_push_unit({
+	extra_arguments = [],
+	source,
+	scoped,
+}: {
+	extra_arguments?: ReadonlyArray<string> | undefined
+	source?: string | undefined
+	scoped?: ScopedSources | undefined
+} = {}): Promise<number> {
 	const tree = await read_push_tree()
 	const reuse = push_reuse(tree, extra_arguments, source)
 
@@ -260,7 +264,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	// `process.argv` is [runner, script, ...arguments].
 	const FIRST_ARGUMENT_INDEX = 2
 
-	process.exitCode = await run_pre_push_unit(process.argv.slice(FIRST_ARGUMENT_INDEX))
+	process.exitCode = await run_pre_push_unit({
+		extra_arguments: process.argv.slice(FIRST_ARGUMENT_INDEX),
+	})
 }
 
 const pre_push_unit = {
