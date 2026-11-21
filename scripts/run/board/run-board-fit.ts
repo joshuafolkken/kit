@@ -105,6 +105,8 @@ interface FrameParts {
 	footer: ReadonlyArray<string>
 	// The column every rule runs on to: where a lane row's full title ends (`run-board-rule-width.ts`).
 	rule_width?: number | undefined
+	// The pane's width: a rule's tail that would run past it is left out (joshuafolkken/kit#8514).
+	columns?: number | undefined
 }
 
 // One thing that gives way: a part as a whole, the processes' details, one note (the oldest shown),

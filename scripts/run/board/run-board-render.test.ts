@@ -85,7 +85,7 @@ describe('run_board_render.render rows', () => {
 		expect(lines.map((line) => unfinished(line))).toContain(row_line)
 		expect(row_line).not.toContain('■')
 		expect(lines.slice(0, -2).join('\n')).not.toContain('implement')
-		expect(lines.some((line) => /^── 🧵 lanes ─+ ⏰ ─+$/u.test(line))).toBe(true)
+		expect(lines.some((line) => /^── 🧵 lanes ─+ ⏰ ─+ ✅ /u.test(line))).toBe(true)
 	})
 
 	it('ends an elapsed time of hours and one of seconds in the same column', () => {
@@ -360,16 +360,5 @@ describe('run_board_render.render links', () => {
 		expect(plain).toContain(
 			`${ROW_INDENT}✅ ${ENDED_AT_1} 2       ${padded('Issue 2')}  1′00″  🔗 other/repo#7`,
 		)
-	})
-})
-
-describe('run_board_render.render header', () => {
-	it('counts the progress with the arrivals since the board first looked', () => {
-		const active = [row(1, { state: 'merged' }), row(2, { state: 'running' })]
-		const layout = { ...EMPTY_LAYOUT, active, unreached: [row(3)] }
-		const progress = lines_of(header({ layout, baseline_total: 2 }))[0] ?? ''
-
-		expect(progress).toMatch(/ {2}✅ {2}1\/3 \S+ \(\+1\)/u)
-		expect(progress).toContain('(+1)  🔄 1  💤 0')
 	})
 })

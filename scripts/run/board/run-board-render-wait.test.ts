@@ -14,8 +14,6 @@ const { minute_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_render_fixture
 const SECOND = 1000
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
-const EMPTY_BAR = '─'.repeat(10)
-const COUNTS = `✅  0/0 ${EMPTY_BAR}  🔄 0  💤 0`
 // The second line's name column with no kit version recorded: `-` under the board's name.
 const VERSION_CELL = '  -'.padEnd('⏸ josh-board'.length)
 // The time cell a running run leaves blank, as wide as the `⏰ 2°10′00″` over it.
@@ -43,7 +41,7 @@ function clock_of(layout: BoardLayout): string | undefined {
 describe('run_board_render.render — the header while the run waits', () => {
 	it('draws the wait as the mark and the missed heartbeat in the notice slot', () => {
 		expect(lines_of(header({ activity: WAITING })).slice(0, 2)).toStrictEqual([
-			`⏸ josh-board  ⏰ 2°10′00″  ${COUNTS}`,
+			'⏸ josh-board  ⏰ 2°10′00″',
 			BEAT_LINE,
 		])
 	})
@@ -70,7 +68,7 @@ describe('run_board_render.render — the header while the run waits', () => {
 	it('marks a run waiting on a person ✋ and changes nothing on the second line', () => {
 		const lines = lines_of(header({ activity: WAITING, layout: PEOPLE_LAYOUT }))
 
-		expect(lines[0]).toMatch(/^✋ josh-board {2}⏰ 2°10′00″ {2}✅ {2}0\/1 /u)
+		expect(lines[0]).toBe('✋ josh-board  ⏰ 2°10′00″')
 		expect(lines[1]?.replace(/^ +- +/u, '')).toBe(BEAT_LINE.replace(/^ +- +/u, ''))
 	})
 
@@ -90,7 +88,7 @@ describe('run_board_render.render — the header once the run has ended', () => 
 		const lines = lines_of(header({ activity, ended_ms }))
 
 		expect(lines.slice(0, 2)).toStrictEqual([
-			`■ josh-board  ⏰ 3′25″  ${COUNTS}`,
+			'■ josh-board  ⏰ 3′25″',
 			`${VERSION_CELL}  🔚 ${minute_of(ended_ms)}  ${MACHINE_UNKNOWN}  ${SLOT_BLANK}`,
 		])
 	})

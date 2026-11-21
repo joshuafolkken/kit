@@ -121,28 +121,36 @@ function fold_parts(parts: FrameParts, folded: ReadonlySet<SectionKey>): FramePa
 	}
 }
 
-function widened_part<Part extends Headed>(part: Part, width: number): Part {
-	return { ...part, head: widened(part.head, width, part.tail) }
+// How far a rule runs: on to `width`, its tail kept within the pane's `columns`.
+interface Reach {
+	width: number
+	columns?: number | undefined
 }
 
-function widened_detail(part: DetailPart | undefined, width: number): DetailPart | undefined {
-	return part === undefined ? undefined : widened_part(part, width)
+function widened_part<Part extends Headed>(part: Part, reach: Reach): Part {
+	return { ...part, head: widened(part.head, reach.width, part.tail, reach.columns) }
+}
+
+function widened_detail(part: DetailPart | undefined, reach: Reach): DetailPart | undefined {
+	return part === undefined ? undefined : widened_part(part, reach)
 }
 
 // Every rule run on to the lane rows' title column, folded or open (joshuafolkken/kit#5520).
 function widened_parts(parts: FrameParts): FrameParts {
-	const { rule_width: width } = parts
+	const { rule_width: width, columns } = parts
 
 	if (width === undefined) return parts
 
+	const reach = { width, columns }
+
 	return {
 		...parts,
-		throughput: widened_detail(parts.throughput, width),
-		usage: widened_detail(parts.usage, width),
-		plan: parts.plan.map((section) => widened_part(section, width)),
-		below: parts.below?.map((section) => widened_part(section, width)),
-		processes: widened_detail(parts.processes, width),
-		notes: widened_part(parts.notes, width),
+		throughput: widened_detail(parts.throughput, reach),
+		usage: widened_detail(parts.usage, reach),
+		plan: parts.plan.map((section) => widened_part(section, reach)),
+		below: parts.below?.map((section) => widened_part(section, reach)),
+		processes: widened_detail(parts.processes, reach),
+		notes: widened_part(parts.notes, reach),
 	}
 }
 

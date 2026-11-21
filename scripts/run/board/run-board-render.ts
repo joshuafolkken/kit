@@ -200,14 +200,14 @@ function plan_parts(
 	header: BoardHeader,
 	notes: ReadonlyArray<BoardNote>,
 	size: TerminalSize | undefined,
-): Pick<FrameParts, 'below' | 'plan' | 'rule_width'> {
+): Pick<FrameParts, 'below' | 'columns' | 'plan' | 'rule_width'> {
 	const { layout } = header
 	const frame = frame_of(header, notes, size)
-	const rule_width = run_board_rule_width.rule_width(frame)
+	const widths = { rule_width: run_board_rule_width.rule_width(frame), columns: size?.columns }
 
-	if (layout === undefined) return { plan: [], rule_width }
+	if (layout === undefined) return { plan: [], ...widths }
 
-	return { plan: active_sections(layout, frame), rule_width, below: below_sections(layout, frame) }
+	return { plan: active_sections(layout, frame), ...widths, below: below_sections(layout, frame) }
 }
 
 function render(view: BoardView): Array<string> {

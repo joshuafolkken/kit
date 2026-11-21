@@ -107,12 +107,9 @@ function redrawn(
 		},
 	}
 
-	// A single frame counts arrivals from its own total, never from the live board's first one.
-	const single = { ...state, baseline_total: undefined }
+	const display = assemble_display(state, local, now_ms, layout_for(state, local, now_ms))
 
-	const display = assemble_display(single, local, now_ms, layout_for(single, local, now_ms))
-
-	draw_display(single, display, { ports: quiet, now_ms })
+	draw_display(state, display, { ports: quiet, now_ms })
 
 	return text
 }

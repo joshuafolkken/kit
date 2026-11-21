@@ -131,16 +131,16 @@ A live board and `--every` record too; a board's age counts from its plan read.
 The header is three lines — the first two in three columns, the third the repository's name, a spinner and time under the second column, then the kind's icon and words under the third:
 
 ```
-▶ josh-board   ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  💤 0  📮 87/6,912
+▶ josh-board   ⏰ 7°18′07″  🎯 ~16:40
   v1.3153.0+1  💓      20″  💪  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
   kit          ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
 The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
-The first line is how far the run is: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, the running and parked counts, `📮` open/closed issues. The queued and waiting counts are on their headings, not here, and so are a plan read in flight and a saved plan's age (the `⏳ queued` heading's right end).
+The first line is how long the run has gone: `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), then `🎯 ~HH:MM` the estimated finish once the plan is read. The tallies, counts, plan read in flight and saved plan's age are on the section headings (below).
 
-The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
+The second line is what the run is on: `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; the first gauge starts in one column whatever its percent.
 
 A live board ends the second line on the sound switch (`🔊` on, `🔇` off) and the last notice, sounded or muted: `🔊 10:42 alert · #<N> stopped` — time, cue, cause; `(repeat)` on a replay, `🔊 —` before the first. `--once`, `--chat` and Telegram draw none.
 
@@ -170,6 +170,8 @@ A missing or broken file opens every section; an unknown section name is dropped
 The `⏳ queued` and `🔗 waiting` headings count their rows, an epic's children counted and its own line not, then the priorities among them: `⏳ queued 18 (🔺 2)`, `🔗 waiting 17 (🚨 1 🔺 9)`. A heading with no priority row draws its count alone, never `(🔺 0)`.
 
 The `⏳ queued` heading ends, open or folded, on `⏳ ⠋` while a plan read is in flight (a live terminal only) and `🕘 3′05″` the saved plan's age while the plan drawn is a saved one: `⏳ ⠋  🕘 3′05″` with both. Wargames draws them `HD` and `AG`. A board with no `⏳ queued` heading draws neither.
+
+The `🧵 lanes` heading ends, open or folded, on the run's tallies: `✅ 7/47  🔄 5  💤 3  📮 78/4,489` — settled over the plan's total (`-` before the plan is read, faint while the plan drawn is a saved one), running, parked, then the repository's open/closed issues. Wargames draws them `OK`, `RN`, `ZZ` and `IS`. None where they would pass the pane's edge or there is no lanes heading.
 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped; an unanswered probe leaves it running. A single frame that finds an idle lane waits out the window and reads again. A lane this run's record ended (`lane:close`) is stopped too.
 
@@ -249,7 +251,7 @@ A stop-marked `halfrun` or `prrun` hold keeps its row, led by `✅`, no phase; i
 
 The name is the one the record carries (`--fullrun`, `--prrun`, or none for a `halfrun`), so a running `prrun` is drawn as `🏠 prrun`; an older `prrun` record without it reads as `fullrun`.
 
-Beside a backlogrun, the root checkout's running or stopped single run is drawn under its own `🏠 <name>` heading above the `🧵` lanes; the header counts no lane and no `🔄` for it. The legend omits a stopped run's `✅`.
+Beside a backlogrun, the root checkout's running or stopped single run is drawn under its own `🏠 <name>` heading above the `🧵` lanes; the lanes heading's tallies count no lane and no `🔄` for it. The legend omits a stopped run's `✅`.
 
 The merge that releases its hold keeps the run's issue, start and end, so a merge inside the backlogrun's span moves it out of `🏠` into `✅ done`, placed by its end like a lane's finished row.
 
