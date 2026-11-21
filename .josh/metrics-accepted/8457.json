@@ -1,0 +1,7 @@
+{
+	"reason": "wargames overwrite typing adds the over-saved-frame typing logic and its tests (+91 code lines in scripts/run/board)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 91
+	}
+}

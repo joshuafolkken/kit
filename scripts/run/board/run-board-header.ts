@@ -9,6 +9,7 @@ import type { FoundOf } from './run-board-found'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_names, type RunMark } from './run-board-header-names'
 import { run_board_header_notice, type Notice } from './run-board-header-notice'
+import { run_board_header_parts } from './run-board-header-parts'
 import { run_board_header_time } from './run-board-header-time'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
@@ -309,7 +310,10 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 		saved_part(header),
 	]
 
-	return parts.filter((part) => part !== undefined).join(GAP)
+	return run_board_header_parts.keyed_progress(
+		header,
+		parts.filter((part) => part !== undefined).join(GAP),
+	)
 }
 
 // The children drawn as running: only their operations are the run's newest.

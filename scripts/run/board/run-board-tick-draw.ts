@@ -176,7 +176,9 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
 // rows the plan brings were already there — so the frame the plan arrives on is the first base. What
-// counts as known is `run_board_row_sections.known_of`'s, over the notes the frame was drawn from.
+// counts as known is `run_board_row_sections.known_of`'s, over the notes the frame was drawn from; the
+// lines a saved plan's frame draws faint type over it on the frame the live plan lands on
+// (joshuafolkken/kit#8457).
 function typing_of(
 	state: BoardState,
 	drawn: Pick<Drawn, 'keyed' | 'notes'>,
@@ -184,7 +186,11 @@ function typing_of(
 	redraw: Redraw,
 ): Typing {
 	const is_on = redraw.ports.types_rows === true && state.plan !== undefined
-	const frame = { keyed: drawn.keyed, known: run_board_row_sections.known_of(header, drawn.notes) }
+	const frame = {
+		keyed: drawn.keyed,
+		known: run_board_row_sections.known_of(header, drawn.notes),
+		faint: run_board_row_sections.faint_keys_of(header),
+	}
 
 	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
 }

@@ -51,3 +51,25 @@ describe('run_board_cut_styled.cut_styled', () => {
 		expect(cut_styled(`${GREEN}ab${DEFAULT}`, 5)).toBe(`${GREEN}ab${DEFAULT}${RESET}`)
 	})
 })
+
+// joshuafolkken/kit#8457: the saved line right of a typing row's block.
+describe('run_board_cut_styled.tail_styled', () => {
+	const { tail_styled } = run_board_cut_styled
+
+	it('drops a plain line’s first columns and resets the colors after it', () => {
+		expect(tail_styled('abcdef', 3)).toBe(`def${RESET}`)
+	})
+
+	it('keeps the colors opened before the dropped columns, so the tail draws as the line did', () => {
+		expect(tail_styled(`a${GREEN}bcd${DEFAULT}ef`, 2)).toBe(`${GREEN}cd${DEFAULT}ef${RESET}`)
+	})
+
+	it('draws blanks for the part of a character two columns wide the cut splits', () => {
+		expect(tail_styled('a✅b', 2)).toBe(` b${RESET}`)
+		expect(tail_styled('a✅b', 3)).toBe(`b${RESET}`)
+	})
+
+	it('keeps nothing of a line no wider than the columns but its escapes', () => {
+		expect(tail_styled(`${GREEN}ab${DEFAULT}`, 5)).toBe(`${GREEN}${DEFAULT}${RESET}`)
+	})
+})

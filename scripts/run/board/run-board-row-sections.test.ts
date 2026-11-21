@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_header } from './run-board-header'
+import { run_board_header_parts } from './run-board-header-parts'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_notes } from './run-board-render-notes'
@@ -87,5 +88,33 @@ describe('run_board_row_sections.known_of', () => {
 
 		expect(note_keys).toHaveLength(NOTE_LIMIT + 1)
 		expect(note_keys).toContain(`note:park:${String(NOTE_LIMIT)}:${String(NOTE_LIMIT)}`)
+	})
+})
+
+// joshuafolkken/kit#8457: the progress line's key, always known, and the keys a frame drawn from a saved
+// plan draws faint.
+describe('run_board_row_sections.faint_keys_of', () => {
+	const { faint_keys_of } = run_board_row_sections
+	const FAINT = /^(?:decision|queued|waiting):/u
+
+	it('knows the progress line’s key where the board types rows', () => {
+		const keyed = header({ layout: LAYOUT, is_keyed: true })
+
+		expect(known_of(keyed, []).has(run_board_header_parts.plan_key(keyed) ?? '')).toBe(true)
+	})
+
+	it('holds the decision, queued and waiting rows and the progress line while the plan is saved', () => {
+		const saved = header({ layout: LAYOUT, plan_saved_ms: 1, is_keyed: true })
+		const rows = [...keys_of(LAYOUT)].filter((key) => FAINT.test(key))
+
+		expect(rows).toHaveLength(5)
+		expect(faint_keys_of(saved)).toStrictEqual(
+			new Set([...rows, run_board_header_parts.plan_key(saved)]),
+		)
+	})
+
+	it('holds none on a live frame or before a layout is read', () => {
+		expect(faint_keys_of(header({ layout: LAYOUT }))).toBeUndefined()
+		expect(faint_keys_of(header({ layout: undefined, plan_saved_ms: 1 }))).toBeUndefined()
 	})
 })
