@@ -16,7 +16,8 @@ interface IntroLeads {
 }
 
 interface IntroDefinition {
-	// The line typed before the first frame, and the pauses after each letter and after the line.
+	// The line typed before the first frame — shown at once after the theme's leads where it has them —
+	// and the pauses after each letter and after the line.
 	line: string
 	letter_ms: number
 	hold_ms: number

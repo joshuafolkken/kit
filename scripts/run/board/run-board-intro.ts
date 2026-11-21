@@ -8,8 +8,10 @@ import { run_board_typing } from './run-board-typing'
 
 // The line a live board in a theme types before its first frame, a letter at a time with a block cursor after
 // the last letter typed, then holds without the cursor — the first frame's read runs meanwhile, and the
-// frame is drawn over the line once both are done. A key skips the rest; the key is spent on the skip,
-// not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last written.
+// frame is drawn over the line once both are done. A theme with lead lines types and erases each first,
+// then shows its line at once (joshuafolkken/kit#8441). A key skips the rest; the key is spent on the
+// skip, not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last
+// written.
 
 const { LINE_MS: REVEAL_LINE_MS, beats_of } = run_board_reveal_blocks
 const LINE_START = '\r'
