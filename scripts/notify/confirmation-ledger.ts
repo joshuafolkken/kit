@@ -68,10 +68,15 @@ async function append(line: object, at: string, directory: string | undefined): 
 	}
 }
 
+// Where a record lands: the ledger directory (none writes nothing) and the call's own checkout.
+interface LedgerScope {
+	directory?: string | undefined
+	context?: HookContext | undefined
+}
+
 async function record(
 	asked: ConfirmationAsked,
-	directory: string | undefined = ledger_directory(),
-	context: HookContext = hook_context.from_process(),
+	{ directory = ledger_directory(), context = hook_context.from_process() }: LedgerScope = {},
 ): Promise<void> {
 	const line = asked_line(asked, context.cwd, new Date())
 
@@ -86,14 +91,10 @@ interface SentInput {
 
 // `telegram_notify.send`'s one call: only a confirmation is recorded, and one that names no reason is
 // a question the person decides.
-async function record_sent(
-	input: SentInput,
-	directory: string | undefined = ledger_directory(),
-	context: HookContext = hook_context.from_process(),
-): Promise<void> {
+async function record_sent(input: SentInput, scope: LedgerScope = {}): Promise<void> {
 	if (input.task_type !== CONFIRMATION_TYPE) return
 
-	await record({ reason: input.reason ?? DEFAULT_REASON, issue: input.issue }, directory, context)
+	await record({ reason: input.reason ?? DEFAULT_REASON, issue: input.issue }, scope)
 }
 
 async function day_files(directory: string): Promise<Array<string>> {

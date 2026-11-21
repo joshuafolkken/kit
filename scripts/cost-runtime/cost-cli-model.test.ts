@@ -23,7 +23,7 @@ describe('cost_cli.run --cut on an Anthropic transcript', () => {
 	])('prices %i tokens on Opus 5.5 at its own break-even as %s', (tokens, verdict) => {
 		write_session(SESSION_A, [priced_line('r1', OPUS, tokens)])
 
-		expect(cost_cli.run(['--cut'], CWD, ANTHROPIC_ENV)).toBe(0)
+		expect(cost_cli.run(['--cut'], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(0)
 		expect(stdout().trim()).toBe(verdict)
 	})
 
@@ -32,7 +32,7 @@ describe('cost_cli.run --cut on an Anthropic transcript', () => {
 
 		write_session(SESSION_A, [priced_line('r1', STANDARD, 1), priced_line('r2', OPUS, tokens)])
 
-		expect(cost_cli.session_figures(CWD, ANTHROPIC_ENV)).toStrictEqual({
+		expect(cost_cli.session_figures({ cwd: CWD, environment: ANTHROPIC_ENV })).toStrictEqual({
 			verdict: 'under',
 			cost: tokens,
 			threshold: OPUS_THRESHOLD,
@@ -44,7 +44,7 @@ describe('cost_cli.run --cut on an Anthropic transcript', () => {
 
 		write_session(SESSION_A, [priced_line('r1', OPUS, 1), priced_line('r2', STANDARD, tokens)])
 
-		expect(cost_cli.session_figures(CWD, ANTHROPIC_ENV)).toStrictEqual({
+		expect(cost_cli.session_figures({ cwd: CWD, environment: ANTHROPIC_ENV })).toStrictEqual({
 			verdict: 'over',
 			cost: tokens,
 			threshold: STANDARD_THRESHOLD,
