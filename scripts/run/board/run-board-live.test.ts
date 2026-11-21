@@ -19,6 +19,7 @@ const DIM_HEADING_START = `\n${ESCAPE}[K${ESCAPE}[2m──${ESCAPE}[22m `
 const { WORDS } = run_board_labels
 // The keeps-running line and the line after it or before it (the keys, or the blank) end every frame.
 const FOOTER_LINES = 2
+const LEFT_MS = 300
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -164,14 +165,22 @@ describe('run_board_live.watch failed tick', () => {
 
 // joshuafolkken/kit#8250: the trill reaches the draws only in a theme, and the board stops it as it
 // leaves.
-function trill_heard(): { switched: Array<string>; typing_sound: TypingSound } {
+// The trill's switches, and the letters' ends each `on` was handed (joshuafolkken/kit#8523).
+function trill_heard(): {
+	switched: Array<string>
+	ends: Array<number | undefined>
+	typing_sound: TypingSound
+} {
 	const switched: Array<string> = []
+	const ends: Array<number | undefined> = []
 
 	return {
 		switched,
+		ends,
 		typing_sound: {
-			set: (is_on) => {
+			set: (is_on, left_ms) => {
 				switched.push(is_on ? 'on' : 'off')
+				if (is_on) ends.push(left_ms)
 			},
 			stop: () => {
 				switched.push('stop')
@@ -222,6 +231,16 @@ describe('run_board_live.watch trill', () => {
 		await expect(run_board_live.watch({ ...ports, typing_sound }, 'wargames')).rejects.toBe(STOPPED)
 		expect(switched.length).toBeGreaterThan(1)
 		expect(switched.at(-1)).toBe('stop')
+	})
+
+	it('hands the draws’ letters end through to the trill', () => {
+		const { ports } = harness(LOCAL, [])
+		const { ends, typing_sound } = trill_heard()
+		const live = run_board_live.live_of('wargames')
+		const trill = run_board_live.trill_of({ ...ports, typing_sound }, { folded: undefined }, live)
+
+		trill?.set(true, LEFT_MS)
+		expect(ends).toStrictEqual([LEFT_MS])
 	})
 
 	it('stops the trill once however many paths reach the leave', async () => {
