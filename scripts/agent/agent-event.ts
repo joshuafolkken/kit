@@ -2,6 +2,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { transcript_record, type TranscriptRecord } from '#scripts/lib/transcript-record'
 import { z } from 'zod'
 import type { AgentProvider } from './agent-role-profile'
+import { agent_usage_limit } from './agent-usage-limit'
 import { claude_result_event } from './claude-result-event'
 
 const ASSISTANT_TYPE = 'assistant'
@@ -31,6 +32,7 @@ type AgentResult = 'running' | 'completed' | 'failed'
 type AgentUsage = z.infer<typeof USAGE_SCHEMA>
 
 interface AgentEventState {
+	is_usage_limited?: boolean
 	provider: AgentProvider | undefined
 	launch: AgentLaunch
 	progress: string | undefined
@@ -144,7 +146,9 @@ function codex_event(value: unknown, state: AgentEventState): AgentEventState | 
 }
 
 function normalized(value: unknown, state: AgentEventState): AgentEventState {
-	return claude_event(value, state) ?? codex_event(value, state) ?? state
+	const next = claude_event(value, state) ?? codex_event(value, state) ?? state
+
+	return agent_usage_limit.is_rejected(value) ? { ...next, is_usage_limited: true } : next
 }
 
 function next_state(line: string, state: AgentEventState): AgentEventState {

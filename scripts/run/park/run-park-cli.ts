@@ -9,7 +9,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_park } from './run-park'
-import { run_park_answered } from './run-park-answered'
+import { run_park_answered, type ParkCheck } from './run-park-answered'
 import { run_park_body } from './run-park-body'
 import { run_park_escalate } from './run-park-escalate'
 import { run_park_release } from './run-park-release'
@@ -72,10 +72,12 @@ function is_next_missing(body: string): boolean {
 
 // **A park asks only what the Issue has not answered** (joshuafolkken/kit#6531): after the schema,
 // `run_park_answered` judges the question against the Issue before any write.
-async function stop_of(request: CommentRequest, directory: string): Promise<number | undefined> {
+async function stop_of(request: CommentRequest, directory: string): Promise<ParkCheck> {
 	const { body } = request
 
-	if (run_park_write.is_refused(body) || is_next_missing(body)) return FAILURE_EXIT_CODE
+	if (run_park_write.is_refused(body) || is_next_missing(body)) {
+		return { exit_code: FAILURE_EXIT_CODE }
+	}
 
 	return await run_park_answered.refusal_of(request.issue_number, request.body, directory)
 }
@@ -83,9 +85,10 @@ async function stop_of(request: CommentRequest, directory: string): Promise<numb
 async function park(request: CommentRequest, directory: string): Promise<number> {
 	const stop = await stop_of(request, directory)
 
-	if (stop !== undefined) return stop
+	if (stop !== undefined && 'exit_code' in stop) return stop.exit_code
 
-	const is_parked = await run_park_write.write(request, directory)
+	const body = stop === undefined ? request.body : `${request.body}\n\n${stop.note}`
+	const is_parked = await run_park_write.write({ ...request, body }, directory)
 
 	return is_parked ? await release(request.issue_number, directory) : FAILURE_EXIT_CODE
 }
