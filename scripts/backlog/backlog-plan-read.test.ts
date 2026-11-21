@@ -88,6 +88,26 @@ describe('backlog_plan_read.fetch_open', () => {
 
 		await expect(backlog_plan_read.fetch_open()).resolves.toBeUndefined()
 	})
+
+	// joshuafolkken/kit#8507: the reason reaches `run:board`'s notice slot.
+	it('carries gh’s reason when the listing could not be read', async () => {
+		issue_list_recent_mock.mockResolvedValue({
+			json: undefined,
+			is_capped: false,
+			error: 'HTTP 401',
+		})
+
+		await expect(backlog_plan_read.read_open()).resolves.toStrictEqual({
+			listing: undefined,
+			error: 'HTTP 401',
+		})
+	})
+
+	it('carries no reason for a listing read but not parsed', async () => {
+		issue_list_recent_mock.mockResolvedValue({ json: '{}', is_capped: false })
+
+		await expect(backlog_plan_read.read_open()).resolves.toStrictEqual({ listing: undefined })
+	})
 })
 
 describe('backlog_plan_read.context_of', () => {

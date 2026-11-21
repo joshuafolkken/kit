@@ -62,6 +62,8 @@ const ONE_REQUEST = 1
 const TWO_REQUESTS = 2
 const SEARCH_TERM = '#1022'
 const FIRST_PAGE_OFFSET = 0
+// joshuafolkken/kit#8507: a failed read carries gh's reason, for `run:board`'s notice slot.
+const UNREAD = { json: undefined, is_capped: false, error: 'HTTP 403' }
 
 function api_paths(): Array<string> {
 	return mocked_api.mock.calls.map(([request]) => request.path)
@@ -337,10 +339,10 @@ describe('issue_list — the page ceiling', () => {
 
 	// An unreadable listing is fully described by `json`; a truncation flag on it would be about
 	// pages that were never fetched.
-	it('answers no json and no cap when the read fails', async () => {
-		mocked_api.mockRejectedValue(new Error('HTTP 403'))
+	it('answers no json and no cap, with gh’s reason, when the read fails', async () => {
+		mocked_api.mockRejectedValue(new Error(UNREAD.error))
 
-		expect(await search_outcome(LIMIT_MANY)).toEqual({ json: undefined, is_capped: false })
+		expect(await search_outcome(LIMIT_MANY)).toStrictEqual(UNREAD)
 	})
 })
 
