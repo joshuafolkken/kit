@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import type { KeyInput } from './run-board-keys'
+import { run_board_labels } from './run-board-labels'
 import { run_board_live } from './run-board-live'
 import { run_board_screen } from './run-board-screen'
 import type { TypingSound } from './run-board-sound-typing'
@@ -15,6 +16,9 @@ const ESCAPE = '\u{1B}'
 const DIM_RULE = new RegExp(`${ESCAPE}\\[2m─+${ESCAPE}\\[22m`, 'u')
 const REFRESH_START = `${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`
 const DIM_HEADING_START = `\n${ESCAPE}[K${ESCAPE}[2m──${ESCAPE}[22m `
+const { WORDS } = run_board_labels
+// The keeps-running line and the line after it or before it (the keys, or the blank) end every frame.
+const FOOTER_LINES = 2
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -81,6 +85,22 @@ describe('run_board_live.watch', () => {
 		await expect(run_board_live.watch(ports, undefined)).rejects.toBe(STOPPED)
 		leaves[0]?.()
 		expect(frames.filter((frame) => frame === SCREEN.leave)).toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#8510: the footer under the legend is drawn at full brightness.
+describe('run_board_live.watch footer', () => {
+	it('draws the footer lines with no dim escape on every redraw', async () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+		await expect(run_board_live.watch(ports, undefined)).rejects.toBe(STOPPED)
+		const drawn = frames.filter((frame) => frame.startsWith(REFRESH_START))
+		const footers = drawn.flatMap((frame) => frame.split('\n').slice(-FOOTER_LINES))
+
+		expect(drawn.length).toBeGreaterThan(0)
+		expect(footers.some((line) => line.includes(WORDS.keeps_running))).toBe(true)
+		expect(footers.join('\n')).not.toContain(`${ESCAPE}[2m`)
 	})
 })
 

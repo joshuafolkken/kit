@@ -1,4 +1,3 @@
-import { styleText } from 'node:util'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_board_earlier } from './run-board-earlier'
 import { run_board_kind } from './run-board-kind'
@@ -173,7 +172,7 @@ function legend_of(
 ): Array<string> {
 	const entries = [...states_line(drawn), ...others_line(rows, drawn, notes)]
 
-	return entries.length === 0 ? [] : [styleText('dim', entries.join(GAP))]
+	return entries.length === 0 ? [] : [entries.join(GAP)]
 }
 
 const run_board_render_legend = {
