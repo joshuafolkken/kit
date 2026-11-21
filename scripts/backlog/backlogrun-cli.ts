@@ -234,10 +234,15 @@ async function dispatch(
 	return await begin(parsed.args, git_directory, ports, request)
 }
 
-async function run(
+interface RunOptions {
+	ports?: BacklogrunPorts
+	environment?: AgentEnvironment
+}
+
+async function run_with_ports(
 	argv: ReadonlyArray<string>,
-	ports: BacklogrunPorts = LIVE_PORTS,
-	environment: AgentEnvironment = {},
+	ports: BacklogrunPorts,
+	environment: AgentEnvironment,
 ): Promise<number> {
 	const parsed = backlogrun_args.parse(argv)
 
@@ -250,13 +255,23 @@ async function run(
 	return await dispatch(parsed, git_directory, ports, { argv, environment })
 }
 
+async function run(
+	argv: ReadonlyArray<string>,
+	{ ports = LIVE_PORTS, environment = {} }: RunOptions = {},
+): Promise<number> {
+	return await run_with_ports(argv, ports, environment)
+}
+
 const backlogrun_cli = { LIVE_PORTS, run }
 
 // `.env` is read inside the guard, as `run:board` reads it, so the board draws in the person's
 // `JOSH_SESSION_LANG` while the unit tests see no developer's `.env`.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	josh_environment_file.load_environment_file()
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET), LIVE_PORTS, process.env)
+	process.exitCode = await run(process.argv.slice(ARGV_OFFSET), {
+		ports: LIVE_PORTS,
+		environment: process.env,
+	})
 }
 
 export type { BacklogrunPorts }
