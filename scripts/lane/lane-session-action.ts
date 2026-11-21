@@ -247,6 +247,7 @@ async function answer(lane: LaneInfo, action: BrokerAction): Promise<BrokerAnswe
 }
 
 const lane_session_action = {
+	BRIEF_PREFIX,
 	SUCCESS,
 	action_schema,
 	answer,

@@ -23,10 +23,13 @@ const INTERACTION_PROMPT =
 const PAIRED_PROMPT =
 	'Review this checkout as a paired /code-review, recorded only: read the review brief at /tmp/b.md'
 
+const ROUND_TWO_PROMPT = `${INTERACTION_PROMPT}\nThis is the final round-2 verification pass; read the scope the brief names.`
+
 interface Run {
 	prompt?: string
 	issue?: number | undefined
-	agent_type?: string
+	// `undefined` for a top-level session, as a `josh ship` reviewer is.
+	agent_type?: string | undefined
 	minute?: number
 }
 
@@ -39,7 +42,7 @@ function run(options: Run): AuditSession {
 		...session('review', [record(`r${String(ids.next)}`, options.minute ?? CURRENT, 1)]),
 		prompt: options.prompt ?? MAIN_PROMPT,
 		issue: 'issue' in options ? options.issue : MERGED,
-		agent_type: options.agent_type ?? REVIEWER,
+		agent_type: 'agent_type' in options ? options.agent_type : REVIEWER,
 	}
 }
 
@@ -125,6 +128,40 @@ describe('cost_audit_review_trigger — a run placed by its prompt and order', (
 
 	it('reads only reviewer agents', () => {
 		const counts = counts_of([run({ agent_type: 'investigator' })])
+
+		expect(new Set(counts.values())).toStrictEqual(new Set([0]))
+	})
+})
+
+describe('cost_audit_review_trigger — a top-level josh ship reviewer', () => {
+	it('counts a session with no agent type by the ship brief path', () => {
+		const counts = counts_of([
+			run({ agent_type: undefined }),
+			run({ agent_type: undefined, prompt: INTERACTION_PROMPT }),
+		])
+
+		expect([counts.get('initial'), counts.get('interaction')]).toStrictEqual([1, 1])
+	})
+
+	it('counts a session with no agent type by its trigger line', () => {
+		const prompt = 'medium — trigger: paired — Review this checkout'
+
+		expect(count_of([run({ agent_type: undefined, prompt })], 'paired')).toBe(1)
+	})
+
+	it('places an interaction round 2 under round-2, not as an interaction retry', () => {
+		const counts = counts_of([
+			run({ agent_type: undefined, prompt: INTERACTION_PROMPT }),
+			run({ agent_type: undefined, prompt: ROUND_TWO_PROMPT }),
+		])
+
+		expect([counts.get('interaction'), counts.get('round-2'), counts.get(RETRY)]).toStrictEqual([
+			1, 1, 0,
+		])
+	})
+
+	it('leaves out a top-level session with neither mark', () => {
+		const counts = counts_of([run({ agent_type: undefined, prompt: 'Fix issue #1' })])
 
 		expect(new Set(counts.values())).toStrictEqual(new Set([0]))
 	})

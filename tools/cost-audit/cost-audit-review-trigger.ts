@@ -1,4 +1,6 @@
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
+import { lane_session_action } from '#scripts/lane/lane-session-action'
+import { lane_transcript_calls } from '#scripts/lane/lane-transcript-calls'
 import { review_prompt_level, type ReviewTrigger } from '#scripts/review/review-prompt-level'
 import type { AuditSession } from './cost-audit-read'
 import type { TriggerRow, TriggerTotal } from './cost-audit-resume'
@@ -6,21 +8,24 @@ import type { TriggerRow, TriggerTotal } from './cost-audit-resume'
 // Why a reviewer was started, for `josh cost:audit`'s reviewer table (joshuafolkken/kit#8361).
 //
 // **A prompt's own `trigger: <word>` wins** — `review-prompt-level.ts` is the single source of the
-// words. A run from before that line existed is placed by its prompt: the interaction brief's path or
-// the paired review's wording names its pass, a round-2 agent its round, else the first round. A second
+// words. A run from before that line existed is placed by its prompt: the round-2 lead, the interaction
+// brief's path or the paired review's wording names its pass, a round-2 agent its round, else the
+// first round. A `josh ship` reviewer is a top-level session, counted by its prompt alone. A second
 // run of the same pass in the same Issue is a retry whose cause the prompt does not say. A run outside
 // a lane keeps a written trigger and is otherwise `unknown`, having no Issue to order it by; every run
 // of an Issue the lane ledger never merged is `unmerged` whatever its trigger. Both are still counted.
 
 const ROUND_TWO_AGENT = 'reviewer-verification'
 const REVIEWER_AGENTS: ReadonlySet<string> = new Set(['reviewer', ROUND_TWO_AGENT])
-// The interaction brief's file name and the paired review's wording, as past prompts carry them
-// (`scripts/review/review-pair.ts`), each with the pass it names.
-const PROMPT_PASSES: ReadonlyArray<readonly [string, ReviewTrigger]> = [
-	['review-brief-interaction-', 'interaction'],
-	['paired /code-review, recorded only', 'paired'],
-]
 const ROUND_TWO: ReviewTrigger = 'round-2'
+// The round-2 prompt's lead, the interaction brief's path or block and the paired review's wording,
+// as past prompts carry them (`scripts/review/review-pair.ts`), each with the pass it names. Round 2
+// is read first: an interaction round 2 also names the interaction brief.
+const PROMPT_PASSES: ReadonlyArray<readonly [ReadonlyArray<string>, ReviewTrigger]> = [
+	[lane_transcript_calls.ROUND_TWO_MARKERS, ROUND_TWO],
+	[lane_transcript_calls.INTERACTION_MARKERS, 'interaction'],
+	[['paired /code-review, recorded only'], 'paired'],
+]
 const INITIAL: ReviewTrigger = 'initial'
 const RETRY = 'retry (unknown cause)'
 const UNKNOWN = 'unknown'
@@ -65,7 +70,21 @@ function written_of(session: AuditSession): ReviewTrigger | undefined {
 }
 
 function prompt_pass(prompt: string): ReviewTrigger | undefined {
-	return PROMPT_PASSES.find(([marker]) => prompt.includes(marker))?.[1]
+	return PROMPT_PASSES.find(([markers]) => markers.some((marker) => prompt.includes(marker)))?.[1]
+}
+
+// A `josh ship` reviewer is a top-level session, not a delegated unit, so it has no agent type: its
+// prompt's `trigger:` line or the ship brief's path marks it.
+function is_ship_reviewer(session: AuditSession): boolean {
+	const prompt = session.prompt ?? ''
+
+	return written_of(session) !== undefined || prompt.includes(lane_session_action.BRIEF_PREFIX)
+}
+
+function is_reviewer(session: AuditSession): boolean {
+	if (session.agent_type === undefined) return is_ship_reviewer(session)
+
+	return REVIEWER_AGENTS.has(agent_of(session))
 }
 
 // The trigger a run without a `trigger:` line is placed under on its first run in its Issue.
@@ -107,7 +126,7 @@ function placed_of(
 	const context: PlaceContext = { merged_issues, seen: new Set() }
 
 	return sessions
-		.filter((session) => REVIEWER_AGENTS.has(agent_of(session)))
+		.filter((session) => is_reviewer(session))
 		.map((session) => ({ session, trigger: place(session, context) }))
 }
 
