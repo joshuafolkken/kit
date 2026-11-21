@@ -64,6 +64,15 @@ describe('review_prompt_level.round_one_trigger', () => {
 	})
 })
 
+// joshuafolkken/kit#8379: each retry word a launch writes is one `trigger_of` reads back.
+describe('review_prompt_level.RETRY', () => {
+	it('names only triggers', () => {
+		expect(review_prompt_level.TRIGGERS).toStrictEqual(
+			expect.arrayContaining(Object.values(review_prompt_level.RETRY)),
+		)
+	})
+})
+
 describe('review_prompt_level.level_of', () => {
 	it('reads a bare level line and a prompt lead alike', () => {
 		expect(review_prompt_level.level_of('low')).toBe('low')

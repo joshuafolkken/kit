@@ -12,6 +12,7 @@ const FINDINGS = 'stamps/josh-ship-review-findings.md'
 const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
 const SUBMIT = 'pnpm josh review:submit'
 const READ_ONLY = 'Do not edit any file'
+const FIXED_CLAUSE = 'prefixing a finding you fixed'
 
 describe('run_ship_review_prompts.submit_command', () => {
 	it('names the code slot bare and the interaction slot with its flag', () => {
@@ -50,6 +51,36 @@ describe('run_ship_review_prompts.reviewer_prompt', () => {
 	})
 })
 
+// joshuafolkken/kit#8379: a rerun's launches name their cause in place of the slot's word.
+describe('run_ship_review_prompts.round_one_prompt', () => {
+	const { STALE } = review_prompt_level.RETRY
+	const BOTH = [CODE, INTERACTION]
+
+	function trigger_beside(prompt_of: ReturnType<typeof run_ship_review_prompts.retried>): unknown {
+		const beside = run_ship_review_prompts.slot_prompt(prompt_of, INTERACTION, BOTH)
+
+		return review_prompt_level.trigger_of(beside(BRIEF, INTERACTION, ISSUE))
+	}
+
+	it('opens the code slot and the read-only slot beside it with the retry', () => {
+		const prompt_of = run_ship_review_prompts.round_one_prompt(STALE)
+		const beside = run_ship_review_prompts.slot_prompt(prompt_of, INTERACTION, BOTH)
+
+		expect(review_prompt_level.trigger_of(prompt_of(BRIEF, CODE, ISSUE))).toBe(STALE)
+		expect(trigger_beside(prompt_of)).toBe(STALE)
+		expect(beside(BRIEF, INTERACTION, ISSUE)).toContain(READ_ONLY)
+		expect(prompt_of(BRIEF, CODE, ISSUE)).toContain(FIXED_CLAUSE)
+	})
+
+	it('keeps the slot words for a first run', () => {
+		const prompt_of = run_ship_review_prompts.round_one_prompt(undefined)
+
+		expect(prompt_of).toBe(run_ship_review_prompts.reviewer_prompt)
+		expect(review_prompt_level.trigger_of(prompt_of(BRIEF, CODE, ISSUE))).toBe('initial')
+		expect(trigger_beside(prompt_of)).toBe('interaction')
+	})
+})
+
 describe('run_ship_review_prompts.report_prompt and verification_prompt', () => {
 	it('keeps the report beside the code review read only, without the fixed mark', () => {
 		const prompt = run_ship_review_prompts.report_prompt(BRIEF, INTERACTION, ISSUE)
@@ -57,7 +88,7 @@ describe('run_ship_review_prompts.report_prompt and verification_prompt', () => 
 		expect(review_prompt_level.trigger_of(prompt)).toBe('interaction')
 		expect(prompt).toContain(READ_ONLY)
 		expect(prompt).toContain(`\`${SUBMIT} --interaction\``)
-		expect(prompt).not.toContain('prefixing a finding you fixed')
+		expect(prompt).not.toContain(FIXED_CLAUSE)
 	})
 
 	it('opens round 2 as the final read-only pass', () => {

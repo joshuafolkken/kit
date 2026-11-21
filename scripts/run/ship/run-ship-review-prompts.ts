@@ -4,7 +4,11 @@ import { review_finding_kind } from '#scripts/review/review-finding-kind'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_finding_text } from '#scripts/review/review-finding-text'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
-import { review_prompt_level, type ReviewTrigger } from '#scripts/review/review-prompt-level'
+import {
+	review_prompt_level,
+	type RetryTrigger,
+	type ReviewTrigger,
+} from '#scripts/review/review-prompt-level'
 
 // The one-line prompts `josh ship --review` launches its supervised reviewers with, kept apart from
 // the verdict they write back (`run-ship-review.ts`), which re-exports them on `run_ship_review`.
@@ -96,16 +100,28 @@ function round_one_opening(brief_path: string, trigger: ReviewTrigger): string {
 	].join(' ')
 }
 
+// A round-1 prompt's text after its opening, which carries the launch's trigger.
+type PromptText = (
+	opening: string,
+	slot: ReviewSlot,
+	issue: string,
+	findings_path?: string,
+) => string
+
+function slot_opening(brief_path: string, slot: ReviewSlot): string {
+	return round_one_opening(brief_path, review_prompt_level.round_one_trigger(slot))
+}
+
 // One line, because `detached_launch` refuses an argument carrying a control character: the multi-line
 // brief travels by path, never inline.
-function reviewer_prompt(
-	brief_path: string,
+function reviewer_text(
+	opening: string,
 	slot: ReviewSlot,
 	issue: string,
 	findings_path?: string,
 ): string {
 	return [
-		round_one_opening(brief_path, review_prompt_level.round_one_trigger(slot)),
+		opening,
 		issue_read_instruction(issue),
 		...review_prior_findings.prompt_clauses(issue),
 		'Apply a fix only for a Medium finding whose fix is small and local — a one-function refactor, an',
@@ -120,21 +136,63 @@ function reviewer_prompt(
 	].join(' ')
 }
 
+function reviewer_prompt(
+	brief_path: string,
+	slot: ReviewSlot,
+	issue: string,
+	findings_path?: string,
+): string {
+	return reviewer_text(slot_opening(brief_path, slot), slot, issue, findings_path)
+}
+
 // The round-1 review run beside the code review: it reads only, so the two sessions never fix, verify
 // and revert in the one shared checkout at once; its findings go to the lane's one fix pass.
+function report_text(
+	opening: string,
+	slot: ReviewSlot,
+	issue: string,
+	findings_path?: string,
+): string {
+	return [
+		opening,
+		'Do not edit any file: the code review running beside this one fixes in this checkout.',
+		issue_read_instruction(issue),
+		...review_prior_findings.prompt_clauses(issue),
+		findings_instruction(slot, '', findings_path),
+	].join(' ')
+}
+
 function report_prompt(
 	brief_path: string,
 	slot: ReviewSlot,
 	issue: string,
 	findings_path?: string,
 ): string {
-	return [
-		round_one_opening(brief_path, review_prompt_level.round_one_trigger(slot)),
-		'Do not edit any file: the code review running beside this one fixes in this checkout.',
-		issue_read_instruction(issue),
-		...review_prior_findings.prompt_clauses(issue),
-		findings_instruction(slot, '', findings_path),
-	].join(' ')
+	return report_text(slot_opening(brief_path, slot), slot, issue, findings_path)
+}
+
+// The read-only prompt `retried` pairs with its round prompt, so the slot beside keeps the retry's trigger.
+const BESIDE_PROMPTS = new WeakMap<PromptOf, PromptOf>()
+
+function opened(text_of: PromptText, retry: RetryTrigger): PromptOf {
+	return function retried_prompt(brief_path, slot, issue, findings_path): string {
+		return text_of(round_one_opening(brief_path, retry), slot, issue, findings_path)
+	}
+}
+
+// **A rerun's launches name their cause** (joshuafolkken/kit#8379): the code slot's prompt and the
+// read-only one beside it open with `retry` in place of the slot's word.
+function retried(retry: RetryTrigger): PromptOf {
+	const prompt = opened(reviewer_text, retry)
+
+	BESIDE_PROMPTS.set(prompt, opened(report_text, retry))
+
+	return prompt
+}
+
+// Round 1's prompt: a rerun's when it has a cause, the slot's own otherwise.
+function round_one_prompt(retry: RetryTrigger | undefined): PromptOf {
+	return retry === undefined ? reviewer_prompt : retried(retry)
 }
 
 // **One reviewer edits the checkout** (joshuafolkken/kit#4672): a slot reviewed beside the code slot
@@ -146,7 +204,7 @@ function slot_prompt(
 ): PromptOf {
 	if (slot === review_attest.REVIEW_SLOT.CODE || slots.length === 1) return round_prompt
 
-	return report_prompt
+	return BESIDE_PROMPTS.get(round_prompt) ?? report_prompt
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
@@ -173,8 +231,10 @@ const run_ship_review_prompts = {
 	OTHER_SITES_CLAUSE,
 	final_opening,
 	report_prompt,
+	retried,
 	reviewer_prompt,
 	round_one_opening,
+	round_one_prompt,
 	slot_prompt,
 	submit_command,
 	verification_prompt,
