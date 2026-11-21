@@ -77,7 +77,7 @@ function failure_line(record: ExitRecord): string {
 	const times = String(record.count ?? 1)
 	const last_at = record.last_at ?? record.at
 
-	return `run:board: the last live board's redraw failed ${times} time(s) in a row (${record.reason}), from ${record.at} to ${last_at}`
+	return `run:board: the last live board's redraw failed ${times} time(s) (${record.reason}), from ${record.at} to ${last_at}`
 }
 
 function line(record: ExitRecord): string {

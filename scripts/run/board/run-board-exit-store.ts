@@ -10,7 +10,8 @@ import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 const RECORD_FILE = 'run-board-exit.json'
 
 // `redraw` is a failed redraw the board survived (joshuafolkken/kit#8381), recorded with how many times
-// it failed in a row and when last; every other kind ended the board.
+// the same failure came back, successful redraws between them included, and when last; every other kind
+// ended the board.
 type ExitKind = 'tick' | 'redraw' | 'uncaught' | 'rejection' | 'signal' | 'stdout'
 
 interface ExitRecord {

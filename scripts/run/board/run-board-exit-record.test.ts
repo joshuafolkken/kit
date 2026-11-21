@@ -177,7 +177,7 @@ describe('run_board_exit_record failed, other records', () => {
 		run_board_exit_record.start(next.ports)
 
 		expect(next.errors).toStrictEqual([
-			`run:board: the last live board's redraw failed 2 time(s) in a row (lost), from ${WATCHED_AT} to ${WATCHED_AT}`,
+			`run:board: the last live board's redraw failed 2 time(s) (lost), from ${WATCHED_AT} to ${WATCHED_AT}`,
 		])
 	})
 })
