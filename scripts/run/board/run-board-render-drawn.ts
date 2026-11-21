@@ -67,7 +67,7 @@ function named_of(
 		operation,
 		elapsed,
 		estimate_of(header, rows),
-		run_board_first_lane.legend(header.activity),
+		run_board_first_lane.legend(header),
 		offline_of(header),
 	]
 

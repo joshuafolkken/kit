@@ -1,3 +1,4 @@
+import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import type { BoardHeader, BoardUsage } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
@@ -191,15 +192,16 @@ function summary_of(usage: BoardUsage): string {
 	return groups.join(SUMMARY_GAP)
 }
 
-// `undefined` where the frame read no usage.
+// `undefined` where the frame read no usage; the time to the first lane at its rule's right end.
 function processes_part(header: BoardHeader): DetailPart | undefined {
 	const { usages } = header
 
 	if (usages === undefined) return undefined
 
 	const part = header.spinner === undefined ? plain_part(usages) : screen_part(usages)
+	const tail = run_board_first_lane.part(header.activity)
 
-	return { ...part, label: LABEL, summary: summary_of(usages) }
+	return { ...part, label: LABEL, summary: summary_of(usages), tail }
 }
 
 const run_board_render_processes = { processes_part }
