@@ -209,7 +209,11 @@ function render(view: BoardView): Array<string> {
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
-		throughput: run_board_render_throughput.throughput_part(view.throughput, view.has_lamps),
+		throughput: run_board_render_throughput.throughput_part(
+			view.throughput,
+			view.has_lamps,
+			run_board_header.alert_part(header),
+		),
 		usage: run_board_render_quota.usage_part({
 			...header,
 			hold: header.quota_hold,

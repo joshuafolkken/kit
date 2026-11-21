@@ -1,0 +1,7 @@
+{
+	"reason": "Throughput rows/part carry an optional alert tail and the header exports alert_part so render can place the theme alert on the throughput rule",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}
