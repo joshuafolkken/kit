@@ -61,6 +61,28 @@ function cut_styled(line: string, columns: number): string {
 	return `${text}${close}${RESET}`
 }
 
-const run_board_cut_styled = { cut_styled }
+// One piece of a line's tail, `used` columns in once it is drawn: every escape, so the colors and links
+// before the cut still hold; no character the cut takes; blanks for the part of one it splits.
+function tail_piece(piece: Piece, used: number, columns: number): string {
+	if (piece.width === 0) return piece.text
+	if (used <= columns) return ''
+
+	return used - piece.width < columns ? ' '.repeat(used - columns) : piece.text
+}
+
+// joshuafolkken/kit#8457: `line` past its first `columns` columns, its colors and links kept — the
+// saved line a typing row is written over, right of the block — and the colors reset.
+function tail_styled(line: string, columns: number): string {
+	let used = 0
+	const kept = pieces_of(line).map((piece) => {
+		used += piece.width
+
+		return tail_piece(piece, used, columns)
+	})
+
+	return `${kept.join('')}${RESET}`
+}
+
+const run_board_cut_styled = { cut_styled, tail_styled }
 
 export { run_board_cut_styled }

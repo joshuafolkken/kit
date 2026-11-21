@@ -98,12 +98,15 @@ describe('run_board_header — the third line’s key', () => {
 		expect(run_board_header.now_key(header({ layout: LAYOUT, ...keyed }))).toBe(GATE_KEY)
 	})
 
-	it('keys nothing where the third line names no words, nor where the board types no rows', () => {
+	it('keys no now line where the third line names no words, nor where the board types no rows', () => {
 		const empty = header({ is_keyed: true })
 
 		expect(run_board_header.now_key(empty)).toBeUndefined()
+		// joshuafolkken/kit#8457: the progress line carries a key of its own.
 		expect(
-			lines_of(empty).every((line) => run_board_row_key.split_key(line).key === undefined),
+			lines_of(empty).every(
+				(line) => run_board_row_key.split_key(line).key?.startsWith('now:') !== true,
+			),
 		).toBe(true)
 		expect(third_of({ operations: OPERATIONS })).toBe(STILL_LINE)
 	})
