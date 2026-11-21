@@ -162,6 +162,8 @@ interface BoardView {
 	sweep?: Sweep | undefined
 	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
+	// Whether those cells run the idle rain in place of the lamps (`run-board-idle-rain.ts`).
+	is_rain?: boolean | undefined
 	// Where the last frame drew its worst-level TRACE field, blinked between redraws (`run-board-trace-spot.ts`).
 	traces?: ReadonlyArray<Spot> | undefined
 	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).

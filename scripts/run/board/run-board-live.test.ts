@@ -11,7 +11,15 @@ import type { TypingSound } from './run-board-sound-typing'
 
 const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const SCREEN = run_board_screen.screen_of('live')
-const NO_LIVE = { sweep: false, types_rows: false, trill: false, codes: false, strip: false }
+const NO_LIVE = {
+	sweep: false,
+	types_rows: false,
+	trill: false,
+	codes: false,
+	strip: false,
+	decode: false,
+	rain: false,
+}
 const ESCAPE = '\u{1B}'
 const DIM_RULE = new RegExp(`${ESCAPE}\\[2m─+${ESCAPE}\\[22m`, 'u')
 const REFRESH_START = `${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`
@@ -29,17 +37,26 @@ afterEach(() => {
 describe('run_board_live.live_of', () => {
 	it('reads the rows typed, the trill and the rules code from the wargames definition', () => {
 		expect(run_board_live.live_of('wargames')).toStrictEqual({
+			...NO_LIVE,
 			sweep: true,
 			types_rows: true,
 			trill: true,
 			codes: true,
-			strip: false,
+		})
+	})
+
+	// joshuafolkken/kit#8356: the matrix board's rows decode and its lamp panel runs the idle rain.
+	it('reads the decoded rows and the idle rain from the matrix definition', () => {
+		expect(run_board_live.live_of('matrix')).toStrictEqual({
+			...NO_LIVE,
+			types_rows: true,
+			decode: true,
+			rain: true,
 		})
 	})
 
 	it('chooses no live effect with no theme', () => {
 		expect(run_board_live.live_of(undefined)).toStrictEqual(NO_LIVE)
-		expect(run_board_live.live_of('matrix')).toStrictEqual(NO_LIVE)
 	})
 
 	it('chooses no live effect for a theme the table has no row for', () => {

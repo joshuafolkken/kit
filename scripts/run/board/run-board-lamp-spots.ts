@@ -1,3 +1,4 @@
+import { run_board_idle_rain, type RainMoment } from './run-board-idle-rain'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spot } from './run-board-spot'
@@ -13,10 +14,9 @@ const { is_lit, lamp_text, place_of } = run_board_lamps
 const CSI = '\u{1B}['
 
 // A moment the lamps are written at, and whether the panel bursts then — every group changing on every
-// step while the screen types (joshuafolkken/kit#8237).
-interface LampMoment {
-	ms: number
-	is_burst: boolean
+// step while the screen types (joshuafolkken/kit#8237) — and whether the cells run the idle rain instead.
+interface LampMoment extends RainMoment {
+	is_rain?: boolean | undefined
 }
 
 // One lamp on screen, 1-based, the row of the panel it is on (`run_board_lamps.PANEL_ROWS`, `0` the
@@ -57,14 +57,16 @@ function lamps_in(
 	)
 }
 
-function is_on(lamp: Lamp, at: LampMoment): boolean {
-	return is_lit(at.ms, lamp.group, lamp.lamp, at.is_burst)
+// The lamp's cell as drawn `at`: lit or out, or the idle rain's cell where the frame runs it
+// (joshuafolkken/kit#8356).
+function cell_text(lamp: Lamp, at: LampMoment): string {
+	if (at.is_rain === true) return run_board_idle_rain.cell_text(lamp, at)
+
+	return lamp_text(lamp.panel_row, is_lit(at.ms, lamp.group, lamp.lamp, at.is_burst))
 }
 
 function lamp_bytes(lamp: Lamp, at: LampMoment): string {
-	const cell = lamp_text(lamp.panel_row, is_on(lamp, at))
-
-	return `${CSI}${String(lamp.row)};${String(lamp.column)}H${cell}`
+	return `${CSI}${String(lamp.row)};${String(lamp.column)}H${cell_text(lamp, at)}`
 }
 
 // The lamps that changed since `since` written as they are `at`, every one with no `since`; each moment
@@ -75,7 +77,7 @@ function lamps_bytes(
 	since: LampMoment | undefined,
 ): string {
 	const changed = lamps.filter(
-		(lamp) => since === undefined || is_on(lamp, at) !== is_on(lamp, since),
+		(lamp) => since === undefined || cell_text(lamp, at) !== cell_text(lamp, since),
 	)
 
 	return changed.map((lamp) => lamp_bytes(lamp, at)).join('')

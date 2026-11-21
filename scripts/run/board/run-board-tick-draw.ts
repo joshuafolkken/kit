@@ -120,13 +120,34 @@ function is_lamp_theme(ports: Pick<DrawPorts, 'types_rows' | 'theme'>, defs: Lam
 	return defs[ports.theme]?.lamps === true
 }
 
+type LivePorts = Pick<DrawPorts, 'types_rows' | 'theme' | 'is_tty'>
+
+// Whether the board draws on a terminal drawing color.
+function is_colored_tty(ports: Pick<DrawPorts, 'is_tty'>): boolean {
+	return ports.is_tty && run_board_lamps.is_colored()
+}
+
 // The lamp panel shows where the rows type — a live board in a theme that draws lamps — on a terminal
 // drawing color (joshuafolkken/kit#8236).
-function has_lamps(
-	ports: Pick<DrawPorts, 'types_rows' | 'theme' | 'is_tty'>,
-	defs: LampDefs = THEME_DEFS,
-): boolean {
-	return is_lamp_theme(ports, defs) && ports.is_tty && run_board_lamps.is_colored()
+function has_lamps(ports: LivePorts, defs: LampDefs = THEME_DEFS): boolean {
+	return is_lamp_theme(ports, defs) && is_colored_tty(ports)
+}
+
+// Whether the lamp panel's cells run the idle rain: where the panel shows, in a theme whose live board
+// rains there (joshuafolkken/kit#8356).
+function has_rain(ports: LivePorts): boolean {
+	return has_lamps(ports) && live_of(ports.theme).rain
+}
+
+// How a new row enters: typed where the rows type; in a theme whose live board decodes them, decoded on
+// a terminal drawing color and shown at once on one drawing none (joshuafolkken/kit#8356).
+type RowEntry = 'type' | 'decode' | 'none'
+
+function entry_of(ports: LivePorts, defs: LiveDefs = THEME_DEFS): RowEntry {
+	if (ports.types_rows !== true) return 'none'
+	if (!live_of(ports.theme, defs).decode) return 'type'
+
+	return is_colored_tty(ports) ? 'decode' : 'none'
 }
 
 // Whether the section rules run code while a row types: a theme whose live board decodes them, where its
@@ -187,11 +208,13 @@ function typing_of(
 	header: LaidHeader,
 	redraw: Redraw,
 ): Typing {
-	const is_on = redraw.ports.types_rows === true && state.plan !== undefined
+	const entry = entry_of(redraw.ports)
+	const is_on = entry !== 'none' && state.plan !== undefined
 	const frame = {
 		keyed: drawn.keyed,
 		known: run_board_row_sections.known_of(header, drawn.notes),
 		faint: run_board_row_sections.faint_keys_of(header),
+		is_decoding: entry === 'decode',
 	}
 
 	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
@@ -218,12 +241,21 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	)
 
 	const { spots, sweep, lamps, traces } = drawn
-	const { rules, strips } = decoded_of(redraw.ports, drawn)
+	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
 
-	return { ...state, ...display.carried, spots, sweep, lamps, traces, rules, strips, typing }
+	return { ...state, ...display.carried, spots, sweep, lamps, traces, ...decoded, typing }
 }
 
-const run_board_tick_draw = { bounds_of, decoded_of, draw, draw_display, has_lamps, has_strip }
+const run_board_tick_draw = {
+	bounds_of,
+	decoded_of,
+	draw,
+	draw_display,
+	entry_of,
+	has_lamps,
+	has_rain,
+	has_strip,
+}
 
 export { run_board_tick_draw }
 export type { DrawPorts, Redraw }

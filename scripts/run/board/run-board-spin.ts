@@ -54,6 +54,7 @@ interface Turning {
 	typing: Typing
 	sweep?: Sweep | undefined
 	lamps?: ReadonlyArray<Lamp> | undefined
+	is_rain?: boolean | undefined
 	traces?: ReadonlyArray<Spot> | undefined
 	rules?: ReadonlyArray<RuleCell> | undefined
 	strips?: ReadonlyArray<StripCell> | undefined
@@ -184,9 +185,12 @@ function boundary_after(now_ms: number, interval_ms: number): number {
 	return now_ms - (now_ms % interval_ms) + interval_ms
 }
 
-// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236).
+// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236);
+// the idle rain runs from the first frame (joshuafolkken/kit#8356).
 function blinking(turning: Turning): ReadonlyArray<Lamp> {
-	return turning.typing.seen === undefined ? [] : (turning.lamps ?? [])
+	const is_ready = turning.is_rain === true || turning.typing.seen !== undefined
+
+	return is_ready ? (turning.lamps ?? []) : []
 }
 
 function traces_of(turning: Turning): ReadonlyArray<Spot> {
@@ -238,11 +242,16 @@ function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 
 // The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
 // header's now line or a section's new row — and blink apart from the step after the last is typed
-// through, so they change only on the spinner's step (joshuafolkken/kit#8237).
+// through, so they change only on the spinner's step (joshuafolkken/kit#8237); where the frame runs the
+// idle rain in their cells, it pours instead (joshuafolkken/kit#8356).
 function lamp_moment(turning: Turning, at_ms: number): LampMoment {
 	const step_ms = at_ms - (at_ms % SPINNER_INTERVAL_MS)
 
-	return { ms: at_ms, is_burst: run_board_type_rows.is_typing(turning.typing, step_ms) }
+	return {
+		ms: at_ms,
+		is_burst: run_board_type_rows.is_typing(turning.typing, step_ms),
+		is_rain: turning.is_rain === true,
+	}
 }
 
 // The turn built and written, timed as a turn where `--timing` times draws, then the lamps that changed;
