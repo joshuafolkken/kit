@@ -1,4 +1,3 @@
-import { styleText } from 'node:util'
 import { poll } from '#scripts/lib/poll'
 import { run_board_fold } from './run-board-fold'
 import { run_board_header } from './run-board-header'
@@ -50,7 +49,7 @@ function framed(ports: BoardPorts, framing: Framing): BoardPorts {
 
 	return {
 		...ports,
-		footer: ['', ...[WORDS.keeps_running, ...keys].map((line) => styleText('dim', line))],
+		footer: ['', WORDS.keeps_running, ...keys],
 		write: (frame) => {
 			framing.sink(framing.wrap(frame.replace(TRAILING_NEWLINE, '')))
 		},
