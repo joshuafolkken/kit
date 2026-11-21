@@ -155,6 +155,7 @@ it('reuses every step of a completed run on an unchanged tree, rerunning none', 
 	await run()
 	expect(await run()).toHaveProperty('code', 0)
 	for (const phase of phases) expect(phase).toHaveBeenCalledOnce()
+	expect(review_attest.check_here).toHaveBeenCalledOnce()
 })
 
 it('passes no retry to the provider of a stale rerun', async () => {
