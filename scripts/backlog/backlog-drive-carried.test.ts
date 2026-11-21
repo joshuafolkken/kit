@@ -252,7 +252,7 @@ describe('adopting an ended run’s lanes', () => {
 })
 
 describe('resume failures and reports', () => {
-	it('reports a failed resume instead of carrying a lane as resumed', async () => {
+	it('reports a failed resume instead of carrying a lane as resumed, leaving it to retry', async () => {
 		read_state.mockResolvedValue(paused())
 		has_ended.mockReturnValue(true)
 		josh_run.mockResolvedValue({ code: 1, out: NO_CHILD })
@@ -260,6 +260,7 @@ describe('resume failures and reports', () => {
 		await expect(backlog_drive_carried.carried([lane(CLAIMED, '/t/a.log')])).rejects.toThrow(
 			NO_CHILD,
 		)
+		expect(record_transfer).not.toHaveBeenCalled()
 	})
 
 	it('relays the resume report on stderr, preserving the driver stdout', async () => {
