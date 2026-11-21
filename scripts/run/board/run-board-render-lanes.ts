@@ -160,7 +160,22 @@ function seat_lines(header: BoardHeader, columns: number | undefined): Array<Pla
 }
 
 // A section of lane rows under `label`'s rule, ⏰ over the run's time and the usage labels over their
-// cells where they are drawn; none without a line.
+// cells where they are drawn, drawn even without a line.
+function section_of(
+	lines: Array<PlanLine>,
+	label: string,
+	cells: LaneCells | undefined,
+	header: BoardHeader,
+): PlanSection {
+	const offset = column_offset(header)
+	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START + offset }
+	const usage = cells === undefined ? [] : label_columns(USAGE_START + offset, cells.gauge)
+	const rule = columns_rule(label, [elapsed, ...usage])
+
+	return { head: ['', rule], lines, label, key: 'lanes' }
+}
+
+// `section_of`, but none without a line.
 function rows_section(
 	lines: Array<PlanLine>,
 	label: string,
@@ -169,17 +184,13 @@ function rows_section(
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	const offset = column_offset(header)
-	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START + offset }
-	const usage = cells === undefined ? [] : label_columns(USAGE_START + offset, cells.gauge)
-	const rule = columns_rule(label, [elapsed, ...usage])
-
-	return [{ head: ['', rule], lines, label, key: 'lanes' }]
+	return [section_of(lines, label, cells, header)]
 }
 
 // The root checkout's single run's row, the first of `rows` (`run_board_layout.lane_rows`), under its
 // own `🏠` rule above the run's lanes (joshuafolkken/kit#7524); then the run's own rows under the lanes
-// rule and the empty seats' reasons.
+// rule and the empty seats' reasons. The lanes rule is drawn without a row too, as its tail carries the
+// run's tallies (joshuafolkken/kit#8514).
 function lanes_section(
 	rows: ReadonlyArray<PlanLine>,
 	cells: LaneCells | undefined,
@@ -189,13 +200,11 @@ function lanes_section(
 	const root = header.layout?.root
 	const root_count = root === undefined ? 0 : 1
 	const lanes = [...rows.slice(root_count), ...seat_lines(header, columns)]
+	const lanes_rule = section_of(lanes, lane_label(header), cells, header)
 
 	return [
 		...rows_section(rows.slice(0, root_count), root_label(root?.name ?? ''), cells, header),
-		...rows_section(lanes, lane_label(header), cells, header).map((section) => ({
-			...section,
-			tail: run_board_header.lanes_tail(header),
-		})),
+		{ ...lanes_rule, tail: run_board_header.lanes_tail(header) },
 	]
 }
 
