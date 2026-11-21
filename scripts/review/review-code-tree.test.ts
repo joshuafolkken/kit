@@ -189,7 +189,10 @@ describe('review_code_tree.record — written beside the round-1 snapshot', () =
 	})
 
 	it('removes an earlier record when the write fails, rather than keep one from another moment', async () => {
-		review_stamps.round_one_code_stamp.write({ [SOURCE]: 'old' }, RECORD_PATH, BASE)
+		review_stamps.round_one_code_stamp.write(
+			{ [SOURCE]: 'old' },
+			{ target: RECORD_PATH, base: BASE },
+		)
 		vi.spyOn(review_stamps.round_one_code_stamp, 'write').mockImplementation(() => {
 			throw new Error('the temp directory is not writable')
 		})

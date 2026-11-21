@@ -38,7 +38,7 @@ function record(issue: number, findings: ReadonlyArray<Finding>, root: string): 
 		return
 	}
 
-	completion.write(tree.files, undefined, tree.base)
+	completion.write(tree.files, { base: tree.base })
 	completion.complete()
 }
 

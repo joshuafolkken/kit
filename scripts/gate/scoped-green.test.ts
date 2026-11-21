@@ -52,14 +52,14 @@ function sources(): ScopedSources {
 }
 
 function plant(target: string | undefined, digest: string, base: string): void {
-	review_stamps.lint_related_stamp.write(tree_of(digest), target, base)
+	review_stamps.lint_related_stamp.write(tree_of(digest), { target, base })
 }
 
 function plant_both(digest: string = DIGEST, base: string = BASE): ScopedSources {
 	const planted = sources()
 
 	plant(planted.lint, digest, base)
-	review_stamps.test_related_stamp.write(tree_of(digest), planted.test, base)
+	review_stamps.test_related_stamp.write(tree_of(digest), { target: planted.test, base })
 
 	return planted
 }
@@ -372,14 +372,7 @@ describe('record_green', () => {
 	it('writes a record a later read matches this tree against', () => {
 		const target = path.join(DIRECTORY, 'written.json')
 
-		scoped_green.record_green(
-			review_stamps.lint_related_stamp,
-			{
-				files: tree_of(),
-				base: BASE,
-			},
-			target,
-		)
+		scoped_green.record_green(review_stamps.lint_related_stamp, BEFORE, { target })
 
 		expect(review_stamps.lint_related_stamp.read(target)?.base).toBe(BASE)
 	})
@@ -393,7 +386,7 @@ describe('record_green', () => {
 				files: tree_of(),
 				base: undefined,
 			},
-			target,
+			{ target },
 		)
 
 		expect(review_stamps.lint_related_stamp.read(target)).toBeUndefined()
@@ -402,7 +395,11 @@ describe('record_green', () => {
 	it('withholds a record when the tree has no changed file', () => {
 		const target = path.join(DIRECTORY, 'empty.json')
 
-		scoped_green.record_green(review_stamps.lint_related_stamp, { files: {}, base: BASE }, target)
+		scoped_green.record_green(
+			review_stamps.lint_related_stamp,
+			{ files: {}, base: BASE },
+			{ target },
+		)
 
 		expect(review_stamps.lint_related_stamp.read(target)).toBeUndefined()
 	})

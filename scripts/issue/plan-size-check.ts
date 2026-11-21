@@ -72,7 +72,10 @@ async function problem_of(
 	const { implement_rate, growth } = await lane_net_read.measurements()
 	const route = size_estimate.route_of(issue.labels.map((label) => label.name))
 
-	return size_estimate.guide_problem(judged_body(plan, issue.body), route, implement_rate, growth)
+	return size_estimate.guide_problem(judged_body(plan, issue.body), route, {
+		rate: implement_rate,
+		growth,
+	})
 }
 
 // `issue:body` has no `--repo`, so another repository's body is rewritten from its own checkout.

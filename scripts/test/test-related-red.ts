@@ -92,7 +92,7 @@ async function read_red(before: GateTree | undefined): Promise<RedReading | unde
 	if (failed.length === 0) return undefined
 
 	const stamp = review_stamps.test_related_red_stamp
-	const parts = await since_green.read_moved_parts(stamp, gate_labels.UNIT_LABEL, undefined, before)
+	const parts = await since_green.read_moved_parts(stamp, gate_labels.UNIT_LABEL, { tree: before })
 
 	return reading_of(parts, { failed, owed: marked(blobs, OWED_MARK) })
 }
@@ -177,12 +177,10 @@ async function write(before: GateTree, failed: ReadonlyArray<string>, run: RedRu
 	const passed = await test_related_reuse.blobs(run.root, run.passed)
 
 	try {
-		review_stamps.test_related_red_stamp.write(
-			before.files,
-			undefined,
-			before.base,
-			blobs_of(failed, run.owed, passed),
-		)
+		review_stamps.test_related_red_stamp.write(before.files, {
+			base: before.base,
+			blobs: blobs_of(failed, run.owed, passed),
+		})
 	} catch {
 		clear()
 	}

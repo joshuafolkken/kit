@@ -173,9 +173,11 @@ interface FileMapStampAccess {
 	// green-gate reuse. The others omit it and are unaffected. `blobs` is the round-1 snapshot's alone.
 	write: (
 		files: Record<string, string>,
-		target?: string,
-		base?: string,
-		blobs?: Record<string, string>,
+		options?: {
+			target?: string | undefined
+			base?: string | undefined
+			blobs?: Record<string, string> | undefined
+		},
 	) => string
 	// Marks an existing record as belonging to a run that finished. It
 	// amends rather than rewrites, and answers `undefined` where there is no record to amend: a run
@@ -259,7 +261,7 @@ function create(prefix: string, root?: string, inputs?: () => string): FileMapSt
 		// `base` goes into the payload undefined and all — `JSON.stringify` drops an undefined value,
 		// so a caller that has no base writes exactly the record it wrote before this field existed.
 		// `own_fields` is what writes the pid, and the writing process's start time beside it — assembled in one place so no record can carry half an identity.
-		write: (files, target = resolve(), base?: string, blobs?: Record<string, string>) =>
+		write: (files, { target = resolve(), base, blobs } = {}) =>
 			stamp_file.write_stamp(target, {
 				taken_at: new Date().toISOString(),
 				files,

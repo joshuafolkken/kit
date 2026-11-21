@@ -72,7 +72,7 @@ async function recorded(
 	stamp: FileMapStampAccess,
 	tree: GateTree,
 ): Promise<JoshResult> {
-	stamp.write(tree.files, undefined, tree.base)
+	stamp.write(tree.files, { base: tree.base })
 	const result = await phase()
 
 	if (result.code === 0) stamp.complete()

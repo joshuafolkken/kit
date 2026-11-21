@@ -64,7 +64,7 @@ const PLAN_TIME_7889 = body_with(
 
 describe('size_estimate.guide_problem against the lane target', () => {
 	it.each([PLAN_TIME_7866, PLAN_TIME_7889])('refuses a plan-time body past the target', (body) => {
-		expect(size_estimate.guide_problem(body, undefined, RATE, GROWTH)).toEqual(
+		expect(size_estimate.guide_problem(body, undefined, { rate: RATE, growth: GROWTH })).toEqual(
 			expect.stringContaining(TARGET_HINT),
 		)
 	})
@@ -72,13 +72,17 @@ describe('size_estimate.guide_problem against the lane target', () => {
 	it('passes the same body once its reason names a kind', () => {
 		const named = PLAN_TIME_7889.replace('分割しない理由: ', '分割しない理由: 全体が遅くなる — ')
 
-		expect(size_estimate.guide_problem(named, undefined, RATE, GROWTH)).toBeUndefined()
+		expect(
+			size_estimate.guide_problem(named, undefined, { rate: RATE, growth: GROWTH }),
+		).toBeUndefined()
 	})
 
 	it('leaves a body within the target to the existing judgement', () => {
 		const small = body_with('- 規模見積もり: 約 2 ファイル / 30 行（テスト除く）')
 
-		expect(size_estimate.guide_problem(small, undefined, RATE, GROWTH)).toBeUndefined()
+		expect(
+			size_estimate.guide_problem(small, undefined, { rate: RATE, growth: GROWTH }),
+		).toBeUndefined()
 	})
 
 	it('does not judge the target with no measured rate', () => {

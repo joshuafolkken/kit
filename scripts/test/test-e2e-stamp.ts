@@ -14,7 +14,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 // Swallowed: a record not written is the safe answer — the stop refuses and the run re-runs the suite.
 function record(tree: GateTree, target?: string): void {
 	try {
-		review_stamps.e2e_stamp.write(tree.files, target, tree.base)
+		review_stamps.e2e_stamp.write(tree.files, { target, base: tree.base })
 	} catch {
 		/* no record — the stop asks for the suite again */
 	}

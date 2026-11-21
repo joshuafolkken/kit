@@ -114,9 +114,9 @@ function passed(label: string): GateStepResult {
 async function record_green(world: World): Promise<void> {
 	const tree = current_tree(world)
 
-	review_stamps.gate_stamp.write(tree.files, gate_record, tree.base)
-	review_stamps.lint_related_stamp.write(tree.files, lint_record, tree.base)
-	review_stamps.test_related_stamp.write(tree.files, unit_record, tree.base)
+	review_stamps.gate_stamp.write(tree.files, { target: gate_record, base: tree.base })
+	review_stamps.lint_related_stamp.write(tree.files, { target: lint_record, base: tree.base })
+	review_stamps.test_related_stamp.write(tree.files, { target: unit_record, base: tree.base })
 	read_changed_tree.mockResolvedValue(tree.files)
 	const results = SCOPED_LABELS.map((label) => passed(label))
 
@@ -128,7 +128,7 @@ async function read_narrowed(
 	label: string,
 	record: string,
 ): Promise<ReadonlyArray<string> | undefined> {
-	const parts = await since_green.read_moved_parts(stamp, label, record)
+	const parts = await since_green.read_moved_parts(stamp, label, { source: record })
 
 	return parts === undefined ? undefined : moved_paths.union_of(parts).toSorted(reuse_world.by_name)
 }
