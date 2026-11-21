@@ -3,7 +3,11 @@ import { z } from 'zod'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_theme } from './run-board-theme'
-import { run_board_theme_defs, type ThemeDefinition } from './run-board-theme-defs'
+import {
+	run_board_theme_defs,
+	type LiveDefinition,
+	type ThemeDefinition,
+} from './run-board-theme-defs'
 
 // joshuafolkken/kit#8349: each theme's look is one row of a table, and the theme names the CLI and the
 // worker accept are its keys — a row added is a theme accepted.
@@ -11,6 +15,17 @@ import { run_board_theme_defs, type ThemeDefinition } from './run-board-theme-de
 const { THEMES, THEME_DEFS, names_of } = run_board_theme_defs
 const PHOSPHOR_RGB = '62;236;225'
 const IDLE_RGB = '31;118;113'
+const OFF_LIVE: LiveDefinition = {
+	sweep: false,
+	types_rows: false,
+	trill: false,
+	codes: false,
+	strip: false,
+	decode: false,
+	rain: false,
+}
+// joshuafolkken/kit#8356: the matrix board's new rows decode and its panel's cells run the idle rain.
+const MATRIX_LIVE: LiveDefinition = { ...OFF_LIVE, types_rows: true, decode: true, rain: true }
 const AMBER: ThemeDefinition = {
 	paint: { rgb: '255;176;0', named: 'yellow' },
 	rule: THEME_DEFS.wargames.rule,
@@ -19,7 +34,7 @@ const AMBER: ThemeDefinition = {
 	alert: run_board_header_defcon.field_of,
 	lamps: false,
 	spinner: '|',
-	live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
+	live: OFF_LIVE,
 }
 const WIDER = { ...THEME_DEFS, amber: AMBER }
 
@@ -70,7 +85,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			alert: run_board_header_defcon.field_of,
 			lamps: true,
 			spinner: '│╱─╲',
-			live: { sweep: true, types_rows: true, trill: true, codes: true, strip: false },
+			live: { ...OFF_LIVE, sweep: true, types_rows: true, trill: true, codes: true },
 		})
 	})
 })
@@ -78,7 +93,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 // joshuafolkken/kit#8354: the matrix row — the green phosphor body and the TRACE gauge; its opening is
 // the approved demo's (joshuafolkken/kit#8441).
 describe('run_board_theme_defs.THEME_DEFS matrix', () => {
-	it('draws the green body, the TRACE alert and the approved opening, with no lamps or live effects', () => {
+	it('draws the green body, the TRACE alert, the approved opening, decoded rows and the idle rain', () => {
 		expect(THEME_DEFS.matrix).toStrictEqual({
 			paint: { rgb: '0;215;60', named: 'green' },
 			rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
@@ -95,9 +110,9 @@ describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 				},
 			},
 			alert: run_board_header_trace.field_of,
-			lamps: false,
+			lamps: true,
 			spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
-			live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
+			live: MATRIX_LIVE,
 		})
 	})
 

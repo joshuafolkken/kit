@@ -1,4 +1,6 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin } from './run-board-spin'
 import { run_board_theme_defs } from './run-board-theme-defs'
@@ -212,6 +214,26 @@ describe('run_board_type_rows — what is written', () => {
 
 		expect(typing.lines).toStrictEqual([])
 		expect(type_bytes(typing, START + SECOND + LETTER_MS)).toBe('')
+	})
+})
+
+// joshuafolkken/kit#8356: where the rows decode, a row resolves out of code with no block, as wide as
+// the row it becomes.
+describe('run_board_type_rows — a decoding row', () => {
+	it('writes the row with no block, as wide as the row', () => {
+		const typing = after_base(frame_of([]), [line_of('done:7', 0)])
+		const decoding = { ...typing, is_decoding: true }
+		const [line = ''] = typed_lines([ROW], decoding, START + SECOND + 10 * LETTER_MS)
+
+		expect(line).not.toContain(CURSOR)
+		expect(run_board_fit.width_of(stripVTControlCharacters(line))).toBe(ROW.length)
+		expect(type_bytes(decoding, START + SECOND + 10 * LETTER_MS)).not.toContain(CURSOR)
+	})
+
+	it('carries the frame’s decoding into the typing', () => {
+		const frame = { ...frame_of([]), is_decoding: true }
+
+		expect(next(NO_TYPING, frame, START, true).is_decoding).toBe(true)
 	})
 })
 

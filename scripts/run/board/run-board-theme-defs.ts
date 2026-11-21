@@ -28,13 +28,17 @@ interface IntroDefinition {
 // the trill sounds while it types, and whether the section rules run launch codes while it types where
 // the lamp panel shows (`run-board-codes.ts`; joshuafolkken/kit#8375), and whether a lamp strip fills
 // above each rule by typing progress where the rules run code (`run-board-strip.ts`; joshuafolkken/kit#8376)
-// — off in every theme for now, kept to switch back on (joshuafolkken/kit#8398).
+// — off in every theme for now, kept to switch back on (joshuafolkken/kit#8398) — and whether each row
+// decodes from code rather than types (`run-board-decode.ts`) and the lamp panel's cells run the idle rain
+// rather than blink (`run-board-idle-rain.ts`; joshuafolkken/kit#8356).
 interface LiveDefinition {
 	sweep: boolean
 	types_rows: boolean
 	trill: boolean
 	codes: boolean
 	strip: boolean
+	decode: boolean
+	rain: boolean
 }
 
 interface ThemeDefinition {
@@ -69,11 +73,19 @@ const THEME_DEFS = {
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
 		spinner: '│╱─╲',
-		live: { sweep: true, types_rows: true, trill: true, codes: true, strip: false },
+		live: {
+			sweep: true,
+			types_rows: true,
+			trill: true,
+			codes: true,
+			strip: false,
+			decode: false,
+			rain: false,
+		},
 	},
 	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening types three
-	// lines and shows the last at once (joshuafolkken/kit#8441), and its live effects come with the
-	// epic's later children.
+	// lines and shows the last at once (joshuafolkken/kit#8441); its new rows decode and the idle rain
+	// runs where the lamps sit (joshuafolkken/kit#8356).
 	matrix: {
 		paint: run_board_header_trace.SHADES.body,
 		rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
@@ -90,9 +102,17 @@ const THEME_DEFS = {
 			},
 		},
 		alert: run_board_header_trace.field_of,
-		lamps: false,
+		lamps: true,
 		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
-		live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
+		live: {
+			sweep: false,
+			types_rows: true,
+			trill: false,
+			codes: false,
+			strip: false,
+			decode: true,
+			rain: true,
+		},
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 
@@ -121,6 +141,8 @@ const NO_LIVE: LiveDefinition = {
 	trill: false,
 	codes: false,
 	strip: false,
+	decode: false,
+	rain: false,
 }
 
 // The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.

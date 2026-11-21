@@ -133,8 +133,10 @@ const run_board_rain = {
 	advanced,
 	cell_of,
 	cells_of,
+	fresh,
 	heads_of,
 	passes,
+	settled,
 }
 
 export { run_board_rain }

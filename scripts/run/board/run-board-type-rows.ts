@@ -1,4 +1,5 @@
 import { run_board_cut_styled } from './run-board-cut-styled'
+import { run_board_decode } from './run-board-decode'
 import { run_board_fit } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
@@ -45,14 +46,17 @@ interface Typing {
 	lines: ReadonlyArray<TypingLine>
 	done_ms?: number | undefined
 	saved?: ReadonlyMap<string, string> | undefined
+	is_decoding?: boolean | undefined
 }
 
-// A frame's keyed rows that can type, the key of every row its layout holds and, while the plan drawn
-// is a saved one, the keys it draws faint.
+// A frame's keyed rows that can type, the key of every row its layout holds, while the plan drawn is a
+// saved one the keys it draws faint, and whether its rows decode rather than type
+// (`run-board-decode.ts`; joshuafolkken/kit#8356).
 interface TypingFrame {
 	keyed: ReadonlyArray<KeyedLine>
 	known: ReadonlySet<string>
 	faint?: ReadonlySet<string> | undefined
+	is_decoding?: boolean | undefined
 }
 
 // Where a row starts typing and the saved line it types over, if any.
@@ -95,17 +99,24 @@ function under_of(line: TypingLine, now_ms: number): string {
 	return run_board_cut_styled.tail_styled(line.under, columns_at(line, now_ms) + 1)
 }
 
-// The row as typed by `now_ms`, its colors kept and its spinners at their frame of that moment; whole,
-// without the block, once typed through.
-function shown(line: TypingLine, now_ms: number): string {
+// The row typed by `now_ms`, the block after it, the saved line it types over right of the block.
+function typed_text(line: TypingLine, now_ms: number): string {
 	const part = is_typed(line, now_ms)
 		? line.text
 		: run_board_cut_styled.cut_styled(line.text, columns_at(line, now_ms))
 
-	return run_board_spot.drawn(
-		`${run_board_typing.typed(line.text, part)}${under_of(line, now_ms)}`,
-		run_board_labels.spinner_of(now_ms),
-	)
+	return `${run_board_typing.typed(line.text, part)}${under_of(line, now_ms)}`
+}
+
+// The row as typed — or, where the rows decode, resolved (joshuafolkken/kit#8356) — by `now_ms`, its
+// colors kept and its spinners at their frame of that moment; whole, without the block, once through.
+function shown(line: TypingLine, now_ms: number, is_decoding: boolean | undefined): string {
+	const text =
+		is_decoding === true
+			? run_board_decode.decoded(line.text, columns_at(line, now_ms))
+			: typed_text(line, now_ms)
+
+	return run_board_spot.drawn(text, run_board_labels.spinner_of(now_ms))
 }
 
 // Where the row starts on this frame: now over its saved line on the frame the live plan lands on, now
@@ -166,14 +177,16 @@ function next(typing: Typing, frame: TypingFrame, now_ms: number, is_on: boolean
 
 	const saved = saved_of(frame)
 
-	if (typing.seen === undefined) return { seen: frame.known, lines: [], saved }
+	const { is_decoding } = frame
+
+	if (typing.seen === undefined) return { seen: frame.known, lines: [], saved, is_decoding }
 
 	const landing = landing_of(typing, frame)
 	const lines = frame.keyed
 		.map((line) => typing_of(line, typing, landing, now_ms))
 		.filter((line) => line !== undefined)
 
-	return { seen: frame.known, lines, done_ms: done_ms(typing), saved }
+	return { seen: frame.known, lines, done_ms: done_ms(typing), saved, is_decoding }
 }
 
 // The frame's lines, each typing row as typed by `now_ms`.
@@ -183,14 +196,17 @@ function typed_lines(lines: ReadonlyArray<string>, typing: Typing, now_ms: numbe
 	return lines.map((text, index) => {
 		const line = typing_at.get(index)
 
-		return line === undefined ? text : shown(line, now_ms)
+		return line === undefined ? text : shown(line, now_ms, typing.is_decoding)
 	})
 }
 
 // Every typing row rewritten where it is on screen as typed by `now_ms`, the rest of its line erased.
 function type_bytes(typing: Typing, now_ms: number): string {
 	return typing.lines
-		.map((line) => `${CSI}${String(line.row)};1H${shown(line, now_ms)}${ERASE_LINE_END}`)
+		.map(
+			(line) =>
+				`${CSI}${String(line.row)};1H${shown(line, now_ms, typing.is_decoding)}${ERASE_LINE_END}`,
+		)
 		.join('')
 }
 
