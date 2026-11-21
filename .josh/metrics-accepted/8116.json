@@ -1,7 +1,0 @@
-{
-	"reason": "Seat lines gain a typing key (#8116): the keyed seat line and its known keys, a few lines",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

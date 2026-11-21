@@ -1,9 +1,0 @@
-{
-	"reason": "New kit-only board-theme skill: its two docs (on-demand bytes), its description (resident bytes), and its tests plus the corpus helper (code lines)",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 14,
-		"ai_cost.resident_bytes": 171,
-		"ai_cost.on_demand_bytes": 9897
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "new run-board-codes module and its tests for the wargames rule launch codes (#8375)",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 154
-	}
-}

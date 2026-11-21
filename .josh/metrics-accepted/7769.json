@@ -1,8 +1,0 @@
-{
-	"reason": "#7769: run a drafted premise at filing and body edit, skipping premises inherited from an untrusted body (issue:body, issue:spill) and cross-repository filings",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 86,
-		"ai_cost.on_demand_bytes": 195
-	}
-}

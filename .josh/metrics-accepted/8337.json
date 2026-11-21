@@ -1,7 +1,0 @@
-{
-	"reason": "#8337 adds the reviewer launch trigger vocabulary, its prompt marker and reader",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}

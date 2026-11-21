@@ -1,7 +1,0 @@
-{
-	"reason": "Moving the live loop to its own module repeats the imports and destructured constants it needs (+9 code lines); run-board-cli.ts drops from the cap",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

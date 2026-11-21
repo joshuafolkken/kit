@@ -1,7 +1,0 @@
-{
-	"reason": "Shared overrides test fixture module (plan comment: no cloned helpers) plus the eslint-plugin-unicorn hold entry",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

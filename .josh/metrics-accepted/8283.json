@@ -1,7 +1,0 @@
-{
-	"reason": "#8283 splits the single no-comparable-green reuse miss into per-cause reasons, including the caller-named after-red and scoped-argument misses",
-	"date": "2026-11-20",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}
