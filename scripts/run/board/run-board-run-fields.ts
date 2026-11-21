@@ -4,6 +4,7 @@ import { run_wake } from '#scripts/run/wake/run-wake'
 import { run_board_operation_read, type OperationSources } from './run-board-operation-read'
 import type { LocalRead } from './run-board-read'
 import { run_board_scope } from './run-board-scope'
+import { run_board_single } from './run-board-single'
 import type { BoardSpan } from './run-board-span'
 import type { SpanHere } from './run-board-span-read'
 import { run_board_throughput } from './run-board-throughput'
@@ -19,17 +20,24 @@ type RunFields = Pick<
 >
 
 // Where each session of the run writes what it does: a lane's child to its dispatch log, in the lane's
-// own checkout; the parent and a judgment session to theirs, in this one.
+// own checkout; the root checkout's single run beside them to its transcript, read as one more child's
+// (`run_board_single.sources_of`), never listed as a lane; the parent and a judgment session to
+// theirs, in this one.
 function sources_of(
 	repository: string,
 	lanes: ReadonlyArray<LaneInfo>,
-	transcript: string | undefined,
+	read: Pick<RunSpan, 'span' | 'root' | 'transcript'>,
 ): OperationSources {
 	const root = process.cwd()
+	const children = lanes.map((lane) => ({
+		issue: lane.issue,
+		log: lane.output,
+		root: lane.directory,
+	}))
 
 	return {
-		lanes: lanes.map((lane) => ({ issue: lane.issue, log: lane.output, root: lane.directory })),
-		owner: { log: transcript, root },
+		lanes: [...children, ...run_board_single.sources_of(read.root ?? read.span)],
+		owner: { log: read.transcript, root },
 		judgment: { log: run_wake.wake_log_path(repository), root },
 	}
 }
@@ -41,7 +49,7 @@ function fields_of(
 	lanes: ReadonlyArray<LaneInfo>,
 	events: ReadonlyArray<RunEvent>,
 ): RunFields {
-	const { span, transcript, carry, resume, roots, is_stranded, is_session_active } = read
+	const { span, carry, resume, roots, is_stranded, is_session_active } = read
 
 	return {
 		scope: run_board_scope.scope_of(span.invocation, carry?.added),
@@ -52,7 +60,7 @@ function fields_of(
 		carry,
 		is_stranded,
 		is_session_active,
-		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
+		operations: run_board_operation_read.read(sources_of(repository, lanes, read)),
 	}
 }
 

@@ -75,14 +75,25 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 	})
 })
 
-// joshuafolkken/kit#8354: the matrix row — the green phosphor body and the TRACE gauge, no effects yet.
+// joshuafolkken/kit#8354: the matrix row — the green phosphor body and the TRACE gauge; its opening is
+// the approved demo's (joshuafolkken/kit#8441).
 describe('run_board_theme_defs.THEME_DEFS matrix', () => {
-	it('draws the green body and the TRACE alert, with no opening line, lamps or live effects', () => {
+	it('draws the green body, the TRACE alert and the approved opening, with no lamps or live effects', () => {
 		expect(THEME_DEFS.matrix).toStrictEqual({
 			paint: { rgb: '0;215;60', named: 'green' },
 			rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
 			idle: run_board_header_trace.SHADES.mid,
-			intro: { line: '', letter_ms: 0, hold_ms: 0 },
+			intro: {
+				line: 'KNOCK, KNOCK, JOSH.',
+				letter_ms: 50,
+				hold_ms: 1300,
+				leads: {
+					lines: ['WAKE UP, JOSH...', 'THE BOARD HAS YOU...', 'FOLLOW THE WHITE RABBIT.'],
+					hold_ms: 1100,
+					gap_ms: 300,
+					paint: { rgb: '0;255;65', named: 'green' },
+				},
+			},
 			alert: run_board_header_trace.field_of,
 			lamps: false,
 			spinner: 'ｦｱｳｴｵｶｷｹｺｻ',

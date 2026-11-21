@@ -35,13 +35,27 @@ const READ: RunSpan = {
 	is_session_active: true,
 }
 
+const SINGLE_TRANSCRIPT = '/sessions/single.jsonl'
+
+// A root checkout's single run as its hold draws it, running unless `ended_ms` is given.
+function single_span(ended_ms?: number): RunSpan['span'] {
+	return {
+		started_ms: STARTED_MS,
+		ended_ms,
+		invocation: 'fullrun #8482',
+		transcript: SINGLE_TRANSCRIPT,
+	}
+}
+
+const SINGLE_SOURCE = { issue: '8482', log: SINGLE_TRANSCRIPT, root: process.cwd() }
+
 afterEach(() => vi.restoreAllMocks())
 
 describe('run_board_run_fields.sources_of', () => {
 	it('names each lane, the owner and the judgment session with their logs and checkouts', () => {
 		const root = process.cwd()
 
-		expect(run_board_run_fields.sources_of(REPOSITORY, LANES, TRANSCRIPT)).toEqual({
+		expect(run_board_run_fields.sources_of(REPOSITORY, LANES, READ)).toEqual({
 			lanes: [
 				{ issue: '101', log: '/lanes/101/dispatch.log', root: '/lanes/101' },
 				{ issue: '102', log: '/lanes/102/dispatch.log', root: '/lanes/102' },
@@ -52,7 +66,29 @@ describe('run_board_run_fields.sources_of', () => {
 	})
 
 	it('leaves the owner log unset where the record names no transcript', () => {
-		expect(run_board_run_fields.sources_of(REPOSITORY, [], undefined).owner.log).toBeUndefined()
+		const read = { ...READ, transcript: undefined }
+
+		expect(run_board_run_fields.sources_of(REPOSITORY, [], read).owner.log).toBeUndefined()
+	})
+
+	it("reads the root checkout's running single run beside the lanes from its transcript", () => {
+		const read = { ...READ, root: single_span() }
+
+		expect(run_board_run_fields.sources_of(REPOSITORY, LANES, read).lanes).toContainEqual(
+			SINGLE_SOURCE,
+		)
+	})
+
+	it('reads a single run drawn alone, with no carry and no lane, from its transcript', () => {
+		const read = { ...READ, span: single_span(), transcript: undefined }
+
+		expect(run_board_run_fields.sources_of(REPOSITORY, [], read).lanes).toEqual([SINGLE_SOURCE])
+	})
+
+	it('reads no operation of a single run a stop ended', () => {
+		const read = { ...READ, span: single_span(STARTED_MS), transcript: undefined }
+
+		expect(run_board_run_fields.sources_of(REPOSITORY, [], read).lanes).toEqual([])
 	})
 })
 
@@ -62,9 +98,20 @@ describe('run_board_run_fields.fields_of', () => {
 		const fields = run_board_run_fields.fields_of(REPOSITORY, READ, LANES, [])
 
 		expect(fields.lanes).toEqual(['101', '102'])
-		expect(read).toHaveBeenCalledWith(
-			run_board_run_fields.sources_of(REPOSITORY, LANES, TRANSCRIPT),
+		expect(read).toHaveBeenCalledWith(run_board_run_fields.sources_of(REPOSITORY, LANES, READ))
+	})
+
+	it("keeps the root checkout's single run out of the lanes it lists", () => {
+		vi.spyOn(run_board_operation_read, 'read').mockReturnValue(undefined as never)
+
+		const fields = run_board_run_fields.fields_of(
+			REPOSITORY,
+			{ ...READ, root: single_span() },
+			LANES,
+			[],
 		)
+
+		expect(fields.lanes).toEqual(['101', '102'])
 	})
 
 	it('carries the span record fields and derives the scope and throughput', () => {

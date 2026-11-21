@@ -8,6 +8,7 @@ import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_hold, type HoldRead, type RunHold } from '#scripts/run/hold/run-hold'
 import { run_hold_ended, type EndedHold } from '#scripts/run/hold/run-hold-ended'
+import type { OperationSources } from './run-board-operation-read'
 import { run_board_records } from './run-board-records'
 import { run_board_span, type BoardSpan } from './run-board-span'
 
@@ -86,6 +87,7 @@ function span_of(read: HoldRead): BoardSpan | undefined {
 	return {
 		invocation: `${command_of(hold)} ${issue_cite.plain_for('program', hold.issue)}`,
 		...times,
+		...(hold.owner_transcript !== undefined && { transcript: hold.owner_transcript }),
 	}
 }
 
@@ -233,6 +235,17 @@ function root_of(span: BoardSpan, events: ReadonlyArray<RunEvent>): RootRun | un
 	return { ...single, events: spanned, stopped: stopped_of(span) }
 }
 
+// A running single run's session, read for its operations as a lane's dispatch log is, so the header's
+// newest and its row's cell weigh it with the lanes' (joshuafolkken/kit#8482); none for any other span.
+function sources_of(span: BoardSpan): OperationSources['lanes'] {
+	const single = single_of(span.invocation)
+	const log = span.ended_ms === undefined ? span.transcript : undefined
+
+	if (single === undefined || log === undefined) return []
+
+	return [{ issue: String(single.issue), log, root: process.cwd() }]
+}
+
 const run_board_single = {
 	ended_here,
 	ended_in,
@@ -240,6 +253,7 @@ const run_board_single = {
 	name_of,
 	root_of,
 	scope_of,
+	sources_of,
 	span_here,
 	span_of,
 	stopped_of,
