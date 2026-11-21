@@ -169,6 +169,7 @@ describe('backlog_ready.lane_use', () => {
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
 			occupied: OPEN.length - ['3867', '3868'].length,
 			seated: OPEN.length,
+			seat_holders: OPEN.map((lane) => lane.issue),
 			unknown: [],
 		})
 	})
@@ -179,6 +180,7 @@ describe('backlog_ready.lane_use', () => {
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
 			occupied: OPEN.length,
 			seated: OPEN.length,
+			seat_holders: OPEN.map((lane) => lane.issue),
 			unknown: [],
 		})
 	})
@@ -191,6 +193,7 @@ describe('backlog_ready.lane_use', () => {
 		await expect(backlog_ready.lane_use()).resolves.toStrictEqual({
 			occupied: OPEN.length - 1,
 			seated: OPEN.length,
+			seat_holders: OPEN.map((lane) => lane.issue),
 			unknown: [],
 		})
 	})
