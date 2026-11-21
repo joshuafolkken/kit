@@ -1,6 +1,7 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_post_merge_check } from '#scripts/issue/issue-post-merge-check'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -138,6 +139,8 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		ship_problems: reads.ship_problems,
 		investigation: reads.investigation,
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
+		post_merge_check:
+			reads.content.kind === 'ok' ? issue_post_merge_check.answer(reads.content.block) : undefined,
 	}
 }
 

@@ -32,6 +32,12 @@ non-zero. Only then:
 **Capture through the project's own E2E suite**: add `await page.screenshot({ path: … })` to the
 Playwright spec covering the screen (or a new spec) and run it.
 
+**Otherwise, when `pnpm josh run:prep <N>` prints `post_merge_check: <where to look>`** (not `none`),
+the issue deferred the look past the merge: check what you can without a screenshot (the real output,
+tests on colors or rendering), record `behavior checked, look unchecked` and the `<where to look>` in
+the PR body and on the issue, and continue the run. This does not close the gate; never report it as
+satisfied.
+
 **Otherwise stop and say so**, in the session language: what you looked for, that the UI verification
 gate is **not** closed by this run, and ask the user to look at the screen.
 
