@@ -1,8 +1,0 @@
-{
-	"reason": "issue:premise-unmet refuses a body declaring a person's judgement is needed (#7969): one refusal constant and branch, plus the pointer lines in the three docs that name the exit",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 5,
-		"ai_cost.on_demand_bytes": 171
-	}
-}

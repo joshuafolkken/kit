@@ -1,8 +1,0 @@
-{
-	"reason": "no-diff investigation close: measured label so run:merge counts it, --deliverable on a dirty tree, empty-value refusal",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 117,
-		"ai_cost.on_demand_bytes": 176
-	}
-}

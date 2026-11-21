@@ -1,7 +1,0 @@
-{
-	"reason": "a new acceptance:check command and its run:chain stage, asking ship's acceptance-map refusal before the review",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 63
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7809 adds the cut, reason mark and work-tree keys to the test-pinned ledger row and the --reasoned launch flag carrying the reason; +37 code lines, within the planned ~40",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 37
-	}
-}

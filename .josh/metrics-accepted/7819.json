@@ -1,7 +1,0 @@
-{
-	"reason": "The board reads the adopt decision after a stop to show the relaunch (#7819); the adopt line's format moved into one shared module",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 48
-	}
-}

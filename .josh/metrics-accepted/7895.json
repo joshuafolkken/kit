@@ -1,7 +1,0 @@
-{
-	"reason": "New feature: the board header's offline mark (#7895) adds the outage read and its cell; no duplicated logic",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 53
-	}
-}

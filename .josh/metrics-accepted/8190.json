@@ -1,7 +1,0 @@
-{
-	"reason": "Per-wave RMS map equalizes cue loudness (#8190)",
-	"date": "2026-11-19",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

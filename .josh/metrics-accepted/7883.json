@@ -1,9 +1,0 @@
-{
-	"reason": "Rename detection for the removed-tests check (#7883): new renamed-tests.ts and tally.ts with tests, plus two rule lines in the rubric and report-format docs",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 112,
-		"rules.lines": 4,
-		"ai_cost.on_demand_bytes": 276
-	}
-}

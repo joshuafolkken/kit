@@ -1,7 +1,0 @@
-{
-	"reason": "New feature #8006: line-by-line reveal of the WarGames board's first frame (reveal in run-board-intro, first-frame buffering in run-board-cli); matches the 70-line estimate",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 70
-	}
-}

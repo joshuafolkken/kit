@@ -1,7 +1,0 @@
-{
-	"reason": "WarGames theme icon-to-text table (~110 emoji rows of data) plus the escape-aware capitals module (#7988)",
-	"date": "2026-11-18",
-	"growth": {
-		"scripts.code_lines": 169
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7804 adds the per-hunk miss reason (miss_of, misses) and its tests the Issue asks for; the hold reading is shared, not duplicated",
-	"date": "2026-11-17",
-	"growth": {
-		"scripts.code_lines": 66
-	}
-}

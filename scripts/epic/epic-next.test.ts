@@ -277,6 +277,25 @@ describe('epic_next.decide', () => {
 	})
 })
 
+describe('epic_next.decide — options', () => {
+	it('carries the repository checkout into its candidates', () => {
+		const path = '/workspace/kit'
+		const result = epic_next.decide(snapshot([child(1)]), { paths: new Map([[REPO, path]]) })
+
+		expect(result.candidates[0]?.path).toBe(path)
+	})
+
+	it('waits for an outside blocker included in the running set', () => {
+		const blocked = { ...child(2), blocked_by: [{ repo: REPO, number: 1, state: 'OPEN' }] } as const
+		const result = epic_next.decide(snapshot([blocked]), {
+			running: new Set([`${REPO}#1`]),
+		})
+
+		expect(result.verdict).toBe('wait')
+		expect(result.waiting.map((entry) => entry.number)).toEqual([2])
+	})
+})
+
 describe('epic_next.decide — the graph anomalies', () => {
 	it('stops on a circular dependency', () => {
 		const result = epic_next.decide(snapshot([child(1, [2]), child(2, [1])]))

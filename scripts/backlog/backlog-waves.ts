@@ -103,11 +103,10 @@ function first_wave(result: EpicNextResult, pool: WavePool): ReadonlyArray<EpicC
 
 function next_wave(pool: WavePool, done: ReadonlySet<string>): ReadonlyArray<EpicChild> {
 	const children = pool.children.map((child) => as_closed(child, done))
-	const { runnable } = epic_classify.classify_children(
-		children,
-		epic_cross_repo.resolve_cross_repo,
-		pool.running,
-	)
+	const { runnable } = epic_classify.classify_children(children, {
+		resolve: epic_cross_repo.resolve_cross_repo,
+		running: pool.running,
+	})
 
 	return offer(
 		runnable.filter((child) => child.repo === pool.repo),
