@@ -21,3 +21,14 @@ fixed cost again while the size-dependent part is merely divided between the hal
 joshuafolkken/kit#1436: round 1's cost is dominated by a fixed part that two Issues pay twice, so there
 is no diff size at which splitting to cut it pays — which is why a proposal for a threshold that splits
 more has to say why that data does not reach it.
+
+## Why a serial chain of children folds into one Issue
+
+A split pays off only when its children run side by side. Children chained by blocked-by run one at a
+time, and each pays the fixed costs again — round 1's fixed part measured in joshuafolkken/kit#1436
+among them — so the whole finishes later than one Issue would. Epic #8628 (`#8626 -> #8627 -> #8629`)
+showed it. The finish of the whole outranks one Issue's speed or size cap, so a pure serial chain folds.
+
+The two kinds keep the exceptions: `1 パスで検証できない` where the folded Issue is too large to verify
+in one pass, and `別の待ちがある` where a child waits on more than its sibling and would not run sooner
+folded.
