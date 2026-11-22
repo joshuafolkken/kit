@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_render_quota_cell, type Cell } from './run-board-render-quota-cell'
 
-const { cell_text, row_text } = run_board_render_quota_cell
+const { cell_text, row_text, short_row_text } = run_board_render_quota_cell
 const CELL_WIDTH = 47
+// Two gauge-less cells: 26 columns, a space, then 25 (joshuafolkken/kit#8695).
+const SHORT_ROW_WIDTH = 52
 const HALF_BAR = '■■■■■■■■■■┊─────────'
 const CELL: Cell = { label: '7d', used_percent: 50, pace: 0.5, count: '≈412', reset: 'Sat 10:00' }
 
@@ -56,5 +58,22 @@ describe('run_board_render_quota_cell.row_text', () => {
 		const row = stripVTControlCharacters(row_text([CELL, { ...CELL, label: 'GraphQL', reset: '' }]))
 
 		expect(row).toBe(`    7d  50% ${HALF_BAR} ≈412 Sat 10:00  GraphQL  50% ${HALF_BAR} ≈412`)
+	})
+})
+
+// joshuafolkken/kit#8695: the gauge-less cells a row under a lamp panel draws.
+describe('run_board_render_quota_cell.short_row_text', () => {
+	it('drops the bar and ┊, keeping the label, percent, count and reset in their columns', () => {
+		const row = stripVTControlCharacters(short_row_text([{ ...CELL, label: '5h' }, CELL]))
+
+		expect(row).toBe('    5h  50% ≈412 Sat 10:00    7d  50% ≈412 Sat 10:00')
+		expect(run_board_fit.width_of(row)).toBe(SHORT_ROW_WIDTH)
+	})
+
+	it('fits `▶ GQL` in the later cells’ label column, ending where a bare label ends', () => {
+		const marked = short_row_text([CELL, { ...CELL, label: '▶ GQL' }])
+
+		expect(stripVTControlCharacters(marked)).toContain('Sat 10:00 ▶ GQL  50%')
+		expect(run_board_fit.width_of(marked)).toBe(SHORT_ROW_WIDTH)
 	})
 })

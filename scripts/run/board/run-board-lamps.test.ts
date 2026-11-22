@@ -172,7 +172,7 @@ describe('run_board_lamps colors', () => {
 	})
 
 	it('names the panel’s rows under the throughput rows', () => {
-		expect(PANEL_ROWS).toEqual({ gap: 2, first_usage: 3, second_usage: 4 })
+		expect(PANEL_ROWS).toEqual({ gap: 2, first_usage: 3, second_usage: 4, github: 5 })
 	})
 
 	it('draws every row’s lamp out at half yellow, dimmed, the start placeholder too', () => {

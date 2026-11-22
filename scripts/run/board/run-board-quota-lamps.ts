@@ -1,8 +1,9 @@
 import { run_board_lamps } from './run-board-lamps'
 
 // Where the `⛽ usage` section carries the WOPR lamp panel on (joshuafolkken/kit#8277): the blank line
-// above its rule and its first two provider rows each start a panel, which `run-board-fold.ts` moves out
-// to the throughput rows' start and runs on to their rule's end. GitHub's row and the rule carry none.
+// above its rule, its first two provider rows and GitHub's row (joshuafolkken/kit#8695) each start a
+// panel, which `run-board-fold.ts` moves out to the throughput rows' start and runs on to their rule's
+// end. The rule carries none but where the panel rains (`run-board-fold.ts`).
 
 const { PANEL_ROWS, start_of } = run_board_lamps
 const PROVIDER_ROWS = [PANEL_ROWS.first_usage, PANEL_ROWS.second_usage]
@@ -22,6 +23,11 @@ function provider_rows(rows: ReadonlyArray<string>, has_lamps: boolean): Array<s
 	})
 }
 
-const run_board_quota_lamps = { gap_line, provider_rows }
+// GitHub's row, ending on where the panel's sixth row starts where the frame `has_lamps`.
+function github_row(row: string, has_lamps: boolean): string {
+	return has_lamps ? `${row} ${start_of(PANEL_ROWS.github)}` : row
+}
+
+const run_board_quota_lamps = { gap_line, github_row, provider_rows }
 
 export { run_board_quota_lamps }

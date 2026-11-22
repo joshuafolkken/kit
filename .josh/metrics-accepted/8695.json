@@ -1,0 +1,7 @@
+{
+	"reason": "#8695 adds the gauge-less short usage row (short_row_text) and the fold's reaching-row cut that keep the lamp panel beside the usage rows",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}

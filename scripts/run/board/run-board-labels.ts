@@ -41,7 +41,7 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 //   `queued`, `estimated finish`;
 // - a command, a repository, a unit or an OS process as it is spelled — `backlogrun`, `kit`, `24h`,
 //   `7d`, `/h`, `node`, the processes line's `claude`;
-// - a marker followed by one space — `▶ GraphQL`, as `▶ backlogrun`.
+// - a marker followed by one space — `▶ GQL`, as `▶ backlogrun`.
 const WORDS = {
 	no_run: 'no run',
 	plan: 'plan',

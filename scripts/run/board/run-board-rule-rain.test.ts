@@ -112,12 +112,19 @@ describe('the usage rule’s row on a rain frame', () => {
 	it.each([
 		['a frame with no rain', { has_rain: false }],
 		['a frame with no lamps', { has_lamps: false }],
-		['usage rows with no room for the panel', { usage_rows: ['x'.repeat(PANEL_START + 1)] }],
 	])('draws the rule whole with %s', (_, panel: Panel) => {
 		const rule = usage_rule(frame_of(panel))
 
 		expect(rule).not.toMatch(LAMP_PATTERN)
 		expect(width_of(rule)).toBe(PANEL_START + PANEL_WIDTH)
+	})
+
+	// joshuafolkken/kit#8695: a usage row reaching the panel is cut, so the rain keeps the rule's row.
+	it('rains on the rule’s row where a usage row reaches the panel, the row cut short of it', () => {
+		const lines = plain(frame_of({ usage_rows: ['x'.repeat(PANEL_START + 1)] }))
+
+		expect(usage_rule(lines)).toMatch(LAMP_PATTERN)
+		expect(lines.filter((line) => line.includes(LAMP))).toHaveLength(RAIN_ROWS - 1)
 	})
 
 	it('draws the rule whole where the usage section is folded', () => {
