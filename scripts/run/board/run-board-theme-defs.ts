@@ -1,3 +1,4 @@
+import { run_board_flux_panel } from './run-board-flux-panel'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
@@ -207,7 +208,9 @@ const THEME_DEFS = {
 		circuits: [BTTF.destination, BTTF.present, BTTF.departed],
 		intro: { line: "Roads? Where we're going, we don't need roads.", letter_ms: 50, hold_ms: 2000 },
 		alert: no_alert,
-		lamps: false,
+		// joshuafolkken/kit#8674: the flux capacitor, the lamp gauge and the speed readout at idle.
+		lamps: true,
+		panel: run_board_flux_panel.FLUX_PAINTER,
 		spinner: '│╱─╲',
 		live: NO_LIVE,
 		typing: no_sound,
