@@ -14,15 +14,17 @@ import { backlog_plan } from './backlog-plan'
 const CHAIN_LABEL = 'Longest serial chain:'
 const ARROW = ' → '
 
+// `chain` is the longest chain starting at this node, filled in by `longest_chain`.
 interface ChainNode {
 	child: EpicChild
 	wave: number
 	key: string
+	chain: ReadonlyArray<EpicChild>
 }
 
 function nodes_of(waves: ReadonlyArray<ReadonlyArray<EpicChild>>): Array<ChainNode> {
 	return waves.flatMap((wave, index) =>
-		wave.map((child) => ({ child, wave: index, key: epic_graph.key_of(child) })),
+		wave.map((child) => ({ child, wave: index, key: epic_graph.key_of(child), chain: [] })),
 	)
 }
 
@@ -39,56 +41,36 @@ function follows(
 		(blocker) => epic_graph.key_of(blocker) === earlier.key,
 	)
 
-	return is_blocked || (neighbors.get(earlier.key)?.has(later.key) ?? false)
-}
-
-// Each node's key mapped to the later nodes it links to, kept in `nodes`' order.
-function successors(
-	nodes: ReadonlyArray<ChainNode>,
-	declared: Declared,
-): ReadonlyMap<string, ReadonlyArray<ChainNode>> {
-	const neighbors = backlog_overlap.overlap_neighbors(
-		nodes.map((node) => ({ key: node.key, paths: declared.get(node.child.number) ?? new Set() })),
-	)
-
-	return new Map(
-		nodes.map((node) => [
-			node.key,
-			nodes.filter((later) => later.wave > node.wave && follows(node, later, neighbors)),
-		]),
-	)
+	return is_blocked || neighbors.get(earlier.key)?.has(later.key) === true
 }
 
 // The first of the longest chains starting at `nodes`; a strict comparison keeps the earliest on a tie.
-function longest_of(
-	nodes: ReadonlyArray<ChainNode>,
-	chains: ReadonlyMap<string, ReadonlyArray<EpicChild>>,
-): ReadonlyArray<EpicChild> {
+function longest_of(nodes: ReadonlyArray<ChainNode>): ReadonlyArray<EpicChild> {
 	let best: ReadonlyArray<EpicChild> = []
 
-	for (const node of nodes) {
-		const chain = chains.get(node.key) ?? []
-
-		if (chain.length > best.length) best = chain
-	}
+	for (const node of nodes) if (node.chain.length > best.length) best = node.chain
 
 	return best
 }
 
-// Walked from the last wave back, so every successor's chain is known before the node that links to it.
+// Walked from the last wave back, so every later node's chain is known before a node that links to it;
+// the later nodes stay in `nodes`' order, so a tie keeps the earliest.
 function longest_chain(
 	waves: ReadonlyArray<ReadonlyArray<EpicChild>>,
 	declared: Declared,
 ): ReadonlyArray<EpicChild> {
 	const nodes = nodes_of(waves).toSorted(earlier_first)
-	const next = successors(nodes, declared)
-	const chains = new Map<string, ReadonlyArray<EpicChild>>()
+	const neighbors = backlog_overlap.overlap_neighbors(
+		nodes.map((node) => ({ key: node.key, paths: declared.get(node.child.number) ?? new Set() })),
+	)
 
 	for (const node of nodes.toReversed()) {
-		chains.set(node.key, [node.child, ...longest_of(next.get(node.key) ?? [], chains)])
+		const later = nodes.filter((next) => next.wave > node.wave && follows(node, next, neighbors))
+
+		node.chain = [node.child, ...longest_of(later)]
 	}
 
-	return longest_of(nodes, chains)
+	return longest_of(nodes)
 }
 
 // One line naming the chain and its length, or none when no two issues are linked.
