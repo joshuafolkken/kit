@@ -212,7 +212,8 @@ const THEME_DEFS = {
 		lamps: true,
 		panel: run_board_flux_panel.FLUX_PAINTER,
 		spinner: '│╱─╲',
-		live: NO_LIVE,
+		// joshuafolkken/kit#8683: its notices, operations and rows type as the other themes' do, silently.
+		live: { ...NO_LIVE, types_rows: true },
 		typing: no_sound,
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
