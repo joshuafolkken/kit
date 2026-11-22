@@ -42,7 +42,7 @@ describe('run_board_tick_draw.draw_display notice typing', () => {
 
 	it('types a new notice', () => {
 		expect(notice_keys(launched)).toHaveLength(1)
-		expect(notice_keys(launched)[0]).toMatch(/^notice:🔄 #1 \d{2}:\d{2}$/u)
+		expect(notice_keys(launched)[0]).toMatch(/^notice:\d{2}:\d{2} 🔄 launch · #1 running$/u)
 	})
 
 	it('types it not again on a later redraw, nor when the sound is switched off', () => {

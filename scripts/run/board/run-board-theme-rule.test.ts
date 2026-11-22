@@ -177,6 +177,30 @@ describe('run_board_theme default section rules', () => {
 	})
 })
 
+// joshuafolkken/kit#8591: a heading's link keeps its escapes whole — the dimmed dashes and the drawn
+// glyphs reach the heading's text only, never the `-` inside a link's id or URL.
+const LINK_URL = 'https://github.com/joshuafolkken/kit/issues?q=is%3Aissue+is%3Aopen'
+const LINK_OPEN = `${ESCAPE}]8;id=josh-run-board;${LINK_URL}\u{7}`
+const LINK_CLOSE = `${ESCAPE}]8;;\u{7}`
+const DCS = `${ESCAPE}P`
+const DOUBLED_ESCAPE = ESCAPE.repeat(2)
+const TMUX_LINK_OPEN = `${DCS}tmux;${DOUBLED_ESCAPE}]8;id=josh-run-board;${LINK_URL}\u{7}${ESCAPE}\\`
+
+describe('run_board_theme.restyle a heading carrying a link', () => {
+	it.each([
+		['wargames', LINK_OPEN],
+		['matrix', LINK_OPEN],
+		['wargames', TMUX_LINK_OPEN],
+		['matrix', TMUX_LINK_OPEN],
+	] as const)('keeps the %s heading link escape %j whole', (theme, open) => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const drawn = run_board_theme.restyle(theme, `── LANES ── IS ${open}51${LINK_CLOSE} ──`)
+
+		expect(drawn.split(open)).toHaveLength(2)
+		expect(drawn).toContain(`${open}51${LINK_CLOSE}`)
+	})
+})
+
 describe('run_board_theme default output boundaries', () => {
 	it('leaves body rows, gauges, empty lines and the standalone spinner unchanged', () => {
 		vi.stubEnv('FORCE_COLOR', '3')

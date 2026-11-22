@@ -277,6 +277,28 @@ describe('run_board_theme_glyphs.textual in color', () => {
 	})
 })
 
+// joshuafolkken/kit#8591: `mapped` hands `draw` a line's text only; its escapes pass as they came.
+describe('run_board_theme_glyphs.mapped', () => {
+	it('draws the text between escapes and keeps a link and a color escape whole', () => {
+		const link = `${ESCAPE}]8;id=josh-run-board;https://a.b/c-d\u{7}`
+		const drawn: Array<[string, boolean]> = []
+		const line = `a-${RED}b-${link}c-${ESCAPE}]8;;\u{7}${DEFAULT_FOREGROUND}d-`
+		const mapped = run_board_theme_glyphs.mapped(line, (text, open) => {
+			drawn.push([text, open.is_colored])
+
+			return text.toUpperCase()
+		})
+
+		expect(mapped).toBe(`A-${RED}B-${link}C-${ESCAPE}]8;;\u{7}${DEFAULT_FOREGROUND}D-`)
+		expect(drawn.filter(([text]) => text !== '')).toStrictEqual([
+			['a-', false],
+			['b-', true],
+			['c-', true],
+			['d-', false],
+		])
+	})
+})
+
 describe('run_board_theme_glyphs.textual in bold or dim', () => {
 	it('turns a dim or bold the line has on back on after a tone that ends it', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
