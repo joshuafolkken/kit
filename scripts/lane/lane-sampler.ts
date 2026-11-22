@@ -1,5 +1,6 @@
 import { lane_ledger } from './lane-ledger'
 import type { LoadEntry } from './lane-ledger-schema'
+import { lane_ledger_tail } from './lane-ledger-tail'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_load } from './lane-load'
 import type { LaneSpan } from './lane-net-time'
@@ -38,14 +39,23 @@ async function take(context: MeasureContext = {}): Promise<LoadEntry> {
 	return entry
 }
 
-async function newest_load(ledger_path?: string): Promise<LoadEntry | undefined> {
-	const path = ledger_path ?? (await lane_ledger.target())
+function newest_in(path: string, since_ms: number): LoadEntry | undefined {
+	return lane_ledger_tail
+		.read_since(path, since_ms)
+		.entries.findLast((entry): entry is LoadEntry => entry.kind === lane_ledger.KIND.LOAD)
+}
+
+// The ledger's newest sample, read backward from its end: each drive start asks for it, and a whole
+// read parsed and kept every entry of the whole ledger (joshuafolkken/kit#8562). A newest sample older
+// than the recent window — a host that ran no drive for a while — reads the rest backward, unkept.
+async function newest_load(context: MeasureContext): Promise<LoadEntry | undefined> {
+	const path = context.ledger_path ?? (await lane_ledger.target())
 
 	if (path === undefined) return undefined
 
-	return lane_ledger
-		.read_entries(path)
-		.findLast((entry): entry is LoadEntry => entry.kind === lane_ledger.KIND.LOAD)
+	const since_ms = (context.now_ms ?? Date.now()) - SAMPLE_INTERVAL_MS
+
+	return newest_in(path, since_ms) ?? newest_in(path, 0)
 }
 
 // How far the host's sleep counter (`lane-load.ts`) grew from `previous` to `current`; an absent
@@ -93,7 +103,7 @@ async function record_quietly(span: LaneSpan, context: MeasureContext): Promise<
 // shows a lid closed while no drive ran — the gap to the ledger's newest sample is read by the counter.
 async function take_first(context: MeasureContext): Promise<void> {
 	try {
-		const previous = await newest_load(context.ledger_path)
+		const previous = await newest_load(context)
 		const slept = sleep_since(previous, await take(context))
 
 		if (slept !== undefined) await record_quietly(slept, context)

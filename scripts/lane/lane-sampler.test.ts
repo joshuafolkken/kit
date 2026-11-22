@@ -220,3 +220,44 @@ describe('lane_sampler.start — host sleep between samplers', () => {
 		expect(run_event_stream.read_events(events_path)).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#8562: each drive start reads the newest sample backward from the ledger's end, so a
+// ledger grown large is neither parsed whole nor kept in the reader's cache.
+const RECENT_MS = 30_000
+
+async function record_load(ledger_path: string, ago_ms: number, slept_ms: number): Promise<void> {
+	const at = new Date(Date.now() - ago_ms).toISOString()
+
+	await lane_ledger_write.record({ kind: 'load', at, load: 1, slept_ms }, ledger_path)
+}
+
+describe('lane_sampler.start — the newest sample read backward', () => {
+	it('measures from the newest sample, not an older one before it', async () => {
+		const ledger_path = fresh_ledger()
+		const events_path = fresh_ledger()
+
+		await record_load(ledger_path, SLEEP_MS + IDLE_MS, 0)
+		await record_load(ledger_path, RECENT_MS, SLEEP_MS)
+		sample_mock.mockImplementation((at: string) => ({
+			kind: 'load',
+			at,
+			load: 3,
+			slept_ms: SLEEP_MS,
+		}))
+		const stop = lane_sampler.start({ ledger_path, events_path })
+
+		await vi.advanceTimersByTimeAsync(0)
+		stop()
+
+		expect(run_event_stream.read_events(events_path)).toStrictEqual([])
+	})
+
+	it('never reads the whole ledger into the entries cache', async () => {
+		const read_entries = vi.spyOn(lane_ledger, 'read_entries')
+
+		await start_after(COUNTER_MS, COUNTER_MS + SLEEP_MS)
+
+		expect(read_entries).not.toHaveBeenCalled()
+		read_entries.mockRestore()
+	})
+})
