@@ -18,6 +18,7 @@ import type { KeyInput } from './run-board-keys'
 import type { Lamp } from './run-board-lamp-spots'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
+import type { NoticeTurn } from './run-board-notice-turn'
 import type { PinnedIssue } from './run-board-pinned-graphql'
 import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
@@ -196,6 +197,9 @@ interface BoardView {
 	sound_pending?: Pending | undefined
 	// The last notice picked, kept while the sound is off too (`run-board-header-notice.ts`).
 	notice?: Notice | undefined
+	// The header notice's trace and where the last frame drew it, traced between redraws
+	// (`run-board-notice-turn.ts`).
+	notice_trace?: NoticeTurn | undefined
 }
 
 type BoardState = BoardData & BoardView

@@ -34,9 +34,12 @@ interface IntroDefinition {
 // decodes from code rather than types (`run-board-decode.ts`) and the lamp panel's cells run the idle rain
 // rather than blink (`run-board-idle-rain.ts`; joshuafolkken/kit#8356), and whether a drop falls down the
 // whole board every second in place of the sweep (`run-board-rain-drop.ts`; joshuafolkken/kit#8367), and
-// whether a changed character lands white and cools (`run-board-change-flash.ts`; joshuafolkken/kit#8353).
+// whether a changed character lands white and cools (`run-board-change-flash.ts`; joshuafolkken/kit#8353),
+// and whether a new header notice traces in and blinks in a green bar (`run-board-notice-trace.ts`;
+// joshuafolkken/kit#8657).
 interface LiveDefinition {
 	flash?: boolean
+	notice_trace?: boolean
 	sweep: boolean
 	drop: boolean
 	types_rows: boolean
@@ -138,6 +141,7 @@ const THEME_DEFS = {
 			decode: true,
 			rain: true,
 			flash: true,
+			notice_trace: true,
 		},
 		// A key click every two letters while the intro types and new rows decode (joshuafolkken/kit#8365).
 		typing: run_board_sound_click.typing_wav,

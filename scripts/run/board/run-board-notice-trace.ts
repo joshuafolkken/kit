@@ -127,6 +127,19 @@ function is_tracing(since_ms: number, length: number): boolean {
 	return since_ms < length * LETTER_MS + TRACE_BRIGHT_MS
 }
 
+// joshuafolkken/kit#8657: how long after it began the notice of `length` letters next changes its look,
+// `since_ms` after it began — the next letter's step while they lock, the stage's end after; none once
+// the trace is over.
+function change_after(since_ms: number, length: number): number {
+	const lock_ms = length * LETTER_MS
+
+	if (since_ms < lock_ms) return (Math.floor(since_ms / LETTER_MS) + 1) * LETTER_MS
+
+	const until_ms = STAGES.find(([stage_ms]) => since_ms - lock_ms < stage_ms)?.[0]
+
+	return until_ms === undefined ? Infinity : lock_ms + until_ms
+}
+
 // The notice slot a frame draws: its key, and whether a standing state holds it in place of a notice.
 interface NoticeSlot {
 	key: string | undefined
@@ -159,6 +172,7 @@ const run_board_notice_trace = {
 	TRACE_BLINK_MS,
 	TRACE_BRIGHT_MS,
 	TRACE_GAP_MS,
+	change_after,
 	is_tracing,
 	length_of,
 	trace_of,

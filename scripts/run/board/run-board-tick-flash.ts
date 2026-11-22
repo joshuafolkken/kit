@@ -1,6 +1,7 @@
 import { run_board_change_flash, type Flash } from './run-board-change-flash'
 import { run_board_fit } from './run-board-fit'
 import { run_board_lamps } from './run-board-lamps'
+import { run_board_notice_turn, type NoticePlace } from './run-board-notice-turn'
 import { run_board_spin, type Spun } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
@@ -20,14 +21,18 @@ interface FlashRedraw {
 	now_ms: number
 }
 
-type FlashDrawn = Pick<Spun, 'lines' | 'keyed' | 'spots'> & Partial<Pick<Spun, 'lamps'>>
+// The frame's cells the flash reads, and the header notice's while it traces (joshuafolkken/kit#8657).
+type FlashDrawn = Pick<Spun, 'lines' | 'keyed' | 'spots'> &
+	Partial<Pick<Spun, 'lamps'>> & { notice?: NoticePlace | undefined }
 
 // The cells written between redraws by their own writers — the spinners and the lamps, which write
-// only what changed — so a flash restored over them would leave the frame's glyph, not theirs.
+// only what changed, and the tracing notice — so a flash restored over them would leave the frame's
+// glyph, not theirs.
 function is_owned(drawn: FlashDrawn, cell: { row: number; column: number }): boolean {
 	const owned = [...drawn.spots, ...(drawn.lamps ?? [])]
+	const is_spot = owned.some((spot) => spot.row === cell.row && spot.column === cell.column)
 
-	return owned.some((spot) => spot.row === cell.row && spot.column === cell.column)
+	return is_spot || run_board_notice_turn.covers(drawn.notice, cell)
 }
 
 // Only the fixed header and producer-keyed rows hold their identity across redraws; a line the pane
@@ -55,13 +60,14 @@ function flash_lines(drawn: FlashDrawn, ports: FlashPorts): Array<KeyedLine> {
 	)
 }
 
-// Whether the board flashes: a live board on a terminal drawing color, in a theme that flashes.
-function is_enabled(ports: FlashPorts): boolean {
+// Whether the board flashes — or traces its notice in (joshuafolkken/kit#8657): a live board on a
+// terminal drawing color, in a theme that switches the effect on.
+function is_enabled(ports: FlashPorts, effect: 'flash' | 'notice_trace' = 'flash'): boolean {
 	const is_live = ports.is_tty && ports.opened_ms !== undefined
 
 	return (
 		is_live &&
-		run_board_theme_defs.live_of(ports.theme).flash === true &&
+		run_board_theme_defs.live_of(ports.theme)[effect] === true &&
 		run_board_lamps.is_colored()
 	)
 }
@@ -82,6 +88,6 @@ function flash_of(
 	return { ...flash, cells: flash.cells.filter((cell) => !is_owned(drawn, cell)) }
 }
 
-const run_board_tick_flash = { flash_of }
+const run_board_tick_flash = { flash_of, is_enabled }
 
 export { run_board_tick_flash }

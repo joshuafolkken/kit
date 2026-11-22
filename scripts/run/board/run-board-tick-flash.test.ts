@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_change_flash } from './run-board-change-flash'
 import { run_board_fixture } from './run-board-fixture'
+import type { Notice } from './run-board-header-notice'
 import type { BoardRow } from './run-board-layout'
 import type { BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 import type { DrawPorts } from './run-board-tick-draw'
 import { run_board_tick_flash } from './run-board-tick-flash'
@@ -11,6 +13,11 @@ import { run_board_tick_flash } from './run-board-tick-flash'
 const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const CPU_PERCENT = 42
+const STOP_NOTICE: Notice = {
+	cause: { cue: 'alert', word: 'stopped', issue: 8103 },
+	is_repeat: false,
+	at_ms: START,
+}
 const DISABLED: Array<[string, Partial<DrawPorts>]> = [
 	['once', { opened_ms: undefined }],
 	['chat', { form: 'chat', opened_ms: undefined }],
@@ -117,6 +124,64 @@ describe('run_board_tick_flash.flash_of over a lamp', () => {
 		const flash = run_board_tick_flash.flash_of(base, changed, redraw, FRESH_STATE.typing)
 
 		expect(flash?.cells.map((cell) => cell.column)).toStrictEqual([1])
+	})
+})
+
+describe('run_board_tick_flash.flash_of over the tracing notice', () => {
+	it('never flashes the notice’s cells, which the spin writes itself', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		vi.stubEnv('NO_COLOR', undefined)
+		const redraw = matrix_redraw()
+		const notice = { row: 1, column: 1, text: '1' }
+		const drawn = { lines: ['12'], keyed: [], spots: [], notice }
+		const base = run_board_tick_flash.flash_of(undefined, drawn, redraw, FRESH_STATE.typing)
+		const changed = { ...drawn, lines: ['34'] }
+		const flash = run_board_tick_flash.flash_of(base, changed, redraw, FRESH_STATE.typing)
+
+		expect(flash?.cells.map((cell) => cell.column)).toStrictEqual([2])
+	})
+
+	it('starts the trace on a notice new after the base frame and places it', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		vi.stubEnv('NO_COLOR', undefined)
+		const base = flash_over(planned())
+		const drawn = flash_over({ ...base, notice: STOP_NOTICE })
+
+		expect(drawn.notice_trace?.trace.start_ms).toBe(START)
+		expect(drawn.notice_trace?.place).toBeDefined()
+	})
+
+	it('never traces a notice already there on the base frame', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		vi.stubEnv('NO_COLOR', undefined)
+		const drawn = flash_over({ ...planned(), notice: STOP_NOTICE })
+
+		expect(drawn.notice_trace?.trace.start_ms).toBe(-Infinity)
+		expect(drawn.notice_trace?.place).toBeUndefined()
+	})
+})
+
+describe('run_board_tick_flash.is_enabled per effect', () => {
+	it('reads the theme’s own switch for each effect', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		vi.stubEnv('NO_COLOR', undefined)
+		const { ports } = matrix_redraw()
+		const live = run_board_theme_defs.live_of('matrix')
+
+		vi.spyOn(run_board_theme_defs, 'live_of').mockReturnValue({ ...live, notice_trace: false })
+
+		expect(run_board_tick_flash.is_enabled(ports)).toBe(true)
+		expect(run_board_tick_flash.is_enabled(ports, 'notice_trace')).toBe(false)
+		vi.restoreAllMocks()
+	})
+
+	it.each(DISABLED)('traces no notice in %s', (mode, overrides) => {
+		vi.stubEnv('FORCE_COLOR', mode === 'noColor' ? '0' : '3')
+		vi.stubEnv('NO_COLOR', mode === 'noColor' ? '1' : undefined)
+		const base = flash_over(planned(), overrides)
+		const drawn = flash_over({ ...base, notice: STOP_NOTICE }, overrides)
+
+		expect(drawn.notice_trace).toBeUndefined()
 	})
 })
 

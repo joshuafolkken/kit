@@ -10,6 +10,7 @@ import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
+import { run_board_notice_turn, type NoticeTurn } from './run-board-notice-turn'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
@@ -304,6 +305,29 @@ function turned_of(drawn: Drawn): Pick<Drawn, 'spots' | 'sweep' | 'lamps' | 'tra
 	return { spots, sweep, lamps, traces, colons }
 }
 
+// joshuafolkken/kit#8657: the header notice's trace this frame carries on, where the board traces it —
+// the flash's gate, by the theme's own switch; the frame the change flash measures against starts none
+// (the matrix types no rows, so the typing keeps no base of its own).
+function notice_of(
+	state: BoardState,
+	drawn: Drawn,
+	header: LaidHeader,
+	redraw: Redraw,
+): NoticeTurn | undefined {
+	const { ports } = redraw
+
+	if (!run_board_tick_flash.is_enabled(ports, 'notice_trace')) return undefined
+
+	return run_board_notice_turn.turn_of(state.notice_trace, {
+		keyed: drawn.keyed,
+		header,
+		is_base: state.flash === undefined,
+		now_ms: redraw.now_ms,
+		look: { theme: ports.theme, icons: ports.icons },
+		columns: drawn.size?.columns ?? Infinity,
+	})
+}
+
 // The frame written with the change flash over it (joshuafolkken/kit#8353), and the trill switched on
 // while a row types.
 function write_frame(redraw: Redraw, drawn: Drawn, typing: Typing, flash: Flash | undefined): void {
@@ -326,11 +350,21 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	if (display.cue !== undefined) redraw.ports.cue?.(display.cue)
 	const drawn = frame_of(display, header, redraw)
 	const typing = typing_of(state, drawn, header, redraw)
-	const flash = run_board_tick_flash.flash_of(state.flash, drawn, redraw, typing)
+	const notice_trace = notice_of(state, drawn, header, redraw)
+	const flash = run_board_tick_flash.flash_of(
+		state.flash,
+		{ ...drawn, notice: notice_trace?.place },
+		redraw,
+		typing,
+	)
 
 	write_frame(redraw, drawn, typing, flash)
 
-	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
+	const decoded = {
+		...decoded_of(redraw.ports, drawn),
+		is_rain: has_rain(redraw.ports),
+		notice_trace,
+	}
 	const drop = drop_of(redraw, drawn, typing, { drop: state.drop, flash })
 
 	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop, flash }

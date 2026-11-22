@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_change_flash } from './run-board-change-flash'
 import { run_board_labels } from './run-board-labels'
+import { run_board_notice_trace } from './run-board-notice-trace'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
 import { run_board_spot } from './run-board-spot'
@@ -135,6 +136,8 @@ describe('run_board_spin.spin_bytes', () => {
 
 const SPOTS = [{ row: 1, column: 1, style: '' }]
 const SPINNING = { spots: SPOTS, typing: NO_TYPING }
+// A two-letter notice's trace writes: one per letter step, then the lit bar.
+const NOTICE_STEPS = [0, 50, 100]
 
 it('ac-8de5883d cools and restores a flash on spinner turns even without spinner spots', async () => {
 	const { ports, writes } = spin_ports(START)
@@ -153,6 +156,25 @@ it('ac-8de5883d cools and restores a flash on spinner turns even without spinner
 		START + run_board_change_flash.COOL_FRAMES * SPINNER_INTERVAL_MS,
 	)
 	expect(overlays.at(-1)?.text).toBe(`${ESCAPE}[1;1Hb`)
+})
+
+it('writes a placed notice trace on its letter steps until the bar is lit', async () => {
+	const { ports, writes } = spin_ports(START)
+	const place = { row: 2, column: 5, text: ' ab ' }
+	const notice_trace = { trace: { key: 'notice', start_ms: START }, place }
+
+	await spin_to_second(
+		{ spots: [], typing: NO_TYPING, notice_trace },
+		{ ...ports, write_drawn: ports.write },
+	)
+	const traced = writes.filter(({ text }) => text.includes(`${ESCAPE}[2;5H`))
+	const lit_ms = NOTICE_STEPS.at(-1) ?? 0
+	const lit = traced.find(({ at_ms }) => at_ms === START + lit_ms)
+
+	expect(traced.map(({ at_ms }) => at_ms - START)).toStrictEqual(
+		expect.arrayContaining(NOTICE_STEPS),
+	)
+	expect(lit?.text).toContain(run_board_notice_trace.traced(place.text, lit_ms, Math.random))
 })
 
 describe('run_board_spin.spin_to_second', () => {
