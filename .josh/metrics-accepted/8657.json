@@ -1,0 +1,7 @@
+{
+	"reason": "matrix notice trace wiring: new run-board-notice-turn.ts module plus its spin/flash/draw hooks (#8657)",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 146
+	}
+}

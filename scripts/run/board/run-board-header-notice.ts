@@ -122,4 +122,4 @@ function key_of(fields: NoticeFields): string | undefined {
 const run_board_header_notice = { key_of, next, part_of }
 
 export { run_board_header_notice }
-export type { Notice }
+export type { Notice, NoticeFields }

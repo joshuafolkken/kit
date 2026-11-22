@@ -49,6 +49,7 @@ describe('run_board_live.live_of', () => {
 	// joshuafolkken/kit#8356: the matrix board's rows decode and its lamp panel runs the idle rain.
 	// joshuafolkken/kit#8367: a raindrop falls down the whole matrix board in place of the sweep.
 	// joshuafolkken/kit#8353: a changed character on the matrix board lands white and cools.
+	// joshuafolkken/kit#8657: a new header notice on the matrix board traces in.
 	it('reads the decoded rows, the idle rain and the board drop from the matrix definition', () => {
 		expect(run_board_live.live_of('matrix')).toStrictEqual({
 			...NO_LIVE,
@@ -58,6 +59,7 @@ describe('run_board_live.live_of', () => {
 			rain: true,
 			drop: true,
 			flash: true,
+			notice_trace: true,
 		})
 	})
 
