@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DropScreen } from './run-board-drop-screen'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_rain_drop } from './run-board-rain-drop'
 import type { BoardState } from './run-board-state'
 import type { Theme } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
@@ -114,14 +115,17 @@ function size(): { rows: number; columns: number } {
 	return WIDE
 }
 
-// A live redraw of a frame in `theme`, on a terminal drawing color: the state its turns carry.
-function redrawn_state(theme: Theme, drop?: DropScreen): BoardState {
+// A live redraw of a frame in `theme`, on a terminal drawing color and opened at the redraw: the state
+// its turns carry.
+function redrawn_state(theme: Theme, drop?: DropScreen, flash?: BoardState['flash']): BoardState {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 	const { FRESH_STATE, layout_for } = run_board_tick
 	const { ports } = harness(LOCAL, [])
-	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms, drop }
-	const redraw = { ports: { ...ports, types_rows: true, theme, size }, now_ms: START }
+	const plan = plan_titled('a')
+	const state = { ...FRESH_STATE, plan, run_started_ms: LOCAL.started_ms, drop, flash }
+	const live = { ...ports, types_rows: true, theme, size, opened_ms: START }
+	const redraw = { ports: live, now_ms: START }
 
 	return drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
 }
@@ -200,6 +204,16 @@ function carried_deja(span: TypingSpan): ReadonlyArray<TypingSpan> {
 	return redrawn_state('matrix', { ...last_drop(), deja_spans: [span] }).drop?.deja_spans ?? []
 }
 
+// The matrix board's flash, replaying its first row from the fixture's start.
+function replaying_flash(): NonNullable<BoardState['flash']> {
+	const { flash } = redrawn_state('matrix')
+	const key = flash?.lines[0]?.key
+
+	if (flash === undefined || key === undefined) throw new Error('the matrix board flashed no row')
+
+	return { ...flash, deja_vu: [{ key, start_ms: run_board_fixture.START }] }
+}
+
 describe('run_board_tick_draw.draw_display with the last frame’s deja vu rains', () => {
 	const { START } = run_board_fixture
 	const RECENT = { from_ms: START - 2000, to_ms: START - 1000 }
@@ -211,5 +225,14 @@ describe('run_board_tick_draw.draw_display with the last frame’s deja vu rains
 
 	it('lets go of one older than the slowest drop’s time on screen', () => {
 		expect(carried_deja(STALE)).toStrictEqual([])
+	})
+
+	it('starts a rain from the first frame of a row the flash replays', () => {
+		expect(redrawn_state('matrix', last_drop(), replaying_flash()).drop?.deja_spans).toStrictEqual([
+			{
+				from_ms: START,
+				to_ms: START + run_board_rain_drop.DEJA_STEPS * run_board_rain_drop.DROP_MS,
+			},
+		])
 	})
 })
