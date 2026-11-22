@@ -57,6 +57,11 @@ function line_of(lines: ReadonlyArray<string>, number: number): string {
 	return lines.find((line) => line.includes(String(number))) ?? ''
 }
 
+// joshuafolkken/kit#8609: wargames draws the headings in capitals, matrix as written.
+function heading_in(theme: 'wargames' | 'matrix', text: string): string {
+	return theme === 'wargames' ? text.toUpperCase() : text
+}
+
 function title_column(lines: ReadonlyArray<string>, number: number): number {
 	return line_of(lines, number).indexOf('Title')
 }
@@ -168,8 +173,8 @@ describe('run_board_render.render — the headings’ priorities', () => {
 			const frame = lines_of(header({ layout })).join('\n')
 			const drawn = stripVTControlCharacters(run_board_theme.restyle(theme, frame))
 
-			expect(drawn).toContain('QUEUED 3 (P1 1 P2 1)')
-			expect(drawn).toContain('WAITING 1 (P2 1)')
+			expect(drawn).toContain(heading_in(theme, 'queued 3 (P1 1 P2 1)'))
+			expect(drawn).toContain(heading_in(theme, 'waiting 1 (P2 1)'))
 			expect(drawn.split('\n', 1)[0]).not.toContain('(P')
 		},
 	)

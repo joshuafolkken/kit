@@ -40,6 +40,7 @@ const MATRIX_LIVE: LiveDefinition = {
 }
 const AMBER: ThemeDefinition = {
 	name: 'josh-amber',
+	capitals: true,
 	paint: { rgb: '255;176;0', named: 'yellow' },
 	rule: THEME_DEFS.wargames.rule,
 	idle: THEME_DEFS.wargames.idle,
@@ -89,6 +90,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 	it('keeps the phosphor cyan and the opening line the board drew before the table', () => {
 		expect(THEME_DEFS.wargames).toStrictEqual({
 			name: 'josh-wopr',
+			capitals: true,
 			paint: { rgb: PHOSPHOR_RGB, named: 'cyan' },
 			// joshuafolkken/kit#8397: the rules in the idle tone's dim cyan.
 			rule: {
@@ -120,15 +122,17 @@ describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 	it('draws the green body, the TRACE alert, the approved opening, decoded rows and the idle rain', () => {
 		expect(THEME_DEFS.matrix).toStrictEqual({
 			name: 'josh-trace',
+			// joshuafolkken/kit#8609: the text and the opening as written, in mixed case.
+			capitals: false,
 			paint: { rgb: '0;215;60', named: 'green' },
 			rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
 			idle: run_board_header_trace.SHADES.mid,
 			intro: {
-				line: 'KNOCK, KNOCK, JOSH.',
+				line: 'Knock, knock, Josh.',
 				letter_ms: 50,
 				hold_ms: 1300,
 				leads: {
-					lines: ['WAKE UP, JOSH...', 'THE BOARD HAS YOU...', 'FOLLOW THE WHITE RABBIT.'],
+					lines: ['Wake up, Josh...', 'The board has you...', 'Follow the white rabbit.'],
 					hold_ms: 1100,
 					gap_ms: 300,
 					paint: { rgb: '0;255;65', named: 'green' },

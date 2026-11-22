@@ -137,7 +137,7 @@ function restyled_line(open: string, look: Look, line: string): string {
 	const kept = run_board_label_pair.dropped(line)
 	const ruled = kept.split(RULE).join(DASH)
 	const glyphs = run_board_theme_glyphs.textual(ruled, look)
-	const text = run_board_theme_case.capitals(glyphs)
+	const text = definition.capitals ? run_board_theme_case.capitals(glyphs) : glyphs
 	const is_rule = run_board_label_pair.heading_lead(stripVTControlCharacters(kept)) !== undefined
 
 	return is_rule

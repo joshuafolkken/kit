@@ -87,29 +87,33 @@ describe('run_board_header.header_lines time circuits', () => {
 })
 
 describe('run_board_header.header_lines time circuits in a theme', () => {
-	it.each(['wargames', 'matrix'] as const)('draws %s’s clocks ET / NW / T0', (theme) => {
+	// joshuafolkken/kit#8609: wargames draws the state in capitals, matrix as written.
+	it.each([
+		['wargames', 'RUNNING'],
+		['matrix', 'running'],
+	] as const)('draws %s’s clocks ET / NW / T0', (theme, state) => {
 		const lines = drawn(circuits(), theme, 'letters')
 
 		expect(lines[0]).toContain(`ET ${minute_of(NOW + 15 * MINUTE)}  -  15′00″`)
 		expect(lines[1]).toContain(`NW ${minute_of(NOW)}  +2°10′00″`)
 		// The theme draws its own spinner in the spinner's cell.
 		expect(lines[2]).toMatch(
-			new RegExp(String.raw`T0 ${minute_of(STARTED)}  \S {10}RN 1 RUNNING$`, 'u'),
+			new RegExp(String.raw`T0 ${minute_of(STARTED)}  \S {10}RN 1 ${state}$`, 'u'),
 		)
 	})
 
-	it.each(['wargames', 'matrix'] as const)(
-		'draws %s’s clocks -> / () / ^^ in shapes (#8505)',
-		(theme) => {
-			const lines = drawn(circuits(), theme, 'shapes')
+	it.each([
+		['wargames', 'RUNNING'],
+		['matrix', 'running'],
+	] as const)('draws %s’s clocks -> / () / ^^ in shapes (#8505)', (theme, state) => {
+		const lines = drawn(circuits(), theme, 'shapes')
 
-			expect(lines[0]).toContain(`-> ${minute_of(NOW + 15 * MINUTE)}  -  15′00″`)
-			expect(lines[1]).toContain(`() ${minute_of(NOW)}  +2°10′00″`)
-			expect(lines[2]).toMatch(
-				new RegExp(String.raw`\^\^ ${minute_of(STARTED)}  \S {10}>> 1 RUNNING$`, 'u'),
-			)
-		},
-	)
+		expect(lines[0]).toContain(`-> ${minute_of(NOW + 15 * MINUTE)}  -  15′00″`)
+		expect(lines[1]).toContain(`() ${minute_of(NOW)}  +2°10′00″`)
+		expect(lines[2]).toMatch(
+			new RegExp(String.raw`\^\^ ${minute_of(STARTED)}  \S {10}>> 1 ${state}$`, 'u'),
+		)
+	})
 })
 
 describe('run_board_header_time.time_parts width', () => {

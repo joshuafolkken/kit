@@ -47,13 +47,13 @@ describe('run_board_intro.play matrix', () => {
 
 		await play({ ...ports, typing_sound }, NO_KEYS, THEME)
 		expect(LEADS.lines).toStrictEqual([
-			'WAKE UP, JOSH...',
-			'THE BOARD HAS YOU...',
-			'FOLLOW THE WHITE RABBIT.',
+			'Wake up, Josh...',
+			'The board has you...',
+			'Follow the white rabbit.',
 		])
 		expect(written).toStrictEqual([
 			...LEADS.lines.flatMap((lead) => lead_written(lead)),
-			bright('KNOCK, KNOCK, JOSH.'),
+			bright('Knock, knock, Josh.'),
 		])
 		expect(written.at(-1)?.includes(CURSOR)).toBe(false)
 		expect(typing_sound.set.mock.calls).toStrictEqual(LEADS.lines.flatMap(() => [[true], [false]]))
