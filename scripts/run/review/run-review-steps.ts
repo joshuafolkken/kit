@@ -61,11 +61,13 @@ function josh_argv(root: string, josh_args: ReadonlyArray<string>): LaunchArgv {
 
 // A `josh` command left running in the background, its output kept at `log_path`: the gate, and the
 // `test:pinned` check beside it (`run-review-pinned-steps.ts`). A long-running check never inherits the
-// review stage's core-budget priority mark (`core-priority.ts`, joshuafolkken/kit#5819).
-function launch_josh(
+// review stage's core-budget priority mark (`core-priority.ts`, joshuafolkken/kit#5819). `environment`
+// is laid over that, as a bounded check's result directory (`bounded-check.ts`, joshuafolkken/kit#8708).
+function launch_josh_with(
 	josh_args: ReadonlyArray<string>,
 	log_path: string,
-	root: string = PROJECT_ROOT,
+	root: string,
+	environment: Readonly<Record<string, string>>,
 ): LaunchResult {
 	return detached_launch.launch(
 		{
@@ -75,10 +77,19 @@ function launch_josh(
 			env: {
 				...git_location_environment.location_free_environment(),
 				...core_priority.UNMARKED_ENVIRONMENT,
+				...environment,
 			},
 		},
 		(note) => process.stderr.write(`${note}\n`),
 	)
+}
+
+function launch_josh(
+	josh_args: ReadonlyArray<string>,
+	log_path: string,
+	root: string = PROJECT_ROOT,
+): LaunchResult {
+	return launch_josh_with(josh_args, log_path, root, {})
 }
 
 function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
@@ -200,6 +211,7 @@ const run_review_steps = {
 	gate_log_path,
 	launch_gate,
 	launch_josh,
+	launch_josh_with,
 	mark_gate_starting,
 	read_gate_log,
 	read_gate_state,

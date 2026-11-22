@@ -61,8 +61,20 @@ const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 // gate exactly as the long spelling does, and the alias is expanded where the command is read rather
 // than by widening this set with every alias standing for one of its names. The suite names `pnpm josh ga` for that reason: an
 // expansion that regressed would show up here rather than as a guard that quietly stopped firing.
+// `josh wait --result` replays a bounded check's log and exit code (joshuafolkken/kit#8708), so it
+// carries that check's verdict; its other targets answer done or pending and stay out.
+const WAIT_COMMANDS: ReadonlySet<string> = new Set(['wait'])
+const RESULT_FLAG = /\s--result(?:\s|=)/u
+
+function is_bounded_check_result(segment: string): boolean {
+	return shell_segments.is_josh_command(segment, WAIT_COMMANDS) && RESULT_FLAG.test(segment)
+}
+
 function is_verification_command(segment: string): boolean {
-	return shell_segments.is_josh_command(segment, VERIFICATION_COMMANDS)
+	return (
+		shell_segments.is_josh_command(segment, VERIFICATION_COMMANDS) ||
+		is_bounded_check_result(segment)
+	)
 }
 
 // A pipeline reports its last command's status, so a check in any earlier segment has its verdict

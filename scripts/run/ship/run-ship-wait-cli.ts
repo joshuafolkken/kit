@@ -138,6 +138,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-const run_ship_wait_cli = { CHUNK_MS, VERDICT, run, wait_for }
+const run_ship_wait_cli = { CHUNK_MS, VERDICT, chunk_left, run, wait_for }
 
 export { run_ship_wait_cli }
