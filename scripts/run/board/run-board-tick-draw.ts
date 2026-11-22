@@ -5,6 +5,7 @@ import type { TerminalSize } from './run-board-fit'
 import type { FrameBounds } from './run-board-fold'
 import type { BoardHeader } from './run-board-header'
 import type { RainMoment } from './run-board-idle-rain'
+import { run_board_jump_start } from './run-board-jump-start'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
@@ -358,6 +359,36 @@ function write_frame(redraw: Redraw, drawn: Drawn, typing: Typing, flash: Flash 
 	)
 }
 
+// What a drawn frame hands the spin to turn between redraws.
+interface FrameEffects {
+	drawn: Drawn
+	header: LaidHeader
+	typing: Typing
+	notice_trace: NoticeTurn | undefined
+}
+
+// The rules, strips, panel, notice trace and bttf time jump (joshuafolkken/kit#8677) the spin turns.
+function effects_of(
+	state: BoardState,
+	frame: FrameEffects,
+	redraw: Redraw,
+): Pick<BoardState, 'rules' | 'strips' | 'panel' | 'notice_trace' | 'jump' | 'arrive_ms'> {
+	const { drawn, notice_trace } = frame
+	const panel = panel_of(redraw.ports, drawn)
+	const jump_frame = {
+		...frame,
+		ports: redraw.ports,
+		notice: frame.header.notice,
+		turn: notice_trace,
+		area: panel?.area,
+		now_ms: redraw.now_ms,
+	}
+	const jump = run_board_jump_start.jump_of(state.jump, jump_frame)
+	const arrive_ms = run_board_jump_start.arrive_of(state.arrive_ms, jump_frame)
+
+	return { ...decoded_of(redraw.ports, drawn), panel, notice_trace, jump, arrive_ms }
+}
+
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the
 // frame is written, so the notice shows on the frame it sounds on — and the trill switched on while a
 // row types, apart from the cue, so both sound on one frame (joshuafolkken/kit#8250).
@@ -377,11 +408,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 
 	write_frame(redraw, drawn, typing, flash)
 
-	const decoded = {
-		...decoded_of(redraw.ports, drawn),
-		panel: panel_of(redraw.ports, drawn),
-		notice_trace,
-	}
+	const decoded = effects_of(state, { drawn, header, typing, notice_trace }, redraw)
 	const drop = drop_of(redraw, drawn, typing, { drop: state.drop, flash })
 
 	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop, flash }

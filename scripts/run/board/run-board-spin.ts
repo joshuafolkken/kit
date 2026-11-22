@@ -6,6 +6,7 @@ import { run_board_colon } from './run-board-colon'
 import type { DropScreen } from './run-board-drop-screen'
 import type { TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
+import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
 import { run_board_notice_turn, type NoticeTurn } from './run-board-notice-turn'
@@ -79,6 +80,10 @@ interface Turning {
 	colons?: ReadonlyArray<Spot> | undefined
 	// The header notice traced in (`run-board-notice-turn.ts`).
 	notice_trace?: NoticeTurn | undefined
+	// The bttf time jump painted over the board (`run-board-jump-screen.ts`).
+	jump?: JumpDraw | undefined
+	// When the bttf panel's arrival started (`run-board-jump-start.ts`).
+	arrive_ms?: number | undefined
 }
 
 // What changed since the last turn was written: the spinner's frame, the sweep's cell, the colons'
@@ -190,18 +195,24 @@ function colons_of(turning: Turning): ReadonlyArray<Spot> {
 	return turning.colons ?? []
 }
 
-function has_effects(turning: Turning): boolean {
-	const is_falling = turning.sweep !== undefined || turning.drop !== undefined
-	const is_blinking = blinking(turning).length > 0 || traces_of(turning).length > 0
-
-	return is_falling || is_blinking || run_board_notice_turn.is_placed(turning.notice_trace)
+function is_falling(turning: Turning): boolean {
+	return turning.sweep !== undefined || turning.drop !== undefined
 }
 
-// The next step the sweep moves or the drops fall on.
-function sweep_boundary(turning: Turning, now_ms: number): number {
-	const is_moving = turning.sweep !== undefined || turning.drop !== undefined
+function has_effects(turning: Turning): boolean {
+	const is_moving = is_falling(turning) || turning.jump !== undefined
+	const is_blinking = blinking(turning).length > 0 || traces_of(turning).length > 0
 
-	return is_moving ? boundary_after(now_ms, SWEEP_MS) : Infinity
+	return is_moving || is_blinking || run_board_notice_turn.is_placed(turning.notice_trace)
+}
+
+// The next step the sweep moves, the drops fall or the jump's frame changes on.
+function sweep_boundary(turning: Turning, now_ms: number): number {
+	const sweep_ms = is_falling(turning) ? boundary_after(now_ms, SWEEP_MS) : Infinity
+	const { FRAME_MS } = run_board_jump_screen
+	const jump_ms = turning.jump === undefined ? Infinity : boundary_after(now_ms, FRAME_MS)
+
+	return Math.min(sweep_ms, jump_ms)
 }
 
 // The next step the TRACE field blinks, the colons turn or the notice's trace changes on.
@@ -250,9 +261,12 @@ function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 
 // The drops' cells that changed since the last turn, written past the theme like the lamps: the
 // screen holds each cell as the theme drew it, so a cell put back keeps a rule's own paint
-// (joshuafolkken/kit#8367).
+// (joshuafolkken/kit#8367); the bttf jump's cells likewise (joshuafolkken/kit#8677).
 function write_drop(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
-	const bytes = run_board_rain_drop.drop_bytes(turning.drop, at_ms, turned.since?.ms)
+	const since_ms = turned.since?.ms
+	const bytes =
+		run_board_rain_drop.drop_bytes(turning.drop, at_ms, since_ms) +
+		run_board_jump_screen.jump_bytes(turning.jump, at_ms, since_ms)
 
 	if (bytes === '') return
 	const write = ports.write_drawn ?? ports.write
@@ -275,7 +289,9 @@ function write_notice(turning: Turning, ports: SpinPorts, at_ms: number, turned:
 function lamp_moment(turning: Turning, at_ms: number): PanelMoment {
 	const step_ms = at_ms - (at_ms % SPINNER_INTERVAL_MS)
 
-	return { ms: at_ms, is_burst: run_board_type_rows.is_typing(turning.typing, step_ms) }
+	const is_burst = run_board_type_rows.is_typing(turning.typing, step_ms)
+
+	return { ms: at_ms, is_burst, jump: turning.jump?.run, arrive_ms: turning.arrive_ms }
 }
 
 // The drops, then the turn built and written over them — a typing row drawn above the rain
