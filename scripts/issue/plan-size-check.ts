@@ -111,7 +111,7 @@ function overrun_text(named: ReadonlyArray<string>, estimate: string): string {
 function overrun_of(plan: string, body: string): string | undefined {
 	const named = plan_named_files.named_files(plan)
 	const estimate = estimate_of(plan, body)
-	const declared = size_estimate.declared_files(judged_body(plan, body))
+	const declared = size_estimate.comparable_size(judged_body(plan, body))?.files
 
 	if (estimate === undefined || declared === undefined) {
 		console.info(
