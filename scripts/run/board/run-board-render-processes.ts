@@ -104,10 +104,21 @@ function named_group(
 	)
 }
 
+// The supervisor's row is keyed by its pid, so the matrix board sees another one take over
+// (joshuafolkken/kit#8470, `run_board_frame_diff.events`).
+function supervisor_id(pid: number | undefined): string {
+	return pid === undefined ? 'supervisor' : `supervisor:${String(pid)}`
+}
+
 function backlogrun_group(backlogrun: ProcessGroups['backlogrun']): Array<Labeled> {
 	const lanes = `${LABELS.lanes}${count_of(backlogrun.lanes.count)}`
 	const own = [
-		{ id: 'supervisor', label: LABELS.supervisor, figure: backlogrun.supervisor, is_detail: true },
+		{
+			id: supervisor_id(backlogrun.supervisor_pid),
+			label: LABELS.supervisor,
+			figure: backlogrun.supervisor,
+			is_detail: true,
+		},
 		{ id: 'parent', label: LABELS.parent, figure: backlogrun.parent, is_detail: true },
 		{ id: 'lanes', label: lanes, figure: backlogrun.lanes.figure, is_detail: true },
 	]

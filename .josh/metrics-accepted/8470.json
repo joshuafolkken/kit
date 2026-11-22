@@ -1,0 +1,7 @@
+{
+	"reason": "#8470 adds the matrix deja vu effect: a new module, its event detection and tests",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 139
+	}
+}

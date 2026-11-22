@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_change_flash } from './run-board-change-flash'
+import { run_board_deja_vu } from './run-board-deja-vu'
 import type { KeyedLine } from './run-board-type-rows'
 
 const { next, bytes, HEAD, BRIGHT, FRAME_MS, COOL_FRAMES } = run_board_change_flash
@@ -40,6 +41,47 @@ describe('run_board_change_flash', () => {
 
 		expect(renewed.cells).toHaveLength(1)
 		expect(bytes(renewed, now_ms)).toContain(`${HEAD}c`)
+	})
+})
+
+function lane(text: string): Array<KeyedLine> {
+	return [{ text, key: 'lanes:1', row: 1, index: 0, prefix_columns: 0 }]
+}
+
+describe('run_board_change_flash deja vu', () => {
+	const FAILED = lane('💥 #1')
+
+	function replayed(): ReturnType<typeof next> {
+		return next(next(undefined, lane('🔨 #1'), 0), FAILED, 0)
+	}
+
+	it.each([
+		[0, true],
+		[1, true],
+		[3, false],
+		[5, true],
+		[run_board_deja_vu.END_FRAMES, false],
+	])('ac-f699b434 replays the failed row at frame %s: %s', (age, on) => {
+		const written = bytes(replayed(), age * FRAME_MS)
+
+		expect(written.startsWith(`${CSI}1;1H${HEAD}`)).toBe(on)
+		expect(written).toContain(`${CSI}1;1H`)
+	})
+
+	it('keeps the spin writing until the replay ends, then lets it rest', () => {
+		const replaying = next(replayed(), FAILED, (run_board_deja_vu.END_FRAMES - 1) * FRAME_MS)
+		const rested = next(replayed(), FAILED, COOL_FRAMES * FRAME_MS)
+
+		expect(replaying.deja_vu).toHaveLength(1)
+		expect(run_board_change_flash.is_lit({ ...replaying, cells: [] })).toBe(true)
+		expect(run_board_change_flash.is_lit(rested)).toBe(false)
+	})
+
+	it('draws a flashing glyph over the replayed row', () => {
+		const flash = next(next(undefined, lane('🔨 #1'), 0), lane('💥 #2'), 0)
+		const written = bytes(flash, 2 * FRAME_MS)
+
+		expect(written.indexOf(`${HEAD}2`)).toBeGreaterThan(written.indexOf('💥 #2'))
 	})
 })
 

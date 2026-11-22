@@ -24,7 +24,9 @@ const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 // A keyed row on screen: its key, its line in the frame, its row on screen (1-based), its text as the
 // frame draws it and the columns before its key — drawn whole, so only the rest types
 // (joshuafolkken/kit#8103: the header's now line types its words, not its time), and what follows its
-// end mark, drawn whole in its own columns after the text (joshuafolkken/kit#8607: the watch panel).
+// end mark, drawn whole in its own columns after the text (joshuafolkken/kit#8607: the watch panel);
+// a flashed row also carries its text before the theme restyled it, which its events are read from
+// (joshuafolkken/kit#8470: the matrix draws 💥 as FL).
 interface KeyedLine {
 	key: string
 	index: number
@@ -32,6 +34,7 @@ interface KeyedLine {
 	text: string
 	prefix_columns: number
 	suffix?: string | undefined
+	source?: string | undefined
 }
 
 // joshuafolkken/kit#8457: a row typing over the saved frame's line of its key carries that line, drawn
