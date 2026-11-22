@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
+import { run_event_resume } from './run-event-resume'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 
 // The one place a stream consumer scopes the event stream to a single invocation. The stream is the
@@ -63,6 +64,13 @@ function scope_of(read: CarryRead): EventScope {
 	return { kind: SINCE_SCOPE, started_at: read.carry.started_at }
 }
 
+// A pre-gate resume is no position either: `run:step` reads a position by its kind alone, and a `resume`
+// reads as back at implementation, which a resume into the gate is not — so its position stays the cut,
+// as before the event was appended (joshuafolkken/kit#8583).
+function is_position(event: RunEvent): boolean {
+	return !run_event_stream.TRACE_KINDS.has(event.kind) && !run_event_resume.is_gate_resume(event)
+}
+
 // The newest event within scope, or `undefined` when the scope could not be determined or nothing falls
 // inside it. The "last line" consumers read this rather than the raw newest event, so a stale event a
 // previous invocation left on the stream is never read as this run's position.
@@ -72,9 +80,7 @@ function last_scoped_event(
 ): RunEvent | undefined {
 	// Trace events (a `josh ship` stage line) are skipped, as `read_last` skips
 	// them, so `run:step` reads the run's position rather than an unknown `ship-stage`.
-	return scoped_events(events, scope)?.findLast(
-		(event) => !run_event_stream.TRACE_KINDS.has(event.kind),
-	)
+	return scoped_events(events, scope)?.findLast((event) => is_position(event))
 }
 
 // The positions a detached `josh ship` supervisor leaves. Each names its issue

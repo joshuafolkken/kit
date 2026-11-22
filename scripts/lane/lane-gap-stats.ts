@@ -4,6 +4,7 @@ import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_hand_back_held } from './lane-hand-back-held'
 import { lane_ledger, type LedgerEntry, type MergeEntry } from './lane-ledger'
+import { lane_phase } from './lane-phase'
 import { lane_spans, type Span } from './lane-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -14,6 +15,8 @@ import { lane_yield_split, type YieldParts } from './lane-yield-split'
 // (joshuafolkken/kit#4395). Three hand-offs, each timed from the moment the slot's next step could run:
 //
 // - `cut → resume`: a child's session cut until the relaunched session resumed the lane.
+// - `resume → progress`: a resume, into implementation or the gate, until the resumed session's first
+//   edit or ship launch (joshuafolkken/kit#8583).
 // - `outage → relaunch`: a child that ended with no result, collected as an `outage`, until its next
 //   `child-launch` (joshuafolkken/kit#4410).
 // - `park → offer`: a park until the driver's next offer answered — a `held`, `released` or `dispatch`
@@ -34,6 +37,7 @@ import { lane_yield_split, type YieldParts } from './lane-yield-split'
 
 const COLUMNS = ['gap', 'count', 'median (s)', 'max (s)', 'not ended'] as const
 const RELAUNCH = 'cut → resume'
+const RESUME_PROGRESS = 'resume → progress'
 const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const YIELD = 'yield → redispatch'
@@ -55,17 +59,41 @@ const OFFER_ANSWERS: ReadonlySet<string> = new Set([
 	lane_ledger.KIND.RELEASED,
 ])
 
-// Only an implementation cut appends a `resume` when it is adopted; a pre-gate resume appends nothing,
-// so its cut would read as never ended (`run-cut-resume.ts` → `emit_resume_event`).
+// The row times implementation cuts only. A pre-gate resume appends a `resume` too
+// (`run-cut-resume.ts` → `emit_resume_event`), but one after an implementation cut always follows a
+// pre-gate `cut`, the bound that closes the span first, so it never ends one.
 function implementation_cuts(events: ReadonlyArray<RunEvent>): Array<RunEvent> {
 	return events.filter((event) => event.text.endsWith(IMPLEMENTATION_CUT))
+}
+
+function cut_bounds(events: ReadonlyArray<RunEvent>): ReturnType<typeof lane_stop_stats.events_of> {
+	return lane_stop_stats.events_of(events, EVENT_KIND.CUT)
 }
 
 function relaunch_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
 	return lane_spans.issue_spans({
 		starts: lane_stop_stats.events_of(implementation_cuts(events), EVENT_KIND.CUT),
-		bounds: lane_stop_stats.events_of(events, EVENT_KIND.CUT),
+		bounds: cut_bounds(events),
 		ends: lane_stop_stats.events_of(events, EVENT_KIND.RESUME),
+	})
+}
+
+// The resumed session's first progress: its first edit (`lane-phase` `implement`) or its ship launch,
+// whichever comes first; the issue's next cut ends the session first.
+function progress_events(events: ReadonlyArray<RunEvent>): ReturnType<typeof cut_bounds> {
+	const first_edits = events.filter((event) => lane_phase.is_implement_event(event))
+
+	return [
+		...lane_stop_stats.events_of(first_edits, EVENT_KIND.LANE_PHASE),
+		...lane_stop_stats.events_of(events, EVENT_KIND.SHIP_LAUNCH),
+	].toSorted((left, right) => left.at_ms - right.at_ms)
+}
+
+function resume_progress_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
+	return lane_spans.issue_spans({
+		starts: lane_stop_stats.events_of(events, EVENT_KIND.RESUME),
+		bounds: cut_bounds(events),
+		ends: progress_events(events),
 	})
 }
 
@@ -205,6 +233,7 @@ function table(
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
 		gap_row(RELAUNCH, relaunch_spans(events), window),
+		gap_row(RESUME_PROGRESS, resume_progress_spans(events), window),
 		gap_row(OUTAGE, outage_spans(events), window),
 		gap_row(PARK, park_spans(entries, events), window),
 		...yield_rows(entries, events, window),

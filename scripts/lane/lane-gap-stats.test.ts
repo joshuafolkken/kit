@@ -111,11 +111,17 @@ describe('lane_gap_stats.table -- cut → resume', () => {
 		expect(row_of([], events, RELAUNCH)).toBe(`| ${RELAUNCH} | 2 | 10 | 10 | 1 |`)
 	})
 
-	// A pre-gate resume appends no `resume` event, so its cut has no end to time.
-	it('leaves out a pre-gate cut', () => {
-		const events = [event('cut', `#${String(ISSUE)} cut (pre-gate)`, 100)]
+	// joshuafolkken/kit#8583: a pre-gate resume appends a `resume` too, but its cut is no start here and
+	// the pre-gate cut bounds the implementation cut before it.
+	it('leaves out a pre-gate cut and its resume', () => {
+		const events = [
+			event('cut', CUT_TEXT, 300),
+			event('resume', `#${String(ISSUE)} resumed`, 290),
+			event('cut', `#${String(ISSUE)} cut (pre-gate)`, 100),
+			event('resume', `#${String(ISSUE)} resumed (gate)`, 95),
+		]
 
-		expect(row_of([], events, RELAUNCH)).toBe(`| ${RELAUNCH} | 0 | ${UNMEASURED} | 0 |`)
+		expect(row_of([], events, RELAUNCH)).toBe(`| ${RELAUNCH} | 1 | 10 | 10 | 0 |`)
 	})
 })
 
@@ -264,7 +270,7 @@ describe('lane_gap_stats.table -- the period', () => {
 		const lines = lane_gap_stats.table([], WINDOW).split('\n')
 
 		expect(lines[0]).toBe(HEADER)
-		expect(lines).toHaveLength(12)
+		expect(lines).toHaveLength(13)
 	})
 
 	it('leaves out a gap that started before the period', () => {
