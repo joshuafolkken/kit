@@ -21,6 +21,9 @@ const ALTERNATE_SCREEN_OFF = `${ESC}?1049l`
 const CURSOR_HIDE = `${ESC}?25l`
 const CURSOR_SHOW = `${ESC}?25h`
 const CURSOR_HOME = `${ESC}H`
+// joshuafolkken/kit#8653: the alternate screen keeps the cursor's row, so the intro typed after
+// entering would land wherever the shell left it; the second row, first column, is where it goes.
+const CURSOR_SECOND_ROW = `${ESC}2;1H`
 const ERASE_BELOW = `${ESC}J`
 const ERASE_LINE = `${ESC}K`
 const SYNC_ON = `${ESC}?2026h`
@@ -60,7 +63,7 @@ function unchanged(text: string): string {
 }
 
 const LIVE: Screen = {
-	enter: `${ALTERNATE_SCREEN_ON}${CURSOR_HIDE}`,
+	enter: `${ALTERNATE_SCREEN_ON}${CURSOR_HIDE}${CURSOR_SECOND_ROW}`,
 	frame: overwritten_synced,
 	held: wiped,
 	leave: `${CURSOR_SHOW}${ALTERNATE_SCREEN_OFF}`,

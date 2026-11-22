@@ -18,11 +18,13 @@ describe('run_board_screen.mode_of', () => {
 })
 
 describe('run_board_screen.screen_of', () => {
+	// joshuafolkken/kit#8653: entering puts the cursor on the second row, so the intro lands there
+	// wherever the shell left it.
 	it('enters the alternate screen with the cursor hidden and leaves in the reverse order', () => {
 		const screen = run_board_screen.screen_of('live')
 
 		expect([screen.enter, screen.leave]).toStrictEqual([
-			`${ESCAPE}[?1049h${ESCAPE}[?25l`,
+			`${ESCAPE}[?1049h${ESCAPE}[?25l${ESCAPE}[2;1H`,
 			`${ESCAPE}[?25h${ESCAPE}[?1049l`,
 		])
 	})
