@@ -54,6 +54,16 @@ describe('run_board_cut_styled.styled_pieces', () => {
 
 		expect(pieces.map((piece) => piece.style)).toEqual([GREEN])
 	})
+
+	// joshuafolkken/kit#8353: a flashed glyph is rewritten inside the link it was drawn in.
+	it('gives each character the link open at it and none once the link closes', () => {
+		const pieces = styled_pieces(`${linked('7')}x`)
+
+		expect(pieces.map((piece) => piece.link)).toEqual([
+			`${ESC}]8;;https://example.com/7${BEL}`,
+			undefined,
+		])
+	})
 })
 
 describe('run_board_cut_styled.cut_styled', () => {

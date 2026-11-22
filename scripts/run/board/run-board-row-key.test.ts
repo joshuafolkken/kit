@@ -12,6 +12,31 @@ const ROW = '#7 a title'
 const GREEN = '\u{1B}[32m'
 const WRAP_COLUMNS = 22
 
+describe('run_board_row_key flash metadata', () => {
+	it('moves flash identity past appended lamps while preserving typing identity', () => {
+		const line = `${run_board_row_key.flashed(ROW, 'usage:claude', true)} lamps`
+		const text = `${ROW} lamps`
+
+		expect(split_key(run_board_row_key.trailing_flash(line))).toStrictEqual({
+			key: 'flash:usage:claude',
+			text,
+			prefix: text,
+			suffix: '',
+		})
+		expect(run_board_row_key.trailing_flash(keyed('lanes', 7, ROW))).toBe(keyed('lanes', 7, ROW))
+		expect(run_board_row_key.trailing_flash(ROW)).toBe(ROW)
+	})
+
+	it('leaves a line already keyed with its own key, so the line reads one key', () => {
+		const line = `rule ${keyed('plan', 'progress', '🎯 1/2')}`
+		const id = 'head:lanes:1'
+
+		expect(run_board_row_key.flashed(line, id, true)).toBe(line)
+		expect(split_key(run_board_row_key.flashed(line, id, true)).key).toBe('plan:progress')
+		expect(run_board_row_key.flashed(ROW, id)).toBe(ROW)
+	})
+})
+
 describe('run_board_row_key', () => {
 	it('gives back the key and the row it led, the indent before it kept', () => {
 		const line = `${INDENT}${keyed('done', 7, ROW)}`

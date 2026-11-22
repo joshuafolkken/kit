@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync, writeFileSync } from 'node:fs'
-import { afterEach, describe, expect, it } from 'vitest'
+import { WriteStream } from 'node:tty'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_frame_store } from './run-board-frame-store'
 
 const { CHAT_KEY, FRESH_MS, file_store, fresh, latest_writer, memory_store, once_key, path_of } =
@@ -8,9 +9,13 @@ const { CHAT_KEY, FRESH_MS, file_store, fresh, latest_writer, memory_store, once
 const SAVED_MS = Date.parse('2026-11-18T09:00:00.000Z')
 const FRAME = { text: 'board\n', saved_ms: SAVED_MS }
 const ROOT = `/run-board-frame-store-test-${randomUUID()}`
+// A color depth `getColorDepth` never answers, so it has no `FORCE_COLOR` level.
+const UNKNOWN_DEPTH = 2
 
 afterEach(() => {
 	rmSync(path_of(CHAT_KEY, ROOT), { force: true })
+	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('run_board_frame_store.file_store', () => {
@@ -111,14 +116,6 @@ describe('run_board_frame_store.fresh', () => {
 		expect(once_key('wargames', false)).not.toBe(once_key(undefined, false))
 	})
 
-	// joshuafolkken/kit#8505: the theme's own icons keep the key they had; others keep their own.
-	it('keeps a still frame in other icons apart, the default icons under the key they had', () => {
-		expect(once_key('wargames', false, 'shapes')).toBe('once-wargames-pipe')
-		expect(once_key(undefined, true, 'emoji')).toBe('once-tty')
-		expect(once_key('wargames', false, 'letters')).toBe('once-wargames-letters-pipe')
-		expect(once_key(undefined, false, 'shapes')).toBe('once-shapes-pipe')
-	})
-
 	it('save_only saves through to the store but loads nothing', () => {
 		const store = memory_store()
 		const only = run_board_frame_store.save_only(store)
@@ -133,5 +130,43 @@ describe('run_board_frame_store.fresh', () => {
 	it('keeps a still frame drawn on a terminal apart from a piped one', () => {
 		expect(once_key(undefined, true)).not.toBe(once_key(undefined, false))
 		expect(once_key('wargames', true)).not.toBe(once_key('wargames', false))
+	})
+})
+
+// joshuafolkken/kit#8616: a piped frame forced into color is recorded apart from an uncolored one.
+describe('run_board_frame_store.once_key — the colors stdout draws', () => {
+	// joshuafolkken/kit#8505: the theme's own icons keep the key they had; others keep their own.
+	it('keeps a still frame in other icons apart, the default icons under the key they had', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		expect(once_key('wargames', false, 'shapes')).toBe('once-wargames-pipe')
+		expect(once_key(undefined, true, 'emoji')).toBe('once-tty')
+		expect(once_key('wargames', false, 'letters')).toBe('once-wargames-letters-pipe')
+		expect(once_key(undefined, false, 'shapes')).toBe('once-shapes-pipe')
+	})
+
+	it.each([undefined, 'wargames', 'matrix'] as const)(
+		'keys %s by the forced color depth',
+		(theme) => {
+			vi.stubEnv('FORCE_COLOR', '0')
+			const plain = once_key(theme, false)
+
+			vi.stubEnv('FORCE_COLOR', '1')
+
+			expect(once_key(theme, false)).toBe(`${plain}-color1`)
+		},
+	)
+
+	it.each(['1', undefined])('draws a pipe in color under FORCE_COLOR alone, NO_COLOR=%s', (no) => {
+		vi.stubEnv('FORCE_COLOR', undefined)
+		vi.stubEnv('NO_COLOR', no)
+		expect(once_key(undefined, false)).toBe('once-pipe')
+		vi.stubEnv('FORCE_COLOR', '3')
+		expect(once_key(undefined, false)).toBe('once-pipe-color3')
+	})
+
+	it('keys a depth with no FORCE_COLOR level as uncolored', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		vi.spyOn(WriteStream.prototype, 'getColorDepth').mockReturnValue(UNKNOWN_DEPTH)
+		expect(once_key(undefined, false)).toBe('once-pipe')
 	})
 })

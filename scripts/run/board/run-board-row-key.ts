@@ -25,6 +25,7 @@ type KeySection =
 	| 'note'
 	| 'notice'
 	| 'plan'
+	| 'flash'
 
 // joshuafolkken/kit#8607: a keyed line's end mark — what follows it (the watch panel beside the header)
 // is drawn whole in its own columns, never typed with the row.
@@ -87,7 +88,35 @@ function rekeyed(line: string, drawn: string, suffix: string): string {
 	return `${prefix}${OPEN}${key}${CLOSE}${drawn.slice(prefix.length)}${END}${suffix}`
 }
 
-const run_board_row_key = { key_of, keyed, rekeyed, split_key, without_key }
+// joshuafolkken/kit#8353: `text` with a change-flash key at its end, where the theme flashes — a key
+// after the whole text, so the typing row draws it whole and never types it. A line already keyed —
+// a rule whose tail types (joshuafolkken/kit#8457) — flashes by that key, since a line reads one key.
+function flashed(text: string, id: string, is_on = false): string {
+	if (!is_on || split_key(text).key !== undefined) return text
+
+	return `${text}${keyed('flash', id, '')}`
+}
+
+// A flash-keyed line with its key moved back to its end, after a step that drew more text past it.
+function trailing_flash(line: string): string {
+	const { key, text, suffix } = split_key(line)
+
+	if (key?.startsWith('flash:') !== true) return line
+
+	return suffix === ''
+		? `${text}${OPEN}${key}${CLOSE}`
+		: `${text}${OPEN}${key}${CLOSE}${END}${suffix}`
+}
+
+const run_board_row_key = {
+	flashed,
+	key_of,
+	keyed,
+	rekeyed,
+	split_key,
+	trailing_flash,
+	without_key,
+}
 
 export { run_board_row_key }
 export type { KeySection }

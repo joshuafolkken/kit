@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_change_flash } from './run-board-change-flash'
 import { run_board_labels } from './run-board-labels'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
@@ -132,6 +133,25 @@ describe('run_board_spin.spin_bytes', () => {
 
 const SPOTS = [{ row: 1, column: 1, style: '' }]
 const SPINNING = { spots: SPOTS, typing: NO_TYPING }
+
+it('ac-8de5883d cools and restores a flash on spinner turns even without spinner spots', async () => {
+	const { ports, writes } = spin_ports(START)
+	const line = { key: 'a', row: 1, index: 0, prefix_columns: 0, text: 'a' }
+	const base = run_board_change_flash.next(undefined, [line], START)
+	const flash = run_board_change_flash.next(base, [{ ...line, text: 'b' }], START)
+
+	await spin_to_second(
+		{ spots: [], typing: NO_TYPING, flash },
+		{ ...ports, write_drawn: ports.write },
+	)
+	const overlays = writes.filter(({ text }) => text.includes('[1;1H'))
+
+	expect(overlays[0]?.at_ms).toBe(START + SPINNER_INTERVAL_MS)
+	expect(overlays.at(-1)?.at_ms).toBe(
+		START + run_board_change_flash.COOL_FRAMES * SPINNER_INTERVAL_MS,
+	)
+	expect(overlays.at(-1)?.text).toBe(`${ESCAPE}[1;1Hb${ESCAPE}[0m`)
+})
 
 describe('run_board_spin.spin_to_second', () => {
 	it('turns the spinners on every interval until the next second, writing nothing but the turns', async () => {

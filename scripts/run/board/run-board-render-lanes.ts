@@ -203,8 +203,10 @@ function lanes_section(
 	const lanes_rule = section_of(lanes, lane_label(header), cells, header)
 
 	return [
-		...rows_section(rows.slice(0, root_count), root_label(root?.name ?? ''), cells, header),
-		{ ...lanes_rule, tail: run_board_header.lanes_tail(header) },
+		...rows_section(rows.slice(0, root_count), root_label(root?.name ?? ''), cells, header).map(
+			(section) => ({ ...section, flash_key: 'root' }),
+		),
+		{ ...lanes_rule, tail: run_board_header.lanes_tail(header), flash_key: 'lanes' },
 	]
 }
 
