@@ -119,9 +119,12 @@ function drawn_width(row: BoardRow, fit: RowFit): number {
 	return is_padded(row, fit) ? limit : Math.min(limit, title)
 }
 
-// The row's title once it has given up `overrun` columns, never under the floor.
+// The row's title once it has given up `overrun` columns, never under the floor nor past the columns it
+// drew in — a section's title column may be narrower than the floor (joshuafolkken/kit#8590).
 function narrowed_limit(row: BoardRow, overrun: number, fit: RowFit): number {
-	return Math.max(TITLE_FLOOR, drawn_width(row, fit) - overrun)
+	const drawn = drawn_width(row, fit)
+
+	return Math.min(drawn, Math.max(TITLE_FLOOR, drawn - overrun))
 }
 
 // A row's line at a narrowed title with its whole reason, or with the reason's end cut by the columns

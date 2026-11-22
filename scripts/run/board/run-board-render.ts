@@ -149,12 +149,12 @@ function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 }
 
 // The decision rows' frame: what to decide matters more than the title, so their title column is as
-// wide as their widest title and they draw no time column, their action starting right after the
-// titles (joshuafolkken/kit#8590).
+// wide as their widest title and, drawing no time (`run-board-render-row.ts` timed_parts), their
+// action starts right after the titles (joshuafolkken/kit#8590).
 function decision_frame(rows: ReadonlyArray<BoardRow>, frame: RowFrame): RowFrame {
 	const title_limit = Math.max(0, ...rows.map((row) => title_width(row, frame)))
 
-	return { ...frame, section: 'decision', title_limit, time_width: 0, stops_width: 0 }
+	return { ...frame, section: 'decision', title_limit }
 }
 
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the

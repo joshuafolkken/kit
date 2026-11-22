@@ -199,6 +199,8 @@ describe('run_board_render_title.fitted on a parked row with a linked reason', (
 // rows' as wide as their widest title.
 const SECTION_LIMIT = 20
 const SHARED = 5
+// A section of short titles, its title column under `TITLE_FLOOR`.
+const TINY_LIMIT = 4
 
 describe('run_board_render_title.fitted at a section title column', () => {
 	it('draws a whole row at the section title column (ac-fb1412e6)', () => {
@@ -213,5 +215,12 @@ describe('run_board_render_title.fitted at a section title column', () => {
 		const fit = { limit: SECTION_LIMIT, shared: SHARED }
 
 		expect(fitted_limit(row, WIDE_PANE, draw_of(row), fit)).toBe(SECTION_LIMIT - SHARED)
+	})
+
+	it('never widens a title past a section title column narrower than the floor', () => {
+		const row = row_of({ state: 'human', title: 'Tiny', reason: UNTRIAGED })
+		const fit = { limit: TINY_LIMIT, shared: SHARED }
+
+		expect(fitted_limit(row, WIDE_PANE, draw_of(row), fit)).toBe(TINY_LIMIT)
 	})
 })

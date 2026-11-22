@@ -122,7 +122,8 @@ function is_title_padded(row: BoardRow, frame: RowFrame): boolean {
 }
 
 // The title padded to the title column, then the time; a waiting row's title is not padded but where
-// `is_title_padded` says so. A lane row draws its time in its lead.
+// `is_title_padded` says so. A lane row draws its time in its lead, and a decision row none, so what
+// to decide follows its title (joshuafolkken/kit#8590).
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 	const title = title_text(row, frame)
 
@@ -130,7 +131,9 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 		return [is_title_padded(row, frame) ? title.padEnd(frame.title_limit) : title]
 	}
 
-	if (frame.is_lane_row === true) return [title.padEnd(frame.title_limit)]
+	if (frame.is_lane_row === true || frame.section === 'decision') {
+		return [title.padEnd(frame.title_limit)]
+	}
 
 	return [title.padEnd(frame.title_limit), time_text(row, frame)]
 }

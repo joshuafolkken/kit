@@ -86,6 +86,7 @@ describe('run board decision tails', () => {
 // joshuafolkken/kit#8590: a decision row's action starts right after the section's widest title.
 const SHORT = { number: 8432, title: 'Shorten board notice text' }
 const LONG = { number: 5272, title: 'Upgrade TypeScript to 7 and fix forward' }
+const PARKED = { number: 7002, title: 'Parked child' }
 const LANE = 7001
 const WIDE_COLUMNS = 200
 const SLEEP = { from_ms: NOW - 40 * MINUTE, to_ms: NOW - 10 * MINUTE }
@@ -101,11 +102,18 @@ function lane_row(): BoardRow {
 	return { ...row_of(false), number: LANE, state: 'running', status, reason: undefined }
 }
 
+// A child parked on a decision, whose recorded time a decision row does not draw.
+function parked_row(): BoardRow {
+	const status = { state: 'parked' as const, started_ms: NOW - 40 * MINUTE }
+
+	return { ...decision_row(PARKED), state: 'parked', status }
+}
+
 function decision_lines(): Array<string> {
 	const layout = {
 		...EMPTY_LAYOUT,
 		active: [lane_row()],
-		people: [decision_row(SHORT), decision_row(LONG)],
+		people: [decision_row(SHORT), decision_row(LONG), parked_row()],
 	}
 	const lines = run_board_render.render({
 		header: header({ layout }),
@@ -129,5 +137,6 @@ describe('run board decision columns', () => {
 
 		expect(long.indexOf('→')).toBe(action)
 		expect(short.indexOf('→')).toBe(action)
+		expect(line_with(lines, PARKED.number).indexOf('→')).toBe(action)
 	})
 })
