@@ -229,16 +229,21 @@ function launched_tools(role: AgentRole): string | undefined {
 // **No role runs with a person at the keyboard, so none carries a web tool** (#4664): a fetched page would enter the
 // context with no trust label. The per-role list is pinned so a re-added tool fails here.
 describe('Claude per-role launched tools', () => {
-	const PINNED_TOOLS =
-		'Bash,Read,Edit,Write,Agent,Skill,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
+	const PINNED_TOOLS = 'Bash,Read,Edit,Write,Agent,Skill,ToolSearch,SendMessage,TaskStop,Monitor'
 	// joshuafolkken/kit#4715: a reviewer carries no tool that opens a nested agent, so its review never
 	// forks a second reader of the same diff and brief.
-	const PINNED_REVIEWER_TOOLS =
-		'Bash,Read,Edit,Write,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
+	const PINNED_REVIEWER_TOOLS = 'Bash,Read,Edit,Write,ToolSearch,SendMessage,TaskStop,Monitor'
 	// #7104: a worker has no Skill call path, so the skill listing leaves its preamble; it keeps Agent
 	// to start its reviewer.
-	const PINNED_WORKER_TOOLS =
-		'Bash,Read,Edit,Write,Agent,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
+	const PINNED_WORKER_TOOLS = 'Bash,Read,Edit,Write,Agent,ToolSearch,SendMessage,TaskStop,Monitor'
+
+	// joshuafolkken/kit#8703: no lane ever called TodoWrite, so no role carries its definition.
+	it.each([['scheduler'], ['worker'], ['reviewer']] as const)(
+		'launches the %s without TodoWrite',
+		(role) => {
+			expect(launched_tools(role)?.split(',')).not.toContain('TodoWrite')
+		},
+	)
 
 	it.each([
 		['scheduler', PINNED_TOOLS],

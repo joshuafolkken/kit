@@ -31,12 +31,11 @@ const { KEY, OVERRUN_KEY } = lane_child_mark_keys
 const CACHE_TTL_KEY = 'CLAUDE_CODE_PROMPT_CACHE_TTL'
 const CACHE_TTL = '5m'
 
-// **A dispatched child also loads its tools up front** (joshuafolkken/kit#8096). Tool search defers
-// the launched `Monitor`, `SendMessage` and `TaskStop`, so a child spent a ToolSearch round trip
-// (about 19 s of model turn each) before its first use of one. A false value selects the standard
-// mode, where every launched tool's definition is in the first request.
-const TOOL_SEARCH_KEY = 'ENABLE_TOOL_SEARCH'
-const TOOL_SEARCH = 'false'
+// **A dispatched child keeps tool search on** (joshuafolkken/kit#8703, undoing #8096). Turning it off
+// put the definitions of `Monitor`, `SendMessage`, `TaskStop` and the project's MCP tools on every
+// request's prefix, to save one ToolSearch round trip that only a small share of lanes ever take; the
+// Issue records the measured cost of each side. So the child's environment does not set
+// `ENABLE_TOOL_SEARCH`, and those definitions stay deferred until a lane asks for one.
 
 // **An overrun investigation also carries its own mark** (joshuafolkken/kit#4880): it runs as the
 // lane's child, so `issue:file` reads this one to record its filings as the investigation's rather than
@@ -54,7 +53,6 @@ function environment_for(issue: string): Record<string, string> {
 	return {
 		[KEY]: issue,
 		[CACHE_TTL_KEY]: CACHE_TTL,
-		[TOOL_SEARCH_KEY]: TOOL_SEARCH,
 		[outer_command.KEY]: '',
 	}
 }
