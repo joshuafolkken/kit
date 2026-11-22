@@ -116,6 +116,17 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 	})
 })
 
+// joshuafolkken/kit#8571: issues declaring one file count each other as dependents.
+describe('git_next_issues.order - path overlap', () => {
+	it('puts a run of same-file issues ahead of an older non-overlapping one', () => {
+		const same_file = '## 変更\n\n- `scripts/run/board/run-board-seat.ts` を直す\n'
+		const independent = { ...issue(1, CREATED_EARLIER), body: '- `scripts/lines/limit.ts`\n' }
+		const run = [2, 3].map((number) => ({ ...issue(number, CREATED_LATER), body: same_file }))
+
+		expect(prioritized_numbers([independent, ...run])).toEqual([2, 3, 1])
+	})
+})
+
 describe('git_next_issues.order - estimated size', () => {
 	it('orders smaller estimates before weekly gain and missing estimates', () => {
 		const background = '## 背景\n\n- 規模見積もり: 約 1 ファイル / '

@@ -1,3 +1,4 @@
+import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
@@ -84,7 +85,17 @@ function order(
 	const candidates = issues
 		.filter((issue) => is_candidate(issue, completed_issue_number))
 		.toSorted(compare_oldest_first)
-	const rank_of = issue_rank.dependency_ranks(candidates.map((issue) => dependency_row(issue)))
+	const neighbors = backlog_overlap.overlap_neighbors(
+		candidates.map((issue) => ({
+			key: String(issue.number),
+			paths: backlog_overlap.declared_paths(issue.body ?? ''),
+		})),
+	)
+	const rows = candidates.map((issue) => ({
+		...dependency_row(issue),
+		overlaps: neighbors.get(String(issue.number)),
+	}))
+	const rank_of = issue_rank.dependency_ranks(rows)
 
 	return issue_rank.rank(candidates, (issue) => rank_row(issue, rank_of(String(issue.number))))
 }
