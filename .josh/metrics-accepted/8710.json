@@ -1,0 +1,7 @@
+{
+	"reason": "#8710 adds the bttf time-circuit roll after a jump, a new module the issue requires",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 64
+	}
+}

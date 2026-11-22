@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_board_drop_screen, type FrameSpots } from './run-board-drop-screen'
+import { run_board_fire_trail } from './run-board-fire-trail'
 import type { TerminalSize } from './run-board-fit'
 import type { Notice } from './run-board-header-notice'
 import { run_board_jump, type JumpRun } from './run-board-jump'
@@ -75,21 +76,39 @@ function lane_of(lines: ReadonlyArray<string>, issue: number | undefined): numbe
 function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 	const { ports, drawn, area } = frame
 	const lines = drawn.lines.map((line) => run_board_theme.restyle(ports.theme, line, ports.icons))
-	const screen = run_board_drop_screen.screen_of({ ...drawn, lines }, frame.typing, drawn.size)
-	const texts = screen.rows.map((row) => row.map((cell) => cell.text).join(''))
+	const drawn_screen = run_board_drop_screen.screen_of(
+		{ ...drawn, lines },
+		frame.typing,
+		drawn.size,
+	)
+	const texts = drawn_screen.rows.map((row) => row.map((cell) => cell.text).join(''))
+	const trails = run_board_fire_trail.rows_of(texts)
+	const screen = run_board_fire_trail.padded(drawn_screen, trails)
 	const scene: JumpScene = {
 		rows: screen.rows.length,
 		lane: lane_of(texts, run.issue),
 		panel: area === undefined ? undefined : { top: area.top - 1, rows: area.rows },
+		trails,
 	}
 
 	return { run, screen, scene, place: frame.turn?.place, panel: area }
 }
 
-// The jump a frame draws: the last one carried on while it runs, else one the frame starts.
+// The last run carried on while it runs — joshuafolkken/kit#8675: once thawed, with only its trails
+// burning out, it yields to a merge notice that starts a jump.
+function carried(last: JumpDraw | undefined, frame: JumpFrame): JumpRun | undefined {
+	if (last === undefined || !run_board_jump.is_running(last.run, frame.now_ms)) return undefined
+
+	if (run_board_jump.is_thawed(last.run, frame.now_ms) && started(frame) !== undefined) {
+		return undefined
+	}
+
+	return last.run
+}
+
+// The jump a frame draws: the last one carried on, else one the frame starts.
 function jump_of(last: JumpDraw | undefined, frame: JumpFrame): JumpDraw | undefined {
-	const is_carried = last !== undefined && run_board_jump.is_running(last.run, frame.now_ms)
-	const run = is_carried ? last.run : started(frame)
+	const run = carried(last, frame) ?? started(frame)
 
 	return run === undefined ? undefined : draw_of(run, frame)
 }

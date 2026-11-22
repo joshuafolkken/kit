@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { process_identity } from '#scripts/josh/process-identity'
@@ -14,9 +15,11 @@ import { run_ship_wait_cli } from './ship/run-ship-wait-cli'
 // - `--pid <pid>` — done once the process is gone.
 // - `--process <pattern>` — done once no process but this wait's own lineage matches, as `pgrep -f`.
 // - `--file <path>` — done once the file exists.
+// - `--result <dir>` — a check `bounded-check.ts` left running: done once its exit code is written,
+//   and then its log and exit code are this wait's own (joshuafolkken/kit#8708).
 // - no target — a backgrounded subagent, whose end reaches the session only after this call: the chunk.
 //
-// The result is the target's own output; the wait only says when to read it.
+// Past `--result`, the result is the target's own output; the wait only says when to read it.
 
 const VERDICT = { DONE: 'done', PENDING: 'pending' } as const
 
@@ -32,12 +35,24 @@ interface WaitOptions {
 const POLL_MS = 2000
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh wait [--pid <pid> | --process <pattern> | --file <path>]'
+// A bounded check still running: non-zero so a shell `&&` stops on it, and apart from a red check's
+// code — the BSD exit status for "temporary failure, try again later".
+const PENDING_EXIT_CODE = 75
+// An exit code as the detached child writes it; anything else reads as a failure, never as green.
+const EXIT_CODE_TEXT = /^\d+$/u
+const USAGE =
+	'Usage: josh wait [--pid <pid> | --process <pattern> | --file <path> | --result <dir>]'
 const ARGUMENT_OPTIONS = {
 	pid: { type: 'string' },
 	process: { type: 'string' },
 	file: { type: 'string' },
+	result: { type: 'string' },
 } as const
+// A bounded check's result directory: the detached launch's log and pid, and the exit code its child
+// writes.
+const RESULT_FILES = { log: 'check.log', exit: 'exit-code', pid: 'pid' } as const
+// The line `detached_launch` stamps at the head of a log, which the check itself never printed.
+const LOG_HEADER = /^\n=== .* ===\n/u
 
 // The no-target wait: nothing this process can read ends it before the chunk.
 function never(): boolean {
@@ -88,8 +103,8 @@ function process_probe(pattern: string): Probe {
 // The probe the arguments name, `undefined` for arguments that do not read as one target or none.
 function probe_of(argv: ReadonlyArray<string>): Probe | undefined {
 	const { values } = parseArgs({ args: [...argv], options: ARGUMENT_OPTIONS, strict: true })
-	const { pid, process: pattern, file } = values
-	const named = [pid, pattern, file].filter((value) => value !== undefined)
+	const { pid, process: pattern, file, result } = values
+	const named = [pid, pattern, file, result].filter((value) => value !== undefined)
 
 	if (named.length > 1) return undefined
 	if (pid !== undefined) return pid_probe(pid)
@@ -111,10 +126,67 @@ async function wait_for(is_done: Probe, options: WaitOptions): Promise<Verdict> 
 	)
 }
 
-// The chunk counts from the process start, as `ship:wait`'s does: both clocks it is sized against
-// start at the session's call.
-function chunk_left(): number {
-	return run_ship_wait_cli.CHUNK_MS - performance.now()
+function result_path(directory: string, file: keyof typeof RESULT_FILES): string {
+	return path.join(directory, RESULT_FILES[file])
+}
+
+// A check killed by a signal never emits `exit`, so its launch being gone also ends the wait.
+function is_launch_gone(directory: string): boolean {
+	const pid_path = result_path(directory, 'pid')
+
+	if (!existsSync(pid_path)) return false
+	const probe = pid_probe(readFileSync(pid_path, 'utf8'))
+
+	return probe !== undefined && probe() === true
+}
+
+function is_finished(directory: string): boolean {
+	return existsSync(result_path(directory, 'exit')) || is_launch_gone(directory)
+}
+
+// The exit code the check wrote; a missing or malformed one reads as a failure, never as green.
+function exit_code_of(directory: string): number {
+	const exit_path = result_path(directory, 'exit')
+	const text = existsSync(exit_path) ? readFileSync(exit_path, 'utf8') : ''
+
+	if (EXIT_CODE_TEXT.test(text)) return Number(text)
+	console.error('wait: the check ended without writing its exit code — killed by a signal?')
+
+	return FAILURE_EXIT_CODE
+}
+
+// The finished check's own output and exit code, as its synchronous run would have left them.
+function replay(directory: string): number {
+	const log = readFileSync(result_path(directory, 'log'), 'utf8')
+
+	process.stdout.write(log.replace(LOG_HEADER, ''))
+
+	return exit_code_of(directory)
+}
+
+// One chunk of a bounded check: its result once it finishes inside, else `pending` and the next wait.
+async function collect(directory: string, options: WaitOptions): Promise<number> {
+	const verdict = await wait_for(() => is_finished(directory), options)
+
+	if (verdict === VERDICT.DONE) return replay(directory)
+	console.info(
+		`pending — the check is still running in the background: run \`pnpm josh wait --result ${directory}\` for its output and exit code`,
+	)
+
+	return PENDING_EXIT_CODE
+}
+
+function result_of(argv: ReadonlyArray<string>): string | undefined {
+	try {
+		return parseArgs({ args: [...argv], options: ARGUMENT_OPTIONS, strict: true }).values.result
+	} catch {
+		return undefined
+	}
+}
+
+// The chunk counts from the process start, as `ship:wait`'s does (`run_ship_wait_cli.chunk_left`).
+function live_chunk(): WaitOptions {
+	return { chunk_ms: run_ship_wait_cli.chunk_left(), sleeper: sleep }
 }
 
 const NEXT_ACTION: Record<Verdict, string> = {
@@ -130,6 +202,14 @@ function read_probe(argv: ReadonlyArray<string>): Probe | undefined {
 	}
 }
 
+// A directory no bounded check launched into would answer `pending` on every call, so it is refused.
+async function collect_result(directory: string): Promise<number> {
+	if (existsSync(result_path(directory, 'log'))) return await collect(directory, live_chunk())
+	console.error(`wait: no bounded check result in ${directory}`)
+
+	return FAILURE_EXIT_CODE
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const probe = read_probe(argv)
 
@@ -139,7 +219,10 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const verdict = await wait_for(probe, { chunk_ms: chunk_left(), sleeper: sleep })
+	const result = result_of(argv)
+
+	if (result !== undefined) return await collect_result(result)
+	const verdict = await wait_for(probe, live_chunk())
 
 	console.info(`wait: ${verdict} — ${NEXT_ACTION[verdict]}`)
 
@@ -148,7 +231,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 const run_wait_cli = {
 	CHUNK_MS: run_ship_wait_cli.CHUNK_MS,
+	PENDING_EXIT_CODE,
 	VERDICT,
+	collect,
+	live_chunk,
+	result_path,
 	is_gone_in,
 	lineage,
 	probe_of,
@@ -156,4 +243,5 @@ const run_wait_cli = {
 	wait_for,
 }
 
+export type { WaitOptions }
 export { run_wait_cli }

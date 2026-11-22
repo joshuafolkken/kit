@@ -273,7 +273,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			'Wait until a pid or process ends or a file exists, or one ship:wait chunk (done | pending)',
 		category: 'AI tools',
 		reference: [
-			'[--pid <pid> | --process <pattern> | --file <path>]',
+			'[--pid <pid> | --process <pattern> | --file <path> | --result <dir>]',
 			'automation',
 			['processes', 'files'],
 		],

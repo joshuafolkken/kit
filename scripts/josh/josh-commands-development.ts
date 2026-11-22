@@ -64,6 +64,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'lint:related': {
 		script: 'scripts/lint/lint-related.ts',
+		is_bounded: true,
 		description:
 			'Apply eslint fixes and prettier to the resolved scope, then check remaining errors and in kit the source guard tests (whole tree on fallback)',
 		category: 'Development',
@@ -204,6 +205,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'check:related': {
 		script: 'scripts/gate/check-related.ts',
+		is_bounded: true,
 		description:
 			'Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes',
 		category: 'Development',
@@ -243,12 +245,14 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: [FILTER_ARGUMENTS, 'developer', ['processes']],
 		...gate_plan.DIRECT_UNIT_CLAIM,
+		is_bounded: true,
 		usage: {
 			examples: [{ arguments: '' }, { arguments: '--shard=1/3', note: FORWARDED_TO_VITEST }],
 		},
 	},
 	'test:related': {
 		script: 'scripts/test/test-related-main.ts',
+		is_bounded: true,
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],

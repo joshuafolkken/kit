@@ -2,12 +2,13 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Notice } from './run-board-header-notice'
 import { run_board_jump } from './run-board-jump'
+import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 import { run_board_jump_start, type JumpFrame } from './run-board-jump-start'
 import type { CueName } from './run-board-sound-cues'
 import { run_board_type_rows } from './run-board-type-rows'
 
 const { arrive_of, jump_of } = run_board_jump_start
-const { TICK_MS, WASH_TICKS, THAW_TICKS, THAW_AT } = run_board_jump
+const { END_TICKS, THAW_AT, THAW_TICKS, TICK_MS, WASH_TICKS } = run_board_jump
 
 const ISSUE = 8677
 const NOW = 1000
@@ -32,6 +33,14 @@ function frame_of(overrides: Partial<JumpFrame> = {}): JumpFrame {
 	}
 }
 
+function trail_draw(lines: ReadonlyArray<string>): JumpDraw {
+	const draw = jump_of(undefined, frame_of({ drawn: { lines, spots: [], size: undefined } }))
+
+	if (draw === undefined) throw new Error('no jump started')
+
+	return draw
+}
+
 beforeEach(() => {
 	vi.stubEnv('FORCE_COLOR', '3')
 })
@@ -48,7 +57,29 @@ describe('run_board_jump_start.jump_of', () => {
 		expect(draw?.run.issue).toBe(ISSUE)
 		expect(draw?.scene.lane).toBe(LANE_ROW)
 	})
+})
 
+describe('run_board_jump_start.jump_of — the fire trails', () => {
+	const THROUGHPUT_RULE = '── 📈 throughput ──'
+	const LANE_LINE = LINES[LANE_ROW] ?? ''
+
+	it('burns the fire trails on the blank rows above the throughput rule and the lanes rule', () => {
+		const lines = ['header', '', THROUGHPUT_RULE, 'x', '', '── 🧵 lanes ──', LANE_LINE]
+
+		expect(trail_draw(lines).scene.trails).toStrictEqual([1, 4])
+	})
+
+	it('fills the blank trail rows out with cells, so the head burns on a real board', () => {
+		const draw = trail_draw(['header', '', THROUGHPUT_RULE, LANE_LINE])
+		const jumped_ms = NOW + draw.run.letters * TICK_MS
+		const written = run_board_jump_screen.jump_bytes(draw, jumped_ms, undefined)
+
+		expect(draw.screen.rows[1]).toHaveLength(draw.screen.columns)
+		expect(written).toMatch(/\[2;1H.*█/u)
+	})
+})
+
+describe('run_board_jump_start.jump_of — other cues and themes', () => {
 	it('starts on no other cue, nor after the first letter', () => {
 		const launch = frame_of({ notice: notice_of('launch') })
 
@@ -83,10 +114,23 @@ describe('run_board_jump_start.jump_of once running', () => {
 		expect(jump_of(first, next)?.run.start_ms).toBe(NOW)
 	})
 
+	it('yields to the next merge notice once thawed, with only its fire trails burning', () => {
+		const first = jump_of(undefined, frame_of())
+		const thawed = NOW + ((first?.run.letters ?? 0) + WASH_TICKS + THAW_TICKS) * TICK_MS
+		const trace = { key: 'k2', start_ms: thawed }
+		const next = frame_of({
+			now_ms: thawed,
+			turn: { trace, place: { row: 1, column: 1, text: NOTICE_TEXT } },
+		})
+
+		expect(jump_of(first, next)?.run.start_ms).toBe(thawed)
+		expect(jump_of(first, frame_of({ now_ms: thawed }))?.run.start_ms).toBe(NOW)
+	})
+
 	it('draws nothing once the jump is over', () => {
 		const first = jump_of(undefined, frame_of())
 		const letters = first?.run.letters ?? 0
-		const over = NOW + (letters + WASH_TICKS + THAW_TICKS) * TICK_MS
+		const over = NOW + (letters + END_TICKS) * TICK_MS
 
 		expect(jump_of(first, frame_of({ now_ms: over }))).toBeUndefined()
 	})

@@ -103,6 +103,9 @@ interface CommandEntry {
 	memory_mb?: number | (() => number)
 	// A unit suite's claim, whose weight is its worker count (`gate_plan.DIRECT_UNIT_CLAIM`).
 	is_unit_claim?: boolean
+	// A standalone check a lane child runs detached and waits for one prompt-cache chunk
+	// (`bounded-check.ts`, joshuafolkken/kit#8708).
+	is_bounded?: boolean
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a
