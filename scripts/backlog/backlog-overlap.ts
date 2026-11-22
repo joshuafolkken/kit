@@ -185,6 +185,9 @@ interface SeparateContext {
 	repo: string
 	// The holders' lane state records, so a clash names a paused holder (joshuafolkken/kit#4270).
 	lanes?: LaneRecords | undefined
+	// The keys of the issues that gave their lane back; one that stops for a person keeps its slot
+	// (`backlog-human-stop-order.ts`). Absent, none did.
+	yielded?: ReadonlySet<string> | undefined
 }
 
 // The path each of `holders` declares, mapped to the issue that holds it.
@@ -330,7 +333,11 @@ function separate(
 		notes: [],
 	}
 
-	const order = backlog_human_stop_order.ordered(selection.offered, overlapping(declared, context))
+	const order = backlog_human_stop_order.ordered(
+		selection.offered,
+		overlapping(declared, context),
+		context.yielded,
+	)
 
 	for (const child of order) visit(walk, child, paths_of(child, declared, context.repo))
 

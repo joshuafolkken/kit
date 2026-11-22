@@ -1,4 +1,4 @@
-import type { EpicChild } from '#scripts/epic/epic-graph'
+import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { issue_auto_ok } from '#scripts/issue/issue-auto-ok'
 
 // The offer order `backlog_overlap.separate` walks: for each candidate that stops for a person
@@ -19,23 +19,36 @@ function stops_for_person(child: EpicChild): boolean {
 	return issue_auto_ok.declares_judgement_needed(child.body ?? '')
 }
 
-// The candidate placed into `child`'s slot — itself unless it stops for a person and a later
+// Whether `child` gives its slot up — it stops for a person and did not give its lane back
+// already: a yielded issue keeps the first free lane `yielded_first` promises it
+// (joshuafolkken/kit#5107).
+function gives_slot_up(child: EpicChild, yielded: ReadonlySet<string>): boolean {
+	return stops_for_person(child) && !yielded.has(epic_graph.key_of(child))
+}
+
+// The candidate placed into `child`'s slot — itself unless it gives the slot up and a later
 // self-completing candidate overlaps it.
 function promoted_of(
 	child: EpicChild,
 	later: ReadonlyArray<EpicChild>,
 	is_overlapping: Overlapping,
+	yielded: ReadonlySet<string>,
 ): EpicChild {
-	if (!stops_for_person(child)) return child
+	if (!gives_slot_up(child, yielded)) return child
 
 	const promoted = later.find((other) => !stops_for_person(other) && is_overlapping(child, other))
 
 	return promoted ?? child
 }
 
-function ordered(offered: ReadonlyArray<EpicChild>, is_overlapping: Overlapping): Array<EpicChild> {
+// `yielded`: the keys of the issues that gave their lane back (`lane-yield.ts`).
+function ordered(
+	offered: ReadonlyArray<EpicChild>,
+	is_overlapping: Overlapping,
+	yielded: ReadonlySet<string> = new Set(),
+): Array<EpicChild> {
 	const slots = offered.flatMap((child, index) => [
-		promoted_of(child, offered.slice(index + 1), is_overlapping),
+		promoted_of(child, offered.slice(index + 1), is_overlapping, yielded),
 		child,
 	])
 

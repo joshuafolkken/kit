@@ -1,5 +1,5 @@
 import type { BusyRead } from '#scripts/epic/epic-busy'
-import type { EpicChild } from '#scripts/epic/epic-graph'
+import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_human_stop_order } from './backlog-human-stop-order'
@@ -70,6 +70,21 @@ describe('backlog_human_stop_order.ordered', () => {
 	it('reads a candidate without a body as self-completing', () => {
 		expect(order_of([child(HUMAN, HUMAN_BODY), child(AUTO)])).toStrictEqual([AUTO, HUMAN])
 		expect(order_of([child(HUMAN), child(AUTO)])).toStrictEqual([HUMAN, AUTO])
+	})
+})
+
+// joshuafolkken/kit#5107: a yielded issue takes the first free lane, so it keeps its slot.
+describe('backlog_human_stop_order.ordered with a yielded candidate', () => {
+	it('keeps a yielded human-stop candidate in its slot', () => {
+		const human = child(HUMAN, HUMAN_BODY)
+		const yielded = new Set([epic_graph.key_of(human)])
+		const order = backlog_human_stop_order.ordered(
+			[human, child(OTHER), child(AUTO)],
+			is_pair,
+			yielded,
+		)
+
+		expect(order.map((entry) => entry.number)).toStrictEqual([HUMAN, OTHER, AUTO])
 	})
 })
 
