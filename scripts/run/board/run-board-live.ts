@@ -70,10 +70,10 @@ function framed(ports: BoardPorts, framing: Framing): BoardPorts {
 // front of them and the whole is written past the theme, so no line the theme reads starts with an
 // erase (joshuafolkken/kit#8401).
 function on_screen(ports: BoardPorts, screen: Screen): Framing {
-	const { theme } = ports
+	const { icons, theme } = ports
 
 	return {
-		wrap: (text) => screen.frame(run_board_theme.restyle(theme, text)),
+		wrap: (text) => screen.frame(run_board_theme.restyle(theme, text, icons)),
 		sink: ports.write_drawn ?? ports.write,
 	}
 }

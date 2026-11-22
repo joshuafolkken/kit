@@ -134,10 +134,10 @@ function record(
 
 	if (local === undefined || saved_ms === undefined) return
 	const chat = redrawn({ ...state, thanks: [] }, local, { ...ports, form: 'chat' }, now_ms)
-	const once = run_board_theme.restyle(theme, redrawn(state, local, ports, now_ms))
+	const once = run_board_theme.restyle(theme, redrawn(state, local, ports, now_ms), ports.icons)
 
 	ports.frames?.save(CHAT_KEY, { text: stripVTControlCharacters(chat), saved_ms })
-	ports.frames?.save(once_key(theme, ports.is_tty), { text: once, saved_ms })
+	ports.frames?.save(once_key(theme, ports.is_tty, ports.icons), { text: once, saved_ms })
 }
 
 // What a live board's worker thread calls after each round (`run-board-gather-record.ts`): records its

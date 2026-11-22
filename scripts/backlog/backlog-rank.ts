@@ -133,13 +133,14 @@ function offer_order(
 // The overlap separation runs before the cap, for the reason the gate does: the cap only ever
 // removes what would otherwise be offered.
 function select(input: OfferInput): SoloSelection {
-	const ranked = yielded_first(rank(input.candidates, input.pool), input.yielded ?? new Set())
-	const { read, repo, lanes } = input
+	const { read, repo, lanes, yielded } = input
+	const ranked = yielded_first(rank(input.candidates, input.pool), yielded ?? new Set())
 	const gated = epic_solo.select(ranked, read, repo)
 	const separated = backlog_overlap.separate(gated, input.declared ?? new Map(), {
 		read,
 		repo,
 		lanes,
+		yielded,
 	})
 
 	return cap(separated, input.standalone, input.limit ?? git_next_issues.DISPLAY_LIMIT)
