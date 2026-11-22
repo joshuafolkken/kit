@@ -20,7 +20,15 @@ interface FlashRedraw {
 	now_ms: number
 }
 
-type FlashDrawn = Pick<Spun, 'lines' | 'keyed' | 'spots'>
+type FlashDrawn = Pick<Spun, 'lines' | 'keyed' | 'spots'> & Partial<Pick<Spun, 'lamps'>>
+
+// The cells written between redraws by their own writers — the spinners and the lamps, which write
+// only what changed — so a flash restored over them would leave the frame's glyph, not theirs.
+function is_owned(drawn: FlashDrawn, cell: { row: number; column: number }): boolean {
+	const owned = [...drawn.spots, ...(drawn.lamps ?? [])]
+
+	return owned.some((spot) => spot.row === cell.row && spot.column === cell.column)
+}
 
 // Only the fixed header and producer-keyed rows hold their identity across redraws; a line the pane
 // wraps or cuts off is left out.
@@ -57,8 +65,8 @@ function is_enabled(ports: FlashPorts): boolean {
 	)
 }
 
-// The flash after this frame, none where the board does not flash; a typing row and a spinner's cell
-// never flash.
+// The flash after this frame, none where the board does not flash; a typing row, a spinner's cell and
+// a lamp never flash.
 function flash_of(
 	last: Flash | undefined,
 	drawn: FlashDrawn,
@@ -69,11 +77,8 @@ function flash_of(
 	const typing_keys = new Set(typing.lines.map((line) => line.key))
 	const lines = flash_lines(drawn, redraw.ports).filter((line) => !typing_keys.has(line.key))
 	const flash = run_board_change_flash.next(last, lines, redraw.now_ms)
-	const cells = flash.cells.filter((cell) =>
-		drawn.spots.every((spot) => !(spot.row === cell.row && spot.column === cell.column)),
-	)
 
-	return { ...flash, cells }
+	return { ...flash, cells: flash.cells.filter((cell) => !is_owned(drawn, cell)) }
 }
 
 const run_board_tick_flash = { flash_of }

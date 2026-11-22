@@ -2,6 +2,6 @@
 	"reason": "#8353 adds the matrix change flash: frame diff, flash overlay, tick flash and per-section flash keying",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 334
+		"scripts.code_lines": 335
 	}
 }
