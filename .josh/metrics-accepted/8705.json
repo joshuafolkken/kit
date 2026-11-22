@@ -2,6 +2,6 @@
 	"reason": "run:chain background worker (run-chain-background.ts) and its tests add the code that returns pending within the wait cap (#8705)",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 117
+		"scripts.code_lines": 126
 	}
 }

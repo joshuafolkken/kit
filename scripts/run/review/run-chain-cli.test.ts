@@ -321,6 +321,19 @@ describe('run_chain_cli.run — the background opening', () => {
 		expect(open).toHaveBeenCalledOnce()
 		expect(ran()).toStrictEqual([])
 	})
+})
+
+describe('run_chain_cli.run — a join after an opening worker', () => {
+	it('runs the join stages after an unread opening worker that ended green', async () => {
+		vi.spyOn(run_chain_background, 'has_worker').mockReturnValue(true)
+		const open = vi.spyOn(run_chain_background, 'open').mockResolvedValue(0)
+
+		josh_run_mock.mockResolvedValue({ code: STOP_EXIT, out: '' })
+		await run_chain_cli.run([ISSUE, '--join'])
+
+		expect(open).toHaveBeenCalledOnce()
+		expect(ran()).toHaveLength(1)
+	})
 
 	it('runs a join in place when no opening worker is unread', async () => {
 		vi.spyOn(run_chain_background, 'has_worker').mockReturnValue(false)

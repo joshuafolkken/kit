@@ -171,11 +171,23 @@ async function record_run(
 }
 
 // The opening half runs in the background so the call returns before the prompt cache expires
-// (joshuafolkken/kit#8705); a join waits first on an opening worker not yet read.
+// (joshuafolkken/kit#8705); a join settles an opening worker not yet read first, then runs its own
+// stages only when that worker ended green.
 function is_backgrounded(parsed: ChainArguments): boolean {
 	if (parsed.is_worker) return false
 
 	return !parsed.is_join || run_chain_background.has_worker(parsed.issue)
+}
+
+// The call's answer when the background run settles it, else undefined: the join goes on.
+async function settle_opening(
+	parsed: ChainArguments,
+	argv: ReadonlyArray<string>,
+): Promise<number | undefined> {
+	if (!is_backgrounded(parsed)) return undefined
+	const code = await run_chain_background.open(parsed.issue, argv)
+
+	return parsed.is_join && code === run_chain.SUCCESS_EXIT_CODE ? undefined : code
 }
 
 async function run_in_place(
@@ -201,7 +213,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const { stages } = parsed
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
-	if (is_backgrounded(parsed)) return await run_chain_background.open(parsed.issue, argv)
+	const settled = await settle_opening(parsed, argv)
+
+	if (settled !== undefined) return settled
 	const code = await run_in_place(parsed, stages)
 
 	if (parsed.is_worker) run_chain_background.finish(parsed.issue, code)
