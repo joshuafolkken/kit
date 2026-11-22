@@ -1,7 +1,0 @@
-{
-	"reason": "#8571 adds overlap_neighbors and wires path-overlap followers into the rank's dependents key; the growth is the feature itself",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 56
-	}
-}

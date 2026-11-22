@@ -1,7 +1,0 @@
-{
-	"reason": "New feature: run:board pinned-issue watch panel (#8607) adds two modules",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 113
-	}
-}

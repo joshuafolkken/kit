@@ -1,7 +1,0 @@
-{
-	"reason": "Ownership transfer for adopted lanes adds record_transfer, adopted_at and the board's is_adopted path; no existing code duplicates it",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 29
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#8647 adds the usage-rule panel row and draws rain-frame lamps as idle rain cells (rained, rule_started, has_rain threading)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 62
-	}
-}

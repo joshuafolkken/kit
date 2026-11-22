@@ -1,7 +1,0 @@
-{
-	"reason": "Per-theme board name: a ThemeDefinition field, board_name_of and the no-run line's theme option (#8604)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

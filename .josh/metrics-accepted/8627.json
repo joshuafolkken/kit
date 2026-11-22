@@ -1,7 +1,0 @@
-{
-	"reason": "#8627 adds per-drop trail length, the pour gain and the closed-form hurry after typing ends to run-board-rain-drop.ts; the growth is the feature itself",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

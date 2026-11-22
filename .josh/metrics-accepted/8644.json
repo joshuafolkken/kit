@@ -1,7 +1,0 @@
-{
-	"reason": "Fix for #8644: rows_fit leaves a stale age aside off the usage rows so both keep the lamp panel; quota rows carry the age as an aside",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}

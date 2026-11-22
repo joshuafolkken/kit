@@ -1,7 +1,0 @@
-{
-	"reason": "mapped splits a line at run_board_escape.LINE_ESCAPE instead of a bare ESC (#8591); the import and the escape branch add 2 code lines",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

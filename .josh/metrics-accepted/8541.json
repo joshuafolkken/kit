@@ -1,8 +1,0 @@
-{
-	"reason": "issue-rank derives a blocker's priority class from the issues it blocks (#8541); the code and its rationale comment are the fix",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 29,
-		"prose.long_paragraphs": 1
-	}
-}

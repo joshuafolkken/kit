@@ -1,7 +1,0 @@
-{
-	"reason": "issue_list carries gh's failure reason to run:board's plan_error (#8507)",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

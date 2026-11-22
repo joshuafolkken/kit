@@ -1,7 +1,0 @@
-{
-	"reason": "judging the owning run by the carry started_at so a supervisor hand-off keeps a person's lane:pause adds the carry read and pid fallback (5 lines)",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 5
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Check 6 now reads native blocked-by relations between epic children (order_links) and names the triage removal command in its error (#8531)",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

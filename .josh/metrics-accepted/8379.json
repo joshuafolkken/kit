@@ -1,7 +1,0 @@
-{
-	"reason": "Stale-retry trigger wiring on reviewer launch prompts plus its regression tests (#8379)",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 96
-	}
-}

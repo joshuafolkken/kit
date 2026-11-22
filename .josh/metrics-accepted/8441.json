@@ -1,7 +1,0 @@
-{
-	"reason": "matrix opening intro (#8441): lead-line beats in the intro, its theme row, and its tests in a new file with the shared intro test ports moved into a fixture",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 125
-	}
-}

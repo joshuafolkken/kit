@@ -1,7 +1,0 @@
-{
-	"reason": "New run-board-colon module and its spin/tick wiring for the #8476 colon blink feature",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 98
-	}
-}

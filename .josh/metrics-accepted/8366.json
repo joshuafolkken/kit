@@ -1,7 +1,0 @@
-{
-	"reason": "Per-theme spinner glyph tables (matrix kana) built from the theme definitions, #8366",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

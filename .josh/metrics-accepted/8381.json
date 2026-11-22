@@ -1,7 +1,0 @@
-{
-	"reason": "New run:board tick survival: failed-tick catch and redraw in run-board-live, redraw failure counting in exit-record, the record store split into run-board-exit-store, and the sync spawn catch in sound-player",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 120
-	}
-}

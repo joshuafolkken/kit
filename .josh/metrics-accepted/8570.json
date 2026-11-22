@@ -1,7 +1,0 @@
-{
-	"reason": "#8570: ring-by-ring selection (rings_of) and destructuring binding names replace the silent one-hop fallback; the fix itself, no duplication",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

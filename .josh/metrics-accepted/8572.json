@@ -1,7 +1,0 @@
-{
-	"reason": "#8572 adds the longest-serial-chain computation and its line in backlog:plan --waves",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 82
-	}
-}

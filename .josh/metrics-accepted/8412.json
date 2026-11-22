@@ -1,7 +1,0 @@
-{
-	"reason": "unicorn 80 prefer-options-parameter: options-object signatures and split test helpers add lines",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "New run:park refusal for a visual-check park on an issue that declares a post-merge check (#8503): a new pure-function module plus its CLI wiring and a human-stops row",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 51
-	}
-}
