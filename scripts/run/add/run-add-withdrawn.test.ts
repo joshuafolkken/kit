@@ -50,6 +50,23 @@ describe('run_add_withdrawn.targets', () => {
 		expect(targets_of(launch(OTHER), note, yielded)).toStrictEqual([])
 	})
 
+	it('leaves out a closed issue the run:wake supervisor withdrew', () => {
+		const closed = event(
+			'withdraw',
+			`#${String(OTHER)} withdrawn by the run:wake supervisor: closed`,
+		)
+
+		expect(targets_of(launch(WITHDRAWN), withdraw(WITHDRAWN), launch(OTHER), closed)).toStrictEqual(
+			[WITHDRAWN],
+		)
+	})
+
+	it('names an issue once when a person withdrew it twice', () => {
+		expect(targets_of(launch(WITHDRAWN), withdraw(WITHDRAWN), withdraw(WITHDRAWN))).toStrictEqual([
+			WITHDRAWN,
+		])
+	})
+
 	it('leaves out an issue a retry already re-admitted', () => {
 		const retried = event('add', run_event_retry.text_of(WITHDRAWN))
 

@@ -131,6 +131,20 @@ describe('run:add --retry --withdrawn', () => {
 
 			expect(await run_add_cli.run(argv, OPEN_PORTS)).toBe(2)
 			expect(console.error).toHaveBeenCalledWith(run_add_cli.USAGE)
+			expect(run_add_cli.USAGE).toContain(`${RETRY_FLAG} ${WITHDRAWN_FLAG}`)
 		},
 	)
+})
+
+describe('run:add --retry --withdrawn — every withdrawn issue refused', () => {
+	it('keeps the withdrawal reason on the refusal line', async () => {
+		withdrawn()
+		const closed: AddPorts = {
+			...OPEN_PORTS,
+			read_issue: async () => ({ is_open: false, blockers: [] }),
+		}
+
+		expect(await run_add_cli.run([RETRY_FLAG, WITHDRAWN_FLAG], closed)).toBe(1)
+		expect(console.info).toHaveBeenCalledWith(expect.stringMatching(` · withdrawn: ${REASON}$`))
+	})
 })
