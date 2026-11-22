@@ -9,8 +9,13 @@ import type { ItemState, ItemStatus } from './run-board-status'
 const { state_icon } = run_board_render_icon
 const LANE = 7
 
-function row(state: ItemState, status?: ItemStatus, reason?: BoardRow['reason']): BoardRow {
-	return { number: LANE, title: 'Issue', kind: undefined, state, status, waits: [], reason }
+function row(state: ItemState, status?: ItemStatus): BoardRow {
+	return { number: LANE, title: 'Issue', kind: undefined, state, status, waits: [] }
+}
+
+// A waiting row with no status, held for `reason`.
+function waiting_on(reason: BoardRow['reason']): BoardRow {
+	return { ...row('waiting'), reason }
 }
 
 describe('run_board_render_icon.state_icon', () => {
@@ -44,10 +49,10 @@ describe('run_board_render_icon.state_icon', () => {
 
 	// joshuafolkken/kit#4288: every wait leads with its own icon in place of ⏳.
 	it.each(['📅', '🧵', '📂', '❓'])('leads a row whose wait leads with %s with it', (icon) => {
-		expect(state_icon(row('waiting', undefined, { icon }))).toBe(icon)
+		expect(state_icon(waiting_on({ icon }))).toBe(icon)
 	})
 
 	it('leads a waiting row whose wait names no icon with ⏳', () => {
-		expect(state_icon(row('waiting', undefined, { tail: 'fullrun #3' }))).toBe('⏳')
+		expect(state_icon(waiting_on({ tail: 'fullrun #3' }))).toBe('⏳')
 	})
 })

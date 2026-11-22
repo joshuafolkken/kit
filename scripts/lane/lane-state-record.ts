@@ -31,6 +31,9 @@ const lane_state_schema = z.object({
 	run: lane_run_schema.optional(),
 	state: z.enum(LANE_STATES),
 	launched_at: z.string().optional(),
+	// When a later run took the lane over from the run that launched it, its `run` now names the
+	// adopting run; this keeps the hand-over on record (the 🎯 estimate leaves such a lane out).
+	adopted_at: z.string().optional(),
 	changed_at: z.string(),
 	changed_by: z.string(),
 	stuck: z.array(stuck_schema).optional(),

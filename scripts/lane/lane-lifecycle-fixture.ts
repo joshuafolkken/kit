@@ -23,7 +23,7 @@ interface LaneModel {
 	is_alive: boolean
 	// Whether `lane:list` holds the lane, i.e. it is open and not yet closed.
 	is_listed: boolean
-	// The run that last launched a child in it.
+	// The run that last launched or adopted its child through resume.
 	launch_run: number | undefined
 }
 

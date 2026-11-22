@@ -3,9 +3,11 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_every } from './run-board-every'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
-import { run_board_gather } from './run-board-gather'
+import { run_board_gather, type GatherRead } from './run-board-gather'
 import { run_board_gather_record, type RecordSetup } from './run-board-gather-record'
 import type { RoundState, WorkerSeed } from './run-board-gather-thread'
+import type { MachineGauges } from './run-board-machine'
+import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_state } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 
@@ -17,7 +19,13 @@ const { CHAT_KEY, once_key } = run_board_frame_store
 const { RECORD_EVERY_MS } = run_board_every
 const SECOND_MS = 1000
 const ROUNDS = 12
-const SETUP: RecordSetup = { theme: undefined, is_tty: true, is_linked: false }
+const SETUP: RecordSetup = {
+	theme: undefined,
+	icons: 'emoji',
+	is_tty: true,
+	is_linked: false,
+	color_level: '0',
+}
 const TERMINAL_ONCE = once_key(undefined, true)
 const ESCAPE = '\u{1B}'
 const OSC = `${ESCAPE}]`
@@ -63,8 +71,12 @@ function counted(): Counted {
 	return { store, saves }
 }
 
-// The worker's recorder over a round a second for `ROUNDS` seconds, on a clock it advances.
-function recorded(setup: RecordSetup, round: RoundState): Counted {
+// The worker's recorder over a round a second for `ROUNDS` seconds, on a clock it advances: the same
+// round each second, or the one `round_at` gives for it.
+function recorded(
+	setup: RecordSetup,
+	round: RoundState | ((second: number) => RoundState),
+): Counted {
 	const frames = counted()
 	const clock = { now_ms: START }
 	const record = run_board_gather_record.round_recorder(setup, {
@@ -74,41 +86,129 @@ function recorded(setup: RecordSetup, round: RoundState): Counted {
 
 	for (let second = 0; second < ROUNDS; second += 1) {
 		clock.now_ms = START + second * SECOND_MS
-		record(round)
+		record(typeof round === 'function' ? round(second) : round)
 	}
 
 	return frames
 }
 
+// The chat and once keys saved by `records` records.
+function saved_keys(records: number): Array<string> {
+	return Array.from({ length: records }, () => [CHAT_KEY, TERMINAL_ONCE]).flat()
+}
+
 describe('run_board_gather_record.round_recorder', () => {
-	it('records the chat and once frames once every five seconds', () => {
-		const { saves } = recorded(SETUP, round_of(START))
+	it('records the chat and once frames at most once every five seconds', () => {
+		const { saves } = recorded(SETUP, (second) => round_of(START + second * SECOND_MS))
 		const records = Math.ceil((ROUNDS * SECOND_MS) / RECORD_EVERY_MS)
 
 		expect(RECORD_EVERY_MS).toBe(5 * SECOND_MS)
-		expect(saves).toStrictEqual(
-			Array.from({ length: records }, () => [CHAT_KEY, TERMINAL_ONCE]).flat(),
-		)
+		expect(saves).toStrictEqual(saved_keys(records))
+	})
+})
+
+// joshuafolkken/kit#8335: an unchanged board is not drawn again for the record.
+describe('run_board_gather_record.round_recorder over unchanged rounds', () => {
+	it('records an unchanged round once (ac-aa38dcc8)', () => {
+		expect(recorded(SETUP, round_of(START)).saves).toStrictEqual(saved_keys(1))
 	})
 
+	it('records a changed round at the next chance to record (ac-2a04f774)', () => {
+		const changed_at = 7
+		const reread_ms = START + changed_at * SECOND_MS
+		const { saves, store } = recorded(SETUP, (second) =>
+			round_of(second < changed_at ? START : reread_ms),
+		)
+
+		expect(saves).toStrictEqual(saved_keys(2))
+		expect(store.load(CHAT_KEY)?.saved_ms).toBe(reread_ms)
+	})
+})
+
+const GAUGES: MachineGauges = {
+	cpu_percent: 20,
+	memory_percent: 37,
+	swap_mb_per_s: 0,
+	memory_pressure: undefined,
+}
+
+describe('run_board_gather_record.round_recorder over sampled rounds', () => {
+	it.each<Partial<GatherRead>>([
+		{ gauges: { ...GAUGES, memory_percent: 90 } },
+		{ usages: run_board_render_fixture.board_usage(new Map()) },
+		{ quotas: { claude: { windows: [], taken_ms: START }, codex: undefined } },
+		{
+			budget_waits: [
+				{
+					lane: '8335',
+					elsewhere: undefined,
+					command: 'gate',
+					waited_ms: SECOND_MS,
+					reason: 'memory',
+				},
+			],
+		},
+	])('records changed samples: %j', (sample) => {
+		const round = round_of(START)
+		const initial = { ...round.gather, gauges: GAUGES }
+		const { saves } = recorded(SETUP, (second) => ({
+			...round,
+			gather: second < 6 ? initial : { ...initial, ...sample },
+		}))
+
+		expect(saves).toStrictEqual(saved_keys(2))
+	})
+})
+
+describe('run_board_gather_record.round_recorder over equal samples', () => {
+	it('records equal samples once even when rebuilt each round', () => {
+		const round = round_of(START)
+		const { saves } = recorded(SETUP, () => ({
+			...round,
+			gather: { ...round.gather, gauges: { ...GAUGES }, budget_waits: [] },
+		}))
+
+		expect(saves).toStrictEqual(saved_keys(1))
+	})
+})
+
+describe('run_board_cli.run over changed worker samples', () => {
+	it.each([
+		['--chat', CHAT_KEY],
+		['--once', TERMINAL_ONCE],
+	])('answers %s with the latest memory sample within the same minute', async (option, key) => {
+		const round = round_of(START)
+		const { store } = recorded(SETUP, (second) => ({
+			...round,
+			gather: { ...round.gather, gauges: { ...GAUGES, memory_percent: second < 6 ? 37 : 90 } },
+		}))
+		const { ports, frames } = harness(LOCAL, [])
+
+		await run_board_cli.run([option], { ...ports, frames: store })
+
+		expect(store.load(key)?.text).toContain('90%')
+		expect(frames.join('')).toContain('90%')
+	})
+})
+
+describe('run_board_gather_record.round_recorder’s frames', () => {
 	it('records nothing before the plan read has settled', () => {
 		const { saves } = recorded(SETUP, round_of(undefined))
 
 		expect(saves).toStrictEqual([])
 	})
 
-	it('records the frames the board would for the same round, dated when the plan was read', () => {
+	it('records the frames the board would for the same round, dated when the plan was read (ac-71e945f3)', () => {
 		const { store } = recorded(SETUP, round_of(START))
 		const expected = run_board_frame_store.memory_store()
 		const { ports } = harness(LOCAL, [])
 		const board = { local: LOCAL, read_ms: START, plan: plan_titled('a'), fetched_ms: START }
-		const last_record_ms = START + 2 * RECORD_EVERY_MS
 
 		run_board_every.record(
 			{ ...run_board_tick.FRESH_STATE, ...board },
 			{ ...ports, link: run_board_gather_record.link, frames: expected },
 			undefined,
-			last_record_ms,
+			START,
 		)
 
 		expect(store.load(CHAT_KEY)).toStrictEqual(expected.load(CHAT_KEY))
@@ -116,11 +216,20 @@ describe('run_board_gather_record.round_recorder', () => {
 		expect(store.load(CHAT_KEY)?.text).not.toContain(ESCAPE)
 	})
 
-	it('keys the once frame by the theme and terminal it was started with', () => {
-		const { saves } = recorded({ ...SETUP, theme: 'wargames', is_tty: false }, round_of(START))
+	it.each([
+		['shapes', '->'],
+		['emoji', '🎯'],
+	] as const)(
+		'keys the once frame by the theme, icons %s and terminal it was started with (#8505)',
+		(icons, clock) => {
+			const setup: RecordSetup = { ...SETUP, theme: 'wargames', icons, is_tty: false }
+			const { store, saves } = recorded(setup, round_of(START))
+			const key = once_key('wargames', false, icons)
 
-		expect(saves).toContain(once_key('wargames', false))
-	})
+			expect(saves).toContain(key)
+			expect(store.load(key)?.text).toContain(`${clock} `)
+		},
+	)
 })
 
 // joshuafolkken/kit#8161: `--chat` answers from the frame the worker recorded, as it did from the
@@ -156,11 +265,31 @@ describe('run_board_gather_record.started_with', () => {
 })
 
 describe('run_board_gather_record.worker_environment', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
 	it('forces the worker’s links to the board terminal’s answer', () => {
 		const { worker_environment } = run_board_gather_record
 
 		expect(worker_environment({ ...SETUP, is_linked: true })['FORCE_HYPERLINK']).toBe('1')
 		expect(worker_environment(SETUP)['FORCE_HYPERLINK']).toBe('0')
+	})
+
+	// joshuafolkken/kit#8616: the worker records under the key a terminal's `--once` reads.
+	it('forces the worker’s colors to the board terminal’s, so their once keys meet', () => {
+		vi.stubEnv('NO_COLOR', '1')
+		vi.stubEnv('FORCE_COLOR', '3')
+		const setup = run_board_gather_record.setup_of(undefined)
+		const terminal = once_key(undefined, setup.is_tty)
+		const worker = run_board_gather_record.worker_environment(setup)
+
+		vi.unstubAllEnvs()
+		vi.stubEnv('FORCE_COLOR', worker['FORCE_COLOR'])
+
+		expect(worker['NO_COLOR']).toBeUndefined()
+		expect(once_key(undefined, setup.is_tty)).toBe(terminal)
+		expect(terminal).toContain('color3')
 	})
 })
 

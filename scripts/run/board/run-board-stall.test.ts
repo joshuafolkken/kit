@@ -79,7 +79,10 @@ function left_after_stall(): { frame: string | undefined; stops: Array<string> }
 	const { ports, frames, leaves } = harness(undefined, [])
 	// The heaps on a timer of their own, so the probe fired is the stall watch's.
 	const heap = { main: run_board_heap.main, every: vi.fn().mockReturnValue(vi.fn()) }
-	const board = run_board_timing.timed(ports, true, () => 0, { ...fake.probes, heap })
+	const board = run_board_timing.timed(ports, true, {
+		now: () => 0,
+		probes: { ...fake.probes, heap },
+	})
 
 	board.on_exit(() => 0)
 	hold(fake, (stage) => board.enter_stage?.(stage), 'turn')
@@ -183,7 +186,7 @@ describe('run_board_timing.timed stalls', () => {
 		const every = vi.spyOn(probes, 'every')
 		const observe = vi.spyOn(probes, 'observe_gc')
 		const { ports } = harness(undefined, [])
-		const board = run_board_timing.timed(ports, false, () => 0, probes)
+		const board = run_board_timing.timed(ports, false, { now: () => 0, probes })
 
 		board.on_exit(() => 0)
 
@@ -197,7 +200,7 @@ describe('run_board_timing.timed stalls', () => {
 		const every = vi.spyOn(probes, 'every')
 		const { ports } = harness(undefined, [])
 
-		run_board_timing.timed(ports, true, () => 0, probes).enter_stage?.('redraw')
+		run_board_timing.timed(ports, true, { now: () => 0, probes }).enter_stage?.('redraw')
 
 		expect(every).not.toHaveBeenCalled()
 	})

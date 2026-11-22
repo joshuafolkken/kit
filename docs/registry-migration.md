@@ -44,7 +44,7 @@ The global CLI installs from npm without changing `~/.npmrc` ([cli.md](./cli.md#
 
 The entry stops before changing anything in these cases ([Verified conditions](#verified-conditions)).
 
-- pnpm version mismatch: the project pins a pnpm other than 12.17.0 (`ERR_PNPM_BAD_PM_VERSION` and similar).
+- pnpm version mismatch: the project pins a pnpm other than 12.22.0 (`ERR_PNPM_BAD_PM_VERSION` and similar).
 - Missing version: a locked kit, app-kit or similar is not on npm. The oldest versions on npm are kit 1.872.0 and app-kit 0.98.0.
 
 In these cases, skip the entry: move up to versions that are on npm and create a new lockfile.
@@ -52,7 +52,7 @@ The old lockfile's integrity is not carried over. Never disable checksums or rew
 
 This assumes every `@joshuafolkken` package in the lockfile is on npm. A project that depends on a package not on npm (`npm view <name> --registry https://registry.npmjs.org/` returns 404) cannot migrate with these steps either.
 
-1. Edit `packageManager` and `devEngines.packageManager` in `package.json` by hand to the same pnpm 12.17.0 pin as kit's `package.json`. Check that `pnpm --version` returns `12.17.0`.
+1. Edit `packageManager` and `devEngines.packageManager` in `package.json` by hand to the same pnpm 12.22.0 pin as kit's `package.json`. Check that `pnpm --version` returns `12.22.0`.
 2. Point the project's `.npmrc` at npm and remove the GitHub Packages token line.
 
    ```sh
@@ -112,7 +112,7 @@ In a project moved to npm, `josh sync` removes `fix-gh-packages` from the `prepa
 
 ## Verified conditions
 
-- Verified with pnpm 12.17.0. Any other version stops before changing files.
+- Verified with pnpm 12.22.0. Any other version stops before changing files.
 - Every same-scope name@version in the lockfile, direct and transitive, is checked against the target kit's npm publication data and the actual artifacts.
 - Each artifact's sha512 is checked against both the npm metadata and the old lockfile. An artifact whose bytes differ under the same version is rejected. Compression or content differences are never approved automatically; the real artifacts from both sources need independent verification.
 - When investigating a difference, record both tarballs' sha512 and compare, before extraction, the paths, types, modes and link targets and each file's content hash.

@@ -8,8 +8,9 @@ const UNICORN = 'eslint-plugin-unicorn'
 const SVELTE_AND_VITEST_UPDATE = ['pnpm', 'update', '--latest', 'svelte', 'vitest']
 
 describe('overrides_check.list_excluded_package_names', () => {
-	it('holds back typescript and eslint-plugin-unicorn', () => {
-		expect(overrides_check.list_excluded_package_names({})).toEqual(['typescript', UNICORN])
+	it('holds back only typescript, not eslint-plugin-unicorn', () => {
+		expect(overrides_check.list_excluded_package_names({})).toEqual(['typescript'])
+		expect(HELD_BACK).not.toContain(UNICORN)
 	})
 
 	it('merges held-back packages with capped-override packages', () => {
@@ -28,7 +29,7 @@ describe('overrides_check.list_excluded_package_names', () => {
 	})
 
 	it('deduplicates a package that is both held back and capped', () => {
-		const overrides = make_overrides([[`${UNICORN}@>=80`, '^79']])
+		const overrides = make_overrides([['typescript@>=7', '^6']])
 
 		expect(overrides_check.list_excluded_package_names(overrides)).toEqual(HELD_BACK)
 	})
@@ -41,10 +42,17 @@ describe('overrides_check.build_update_command — held-back packages', () => {
 		expect(overrides_check.build_update_command({}, content)).toEqual(SVELTE_AND_VITEST_UPDATE)
 	})
 
-	it('leaves eslint-plugin-unicorn out of the update targets without any overrides', () => {
-		const content = make_package_json({ svelte: '^5' }, { [UNICORN]: '^79.0.0', vitest: '^3' })
+	it('includes eslint-plugin-unicorn in the update targets without any overrides', () => {
+		const content = make_package_json({ svelte: '^5' }, { [UNICORN]: '^80.0.0', vitest: '^3' })
 
-		expect(overrides_check.build_update_command({}, content)).toEqual(SVELTE_AND_VITEST_UPDATE)
+		expect(overrides_check.build_update_command({}, content)).toEqual([
+			'pnpm',
+			'update',
+			'--latest',
+			'svelte',
+			UNICORN,
+			'vitest',
+		])
 	})
 
 	it('excludes both held-back and overridden packages together', () => {

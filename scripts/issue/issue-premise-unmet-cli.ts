@@ -10,6 +10,7 @@ import { issue_evidence_exit } from '#scripts/issue/issue-evidence-exit'
 import { measure_declaration } from '#scripts/issue/measure-declaration'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { lane_registered_branch } from '#scripts/lane/lane-registered-branch'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { error_text } from '#scripts/lib/error-message'
 
@@ -56,7 +57,7 @@ async function lane_directory(issue_number: string): Promise<string> {
 }
 
 async function branch_refusal(issue_number: string): Promise<string | undefined> {
-	const branch = lane_paths.lane_branch(issue_number)
+	const branch = await lane_registered_branch.read(issue_number)
 
 	if ((await git_command.commit_count_beyond(BASE, branch)) > 0) {
 		return `\`${branch}\` has commits beyond \`${BASE}\``

@@ -7,6 +7,7 @@ import {
 	type SectionKey,
 	type TerminalSize,
 } from './run-board-fit'
+import { run_board_flash_parts } from './run-board-flash-parts'
 import { run_board_lamps, type PanelSpan } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
 
@@ -36,6 +37,7 @@ const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: a
 // The live terminal a frame is kept within, the footer the frame ends on and gives way first, and the
 // sections a person folded; none for a frame that is not redrawn in place, which is drawn as it was.
 interface FrameBounds {
+	is_flash_keyed?: boolean | undefined
 	size?: TerminalSize | undefined
 	footer?: ReadonlyArray<string> | undefined
 	folded?: ReadonlySet<SectionKey> | undefined
@@ -44,6 +46,7 @@ interface FrameBounds {
 interface Headed {
 	head: ReadonlyArray<string>
 	is_folded?: boolean | undefined
+	tail?: string | undefined
 }
 
 function flipped(folded: ReadonlySet<SectionKey>, section: SectionKey): ReadonlySet<SectionKey> {
@@ -69,7 +72,7 @@ function headed<Part extends Headed>(part: Part, label: string, summary: string 
 	return { ...part, head: folded_head(label, summary), is_folded: true }
 }
 
-// A folded section counts its rows.
+// A folded section counts its rows, the priorities among them after the count.
 function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): PlanSection {
 	const { key, label } = section
 
@@ -77,9 +80,9 @@ function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): Pl
 	if (key === undefined) return { ...section, head: lone_head(section.head, label) }
 	if (!folded.has(key)) return headed(section, label, undefined)
 
-	const count = row_count(section.lines)
+	const summary = `${String(row_count(section.lines))}${section.tally ?? ''}`
 
-	return { ...headed(section, label, String(count)), lines: [] }
+	return { ...headed(section, label, summary), lines: [] }
 }
 
 // The findings count every one there is, the ones past the section's limit too; with none there is no
@@ -120,28 +123,36 @@ function fold_parts(parts: FrameParts, folded: ReadonlySet<SectionKey>): FramePa
 	}
 }
 
-function widened_part<Part extends Headed>(part: Part, width: number): Part {
-	return { ...part, head: widened(part.head, width) }
+// How far a rule runs: on to `width`, its tail kept within the pane's `columns`.
+interface Reach {
+	width: number
+	columns?: number | undefined
 }
 
-function widened_detail(part: DetailPart | undefined, width: number): DetailPart | undefined {
-	return part === undefined ? undefined : widened_part(part, width)
+function widened_part<Part extends Headed>(part: Part, reach: Reach): Part {
+	return { ...part, head: widened(part.head, reach.width, part.tail, reach.columns) }
+}
+
+function widened_detail(part: DetailPart | undefined, reach: Reach): DetailPart | undefined {
+	return part === undefined ? undefined : widened_part(part, reach)
 }
 
 // Every rule run on to the lane rows' title column, folded or open (joshuafolkken/kit#5520).
 function widened_parts(parts: FrameParts): FrameParts {
-	const { rule_width: width } = parts
+	const { rule_width: width, columns } = parts
 
 	if (width === undefined) return parts
 
+	const reach = { width, columns }
+
 	return {
 		...parts,
-		throughput: widened_detail(parts.throughput, width),
-		usage: widened_detail(parts.usage, width),
-		plan: parts.plan.map((section) => widened_part(section, width)),
-		below: parts.below?.map((section) => widened_part(section, width)),
-		processes: widened_detail(parts.processes, width),
-		notes: widened_part(parts.notes, width),
+		throughput: widened_detail(parts.throughput, reach),
+		usage: widened_detail(parts.usage, reach),
+		plan: parts.plan.map((section) => widened_part(section, reach)),
+		below: parts.below?.map((section) => widened_part(section, reach)),
+		processes: widened_detail(parts.processes, reach),
+		notes: widened_part(parts.notes, reach),
 	}
 }
 
@@ -160,20 +171,69 @@ function panel_span(throughput: DetailPart | undefined): PanelSpan {
 	return start === undefined ? NO_PANEL : { start, end }
 }
 
-// The usage rows run their panels both or neither: none where one's text reaches the panel's start.
-function rows_span(usage: DetailPart, span: PanelSpan): PanelSpan {
-	const starts = usage.lines.map((line) => run_board_lamps.start_column(line.text))
-	const is_clear = starts.every((column) => column === undefined || column < span.start)
+type DetailLine = DetailPart['lines'][number]
 
-	return is_clear ? span : NO_PANEL
+// The usage part as its panels are run, and the span its rows run them to.
+interface RowsFit {
+	usage: DetailPart
+	rows: PanelSpan
+}
+
+function is_line_clear(line: DetailLine, span: PanelSpan): boolean {
+	const column = run_board_lamps.start_column(line.text)
+
+	return column === undefined || column < span.start
+}
+
+function is_clear(lines: ReadonlyArray<DetailLine>, span: PanelSpan): boolean {
+	return lines.every((line) => is_line_clear(line, span))
+}
+
+// A line reaching the panel's start with the trailing note its text ends on left off; one clear of it
+// keeps its note.
+function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
+	const { text, aside } = line
+	const index = aside === undefined ? -1 : text.lastIndexOf(aside)
+	if (aside === undefined || index === -1 || is_line_clear(line, span)) return line
+
+	return { ...line, text: `${text.slice(0, index)}${text.slice(index + aside.length)}` }
+}
+
+// The usage rows run their panels both or neither: where one's text reaches the panel's start, the
+// reaching rows' asides — a stale reading's age — are left off so both run them
+// (joshuafolkken/kit#8644); none where one reaches it still, or where the span has no room for a panel.
+function rows_fit(usage: DetailPart, span: PanelSpan): RowsFit {
+	if (run_board_lamps.count_of(span.end - span.start) === 0) return { usage, rows: NO_PANEL }
+	if (is_clear(usage.lines, span)) return { usage, rows: span }
+
+	const bare = { ...usage, lines: usage.lines.map((line) => without_aside(line, span)) }
+
+	return is_clear(bare.lines, span) ? { usage: bare, rows: span } : { usage, rows: NO_PANEL }
+}
+
+// The usage rule's row started as a panel row where the panel rains and the rows under it run theirs
+// (joshuafolkken/kit#8647); a folded usage, or rows with no panel, keep the rule whole.
+function is_rule_rained(part: DetailPart, rows: PanelSpan): boolean {
+	return part.is_rule_lamped === true && part.is_folded !== true && rows !== NO_PANEL
+}
+
+function rule_lamped(part: DetailPart, rows: PanelSpan): DetailPart {
+	const rule = part.head.at(-1)
+	if (rule === undefined || !is_rule_rained(part, rows)) return part
+
+	return {
+		...part,
+		head: [...part.head.slice(0, -1), run_board_lamps.rule_started(rule, rows.start)],
+	}
 }
 
 function lamped(
-	part: DetailPart | undefined,
+	whole: DetailPart | undefined,
 	span: PanelSpan,
 	rows = span,
 ): DetailPart | undefined {
-	if (part === undefined) return undefined
+	if (whole === undefined) return undefined
+	const part = rule_lamped(whole, rows)
 	const head = part.head.map((line) => run_board_lamps.expanded(line, span))
 	const lines = part.lines.map((line) => ({
 		...line,
@@ -186,12 +246,12 @@ function lamped(
 function lamped_parts(parts: FrameParts): FrameParts {
 	const { throughput, usage } = parts
 	const span = panel_span(throughput)
-	const rows = usage === undefined ? span : rows_span(usage, span)
+	const fit = usage === undefined ? undefined : rows_fit(usage, span)
 
 	return {
 		...parts,
 		throughput: lamped(throughput, span),
-		usage: lamped(usage, span, rows),
+		usage: lamped(fit?.usage, span, fit?.rows),
 		usage_alone: lamped(usage, NO_PANEL),
 	}
 }
@@ -200,7 +260,7 @@ function lamped_parts(parts: FrameParts): FrameParts {
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size, folded } = bounds
 	const ruled = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
-	const shown = lamped_parts(ruled)
+	const shown = run_board_flash_parts.keyed(lamped_parts(ruled), bounds.is_flash_keyed)
 
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }

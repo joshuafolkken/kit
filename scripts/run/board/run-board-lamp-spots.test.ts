@@ -71,8 +71,8 @@ describe('run_board_lamp_spots.lamps_in', () => {
 	})
 
 	it('draws each lamp out as `■`, the frame’s lines the same at every moment', () => {
-		const first = spun(LINES, '⠋', WIDE)
-		const later = spun(LINES, '⠙', WIDE)
+		const first = spun(LINES, '⠋', { size: WIDE })
+		const later = spun(LINES, '⠙', { size: WIDE })
 		const marks = Array.from({ length: 8 }, () => LAMP_MARK).join(' ')
 
 		expect(first.lines[1]).toBe(`  24h  5  ${marks}`)
@@ -85,7 +85,7 @@ describe('run_board_spin.spin_to_second with lamps', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const { ports, themed, drawn } = lamp_ports(START)
 
-		await spin_to_second(turning_of(spun(LINES, '⠋', WIDE).lamps), ports)
+		await spin_to_second(turning_of(spun(LINES, '⠋', { size: WIDE }).lamps), ports)
 		const cells = drawn.map((text) => text.match(CELL)?.length ?? 0)
 
 		expect(cells[0]).toBe(16)
@@ -98,7 +98,7 @@ describe('run_board_spin.spin_to_second with lamps', () => {
 		const { ports, drawn } = lamp_ports(START)
 		const unseen = { seen: undefined, lines: [] }
 
-		await spin_to_second(turning_of(spun(LINES, '⠋', WIDE).lamps, unseen), ports)
+		await spin_to_second(turning_of(spun(LINES, '⠋', { size: WIDE }).lamps, unseen), ports)
 
 		expect(drawn).toStrictEqual([])
 	})
@@ -106,7 +106,7 @@ describe('run_board_spin.spin_to_second with lamps', () => {
 	it('keeps the theme’s line cache from filling with the lamps’ steps', async () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const { ports } = lamp_ports(START)
-		const { lamps } = spun(LINES, '⠋', WIDE)
+		const { lamps } = spun(LINES, '⠋', { size: WIDE })
 		const live = run_board_theme.themed({ ...ports, theme: undefined }, 'wargames')
 
 		await spin_to_second(turning_of(lamps), live)
@@ -118,8 +118,22 @@ describe('run_board_spin.spin_to_second with lamps', () => {
 	})
 })
 
+describe('run_board_spin.spin_to_second with the idle rain', () => {
+	it('runs the rain before the first frame is out', async () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const { ports, drawn } = lamp_ports(START)
+		const unseen = { seen: undefined, lines: [] }
+		const raining = { ...turning_of(spun(LINES, '⠋', { size: WIDE }).lamps, unseen), is_rain: true }
+
+		await spin_to_second(raining, ports)
+
+		expect(drawn[0]?.match(CELL)?.length).toBe(16)
+		expect(drawn.join('')).not.toContain(LAMP_MARK)
+	})
+})
+
 // joshuafolkken/kit#8237: while a row types, every group changes on every step.
-const TYPED_LAMPS = spun(LINES, '⠋', WIDE).lamps
+const TYPED_LAMPS = spun(LINES, '⠋', { size: WIDE }).lamps
 
 function typing_of(text: string): Turning['typing'] {
 	return {

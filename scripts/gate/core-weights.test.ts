@@ -4,8 +4,10 @@ import { core_weights } from './core-weights'
 
 // joshuafolkken/kit#4362: eslint ran at 124–147% CPU while the floored weights claimed one core for it.
 const ESLINT_PEAK_CORES = 1.5
-// joshuafolkken/kit#6684: the eslint RSS peak `josh lane:stats --period 7` recorded across lanes.
-const ESLINT_PEAK_MB = 7000
+// joshuafolkken/kit#8587: the largest single eslint process the lane ledger's load samples recorded.
+const ESLINT_PROCESS_MAX_MB = 2552
+// joshuafolkken/kit#6331: the heap typed whole-tree lint needs; #8587 left it unchanged.
+const ESLINT_HEAP_CAP_MIB = 8192
 const BYTES_PER_MIB = 1_048_576
 const BYTES_PER_MB = 1_000_000
 const LEDGER_P90_FLOOR = 1.7
@@ -91,26 +93,36 @@ describe('core_weights — the weights read off the lane ledger', () => {
 	})
 })
 
-// joshuafolkken/kit#6684: the ledger reserved less than the heap eslint was launched under, so
-// several lanes' lints were admitted together and swapped.
+// joshuafolkken/kit#8587: the heap cap reserved for every eslint run admitted one eslint at a time
+// past four lanes, while one eslint process held a fraction of it.
 describe('core_weights — the eslint reservation and its heap cap', () => {
 	it.each(['lint', 'eslint_scan'] as const)(
-		'reserves the %s eslint run its heap cap, in megabytes rounded up',
+		'reserves the %s eslint run its ledger-measured peak',
 		(tool) => {
-			const heap_bytes = core_weights.ESLINT_HEAP_MIB * BYTES_PER_MIB
-
-			expect(core_weights.MEMORY_MB[tool]).toBe(Math.ceil(heap_bytes / BYTES_PER_MB))
+			expect(core_weights.MEMORY_MB[tool]).toBe(core_weights.LEDGER_PEAK_MB.eslint)
 		},
 	)
 
 	it.each(['lint', 'eslint_scan'] as const)(
-		'never reserves the %s eslint run below its measured lane peak',
+		'reserves the %s eslint run from its single-process maximum up to below the heap cap',
 		(tool) => {
-			expect(core_weights.MEMORY_MB[tool]).toBeGreaterThanOrEqual(ESLINT_PEAK_MB)
+			expect(core_weights.MEMORY_MB[tool]).toBeGreaterThanOrEqual(ESLINT_PROCESS_MAX_MB)
+			expect(core_weights.MEMORY_MB[tool]).toBeLessThan(core_weights.ESLINT_HEAP_MB)
 		},
 	)
 
-	it('launches eslint under the heap the budget reserves', () => {
+	it('falls back to the heap cap, in megabytes rounded up, while no peak is measured', () => {
+		const heap_bytes = core_weights.ESLINT_HEAP_MIB * BYTES_PER_MIB
+
+		expect(core_weights.eslint_claim_mb()).toBe(Math.ceil(heap_bytes / BYTES_PER_MB))
+	})
+
+	it('claims a measured peak as it is', () => {
+		expect(core_weights.eslint_claim_mb(ESLINT_PROCESS_MAX_MB)).toBe(ESLINT_PROCESS_MAX_MB)
+	})
+
+	it('keeps the eslint heap cap at the ceiling eslint is launched under', () => {
+		expect(core_weights.ESLINT_HEAP_MIB).toBe(ESLINT_HEAP_CAP_MIB)
 		expect(ESLINT_HEAP_MIB).toBe(core_weights.ESLINT_HEAP_MIB)
 	})
 })

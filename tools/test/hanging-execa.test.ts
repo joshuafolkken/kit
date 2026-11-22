@@ -70,7 +70,7 @@ describe('hanging_execa.answer_with', () => {
 	it('answers the named binary at once and leaves the others hanging', async () => {
 		hanging_execa.answer_with(BINARY, ANSWER)
 
-		const other = hanging_execa.spawn('sysctl')
+		const other = hanging_execa.spawn('sysctl', [])
 
 		await expect(hanging_execa.spawn(BINARY, ARGUMENTS)).resolves.toStrictEqual({
 			stdout: ANSWER,
@@ -85,7 +85,7 @@ describe('hanging_execa call record', () => {
 	it('records each spawn and the budget it carried, in call order', () => {
 		hanging_execa.answer_with(BINARY, ANSWER)
 		void hanging_execa.spawn(BINARY, ARGUMENTS, { timeout: BUDGET_MS })
-		void hanging_execa.spawn(BINARY)
+		void hanging_execa.spawn(BINARY, [])
 
 		expect(hanging_execa.timeouts()).toStrictEqual([BUDGET_MS, undefined])
 		expect(hanging_execa.calls()[0]).toStrictEqual({
@@ -97,11 +97,11 @@ describe('hanging_execa call record', () => {
 
 	it('forgets the answers and the calls on reset', async () => {
 		hanging_execa.answer_with(BINARY, ANSWER)
-		void hanging_execa.spawn(BINARY)
+		void hanging_execa.spawn(BINARY, [])
 
 		hanging_execa.reset()
 
 		expect(hanging_execa.calls()).toStrictEqual([])
-		expect(await settle_or_pending(hanging_execa.spawn(BINARY))).toBe(PENDING)
+		expect(await settle_or_pending(hanging_execa.spawn(BINARY, []))).toBe(PENDING)
 	})
 })

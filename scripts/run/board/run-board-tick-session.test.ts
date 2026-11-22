@@ -62,7 +62,9 @@ describe('run_board_tick judgment session activity', () => {
 		await tick(state, ports)
 		expect(header(frames[0])).toMatch(/^▶ josh-board.*\n.*\n.*⠋/u)
 		expect(header(frames[1])).toMatch(/^⏸ josh-board/u)
-		expect(header(frames[1])).toContain('🔄 0  ⏳ 5')
+		expect(stripVTControlCharacters(frames[1] ?? '')).toMatch(
+			/🧵 lanes ─.* ✅ 0\/5 {2}🔄 0 {2}💤 0/u,
+		)
 		expect(header(frames[1])).not.toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u)
 	})
 	it('resumes when judgment work starts again on the same stage', async () => {

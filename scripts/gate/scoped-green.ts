@@ -279,13 +279,15 @@ function is_unmoved(before: GateTree, after: GateTree): boolean {
 function record_green(
 	stamp: FileMapStampAccess,
 	tree: GateTree,
-	target?: string,
-	blobs?: Record<string, string>,
+	{
+		target,
+		blobs,
+	}: { target?: string | undefined; blobs?: Record<string, string> | undefined } = {},
 ): void {
 	if (!is_describable(tree.files, tree.base)) return
 
 	try {
-		stamp.write(tree.files, target, tree.base, blobs)
+		stamp.write(tree.files, { target, base: tree.base, blobs })
 	} catch {
 		/* a record that could not be written re-runs the checks rather than skipping them */
 	}
@@ -316,7 +318,7 @@ async function record_if_green(stamp: FileMapStampAccess, record: GreenRecord): 
 		return
 	}
 
-	record_green(stamp, before, target, record.blobs)
+	record_green(stamp, before, { target, blobs: record.blobs })
 }
 
 const scoped_green = {

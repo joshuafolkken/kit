@@ -110,8 +110,12 @@ describe('run_report_cli.run', () => {
 
 		expect(await run_report_cli.run(['--end'])).toBe(SUCCESS)
 		expect(stdout.join('')).toContain('#7 merged')
-		expect(josh_run_mock).toHaveBeenNthCalledWith(1, ['run:carry', '--end'], true)
-		expect(josh_run_mock).toHaveBeenNthCalledWith(2, ['run:wake', '--stop'], true)
+		expect(josh_run_mock).toHaveBeenNthCalledWith(1, ['run:carry', '--end'], {
+			should_forward_stderr: true,
+		})
+		expect(josh_run_mock).toHaveBeenNthCalledWith(2, ['run:wake', '--stop'], {
+			should_forward_stderr: true,
+		})
 	})
 })
 

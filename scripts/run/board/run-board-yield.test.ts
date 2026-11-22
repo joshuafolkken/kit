@@ -68,7 +68,7 @@ function overlap_on(holder: number): () => RowReason {
 function layout_after(events: ReadonlyArray<RunEvent>, holder = FIRST_HOLDER): BoardLayout {
 	const statuses = run_board_status.statuses_of(events, NO_LANES)
 
-	return run_board_layout.layout_of(PLAN, statuses, overlap_on(holder))
+	return run_board_layout.layout_of(PLAN, statuses, { reason_of: overlap_on(holder) })
 }
 
 function queued_reasons(layout: BoardLayout): Array<RowReason | undefined> {

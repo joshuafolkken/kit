@@ -90,6 +90,11 @@ const HUMAN_STOPS = [
 		reason: 'A halfrun stops for the verification only a person can run on the real device.',
 	},
 	{
+		key: 'visual-check',
+		reason:
+			'A run parks for a person to look at a rendered UI it cannot capture; an issue declaring `マージ後の確認:` does not stop — run:park refuses that park and the run records the look as unchecked.',
+	},
+	{
 		key: 'merge-approval',
 		reason: 'A prrun stops at a mergeable pull request; merging is Tier C.',
 	},

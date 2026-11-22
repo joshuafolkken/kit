@@ -19,7 +19,7 @@
 
   **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
   children as in `kickoff new`, then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
-  ... --title "<title>" --notify [--chain "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...] [--rationale-file .josh/tmp/rationale.md]` (when `#N` is a request, a discussion
+  ... --title "<title>" --notify [--chain "#A -> #C" ... --order-reason "#A -> #C: <kind> — <reason>" ...] [--rationale-file .josh/tmp/rationale.md]` (when `#N` is a request, a discussion
   or a container) — `--title` renames it to the step-2 title — or keep `#N` as a child of a new epic
   made with `pnpm josh epic … --notify`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
   record the reasoning on the Issue. Record each prepared child's plan with `issue:plan --planned --no-notify`,
@@ -53,7 +53,7 @@ checked out here. A third-party owner is Tier C: stop rather than file.
     backlink, the epic the same link as prose (never a checkbox row, which disables its auto-close), and
     the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
     every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... --notify [--chain
-    "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...] [--rationale-file .josh/tmp/rationale.md] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
+    "#A -> #C" ... --order-reason "#A -> #C: <kind> — <reason>" ...] [--rationale-file .josh/tmp/rationale.md] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
     with `pnpm josh epic:check <E>`. (3) Record every child's plan with
     `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --planned --no-notify`, then
     `pnpm josh issue:file --publish <E>`. Split children remain unpublished until this command

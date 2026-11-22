@@ -1,139 +1,23 @@
+import { run_board_escape } from './run-board-escape'
 import { run_board_fit } from './run-board-fit'
-import { run_board_labels } from './run-board-labels'
+import type { Icons } from './run-board-icons'
+import { run_board_labels, type Paint } from './run-board-labels'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
+import { run_board_theme_glyph_table, type Glyph } from './run-board-theme-glyph-table'
 import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
 // joshuafolkken/kit#7988: the WarGames theme draws the board as a text terminal would, so every icon is
 // drawn as ASCII text of the width the icon took — the columns line up as they do without the theme.
-// The one table of what each icon reads as; the render modules keep their own icons and never see it.
-// joshuafolkken/kit#8150: each text in the color of the tone of the state its icon marks.
+// joshuafolkken/kit#8505: `shapes` draws a row's shape where it has one, else its letters; both stay as
+// they are when the theme capitalizes the frame. The rows: `run-board-theme-glyph-table.ts`.
 
-type Glyph = readonly [text: string, tone: Tone]
-type Glyphs = ReadonlyMap<string, Glyph>
+const { EMOJI, SYMBOLS } = run_board_theme_glyph_table
 
-// Each emoji the board's sources draw, by what it marks; a text-presentation symbol one column wide
-// gets one character. A section heading's icon reads as its rule, so every heading reads
-// `V -- NAME` as one whose icon is dropped beside its label does (joshuafolkken/kit#8154).
-const EMOJI: Glyphs = new Map<string, Glyph>([
-	['💻', ['--', 'info']],
-	['📈', ['--', 'info']],
-	['⛽', ['--', 'info']],
-	['🧵', ['--', 'info']],
-	['📌', ['--', 'info']],
-	['🚨', ['P1', 'alert']],
-	['🔺', ['P2', 'caution']],
-	['✨', ['FT', 'info']],
-	['🐛', ['BG', 'info']],
-	['🔍', ['IV', 'running']],
-	['📝', ['PL', 'running']],
-	['🔨', ['BD', 'running']],
-	['👀', ['RV', 'running']],
-	['🔀', ['MG', 'done']],
-	['📦', ['CM', 'running']],
-	['🔂', ['R2', 'running']],
-	['🚢', ['SH', 'done']],
-	['📣', ['RP', 'running']],
-	['💥', ['FL', 'alert']],
-	['⏳', ['HD', 'idle']],
-	['💤', ['ZZ', 'idle']],
-	['✅', ['OK', 'done']],
-	['🚫', ['XX', 'alert']],
-	['🔄', ['RN', 'running']],
-	['🏁', ['FN', 'done']],
-	['⏩', ['AD', 'idle']],
-	['🧊', ['PS', 'idle']],
-	['❔', ['??', 'caution']],
-	['❓', ['Q?', 'human']],
-	['❗', ['!!', 'alert']],
-	['🔧', ['> ', 'info']],
-	['💬', [': ', 'info']],
-	['🔭', ['WT', 'idle']],
-	['🔚', ['EN', 'info']],
-	['⏰', ['T+', 'caution']],
-	['🕘', ['AG', 'idle']],
-	['🎯', ['ET', 'info']],
-	['💓', ['HB', 'info']],
-	['🧠', ['MM', 'info']],
-	['💾', ['DK', 'info']],
-	['💪', ['CP', 'info']],
-	['⚡', ['PW', 'info']],
-	['🔥', ['HT', 'alert']],
-	['📴', ['OF', 'idle']],
-	['🔊', ['SN', 'info']],
-	['🔇', ['MU', 'idle']],
-	['✋', ['HU', 'human']],
-	['🙋', ['DC', 'human']],
-	['🛑', ['ST', 'alert']],
-	['🧳', ['ER', 'info']],
-	['🔗', ['LK', 'idle']],
-	['📂', ['FD', 'info']],
-	['🧍', ['SO', 'info']],
-	['🙅', ['NO', 'alert']],
-	['📋', ['OR', 'info']],
-	['🚦', ['SG', 'info']],
-	['🛫', ['TO', 'info']],
-	['📮', ['IS', 'info']],
-	['📅', ['NB', 'idle']],
-	['⚓', ['AN', 'info']],
-	['🔁', ['RT', 'caution']],
-	['🆕', ['NW', 'info']],
-	['🧨', ['XP', 'alert']],
-	['🚪', ['DR', 'info']],
-	['📥', ['IN', 'info']],
-	['📤', ['DS', 'info']],
-	['🚀', ['GO', 'done']],
-	['🤝', ['HO', 'info']],
-	['🤔', ['JG', 'caution']],
-	['💭', ['SS', 'info']],
-	['🚧', ['BL', 'alert']],
-	['🔒', ['LC', 'caution']],
-	['🪫', ['LO', 'caution']],
-	['📰', ['NS', 'info']],
-	['🔏', ['HM', 'info']],
-	['🔑', ['AU', 'info']],
-	['🐰', ['CR', 'info']],
-	['⛔', ['RL', 'alert']],
-	['🤏', ['CX', 'info']],
-	['💺', ['SE', 'info']],
-	['🏠', ['HQ', 'info']],
-	['🌐', ['WB', 'info']],
-	['👻', ['GH', 'info']],
-	['🧭', ['SV', 'info']],
-	['🎬', ['PA', 'info']],
-	['🤖', ['AI', 'info']],
-	['🙏', ['TY', 'info']],
-	['🟢', ['AC', 'done']],
-	['📁', ['EP', 'info']],
-	['▶', ['>', 'info']],
-	['⏸', ['=', 'idle']],
-	['⏭', ['>', 'info']],
-	['⏱', ['T', 'info']],
-	['↪', ['^', 'info']],
-	['🅿', ['P', 'info']],
-	['☑', ['V', 'done']],
-	['⛓', ['#', 'info']],
-	['🗓', ['D', 'info']],
-	['⚠', ['!', 'caution']],
-	['🛤', ['=', 'info']],
-	['🗜', ['C', 'info']],
-	['🖥', ['M', 'info']],
-	['🎛', ['K', 'info']],
-	['🏔', ['^', 'info']],
-])
-
-// The one-column symbols drawn as one ASCII character. The rules and gauges (`■ █ ▁…▇ ┊ ├ └`) stay.
-const SYMBOLS: Glyphs = new Map<string, Glyph>([
-	['→', ['>', 'info']],
-	['↻', ['@', 'info']],
-	['▸', ['>', 'info']],
-	['▾', ['V', 'info']],
-	['✚', ['+', 'done']],
-	['✓', ['+', 'done']],
-	['✗', ['X', 'alert']],
-])
-
-// The spinner turns a line through `│ ╱ ─ ╲` instead of the braille dots, each frame the turn
-// its place in the dots' cycle falls on, so one cycle of the dots is one turn.
-const TURN = ['│', '╱', '─', '╲'] as const
+// The spinner steps through its theme's glyphs (`spinner` in the theme table: wargames' `│ ╱ ─ ╲`,
+// matrix's kana) instead of the braille dots, each frame the glyph its place in the dots' cycle
+// falls on, so one cycle of the dots is one pass through the glyphs.
+const { THEMES, THEME_DEFS } = run_board_theme_defs
+const TURN = THEME_DEFS.wargames.spinner
 const UNKNOWN: Glyph = ['?', 'info']
 const VARIATION_SELECTOR = '\u{FE0F}'
 const ESC = '\u{1B}'
@@ -145,23 +29,55 @@ const DEFAULT_CODES: ReadonlySet<string> = new Set(['', '0', '39'])
 const INTENSITY = /^[12]$/u
 const INTENSITY_ENDS: ReadonlySet<string> = new Set(['', '0', '22'])
 
-function turn_of(index: number, count: number): string {
-	return TURN[Math.floor((index * TURN.length) / count)] ?? TURN[0]
+function turn_of(turn: string, index: number, count: number): string {
+	return turn[Math.floor((index * turn.length) / count)] ?? ''
 }
 
-function spinner_turns(): Array<[string, Glyph]> {
+function spinner_turns(theme: Theme): Array<[string, Glyph]> {
 	const frames = run_board_labels.SPINNER_FRAMES
+	const turn = THEME_DEFS[theme].spinner
 
-	return frames.map((frame, index) => [frame, [turn_of(index, frames.length), 'info']])
+	return frames.map((frame, index) => [frame, [turn_of(turn, index, frames.length), 'info']])
 }
 
-const SINGLES: Glyphs = new Map([...SYMBOLS, ...spinner_turns()])
-const SINGLE_CLASS = [...SINGLES.keys()].join('')
+const TURNS = new Map(THEMES.map((theme) => [theme, new Map(spinner_turns(theme))]))
+const SPINNER: ReadonlySet<string> = new Set(run_board_labels.SPINNER_FRAMES)
+const SINGLE_CLASS = [...SYMBOLS.keys(), ...run_board_labels.SPINNER_FRAMES].join('')
 const PICTOGRAPHIC = String.raw`\p{Extended_Pictographic}`
 const GLYPH = new RegExp(`${PICTOGRAPHIC}${VARIATION_SELECTOR}?|[${SINGLE_CLASS}]`, 'gu')
 
-function entry_of(glyph: string): Glyph {
-	return SINGLES.get(glyph) ?? EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
+// What a line's glyphs are drawn with: its theme, none for a board in no theme, and its icons.
+interface GlyphLook {
+	theme: Theme | undefined
+	icons: Icons
+}
+
+const DEFAULT_LOOK: GlyphLook = { theme: 'wargames', icons: 'shapes' }
+
+// A spinner dot takes its theme's glyph; a board in no theme keeps the dots.
+function turn_entry(glyph: string, theme: Theme | undefined): Glyph | undefined {
+	return theme === undefined ? undefined : TURNS.get(theme)?.get(glyph)
+}
+
+function icon_entry(glyph: string): Glyph {
+	return SYMBOLS.get(glyph) ?? EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
+}
+
+// The row a glyph is drawn by; `undefined` where it is drawn as it is — every icon as `emoji`.
+function entry_of(glyph: string, look: GlyphLook): Glyph | undefined {
+	if (SPINNER.has(glyph)) return turn_entry(glyph, look.theme)
+
+	return look.icons === 'emoji' ? undefined : icon_entry(glyph)
+}
+
+// A row's text: its shape as `shapes` where it has one, else its letters.
+function drawn_text([letters, , shape = letters]: Glyph, icons: Icons): string {
+	return icons === 'shapes' ? shape : letters
+}
+
+// The idle tone's paint: the theme's, else the tones' own dim.
+function idle_of(theme: Theme | undefined): Paint | undefined {
+	return theme === undefined ? undefined : THEME_DEFS[theme].idle
 }
 
 // What a render module left open where a glyph is drawn: a foreground color, and the escapes of the
@@ -175,24 +91,27 @@ const PLAIN: Open = { is_colored: false, intensity: '' }
 
 // Inside a color a render module gave, the text is left uncolored, so that color is not cut; a tone
 // that ends bold or dim (`ESC[22m`) is followed by the bold or dim the line had on.
-function toned_text(text: string, tone: Tone, open: Open): string {
+function toned_text(text: string, tone: Tone, open: Open, idle: Paint | undefined): string {
 	if (open.is_colored) return text
-	const toned = run_board_theme_tones.toned(tone, text)
+	const toned = run_board_theme_tones.toned(tone, text, idle)
 
 	return toned === text ? text : toned + open.intensity
 }
 
 // An emoji, with its variation selector, as its text in its tone's color padded to the width it took;
-// one the table misses as `?`, so no emoji is ever drawn.
-function text_of(glyph: string, open: Open): string {
-	const [text, tone] = entry_of(glyph)
+// one the table misses as `?`, so no emoji is drawn but as `emoji`.
+function text_of(glyph: string, open: Open, look: GlyphLook): string {
+	const entry = entry_of(glyph, look)
+
+	if (entry === undefined) return glyph
+	const text = drawn_text(entry, look.icons)
 	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
 
-	return toned_text(text, tone, open) + padding
+	return toned_text(text, entry[1], open, idle_of(look.theme)) + padding
 }
 
-function glyphs_as_text(text: string, open: Open): string {
-	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open))
+function glyphs_as_text(text: string, open: Open, look: GlyphLook): string {
+	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open, look))
 }
 
 // The first code of the color escape a segment starts with; `undefined` for any other segment.
@@ -226,21 +145,28 @@ function opened(open: Open, segment: string): Open {
 }
 
 // Share the escape walk with renderers that must restore the line's existing bold and dim.
+// joshuafolkken/kit#8591: a frame splits at its escapes (`run-board-escape.ts`), so `draw` is given its
+// text only — a link's body or tmux's passthrough is kept as it came; a color escape updates `open`.
+// joshuafolkken/kit#8649: a cursor move is an escape of its own too, so the spinner glyph after it is drawn.
 function mapped(frame: string, draw: (text: string, open: Open) => string): string {
-	const [head = '', ...escaped] = frame.split(ESC)
-	const drawn = [draw(head, PLAIN)]
 	let open = PLAIN
 
-	for (const segment of escaped) {
-		open = opened(open, segment)
-		drawn.push(draw(segment, open))
-	}
+	return frame
+		.split(run_board_escape.FRAME_ESCAPE)
+		.map((part) => {
+			if (!run_board_escape.is_escape(part)) return draw(part, open)
+			open = opened(open, part.slice(ESC.length))
 
-	return drawn.join(ESC)
+			return part
+		})
+		.join('')
 }
 
-function textual(frame: string): string {
-	return mapped(frame, glyphs_as_text)
+// A board in no theme drawing `emoji` is the frame as its sources drew it.
+function textual(frame: string, look: GlyphLook = DEFAULT_LOOK): string {
+	if (look.theme === undefined && look.icons === 'emoji') return frame
+
+	return mapped(frame, (text, open) => glyphs_as_text(text, open, look))
 }
 
 const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, mapped, textual }

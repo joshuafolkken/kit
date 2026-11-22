@@ -17,6 +17,7 @@ const OVER_LIMIT_COUNT = 8
 const CREATED_EARLIER = '2026-08-01T00:00:00Z'
 const CREATED_LATER = '2026-08-02T00:00:00Z'
 const CREATED_LATEST = '2026-08-03T00:00:00Z'
+const PRIORITY_HIGH = 'priority:high'
 const WEEKLY_EFFECT = '## 期待効果\n\n- 効く率: 週 23 回のうち 5 回\n- 1 回あたりの得: 約 250 秒\n'
 const EXCLUDED_LABEL_SPELLINGS: ReadonlyArray<string> = [
 	'epic',
@@ -81,7 +82,7 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 			issue(4, CREATED_LATEST),
 			issue(3, CREATED_EARLIER, ['bug', 'run:solo']),
 			issue(2, CREATED_EARLIER),
-			issue(1, CREATED_EARLIER, ['priority:high']),
+			issue(1, CREATED_EARLIER, [PRIORITY_HIGH]),
 		]
 
 		expect(prioritized_numbers(issues)).toEqual([1, 3, 2, 4, 5])
@@ -115,6 +116,17 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 	})
 })
 
+// joshuafolkken/kit#8571: issues declaring one file count each other as dependents.
+describe('git_next_issues.order - path overlap', () => {
+	it('puts a run of same-file issues ahead of an older non-overlapping one', () => {
+		const same_file = '## 変更\n\n- `scripts/run/board/run-board-seat.ts` を直す\n'
+		const independent = { ...issue(1, CREATED_EARLIER), body: '- `scripts/lines/limit.ts`\n' }
+		const run = [2, 3].map((number) => ({ ...issue(number, CREATED_LATER), body: same_file }))
+
+		expect(prioritized_numbers([independent, ...run])).toEqual([2, 3, 1])
+	})
+})
+
 describe('git_next_issues.order - estimated size', () => {
 	it('orders smaller estimates before weekly gain and missing estimates', () => {
 		const background = '## 背景\n\n- 規模見積もり: 約 1 ファイル / '
@@ -141,6 +153,20 @@ describe('git_next_issues.order - defect key (ac-ac7a05a2)', () => {
 		const bug = issue(2, CREATED_LATER, ['bug'])
 
 		expect(git_next_issues.order([small, bug]).map((entry) => entry.number)).toEqual([2, 1])
+	})
+})
+
+// joshuafolkken/kit#8541: an issue blocking a priority:high issue reads the label of the issue it
+// blocks, so it ranks in the high class ahead of an older plain issue.
+describe('git_next_issues.order - blocked priority class', () => {
+	it('puts the blocker of a priority:high issue in the high class', () => {
+		const urgent = {
+			...issue(2, CREATED_EARLIER, [PRIORITY_HIGH]),
+			blockedBy: { nodes: [{ number: 3 }] },
+		}
+		const issues = [issue(1, CREATED_EARLIER), urgent, issue(3, CREATED_LATEST)]
+
+		expect(git_next_issues.order(issues).map((entry) => entry.number)).toEqual([3, 2, 1])
 	})
 })
 

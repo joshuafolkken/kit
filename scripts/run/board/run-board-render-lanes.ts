@@ -1,6 +1,6 @@
 import { run_board_earlier } from './run-board-earlier'
 import { run_board_fit, type PlanLine, type PlanSection, type RowYield } from './run-board-fit'
-import type { BoardHeader } from './run-board-header'
+import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
@@ -17,7 +17,8 @@ import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 // 🧠 MEM ─ 🤏 CMPRS ───`. The cells start at `USAGE_START`, as the processes rows' do, so the two
 // sections' figures stand in one column (joshuafolkken/kit#4292). A running row draws its lane's
 // figures; every other row blanks of the same width, so every number and title after them starts in
-// one column. Drawn with gauges on a terminal and as figures alone anywhere else.
+// one column. Drawn with gauges on a terminal and as figures alone anywhere else. The lanes rule ends on
+// the run's tallies and the issue count (`run_board_header.lanes_tail`, joshuafolkken/kit#8514).
 
 const { HEADER_ICONS } = run_board_labels
 const { cell_widths, cells_of, lane_limits } = run_board_usage_text
@@ -159,7 +160,22 @@ function seat_lines(header: BoardHeader, columns: number | undefined): Array<Pla
 }
 
 // A section of lane rows under `label`'s rule, ⏰ over the run's time and the usage labels over their
-// cells where they are drawn; none without a line.
+// cells where they are drawn, drawn even without a line.
+function section_of(
+	lines: Array<PlanLine>,
+	label: string,
+	cells: LaneCells | undefined,
+	header: BoardHeader,
+): PlanSection {
+	const offset = column_offset(header)
+	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START + offset }
+	const usage = cells === undefined ? [] : label_columns(USAGE_START + offset, cells.gauge)
+	const rule = columns_rule(label, [elapsed, ...usage])
+
+	return { head: ['', rule], lines, label, key: 'lanes' }
+}
+
+// `section_of`, but none without a line.
 function rows_section(
 	lines: Array<PlanLine>,
 	label: string,
@@ -168,17 +184,13 @@ function rows_section(
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	const offset = column_offset(header)
-	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START + offset }
-	const usage = cells === undefined ? [] : label_columns(USAGE_START + offset, cells.gauge)
-	const rule = columns_rule(label, [elapsed, ...usage])
-
-	return [{ head: ['', rule], lines, label, key: 'lanes' }]
+	return [section_of(lines, label, cells, header)]
 }
 
 // The root checkout's single run's row, the first of `rows` (`run_board_layout.lane_rows`), under its
 // own `🏠` rule above the run's lanes (joshuafolkken/kit#7524); then the run's own rows under the lanes
-// rule and the empty seats' reasons.
+// rule and the empty seats' reasons. The lanes rule is drawn without a row too, as its tail carries the
+// run's tallies (joshuafolkken/kit#8514).
 function lanes_section(
 	rows: ReadonlyArray<PlanLine>,
 	cells: LaneCells | undefined,
@@ -188,10 +200,13 @@ function lanes_section(
 	const root = header.layout?.root
 	const root_count = root === undefined ? 0 : 1
 	const lanes = [...rows.slice(root_count), ...seat_lines(header, columns)]
+	const lanes_rule = section_of(lanes, lane_label(header), cells, header)
 
 	return [
-		...rows_section(rows.slice(0, root_count), root_label(root?.name ?? ''), cells, header),
-		...rows_section(lanes, lane_label(header), cells, header),
+		...rows_section(rows.slice(0, root_count), root_label(root?.name ?? ''), cells, header).map(
+			(section) => ({ ...section, flash_key: 'root' }),
+		),
+		{ ...lanes_rule, tail: run_board_header.lanes_tail(header), flash_key: 'lanes' },
 	]
 }
 

@@ -107,12 +107,9 @@ function redrawn(
 		},
 	}
 
-	// A single frame counts arrivals from its own total, never from the live board's first one.
-	const single = { ...state, baseline_total: undefined }
+	const display = assemble_display(state, local, now_ms, layout_for(state, local, now_ms))
 
-	const display = assemble_display(single, local, now_ms, layout_for(single, local, now_ms))
-
-	draw_display(single, display, { ports: quiet, now_ms })
+	draw_display(state, display, { ports: quiet, now_ms })
 
 	return text
 }
@@ -137,25 +134,27 @@ function record(
 
 	if (local === undefined || saved_ms === undefined) return
 	const chat = redrawn({ ...state, thanks: [] }, local, { ...ports, form: 'chat' }, now_ms)
-	const once = run_board_theme.restyle(theme, redrawn(state, local, ports, now_ms))
+	const once = run_board_theme.restyle(theme, redrawn(state, local, ports, now_ms), ports.icons)
 
 	ports.frames?.save(CHAT_KEY, { text: stripVTControlCharacters(chat), saved_ms })
-	ports.frames?.save(once_key(theme, ports.is_tty), { text: once, saved_ms })
+	ports.frames?.save(once_key(theme, ports.is_tty, ports.icons), { text: once, saved_ms })
 }
 
 // What a live board's worker thread calls after each round (`run-board-gather-record.ts`): records its
 // frames at most once every `RECORD_EVERY_MS`, from the first state whose plan read has settled. Drawn
 // in place, they take no read, and the store writes them without being awaited, so the next round waits
-// on neither.
-function recorder(ports: RecordPorts, theme: Theme | undefined): (state: BoardState) => void {
+// on neither. Answers whether it recorded.
+function recorder(ports: RecordPorts, theme: Theme | undefined): (state: BoardState) => boolean {
 	let next_ms = -Infinity
 
 	return (state) => {
 		const now_ms = ports.now()
 
-		if (ports.frames === undefined || read_ms(state) === undefined || now_ms < next_ms) return
+		if (ports.frames === undefined || read_ms(state) === undefined || now_ms < next_ms) return false
 		next_ms = now_ms + RECORD_EVERY_MS
 		record(state, ports, theme, now_ms)
+
+		return true
 	}
 }
 

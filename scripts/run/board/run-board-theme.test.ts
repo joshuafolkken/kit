@@ -1,13 +1,15 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_header_names } from './run-board-header-names'
 import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_labels } from './run-board-labels'
 import { run_board_render_throughput } from './run-board-render-throughput'
+import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_case } from './run-board-theme-case'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
-import { run_board_theme_tones } from './run-board-theme-tones'
 import type { ThroughputRow } from './run-board-throughput'
 
 // joshuafolkken/kit#7934: the WarGames theme — which one a board takes, and how it draws a frame.
@@ -20,8 +22,6 @@ const RED = `${ESCAPE}[31m`
 const RULED = '── LANES ─────\n  ■■■──── 3/7 ── 2 CPU'
 const ENV = { [run_board_theme.THEME_ENV]: 'wargames' }
 const MATRIX_ENV = { [run_board_theme.THEME_ENV]: 'matrix' }
-const RGB_MATRIX = `${ESCAPE}[38;2;0;215;60m`
-const NAMED_GREEN = `${ESCAPE}[32m`
 const LINK_OPEN = `${ESCAPE}]8;;https://github.com/joshuafolkken/kit/issues/1\u{7}`
 const LINK_CLOSE = `${ESCAPE}]8;;\u{7}`
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u
@@ -62,33 +62,6 @@ describe('run_board_theme.choose', () => {
 		{ argv: ['--theme', 'matrix'], env: ENV, theme: 'matrix' },
 	])('takes $theme with matrix in $argv or $env', ({ argv, env, theme }) => {
 		expect(run_board_theme.choose(argv, env)).toStrictEqual({ theme, argv: [] })
-	})
-})
-
-describe('run_board_theme.restyle matrix', () => {
-	it('opens every line in the 24-bit green phosphor body', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(run_board_theme.restyle('matrix', 'A')).toBe(`${RGB_MATRIX}A${DEFAULT_FOREGROUND}`)
-	})
-
-	it('draws the palette green where stdout has no 24-bit color', () => {
-		vi.stubEnv('FORCE_COLOR', '1')
-
-		expect(run_board_theme.restyle('matrix', 'A')).toBe(`${NAMED_GREEN}A${DEFAULT_FOREGROUND}`)
-	})
-
-	it('keeps the fault red and the caution amber, resuming the green after each', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-		const fault = run_board_theme_tones.toned('alert', 'FL')
-		const caution = run_board_theme_tones.toned('caution', 'JG')
-		const resumed = [fault, caution].map((text) => text.split(DEFAULT_FOREGROUND).join(RGB_MATRIX))
-
-		expect(run_board_theme.restyle('matrix', `${fault} ${caution}`)).toBe(
-			`${RGB_MATRIX}${resumed.join(' ')}${DEFAULT_FOREGROUND}`,
-		)
-		expect(fault).toContain('255;69;58')
-		expect(caution).toContain('255;214;10')
 	})
 })
 
@@ -134,7 +107,7 @@ describe('run_board_theme.restyle', () => {
 	})
 })
 
-// joshuafolkken/kit#7988: the theme draws icons as text and the text in capitals.
+// joshuafolkken/kit#7988: the theme draws icons as text and, in wargames, the text in capitals.
 describe('run_board_theme.restyle as text', () => {
 	it('draws each icon as text of its width and the text in capitals, its colors and links as written', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
@@ -152,6 +125,17 @@ describe('run_board_theme.restyle as text', () => {
 
 		expect(stripVTControlCharacters(themed)).not.toMatch(PICTOGRAPHIC)
 		expect(widths_of(themed)).toStrictEqual(widths_of(frame))
+	})
+
+	// joshuafolkken/kit#8604: each theme's board name is drawn in the theme's case (joshuafolkken/kit#8609).
+	it.each([
+		['wargames', 'JOSH-WOPR'],
+		['matrix', 'josh-trace'],
+	] as const)('draws the %s board name as %s', (theme, drawn) => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const line = `■ ${run_board_header_names.board_name_of(theme)}`
+
+		expect(stripVTControlCharacters(run_board_theme.restyle(theme, line))).toContain(drawn)
 	})
 })
 
@@ -271,6 +255,35 @@ describe('run_board_theme.restyle from its cache', () => {
 		const lines = FRAME.split('\n')
 
 		expect(lines.map((line) => whole_frame(line))).toStrictEqual(whole_frame(FRAME).split('\n'))
+	})
+})
+
+// joshuafolkken/kit#8649: the spinner's write, its spot with no color before it or with one, in the theme's glyphs.
+const { SPINNER_FRAMES } = run_board_labels
+const SPINNER_DOT = new RegExp(`[${SPINNER_FRAMES.join('')}]`, 'u')
+
+function spun(theme: 'matrix' | 'wargames' | undefined, style: string): string {
+	vi.stubEnv('FORCE_COLOR', '0')
+	const spot = { row: 3, column: 5, style }
+	const writes = SPINNER_FRAMES.map((frame) => run_board_spin.spin_bytes([spot], frame))
+	const themed = writes.map((write) => run_board_theme.restyle(theme, write))
+
+	return stripVTControlCharacters(themed.join(''))
+}
+
+describe('run_board_theme.restyle on a spinner write', () => {
+	it.each([
+		['wargames', '│││╱╱───╲╲'],
+		['matrix', 'ｦｱｳｴｵｶｷｹｺｻ'],
+	] as const)('turns the %s spinner in its glyphs, with a color or none', (theme, glyphs) => {
+		const drawn = ['', NAMED_CYAN].map((style) => spun(theme, style))
+
+		expect(drawn).toStrictEqual([glyphs, glyphs])
+		expect(drawn.join('')).not.toMatch(SPINNER_DOT)
+	})
+
+	it('keeps the spinner dots with no theme', () => {
+		expect(spun(undefined, '')).toBe(SPINNER_FRAMES.join(''))
 	})
 })
 

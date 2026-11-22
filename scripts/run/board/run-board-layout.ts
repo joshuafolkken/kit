@@ -18,7 +18,9 @@ import type {
 	RowRead,
 	RowReason,
 } from './run-board-layout-types'
+import { run_board_parked_decision } from './run-board-parked-decision'
 import { run_board_retry_wait } from './run-board-retry-wait'
+import { run_board_review_stop } from './run-board-review-stop'
 import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -45,10 +47,12 @@ function is_blocked(child: EpicChild, overlay: Overlay): boolean {
 	return child.blocked_by.some((edge) => run_board_standing_waits.is_waiting_on(edge, overlay))
 }
 
-// What a person does for a row waiting on one: merge its pull request (🔏), or decide.
+// What a person does for a row waiting on one: merge its pull request (🔏), review a review stop's
+// changes, or decide.
 function human_reason(child: EpicChild, plan: BoardPlan): RowReason | undefined {
 	return (
 		run_board_human_merge.reason_of(child, plan) ??
+		run_board_review_stop.reason_of(child, plan) ??
 		run_board_decision.plan_reason(child.number, plan)
 	)
 }
@@ -90,10 +94,10 @@ function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'
 	return has_label_name(labels, RUN_SOLO_LABEL) ? { is_solo: true } : {}
 }
 
-// A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
-// child does; its tail names the decision that resumes it.
+// A child parked on a decision, or withdrawn while its open issue still waits on a person, is a 🙋 row,
+// as an untouched `needs-decision` child is; its tail names the decision that resumes it.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
-	const is_asked = status.state === 'parked' && run_board_human.is_decision(status.reason)
+	const is_asked = run_board_parked_decision.is_parked_decision(number, status, read)
 	const labels = read.labels.get(number)
 
 	return {
@@ -138,10 +142,13 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 	return !overlay.statuses.has(child.number)
 }
 
-// A plan row waits, unless it waits on a person — a decision, or a merge drawn with 🔏 — or the run
-// stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as a decision.
-function plan_state(child: EpicChild): ItemState {
-	if (run_board_human.is_human(child.labels)) return 'human'
+// A plan row waits, unless it waits on a person — a decision, a merge drawn with 🔏, or a review stop
+// — or the run stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as
+// a decision.
+function plan_state(child: EpicChild, plan: BoardPlan): ItemState {
+	if (run_board_human.is_human(child.labels) || run_board_review_stop.is_stopped(child, plan)) {
+		return 'human'
+	}
 
 	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
 }
@@ -152,7 +159,7 @@ function queued_entries(queue: ReadonlyArray<EpicChild>, overlay: Drawn): Array<
 	const entries: Array<QueuedEntry> = []
 
 	for (const child of queue) {
-		const row = plan_row(child, plan_state(child), overlay)
+		const row = plan_row(child, plan_state(child, overlay.plan), overlay)
 		const epic = overlay.plan.tracked.get(child.number)
 
 		if (epic === undefined) entries.push({ kind: 'row', row })
@@ -165,7 +172,7 @@ function queued_entries(queue: ReadonlyArray<EpicChild>, overlay: Drawn): Array<
 function unreached_rows(overlay: Drawn, is_people: boolean): Array<BoardRow> {
 	return overlay.plan.waves.unreached
 		.filter((child) => is_untouched(child, overlay))
-		.map((child) => plan_row(child, plan_state(child), overlay))
+		.map((child) => plan_row(child, plan_state(child, overlay.plan), overlay))
 		.filter((row) => (row.state === 'human') === is_people)
 		.toSorted(run_board_layout_order.start_order)
 }
@@ -179,7 +186,7 @@ function children_of(plan: BoardPlan): Array<EpicChild> {
 // it is neither parked for a decision nor stalled.
 function waiting_children(overlay: Overlay): Array<EpicChild> {
 	return children_of(overlay.plan).filter(
-		(child) => is_untouched(child, overlay) && plan_state(child) === 'waiting',
+		(child) => is_untouched(child, overlay) && plan_state(child, overlay.plan) === 'waiting',
 	)
 }
 
@@ -203,18 +210,36 @@ function blocker_rows(overlay: Overlay, earlier: ReadonlyArray<BoardRow>): Array
 	return run_board_decision_rows.rows_of(plan, drawn)
 }
 
-function row_read(overlay: Overlay): RowRead {
-	const { plan } = overlay
-	const waits = run_board_standing_waits.by_number(children_of(plan), overlay)
+// The plan row's reading of a planned child by number, for a touched ⏳ row with no blocker.
+function held_of(children: ReadonlyArray<EpicChild>, reason_of: ReasonOf): RowRead['held_of'] {
+	const by_number = new Map(children.map((child) => [child.number, child]))
 
-	return { ...plan, titles: plan.context.titles, waits }
+	return function held(number) {
+		const child = by_number.get(number)
+
+		return child === undefined ? undefined : reason_of(child, [])
+	}
+}
+
+function row_read(overlay: Drawn): RowRead {
+	const { plan, reason_of } = overlay
+	const children = children_of(plan)
+	const waits = run_board_standing_waits.by_number(children, overlay)
+	const held = reason_of === undefined ? undefined : held_of(children, reason_of)
+
+	return { ...plan, titles: plan.context.titles, waits, held_of: held }
+}
+
+// What the layout reads beyond the plan and the statuses: each row's reason, and the earlier run's lanes.
+interface LayoutReads {
+	reason_of?: ReasonOf | undefined
+	earlier?: EarlierLanes | undefined
 }
 
 function layout_of(
 	input_plan: BoardPlan,
 	input_statuses: ReadonlyMap<number, ItemStatus>,
-	reason_of?: ReasonOf,
-	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
+	{ reason_of, earlier = run_board_earlier.NO_EARLIER }: LayoutReads = {},
 ): BoardLayout {
 	const current = run_board_retry_wait.overlay_of(input_plan, input_statuses)
 	const { plan, statuses } = current
@@ -237,13 +262,18 @@ function layout_of(
 
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 
+// The earlier run's lanes and what each row reads; none and nothing when omitted.
+interface LocalLayoutOptions {
+	earlier?: EarlierLanes
+	read?: RowRead
+}
+
 // The run's own children before the plan is read: the stream and the lanes are local and read at
 // once, so the rows, their states and how long each has run are drawn while GitHub answers; the titles
 // and every issue the run has not touched wait for the plan.
 function local_layout_of(
 	statuses: ReadonlyMap<number, ItemStatus>,
-	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
-	read: RowRead = NO_READ,
+	{ earlier = run_board_earlier.NO_EARLIER, read = NO_READ }: LocalLayoutOptions = {},
 ): BoardLayout {
 	return {
 		...EMPTY_LAYOUT,

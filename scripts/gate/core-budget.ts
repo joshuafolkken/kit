@@ -208,12 +208,10 @@ async function await_admission(context: WaitContext): Promise<Admission> {
 		sleeper: context.sleep,
 	})
 
-	await core_wait_record.record_admitted(
-		context.fields,
-		context.now(),
-		context.record_wait,
+	await core_wait_record.record_admitted(context.fields, context.now(), {
+		sink: context.record_wait,
 		admission,
-	)
+	})
 
 	return admission
 }
@@ -266,12 +264,10 @@ async function poll_claim(context: WaitContext): Promise<Handle | undefined> {
 
 	if (admission === undefined) return undefined
 
-	await core_wait_record.record_admitted(
-		context.fields,
-		context.now(),
-		context.record_wait,
+	await core_wait_record.record_admitted(context.fields, context.now(), {
+		sink: context.record_wait,
 		admission,
-	)
+	})
 
 	return { target: context.target, admission }
 }

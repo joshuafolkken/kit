@@ -171,12 +171,10 @@ describe('run_ship_steps — the commit stage', () => {
 	it('commits with no skip flags on a fresh state, under the core-budget priority mark', async () => {
 		await step_for(STAGE.COMMIT).run(ARGS, FRESH)
 
-		expect(josh_spy).toHaveBeenCalledWith(
-			['git', '-y', '--body', 'text', TITLE],
-			true,
-			undefined,
-			core_priority.PRIORITY_ENVIRONMENT,
-		)
+		expect(josh_spy).toHaveBeenCalledWith(['git', '-y', '--body', 'text', TITLE], {
+			should_forward_stderr: true,
+			environment: core_priority.PRIORITY_ENVIRONMENT,
+		})
 	})
 
 	it('carries the skip flags a resumed ship needs', async () => {
@@ -186,9 +184,7 @@ describe('run_ship_steps — the commit stage', () => {
 
 		expect(josh_spy).toHaveBeenCalledWith(
 			['git', '-y', '--skip-commit', '--skip-push', '--body', 'text', TITLE],
-			true,
-			undefined,
-			core_priority.PRIORITY_ENVIRONMENT,
+			{ should_forward_stderr: true, environment: core_priority.PRIORITY_ENVIRONMENT },
 		)
 	})
 
@@ -198,13 +194,16 @@ describe('run_ship_steps — the commit stage', () => {
 			await step_for(STAGE.COMMIT).run(ARGS, FRESH)
 		})
 
-		expect(josh_spy).toHaveBeenCalledWith(expect.any(Array), true, undefined, {
-			...core_priority.PRIORITY_ENVIRONMENT,
-			[run_ship_lap.ENVIRONMENT_KEY]: JSON.stringify({
-				issue: 5831,
-				stage: 'commit',
-				parent: run_ship_lap.STEP.COMMIT,
-			}),
+		expect(josh_spy).toHaveBeenCalledWith(expect.any(Array), {
+			should_forward_stderr: true,
+			environment: {
+				...core_priority.PRIORITY_ENVIRONMENT,
+				[run_ship_lap.ENVIRONMENT_KEY]: JSON.stringify({
+					issue: 5831,
+					stage: 'commit',
+					parent: run_ship_lap.STEP.COMMIT,
+				}),
+			},
 		})
 	})
 })
@@ -217,11 +216,9 @@ describe('run_ship_steps — the followup and report stages', () => {
 		expect(josh_spy.mock.calls).toStrictEqual([
 			[
 				['followup', TITLE, '--notify', 'done'],
-				true,
-				undefined,
-				followup_section.SHIPPED_ENVIRONMENT,
+				{ should_forward_stderr: true, environment: followup_section.SHIPPED_ENVIRONMENT },
 			],
-			[['run:tail', ISSUE, '--cite', '#1'], true],
+			[['run:tail', ISSUE, '--cite', '#1'], { should_forward_stderr: true }],
 		])
 	})
 

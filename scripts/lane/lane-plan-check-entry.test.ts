@@ -31,7 +31,7 @@ const LISTING_LIMIT = 100
 const PAST_CAP = 18
 const WITHIN_CAP = 8
 const DECLARED_FILES = 6
-const DECLARED = '## 背景\n\n- 規模見積もり: 約 3 ファイル / 20 行（テスト除く）\n'
+const DECLARED = '## 背景\n\n- 規模見積もり: 約 3 ファイル / 20 行（テスト含む）\n'
 const REASON = 'one gate rule whose parts cannot merge alone'
 const WARNING = 'size warning (files)'
 

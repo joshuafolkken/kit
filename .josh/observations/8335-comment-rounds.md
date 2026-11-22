@@ -1,0 +1,2 @@
+- rf:none | none | - | 2026-11-21 | #8335
+- rf:bug-risks | medium | scripts/run/board/run-board-gather-record.ts:104 | 2026-11-21 | #8335 | - | stale-cache

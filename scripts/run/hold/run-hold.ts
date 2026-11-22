@@ -8,6 +8,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
+import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { run_stage } from '#scripts/run/run-stage'
 import { z } from 'zod'
 
@@ -83,6 +84,9 @@ interface RunHold {
 	// run that resumed the lane (`run-preflight.ts` → `resume_steps`). The board draws it from the main
 	// checkout as a single run; a child's hold is its `backlogrun`'s row (`run-board-single.ts`).
 	is_single_in_lane?: boolean | undefined
+	// The claiming session's transcript, which `run:board` reads the single run's newest operation from
+	// (joshuafolkken/kit#8482). Absent where the claim ran outside a session, as a detached supervisor's does.
+	owner_transcript?: string | undefined
 }
 
 type HoldRead =
@@ -129,6 +133,7 @@ const run_hold_schema = z.object({
 	owner_start: z.string().optional(),
 	notified_at: z.string().optional(),
 	is_single_in_lane: z.boolean().optional(),
+	owner_transcript: z.string().optional(),
 })
 
 // `undefined` for anything that is not a well-formed record, so the caller decides what a broken one
@@ -194,6 +199,13 @@ function session_owner(environment: Environment = process.env): SessionOwner {
 	return { owner_pid: pid, owner_start: process_identity.read_start(pid) }
 }
 
+// The session's transcript, resolved as a carry record's is; none where it cannot be found.
+function transcript_mark(
+	transcript: string | undefined = run_carry_conversation.own_transcript(),
+): Pick<RunHold, 'owner_transcript'> {
+	return transcript === undefined ? {} : { owner_transcript: transcript }
+}
+
 // The mark a hold taken in a lane by anything but that lane's dispatched child carries; none elsewhere.
 function lane_mark(
 	directory: string,
@@ -220,7 +232,7 @@ function resumed_mark(command: string): HoldMark {
 }
 
 function build_hold(issue: string, now: Date, mark: HoldMark = {}): RunHold {
-	const owner = { ...session_owner(), ...lane_mark(process.cwd()) }
+	const owner = { ...session_owner(), ...transcript_mark(), ...lane_mark(process.cwd()) }
 
 	return { issue, taken_at: now.toISOString(), pid: process.pid, ...mark, ...owner }
 }

@@ -114,8 +114,10 @@ interface BacklogOptions {
 async function fetch_backlog(
 	repo: string,
 	epics: Map<number, number>,
-	epic_numbers: ReadonlySet<number> = new Set(epics.values()),
-	options?: BacklogOptions,
+	{
+		epic_numbers = new Set(epics.values()),
+		...options
+	}: BacklogOptions & { epic_numbers?: ReadonlySet<number> } = {},
 ): Promise<FetchedBacklog> {
 	const { json, is_capped } = await list_backlog(options)
 	// A failed listing is not an empty backlog. Reported rather than degraded into one, which would
@@ -159,7 +161,7 @@ async function read_backlog(repo: string, options?: BacklogOptions): Promise<Fet
 	const epic_numbers = new Set(open_epics.epics.map((epic) => epic.number))
 
 	return {
-		...(await fetch_backlog(repo, epics, epic_numbers, options)),
+		...(await fetch_backlog(repo, epics, { ...options, epic_numbers })),
 		has_epic_list: true,
 		epic_cutoff: open_epics.cutoff,
 		context: { repo, epics, epic_numbers },

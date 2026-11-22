@@ -87,6 +87,8 @@ Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in eve
 
 **Output / exit codes:** `lane:open` prints its directory on stdout, reasons on stderr; refusal exits non-zero with empty stdout. Seats `1..9` (main: 0) are claimed atomically. Install or `josh.lane.setup` failure fails; warming is best-effort. `lane:list`: one row per lane — issue, seat, ports, branch, state, directory, output path, profile.
 
+`lane:limit`: when port seats block a launch, its status line appends `seats 9/9 held by` and the issues holding seats.
+
 **`in-progress` / lane:** `lane:list` reports label/lane mismatches on stderr without changing labels.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune` in detail".
@@ -305,7 +307,7 @@ runs with no `cpu_ms` left out. It only reports: a core weight is changed in its
 The `catch rate` table and `candidates:`: `lane-catch-rate-stats.ts`.
 
 Under the size table, the implement-rate table (`lane-implement-rate.ts`) prints the median `implement` minutes per 100
-actual non-test lines over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
+actual lines, tests included, over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
 issue to the last `size` measured before the merge, lanes with no size, no interval or zero lines left out.
 
 The row's last two columns, `estimate ratio first` and `estimate ratio median`, measure the run board's finish estimate
@@ -513,9 +515,9 @@ A lane child runs it once its work summary settles, before the first edit, namin
 
 `plan:scaffold` prints the same input's size. `lane:plan` saves it for the split bar without lowering the body declaration.
 
-Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single "<reason>"` keeps an indivisible contract together.
+Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single "<reason>"` keeps an indivisible contract together. A `split` answer asks for a follow-up Issue this one does not wait on, and names `--single` for a carve-off the rest would wait on.
 
-A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
+A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document. Nor does a path under `.josh/tmp/`: git ignores it, so no lane's change carries it.
 
 A lane child's `issue:plan` runs it on the recorded plan's backticked paths (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
 
@@ -536,7 +538,7 @@ A lane dispatched before its holder, with commits, waits instead, keeping its se
 
 A `run:planned` candidate's plan comment (the latest trusted one carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body: one naming a running lane's file is held back before dispatch; a path its body only cites holds nothing.
 
-A first plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
+A first plan over twice the files its `- 規模見積もり:` declares (tests included) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
 
 Hunks outside planned files over 2× declared files, or declared lines × recent ratio (min 160 per new file) over 200, also split; logged.
 

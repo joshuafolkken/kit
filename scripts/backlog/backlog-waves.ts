@@ -12,6 +12,7 @@ import {
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { run_stalled } from '#scripts/run/park/run-stalled'
+import { backlog_chain } from './backlog-chain'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank, type GateScope } from './backlog-rank'
 
@@ -103,11 +104,10 @@ function first_wave(result: EpicNextResult, pool: WavePool): ReadonlyArray<EpicC
 
 function next_wave(pool: WavePool, done: ReadonlySet<string>): ReadonlyArray<EpicChild> {
 	const children = pool.children.map((child) => as_closed(child, done))
-	const { runnable } = epic_classify.classify_children(
-		children,
-		epic_cross_repo.resolve_cross_repo,
-		pool.running,
-	)
+	const { runnable } = epic_classify.classify_children(children, {
+		resolve: epic_cross_repo.resolve_cross_repo,
+		running: pool.running,
+	})
 
 	return offer(
 		runnable.filter((child) => child.repo === pool.repo),
@@ -203,6 +203,10 @@ function format_waves(
 		width_line(scope.wave_limit),
 		'',
 		...(waves.length === 0 ? [backlog_plan.NOTHING] : waves),
+		...backlog_chain.chain_lines(
+			backlog_chain.longest_chain(plan.waves, scope.declared),
+			context.repo,
+		),
 		'',
 		backlog_plan.section(UNREACHED_HEADING, unreached_lines(plan, context)),
 	].join('\n')

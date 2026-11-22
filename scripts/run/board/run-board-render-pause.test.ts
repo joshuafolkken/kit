@@ -96,7 +96,7 @@ describe('run_board_render pause reasons', () => {
 		const next: ItemStatus = { state: 'parked', reason: DECISION, launched_ms: NOW + 1 }
 
 		expect(line_of(next)).not.toContain(URL)
-		expect(line_of(next)).toContain('Reason unavailable: inspect issue')
+		expect(line_of(next)).toContain(run_board_pause.FALLBACK)
 	})
 })
 

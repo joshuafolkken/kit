@@ -34,7 +34,6 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		ended_ms: undefined,
 		activity: { last_event_ms: NOW - MINUTE, is_stopped: false },
 		layout: EMPTY_LAYOUT,
-		baseline_total: undefined,
 		plan_fetched_ms: NOW,
 		plan_failed_ms: undefined,
 		is_plan_loading: false,

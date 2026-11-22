@@ -1,6 +1,7 @@
 import { styleText } from 'node:util'
 import { run_board_fit } from './run-board-fit'
 import type { BoardLinks, Link } from './run-board-link'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 
 // The header's first column (`run-board-header.ts`): the board's name and the run's state over the kit
 // version the run's supervisor runs, over the repository the run is in. The name links to kit and the
@@ -35,6 +36,8 @@ interface NameFields extends Pick<BoardLinks, 'comment_link' | 'repo_link'> {
 	kit_version?: string | undefined
 	// The repository as `owner/repo`; `undefined` before a plan is read.
 	repo: string | undefined
+	// The screen's theme, whose board name the column draws; `undefined` draws `josh-board`.
+	theme?: Theme | undefined
 }
 
 // `text` linked to `url` where the frame opens links, plain where it does not.
@@ -42,10 +45,15 @@ function linked(text: string, url: string, link: Link | undefined): string {
 	return link === undefined ? text : link(text, url)
 }
 
+// The board's name: the theme's own (joshuafolkken/kit#8604), `josh-board` in no theme.
+function board_name_of(theme: Theme | undefined): string {
+	return theme === undefined ? BOARD_NAME : run_board_theme_defs.THEME_DEFS[theme].name
+}
+
 // The mark stands still in every state: the spinner turns on the third line.
 function run_part(mark: RunMark, fields: NameFields): string {
 	const { glyph, color } = RUN_MARKS[mark]
-	const name = fields.run_name ?? linked(BOARD_NAME, KIT_URL, fields.comment_link)
+	const name = fields.run_name ?? linked(board_name_of(fields.theme), KIT_URL, fields.comment_link)
 
 	const named = `${glyph} ${name}`
 
@@ -82,7 +90,7 @@ function names_of(mark: RunMark, fields: NameFields): Array<string> {
 	]
 }
 
-const run_board_header_names = { BOARD_NAME, names_of }
+const run_board_header_names = { BOARD_NAME, board_name_of, names_of }
 
 export { run_board_header_names }
 export type { RunMark }

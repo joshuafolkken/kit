@@ -29,6 +29,10 @@ const STALE_HANDOFF: StallCause = {
 	why: 'the child stopped at `resume: handed-off` because an old hand-off cut record was already adopted.',
 }
 
+// The drive's stop on an issue that keeps giving its lane back (`backlog-yield-cap.ts`); a retry lifts
+// it (`backlog-drive-restore.ts`).
+const YIELD_CAP = 'yield cap'
+
 const RESUME_COMMAND = 'fullrun'
 const CAUSE_LEAD = `${RUN_STALLED_LABEL}: `
 
@@ -191,6 +195,7 @@ const run_stalled = {
 	session_unfinished,
 	stop_of,
 	waiting_text,
+	YIELD_CAP,
 }
 
 export { run_stalled }

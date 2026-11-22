@@ -1,4 +1,5 @@
 import { defect_rate } from '#scripts/issue/defect-rate'
+import { PRIORITY_HIGH_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import type { EpicChild } from './epic-graph'
 import { epic_rank } from './epic-rank'
@@ -51,5 +52,64 @@ describe('epic_rank.rank', () => {
 		const children = [child(1), child(2, defect_rate.DEFECT_DECLARATION_LINE)]
 
 		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([2, 1])
+	})
+})
+
+// joshuafolkken/kit#8541: a child blocking an open priority:high child ranks in the high class; one
+// blocking a closed priority:high child does not.
+function ranked_beside_urgent(state: EpicChild['state']): Array<number> {
+	const urgent: EpicChild = {
+		...child(2),
+		state,
+		labels: [PRIORITY_HIGH_LABEL],
+		blocked_by: [{ number: 3, repo: REPO }],
+	}
+	const children = [child(1), child(3)]
+
+	return epic_rank.rank(children, [...children, urgent]).map((entry) => entry.number)
+}
+
+// joshuafolkken/kit#8571: a run of children declaring one file goes ahead of an older independent
+// child of its priority, and never ahead of a higher priority class.
+const SAME_FILE_BODY = '## 変更\n\n- `scripts/run/board/run-board-seat.ts` を直す\n'
+const OTHER_FILE_BODY = '## 変更\n\n- `scripts/lines/effective-limit.ts` を直す\n'
+
+function same_file_run(): Array<EpicChild> {
+	return [child(2, SAME_FILE_BODY), child(3, SAME_FILE_BODY), child(4, SAME_FILE_BODY)]
+}
+
+describe('epic_rank.rank path-overlap run', () => {
+	it('puts the same-file run ahead of an older non-overlapping child (ac-5c644983)', () => {
+		const children = [child(1, OTHER_FILE_BODY), ...same_file_run()]
+
+		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([
+			2, 3, 4, 1,
+		])
+	})
+
+	it('keeps a priority:high non-overlapping child ahead of the run', () => {
+		const urgent: EpicChild = { ...child(1, OTHER_FILE_BODY), labels: [PRIORITY_HIGH_LABEL] }
+		const children = [urgent, ...same_file_run()]
+
+		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([
+			1, 2, 3, 4,
+		])
+	})
+
+	it('does not count the same path in another repository as an overlap', () => {
+		const elsewhere: EpicChild = { ...child(3, SAME_FILE_BODY), repo: 'joshuafolkken/other' }
+		const children = [child(1, OTHER_FILE_BODY), child(2, SAME_FILE_BODY), elsewhere]
+
+		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([1, 2, 3])
+	})
+})
+
+describe('epic_rank.rank blocked priority class', () => {
+	it('lifts the blocker of an open priority:high child into the high class', () => {
+		expect(ranked_beside_urgent('OPEN')).toStrictEqual([3, 1])
+	})
+
+	it('does not lift the blocker of a closed priority:high child (ac-a55d5ed8)', () => {
+		expect(ranked_beside_urgent('CLOSED')).toStrictEqual([1, 3])
 	})
 })

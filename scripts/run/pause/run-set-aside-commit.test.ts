@@ -1,7 +1,8 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { git_stash } from '#scripts/git/stash/git-stash'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_registry } from '#scripts/lane/lane-registry'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_set_aside_commit } from './run-set-aside-commit'
 
 // joshuafolkken/kit#5930: the set-aside on a lane branch is a WIP commit there, not a stash. Git is
@@ -11,11 +12,17 @@ const MESSAGE = 'run:pause: #10 waits on #11'
 const WIP = `wip: ${MESSAGE}`
 
 const EARLIER = 'feat: earlier'
+const ADOPTED_BRANCH = '10-legacy-feature'
 
 const state = { head: EARLIER, has_work: true, unmerged: [] as Array<string> }
 const commands: Array<Array<string>> = []
 
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
 beforeEach(() => {
+	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([])
 	Object.assign(state, { head: EARLIER, has_work: true, unmerged: [] })
 	commands.length = 0
 	vi.spyOn(git_stash, 'unmerged_paths').mockImplementation(async () => state.unmerged)
@@ -29,6 +36,22 @@ beforeEach(() => {
 })
 
 describe('run_set_aside_commit.is_lane', () => {
+	it('answers yes for an adopted PR branch registered as the issue lane', async () => {
+		vi.spyOn(git_command, 'branch').mockResolvedValue(ADOPTED_BRANCH)
+		vi.spyOn(lane_registry, 'find_lane').mockReturnValue({
+			issue: '10',
+			branch: ADOPTED_BRANCH,
+			directory: '/lanes/10',
+			seat: undefined,
+			development_port: undefined,
+			preview_port: undefined,
+			output: undefined,
+			is_stranded: false,
+		})
+
+		expect(await run_set_aside_commit.is_lane('10')).toBe(true)
+	})
+
 	it('answers yes on the issue’s own lane branch and no elsewhere', async () => {
 		vi.spyOn(git_command, 'branch').mockResolvedValueOnce('10-lane').mockResolvedValueOnce('main')
 

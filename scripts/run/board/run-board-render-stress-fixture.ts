@@ -35,13 +35,13 @@ function title_of(number: number): string {
 	return `Issue ${String(number)} 全角のタイトルが長く続く行の描画`
 }
 
-function row(
-	number: number,
-	state: BoardRow['state'],
-	status?: ItemStatus,
-	reason?: RowReason,
-): BoardRow {
-	return { number, title: title_of(number), kind: undefined, state, status, waits: [], reason }
+function row(number: number, state: BoardRow['state'], status?: ItemStatus): BoardRow {
+	return { number, title: title_of(number), kind: undefined, state, status, waits: [] }
+}
+
+// A waiting row whose wait reads as `reason`.
+function waiting_on(number: number, reason: RowReason): BoardRow {
+	return { ...row(number, 'waiting'), reason }
 }
 
 function running(number: number): BoardRow {
@@ -73,9 +73,9 @@ function active(): Array<BoardRow> {
 
 function queued(): Array<QueuedEntry> {
 	const waiting = [
-		row(CROSS, 'waiting', undefined, { icon: WAIT_ICONS.blocker, issues: [CROSS_REPO, '4001'] }),
-		row(LANES, 'waiting', undefined, { icon: WAIT_ICONS.lane, value: '4/4' }),
-		row(REASONED, 'waiting', undefined, { tail: WIDE_REASON }),
+		waiting_on(CROSS, { icon: WAIT_ICONS.blocker, issues: [CROSS_REPO, '4001'] }),
+		waiting_on(LANES, { icon: WAIT_ICONS.lane, value: '4/4' }),
+		waiting_on(REASONED, { tail: WIDE_REASON }),
 	]
 
 	return waiting.map((entry) => ({ kind: 'row', row: entry }))

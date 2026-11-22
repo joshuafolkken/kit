@@ -33,6 +33,7 @@ const FETCH_KEYS: ReadonlyArray<FetchKey> = [
 	'thanks_fetch',
 	'rate_limit_fetch',
 	'issue_count_fetch',
+	'pinned_fetch',
 ]
 // The stamps that say each read was asked; cleared, the read is due at once.
 const UNASKED: Readonly<Record<FetchKey, Partial<DataPost>>> = {
@@ -41,6 +42,7 @@ const UNASKED: Readonly<Record<FetchKey, Partial<DataPost>>> = {
 	thanks_fetch: { thanks_attempted_ms: undefined },
 	rate_limit_fetch: { rate_limit_attempted_ms: undefined },
 	issue_count_fetch: { issue_count_attempted_ms: undefined },
+	pinned_fetch: { pinned_attempted_ms: undefined },
 }
 
 // What a step reads through, at what moment and how long it waits for the reads it launches.
@@ -119,6 +121,8 @@ function posted(data: BoardData): DataPost {
 		rate_limit_attempted_ms: data.rate_limit_attempted_ms,
 		issue_count: data.issue_count,
 		issue_count_attempted_ms: data.issue_count_attempted_ms,
+		pinned: data.pinned,
+		pinned_attempted_ms: data.pinned_attempted_ms,
 		in_flight: FETCH_KEYS.filter((key) => data[key] !== undefined),
 	}
 }
@@ -139,6 +143,7 @@ function received(post: DataPost, read: GatherRead): BoardData {
 		thanks_fetch: held(in_flight, 'thanks_fetch'),
 		rate_limit_fetch: held(in_flight, 'rate_limit_fetch'),
 		issue_count_fetch: held(in_flight, 'issue_count_fetch'),
+		pinned_fetch: held(in_flight, 'pinned_fetch'),
 	}
 }
 

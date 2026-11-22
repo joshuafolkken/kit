@@ -56,7 +56,7 @@ it('does not reuse an unsuccessful or interrupted review', async () => {
 	review.mockResolvedValueOnce({ code: 1, out: 'finding' })
 	await run_ship_final_review.run(ISSUE, review)
 	expect(await run_ship_final_review.run(ISSUE, review)).toStrictEqual(PASS)
-	stamp.write(TREE.files, undefined, TREE.base)
+	stamp.write(TREE.files, { base: TREE.base })
 	expect(await run_ship_final_review.run(ISSUE, review)).toStrictEqual(PASS)
 	expect(review).toHaveBeenCalledTimes(3)
 })

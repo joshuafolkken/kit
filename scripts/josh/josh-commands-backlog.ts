@@ -142,7 +142,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--done "filed #<M>"'],
 					description:
-						"for a `親` option naming `issue:file`: the open Issue it filed (else refused with the `issue:file … --route interrupt --found-during <N> --blocks-finder` line). The child is blocked by `#M`, not requeued; `#M`'s merge re-dispatches it.",
+						"for a `親` option naming `issue:file`: the open Issue it filed (else refused with the `issue:file … --route interrupt --found-during <N> --blocks-finder` line). The child is blocked by `#M`, not requeued; `#M`'s merge re-dispatches it. An option with no `- 順序の理由: <kind> — <理由>` line is refused as a serial carve-off.",
 				},
 			],
 		},
@@ -168,7 +168,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--waves'],
 					description:
-						'print the order the run takes, wave by wave, assuming each wave merges before the next. Read-only.',
+						'print the order the run takes, wave by wave, assuming each wave merges before the next, then `Longest serial chain: <count> — #A → …`: issues no two of which may run together (blocked-by or overlapping paths), a floor more lanes cannot shorten — found by one walk, so a larger set may exist; omitted under two. Read-only.',
 				},
 				{
 					names: [PENDING_PUBLICATION],

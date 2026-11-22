@@ -48,7 +48,7 @@ test('offers the child epic:next reads runnable, asked of the epic itself', asyn
 	})
 	expect(josh_command.josh_run).toHaveBeenCalledWith(
 		['epic:next', EPIC, '--repo', REPO, '--lanes'],
-		true,
+		{ should_forward_stderr: true },
 	)
 })
 

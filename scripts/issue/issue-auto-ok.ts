@@ -18,7 +18,8 @@ import { markdown_section } from './markdown-section'
 // The order: `--no-auto-ok`, a filing to another repository (whose own `backlogrun` would implement
 // and merge it though nobody opted that repository in), a label that keeps a person in the loop, and
 // last the body's recorded user prohibition or judgement declaration (`JUDGEMENT_NEEDED` / `JUDGEMENT_NOT_NEEDED`): whether a
-// policy decision, an external account or a human visual check is needed before merge.
+// policy decision or an external account is needed before merge (a visual check that cannot be fixed
+// after merge declares its reason — `visual_check_lint`).
 
 interface AutoOkFiling {
 	// `--no-auto-ok`: an existing exclusion or a verified original user prohibition.
@@ -37,7 +38,7 @@ interface AutoOkDecision {
 const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const JUDGEMENT_NOT_NEEDED = issue_body_keys.line('judgement', 'not_needed')
 const JUDGEMENT_NEEDED = issue_body_keys.line('judgement', 'needed')
-const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account, a human visual check) is needed before merge: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (\`issue-template.md\`)`
+const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account) is needed before merge: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (\`issue-template.md\`)`
 const DECISION_RULE_PREFIX = issue_body_keys.prefix('decision_rule')
 const DECISION_PROBLEM = `a decision rule citing a measurement Issue determines the choice; declare \`${JUDGEMENT_NOT_NEEDED}\` and record the applied result and reason in an Issue comment`
 
@@ -110,6 +111,17 @@ function judgement_of(body: string): boolean | undefined {
 	return is_not_needed === is_needed ? undefined : is_needed
 }
 
+// The reason after `JUDGEMENT_NEEDED` (its parentheses included), or `undefined` unless the body
+// declares a person's judgement is needed — what `visual_check_lint` reads.
+function judgement_reason(body: string): string | undefined {
+	if (judgement_of(body) !== true) return undefined
+
+	return background_lines(body)
+		.find((line) => line.startsWith(JUDGEMENT_NEEDED))
+		?.slice(JUDGEMENT_NEEDED.length)
+		.trim()
+}
+
 // Whether the body declares a person's judgement is needed — the reading `body_decision` withholds
 // `auto-ok` by, so `backlogrun`'s judgement of an open Issue refuses the same bodies (joshuafolkken/kit#7856).
 function declares_judgement_needed(body: string): boolean {
@@ -158,6 +170,7 @@ const issue_auto_ok = {
 	decide,
 	decision_problem,
 	exclusion_of,
+	judgement_reason,
 	line_of,
 	opt_out_problem,
 	user_constraint_of,

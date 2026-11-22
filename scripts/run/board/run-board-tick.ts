@@ -67,6 +67,7 @@ function plan_here(plan: BoardPlan, state: BoardState, local: LocalRead): BoardP
 		labels,
 		is_backlog_live: is_backlog_live(local),
 		occupied_lanes: local.occupied_lanes,
+		review_stops: local.review_stops,
 	}
 }
 
@@ -74,6 +75,7 @@ type RoomRead = Pick<
 	ReasonRead,
 	| 'free_lanes'
 	| 'occupied_count'
+	| 'lane_capacity'
 	| 'lane_limit'
 	| 'usage_reset_ms'
 	| 'usage_cause'
@@ -87,6 +89,7 @@ function room_of(state: BoardState, local: LocalRead): RoomRead {
 	return {
 		free_lanes: local.free_lanes,
 		occupied_count: local.occupied_count,
+		lane_capacity: local.lane_capacity,
 		lane_limit: local.lane_limit,
 		usage_reset_ms: local.usage_reset_ms,
 		usage_cause: local.usage_cause,
@@ -137,7 +140,10 @@ function planned_layout(
 		now_ms,
 	})
 
-	return run_board_layout.layout_of({ ...plan, now_ms }, statuses, reason_of, earlier_here(local))
+	return run_board_layout.layout_of({ ...plan, now_ms }, statuses, {
+		reason_of,
+		earlier: earlier_here(local),
+	})
 }
 
 // The statuses scoped to the run's plan, a running child GitHub read closed settled.
@@ -149,17 +155,20 @@ function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardL
 	const statuses = run_board_status.settle_closed(statuses_for(state, local), read)
 	const known = closed_under(state.known, state.closed)
 
-	return run_board_layout.local_layout_of(statuses, earlier_here(local), {
-		...known,
-		is_backlog_live: is_backlog_live(local),
+	return run_board_layout.local_layout_of(statuses, {
+		earlier: earlier_here(local),
+		read: { ...known, is_backlog_live: is_backlog_live(local) },
 	})
 }
 
-// The frame with no run, which keeps no spinner.
+// The frame with no run, which keeps no spinner, sweep, lamp, TRACE field or clock colon to redraw over it.
 function draw_no_run(state: BoardState, ports: BoardPorts, now_ms: number): BoardState {
-	draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), state))
+	const options = { bounds: bounds_of(ports), failure: state, theme: ports.theme }
 
-	return { ...state, spots: [], sweep: undefined }
+	draw(ports, run_board_render.render_no_run(now_ms, options))
+	const still = { sweep: undefined, lamps: undefined, traces: undefined, colons: undefined }
+
+	return { ...state, spots: [], ...still }
 }
 
 // The frame over the display a live board's worker assembled (joshuafolkken/kit#8160), so this thread

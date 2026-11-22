@@ -77,7 +77,32 @@ test('waits on a declared issue whose yielded plan a lane in flight still holds'
 
 	expect(offer?.verdict).toBe('wait')
 	expect(declared).toHaveBeenCalledWith([RUNNING], process.cwd())
-	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), undefined)
+	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), {
+		scope: undefined,
+		stops: new Set(),
+	})
+})
+
+// joshuafolkken/kit#8575: the hold orders the overlap as `lane:plan` does, so it reads which listed
+// issues stop for a person before their merge.
+test('holds a yielded issue on the listing it reads for the issues that stop for a person', async () => {
+	const human = { ...RUNNING, body: `${RUNNING.body ?? ''}\n\n## 背景\n\n- 人の判断: 要（目視）\n` }
+
+	vi.spyOn(lane_plan, 'is_yielded').mockImplementation((issue) => issue === 1)
+	vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
+		kind: 'read',
+		issues: [human],
+		cutoff: cutoff_of(1, LISTING_LIMIT, false),
+	})
+	vi.spyOn(backlog_plan_comment, 'declared_of').mockResolvedValue(DECLARED)
+	const held = vi.spyOn(lane_plan, 'is_yield_held').mockReturnValue(false)
+
+	await backlog_drive_named_offer.read(CARRY, backlog_drive.initial_state(['3'], ACTIVE), CONTEXT)
+
+	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), {
+		scope: undefined,
+		stops: new Set([RUNNING.number]),
+	})
 })
 
 // joshuafolkken/kit#6798: the yielded issue is held on its own declaration — its plan comment when that
@@ -100,7 +125,7 @@ test('holds a yielded issue on its own declared scope', async () => {
 	await backlog_drive_named_offer.read(CARRY, backlog_drive.initial_state(['3'], ACTIVE), CONTEXT)
 
 	expect(declared).toHaveBeenLastCalledWith([{ number: 1 }], process.cwd())
-	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), scope)
+	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), { scope, stops: new Set() })
 })
 
 // The listing the hold reads (`labels` on the holder #3, outside the run), with #1 yielded on a plan

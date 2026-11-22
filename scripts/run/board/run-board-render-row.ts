@@ -83,6 +83,12 @@ function title_text(row: BoardRow, frame: RowFrame): string {
 	return `${FILED_LEAD}${title_of(title, frame.title_limit - FILED_LEAD.length)}`
 }
 
+// The columns a row's title takes cut to the frame's title column, its ✚ among them — what a section
+// as wide as its widest title is measured by (joshuafolkken/kit#8590).
+function title_width(row: BoardRow, frame: RowFrame): number {
+	return title_text(row, frame).length
+}
+
 // The time padded by its net time to the time column — blanks where a row has none — so the net times
 // end in one column, and its bracketed stops padded to the stops column, so what follows starts in one
 // (joshuafolkken/kit#7992). A row with nothing after it is trimmed at its end (`row_text`).
@@ -116,7 +122,8 @@ function is_title_padded(row: BoardRow, frame: RowFrame): boolean {
 }
 
 // The title padded to the title column, then the time; a waiting row's title is not padded but where
-// `is_title_padded` says so. A lane row draws its time in its lead.
+// `is_title_padded` says so. A lane row draws its time in its lead, and a decision row none, so what
+// to decide follows its title (joshuafolkken/kit#8590).
 function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 	const title = title_text(row, frame)
 
@@ -124,7 +131,9 @@ function timed_parts(row: BoardRow, frame: RowFrame): Array<string> {
 		return [is_title_padded(row, frame) ? title.padEnd(frame.title_limit) : title]
 	}
 
-	if (frame.is_lane_row === true) return [title.padEnd(frame.title_limit)]
+	if (frame.is_lane_row === true || frame.section === 'decision') {
+		return [title.padEnd(frame.title_limit)]
+	}
 
 	return [title.padEnd(frame.title_limit), time_text(row, frame)]
 }
@@ -234,6 +243,7 @@ function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 		is_head_kept: frame.is_lane_row === true,
 		shared: is_tailed ? frame.shared : undefined,
 		is_title_padded: is_title_padded(row, frame),
+		limit: frame.title_limit,
 	}
 }
 
@@ -267,10 +277,9 @@ function shared_overrun(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number 
 const run_board_render_row = {
 	GAP,
 	head_text,
-	row_draw,
-	row_fit,
 	row_line,
 	shared_overrun,
+	title_width,
 }
 
 export { run_board_render_row }

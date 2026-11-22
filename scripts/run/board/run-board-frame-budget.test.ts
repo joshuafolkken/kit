@@ -4,6 +4,8 @@ import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import string_width from 'string-width'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { run_board_drop_screen } from './run-board-drop-screen'
+import { run_board_exit_rain } from './run-board-exit-rain'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type Gatherer, type GatherState } from './run-board-gather'
 import {
@@ -13,11 +15,16 @@ import {
 } from './run-board-gather-thread'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
+import { run_board_rain, type Random } from './run-board-rain'
+import { run_board_rain_drop } from './run-board-rain-drop'
 import type { LocalRead } from './run-board-read'
 import { run_board_render_stress_fixture } from './run-board-render-stress-fixture'
+import type { Beat } from './run-board-reveal-blocks'
+import { run_board_reveal_rain } from './run-board-reveal-rain'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_type_rows, type TypingSpan } from './run-board-type-rows'
 import type { UsageMark } from './run-board-usage'
 import { run_board_usage_board } from './run-board-usage-board'
 
@@ -47,6 +54,7 @@ const STAGES = ['preflight', 'sync', 'gate', 'commit', 'push', 'checks', 'review
 const ROUNDS = 3
 // The pane the live board was profiled in (joshuafolkken/kit#5185).
 const PANE = { rows: 50, columns: 160 }
+const HALF = 0.5
 const ISSUES = EVENTS / EVENTS_PER_ISSUE
 const LIVE = Array.from({ length: LANES }, (_, index) => FIRST_ISSUE + ISSUES - LANES + index)
 
@@ -256,7 +264,7 @@ function draw_ms(): number {
 	const started = performance.now()
 	const lines = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows)
 
-	run_board_spin.spun(lines, run_board_labels.spinner_of(0), PANE)
+	run_board_spin.spun(lines, run_board_labels.spinner_of(0), { size: PANE })
 
 	return performance.now() - started
 }
@@ -266,5 +274,90 @@ describe('run_board_spin.spun draw budget', () => {
 		const spent = Array.from({ length: DRAWS }, () => draw_ms())
 
 		expect(lane_stats.median(spent)).toBeLessThan(run_board_labels.SPINNER_INTERVAL_MS)
+	})
+})
+
+// joshuafolkken/kit#8367: the matrix board keeps the stress frame's cells on each redraw and writes the
+// drops' cells on every step between, so both are held under one drop step.
+// joshuafolkken/kit#8369: a pour adds four drops a step, so the step is held under one too while it pours.
+// joshuafolkken/kit#8629: a deja vu rains a hundred and twenty drops over the text in its second.
+function drop_ms(
+	at_ms: number,
+	pours: ReadonlyArray<TypingSpan> = [],
+	deja_starts: ReadonlyArray<number> = [],
+): number {
+	const started = performance.now()
+	const lines = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows)
+	const screen = run_board_drop_screen.screen_of(
+		{ lines, spots: [] },
+		run_board_type_rows.NO_TYPING,
+		PANE,
+	)
+	const deja = deja_starts.map((start) => run_board_rain_drop.deja_span(start))
+	const poured = run_board_rain_drop.poured(screen, pours, at_ms, deja)
+
+	run_board_rain_drop.drop_bytes(poured, at_ms, at_ms - run_board_rain_drop.DROP_MS)
+
+	return performance.now() - started
+}
+
+describe('run_board_rain_drop draw budget', () => {
+	it('keeps the stress frame’s cells and writes a drop step within one step', () => {
+		const spent = Array.from({ length: DRAWS }, (_, index) => drop_ms(START + index * SECOND_MS))
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
+
+	it('writes a pouring step within one step, the pour on long enough to fill the board', () => {
+		const spent = Array.from({ length: DRAWS }, (_, index) => {
+			const at_ms = START + index * SECOND_MS
+
+			return drop_ms(at_ms, [{ from_ms: at_ms - 10 * SECOND_MS, to_ms: at_ms + SECOND_MS }])
+		})
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
+
+	// joshuafolkken/kit#8627: a poured drop's head sums its hurried steps in closed form, so the
+	// frames after the typing ends stay within one step too.
+	it('writes a step within one step while the poured drops hurry after the typing', () => {
+		const spent = Array.from({ length: DRAWS }, (_, index) => {
+			const at_ms = START + index * SECOND_MS
+
+			return drop_ms(at_ms, [{ from_ms: at_ms - 10 * SECOND_MS, to_ms: at_ms - SECOND_MS }])
+		})
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
+
+	it('writes a step within one step as a deja vu’s last drops enter, every drop on screen', () => {
+		const spent = Array.from({ length: DRAWS }, (_, index) => {
+			const at_ms = START + index * SECOND_MS
+
+			return drop_ms(at_ms, [], [at_ms - SECOND_MS + run_board_rain_drop.DROP_MS])
+		})
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
+})
+
+// joshuafolkken/kit#8626: the reveal's and the wipe's tails run one to two screens long, so a whole pass
+// over the stress frame is held to one `RAIN_MS` a frame on average.
+type Pass = (frame: string, random: Random) => Iterable<Beat>
+
+function beat_ms(pass: Pass): number {
+	const frame = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows).join('\n')
+	const started = performance.now()
+	const beats = [...pass(frame, () => HALF)]
+
+	return (performance.now() - started) / beats.length
+}
+
+describe('run_board_rain draw budget', () => {
+	it.each<[string, Pass]>([
+		['reveal', (frame, random) => run_board_reveal_rain.beats_of(frame, random, { size: PANE })],
+		['wipe', (frame, random) => run_board_exit_rain.beats_of(frame, random, PANE)],
+	])('draws each %s frame over the stress frame within one rain frame', (_name, pass) => {
+		expect(beat_ms(pass)).toBeLessThan(run_board_rain.RAIN_MS)
 	})
 })

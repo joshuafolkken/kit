@@ -89,7 +89,10 @@ async function read_branch(): Promise<ReturnType<typeof split_assess.assess>> {
 
 	const adjusted = await split_relocations.without_relocations(root, base, numstat, files)
 
-	return split_assess.assess(adjusted.numstat, await read_guide(), new Set(adjusted.added))
+	return split_assess.assess(adjusted.numstat, {
+		guide: await read_guide(),
+		added: new Set(adjusted.added),
+	})
 }
 
 const split_measure = { line_count, read_branch }

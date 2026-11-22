@@ -59,7 +59,7 @@ function carry_args(stopped: string | undefined): ReadonlyArray<string> {
 }
 
 async function josh_stage(args: ReadonlyArray<string>): Promise<number> {
-	const result = await josh_command.josh_run(args, should_forward_stderr)
+	const result = await josh_command.josh_run(args, { should_forward_stderr })
 
 	if (result.out !== '') process.stdout.write(`${result.out}\n`)
 

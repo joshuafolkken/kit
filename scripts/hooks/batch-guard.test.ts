@@ -139,7 +139,7 @@ afterAll(() => {
 // asks is `time/time-batch-guard.test.ts`'s.
 describe('batch_refusal', () => {
 	it('refuses the third consecutive single-call turn', () => {
-		const reason = batch_refusal(payload_of('unbatched'), NOW_MS)
+		const reason = batch_refusal(payload_of('unbatched'), { now_ms: NOW_MS })
 
 		expect(reason).toContain('batching')
 	})
@@ -150,20 +150,20 @@ describe('batch_refusal', () => {
 	it('refuses the same sequence only once', () => {
 		const payload = payload_of('twice')
 
-		expect(batch_refusal(payload, NOW_MS)).toBeDefined()
-		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeDefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	// A turn that already batched breaks the run of singles, so what precedes it is not carried across.
 	it('says nothing where a batched turn broke the run of singles', () => {
 		const payload = payload_of('batched', batched_text())
 
-		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	// Every failure allows the call: a hook that failed closed would stop a run over its own plumbing.
 	it('says nothing when the payload is not JSON', () => {
-		expect(batch_refusal('not json', NOW_MS)).toBeUndefined()
+		expect(batch_refusal('not json', { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing when the transcript is not there', () => {
@@ -173,13 +173,13 @@ describe('batch_refusal', () => {
 			tool_input: { file_path: FRESH_PATH },
 		})
 
-		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing when the switch is off', () => {
 		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
 
-		expect(batch_refusal(payload_of('switched-off'), NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload_of('switched-off'), { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -191,7 +191,7 @@ describe('batch_refusal — an edit payload', () => {
 	it('refuses the third consecutive single-call turn on an edit', () => {
 		const payload = payload_of('edit', unbatched_text(), EDIT_TOOL)
 
-		expect(batch_refusal(payload, NOW_MS)).toContain('batching')
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toContain('batching')
 	})
 
 	// The off switch is read before the candidate test, so it covers a write for free — and this is what
@@ -200,7 +200,7 @@ describe('batch_refusal — an edit payload', () => {
 		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
 		const payload = payload_of('edit-switched-off', unbatched_text(), EDIT_TOOL)
 
-		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -213,7 +213,7 @@ describe('batch_outcome — the whole-file write is notified, not refused', () =
 	it('returns a notice on the third consecutive single-call turn for a write', () => {
 		const { reason, notice } = batch_outcome(
 			payload_of('write-notice', unbatched_text(), WRITE_TOOL),
-			NOW_MS,
+			{ now_ms: NOW_MS },
 		)
 
 		expect(reason).toBeUndefined()
@@ -224,8 +224,8 @@ describe('batch_outcome — the whole-file write is notified, not refused', () =
 	it('notifies the same sequence only once', () => {
 		const payload = payload_of('write-notice-twice', unbatched_text(), WRITE_TOOL)
 
-		expect(batch_outcome(payload, NOW_MS).notice).toBeDefined()
-		expect(batch_outcome(payload, NOW_MS).notice).toBeUndefined()
+		expect(batch_outcome(payload, { now_ms: NOW_MS }).notice).toBeDefined()
+		expect(batch_outcome(payload, { now_ms: NOW_MS }).notice).toBeUndefined()
 	})
 
 	// A write is never refused, whatever the run of single-call turns behind it — where a read in its
@@ -233,7 +233,7 @@ describe('batch_outcome — the whole-file write is notified, not refused', () =
 	it('never sets a reason for a write', () => {
 		const payload = payload_of('write-never-refused', unbatched_text(), WRITE_TOOL)
 
-		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -242,7 +242,7 @@ describe('batch_outcome — the whole-file write is notified, not refused', () =
 // refused nothing at all in 551 measured forks.
 describe('batch_refusal — a forked agent is judged on its own transcript', () => {
 	it("refuses on the fork's history where the parent's says nothing", () => {
-		expect(batch_refusal(fork_payload_of('fork-judged'), NOW_MS)).toContain('batching')
+		expect(batch_refusal(fork_payload_of('fork-judged'), { now_ms: NOW_MS })).toContain('batching')
 	})
 
 	// The record has always been described as giving a delegated unit a budget of its own. It only does
@@ -253,7 +253,7 @@ describe('batch_refusal — a forked agent is judged on its own transcript', () 
 		const { transcript_path } = JSON.parse(payload) as { transcript_path: string }
 		const fork = time_hook_transcript.fork_path(transcript_path, AGENT_ID)
 
-		expect(batch_refusal(payload, NOW_MS)).toBeDefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeDefined()
 		expect(existsSync(refusal_path(fork))).toBe(true)
 		expect(existsSync(refusal_path(transcript_path))).toBe(false)
 	})
@@ -272,7 +272,7 @@ describe('batch_refusal — a forked agent is judged on its own transcript', () 
 			tool_input: { file_path: FRESH_PATH },
 		})
 
-		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 		expect(existsSync(refusal_path(session_path))).toBe(false)
 	})
 
@@ -281,7 +281,7 @@ describe('batch_refusal — a forked agent is judged on its own transcript', () 
 	it('judges the session itself when the agent is spelled null', () => {
 		const payload = time_transcript_fixture.with_null_agent(payload_of('null-agent'))
 
-		expect(batch_refusal(payload, NOW_MS)).toContain('batching')
+		expect(batch_refusal(payload, { now_ms: NOW_MS })).toContain('batching')
 	})
 })
 
@@ -312,7 +312,7 @@ describe('batch_outcome — a dispatched lane child is silent, neither refused n
 	// limit comes back with neither a reason nor a notice — the call proceeds untouched, which is what
 	// discontinuing the failed advisory in a lane child means.
 	it('delivers neither a refusal nor a notice on the third single-call turn', () => {
-		const { reason, notice } = batch_outcome(payload_of('lane-silent'), NOW_MS)
+		const { reason, notice } = batch_outcome(payload_of('lane-silent'), { now_ms: NOW_MS })
 
 		expect(reason).toBeUndefined()
 		expect(notice).toBeUndefined()
@@ -323,14 +323,14 @@ describe('batch_outcome — a dispatched lane child is silent, neither refused n
 	// single-call turn that would be refused on the main line, so a headless `claude -p` child is not
 	// killed by it (joshuafolkken/kit#2164).
 	it('refuses nothing on the third single-call turn while marked as a lane child', () => {
-		expect(batch_refusal(payload_of('lane-child'), NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload_of('lane-child'), { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	// A person working in a lane carries no mark and is refused exactly as before.
 	it('refuses again once the lane-child mark is gone', () => {
 		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 
-		expect(batch_refusal(payload_of('lane-unmarked'), NOW_MS)).toContain('batching')
+		expect(batch_refusal(payload_of('lane-unmarked'), { now_ms: NOW_MS })).toContain('batching')
 	})
 })
 
@@ -338,7 +338,10 @@ describe('batch_outcome — the per-call context, not the process (kit#6967)', (
 	const LANE_CONTEXT = context_of(LANE_DIRECTORY, { [lane_child_marker.KEY]: LANE_ISSUE })
 
 	it('stays silent for a lane child the context names under a main-line process', () => {
-		const { reason, notice } = batch_outcome(payload_of('context-lane'), NOW_MS, LANE_CONTEXT)
+		const { reason, notice } = batch_outcome(payload_of('context-lane'), {
+			now_ms: NOW_MS,
+			context: LANE_CONTEXT,
+		})
 
 		expect(reason).toBeUndefined()
 		expect(notice).toBeUndefined()
@@ -347,14 +350,18 @@ describe('batch_outcome — the per-call context, not the process (kit#6967)', (
 	it('reads its switch from the context environment', () => {
 		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
 
-		expect(batch_outcome(payload_of('context-off'), NOW_MS, off).reason).toBeUndefined()
+		expect(
+			batch_outcome(payload_of('context-off'), { now_ms: NOW_MS, context: off }).reason,
+		).toBeUndefined()
 	})
 
 	it('refuses when only the process environment switches it off', () => {
 		process.env[SWITCH_ENV_KEY] = 'off'
 		const on = context_of(process.cwd(), {})
 
-		expect(batch_outcome(payload_of('context-on'), NOW_MS, on).reason).toContain('batching')
+		expect(
+			batch_outcome(payload_of('context-on'), { now_ms: NOW_MS, context: on }).reason,
+		).toContain('batching')
 	})
 })
 

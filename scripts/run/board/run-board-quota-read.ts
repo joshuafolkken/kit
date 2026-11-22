@@ -1,6 +1,7 @@
 import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { agent_provider } from '#scripts/agent/agent-provider'
+import { agent_usage_limit } from '#scripts/agent/agent-usage-limit'
 import { codex_home_source } from '#scripts/agent/codex-home-source'
 import { durable_state } from '#scripts/josh/durable-state'
 import { figure_format } from '#scripts/lib/figure-format'
@@ -77,17 +78,7 @@ interface QuotaFile {
 	mtime_ms: number
 }
 
-const CLAUDE_WINDOW = z.looseObject({ utilization: z.number(), resetsAt: z.number() })
-const CLAUDE_WINDOWS = z.looseObject({
-	five_hour: CLAUDE_WINDOW.optional(),
-	seven_day: CLAUDE_WINDOW.optional(),
-})
-const CLAUDE_INFO = z.looseObject({ unifiedWindows: CLAUDE_WINDOWS })
-const CLAUDE_EVENT = z.looseObject({
-	type: z.literal('rate_limit_event'),
-	rate_limit_info: CLAUDE_INFO,
-	timestamp: z.string().nullish().catch(undefined),
-})
+const { CLAUDE_EVENT } = agent_usage_limit
 const CODEX_WINDOW = z.looseObject({
 	used_percent: z.number(),
 	window_minutes: z.number(),
@@ -104,7 +95,9 @@ const CODEX_EVENT = z.looseObject({
 })
 const TIMED_LINE = z.looseObject({ timestamp: z.string() })
 
-type ClaudeWindow = z.infer<typeof CLAUDE_WINDOW>
+type ClaudeWindow = NonNullable<
+	z.infer<typeof CLAUDE_EVENT>['rate_limit_info']['unifiedWindows']
+>['five_hour']
 type CodexWindow = z.infer<typeof CODEX_WINDOW>
 
 function claude_window(minutes: number, window: ClaudeWindow | undefined): Array<QuotaWindow> {
@@ -121,7 +114,7 @@ function claude_line(line: string): QuotaReading | undefined {
 
 	const event = json_value.parse_with(line, CLAUDE_EVENT)
 
-	if (event === undefined) return undefined
+	if (event?.rate_limit_info.unifiedWindows === undefined) return undefined
 
 	const { five_hour, seven_day } = event.rate_limit_info.unifiedWindows
 

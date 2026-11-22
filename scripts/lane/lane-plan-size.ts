@@ -1,17 +1,22 @@
+import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { issue_body_keys } from '#scripts/issue/issue-body-keys'
-import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { declared_growth } from '#scripts/split/declared-growth'
 import { split_assess, type SplitGuide } from '#scripts/split/split-assess'
-import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
 import { lane_plan_moves } from './lane-plan-moves'
-import { lane_plan_new_files, type NewFilesFloor } from './lane-plan-new-files'
+import { lane_plan_new_files } from './lane-plan-new-files'
+import {
+	lane_plan_size_text,
+	type FilesOver,
+	type HubOver,
+	type MeasureOver,
+	type Oversize,
+} from './lane-plan-size-text'
 import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget } from './lane-stage-budget'
 
@@ -19,7 +24,7 @@ import { lane_stage_budget } from './lane-stage-budget'
 // the size estimate times the period's files ratio is refused, not recorded, and the lane splits the rest
 // off rather than writing why it stays one. Two lanes declared at 4 files planned 9 with that comment
 // and shipped 16 and 18, their implement step twice the median. Files count as the declaration counts
-// them (`size-estimate.ts`): tests excluded, documents and snapshots included, and a generated artifact
+// them (`size-estimate.ts`): tests, documents and snapshots included, and a generated artifact
 // planned beside its source (`codex_hooks.GENERATED_SOURCES`) excluded. An Issue with no
 // declaration — an epic — or one declaring 0 files, as `lane:stats` skips it, is never refused.
 //
@@ -82,33 +87,6 @@ interface PlanSignals {
 	hubs?: ReadonlyArray<string> | undefined
 }
 
-interface FilesOver {
-	reason: 'files'
-	declared: number
-	limit: number
-	kept: ReadonlyArray<string>
-	split_off: ReadonlyArray<string>
-	tests: ReadonlyArray<string>
-}
-
-interface MeasureOver {
-	reason: 'hunks' | 'lines'
-	declared: number
-	limit: number
-	measured: number
-	floor?: NewFilesFloor | undefined
-	moved?: number | undefined
-}
-
-// `limit` is the test-file cap the hubs' reach passes.
-interface HubOver {
-	reason: 'hub'
-	limit: number
-	hubs: ReadonlyArray<string>
-}
-
-type Oversize = (FilesOver | MeasureOver | HubOver) & { guide?: SplitGuide }
-
 interface Declared {
 	files: number
 	lines: number
@@ -116,7 +94,7 @@ interface Declared {
 
 function declared_of(issue: number, issues: ReadonlyArray<OpenIssueData>): Declared | undefined {
 	const body = issues.find((candidate) => candidate.number === issue)?.body
-	const size = body === undefined ? undefined : size_estimate.declared_size(body)
+	const size = body === undefined ? undefined : size_estimate.comparable_size(body)
 
 	return size === undefined || size.files === 0 ? undefined : size
 }
@@ -167,7 +145,7 @@ function files_approved(
 	)
 }
 
-// Estimate paths and the actual diff exclude the same tests and run records. Generated pairs are
+// Estimate paths and the actual diff count tests and exclude run records alike. Generated pairs are
 // grouped by `split_assess.units_of`, so no caller can split an artifact from its source.
 function is_counted(file: string): boolean {
 	return split_assess.is_deliverable({ path: file, changed_lines: 0 })
@@ -187,11 +165,11 @@ function files_over(
 		return undefined
 	}
 
-	const tests = plan.paths.filter((file) => test_declared_logic.is_test_file(file))
-	const kept = counted.filter((file) => units.slice(0, limit).flat().includes(file))
-	const split_off = counted.filter((file) => units.slice(limit).flat().includes(file))
+	const kept_files = new Set(split_assess.kept_units(units, limit).flat())
+	const kept = counted.filter((file) => kept_files.has(file))
+	const split_off = counted.filter((file) => !kept_files.has(file))
 
-	return { reason: 'files', declared, limit, kept, split_off, tests }
+	return { reason: 'files', declared, limit, kept, split_off }
 }
 
 // The files an earlier clear held — the recorded history, else, for a cleared record that predates it,
@@ -208,13 +186,14 @@ function earlier_cleared(
 // Matched by the ship's `unplanned` rule — a claim ending in `/` holds every file under it — against a
 // wider set: this plan's files and a path an earlier clear of this lane held count as planned too, while
 // the ship's stop reads the recorded `paths` alone (joshuafolkken/kit#5672, joshuafolkken/kit#5679).
-// A directory this plan claims is left out: the files axis counts it as one file, so it passed nothing.
+// A directory or glob this plan claims is left out: the files axis counts it as one file, so it passed
+// nothing.
 function unplanned_hunks(
 	signals: PlanSignals,
 	plan: LanePlan,
 	recorded: LanePlan | undefined,
 ): number {
-	const listed = plan.paths.filter((path) => !path.endsWith('/'))
+	const listed = plan.paths.filter((path) => backlog_overlap.is_file_claim(path))
 	const planned = [...listed, ...(recorded?.paths ?? []), ...earlier_cleared(recorded, signals)]
 
 	return run_ship_planned.unplanned_of(planned, signals.hunk_files).length
@@ -235,7 +214,7 @@ function hunks_over(
 // count. With no measured rate the bar is the guide's fallback lines, which the filing refuses past too.
 function lines_limit(signals: PlanSignals): number {
 	const growth = ratios_of(signals)
-	const bar = size_estimate.declared_lines_bar(signals.implement_rate, growth)
+	const bar = size_estimate.declared_lines_bar({ rate: signals.implement_rate, growth })
 
 	return bar ?? Math.floor(guide_of(signals).lines / declared_growth.factor(growth, 'lines'))
 }
@@ -331,9 +310,9 @@ function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
 	return over !== undefined && (plan.single === true || plan.sized === true)
 }
 
-// The size `over` measured: the plan's files (tests excluded) and the lines axis's projection, else none.
+// The size `over` measured: the plan's counted files and the lines axis's projection, else none.
 function measured_of(plan: LanePlan, over: Oversize): { files: number; lines: number } {
-	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
+	const files = plan.paths.filter((file) => is_counted(file)).length
 
 	return { files, lines: over.reason === 'lines' ? over.measured : 0 }
 }
@@ -382,69 +361,17 @@ function oversize(
 	return over === undefined ? undefined : { ...over, guide: guide_of(signals) }
 }
 
-function bar_tail(): string {
-	return `A \`${split_assess.REASON_PREFIX}\` comment does not pass this bar — split-assessment.md → "${split_assess.QUESTION_SECTION}".`
-}
-
-const SIZE_PREFIX = issue_body_keys.prefix('size')
-const SINGLE_HINT =
-	'`--single "<why it cannot be merged in parts>"` — the reason goes on the Issue and the ledger'
-
-function files_text(issue: number, over: FilesOver): string {
-	const planned = [...over.kept, ...over.split_off]
-	const counted = split_assess.units_of(planned, new Set()).length
-	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
-	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
-
-	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
-}
-
-function waiver_text(issue: number, over: Oversize): string {
-	return `size warning (${over.reason}): ${session_cite.issue(issue)}'s plan is past its ${String(over.limit)} bar, recorded and noted on the ledger — a warning, not a stop; finish this Issue, never split it — an overrun past the cap at the merge is recorded as a pre-split miss (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
-}
-
-function measure_bar(over: MeasureOver): string {
-	if (over.reason === 'hunks') {
-		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`${SIZE_PREFIX}\` declares`
-	}
-
-	const floor =
-		over.floor === undefined ? '' : `, and ${lane_plan_new_files.floor_text(over.floor)}`
-	const moved = over.moved === undefined ? '' : `, and ${lane_plan_moves.moved_text(over.moved)}`
-
-	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration${floor}${moved} — over the ${String(over.limit)} declared lines the size bar allows`
-}
-
-function measure_text(issue: number, over: MeasureOver): string {
-	return `split (${over.reason}): ${session_cite.issue(issue)}'s ${measure_bar(over)}, so the plan is not recorded. Carve a separately-mergeable part off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. ${bar_tail()}`
-}
-
-function hub_text(issue: number, over: HubOver): string {
-	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
-}
-
-function over_text(issue: number, over: Oversize): string {
-	if (over.reason === 'files') return files_text(issue, over)
-
-	return over.reason === 'hub' ? hub_text(issue, over) : measure_text(issue, over)
-}
-
-function refusal_text(issue: number, over: Oversize): string {
-	const text = over_text(issue, over)
-	const guide = over.guide ?? split_assess.guide_for(lane_stage_budget.BUDGET_MINUTES.implement)
-
-	return `${text} ${split_assess.policy_text(guide)}`
-}
-
 const lane_plan_size = {
 	declares,
 	is_past_cap,
 	is_waived,
 	measured_of,
 	oversize,
-	refusal_text,
-	waiver_text,
+	refusal_text: lane_plan_size_text.refusal_text,
+	waiver_text: lane_plan_size_text.waiver_text,
 }
 
 export { lane_plan_size }
-export type { Oversize, PlanSignals, SplitReason }
+export type { PlanSignals, SplitReason }
+
+export { type Oversize } from './lane-plan-size-text'

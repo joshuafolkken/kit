@@ -24,7 +24,10 @@ const SECOND_MS = 1000
 const FAILED_MS = START + SECOND_MS
 const READ_ERROR = 'usage read failed'
 const READ: GatherState = { ...FRESH_GATHER, local: LOCAL, read_ms: START }
-const FAILED_READ = new RegExp(String.raw`❗ ${WORDS.read} \d{2}:\d{2}`, 'u')
+// joshuafolkken/kit#8475: a failing read is said as stale in the notice slot, its reason a finding.
+const FAILED_READ = /❗ stale \S+ · /u
+// The no-run screen still says a failed read on its own line.
+const FAILED_NO_RUN = new RegExp(String.raw`❗ ${WORDS.read} \d{2}:\d{2}`, 'u')
 
 interface Played {
 	carried: Carried | undefined
@@ -75,5 +78,25 @@ describe('run_board_tick.tick over a failed read after a worker frame', () => {
 		expect(failed.display).toBeDefined()
 		expect(drawn).toMatch(FAILED_READ)
 		expect(drawn).toContain(READ_ERROR)
+	})
+})
+
+describe('run_board_tick.tick over failed reads', () => {
+	it('says the reads failed beside no run', async () => {
+		const { ports, frames } = harness(undefined, [])
+		const failed = { ...read_of(FRESH_GATHER), read_failed_ms: FAILED_MS }
+
+		await tick(FRESH_STATE, { ...ports, gather: async () => failed })
+
+		expect(stripVTControlCharacters(frames.join('\n'))).toMatch(FAILED_NO_RUN)
+	})
+
+	it('says the reads failed over the last run read', async () => {
+		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const failed = { ...read_of(READ), read_failed_ms: FAILED_MS }
+
+		await tick(FRESH_STATE, { ...ports, gather: async () => failed })
+
+		expect(stripVTControlCharacters(frames.join('\n'))).toMatch(FAILED_READ)
 	})
 })

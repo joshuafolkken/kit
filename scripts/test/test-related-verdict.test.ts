@@ -90,12 +90,11 @@ describe('test_related_verdict.run — individual stamp greens', () => {
 		)
 		await test_related_verdict.run([], fresh)
 		expect(fresh).toHaveBeenCalledTimes(1)
-		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(
-			TREE.files,
-			undefined,
-			TREE.base,
-			sample.expected,
-		)
+		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(TREE.files, {
+			target: undefined,
+			base: TREE.base,
+			blobs: sample.expected,
+		})
 	})
 })
 
@@ -112,12 +111,11 @@ describe('test_related_verdict.run — scoped stamp refresh', () => {
 		vi.mocked(gate_tree.read_gate_tree).mockResolvedValue(TREE)
 		await test_related_verdict.run([], fresh)
 		expect(fresh).toHaveBeenCalledTimes(2)
-		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(
-			TREE.files,
-			undefined,
-			TREE.base,
-			undefined,
-		)
+		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(TREE.files, {
+			target: undefined,
+			base: TREE.base,
+			blobs: undefined,
+		})
 	})
 
 	it('never refreshes the full scoped stamp for explicit replay arguments', async () => {
@@ -133,12 +131,11 @@ describe('test_related_verdict.run — touched review record', () => {
 		await test_related_verdict.run(['--touched'], fresh)
 		expect(fresh).toHaveBeenCalledTimes(1)
 		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledTimes(2)
-		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(
-			TREE.files,
-			test_related_verdict.touched_target(),
-			TREE.base,
-			undefined,
-		)
+		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(TREE.files, {
+			target: test_related_verdict.touched_target(),
+			base: TREE.base,
+			blobs: undefined,
+		})
 		await test_related_verdict.run([], fresh)
 		expect(fresh).toHaveBeenCalledTimes(2)
 	})
@@ -218,13 +215,15 @@ describe('test_related_verdict.run — review prerequisites', () => {
 	it('admits a review-fix check without satisfying full-reach checks', async () => {
 		let touched: FileMapStamp | undefined
 
-		vi.mocked(review_stamps.test_related_stamp.write).mockImplementation((files, target, base) => {
-			if (target === test_related_verdict.touched_target()) {
-				touched = { files, taken_at: 'now', ...(base !== undefined && { base }) }
-			}
+		vi.mocked(review_stamps.test_related_stamp.write).mockImplementation(
+			(files, { target, base } = {}) => {
+				if (target === test_related_verdict.touched_target()) {
+					touched = { files, taken_at: 'now', ...(base !== undefined && { base }) }
+				}
 
-			return 'unused'
-		})
+				return 'unused'
+			},
+		)
 		vi.mocked(review_stamps.test_related_stamp.read).mockImplementation((target) =>
 			target === test_related_verdict.touched_target() ? touched : undefined,
 		)

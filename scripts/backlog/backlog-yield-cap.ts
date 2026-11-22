@@ -3,6 +3,7 @@ import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_yield } from '#scripts/lane/lane-yield'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -29,7 +30,7 @@ const YIELD_CAP = 3
 const WINDOW_MINUTES = 15
 const WINDOW_MS = WINDOW_MINUTES * MS_PER_MINUTE
 const YIELDED_OUTCOME = 'yielded'
-const TRIP_CAUSE = 'yield cap'
+const TRIP_CAUSE = run_stalled.YIELD_CAP
 
 interface YieldCapPorts {
 	// When this run's lanes on the issue gave their lane back — the stream's yield notes in production.
@@ -45,8 +46,11 @@ function is_tripped(times: ReadonlyArray<string>, now: Date): boolean {
 	return times.filter((at) => Date.parse(at) >= since_ms).length >= YIELD_CAP
 }
 
+// A retry starts the count over: the yields before it already tripped the cap it lifts
+// (joshuafolkken/kit#8665).
 function times_of(events: ReadonlyArray<RunEvent>, issue: string): ReadonlyArray<string> {
-	return events
+	return run_event_retry
+		.current_attempts(events)
 		.filter(
 			(event) => lane_yield.is_yield_note(event) && run_event_scope.issue_named(event) === issue,
 		)

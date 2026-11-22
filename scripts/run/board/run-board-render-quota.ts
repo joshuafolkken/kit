@@ -12,6 +12,7 @@ import {
 	type GithubRateLimit,
 } from './run-board-render-quota-github'
 import { run_board_render_section } from './run-board-render-section'
+import { run_board_row_key } from './run-board-row-key'
 
 // The `⛽ usage` section (joshuafolkken/kit#5395): Claude's and Codex's usage-limit windows, one row
 // each, drawing only the windows the provider reported, shortest first, straight after the name
@@ -77,6 +78,7 @@ interface QuotaHold {
 }
 
 interface QuotaView {
+	is_flash_keyed?: boolean | undefined
 	quotas?: Quotas | undefined
 	scheduler_provider?: QuotaProvider | undefined
 	now_ms: number
@@ -85,6 +87,8 @@ interface QuotaView {
 	rate_limit?: GithubRateLimit | undefined
 	// Whether the frame runs the WOPR lamp panel (`run-board-quota-lamps.ts`).
 	has_lamps?: boolean | undefined
+	// Whether the panel rains (matrix), running the rule's row as a panel row too (joshuafolkken/kit#8647).
+	has_rain?: boolean | undefined
 }
 
 // The windows the provider reported, shortest first — the order its row and its summary both read.
@@ -182,12 +186,22 @@ function cells_text(reading: QuotaReading | undefined, now_ms: number): string {
 	)
 }
 
+// A provider row's body and the age note it ends on, which a lamp panel may leave off
+// (joshuafolkken/kit#8644).
+interface RowText {
+	text: string
+	aside?: string | undefined
+}
+
 // Age annotates the observation; values and warning colors remain readable as it ages.
-function reading_text(reading: QuotaReading | undefined, now_ms: number): string {
+function reading_text(reading: QuotaReading | undefined, now_ms: number): RowText {
 	const cells = cells_text(reading, now_ms)
 	const stale = reading?.windows.length ? stale_text(reading, now_ms) : undefined
+	if (stale === undefined) return { text: cells }
 
-	return stale === undefined ? cells : `${cells} ${styleText('dim', stale)}`
+	const aside = ` ${styleText('dim', stale)}`
+
+	return { text: `${cells}${aside}`, aside }
 }
 
 function hold_text(hold: QuotaHold, now_ms: number): string {
@@ -220,14 +234,19 @@ function name_cell(name: string): string {
 }
 
 // Claude's row reads its hold while a usage limit or an authentication failure stops the run's launches.
-function row_of(provider: QuotaProvider, view: QuotaView): string {
+function row_of(provider: QuotaProvider, view: QuotaView): RowText {
 	const { hold, now_ms } = view
 	const body =
 		provider === 'claude' && hold !== undefined
-			? hold_text(hold, now_ms)
+			? { text: hold_text(hold, now_ms) }
 			: reading_text(view.quotas?.[provider], now_ms)
+	const text = run_board_row_key.flashed(
+		`${INDENT}${name_cell(name_of(provider, view))}${body.text}`,
+		`quota:${provider}`,
+		view.is_flash_keyed,
+	)
 
-	return `${INDENT}${name_cell(name_of(provider, view))}${body}`
+	return { text, aside: body.aside }
 }
 
 // `42/68`: each drawn window's percent; a single `—` where none was reported.
@@ -259,7 +278,13 @@ function rate_limit_rows(view: QuotaView): Array<string> {
 
 	const body = run_board_render_quota_github.row_text(rate_limit, now_ms)
 
-	return [`${INDENT}${name_cell(name_of('github', view))}${body}`]
+	return [
+		run_board_row_key.flashed(
+			`${INDENT}${name_cell(name_of('github', view))}${body}`,
+			'quota:github',
+			view.is_flash_keyed,
+		),
+	]
 }
 
 // `GitHub REST 38% 1877/5000 ↻12:33 · ▶ GraphQL 1% 48/5000 ↻12:40`.
@@ -282,21 +307,40 @@ function summary_of(view: QuotaView): string {
 	return [...parts, ...rate_limit_summary(view)].join(SEPARATOR)
 }
 
+// The provider rows, the first two starting their panels where the frame `has_lamps`, then GitHub's.
+function usage_lines(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
+	const providers = providers_of(view).map((provider) => row_of(provider, view))
+	const texts = run_board_quota_lamps.provider_rows(
+		providers.map((row) => row.text),
+		has_lamps,
+	)
+
+	return [
+		...texts.map((text, index) => ({
+			text,
+			is_detail: false,
+			aside: has_lamps ? providers[index]?.aside : undefined,
+		})),
+		...rate_limit_rows(view).map((text) => ({ text, is_detail: false })),
+	]
+}
+
 // None where no reader is open — a frame drawn with no usage read.
 function usage_part(view: QuotaView): DetailPart | undefined {
 	if (view.quotas === undefined) return undefined
 
 	const has_lamps = view.has_lamps === true
-	const providers = providers_of(view).map((provider) => row_of(provider, view))
-	const rows = [
-		...run_board_quota_lamps.provider_rows(providers, has_lamps),
-		...rate_limit_rows(view),
-	]
-	const lines = rows.map((text) => ({ text, is_detail: false }))
+	const lines = usage_lines(view, has_lamps)
 	const rule = run_board_render_section.columns_rule(LABEL, [])
 	const head = [run_board_quota_lamps.gap_line(has_lamps), rule]
 
-	return { head, lines, label: LABEL, summary: summary_of(view) }
+	return {
+		head,
+		lines,
+		label: LABEL,
+		summary: summary_of(view),
+		is_rule_lamped: has_lamps && view.has_rain === true,
+	}
 }
 
 const run_board_render_quota = { LEGEND, usage_part }

@@ -82,8 +82,15 @@ function pass(pending: ReadonlyArray<Pending>, lanes: Lanes): Array<Pending> {
 	return pending.filter((entry) => !lanes.ends.has(entry.number))
 }
 
-// The time the last lane ends, the waiting rows placed pass after pass until a pass places none.
-function end_of(waiting: ReadonlyArray<BoardRow>, lanes: Lanes): number {
+interface Placement {
+	// When the last lane ends, from now.
+	end: number
+	// When each waiting child placed ends, from now; one never placed is absent.
+	ends: ReadonlyMap<number, number>
+}
+
+// The waiting rows placed pass after pass until a pass places none: when each ends, and the last lane.
+function placed_of(waiting: ReadonlyArray<BoardRow>, lanes: Lanes): Placement {
 	let left = waiting.map((row) => pending_of(row))
 	let placed = Infinity
 
@@ -94,10 +101,13 @@ function end_of(waiting: ReadonlyArray<BoardRow>, lanes: Lanes): number {
 		left = next
 	}
 
-	return Math.max(...lanes.free)
+	const queued = waiting.map((row) => [row.number, lanes.ends.get(row.number)] as const)
+	const ends = new Map(queued.filter((entry): entry is [number, number] => entry[1] !== undefined))
+
+	return { end: Math.max(...lanes.free), ends }
 }
 
-const run_board_estimate_schedule = { end_of }
+const run_board_estimate_schedule = { placed_of }
 
 export { run_board_estimate_schedule }
-export type { Lanes }
+export type { Lanes, Placement }

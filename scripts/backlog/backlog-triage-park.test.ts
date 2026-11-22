@@ -115,7 +115,10 @@ describe("backlog_triage_park.lines_of — an option needing the parent's action
 
 	// joshuafolkken/kit#7771: a filing option's `--done` names the open Issue the parent filed.
 	it('asks a filing option for the filed Issue', async () => {
-		const filing = park(PICK_ONE).replace('必要な権限: なし', '必要な権限: 親（`issue:file`）')
+		const filing = park(PICK_ONE).replace(
+			'必要な権限: なし',
+			'必要な権限: 親（`issue:file`）\n   - 順序の理由: 別の待ちがある — 上流の修正',
+		)
 
 		parked_with([filing])
 

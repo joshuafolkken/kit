@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 
 // The lines a plan's file moves add to `lane:plan`'s lines axis (joshuafolkken/kit#8119): the merge
 // measures a move as the whole file deleted and added (`git-diff-reads.ts` → `NO_RENAME_DETECTION`), and
@@ -36,13 +37,13 @@ function unique_names(files: ReadonlyArray<string>): Set<string> {
 	)
 }
 
-// `counted` are the plan's counted files (tests excluded); a directory claim moves nothing.
+// `counted` are the plan's counted files (tests included); a directory or glob claim moves nothing.
 function sources_of(
 	counted: ReadonlyArray<string>,
 	base_files: ReadonlySet<string> | undefined,
 ): Array<string> {
 	if (base_files === undefined) return []
-	const files = counted.filter((file) => !file.endsWith('/'))
+	const files = counted.filter((file) => backlog_overlap.is_file_claim(file))
 	const listed = files.filter((file) => base_files.has(file))
 	const sources = unique_names(listed)
 	const added = unique_names(files.filter((file) => !base_files.has(file)))

@@ -8,6 +8,7 @@ import { split_assess_cli } from './split-assess-cli'
 const NO_DELETE = '0'
 const A_TS = 'scripts/a.ts'
 const TAB_PATH = 'scripts/a\tb.ts'
+const A_TEST = 'scripts/a.test.ts'
 const OBSERVATION_RECORD = '.josh/observations/6391.md'
 const GUIDE_TEXT = 'guide 8 files / 200 lines'
 const HOOK_SOURCE = '.claude/settings.json'
@@ -53,17 +54,17 @@ describe('split notice on lane:plan units', () => {
 	const declared = { files: 2, lines: 20 }
 
 	it('prints no notice when the new module and its importer count as one', () => {
-		const measurement = split_assess.assess(plan_diff, guide, new Set([new_module]))
+		const measurement = split_assess.assess(plan_diff, { guide, added: new Set([new_module]) })
 
 		expect(measurement.files).toBe(3)
-		expect(split_assess.notice(measurement, declared)).toBeUndefined()
+		expect(split_assess.notice(measurement, { declared })).toBeUndefined()
 	})
 
 	it('still counts each file alone when no file is added', () => {
-		const measurement = split_assess.assess(plan_diff, guide)
+		const measurement = split_assess.assess(plan_diff, { guide })
 
 		expect(measurement.files).toBe(4)
-		expect(split_assess.notice(measurement, declared)).toContain('split notice')
+		expect(split_assess.notice(measurement, { declared })).toContain('split notice')
 	})
 })
 
@@ -91,25 +92,29 @@ describe('parse_numstat', () => {
 	})
 })
 
-describe('measure excludes test files from both counts', () => {
+describe('measure counts test files in both counts', () => {
 	it.each(['quote"name.test.ts', 'tab\tname.e2e.ts', 'line\nname.test.ts'])(
-		'excludes a C-quoted test path: %j',
+		'counts a C-quoted test path: %j',
 		(file) => {
 			const raw = add_row(201, JSON.stringify(file))
 
-			expect(split_assess.assess(raw)).toStrictEqual({ files: 0, lines: 0, verdict: 'single' })
+			expect(split_assess.assess(raw)).toStrictEqual({ files: 1, lines: 201, verdict: 'split' })
 		},
 	)
 
-	it('drops *.test.ts and *.e2e.ts from files and lines', () => {
-		const raw = [
-			add_row(40, A_TS),
-			add_row(500, 'scripts/a.test.ts'),
-			add_row(500, 'scripts/a.e2e.ts'),
-		].join('\n')
+	it('counts *.test.ts and *.e2e.ts in files and lines', () => {
+		const raw = [add_row(40, A_TS), add_row(500, A_TEST), add_row(500, 'scripts/a.e2e.ts')].join(
+			'\n',
+		)
 		const measurement = split_assess.assess(raw)
 
-		expect(measurement).toMatchObject({ files: 1, lines: 40 })
+		expect(measurement).toMatchObject({ files: 3, lines: 1040 })
+	})
+
+	it('splits a change with few non-test lines and many test lines', () => {
+		const raw = [add_row(40, A_TS), add_row(180, A_TEST)].join('\n')
+
+		expect(split_assess.assess(raw).verdict).toBe('split')
 	})
 })
 
@@ -128,7 +133,7 @@ describe('measure excludes run records', () => {
 		const measurement = split_assess.assess(raw)
 
 		expect(measurement).toMatchObject({ files: 3, lines: 3 })
-		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeDefined()
+		expect(split_assess.notice(measurement, { declared: { files: 1, lines: 10 } })).toBeDefined()
 	})
 })
 
@@ -174,10 +179,10 @@ describe('is_over_cap is one and a half times the guide', () => {
 })
 
 describe('reason', () => {
-	it('reports the excluded-test counting and the guide on a single verdict', () => {
+	it('reports the included-test counting and the guide on a single verdict', () => {
 		const reason = split_assess.reason({ files: 2, lines: 30, verdict: 'single' })
 
-		expect(reason).toContain('2 changed file(s), 30 changed line(s), tests excluded')
+		expect(reason).toContain('2 changed file(s), 30 changed line(s), tests included')
 		expect(reason).toContain('under the guide on both axes')
 	})
 
@@ -213,9 +218,9 @@ describe('notice', () => {
 		const declared = { files: 0, lines: 0 }
 
 		expect(
-			split_assess.notice({ files: 8, lines: 200, verdict: 'single' }, declared),
+			split_assess.notice({ files: 8, lines: 200, verdict: 'single' }, { declared }),
 		).toBeUndefined()
-		expect(split_assess.notice({ files: 9, lines: 10, verdict: 'split' }, declared)).toContain(
+		expect(split_assess.notice({ files: 9, lines: 10, verdict: 'split' }, { declared })).toContain(
 			GUIDE_TEXT,
 		)
 	})
@@ -226,19 +231,24 @@ describe('notice against a declared size', () => {
 	const DECLARED = { files: 3, lines: 40 }
 
 	it('fires at 7 files, past 3 declared files × 2', () => {
-		const notice = split_assess.notice({ files: 7, lines: 40, verdict: 'single' }, DECLARED)
+		const notice = split_assess.notice(
+			{ files: 7, lines: 40, verdict: 'single' },
+			{ declared: DECLARED },
+		)
 
 		expect(notice).toContain('declared 3 files / 40 lines; growth files × 2 (fallback)')
 		expect(notice).toContain('= 6 files / 80 lines')
 	})
 
 	it('fires at 81 lines, past 40 declared lines × 2', () => {
-		expect(split_assess.notice({ files: 1, lines: 81, verdict: 'single' }, DECLARED)).toBeDefined()
+		expect(
+			split_assess.notice({ files: 1, lines: 81, verdict: 'single' }, { declared: DECLARED }),
+		).toBeDefined()
 	})
 
 	it('prints nothing at the grown bar on both axes', () => {
 		expect(
-			split_assess.notice({ files: 6, lines: 80, verdict: 'single' }, DECLARED),
+			split_assess.notice({ files: 6, lines: 80, verdict: 'single' }, { declared: DECLARED }),
 		).toBeUndefined()
 	})
 })
@@ -248,7 +258,7 @@ describe('notice against a declaration grown past the guide', () => {
 	it('caps a declaration grown past the guide at the guide', () => {
 		const notice = split_assess.notice(
 			{ files: 9, lines: 40, verdict: 'split' },
-			{ files: 8, lines: 200 },
+			{ declared: { files: 8, lines: 200 } },
 		)
 
 		expect(notice).toContain(GUIDE_TEXT)
@@ -257,7 +267,7 @@ describe('notice against a declaration grown past the guide', () => {
 	it('caps only the axis grown past the guide', () => {
 		const notice = split_assess.notice(
 			{ files: 1, lines: 201, verdict: 'split' },
-			{ files: 3, lines: 150 },
+			{ declared: { files: 3, lines: 150 } },
 		)
 
 		expect(notice).toContain('lines × 2 (fallback), capped at the guide = 6 files / 200 lines')
@@ -265,7 +275,10 @@ describe('notice against a declaration grown past the guide', () => {
 
 	it('falls back to the guide for a declaration of zero lines', () => {
 		expect(
-			split_assess.notice({ files: 1, lines: 1, verdict: 'single' }, { files: 2, lines: 0 }),
+			split_assess.notice(
+				{ files: 1, lines: 1, verdict: 'single' },
+				{ declared: { files: 2, lines: 0 } },
+			),
 		).toBeUndefined()
 	})
 })

@@ -290,12 +290,16 @@ describe('the resume event', () => {
 		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.RESUME, `#${ISSUE} resumed`)
 	})
 
-	it('appends nothing when a pre-gate cut resumes into the gate', async () => {
+	// joshuafolkken/kit#8583: `lane:stats` times every resume to its session's next progress.
+	it('appends a gate-marked resume event when a pre-gate cut resumes into the gate', async () => {
 		existing_cut()
 
 		await run_cut_cli.run(['--resume', ISSUE])
 
 		expect(verdict()).toBe(run_cut_cli.RESUME_VERDICT)
-		expect(emit).not.toHaveBeenCalled()
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.RESUME,
+			`#${ISSUE} resumed (gate)`,
+		)
 	})
 })

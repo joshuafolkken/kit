@@ -9,23 +9,30 @@ import { review_attest, type ReviewSlot } from './review-attest'
 //
 // **The trigger follows the level** (joshuafolkken/kit#8337): which launch this is — round 1, the
 // interaction review beside it, the paired run, round 2 or a retry — so `cost:audit` reads the cause of
-// each reviewer run back off its transcript with `trigger_of`.
+// each reviewer run back off its transcript with `trigger_of`. A rerun names its cause in place of the
+// slot's word (joshuafolkken/kit#8379), so an avoidable launch is told from a first one.
 
 const LEVEL_PATTERN = /^(low|medium|high|xhigh|max)(?:$| — )/u
 const SEPARATOR = ' — '
+const RETRY = {
+	ATTEST: 'attest-retry',
+	STALE: 'stale-retry',
+	POST_CONFLICT: 'post-conflict',
+} as const
 const TRIGGERS = [
 	'initial',
 	'interaction',
 	'paired',
 	'round-2',
-	'attest-retry',
-	'stale-retry',
-	'post-conflict',
+	RETRY.ATTEST,
+	RETRY.STALE,
+	RETRY.POST_CONFLICT,
 ] as const
 const TRIGGER_WORDS: ReadonlySet<string> = new Set(TRIGGERS)
 const TRIGGER_PATTERN = /(?:^| — )trigger: ([a-z0-9-]+) — /u
 
 type ReviewTrigger = (typeof TRIGGERS)[number]
+type RetryTrigger = (typeof RETRY)[keyof typeof RETRY]
 
 // The level a line opens with — a brief's bare first line or a prompt's lead — `undefined` otherwise.
 function level_of(line: string): string | undefined {
@@ -58,6 +65,6 @@ function opening(brief_path: string, trigger: ReviewTrigger): string {
 	return `${lead}trigger: ${trigger}${SEPARATOR}`
 }
 
-const review_prompt_level = { TRIGGERS, level_of, opening, round_one_trigger, trigger_of }
+const review_prompt_level = { RETRY, TRIGGERS, level_of, opening, round_one_trigger, trigger_of }
 
-export { review_prompt_level, type ReviewTrigger }
+export { review_prompt_level, type RetryTrigger, type ReviewTrigger }

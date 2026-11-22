@@ -173,8 +173,7 @@ async function read_since_green(
 	const verdict = await since_green.read_verdict(
 		review_stamps.lint_related_stamp,
 		gate_labels.LINT_LABEL,
-		undefined,
-		before,
+		{ tree: before },
 	)
 
 	if ('parts' in verdict) return moved_paths.union_of(verdict.parts)

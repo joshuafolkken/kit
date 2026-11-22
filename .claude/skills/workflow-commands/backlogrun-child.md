@@ -15,7 +15,7 @@ or a split found mid-run does **not** stop it:
 
 **A split** → file the children with `route:split` (no confirmation) by `split-assessment.md` → "Two
 or more always means an epic", then
-`pnpm josh run:split <N> --children <N1,N2,...> [--chain "#A -> #C" ... --order-reason "#A -> #C: <reason>" ...] [--title "<title>"]` (`docs/josh-commands-run.md`
+`pnpm josh run:split <N> --children <N1,N2,...> [--chain "#A -> #C" ... --order-reason "#A -> #C: <kind> — <reason>" ...] [--title "<title>"]` (`docs/josh-commands-run.md`
 → "`josh run:split`"). `epic #<E>` → continue into the loop against `#<E>`; `needs-decision` → report.
 
 **A prerequisite** `<P>` → file it with `route:tier-a` (no confirmation), then

@@ -17,7 +17,8 @@ type CueDecision = Pick<BoardState, 'sound_snapshot' | 'sound_pending' | 'notice
 // The cue this frame picked over the last one's, kept as the notice the header draws whether it sounds or
 // not, and what the next frame weighs its own against. A frame before the plan is read is no base — the
 // rows the plan brings were already there — so the frame the plan arrives on is the first base, silent.
-// It is decided before the frame is drawn, so the notice shows on the frame it sounds on.
+// It is decided before the frame is drawn, so the notice shows on the frame it sounds on, and is said
+// settled once its cause no longer holds (joshuafolkken/kit#8475).
 function decided(
 	state: CueState,
 	header: SoundHeader,
@@ -32,7 +33,8 @@ function decided(
 		state.sound_pending,
 		now_ms,
 	)
-	const notice = run_board_header_notice.next(state.notice, sounding, now_ms)
+	const held = snapshot === undefined ? undefined : run_board_sound_transition.held_causes(snapshot)
+	const notice = run_board_header_notice.next(state.notice, sounding, now_ms, held)
 
 	return { sound_snapshot: snapshot, sound_pending: pending, notice, cue: sounding?.cause.cue }
 }

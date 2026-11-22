@@ -132,7 +132,7 @@ describe('a line josh writes into an Issue body', () => {
 		if (finding === undefined) throw new Error('fixture did not parse')
 
 		expect(disposition_batch_filing.body_of(finding, 1)).toContain(
-			'- Size estimate: about 1 files / 20 lines (excluding tests)',
+			'- Size estimate: about 1 files / 20 lines (including tests)',
 		)
 	})
 

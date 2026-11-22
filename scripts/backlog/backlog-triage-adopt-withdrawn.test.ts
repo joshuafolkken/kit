@@ -108,6 +108,8 @@ describe('backlog:triage --apply --adopt — a lane a person withdrew', () => {
 
 		await expect(adopt()).resolves.toBe(0)
 
-		expect(josh_command.josh_run).toHaveBeenCalledWith(['run:add', ISSUE, '--retry'], true)
+		expect(josh_command.josh_run).toHaveBeenCalledWith(['run:add', ISSUE, '--retry'], {
+			should_forward_stderr: true,
+		})
 	})
 })

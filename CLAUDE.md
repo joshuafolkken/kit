@@ -9,6 +9,7 @@
 - **No clones — single-source, even across package boundaries.** Duplicate non-trivial logic only after presenting the alternative and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "no-clones".
 - **Design for elegance and simplicity first.** Before adding a hook, guard, rule or abstraction, ask whether fixing the cause makes it unnecessary. `prompts/collaboration-workflow/principles.md` → "elegant-design"; conflicting quality goals, or a remedy for defects → "quality-priority".
 - **Write concise prose: conditions and actions only.** `prompts/collaboration-workflow/principles.md` → "concise-prose".
+- **Aim for 120, not 80.** Reproduce a reference fully before adding one touch of your own; without one, show the real thing. `prompts/collaboration-workflow/principles.md` → "reproduce-first".
 - **Never hand remaining steps back to the user.** Run them or leave them to the run; asking for a decision, give your recommendation and why. `prompts/collaboration-workflow/principles.md` → "concise-reply".
 - **Distinguish consultation from execution.** Imperative requests, main-line scope, handoff: `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
 - **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config; in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
@@ -50,7 +51,7 @@ Before building a feature, run `pnpm josh pkg:scout <keywords>` and act on its `
 
 ## Completion gate (before you tell the user work is done)
 
-In order, none skipped: tests (Step 0) → refactor → `pnpm josh gate` → Pre-commit Self-Review → IDE feedback → E2E (`prompts/testing-guide.md` → "Closing the E2E gate without a human run") → live-execution evidence (`prompts/collaboration-workflow/report-format.md`). **UI verification:** a rendered-UI change is not done until you have looked at it with `/verify-ui`, or asked the user to.
+In order, none skipped: tests (Step 0) → refactor → `pnpm josh gate` → Pre-commit Self-Review → IDE feedback → E2E (`prompts/testing-guide.md` → "Closing the E2E gate without a human run") → live-execution evidence (`prompts/collaboration-workflow/report-format.md`). **UI verification:** a rendered-UI change is not done until you have looked at it with `/verify-ui`, or asked the user to (`post_merge_check:` → `/verify-ui`).
 
 ## Pre-commit Self-Review (mandatory)
 

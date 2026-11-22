@@ -1,7 +1,11 @@
+import { WriteStream } from 'node:tty'
+import { styleText } from 'node:util'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { z } from 'zod'
+import { run_board_icons, type Icons } from './run-board-icons'
+import type { Theme } from './run-board-theme-defs'
 
 // The last frame `run:board --chat` and `--once` drew, kept per checkout and per form in `/tmp`, so a
 // progress question asked again within a minute is answered from it without reading anything — a read
@@ -11,6 +15,21 @@ const FRAME_PREFIX = 'josh-run-board-frame-'
 const FRESH_MS = MS_PER_MINUTE
 const CHAT_KEY = 'chat'
 const ONCE_KEY = 'once'
+const COLOR_PROBE = 'x'
+const COLOR_LEVELS = ['0', '1', '2', '3'] as const
+const NO_COLOR_LEVEL = '0'
+// The depths `getColorDepth` answers past 2 colors, in bits: 16, 256 and 16 million colors.
+const DEPTH_16 = 4
+const DEPTH_256 = 8
+const DEPTH_TRUE = 24
+// `FORCE_COLOR`'s level for each of them.
+const LEVEL_OF_DEPTH = new Map<number, ColorLevel>([
+	[DEPTH_16, '1'],
+	[DEPTH_256, '2'],
+	[DEPTH_TRUE, '3'],
+])
+
+type ColorLevel = (typeof COLOR_LEVELS)[number]
 
 interface RecordedFrame {
 	text: string
@@ -151,12 +170,31 @@ function save_only(store: FrameStore | undefined): FrameStore | undefined {
 	return { load: no_record, save: store.save }
 }
 
-// A still frame in a theme is drawn in its own colors, and one on a terminal carries its links, so each
-// theme and each output keeps its own record.
-function once_key(theme: string | undefined, is_tty: boolean): string {
-	const output = is_tty ? 'tty' : 'pipe'
+// joshuafolkken/kit#8616: the `FORCE_COLOR` level this process's stdout draws at — `0` for none — as
+// `styleText` decides it from stdout and the color variables, as every color on the frame does.
+function color_level(): ColorLevel {
+	if (styleText('red', COLOR_PROBE) === COLOR_PROBE) return NO_COLOR_LEVEL
 
-	return theme === undefined ? `${ONCE_KEY}-${output}` : `${ONCE_KEY}-${theme}-${output}`
+	return LEVEL_OF_DEPTH.get(WriteStream.prototype.getColorDepth()) ?? NO_COLOR_LEVEL
+}
+
+// So a frame forced into color is never answered by one recorded without, nor the reverse.
+function colors_drawn(): string | undefined {
+	const level = color_level()
+
+	return level === NO_COLOR_LEVEL ? undefined : `color${level}`
+}
+
+// A still frame in a theme is drawn in its own colors, and one on a terminal carries its links, so each
+// theme and each output keeps its own record; icons other than the theme's default keep theirs too
+// (joshuafolkken/kit#8505).
+function once_key(theme: Theme | undefined, is_tty: boolean, icons?: Icons): string {
+	const output = is_tty ? 'tty' : 'pipe'
+	const drawn = icons === run_board_icons.default_of(theme) ? undefined : icons
+
+	return [ONCE_KEY, theme, drawn, output, colors_drawn()]
+		.filter((part) => part !== undefined)
+		.join('-')
 }
 
 function is_fresh(age_ms: number): boolean {
@@ -188,7 +226,9 @@ function recording(
 
 const run_board_frame_store = {
 	CHAT_KEY,
+	COLOR_LEVELS,
 	FRESH_MS,
+	color_level,
 	file_store,
 	fresh,
 	latest_writer,
@@ -200,4 +240,4 @@ const run_board_frame_store = {
 }
 
 export { run_board_frame_store }
-export type { FileFrameStore, FrameStore, RecordedFrame }
+export type { ColorLevel, FileFrameStore, FrameStore, RecordedFrame }

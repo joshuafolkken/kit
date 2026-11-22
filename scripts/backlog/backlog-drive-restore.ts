@@ -1,6 +1,8 @@
 import { lane_yield } from '#scripts/lane/lane-yield'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
+import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { backlog_offer_exclude } from './backlog-offer-exclude'
 import { backlog_triage_withdrawn } from './backlog-triage-withdrawn'
 
@@ -72,10 +74,51 @@ function issues_of_kind(events: ReadonlyArray<RunEvent>, kind: string): Readonly
 // The issues a person withdrew from this run and nobody launched again: the withdrawal leaves the issue
 // open for the next run, so this one keeps it out of the offer (joshuafolkken/kit#4365). A lane that
 // yielded stays in the run: its retained plan holds it back until the holder ends (`lane-yield.ts`).
+// A person's `run:add --retry` after the withdrawal starts a new attempt, so the issue is offered
+// again (joshuafolkken/kit#8599).
 function withdrawn_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
-	const named = issues_of_kind(events, run_event_stream.EVENT_KIND.WITHDRAW)
+	const current = run_event_retry.current_attempts(events)
+	const named = issues_of_kind(current, run_event_stream.EVENT_KIND.WITHDRAW)
 
-	return named.filter((issue) => backlog_triage_withdrawn.is_withdrawn(events, issue))
+	return named.filter((issue) => backlog_triage_withdrawn.is_withdrawn(current, issue))
+}
+
+// Whether the drive parked the issue for giving its lane back too often (`backlog-yield-cap.ts`).
+function is_yield_capped(events: ReadonlyArray<RunEvent>, issue: string): boolean {
+	return events.some(
+		(event) =>
+			event.kind === run_event_stream.EVENT_KIND.PARK &&
+			run_event_scope.issue_named(event) === issue &&
+			run_stalled.cause_in(event.text) === run_stalled.YIELD_CAP,
+	)
+}
+
+// The exclusions a later `run:add --retry` lifts: a person's withdrawal (joshuafolkken/kit#8599) and
+// the yield cap's park (joshuafolkken/kit#8665).
+const LIFTED_BY_RETRY: ReadonlyArray<(events: ReadonlyArray<RunEvent>, issue: string) => boolean> =
+	[backlog_triage_withdrawn.is_withdrawn, is_yield_capped]
+
+function is_readmitted(
+	events: ReadonlyArray<RunEvent>,
+	current: ReadonlyArray<RunEvent>,
+	issue: string,
+): boolean {
+	return LIFTED_BY_RETRY.some((excluded) => excluded(events, issue) && !excluded(current, issue))
+}
+
+// An exclusion less the issues a later `run:add --retry` put back: the drive added them when it
+// collected the withdrawn or yield-capped child, or carried them in on its `--exclude`. One the retried
+// attempt settled again — merged, say — stays out.
+function without_readmitted(
+	exclude: ReadonlyArray<string>,
+	events: ReadonlyArray<RunEvent>,
+): ReadonlyArray<string> {
+	const current = run_event_retry.current_attempts(events)
+	const settled = settled_issues(events)
+
+	return exclude.filter(
+		(issue) => settled.has(Number(issue)) || !is_readmitted(events, current, issue),
+	)
 }
 
 // The issues this run found waiting for their measurement sample (joshuafolkken/kit#6503): a drive
@@ -85,11 +128,11 @@ function waiting_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> 
 }
 
 // What a drive seeded from the stream keeps out of its offers: the resume line's exclusion with the
-// withdrawals beside it, and the sample waits apart from both.
+// withdrawals beside it, less what a retry put back, and the sample waits apart from both.
 function left_out(events: ReadonlyArray<RunEvent>, carried: ReadonlyArray<string>): LeftOut {
 	const exclude = [...new Set([...carried, ...withdrawn_issues(events)])]
 
-	return { exclude, waiting: [...waiting_issues(events)] }
+	return { exclude: [...without_readmitted(exclude, events)], waiting: [...waiting_issues(events)] }
 }
 
 // The offer's exclusion as the stream records it: the merged and withdrawn children, the ones waiting
@@ -108,6 +151,14 @@ function parked_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
 			Number,
 		),
 	)
+}
+
+// The parks the drive may retry on its own. One a person withdrew is theirs to put back with
+// `run:add --retry`, which re-admits it, so no automatic retry takes it (joshuafolkken/kit#8599).
+function retryable_parks(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
+	const withdrawn = new Set(withdrawn_issues(events).map(Number))
+
+	return new Set([...parked_issues(events)].filter((issue) => !withdrawn.has(issue)))
 }
 
 // The issues this invocation launched or settled — any other dispatched lane was carried in from an
@@ -147,6 +198,8 @@ export const backlog_drive_restore = {
 	offer_exclude,
 	restore,
 	withdrawn_issues,
+	without_readmitted,
 	settled_issues,
 	parked_issues,
+	retryable_parks,
 }

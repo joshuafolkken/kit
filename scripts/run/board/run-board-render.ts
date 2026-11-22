@@ -12,6 +12,8 @@ import {
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
+import type { PinnedIssue } from './run-board-pinned-graphql'
+import { run_board_priority } from './run-board-priority'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
 import { run_board_render_lanes } from './run-board-render-lanes'
@@ -29,7 +31,10 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_rule_width } from './run-board-rule-width'
 import type { Thanks } from './run-board-thanks-csv'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
+import { run_board_watch_panel } from './run-board-watch-panel'
+import { run_board_watch_row } from './run-board-watch-row'
 
 // The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
 // terminal. The header says where the run is; under it the run's own rows, then the ones waiting on a
@@ -48,7 +53,8 @@ const { TITLE_LIMIT, WHOLE, title_of } = run_board_render_title
 const { width_for } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, kept_section, keyed, plan_section } = run_board_render_section
-const { GAP, row_line, shared_overrun } = run_board_render_row
+const { GAP, row_line, shared_overrun, title_width } = run_board_render_row
+const { tally_of } = run_board_priority
 const BRANCH = `${ROW_INDENT}   ├ `
 const LAST_BRANCH = `${ROW_INDENT}   └ `
 const { bounded } = run_board_fold
@@ -65,6 +71,10 @@ interface BoardView extends FrameBounds {
 	throughput?: ReadonlyArray<ThroughputRow> | undefined
 	// Whether the throughput rows end on the lamp panel (`run-board-lamps.ts`).
 	has_lamps?: boolean | undefined
+	// Whether the lamp panel rains (matrix): the usage rule's row then carries the panel as well.
+	has_rain?: boolean | undefined
+	// The repository's pinned issues, drawn as the watch panel at the header's right.
+	pinned?: ReadonlyArray<PinnedIssue> | undefined
 }
 
 function bare(text: string): PlanLine {
@@ -146,6 +156,15 @@ function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 	return [kept_section(pair(STATE_ICONS.waiting, WORDS.queued), lines)]
 }
 
+// The decision rows' frame: what to decide matters more than the title, so their title column is as
+// wide as their widest title and, drawing no time (`run-board-render-row.ts` timed_parts), their
+// action starts right after the titles (joshuafolkken/kit#8590).
+function decision_frame(rows: ReadonlyArray<BoardRow>, frame: RowFrame): RowFrame {
+	const title_limit = Math.max(0, ...rows.map((row) => title_width(row, frame)))
+
+	return { ...frame, section: 'decision', title_limit }
+}
+
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
 // ones waiting on a person's decision — a child parked on one and an untouched plan row alike
 // (joshuafolkken/kit#4099).
@@ -163,7 +182,7 @@ function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 		frame.columns,
 	)
 
-	const decided = rows_section(decision, people, { ...frame, section: 'decision' })
+	const decided = rows_section(decision, people, decision_frame(people, frame))
 
 	return [...lanes, ...planned(frame.header, decided)]
 }
@@ -175,47 +194,81 @@ function waiting_section(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 	return rows_section(waiting, layout.unreached, { ...frame, section: 'waiting' }, 'waiting')
 }
 
+// The queued, waiting and done sections, the first two counting their priorities beside their rows
+// (joshuafolkken/kit#8511), the plan read in flight and the saved plan's age at the queued rule's end
+// (joshuafolkken/kit#8512).
+function below_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+	const { header } = frame
+	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
+	const done = run_board_row_sections.done_rows(layout)
+	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
+	const waiting = waiting_section(layout, conditioned)
+	const queued_tally = tally_of(run_board_layout.queued_rows(layout))
+
+	return [
+		...keyed('queued', planned(header, queued), queued_tally, run_board_header.queued_tail(header)),
+		...keyed('waiting', planned(header, waiting), tally_of(layout.unreached)),
+		...done_section(done, (row) => row_line(ROW_INDENT, row, { ...conditioned, section: 'done' })),
+	]
+}
+
 // The plan's rest under the findings, the 🔗 waiting rows giving way before them.
 function plan_parts(
 	header: BoardHeader,
 	notes: ReadonlyArray<BoardNote>,
 	size: TerminalSize | undefined,
-): Pick<FrameParts, 'below' | 'plan' | 'rule_width'> {
+): Pick<FrameParts, 'below' | 'columns' | 'plan'> & { rule_width: number } {
 	const { layout } = header
 	const frame = frame_of(header, notes, size)
-	const rule_width = run_board_rule_width.rule_width(frame)
+	const widths = { rule_width: run_board_rule_width.rule_width(frame), columns: size?.columns }
 
-	if (layout === undefined) return { plan: [], rule_width }
+	if (layout === undefined) return { plan: [], ...widths }
 
-	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
-	const done = run_board_row_sections.done_rows(layout)
-	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
+	return { plan: active_sections(layout, frame), ...widths, below: below_sections(layout, frame) }
+}
+
+// The header with the pinned issues' watch panel at its right (joshuafolkken/kit#8607), then the
+// session a stopped run resumes from.
+function above_of(view: BoardView, rule_width: number): Array<string> {
+	const rows = (view.pinned ?? []).map((pin) => run_board_watch_row.watch_row(view.header, pin))
+	const header = run_board_header.header_lines(view.header)
+
+	return [...run_board_watch_panel.composed(header, rows, rule_width), ...resume_lines(view.resume)]
+}
+
+// The throughput and usage sections, their rows keyed for the change flash where the theme flashes
+// (joshuafolkken/kit#8353).
+function figure_parts(
+	view: BoardView,
+	is_flash_keyed: boolean,
+): Pick<FrameParts, 'throughput' | 'usage'> {
+	const { header, has_lamps } = view
 
 	return {
-		plan: active_sections(layout, frame),
-		rule_width,
-		below: [
-			...keyed('queued', planned(header, queued)),
-			...keyed('waiting', planned(header, waiting_section(layout, conditioned))),
-			...done_section(done, (row) =>
-				row_line(ROW_INDENT, row, { ...conditioned, section: 'done' }),
-			),
-		],
+		throughput: run_board_render_throughput.throughput_part(
+			view.throughput,
+			has_lamps,
+			run_board_header.alert_part(header),
+			is_flash_keyed,
+		),
+		usage: run_board_render_quota.usage_part({
+			...header,
+			hold: header.quota_hold,
+			has_lamps,
+			has_rain: view.has_rain,
+			is_flash_keyed,
+		}),
 	}
 }
 
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
+	const plan = plan_parts(header, notes, view.size)
+	const is_flash_keyed = run_board_theme_defs.live_of(header.theme).flash === true
 	const parts = {
-		above,
-		throughput: run_board_render_throughput.throughput_part(view.throughput, view.has_lamps),
-		usage: run_board_render_quota.usage_part({
-			...header,
-			hold: header.quota_hold,
-			has_lamps: view.has_lamps,
-		}),
-		...plan_parts(header, notes, view.size),
+		above: above_of(view, plan.rule_width),
+		...figure_parts(view, is_flash_keyed),
+		...plan,
 		processes: run_board_render_processes.processes_part(header),
 		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),
 		thanks: thanks_part(view.thanks, view.link, view.size?.columns),
@@ -223,7 +276,7 @@ function render(view: BoardView): Array<string> {
 		footer: view.footer ?? [],
 	}
 
-	return run_board_label_pair.settled(bounded(parts, view), header)
+	return run_board_label_pair.settled(bounded(parts, { ...view, is_flash_keyed }), header)
 }
 
 const run_board_render = {

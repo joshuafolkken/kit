@@ -73,7 +73,7 @@ function refusal_after(
 ): string | undefined {
 	const payload = payload_of(lines_transcript(name, lines), file_path)
 
-	return large_read_refusal(payload, NOW_MS)
+	return large_read_refusal(payload, { now_ms: NOW_MS })
 }
 
 beforeEach(() => {
@@ -92,13 +92,13 @@ describe('large_read_refusal — which reads it refuses', () => {
 	it('refuses a whole-file read of a file over the limit', () => {
 		const payload = payload_of(transcript_of('large'), large_file())
 
-		expect(large_read_refusal(payload, NOW_MS)).toBe(large_reads.REASON)
+		expect(large_read_refusal(payload, { now_ms: NOW_MS })).toBe(large_reads.REASON)
 	})
 
 	it('allows a whole-file read of a file at the limit', () => {
 		const payload = payload_of(transcript_of('small'), subject_file(large_reads.LARGE_READ_BYTES))
 
-		expect(large_read_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(large_read_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it.each([{ offset: 100 }, { limit: 50 }])(
@@ -106,21 +106,21 @@ describe('large_read_refusal — which reads it refuses', () => {
 		(slice) => {
 			const payload = payload_of(transcript_of('sliced'), large_file(), slice)
 
-			expect(large_read_refusal(payload, NOW_MS)).toBeUndefined()
+			expect(large_read_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 		},
 	)
 
 	it('allows a read of a file that cannot be stat-ed', () => {
 		const payload = payload_of(transcript_of('missing'), path.join(WORK_DIRECTORY, 'none.md'))
 
-		expect(large_read_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(large_read_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing when the switch is off', () => {
 		process.env[SWITCH_ENV_KEY] = 'off'
 		const payload = payload_of(transcript_of('off'), large_file())
 
-		expect(large_read_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(large_read_refusal(payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -150,7 +150,8 @@ describe('large_read_outcome — a lane child is nudged, not killed', () => {
 	it('raises a notice instead of a refusal', () => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		const lane = context_of(LANE_DIRECTORY, { [lane_child_marker.KEY]: LANE_ISSUE })
-		const result = large_read_outcome(payload_of(transcript_of('lane'), large_file()), NOW_MS, lane)
+		const options = { now_ms: NOW_MS, context: lane }
+		const result = large_read_outcome(payload_of(transcript_of('lane'), large_file()), options)
 
 		expect(result.reason).toBeUndefined()
 		expect(result.notice).toBe(large_reads.NOTICE)
@@ -161,8 +162,10 @@ describe('large_read_outcome — a lane child is nudged, not killed', () => {
 		const lane = context_of(LANE_DIRECTORY, { [lane_child_marker.KEY]: LANE_ISSUE })
 		const payload = payload_of(transcript_of('lane-quiet'), large_file())
 
-		expect(large_read_outcome(payload, NOW_MS, lane).notice).toBe(large_reads.NOTICE)
-		expect(large_read_outcome(payload, NOW_MS, lane).notice).toBeUndefined()
+		expect(large_read_outcome(payload, { now_ms: NOW_MS, context: lane }).notice).toBe(
+			large_reads.NOTICE,
+		)
+		expect(large_read_outcome(payload, { now_ms: NOW_MS, context: lane }).notice).toBeUndefined()
 	})
 
 	it('speaks again once a Read has landed after the notice', () => {
@@ -174,7 +177,11 @@ describe('large_read_outcome — a lane child is nudged, not killed', () => {
 		]
 		const payload = payload_of(lines_transcript('lane-rearm', lines), large_file())
 
-		expect(large_read_outcome(payload, EARLIER_MS, lane).notice).toBe(large_reads.NOTICE)
-		expect(large_read_outcome(payload, EARLIER_MS, lane).notice).toBe(large_reads.NOTICE)
+		expect(large_read_outcome(payload, { now_ms: EARLIER_MS, context: lane }).notice).toBe(
+			large_reads.NOTICE,
+		)
+		expect(large_read_outcome(payload, { now_ms: EARLIER_MS, context: lane }).notice).toBe(
+			large_reads.NOTICE,
+		)
 	})
 })

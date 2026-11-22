@@ -69,7 +69,7 @@ function listing(
 		title: 'size approval',
 		createdAt: '2026-11-06T00:00:00Z',
 		labels: [{ name: 'in-progress' }],
-		body: `## 背景\n\n- 規模見積もり: 約 ${String(files)} ファイル / 170 行（テスト除く）`,
+		body: `## 背景\n\n- 規模見積もり: 約 ${String(files)} ファイル / 170 行（テスト含む）`,
 	}
 
 	return { kind: 'read' as const, issues: [own], cutoff: cutoff_of(1, LIMIT, false) }
@@ -157,7 +157,7 @@ describe('lane:plan approval scope', () => {
 			...read,
 			issues: read.issues.map((row) => ({
 				...row,
-				body: '## 背景\n\n- 規模見積もり: 約 3 ファイル / 180 行（テスト除く）',
+				body: '## 背景\n\n- 規模見積もり: 約 3 ファイル / 180 行（テスト含む）',
 			})),
 		})
 		signals.mockResolvedValue({ ...QUIET, lines_ratio: 1.13 })

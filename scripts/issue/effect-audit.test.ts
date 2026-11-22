@@ -116,7 +116,7 @@ describe('effect_audit.draft_body — the retirement candidate', () => {
 
 		expect(body).toContain('- 出どころ: #4897 の計測（`measured:unmet`）')
 		expect(body).toContain('- [ ] #4896 で足した機構を撤去するか縮小し')
-		expect(body).toContain('- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）')
+		expect(body).toContain('- 規模見積もり: 約 <N> ファイル / <M> 行（テスト含む）')
 		expect(row === undefined ? '' : effect_audit.draft_title(row)).toContain('#4896')
 	})
 

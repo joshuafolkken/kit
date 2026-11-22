@@ -9,9 +9,9 @@ import { test_symbol_users, type Reach, type Source, type SymbolIndex } from './
 
 // **The test files a change selects by the users of what it changed** (joshuafolkken/kit#7980, the
 // depth decided in #7979): every user is followed, but the command map passes a change on to its own
-// tests alone, and where that still selects more than the cap the walk falls back to one file
-// boundary. A test that mocks a changed module whole does not run on it; a changed command registry
-// entry selects the tests naming the command.
+// tests alone, and where that still selects more than the cap the nearest rings come first. A test
+// that mocks a changed module whole does not run on it; a changed command registry entry selects the
+// tests naming the command.
 
 const HUB_KEYS: ReadonlySet<string> = new Set(['scripts/josh/josh-command-map.ts::COMMAND_MAP'])
 const FULL: Reach = { max_hops: Infinity, stops: HUB_KEYS }
@@ -30,15 +30,17 @@ interface SymbolInput {
 	imports: ImportMap
 }
 
-// Root-relative test files selected, each changed code file's count of them, and among them the
-// direct users — those within one file boundary, which a cut keeps first (joshuafolkken/kit#8091).
+// Root-relative test files selected, each changed code file's count of them, among them the direct
+// users — those within one file boundary, which a cut keeps first (joshuafolkken/kit#8091) — and all of
+// them ring by ring, nearest first, the order the cut keeps them in (joshuafolkken/kit#8570).
 interface SymbolSelection {
 	tests: Array<string>
 	reach: Array<ReachedCount>
 	direct: Array<string>
+	rings: Array<Array<string>>
 }
 
-type Reached = Omit<SymbolSelection, 'direct'>
+type Reached = Omit<SymbolSelection, 'direct' | 'rings'>
 
 interface Selecting {
 	input: SymbolInput
@@ -107,13 +109,32 @@ function selecting_of(input: SymbolInput): Selecting {
 	return { input, index, tests }
 }
 
-// Every user followed, or one file boundary where that selects more than the cap.
+// The users ring by ring, ring `k` those first reached past `k` file boundaries. Within the cap, one
+// ring: the cut keeps them all whatever their order.
+function rings_of(selecting: Selecting, full: Reached): Array<Array<string>> {
+	if (full.tests.length <= test_pinned_logic.MAX_TEST_FILES) return [full.tests]
+	const rings: Array<Array<string>> = []
+	const seen = new Set<string>()
+
+	while (seen.size < full.tests.length) {
+		const max_hops = rings.length + 1
+		const reached = selection_at(selecting, { max_hops, stops: HUB_KEYS }).tests
+		const ring = reached.filter((test) => !seen.has(test))
+
+		for (const test of ring) seen.add(test)
+		rings.push(ring)
+	}
+
+	return rings
+}
+
+// **Every user followed, nearest first** (joshuafolkken/kit#8570): past the cap the farthest rings are
+// what the cut defers to CI — counted, where the one-hop fallback dropped them unseen.
 function select_within(selecting: Selecting): SymbolSelection {
 	const direct = selection_at(selecting, ONE_HOP)
 	const full = selection_at(selecting, FULL)
-	const chosen = full.tests.length > test_pinned_logic.MAX_TEST_FILES ? direct : full
 
-	return { ...chosen, direct: direct.tests }
+	return { ...full, direct: direct.tests, rings: rings_of(selecting, full) }
 }
 
 function select_from(input: SymbolInput): SymbolSelection {
@@ -121,14 +142,14 @@ function select_from(input: SymbolInput): SymbolSelection {
 }
 
 // Each changed file's count as though it changed alone, over one index — so one wide file does not
-// send the others to the one-hop fallback.
+// count in the others.
 function counts_from(input: SymbolInput): Array<ReachedCount> {
 	const selecting = selecting_of(input)
 
 	return input.changed.map((file) => {
 		const alone = { ...selecting, input: { ...input, changed: [file] } }
 
-		return { file, count: select_within(alone).tests.length }
+		return { file, count: selection_at(alone, FULL).tests.length }
 	})
 }
 

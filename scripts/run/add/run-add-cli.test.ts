@@ -66,6 +66,7 @@ describe('parse_request', () => {
 			issues: [3433, 3434],
 			is_priority: true,
 			is_retry: false,
+			is_withdrawn: false,
 		})
 	})
 
@@ -134,7 +135,7 @@ describe('unreadable retry history', () => {
 })
 
 describe('non-mechanical retry protection', () => {
-	it.each(['withdraw', 'merge', 'human-review', 'split'])(
+	it.each(['merge', 'human-review', 'split'])(
 		'refuses a previous %s rather than queueing an excluded issue',
 		async (kind) => {
 			run_carry.begin_carry(target(), RETRY_INVOCATION, run_carry.NO_OWNER, new Date())

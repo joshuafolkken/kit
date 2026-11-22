@@ -15,7 +15,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
 		reference: [
-			'<title> <issue...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <reason>"...]',
+			'<title> <issue...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]',
 			'automation',
 			['network'],
 		],
@@ -24,23 +24,29 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '"Epic: split the parser work" 101 102 103' },
 				{
 					arguments:
-						'"Epic: staged rollout" A B --ordered --order-reason "#A -> #B: B ships the flag A adds"',
+						'"Epic: staged rollout" A B --ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"',
 				},
 				{
 					arguments:
-						'"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: …" --order-reason "#B -> #C: …"',
+						'"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"',
 					note: 'a join',
 				},
 				{
 					arguments:
-						'"Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: #B calls the parser #A adds"',
+						'"Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"',
 					note: 'why B waits on A',
 				},
 				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
 				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
-				{ arguments: '--add 893 894 --before 891', note: '#894 must finish before #891' },
-				{ arguments: '--add 893 894 --after 890', note: '#894 starts once #890 is done' },
+				{
+					arguments: '--add 893 894 --before 891 --order-reason "<chain>: <reason>"',
+					note: '#894 must finish before #891',
+				},
+				{
+					arguments: '--add 893 894 --after 890 --order-reason "<chain>: <reason>"',
+					note: '#894 starts once #890 is done',
+				},
 				{
 					arguments: '--add 893 894 --decision-file .josh/tmp/why.md',
 					note: '…and record why, in one call',
@@ -66,7 +72,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--order-reason "#A -> #B: <reason>"'],
 					description:
-						'repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain` or `--ordered`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.',
+						'repeatable, on create, `--promote` and `--add`: what the later child of one declared chain takes from the earlier one. Required per chain; written under its `### Declared order` entry. On create or `--promote` it opens with its kind (`unverifiable in one pass` / `waits on another`). A missing, undeclared, repeated, reasonless or kindless one is refused.',
 				},
 				{
 					names: ['--rationale-file <path|->'],

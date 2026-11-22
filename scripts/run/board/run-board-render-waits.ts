@@ -3,6 +3,7 @@ import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
+import { run_board_length } from './run-board-length'
 
 // The claims waiting in the machine-wide core budget (joshuafolkken/kit#3943, #4052): a lane held back
 // by memory pressure otherwise reads the same as one that is stuck. A lane's wait is drawn on its own
@@ -11,7 +12,8 @@ import { run_board_layout, type BoardRow } from './run-board-layout'
 // checkout's, another repository's — is one line right before the legend, which gives way with it,
 // so nothing is added under the header.
 
-const { HEADER_ICONS, WORDS, minute_span_of, span_of } = run_board_labels
+const { HEADER_ICONS, WORDS, span_of } = run_board_labels
+const { fitted_span_of } = run_board_length
 // 🚧 rather than ⏳, which a waiting row already draws, or 🚦, the gate stage's; an emoji a terminal
 // draws two columns wide.
 const BUDGET_ICON = '🚧'
@@ -38,11 +40,9 @@ function check_of(wait: BudgetWait): string {
 	return word === undefined || word === '' ? UNNAMED_CHECK : word.replace(RELATED_SUFFIX, '')
 }
 
-// How long, to the minute where the seconds would not fit `room` (`10′05″` → `11′`).
+// How long, up to the minute where the seconds would not fit `room` (`10′05″` → `11′`).
 function held_span(wait: BudgetWait, room: number): string {
-	const span = span_of(wait.waited_ms)
-
-	return run_board_fit.width_of(span) <= room ? span : minute_span_of(wait.waited_ms)
+	return fitted_span_of(wait.waited_ms, room, 'up')
 }
 
 // Why and how long, the two filling `width` columns with the time right-aligned (joshuafolkken/kit#4292).

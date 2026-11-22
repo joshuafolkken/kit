@@ -3,6 +3,7 @@ import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_observation_fixture as observation } from '#scripts/issue/issue-observation-fixture'
 import { issue_observation_gate } from '#scripts/issue/issue-observation-gate'
 import { afterEach, describe, expect, it } from 'vitest'
+import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_reason } from './run-board-reason'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -12,6 +13,7 @@ import type { ItemStatus } from './run-board-status'
 // plan that leaves it unreached draws it in the waiting section with its reason, not as an empty lane.
 
 const { header, lines_of } = run_board_render_fixture
+const { WAIT_ICONS } = run_board_labels
 const REPO = 'joshuafolkken/kit'
 const UPSTREAM_REPO = 'joshuafolkken/app-kit'
 const WAITS = 7400
@@ -19,6 +21,7 @@ const NEXT = 7401
 const NOW_MS = Date.parse('2026-11-14T06:00:00.000Z')
 const RETRIED: ItemStatus = { state: 'waiting', started_ms: undefined }
 const RELAUNCHED: ItemStatus = { state: 'waiting', started_ms: NOW_MS }
+const FREE_LANE = 'retry · → next free lane'
 const MISSING = 'observation evidence required: multi-slot, comparison, cost'
 
 function child(number: number, body?: string): EpicChild {
@@ -45,11 +48,9 @@ function layout_of(plan: BoardPlan, status: ItemStatus, issue = WAITS): BoardLay
 	const statuses = new Map([[issue, status]])
 	const read = { plan, statuses, events: [], free_lanes: 1, is_stopped: false, now_ms: NOW_MS }
 
-	return run_board_layout.layout_of(
-		{ ...plan, now_ms: NOW_MS },
-		statuses,
-		run_board_reason.reader(read),
-	)
+	return run_board_layout.layout_of({ ...plan, now_ms: NOW_MS }, statuses, {
+		reason_of: run_board_reason.reader(read),
+	})
 }
 
 function markdown_link(text: string, url: string): string {
@@ -60,6 +61,10 @@ const UPSTREAM_NAMED = '🔗 app-kit#7691'
 
 function text_of(layout: BoardLayout): string {
 	return lines_of(header({ layout })).join('\n')
+}
+
+function reason_of(layout: BoardLayout): BoardLayout['active'][number]['reason'] {
+	return layout.active.find((row) => row.number === WAITS)?.reason
 }
 
 function numbers_of(rows: ReadonlyArray<{ number: number }>): Array<number> {
@@ -157,7 +162,6 @@ describe('run_board_layout.layout_of — a ⏳ lane row line end', () => {
 describe('run_board_layout.layout_of — a re-queued issue that launched before and has a start date', () => {
 	const AHEAD = '## 背景\n\n- 実施可能日: 2026-11-25T09:00Z\n'
 	const PASSED = '## 背景\n\n- 実施可能日: 2026-11-13T09:00Z\n'
-	const FREE_LANE = 'retry · → next free lane'
 
 	it('draws a date still ahead as a 📅 row in the waiting section, not as a free-lane retry', () => {
 		const layout = layout_of(plan_of([], [child(WAITS, AHEAD)]), RELAUNCHED)
@@ -187,5 +191,41 @@ describe('run_board_layout.layout_of — a re-queued issue that launched before 
 		expect(numbers_of(layout.active)).toStrictEqual([WAITS])
 		expect(numbers_of(layout.unreached)).toStrictEqual([])
 		expect(text_of(layout)).toContain(UPSTREAM_NAMED)
+	})
+})
+
+// joshuafolkken/kit#8497: a relaunched retry the offer holds on a running lane's declared path says so
+// as the plan row would, rather than waiting on a free lane.
+describe('run_board_layout.layout_of — a relaunched retry a running lane holds on a path', () => {
+	const RUNNING = 7402
+	const SHARED = 'scripts/run/board/run-board-layout.ts'
+	const OVERLAP = { icon: WAIT_ICONS.path, issues: [String(RUNNING)], tail: SHARED }
+
+	function held_layout(declared: BoardPlan['declared']): BoardLayout {
+		const plan = { ...plan_of([child(WAITS)], []), declared }
+		const statuses = new Map<number, ItemStatus>([
+			[WAITS, RELAUNCHED],
+			[RUNNING, { state: 'running' }],
+		])
+		const read = { plan, statuses, events: [], free_lanes: 1, is_stopped: false, now_ms: NOW_MS }
+
+		return run_board_layout.layout_of(plan, statuses, {
+			reason_of: run_board_reason.reader(read),
+		})
+	}
+
+	it('draws the 📂 holder and path the plan row draws', () => {
+		const declared = new Map([
+			[RUNNING, new Set([SHARED])],
+			[WAITS, new Set([SHARED])],
+		])
+
+		expect(reason_of(held_layout(declared))).toStrictEqual(OVERLAP)
+	})
+
+	it('keeps the free-lane retry tail where no path is shared', () => {
+		const declared = new Map([[RUNNING, new Set([SHARED])]])
+
+		expect(reason_of(held_layout(declared))).toStrictEqual({ tail: FREE_LANE })
 	})
 })

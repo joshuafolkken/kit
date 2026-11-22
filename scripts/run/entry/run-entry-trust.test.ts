@@ -7,7 +7,7 @@ function content(
 	is_body_trusted: boolean | undefined,
 	has_trusted_comment: boolean | undefined,
 ): BlockRead {
-	return { kind: 'ok', block: '', trust: { is_body_trusted, has_trusted_comment } }
+	return { kind: 'ok', block: '', body: '', trust: { is_body_trusted, has_trusted_comment } }
 }
 
 function state(labels: Array<string>): StateRead {

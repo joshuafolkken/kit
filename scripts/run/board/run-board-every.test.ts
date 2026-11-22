@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync } from 'node:fs'
-import type { EpicChild } from '#scripts/epic/epic-graph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_every } from './run-board-every'
@@ -121,24 +120,20 @@ describe('run_board_every.recorder', () => {
 
 		expect(store.load(run_board_frame_store.CHAT_KEY)?.saved_ms).toBe(fetched_ms)
 	})
+})
 
-	it('records no arrivals counted from the live board’s first total', () => {
+// joshuafolkken/kit#8335: the worker keeps a round's inputs as the last record's only when it was.
+describe('run_board_every.recorder’s answer', () => {
+	it('answers whether it recorded', () => {
 		const { ports } = harness(LOCAL, PLANS)
-		const store = run_board_frame_store.memory_store()
-		const titled = plan_titled('a')
-		const child: EpicChild = {
-			number: 1,
-			repo: titled.context.repo,
-			state: 'OPEN',
-			labels: [],
-			blocked_by: [],
-		}
-		const plan = { ...titled, waves: { waves: [[child]], unreached: [] } }
-		const state = { ...FRESH_STATE, local: LOCAL, plan, fetched_ms: START, baseline_total: 0 }
+		const record = run_board_every.recorder(
+			{ ...ports, frames: run_board_frame_store.memory_store() },
+			undefined,
+		)
 
-		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
-
-		expect(store.load(run_board_frame_store.CHAT_KEY)?.text).not.toMatch(/\(\+\d+\)/u)
+		expect(record({ ...FRESH_STATE, local: LOCAL })).toBe(false)
+		expect(record({ ...FRESH_STATE, local: LOCAL, fetched_ms: START })).toBe(true)
+		expect(record({ ...FRESH_STATE, local: LOCAL, fetched_ms: START })).toBe(false)
 	})
 })
 

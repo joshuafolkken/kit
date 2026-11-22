@@ -103,7 +103,7 @@ function is_direct_issue_comment(
 // The row's trigger: the checkout's repository read under the hook call's own cwd and environment.
 function is_direct_issue_comment_in(command: string, context: HookContext): boolean {
 	return is_direct_issue_comment(command, () =>
-		repo_party.current_repository(context.cwd, context.env),
+		repo_party.current_repository({ repository_path: context.cwd, environment: context.env }),
 	)
 }
 

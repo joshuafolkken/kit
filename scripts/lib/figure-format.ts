@@ -50,7 +50,15 @@ function minute_of(ms: number): string {
 	return [date.getHours(), date.getMinutes()].map((value) => two_digits(value)).join(':')
 }
 
+// The local `MM-DD` of a moment, for one a person reads to the day.
+function day_of(ms: number): string {
+	const date = new Date(ms)
+
+	return [date.getMonth() + 1, date.getDate()].map((value) => two_digits(value)).join('-')
+}
+
 const figure_format = {
+	day_of,
 	format_usd,
 	format_tokens,
 	format_share,

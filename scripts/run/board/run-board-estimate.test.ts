@@ -205,6 +205,24 @@ describe('run_board_estimate.left_ms with nothing to estimate', () => {
 	})
 })
 
+describe('run_board_estimate.queued_finish_ms with nothing to estimate', () => {
+	it('leaves an unreached, a human and an unqueued child out', () => {
+		const queued = queue(row(2, 'waiting'), row(3, 'human'))
+		const board = read({ queued, unreached: [row(4, 'waiting')] })
+
+		expect(run_board_estimate.queued_finish_ms(board, 2)).toBe(NOW + PER_CHILD)
+		expect(
+			[3, 4, 5].map((number) => run_board_estimate.queued_finish_ms(board, number)),
+		).toStrictEqual([undefined, undefined, undefined])
+	})
+
+	it('finishes no queued child without a lane total', () => {
+		const board = read({ queued: queue(row(2, 'waiting')) }, { lane_totals: [] })
+
+		expect(run_board_estimate.queued_finish_ms(board, 2)).toBeUndefined()
+	})
+})
+
 describe('run_board_estimate.row_finish', () => {
 	it('finishes a running child when the header reads it as finishing', () => {
 		const child = running(1, 'implement', 5)
@@ -258,26 +276,21 @@ describe('run_board_estimate.is_finish_drawn', () => {
 	})
 })
 
-describe('run_board_estimate.part_of', () => {
-	it('draws the local finish time after 🎯', () => {
-		const active = [running(1, 'implement', 5)]
-		const finish = run_board_labels.minute_of(NOW + 25 * MINUTE)
+// joshuafolkken/kit#8478: no `~` — the 🎯 says the time is an estimate.
+describe('run_board_estimate.stamp_of', () => {
+	it('draws the local finish time after 🎯 on the same day', () => {
+		const finish = NOW + 25 * MINUTE
 
-		expect(run_board_estimate.part_of(read({ active }))).toBe(`🎯 ~${finish}`)
-	})
-
-	it('draws the day too for a finish on another day', () => {
-		const active = [running(1, 'implement', 0)]
-		const finish = run_board_labels.day_minute_of(NOW + 30 * HOUR)
-
-		expect(run_board_estimate.part_of(read({ active }, { lane_totals: [30 * HOUR] }))).toBe(
-			`🎯 ~${finish}`,
+		expect(run_board_estimate.stamp_of(NOW, finish)).toBe(
+			`🎯 ${run_board_labels.minute_of(finish)}`,
 		)
 	})
 
-	it('draws nothing for an ended run', () => {
-		const active = [running(1, 'implement', 5)]
+	it('draws the day too for a finish on another day', () => {
+		const finish = NOW + 30 * HOUR
 
-		expect(run_board_estimate.part_of(read({ active }, { ended_ms: NOW }))).toBeUndefined()
+		expect(run_board_estimate.stamp_of(NOW, finish)).toBe(
+			`🎯 ${run_board_labels.day_minute_of(finish)}`,
+		)
 	})
 })

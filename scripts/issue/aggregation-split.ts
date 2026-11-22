@@ -19,8 +19,9 @@ const RECORDING_WORDS: ReadonlyArray<string> = ['Issue', 'コメント', '記録
 const SUBJECT_WORDS: ReadonlyArray<string> = ['集計', '計測', 'before', '変更前後']
 // A criterion citing the prior aggregation Issue is the implementation this rule asks for.
 const ISSUE_REFERENCE = /#\d+/u
-// The implementation the estimate declares: a prior aggregation Issue may add a script or two of its own.
-const IMPLEMENTATION_FILES = 3
+// The implementation the estimate declares: a prior aggregation Issue may add a script or two of its own,
+// with their tests, which the estimate counts (joshuafolkken/kit#8589).
+const IMPLEMENTATION_FILES = 5
 const REFUSAL = `an acceptance criterion records an aggregation or a measurement as an Issue comment beside an implementation of ${String(IMPLEMENTATION_FILES)}+ files — file it as a prior Issue (\`--route split\`) and cite its comment under ${BACKGROUND_HEADING} in this one; issue-template.md → "\`${BACKGROUND_HEADING}\` 直下の宣言と分類ラベル"`
 
 function is_aggregation_criterion(line: string): boolean {

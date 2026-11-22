@@ -13,7 +13,7 @@ import { run_board_status, type ItemStatus } from './run-board-status'
 type RootRead = Pick<LocalRead, 'root' | 'ended_roots' | 'lane_states' | 'stopped_single'>
 
 function row_of(issue: number, status: ItemStatus, read: RowRead): BoardRow | undefined {
-	const [row] = run_board_layout.local_layout_of(new Map([[issue, status]]), undefined, read).active
+	const [row] = run_board_layout.local_layout_of(new Map([[issue, status]]), { read }).active
 
 	return row
 }
@@ -54,7 +54,7 @@ function active_of(
 	if (ended.length === 0) return active
 
 	const statuses = new Map(ended.map((run) => [run.issue, ended_status(run, state)]))
-	const rows = run_board_layout.local_layout_of(statuses, undefined, read).active
+	const rows = run_board_layout.local_layout_of(statuses, { read }).active
 	const kept = active.filter((row) => !statuses.has(row.number))
 
 	return [...kept, ...rows].toSorted(run_board_layout.active_order)
@@ -72,19 +72,6 @@ function layout_of(layout: BoardLayout, local: RootRead, read: RowRead): BoardLa
 	}
 }
 
-// The baseline the header counts arrivals against: the rows the ended runs add to the run's are no
-// arrival to its plan.
-function baseline_of(
-	baseline_total: number | undefined,
-	run_layout: BoardLayout,
-	layout: BoardLayout,
-): number | undefined {
-	if (baseline_total === undefined) return undefined
-	const { rows_of } = run_board_layout
-
-	return baseline_total + rows_of(layout).length - rows_of(run_layout).length
-}
-
-const run_board_root_layout = { baseline_of, layout_of }
+const run_board_root_layout = { layout_of }
 
 export { run_board_root_layout }

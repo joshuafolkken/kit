@@ -2,6 +2,8 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import type { OfferExclusion, OfferRecord } from '#scripts/lane/lane-ledger-schema-offer'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_review_stop } from '#scripts/lane/lane-review-stop'
+import { lane_state } from '#scripts/lane/lane-state'
 import type { OptedIn, PoolContext } from './backlog-gate-scope'
 import { backlog_next_report } from './backlog-next-report'
 import { backlog_wait_cause } from './backlog-wait-cause'
@@ -61,17 +63,26 @@ function withheld_of(outcome: GateOutcome, repo: string): Set<number> {
 	)
 }
 
-function waiting_reason(child: EpicChild, withheld: ReadonlySet<number>): string {
+// A child held at a review stop waits on a person, not on the run: its `in-progress` lane keeps its
+// changes uncommitted until a person reviews them (joshuafolkken/kit#8527).
+function waiting_reason(
+	child: EpicChild,
+	withheld: ReadonlySet<number>,
+	stops: ReadonlyMap<number, number>,
+): string {
 	if (withheld.has(child.number)) return SOLO_REASON
+	if (lane_review_stop.is_review_stop(child.number, child.labels, stops)) return PERSON_REASON
 
 	return backlog_wait_cause.cause_of(child) ?? WAIT_REASON
 }
 
-// Each issue of this repository the answer held back, with the first reason that holds it.
+// Each issue of this repository the answer held back, with the first reason that holds it; `stops`
+// the stopped lanes by issue (`lane_review_stop.stops_of`).
 function excluded_of(
 	context: PoolContext,
 	outcome: GateOutcome,
 	untriaged: ReadonlyArray<EpicChild>,
+	stops: ReadonlyMap<number, number>,
 ): Array<OfferExclusion> {
 	const { repo } = context
 	const result = outcome.gated
@@ -82,7 +93,7 @@ function excluded_of(
 		...untriaged.map((child) => ({ issue: child.number, reason: TRIAGE_REASON })),
 		...here(result.waiting, repo).map((child) => ({
 			issue: child.number,
-			reason: waiting_reason(child, withheld),
+			reason: waiting_reason(child, withheld, stops),
 		})),
 		...here(result.blocked_on_people, repo).map((child) => ({
 			issue: child.number,
@@ -114,11 +125,12 @@ async function record_answer(
 ): Promise<void> {
 	const { gated } = outcome
 	const started = backlog_next_report.offered_of(gated, context.repo).map((child) => child.number)
+	const stops = lane_review_stop.stops_of(await lane_state.read_records())
 
 	await lane_ledger_write.record_offer({
 		...base_of(context.opted_in, verdict_of(gated, context.repo, untriaged, started)),
 		started,
-		excluded: excluded_of(context, outcome, untriaged),
+		excluded: excluded_of(context, outcome, untriaged, stops),
 	})
 }
 

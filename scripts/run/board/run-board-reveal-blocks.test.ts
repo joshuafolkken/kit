@@ -33,7 +33,7 @@ const AGREED = [
 	},
 	{
 		name: 'a lane row',
-		line: `│   BD   30′52″   44′31″  6.5 ■■---  3.2 ■■■■■  0.7 ■---- 8159 P1 FT ${MARK}RUN THE RUN:BOARD GITHUB, THANKS AND SNAPSHOT R…  ET ~17:05 +12′  >    41″`,
+		line: `│   BD   30′52″   44′31″  6.5 ■■---  3.2 ■■■■■  0.7 ■---- 8159 P1 FT ${MARK}RUN THE RUN:BOARD GITHUB, THANKS AND SNAPSHOT R…  ET 17:05 +12′  >    41″`,
 		blocks: [
 			'│',
 			'   BD',
@@ -44,7 +44,7 @@ const AGREED = [
 			'  0.7 ■----',
 			' 8159 P1 FT',
 			' RUN THE RUN:BOARD GITHUB, THANKS AND SNAPSHOT R…',
-			'  ET ~17:05 +12′',
+			'  ET 17:05 +12′',
 			'  >',
 			'    41″',
 		],

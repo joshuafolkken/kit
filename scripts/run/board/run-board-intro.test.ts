@@ -1,6 +1,7 @@
+import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
-import type { KeyReading } from './run-board-keys'
+import { run_board_intro_fixture } from './run-board-intro-fixture'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
@@ -8,7 +9,9 @@ import { run_board_typing } from './run-board-typing'
 // joshuafolkken/kit#7927: a live board types its line a letter at a time and holds it before the first
 // frame, which a key skips; the first read runs meanwhile and is handed over only once the line is done.
 
-const { ERASE_LINE_END, LINE_START, REVEAL_LINE_MS, after, play, reveal } = run_board_intro
+const { REVEAL_LINE_MS, after, play, reveal } = run_board_intro
+const { NO_KEYS, READ, deferred, instant, line_of, never, read_at_once, recorded, skippable } =
+	run_board_intro_fixture
 const THEME = 'wargames'
 const {
 	line: LINE,
@@ -18,85 +21,12 @@ const {
 const { CURSOR } = run_board_typing
 const { TITLE_MARK, untitled } = run_board_label_pair
 
-function line_of(shown: string): string {
-	return `${LINE_START}${shown}${ERASE_LINE_END}`
-}
-
-async function instant(): Promise<void> {
-	await Promise.resolve()
-}
-
-const READ = 'read'
-
 function recording(written: Array<string>): IntroPorts {
 	return {
 		intro_sleep: instant,
 		write: (text) => {
 			written.push(text)
 		},
-	}
-}
-
-const NO_KEYS: KeyReading = { folded: undefined }
-
-interface Deferred<Value> {
-	promise: Promise<Value>
-	resolve: (value: Value) => void
-}
-
-function deferred<Value>(): Deferred<Value> {
-	const held: { resolve: ((value: Value) => void) | undefined } = { resolve: undefined }
-	const promise = new Promise<Value>((resolve) => {
-		held.resolve = resolve
-	})
-
-	return { promise, resolve: (value) => held.resolve?.(value) }
-}
-
-async function never(): Promise<void> {
-	await deferred<undefined>().promise
-}
-
-function recorded(intro_sleep: (ms: number) => Promise<void>): {
-	written: Array<string>
-	ports: IntroPorts
-} {
-	const written: Array<string> = []
-	const ports: IntroPorts = {
-		write: (text) => {
-			written.push(text)
-		},
-		intro_sleep,
-	}
-
-	return { written, ports }
-}
-
-interface Skippable {
-	keys: KeyReading
-	press: () => void
-	released: () => boolean
-}
-
-function skippable(): Skippable {
-	const held: { taker: (() => void) | undefined; is_released: boolean } = {
-		taker: undefined,
-		is_released: false,
-	}
-
-	return {
-		keys: {
-			folded: undefined,
-			intercept: (on_key) => {
-				held.taker = on_key
-
-				return () => {
-					held.is_released = true
-				}
-			},
-		},
-		press: () => held.taker?.(),
-		released: () => held.is_released,
 	}
 }
 
@@ -232,6 +162,15 @@ describe('run_board_intro.reveal', () => {
 	})
 })
 
+describe('run_board_intro.reveal in its icons', () => {
+	it('draws the frame in the icons the ports ask for (#8505)', async () => {
+		const { written, ports } = recorded(never)
+
+		await reveal('🔄', { write: ports.write, icons: 'letters' }, NO_KEYS, THEME)
+		expect(stripVTControlCharacters(written.join(''))).toBe('RN')
+	})
+})
+
 describe('run_board_intro.after', () => {
 	it('holds the first read until the intro is over, then hands it over', async () => {
 		const intro = deferred<undefined>()
@@ -291,9 +230,6 @@ describe('run_board_intro.after on a failed first read', () => {
 })
 
 // joshuafolkken/kit#8029: the opening is the theme's — a board in none reads at once and reveals nothing.
-async function read_at_once(): Promise<string> {
-	return await READ
-}
 
 describe('run_board_intro.opening', () => {
 	it('plays nothing and hands the read back as it is with no theme', async () => {

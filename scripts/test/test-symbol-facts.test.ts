@@ -44,6 +44,14 @@ describe('test_symbol_facts.read_file — declarations', () => {
 		expect(facts().declarations.get(`${test_symbol_facts.LOAD}13`)?.references).toContain('run')
 	})
 
+	it('declares each name a destructuring binds, referencing the object it is read from', () => {
+		const text = `const { first, second: [third] } = shared\n`
+		const { declarations } = test_symbol_facts.read_file(ts, resolve, FILE, text)
+
+		expect([...declarations.keys()]).toEqual(['first', 'third'])
+		expect(declarations.get('third')?.references).toContain('shared')
+	})
+
 	it('reads the members of an object bundling functions', () => {
 		expect(facts().members.get('bundle')).toEqual(
 			new Map([

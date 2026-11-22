@@ -52,7 +52,7 @@ describe('epic_command.create', () => {
 describe('epic_command.create — --chain', () => {
 	it('passes the declared --chain lines to the creation', async () => {
 		const joins = ['#10 -> #12', '#11 -> #12']
-		const reasons = joins.flatMap((join) => [REASON, `${join}: a reason`])
+		const reasons = joins.flatMap((join) => [REASON, `${join}: 別の待ちがある — a reason`])
 
 		await epic_command.create([
 			...ARGV,
@@ -92,7 +92,7 @@ describe('epic_command.run — --promote with --chain', () => {
 	const PROMOTE = ['--promote', '9', '10', '11']
 
 	it('passes the declared --chain lines to the promotion', async () => {
-		const reason = [REASON, `${TEN_TO_ELEVEN}: #11 reads #10`]
+		const reason = [REASON, `${TEN_TO_ELEVEN}: 別の待ちがある — #11 reads #10`]
 
 		expect(await epic_command.run([...PROMOTE, CHAIN, TEN_TO_ELEVEN, ...reason])).toBe(0)
 
@@ -108,8 +108,9 @@ describe('epic_command.run — --promote with --chain', () => {
 })
 
 describe('epic_command — --order-reason', () => {
-	const REASONS = [{ chain: [10, 11], reason: '#11 reads what #10 writes' }]
-	const REASON_ARGS = [CHAIN, TEN_TO_ELEVEN, REASON, `${TEN_TO_ELEVEN}: #11 reads what #10 writes`]
+	const WHY = '別の待ちがある — #11 reads what #10 writes'
+	const REASONS = [{ chain: [10, 11], reason: WHY }]
+	const REASON_ARGS = [CHAIN, TEN_TO_ELEVEN, REASON, `${TEN_TO_ELEVEN}: ${WHY}`]
 
 	it('passes the per-chain reasons to the creation', async () => {
 		await epic_command.create([...ARGV, ...REASON_ARGS])

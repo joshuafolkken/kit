@@ -1,5 +1,9 @@
 import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
-import { run_board_estimate_schedule, type Lanes } from './run-board-estimate-schedule'
+import {
+	run_board_estimate_schedule,
+	type Lanes,
+	type Placement,
+} from './run-board-estimate-schedule'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
@@ -19,7 +23,6 @@ import type { UsualTimes } from './run-board-usual'
 
 const { HEADER_ICONS, WORDS, day_minute_of, minute_of } = run_board_labels
 const LEGEND = `${HEADER_ICONS.estimate} ${WORDS.estimate}`
-const ESTIMATE_MARK = '~'
 // A row whose finish nothing measures.
 const UNKNOWN = `${HEADER_ICONS.estimate} —`
 const FINISH_STATES: ReadonlySet<ItemState> = new Set(['running', 'parked'])
@@ -124,19 +127,40 @@ function lanes_of(running: ReadonlyArray<BoardRow>, read: EstimateRead, totals: 
 	return { free, ends, floor: Math.max(0, ...solo), per_child }
 }
 
-// How long the run has left, `undefined` where nothing is left to run or no lane total is measured.
-function left_ms(read: EstimateRead): number | undefined {
+// Whether this run's lane totals foretell the row: not an earlier run's lane (🧳), nor one this run took
+// over from an ended run (joshuafolkken/kit#8455) — its time began under that run.
+function is_foretold(row: BoardRow): boolean {
+	return row.is_earlier !== true && row.status?.is_adopted !== true
+}
+
+// The waiting children placed on the lanes the running ones leave, `undefined` where nothing is left to
+// run or no lane total is measured.
+function placement_of(read: EstimateRead): Placement | undefined {
 	const { layout } = read
 	const totals = read.lane_totals ?? []
 
 	if (layout === undefined || totals.length === 0) return undefined
 
-	const running = layout.active.filter((row) => row.state === 'running')
+	const running = layout.active.filter((row) => row.state === 'running' && is_foretold(row))
 	const waiting = waiting_rows(layout)
 
 	if (running.length + waiting.length === 0) return undefined
 
-	return run_board_estimate_schedule.end_of(waiting, lanes_of(running, read, totals))
+	return run_board_estimate_schedule.placed_of(waiting, lanes_of(running, read, totals))
+}
+
+// How long the run has left, `undefined` where nothing is left to run or no lane total is measured.
+function left_ms(read: EstimateRead): number | undefined {
+	return placement_of(read)?.end
+}
+
+// When a queued child should finish (epoch ms), from the same placement the run's finish reads;
+// `undefined` for a child the lanes do not take — a blocker or start date ahead of it, a decision a
+// person owes, one not queued — or where no lane total is measured.
+function queued_finish_ms(read: EstimateRead, number: number): number | undefined {
+	const end = placement_of(read)?.ends.get(number)
+
+	return end === undefined ? undefined : read.now_ms + end
 }
 
 // When one running child should finish, from the same lane totals the run's finish reads
@@ -156,11 +180,11 @@ function row_finish(row: BoardRow, read: EstimateRead): RowFinish | undefined {
 
 // Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and a parked one, while the
 // run goes on; a row waiting on a person draws none, its finish never measured (joshuafolkken/kit#8166) — a stopped or ended run's header draws no 🎯, nor do its rows. An
-// earlier run's lane (🧳) draws none: this run's lane totals do not foretell it.
+// earlier run's lane (🧳), or an adopted one, draws none: this run's lane totals do not foretell it.
 function is_finish_drawn(row: BoardRow, run: RunMotion): boolean {
 	const is_moving = run.ended_ms === undefined && !run.activity.is_stopped
 
-	return is_moving && row.is_earlier !== true && FINISH_STATES.has(row.state)
+	return is_moving && is_foretold(row) && FINISH_STATES.has(row.state)
 }
 
 // The local finish time, with its `MM-DD` when it falls on another day than now.
@@ -170,16 +194,10 @@ function finish_of(now_ms: number, finish_ms: number): string {
 	return is_today ? minute_of(finish_ms) : day_minute_of(finish_ms)
 }
 
-// `🎯 ~14:32`, `🎯 ~10-19 02:05` on another day.
+// `🎯 14:32`, `🎯 10-19 02:05` on another day — no `~`, the 🎯 says it is an estimate
+// (joshuafolkken/kit#8478).
 function stamp_of(now_ms: number, finish_ms: number): string {
-	return `${HEADER_ICONS.estimate} ${ESTIMATE_MARK}${finish_of(now_ms, finish_ms)}`
-}
-
-// The run's finish stamp, `undefined` for an ended run or nothing to estimate.
-function part_of(read: EstimateRead): string | undefined {
-	const left = read.ended_ms === undefined ? left_ms(read) : undefined
-
-	return left === undefined ? undefined : stamp_of(read.now_ms, read.now_ms + left)
+	return `${HEADER_ICONS.estimate} ${finish_of(now_ms, finish_ms)}`
 }
 
 const run_board_estimate = {
@@ -187,8 +205,8 @@ const run_board_estimate = {
 	UNKNOWN,
 	is_finish_drawn,
 	left_ms,
-	part_of,
 	phase_spent,
+	queued_finish_ms,
 	row_finish,
 	stamp_of,
 }

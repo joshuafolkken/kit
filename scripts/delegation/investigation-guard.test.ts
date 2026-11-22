@@ -40,6 +40,7 @@ const { BRANCH, call_line, edit_call_line, error_result_line, result_line, ms, t
 
 const BELOW_THRESHOLD = delegation_policy.INVESTIGATION_FILE_THRESHOLD - 1
 const NOW_MS = ms(59)
+const OPTIONS = { now_ms: NOW_MS }
 const context_of = hook_context_fixture.of
 const EARLIER_REFUSAL_MS = ms(9)
 const DELEGATION_MINUTE = 20
@@ -120,7 +121,9 @@ function threshold_then_edit(name: string, is_edit_ok: boolean): string {
 }
 
 function refusal_for(transcript: string, file_path: string): string | undefined {
-	return investigation_refusal(payload_of(transcript, { tool_input: { file_path } }), NOW_MS)
+	return investigation_refusal(payload_of(transcript, { tool_input: { file_path } }), {
+		now_ms: NOW_MS,
+	})
 }
 
 // The switch is assigned rather than deleted, so a value left in the real environment cannot decide
@@ -141,10 +144,12 @@ afterAll(() => {
 })
 
 describe('investigation_refusal — the threshold, and its second firing', () => {
+	const EARLIER_OPTIONS = { now_ms: EARLIER_REFUSAL_MS }
+
 	it('refuses the read that reaches the threshold', () => {
 		const transcript = write_transcript('at-threshold', at_threshold_lines())
 
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBe(investigation_reads.REASON)
+		expect(investigation_refusal(payload_of(transcript), OPTIONS)).toBe(investigation_reads.REASON)
 	})
 
 	// One refusal per accumulation. Without this the same call is refused on every look and the run is
@@ -152,8 +157,8 @@ describe('investigation_refusal — the threshold, and its second firing', () =>
 	it('refuses the same accumulation only once', () => {
 		const transcript = write_transcript('once', at_threshold_lines())
 
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeDefined()
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+		expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	// The whole of the Issue: a delegation clears the count, three more unedited files rebuild it, and
@@ -161,8 +166,8 @@ describe('investigation_refusal — the threshold, and its second firing', () =>
 	it('refuses again after a delegation has reset the count', () => {
 		const transcript = write_transcript('rearmed', [...at_threshold_lines(), ...delegated_lines()])
 
-		expect(investigation_refusal(payload_of(transcript), EARLIER_REFUSAL_MS)).toBeDefined()
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), EARLIER_OPTIONS)).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeDefined()
 	})
 
 	// joshuafolkken/kit#1764: the disarm is per accumulation, and a run that ignores its one refusal
@@ -174,8 +179,8 @@ describe('investigation_refusal — the threshold, and its second firing', () =>
 			...target_turn_lines(LATE_TURN, subject_files('late')),
 		])
 
-		expect(investigation_refusal(payload_of(transcript), EARLIER_REFUSAL_MS)).toBeDefined()
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), EARLIER_OPTIONS)).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeDefined()
 	})
 
 	// joshuafolkken/kit#1764: a denied call is written to the transcript like any other, so counting
@@ -186,14 +191,14 @@ describe('investigation_refusal — the threshold, and its second firing', () =>
 		const lines = [...at_threshold_lines(), ...refused_read_lines()]
 		const transcript = write_transcript('refused-read', lines)
 
-		expect(investigation_refusal(payload_of(transcript), EARLIER_REFUSAL_MS)).toBeDefined()
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+		expect(investigation_refusal(payload_of(transcript), EARLIER_OPTIONS)).toBeDefined()
+		expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing below the threshold', () => {
 		const transcript = write_transcript('below', target_turn_lines(0, [LONE_FILE]))
 
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+		expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -202,17 +207,19 @@ describe('investigation_refusal — every failure allows the call', () => {
 		const transcript = write_transcript('write-call', at_threshold_lines())
 		const overrides = { tool_name: 'Bash', tool_input: { command: 'pnpm josh gate' } }
 
-		expect(investigation_refusal(payload_of(transcript, overrides), NOW_MS)).toBeUndefined()
+		expect(
+			investigation_refusal(payload_of(transcript, overrides), { now_ms: NOW_MS }),
+		).toBeUndefined()
 	})
 
 	it('says nothing when the payload is not JSON', () => {
-		expect(investigation_refusal('not json', NOW_MS)).toBeUndefined()
+		expect(investigation_refusal('not json', { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing when the transcript is not there', () => {
 		const missing = path.join(WORK_DIRECTORY, 'absent.jsonl')
 
-		expect(investigation_refusal(payload_of(missing), NOW_MS)).toBeUndefined()
+		expect(investigation_refusal(payload_of(missing), { now_ms: NOW_MS })).toBeUndefined()
 	})
 
 	it('says nothing when the switch is off', () => {
@@ -220,7 +227,7 @@ describe('investigation_refusal — every failure allows the call', () => {
 
 		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
 
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+		expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -238,7 +245,7 @@ describe('investigation_refusal — a delegated unit is never refused', () => {
 		WRITTEN_TRANSCRIPTS.push(fork)
 
 		expect(
-			investigation_refusal(payload_of(parent, { agent_id: AGENT_NAME }), NOW_MS),
+			investigation_refusal(payload_of(parent, { agent_id: AGENT_NAME }), { now_ms: NOW_MS }),
 		).toBeUndefined()
 		expect(existsSync(refusal_path(fork))).toBe(false)
 	})
@@ -258,8 +265,8 @@ describe('investigation_refusal — a delegated unit is never refused', () => {
 
 		const unit_payload = payload_of(parent, { agent_id: UNIT_NAME })
 
-		expect(investigation_refusal(unit_payload, EARLIER_REFUSAL_MS)).toBeUndefined()
-		expect(investigation_refusal(unit_payload, NOW_MS)).toBeUndefined()
+		expect(investigation_refusal(unit_payload, { now_ms: EARLIER_REFUSAL_MS })).toBeUndefined()
+		expect(investigation_refusal(unit_payload, { now_ms: NOW_MS })).toBeUndefined()
 	})
 })
 
@@ -302,7 +309,7 @@ describe('investigation — a dispatched lane child is refused like the main lin
 	// so the guard and the policy cannot drift apart.
 	it('refuses at the threshold while marked as a lane child, with no notice', () => {
 		const transcript = write_transcript('lane-child', at_threshold_lines())
-		const outcome = investigation_outcome(payload_of(transcript), NOW_MS)
+		const outcome = investigation_outcome(payload_of(transcript), { now_ms: NOW_MS })
 
 		expect(lane_guard_policy.mode_in_lane_child('investigation')).toBe('refuse')
 		expect(outcome.reason).toBe(investigation_reads.REASON)
@@ -313,7 +320,7 @@ describe('investigation — a dispatched lane child is refused like the main lin
 	it('says nothing below the threshold while marked as a lane child', () => {
 		const transcript = write_transcript('lane-child-below', target_turn_lines(0, [LONE_FILE]))
 
-		expect(investigation_outcome(payload_of(transcript), NOW_MS).reason).toBeUndefined()
+		expect(investigation_outcome(payload_of(transcript), { now_ms: NOW_MS }).reason).toBeUndefined()
 	})
 
 	// A person working in a lane carries no mark, so the guard refuses exactly as it always did.
@@ -322,7 +329,7 @@ describe('investigation — a dispatched lane child is refused like the main lin
 
 		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 
-		expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBe(investigation_reads.REASON)
+		expect(investigation_refusal(payload_of(transcript), OPTIONS)).toBe(investigation_reads.REASON)
 	})
 
 	// The lane's headless reviewer carries the same mark, and reading the diff's files is its task.
@@ -332,7 +339,7 @@ describe('investigation — a dispatched lane child is refused like the main lin
 		process.env[agent_session_role.KEY] = agent_role_profile.REVIEWER
 
 		try {
-			expect(investigation_refusal(payload_of(transcript), NOW_MS)).toBeUndefined()
+			expect(investigation_refusal(payload_of(transcript), { now_ms: NOW_MS })).toBeUndefined()
 		} finally {
 			Reflect.deleteProperty(process.env, agent_session_role.KEY)
 		}
@@ -349,8 +356,10 @@ describe('investigation_outcome — the per-call context, not the process (kit#6
 			[agent_session_role.KEY]: agent_role_profile.REVIEWER,
 		})
 
+		const options = { now_ms: NOW_MS, context: reviewer }
+
 		expect(
-			investigation_outcome(at_threshold_payload('ctx-reviewer'), NOW_MS, reviewer).reason,
+			investigation_outcome(at_threshold_payload('ctx-reviewer'), options).reason,
 		).toBeUndefined()
 	})
 
@@ -358,7 +367,8 @@ describe('investigation_outcome — the per-call context, not the process (kit#6
 		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
 
 		expect(
-			investigation_outcome(at_threshold_payload('ctx-off'), NOW_MS, off).reason,
+			investigation_outcome(at_threshold_payload('ctx-off'), { now_ms: NOW_MS, context: off })
+				.reason,
 		).toBeUndefined()
 	})
 
@@ -366,9 +376,9 @@ describe('investigation_outcome — the per-call context, not the process (kit#6
 		process.env[SWITCH_ENV_KEY] = 'off'
 		const on = context_of(process.cwd(), {})
 
-		expect(investigation_outcome(at_threshold_payload('ctx-on'), NOW_MS, on).reason).toBe(
-			investigation_reads.REASON,
-		)
+		expect(
+			investigation_outcome(at_threshold_payload('ctx-on'), { now_ms: NOW_MS, context: on }).reason,
+		).toBe(investigation_reads.REASON)
 	})
 })
 
@@ -377,7 +387,7 @@ function lane_instruction_reason(name: string, cwd: string): string | undefined 
 	const tool_input = { file_path: path.join(LANE_DIRECTORY, 'prompts', 'review.md') }
 	const payload = payload_of(write_transcript(name, at_threshold_lines()), { tool_input })
 
-	return investigation_outcome(payload, NOW_MS, context_of(cwd, {})).reason
+	return investigation_outcome(payload, { now_ms: NOW_MS, context: context_of(cwd, {}) }).reason
 }
 
 // The instruction exemption is anchored at the call's checkout, not the process's (kit#6967).

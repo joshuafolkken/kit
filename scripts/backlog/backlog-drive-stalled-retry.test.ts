@@ -1,8 +1,11 @@
 import type { EpicIssue } from '#scripts/epic/epic-issue'
+import { git_gh_issue_merged_pull } from '#scripts/gh/git-gh-issue-merged-pull'
+import { git_gh_pr_auto_merge } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from '#scripts/gh/git-gh-pr-snapshot'
 import { REQUIRED_CHECKS } from '#scripts/gh/git-pr-checks-eval'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_add_issue } from '#scripts/run/add/run-add-issue'
 import { run_board_ending_reason } from '#scripts/run/board/run-board-ending-reason'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -78,7 +81,14 @@ function mock_stream(events: ReadonlyArray<RunEvent>, history = events): void {
 	vi.mocked(run_event_stream_emit.all_events).mockResolvedValue(history)
 }
 
+function mock_lane_branches(): void {
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+	vi.spyOn(git_gh_pr_auto_merge, 'pr_list_open_with_head_prefix').mockResolvedValue([])
+	vi.spyOn(git_gh_issue_merged_pull, 'pr_merged_head_of_issue').mockResolvedValue(undefined)
+}
+
 beforeEach(() => {
+	mock_lane_branches()
 	vi.spyOn(run_event_stream_emit, 'current_events')
 	vi.spyOn(run_event_stream_emit, 'all_events')
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
@@ -99,19 +109,57 @@ async function next_sweep(): Promise<void> {
 	await backlog_drive_stalled_retry.sweep(clock.now)
 }
 
+describe('backlog_drive_stalled_retry.sweep — an adopted PR', () => {
+	it('retries the slug PR after its lane registration is removed (ac-8429)', async () => {
+		const branch = `${String(PARKED)}-legacy-implementation`
+
+		vi.mocked(git_gh_pr_auto_merge.pr_list_open_with_head_prefix).mockResolvedValue([
+			{ number: 1, head_ref: branch, has_auto_merge: false },
+		])
+		await next_sweep()
+
+		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(branch)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
+	})
+
+	it('checks the registered slug PR before retrying (ac-8429)', async () => {
+		const branch = `${String(PARKED)}-legacy-implementation`
+
+		vi.mocked(lane_registry.find_open_lane).mockResolvedValue(
+			lane_registry.parse_block(
+				`worktree /lanes/${String(PARKED)}\nbranch refs/heads/${branch}`,
+				'/lanes',
+			),
+		)
+
+		await next_sweep()
+
+		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(branch)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
+	})
+})
+
 describe('backlog_drive_stalled_retry.sweep — the cause cleared', () => {
 	it('retries a mechanical followup park through run:add --retry (ac-765f9d97)', async () => {
 		await next_sweep()
 
 		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(`${String(PARKED)}-lane`)
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('retries below the cap, counting earlier retries (ac-765f9d97)', async () => {
 		mock_stream([park()], [retry_event(0), park()])
 		await next_sweep()
 
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('leaves a park run:add refuses for a person, without ending the drive', async () => {
@@ -238,7 +286,9 @@ describe('backlog_drive_stalled_retry.sweep — a park with no stop (ac-a7d6e211
 		await next_sweep()
 
 		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).not.toHaveBeenCalled()
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 })
 
@@ -264,7 +314,9 @@ describe('backlog_drive_stalled_retry.sweep — a yield-cap park (ac-1737b91a)',
 		mock_stream([yield_park(due_at())])
 		await next_sweep()
 
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('reaches the cap on the third trip, naming the cause', async () => {

@@ -27,11 +27,12 @@ function write_repository(manifest: Record<string, unknown>): string {
 }
 
 // A supplier has to ship a CLI, so every fixture does unless it is built as a library.
-function make_repository(
-	name: string,
-	version?: string,
-	bin: Record<string, string> = KIT_BIN,
-): string {
+interface RepositoryFields {
+	version?: string | undefined
+	bin?: Record<string, string> | undefined
+}
+
+function make_repository(name: string, { version, bin = KIT_BIN }: RepositoryFields = {}): string {
 	return write_repository({ name, version, bin })
 }
 
@@ -58,7 +59,10 @@ describe('propagate.refuse_outside_source_repository', () => {
 
 	// A toolkit built on kit propagates its own releases (joshuafolkken/kit#2879).
 	it('allows the run inside a toolkit own repository', () => {
-		const repository_path = make_repository(APP_KIT, VERSION, { 'josh-app': 'dist/josh-app.js' })
+		const repository_path = make_repository(APP_KIT, {
+			version: VERSION,
+			bin: { 'josh-app': 'dist/josh-app.js' },
+		})
 
 		expect(propagate.refuse_outside_source_repository(repository_path)).toBeUndefined()
 	})
@@ -74,7 +78,9 @@ describe('propagate.refuse_outside_source_repository', () => {
 
 describe('propagate.resolve_run_version', () => {
 	it('reads the supplier own declared version, not whatever is newest', () => {
-		expect(propagate.resolve_target_version(make_repository(KIT, VERSION))).toBe(VERSION)
+		expect(propagate.resolve_target_version(make_repository(KIT, { version: VERSION }))).toBe(
+			VERSION,
+		)
 	})
 
 	it('refuses rather than guessing when the version cannot be read', () => {
@@ -88,7 +94,9 @@ describe('propagate.resolve_run_version', () => {
 	// them — which is the same guarantee that keeps a supplier checkout that is behind from
 	// propagating the previous release.
 	it('refuses a supplier checkout it cannot confirm is clean and current', () => {
-		const { version, refusal } = propagate.resolve_run_version(make_repository(KIT, VERSION))
+		const { version, refusal } = propagate.resolve_run_version(
+			make_repository(KIT, { version: VERSION }),
+		)
 
 		expect(version).toBeUndefined()
 		expect(refusal).toContain(REFUSAL)
@@ -97,14 +105,15 @@ describe('propagate.resolve_run_version', () => {
 	// A dry run writes nothing, so the same unready supplier is a warning there and the target list
 	// still gets printed.
 	it('warns instead of refusing on a dry run, and still reports a version', () => {
-		const resolved = propagate.resolve_run_version(make_repository(KIT, VERSION), true)
+		const supplier = make_repository(KIT, { version: VERSION })
+		const resolved = propagate.resolve_run_version(supplier, true)
 
 		expect(resolved.version).toBe(VERSION)
 		expect(resolved.warning).toContain('a real run would refuse')
 	})
 
 	it('refuses outside the supplier repository before reading any version', () => {
-		const consumer = make_repository(APP_KIT, '9.9.9')
+		const consumer = make_repository(APP_KIT, { version: '9.9.9' })
 
 		expect(propagate.resolve_run_version(consumer).version).toBeUndefined()
 	})

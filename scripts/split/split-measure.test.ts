@@ -75,17 +75,17 @@ describe('read_branch on a new module and its importer', () => {
 	})
 })
 
-describe('read_branch excludes quoted tests', () => {
-	it('excludes an untracked C-quoted test file over the line guide', async () => {
+describe('read_branch counts quoted tests', () => {
+	it('counts an untracked C-quoted test file over the line guide', async () => {
 		const file = 'quote"name.test.ts'
 
 		await writeFile(path.join(fixture.root, file), lines_of(201))
 		vi.mocked(git_command.untracked_names).mockResolvedValue(JSON.stringify(file))
 
 		expect(await split_measure.read_branch()).toStrictEqual({
-			files: 0,
-			lines: 0,
-			verdict: 'single',
+			files: 1,
+			lines: 201,
+			verdict: 'split',
 			guide: LEGACY_GUIDE,
 		})
 	})
@@ -99,7 +99,7 @@ describe('read_branch measured guide', () => {
 		})
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(SMALL_DIFF)
 		const measured = await split_measure.read_branch()
-		const notice = split_assess.notice(measured, { files: 1, lines: 40 })
+		const notice = split_assess.notice(measured, { declared: { files: 1, lines: 40 } })
 
 		expect(notice).toContain('growth files × 1 (measured) / lines × 1.25 (measured)')
 		expect(split_assess.reason(measured)).toContain('guide 8 files / 200 lines (fallback)')
@@ -170,12 +170,12 @@ describe('read_branch excludes run records', () => {
 		await writeFile(path.join(fixture.root, record), lines_of(NEW_FILE_LINES))
 		vi.mocked(git_command.untracked_names).mockResolvedValue(record)
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(
-			'1\t0\tscripts/a.ts\n50\t0\tscripts/a.test.ts\n50\t0\t.josh/metrics-accepted/6391.json',
+			'1\t0\tscripts/a.ts\n50\t0\t.josh/metrics-accepted/6391.json',
 		)
 		const measurement = await split_measure.read_branch()
 
 		expect(measurement).toEqual({ files: 1, lines: 1, verdict: 'single', guide: LEGACY_GUIDE })
-		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeUndefined()
+		expect(split_assess.notice(measurement, { declared: { files: 1, lines: 10 } })).toBeUndefined()
 	})
 })
 

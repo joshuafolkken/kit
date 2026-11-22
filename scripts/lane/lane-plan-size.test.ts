@@ -9,7 +9,7 @@ import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-siz
 // joshuafolkken/kit#5568: the probed hunks and the projected lines answer `split` too, with their reason.
 
 const ISSUE = 5533
-const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト除く）\n'
+const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト含む）\n'
 const PLANNED_AT = '2026-10-31T00:00:00.000Z'
 const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
 const UNPLANNED = 'scripts/lane/unplanned.ts'
@@ -33,7 +33,7 @@ function issue_with(body: string): Array<OpenIssueData> {
 
 function declared(file_count: number, line_count: number): Array<OpenIssueData> {
 	return issue_with(
-		`## 背景\n\n- 規模見積もり: 約 ${String(file_count)} ファイル / ${String(line_count)} 行（テスト除く）\n`,
+		`## 背景\n\n- 規模見積もり: 約 ${String(file_count)} ファイル / ${String(line_count)} 行（テスト含む）\n`,
 	)
 }
 
@@ -90,10 +90,9 @@ describe('lane_plan_size.oversize', () => {
 		})
 	})
 
-	it('does not count test files toward the bar', () => {
-		expect(oversize_of([...files(8), TEST_FILE])).toBeUndefined()
+	it('counts test files toward the bar', () => {
+		expect(oversize_of([...files(8), TEST_FILE])).toMatchObject({ split_off: [TEST_FILE] })
 	})
-
 	it.each([
 		['an Issue with no declaration (an epic)', issue_with('## 背景\n\n- 種別: 非不具合\n')],
 		['an Issue missing from the listing', []],
@@ -352,6 +351,16 @@ describe('lane_plan_size.oversize on a re-plan that adds files to a narrow recor
 			measured: 9,
 		})
 	})
+
+	// joshuafolkken/kit#8529: a glob a plan keeps as a pattern passed no hunk it matches, as a directory did.
+	it('still answers hunks for a re-plan that claims them by a glob', () => {
+		const plan = plan_of([held, TEST_FILE, 'scripts/lane/file-*.ts'])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			measured: 9,
+		})
+	})
 })
 
 describe('lane_plan_size.refusal_text', () => {
@@ -369,11 +378,9 @@ describe('lane_plan_size.refusal_text', () => {
 	it('names the split-off files, the `--route split` filing and the replan on the kept files', () => {
 		const text = text_of(oversize_of([...files(9), TEST_FILE]))
 
-		expect(text).toContain('Split off: scripts/lane/file-9.ts')
+		expect(text).toContain(`Split off: scripts/lane/file-9.ts, ${TEST_FILE}`)
 		expect(text).toContain('pnpm josh issue:file "<title>" --body-file <body.md> --route split')
-		expect(text).toContain(
-			`pnpm josh lane:plan ${String(ISSUE)} ${files(8).join(' ')} ${TEST_FILE}`,
-		)
+		expect(text).toContain(`pnpm josh lane:plan ${String(ISSUE)} ${files(8).join(' ')}\`, and ship`)
 		expect(text).toContain('split-assessment.md → "The question"')
 	})
 })

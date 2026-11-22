@@ -15,8 +15,10 @@ import { run_repair_attempt } from '#scripts/run/run-repair-attempt'
 import { run_add, type AddContext, type AddOutcome, type AddPorts, type IssueView } from './run-add'
 import { run_add_epic } from './run-add-epic'
 import { run_add_issue } from './run-add-issue'
+import { run_add_withdrawn } from './run-add-withdrawn'
 
-// `josh run:add <issue...> [--no-priority]` — the wiring around `run-add.ts`.
+// `josh run:add <issue...> [--no-priority]` — the wiring around `run-add.ts`; `--retry --withdrawn`
+// stands for every issue a person withdrew from the live run (`run-add-withdrawn.ts`).
 // It refuses unless a `backlogrun` holds the carry record here: an issue labelled with no run to take
 // it would be picked up by whichever run starts next, which is not what was asked. A run that named
 // issues reads its list off the record — with `--only` or without, since a named run drains the pool
@@ -32,8 +34,10 @@ const ARGV_OFFSET = 2
 const ISSUE_PREFIX = '#'
 const NO_PRIORITY_FLAG = '--no-priority'
 const RETRY_FLAG = '--retry'
+const WITHDRAWN_FLAG = '--withdrawn'
+const FLAGS: ReadonlySet<string> = new Set([NO_PRIORITY_FLAG, RETRY_FLAG, WITHDRAWN_FLAG])
 const RETRY_FAILED = 'Could not record the retry boundary.'
-const USAGE = `Usage: josh run:add <issue...> [${NO_PRIORITY_FLAG}] [${RETRY_FLAG}] — an epic is tracked as a root`
+const USAGE = `Usage: josh run:add <issue...> [${NO_PRIORITY_FLAG}] [${RETRY_FLAG}] | ${RETRY_FLAG} ${WITHDRAWN_FLAG} [${NO_PRIORITY_FLAG}] — an epic is tracked as a root`
 const NO_RUN_MESSAGE =
 	'No backlogrun is running here, so nothing was added. Start one with `pnpm josh backlogrun N`.'
 
@@ -41,7 +45,10 @@ interface AddRequest {
 	issues: ReadonlyArray<number>
 	is_priority: boolean
 	is_retry: boolean
+	is_withdrawn: boolean
 }
+
+type Annotate = (issue: number) => string
 
 interface LiveRun {
 	target: string
@@ -54,18 +61,29 @@ function parse_issue(token: string): number | undefined {
 	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(digits) ? Number(digits) : undefined
 }
 
-// Every token but the flag must be an issue number: a typo is refused whole rather than adding the
+// `--withdrawn` names its issues itself, so it takes no number and only beside `--retry`, the path
+// that lifts a withdrawal; without it at least one number is asked for.
+function is_issue_count_valid(argv: ReadonlyArray<string>, count: number): boolean {
+	if (!argv.includes(WITHDRAWN_FLAG)) return count > 0
+
+	return count === 0 && argv.includes(RETRY_FLAG)
+}
+
+// Every token but the flags must be an issue number: a typo is refused whole rather than adding the
 // rest, so the queue never holds half of what was typed.
 function parse_request(argv: ReadonlyArray<string>): AddRequest | undefined {
-	const tokens = argv.filter((token) => token !== NO_PRIORITY_FLAG && token !== RETRY_FLAG)
+	const tokens = argv.filter((token) => !FLAGS.has(token))
 	const issues = tokens.map((token) => parse_issue(token)).filter((issue) => issue !== undefined)
 
-	if (issues.length === 0 || issues.length !== tokens.length) return undefined
+	if (issues.length !== tokens.length || !is_issue_count_valid(argv, issues.length)) {
+		return undefined
+	}
 
 	return {
 		issues: [...new Set(issues)],
 		is_priority: !argv.includes(NO_PRIORITY_FLAG),
 		is_retry: argv.includes(RETRY_FLAG),
+		is_withdrawn: argv.includes(WITHDRAWN_FLAG),
 	}
 }
 
@@ -178,6 +196,12 @@ async function clear_label(issue: number, label: string): Promise<boolean> {
 
 const GH_PORTS: AddPorts = { read_issue, apply_label, clear_label }
 
+// The settlements `--retry` lifts: a park, and a person's withdrawal (joshuafolkken/kit#8599).
+const RETRY_LIFTED_KINDS: ReadonlySet<string> = new Set([
+	run_event_stream.EVENT_KIND.PARK,
+	run_event_stream.EVENT_KIND.WITHDRAW,
+])
+
 async function context_of(
 	live: LiveRun,
 	is_retry: boolean,
@@ -186,13 +210,14 @@ async function context_of(
 	const lanes = await lane_spent.lanes_in_use()
 	const events = await run_event_stream_emit.current_events(is_retry)
 	const active = backlog_drive_restore.active_issues(events)
-	const terminal = events.filter((event) => event.kind !== run_event_stream.EVENT_KIND.PARK)
+	const terminal = events.filter((event) => !RETRY_LIFTED_KINDS.has(event.kind))
 
 	return {
 		is_retry,
 		repairs,
 		done: live.carry.done ?? [],
 		active: new Set([...active, ...lanes.working, ...lanes.unread]),
+		withdrawn: new Set(backlog_drive_restore.withdrawn_issues(events).map(Number)),
 		settled: new Set([
 			...(live.carry.merged_issues ?? []),
 			...backlog_drive_restore.settled_issues(terminal),
@@ -201,13 +226,28 @@ async function context_of(
 	}
 }
 
-function report(outcomes: ReadonlyArray<AddOutcome>, is_priority: boolean): number {
-	for (const outcome of outcomes) console.info(run_add.describe(outcome, is_priority))
+function no_annotation(): string {
+	return ''
+}
+
+function report(
+	outcomes: ReadonlyArray<AddOutcome>,
+	is_priority: boolean,
+	annotate: Annotate = no_annotation,
+): number {
+	for (const outcome of outcomes) {
+		console.info(`${run_add.describe(outcome, is_priority)}${annotate(outcome.issue)}`)
+	}
 
 	return run_add.is_all_added(outcomes) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
-async function add(request: AddRequest, live: LiveRun, ports: AddPorts): Promise<number> {
+async function add(
+	request: AddRequest,
+	live: LiveRun,
+	ports: AddPorts,
+	annotate: Annotate = no_annotation,
+): Promise<number> {
 	const repairs = await prepare_repairs(request)
 	const outcomes: ReadonlyArray<AddOutcome> = await run_add.add_all(
 		request.issues,
@@ -218,7 +258,7 @@ async function add(request: AddRequest, live: LiveRun, ports: AddPorts): Promise
 	const additions = run_add.additions_of(outcomes, request.is_priority)
 	const roots = run_add.roots_of(outcomes)
 
-	if (additions.length === 0) return report(outcomes, request.is_priority)
+	if (additions.length === 0) return report(outcomes, request.is_priority, annotate)
 
 	await announce(
 		additions.map((addition) => addition.issue).filter((issue) => !repairs.has(issue)),
@@ -227,7 +267,23 @@ async function add(request: AddRequest, live: LiveRun, ports: AddPorts): Promise
 	)
 	record(live.target, additions, roots, request.is_retry)
 
-	return report(outcomes, request.is_priority)
+	return report(outcomes, request.is_priority, annotate)
+}
+
+// The issues `--withdrawn` stands for, read off the run's events, through the same `--retry` path.
+async function add_withdrawn(request: AddRequest, live: LiveRun, ports: AddPorts): Promise<number> {
+	const events = await run_event_stream_emit.current_events(true)
+	const issues = run_add_withdrawn.targets(events)
+
+	if (issues.length === 0) {
+		console.info(run_add_withdrawn.NO_WITHDRAWN_MESSAGE)
+
+		return SUCCESS_EXIT_CODE
+	}
+
+	return await add({ ...request, issues }, live, ports, (issue) =>
+		run_add_withdrawn.suffix_of(events, issue),
+	)
 }
 
 async function run(argv: ReadonlyArray<string>, ports: AddPorts = GH_PORTS): Promise<number> {
@@ -246,6 +302,8 @@ async function run(argv: ReadonlyArray<string>, ports: AddPorts = GH_PORTS): Pro
 
 		return FAILURE_EXIT_CODE
 	}
+
+	if (request.is_withdrawn) return await add_withdrawn(request, live, ports)
 
 	return await add(request, live, ports)
 }

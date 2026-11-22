@@ -2,9 +2,11 @@ import terminalLink from 'terminal-link'
 import { z } from 'zod'
 import { run_board_data } from './run-board-data'
 import { run_board_every, type RecordPorts } from './run-board-every'
-import { run_board_frame_store } from './run-board-frame-store'
+import { run_board_frame_store, type ColorLevel } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import type { RoundState } from './run-board-gather-thread'
+import { run_board_icons, type Icons } from './run-board-icons'
+import { run_board_round_change, type RoundInputs } from './run-board-round-change'
 import { run_board_state, type BoardPorts, type BoardState } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 
@@ -14,18 +16,24 @@ import { run_board_theme, type Theme } from './run-board-theme'
 // whether it opens links — is handed to the worker as it starts, since the worker writes to no terminal.
 
 const FORCE_HYPERLINK = 'FORCE_HYPERLINK'
+const FORCE_COLOR = 'FORCE_COLOR'
+const COLOR_OFF = new Set(['NO_COLOR', 'NODE_DISABLE_COLORS'])
 
 // What the worker records with, read off the board's terminal.
 interface RecordSetup {
 	theme: Theme | undefined
+	icons: Icons | undefined
 	is_tty: boolean
 	is_linked: boolean
+	color_level: ColorLevel
 }
 
 const setup_schema = z.object({
 	theme: z.enum(run_board_theme.THEMES).optional(),
+	icons: z.enum(run_board_icons.ICONS).optional(),
 	is_tty: z.boolean(),
 	is_linked: z.boolean(),
+	color_level: z.enum(run_board_frame_store.COLOR_LEVELS),
 })
 
 // joshuafolkken/kit#8242: every link opens with the same `id=`. A terminal keying links by id and URL
@@ -43,8 +51,14 @@ function link(text: string, url: string): string {
 	return linked.replace(`${LINK_OPEN}${url}`, () => `${LINK_OPEN_WITH_ID}${url}`)
 }
 
-function setup_of(theme: Theme | undefined): RecordSetup {
-	return { theme, is_tty: process.stdout.isTTY, is_linked: terminalLink.isSupported }
+function setup_of(theme: Theme | undefined, icons?: Icons): RecordSetup {
+	return {
+		theme,
+		icons,
+		is_tty: process.stdout.isTTY,
+		is_linked: terminalLink.isSupported,
+		color_level: run_board_frame_store.color_level(),
+	}
 }
 
 // What a worker is started with (`run-board-gather-thread.ts` → `WorkerSeed`).
@@ -57,10 +71,20 @@ interface WorkerStart {
 	record: ((round: RoundState) => void) | undefined
 }
 
-// The worker's environment: `link` there reads the worker's own output, never a terminal, so whether
-// the board's terminal opens links is forced to its answer.
+// The worker's environment: `link` and `styleText` there read the worker's own output, never a
+// terminal, so whether the board's terminal opens links, and the colors it draws (joshuafolkken/kit#8616),
+// are forced to its answers — the recorded `--once` frame, and its key, are then the terminal's. The
+// variables that turn color off go: `FORCE_COLOR` already carries their answer.
 function worker_environment(setup: RecordSetup): NodeJS.ProcessEnv {
-	return { ...process.env, [FORCE_HYPERLINK]: setup.is_linked ? '1' : '0' }
+	const inherited = Object.fromEntries(
+		Object.entries(process.env).filter(([name]) => !COLOR_OFF.has(name)),
+	)
+
+	return {
+		...inherited,
+		[FORCE_HYPERLINK]: setup.is_linked ? '1' : '0',
+		[FORCE_COLOR]: setup.color_level,
+	}
 }
 
 // The board's state over a round, as the board receives it (`run-board-gather-thread.ts`), with no view
@@ -81,19 +105,28 @@ function record_ports(setup: RecordSetup, ports: Pick<BoardPorts, 'now' | 'frame
 		is_tty: setup.is_tty,
 		form: 'screen',
 		theme: setup.theme,
+		icons: setup.icons,
 	}
 }
 
-// What the worker calls after each round: its frames recorded every `RECORD_EVERY_MS`
-// (`run-board-every.ts`).
+// What the worker calls after each round: its frames recorded at most every `RECORD_EVERY_MS`
+// (`run-board-every.ts`), and only from a round whose inputs changed since the last record
+// (joshuafolkken/kit#8335), including its samples (`run-board-round-change.ts`). A frame is
+// dated when its plan was read, so drawing an unchanged round again would not keep it fresh any longer;
+// a new plan read is a change, and so is a new minute.
 function round_recorder(
 	setup: RecordSetup,
 	ports: Pick<BoardPorts, 'now' | 'frames'>,
 ): (round: RoundState) => void {
-	const record = run_board_every.recorder(record_ports(setup, ports), setup.theme)
+	const did_record = run_board_every.recorder(record_ports(setup, ports), setup.theme)
+	const recorded: { last: RoundInputs | undefined } = { last: undefined }
 
 	return (round) => {
-		record(state_of(round))
+		const state = state_of(round)
+		const next = run_board_round_change.inputs_of(state, ports.now())
+
+		if (run_board_round_change.is_record_unchanged(recorded.last, next, state)) return
+		if (did_record(state)) recorded.last = next
 	}
 }
 
@@ -110,7 +143,10 @@ function started_with(given: unknown): WorkerStart {
 
 	if (!parsed.success) return { seed: undefined, record: undefined }
 	const { seed, setup } = parsed.data
-	const record = setup === undefined ? undefined : live_recorder({ ...setup, theme: setup.theme })
+	const record =
+		setup === undefined
+			? undefined
+			: live_recorder({ ...setup, theme: setup.theme, icons: setup.icons })
 
 	return { seed, record }
 }

@@ -89,7 +89,9 @@ function layout_of(plan: BoardPlan): ReturnType<typeof run_board_layout.layout_o
 		now_ms: 0,
 	}
 
-	return run_board_layout.layout_of(plan, read.statuses, run_board_reason.reader(read))
+	return run_board_layout.layout_of(plan, read.statuses, {
+		reason_of: run_board_reason.reader(read),
+	})
 }
 
 describe('run board human merge layout', () => {
@@ -245,7 +247,7 @@ describe('run board human merge pull request links', () => {
 describe('run board human merge earlier lanes', () => {
 	it('draws the decision issue once while keeping unrelated earlier lanes', () => {
 		const earlier = { lanes: [String(ISSUE), '1'], unknown: [String(ISSUE), '2'] }
-		const layout = run_board_layout.layout_of(plan_of(), new Map(), undefined, earlier)
+		const layout = run_board_layout.layout_of(plan_of(), new Map(), { earlier })
 
 		expect(layout.people.map((row) => row.number)).toEqual([ISSUE])
 		expect(layout.earlier?.map((row) => row.number)).toEqual([1, 2])

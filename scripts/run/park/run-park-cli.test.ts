@@ -1,8 +1,13 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { answer_judge, type JudgePorts } from '#scripts/agent/answer-judge'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
+import { issue_sources } from '#scripts/issue/issue-sources'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ParkCheck, run_park_answered } from './run-park-answered'
 import { run_park_cli } from './run-park-cli'
 
 const make_directory = temporary_directory('suite')
@@ -16,9 +21,12 @@ const {
 	lane_note_mock,
 	print_once_mock,
 	refusal_mock,
+	actual_refusal,
+	post_merge_mock,
 } = vi.hoisted(() => ({
-	refusal_mock:
-		vi.fn<(issue: string, question: string, directory: string) => Promise<number | undefined>>(),
+	post_merge_mock: vi.fn(async (): Promise<boolean> => false),
+	actual_refusal: vi.fn<typeof run_park_answered.refusal_of>(),
+	refusal_mock: vi.fn<(issue: string, question: string, directory: string) => Promise<ParkCheck>>(),
 	print_once_mock: vi.fn<(key: string, root?: string) => number>(),
 	lane_note_mock: vi.fn<(body: string, directory: string) => string>(),
 	apply_mock:
@@ -42,7 +50,14 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 vi.mock('./run-park', () => ({ run_park: { record: record_mock, clear: clear_record_mock } }))
 vi.mock('./run-park-release', () => ({ run_park_release: { release: release_mock } }))
 vi.mock('./run-park-lane', () => ({ run_park_lane: { with_lane_note: lane_note_mock } }))
-vi.mock('./run-park-answered', () => ({ run_park_answered: { refusal_of: refusal_mock } }))
+vi.mock('./run-park-post-merge', () => ({ run_park_post_merge: { is_refused: post_merge_mock } }))
+vi.mock('./run-park-answered', async (import_original) => {
+	const original = await import_original<{ run_park_answered: typeof run_park_answered }>()
+
+	actual_refusal.mockImplementation(original.run_park_answered.refusal_of)
+
+	return { run_park_answered: { refusal_of: refusal_mock } }
+})
 vi.mock('#scripts/run/run-step-section', () => ({
 	run_step_section: { PARK: 'run:park', print_once: print_once_mock },
 }))
@@ -154,7 +169,40 @@ describe('run:park next action', () => {
 	})
 })
 
+function mock_judgment_sources(): void {
+	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+	vi.spyOn(issue_sources, 'read_sources').mockResolvedValue({
+		kind: 'sources',
+		sources: [],
+		untrusted_count: 0,
+	})
+}
+
 // joshuafolkken/kit#6531: the question is judged against the Issue before any write.
+describe('run:park usage limit', () => {
+	it('records and releases a park from a real usage-limit judgment log', async () => {
+		const { judge } = answer_judge
+		const ports: JudgePorts = {
+			profile: () => ({ kind: 'profile', profile: agent_role_profile.DEFAULT_PROFILES.reviewer }),
+			launch: async () => ({ kind: 'completed', pid: 1, exit_code: 1 }),
+			read_log: () =>
+				'{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"seven_day"}}\n{"type":"assistant","error":"rate_limit"}',
+			log_path: () => 'judgment.log',
+		}
+
+		mock_judgment_sources()
+		vi.spyOn(answer_judge, 'judge').mockImplementation(
+			async (request) => await judge(request, ports),
+		)
+		refusal_mock.mockImplementation(actual_refusal)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
+		expect(apply_mock).toHaveBeenCalledWith(ISSUE, LABEL, expect.stringContaining('usage limit:'))
+		expect(record_mock).toHaveBeenCalledWith(ISSUE, DIRECTORY)
+		expect(release_mock).toHaveBeenCalledWith(ISSUE)
+	})
+})
+
 describe('run:park answered question', () => {
 	it('judges the question as written, before the lane note and any write', async () => {
 		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
@@ -165,12 +213,20 @@ describe('run:park answered question', () => {
 	})
 
 	it('writes, records and releases nothing when the judgment stops the park', async () => {
-		refusal_mock.mockResolvedValue(1)
+		refusal_mock.mockResolvedValue({ exit_code: 1 })
 
 		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
 		expect(apply_mock).not.toHaveBeenCalled()
 		expect(record_mock).not.toHaveBeenCalled()
 		expect(release_mock).not.toHaveBeenCalled()
+	})
+
+	it('writes nothing and fails when a visual-check park meets a post-merge check', async () => {
+		post_merge_mock.mockResolvedValueOnce(true)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(post_merge_mock).toHaveBeenCalledWith(ISSUE, MARKED_BODY)
+		expect(apply_mock).not.toHaveBeenCalled()
 	})
 
 	it('does not judge a body off the schema', async () => {

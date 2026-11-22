@@ -1,4 +1,6 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin } from './run-board-spin'
 import { run_board_theme_defs } from './run-board-theme-defs'
@@ -17,7 +19,6 @@ const { NO_TYPING, next, type_bytes, typed_lines } = run_board_type_rows
 const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 const { CURSOR } = run_board_typing
 const ESC = '\u{1B}'
-const RESET = `${ESC}[0m`
 const START = Date.parse('2026-11-19T09:00:00.000Z')
 const SECOND = 1000
 const ROW = 'x'.repeat(100)
@@ -49,7 +50,7 @@ function after_base(base: TypingFrame, drawn: ReadonlyArray<KeyedLine>): Typing 
 
 // The keyed rows a frame of `lines` leaves on a pane two rows tall.
 function on_screen(lines: ReadonlyArray<string>): Array<KeyedLine> {
-	return run_board_spin.spun(lines, '⠋', { rows: 2, columns: 80 }).keyed
+	return run_board_spin.spun(lines, '⠋', { size: { rows: 2, columns: 80 } }).keyed
 }
 
 function keys_of(typing: Typing): Array<string> {
@@ -116,6 +117,22 @@ describe('run_board_type_rows.is_typing', () => {
 	})
 })
 
+// joshuafolkken/kit#8523: the trill stops itself as the last row types through.
+describe('run_board_type_rows.left_ms', () => {
+	it('runs out at the first moment no row types', () => {
+		const typing = after_base(frame_of([line_of('#1', 0)]), [line_of('#1', 0), line_of('#2', 1)])
+		const done_ms = START + SECOND + run_board_type_rows.left_ms(typing, START + SECOND)
+
+		expect(run_board_type_rows.is_typing(typing, done_ms - 1)).toBe(true)
+		expect(run_board_type_rows.is_typing(typing, done_ms)).toBe(false)
+		expect(run_board_type_rows.left_ms(typing, done_ms + SECOND)).toBe(0)
+	})
+
+	it('is 0 with no row typing', () => {
+		expect(run_board_type_rows.left_ms(NO_TYPING, START)).toBe(0)
+	})
+})
+
 // joshuafolkken/kit#8375: the rules' lock starts once the row that types through last is done.
 describe('run_board_type_rows.done_ms', () => {
 	it('is the moment the row typing through last is done, with rows typing together', () => {
@@ -168,7 +185,7 @@ describe('run_board_type_rows — what is written', () => {
 		const later = next(typing, frame_of(typing.lines), START + SECOND + 10 * LETTER_MS, true)
 		const lines = typed_lines(['head', ROW, 'foot'], later, START + SECOND + 10 * LETTER_MS)
 
-		expect(lines).toStrictEqual(['head', `${'x'.repeat(11)}${RESET}${CURSOR}`, 'foot'])
+		expect(lines).toStrictEqual(['head', `${'x'.repeat(11)}${CURSOR}`, 'foot'])
 	})
 
 	it('types two rows that appear together side by side, each with its own block, at its own row', () => {
@@ -176,7 +193,7 @@ describe('run_board_type_rows — what is written', () => {
 		const bytes = type_bytes(typing, START + SECOND + 6 * LETTER_MS)
 
 		expect(bytes).toBe(
-			`${ESC}[3;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K${ESC}[5;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K`,
+			`${ESC}[3;1H${'x'.repeat(7)}${CURSOR}${ESC}[K${ESC}[5;1H${'x'.repeat(7)}${CURSOR}${ESC}[K`,
 		)
 	})
 
@@ -199,6 +216,33 @@ describe('run_board_type_rows — what is written', () => {
 	})
 })
 
+// joshuafolkken/kit#8356: where the rows decode, a row resolves out of code with no block, as wide as
+// the row it becomes.
+describe('run_board_type_rows — a decoding row', () => {
+	it('writes the row with no block, as wide as the row', () => {
+		const typing = after_base(frame_of([]), [line_of('done:7', 0)])
+		const decoding = { ...typing, is_decoding: true }
+		const [line = ''] = typed_lines([ROW], decoding, START + SECOND + 10 * LETTER_MS)
+
+		expect(line).not.toContain(CURSOR)
+		expect(run_board_fit.width_of(stripVTControlCharacters(line))).toBe(ROW.length)
+		expect(type_bytes(decoding, START + SECOND + 10 * LETTER_MS)).not.toContain(CURSOR)
+	})
+
+	it('carries the frame’s decoding into the typing', () => {
+		const frame = { ...frame_of([]), is_decoding: true }
+
+		expect(next(NO_TYPING, frame, START, true).is_decoding).toBe(true)
+	})
+
+	it('keeps the frame’s decoding past the base', () => {
+		const base = next(NO_TYPING, frame_of([]), START, true)
+		const frame = { ...frame_of([line_of('done:7', 0)]), is_decoding: true }
+
+		expect(next(base, frame, START + SECOND, true).is_decoding).toBe(true)
+	})
+})
+
 // joshuafolkken/kit#8402: the block stays lit at every moment a row types — no blank beat.
 describe('run_board_type_rows — the steady block', () => {
 	it.each([0, 1, 2, 3, 6, 7, 9, 13])(
@@ -208,7 +252,7 @@ describe('run_board_type_rows — the steady block', () => {
 			const shown = 'x'.repeat(letters + 1)
 
 			expect(type_bytes(typing, START + SECOND + letters * LETTER_MS)).toBe(
-				`${ESC}[3;1H${shown}${RESET}${CURSOR}${ESC}[K${ESC}[5;1H${shown}${RESET}${CURSOR}${ESC}[K`,
+				`${ESC}[3;1H${shown}${CURSOR}${ESC}[K${ESC}[5;1H${shown}${CURSOR}${ESC}[K`,
 			)
 		},
 	)
@@ -220,9 +264,7 @@ describe('run_board_type_rows — the header’s now line (joshuafolkken/kit#810
 		const at_ms = START + SECOND + 6 * LETTER_MS
 
 		expect(keys_of(typing)).toStrictEqual([`now:${WORDS}`])
-		expect(type_bytes(typing, at_ms)).toBe(
-			`${ESC}[3;1H${NOW_PREFIX}#8093 ·${RESET}${CURSOR}${ESC}[K`,
-		)
+		expect(type_bytes(typing, at_ms)).toBe(`${ESC}[3;1H${NOW_PREFIX}#8093 ·${CURSOR}${ESC}[K`)
 	})
 
 	it('writes the now line whole once its words are typed through', () => {

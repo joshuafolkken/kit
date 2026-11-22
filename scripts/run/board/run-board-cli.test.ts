@@ -23,7 +23,7 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 })
 const ESCAPE = '\u{1B}'
-const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
+const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l${ESCAPE}[2;1H`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ josh-board'
 const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
@@ -84,7 +84,7 @@ describe('run_board_cli.run', () => {
 
 	// joshuafolkken/kit#7089: the header's issue counts open their lists, its name the repository.
 	it('links the issue counts and the repository’s name into the plan’s repository', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_cli.run(['--once'], { ...ports, link: bracketed, read_issue_count })
 
@@ -123,13 +123,13 @@ describe('run_board_cli.run --chat', () => {
 
 	// joshuafolkken/kit#7089: the header's repository links come out as their plain text.
 	it('writes the issue counts and the repository’s name with no link', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_cli.run(['--chat'], { ...ports, link: hyperlink, read_issue_count })
 
-		const [first, , third] = (frames[0] ?? '').split('\n', 3)
+		const third = (frames[0] ?? '').split('\n', 3).at(-1)
 
-		expect(first).toMatch(/📮 87\/6,912$/u)
+		expect(frames[0]).toMatch(/ lanes .*📮 87\/6,912$/mu)
 		expect(third).toMatch(/^ {2}kit\b/u)
 	})
 
@@ -271,17 +271,18 @@ describe('run_board_cli.run plan read', () => {
 
 		await expect(run_board_cli.run([], { ...ports, read_plan })).rejects.toBe(STOPPED)
 		expect(read_plan).toHaveBeenCalledOnce()
-		expect(frames[1]?.split('\n', 1)[0]).toMatch(SPINNING)
+		expect(frames[1]).toMatch(SPINNING)
+		expect(frames[1]?.split('\n', 1)[0]).not.toContain('⏳')
 	})
 
 	it('draws the plan in one plain frame, with no spinner', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_cli.run(['--once'], ports)
 
 		expect(frames).toHaveLength(1)
-		expect(frames[0]).toMatch(/✅ +\d+\/\d+/u)
-		expect(frames[0]?.split('\n', 1)[0]).not.toMatch(SPINNING)
+		expect(frames[0]).toMatch(/✅ \d+\/\d+/u)
+		expect(frames[0]).not.toMatch(SPINNING)
 	})
 })
 

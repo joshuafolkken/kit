@@ -107,6 +107,12 @@ describe('run_board_header_defcon.level_of', () => {
 })
 
 describe('run_board_header_defcon.level_of on held seats and blocked P1s', () => {
+	it('raises nothing when seats prevent a waiting P1 from launching', () => {
+		const lane_capacity = { free: 0, bound: 'seats', seated: 9 } as const
+
+		expect(level({ active: ONE, queued: P1_QUEUED }, { lane_capacity })).toBe(CALM)
+	})
+
 	it('counts an earlier run lane as a held seat', () => {
 		expect(level({ active: ONE, queued: P1_QUEUED }, { occupied_count: LANES })).toBe(CALM)
 		expect(level({ active: ONE }, { occupied_count: LANES + 1 })).toBe(OVER_LIMIT)
@@ -151,35 +157,46 @@ describe('run_board_header_defcon.field_of', () => {
 	})
 })
 
-// joshuafolkken/kit#8107: the level ends the first line, leaving the second's end to the notice.
-describe('run_board_header.header_lines with the alert level', () => {
-	it('ends a themed screen header first line on the level, and draws none on the second', () => {
-		expect(header_line(0, WARGAMES)).toMatch(/ {2}DEFCON \[5\] 4 3 2 1$/u)
+function alert_of(extra: Partial<BoardHeader>): string | undefined {
+	const part = run_board_header.alert_part(board({}, extra))
+
+	return part === undefined ? undefined : stripVTControlCharacters(part)
+}
+
+// joshuafolkken/kit#8513: the level rides the throughput rule's right end; the header draws it on no line.
+describe('run_board_header.alert_part', () => {
+	it('draws the level on a themed screen alone, and on no header line', () => {
+		expect(alert_of(WARGAMES)).toBe('DEFCON [5] 4 3 2 1')
+		expect(alert_of({})).toBeUndefined()
+		expect(alert_of({ ...WARGAMES, form: 'chat' })).toBeUndefined()
+		expect(header_line(0, WARGAMES)).not.toContain('DEFCON')
 		expect(header_line(1, WARGAMES)).not.toContain('DEFCON')
 	})
 
-	it('leaves a header with no theme, and a chat frame, as it was', () => {
-		const plain = header_line(0, {})
+	// The theme's board name (joshuafolkken/kit#8604) is the one change.
+	it('leaves the header of a themed screen as the plain one draws it but the board name', () => {
+		expect(header_line(0, WARGAMES)).toBe(header_line(0, {}).replace('josh-board', 'josh-wopr'))
+	})
 
-		expect(plain).not.toContain('DEFCON')
-		expect(header_line(0, { ...WARGAMES, form: 'chat' })).toBe(plain)
-		expect(header_line(0, WARGAMES).startsWith(plain)).toBe(true)
+	// A chat frame recorded off a themed live board keeps `josh-board`, as `--chat` draws no theme.
+	it('names the board josh-board in a chat frame that carries a theme', () => {
+		expect(header_line(0, { ...WARGAMES, form: 'chat' })).toBe(header_line(0, { form: 'chat' }))
 	})
 })
 
 // joshuafolkken/kit#8358: the theme's row picks how the level is drawn; the level stays shared.
-describe('run_board_header.header_lines with the theme row alert', () => {
+describe('run_board_header.alert_part with the theme row alert', () => {
 	it('draws the alert the theme row names, at the shared level', () => {
 		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert').mockReturnValue('ALERT')
 
-		expect(header_line(0, WARGAMES)).toMatch(/ {2}ALERT$/u)
+		expect(alert_of(WARGAMES)).toBe('ALERT')
 		expect(alert).toHaveBeenCalledWith(CALM)
 	})
 
 	it('draws no alert where no theme is drawn', () => {
 		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert')
 
-		header_line(0, {})
+		alert_of({})
 
 		expect(alert).not.toHaveBeenCalled()
 	})

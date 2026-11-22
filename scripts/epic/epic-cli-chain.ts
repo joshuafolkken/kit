@@ -1,5 +1,7 @@
 import { session_cite } from '#scripts/issue/session-cite'
 import { epic_body, type OrderReason } from './epic-body'
+import { epic_chain_kind } from './epic-chain-kind'
+import { epic_chains, type InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv } from './epic-cli-argv'
 import {
 	chain_links,
@@ -29,15 +31,38 @@ interface ChainRead {
 	chains: Array<Chain>
 	chain_refusal?: string | undefined
 	order_reasons?: Array<OrderReason> | undefined
+	placed_chain?: Chain | undefined
 }
 
 // `children` is `undefined` where the epic's children are not known yet — `--add` reads them from the
 // epic, so its outsider check runs in the plan (`find_outsider_refusal`). `rival_flag` names another flag
 // given beside `--chain` that also decides the order (`--before` and its kin under `--add`).
+// `placed_chain` is the chain `--before` / `--after` writes (`epic_chains.chain_for`): declared like a
+// `--chain`, so it needs its `--order-reason` too.
 interface ChainSubject {
 	children?: ReadonlyArray<number> | undefined
 	is_ordered: boolean
 	rival_flag?: string | undefined
+	placed_chain?: Chain | undefined
+}
+
+// The chain `--add`'s position writes, or `undefined` for none — no position, or an order-only move
+// (`--order-before` / `--order-after`), which writes no dependency.
+function to_placed_chain(
+	additions: ReadonlyArray<number>,
+	placed: { position?: InsertPosition | undefined; is_order_only?: boolean | undefined },
+): Chain | undefined {
+	if (placed.position === undefined || placed.is_order_only === true) return undefined
+
+	return epic_chains.chain_for(additions, placed.position)
+}
+
+// Every chain the read declares — the `--chain` values, then the positioned one — as the record of
+// orders `## Decisions` gets.
+function declared_of(
+	read: Pick<ChainRead, 'placed_chain'> & { chains: ReadonlyArray<Chain> },
+): ReadonlyArray<Chain> {
+	return read.placed_chain === undefined ? read.chains : [...read.chains, read.placed_chain]
 }
 
 // The value as one chain, or `undefined` when the body parser would not read it as a chain line.
@@ -174,7 +199,7 @@ function find_reason_refusal(
 	const read = values.map((value) => to_order_reason(value))
 	const index = read.findIndex((_entry, at) => is_unusable(read, at, declared))
 	if (index === -1) return undefined
-	const expected = `\`<chain>: <reason>\` for a chain \`${CHAIN_FLAG}\` or \`--ordered\` declared, once`
+	const expected = `\`<chain>: <reason>\` for a chain \`${CHAIN_FLAG}\`, \`--ordered\`, \`--before\` or \`--after\` declared, once`
 
 	return `\`${ORDER_REASON_FLAG} ${values[index] ?? ''}\` is not ${expected}; nothing was written.`
 }
@@ -193,18 +218,32 @@ function find_missing_reason_refusal(
 	return `The declared order \`${chain}\` has no \`${ORDER_REASON_FLAG} "${chain}: <reason>"\`; every declared chain needs its reason. Nothing was written.`
 }
 
-// The reasons given for the declared chains, or a refusal — a value that does not fit, or a declared
-// chain left without its reason.
+// A creation or promotion — the subjects whose children are known — asks each declared order for its
+// kind (`epic-chain-kind.ts`); `--add` does not.
+function find_kind_refusal(
+	reasons: ReadonlyArray<OrderReason>,
+	subject: ChainSubject,
+): string | undefined {
+	return subject.children === undefined ? undefined : epic_chain_kind.find_refusal(reasons)
+}
+
+// The reasons given for the declared chains, or a refusal — a value that does not fit, a declared
+// chain left without its reason, or a creation's order with no kind.
 function read_order_reasons(
 	parsed: EpicArgv,
 	subject: ChainSubject,
 	chains: ReadonlyArray<Chain>,
 ): Omit<ChainRead, 'chains'> {
 	const values = epic_cli_argv.values_of_flag(parsed, ORDER_REASON_FLAG)
-	const declared = epic_body.declared_chains(subject.children ?? [], subject.is_ordered, chains)
+	const declared = declared_of({
+		chains: epic_body.declared_chains(subject.children ?? [], subject.is_ordered, chains),
+		placed_chain: subject.placed_chain,
+	})
 	const order_reasons = values.flatMap((value) => to_order_reason(value) ?? [])
 	const chain_refusal =
-		find_reason_refusal(values, declared) ?? find_missing_reason_refusal(order_reasons, declared)
+		find_reason_refusal(values, declared) ??
+		find_missing_reason_refusal(order_reasons, declared) ??
+		find_kind_refusal(order_reasons, subject)
 	if (chain_refusal !== undefined) return { chain_refusal }
 
 	return { order_reasons }
@@ -218,15 +257,20 @@ function read_chains(parsed: EpicArgv, subject: ChainSubject): ChainRead {
 	if (chain_refusal !== undefined) return { chains: [], chain_refusal }
 	const chains = values.map((value) => to_chain(value) ?? [])
 
-	return { chains, ...read_order_reasons(parsed, subject, chains) }
+	const { placed_chain } = subject
+	const placed = placed_chain === undefined ? {} : { placed_chain }
+
+	return { chains, ...placed, ...read_order_reasons(parsed, subject, chains) }
 }
 
 const epic_cli_chain = {
 	CHAIN_FLAG,
 	ORDER_REASON_FLAG,
+	declared_of,
 	find_cycle_refusal,
 	find_outsider_refusal,
 	read_chains,
+	to_placed_chain,
 }
 
 export { epic_cli_chain }

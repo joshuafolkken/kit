@@ -123,19 +123,16 @@ function dispatched_at(directory: string): number | undefined {
 	return statSync(path.join(directory, ENV_FILE_NAME), { throwIfNoEntry: false })?.mtimeMs
 }
 
-// A lane is identified by its branch rather than by where it sits, so nothing here compares two
-// spellings of one path — git prints the resolved one, and a lane root reached through a symlink
-// would otherwise read as no lane at all.
-//
-// The issue is the same shape `lane:open` accepts. Nothing reserves the `-lane` suffix, so a hand-made
-// `spike-lane` branch with a work tree would otherwise be read as a lane — and `lane:close --all`
-// would delete its directory and its branch on an issue number that never existed.
+// Adopted PR heads keep their numeric issue prefix. parse_block also requires the exact lane
+// directory, so an ordinary issue checkout outside the lane root cannot be closed as a lane.
 function branch_issue(branch: string | undefined): string | undefined {
-	if (!branch?.endsWith(lane_paths.LANE_BRANCH_SUFFIX)) return undefined
+	if (branch === undefined) return undefined
 
-	const issue = branch.slice(0, -lane_paths.LANE_BRANCH_SUFFIX.length)
+	const issue = branch.split('-', 1)[0] ?? ''
 
-	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue) ? issue : undefined
+	return branch.includes('-') && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)
+		? issue
+		: undefined
 }
 
 // **Stranded means the work tree is gone from disk, and nothing else.** git also marks a
@@ -280,11 +277,13 @@ async function has_lanes_in_flight(): Promise<boolean> {
 	return lanes.some((lane) => !lane.is_stranded)
 }
 
+function holds_seat(lane: LaneInfo): boolean {
+	return lane.seat_held !== false && lane.seat !== undefined
+}
+
 /** The seats live lanes hold — what a new lane's seat has to avoid. */
 function used_seats(lanes: ReadonlyArray<LaneInfo>): Array<number> {
-	return [
-		...new Set(lanes.filter((lane) => lane.seat_held !== false).flatMap((lane) => lane.seat ?? [])),
-	]
+	return [...new Set(lanes.filter((lane) => holds_seat(lane)).flatMap((lane) => lane.seat ?? []))]
 }
 
 /** The live lanes whose seat could not be read, which is what stops an allocation. */
@@ -323,6 +322,7 @@ const lane_registry = {
 	registered_directories,
 	unreadable_lanes,
 	used_seats,
+	holds_seat,
 	write_environment,
 	OWNER_ONLY_MODE,
 }

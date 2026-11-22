@@ -14,9 +14,7 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 		read_carry: vi.fn(() => carry),
 	},
 }))
-vi.mock('#scripts/issue/issue-state-cli', () => ({
-	issue_state_cli: { read_issue: vi.fn() },
-}))
+vi.mock('#scripts/issue/issue-state-cli')
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_list_comments: vi.fn(async () => '[]') },
 }))
@@ -123,7 +121,9 @@ describe('backlog:triage --apply --adopt', () => {
 			children: [Number(ISSUE)],
 			decision: `#${ISSUE}: adopted park option 1 (backlog:triage --adopt) — ${REASON}`,
 		})
-		expect(josh_command.josh_run).toHaveBeenCalledWith(['run:add', ISSUE, '--retry'], true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(['run:add', ISSUE, '--retry'], {
+			should_forward_stderr: true,
+		})
 	})
 
 	it.each([
@@ -292,8 +292,8 @@ const FILING_PARK = [
 	'1. 親が割り込み Issue を起票して直す（premise の読み取りを `lane:stats` の表の形に合わせる）。',
 	'   - 層: A',
 	'   - 必要な権限: 親（`issue:file --route interrupt --label priority:high --blocks-finder`）',
-	'### 推奨',
-	'1 the premise reader is the defect',
+	'   - 順序の理由: 別の待ちがある — premise の読み取りの不具合',
+	'### 推奨\n1 the premise reader is the defect',
 ].join('\n')
 
 function adopt_filing(done: string): Promise<number> {

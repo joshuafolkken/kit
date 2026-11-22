@@ -86,7 +86,9 @@ describe('cost_cli.run — the target project path', () => {
 	it('reads the transcripts of the project named by --path', () => {
 		write_session_under(TARGET, SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD, ANTHROPIC_ENV)).toBe(0)
+		expect(
+			cost_cli.run(['--over', '0', '--path', TARGET], { cwd: CWD, environment: ANTHROPIC_ENV }),
+		).toBe(0)
 		expect(output()).toContain(PER_REQUEST)
 	})
 
@@ -94,9 +96,9 @@ describe('cost_cli.run — the target project path', () => {
 	it('does not read the process cwd when --path names another project', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD, ANTHROPIC_ENV)).toBe(
-			FAILURE_EXIT_CODE,
-		)
+		expect(
+			cost_cli.run(['--over', '0', '--path', TARGET], { cwd: CWD, environment: ANTHROPIC_ENV }),
+		).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(NO_TRANSCRIPT)
 	})
 
@@ -104,7 +106,7 @@ describe('cost_cli.run — the target project path', () => {
 	it('reads the process cwd when --path is absent', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(0)
+		expect(cost_cli.run(['--over', '0'], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(0)
 		expect(output()).toContain(PER_REQUEST)
 	})
 })
@@ -113,7 +115,9 @@ describe('cost_cli.run — OpenAI path scope', () => {
 	it('refuses an OpenAI path in another project without reading a thread', () => {
 		const measurement = vi.spyOn(codex_usage, 'measurement')
 
-		expect(cost_cli.run(['--over', '0', '--path', TARGET], CWD, OPENAI_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(
+			cost_cli.run(['--over', '0', '--path', TARGET], { cwd: CWD, environment: OPENAI_ENV }),
+		).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain('OpenAI --path cannot select a thread from another project')
 		expect(measurement).not.toHaveBeenCalled()
 	})
@@ -121,7 +125,7 @@ describe('cost_cli.run — OpenAI path scope', () => {
 	it('reads the active lane rollout when --path names its linked main checkout', () => {
 		const { main, lane, environment } = linked_rollout()
 
-		expect(cost_cli.run(['--over', '0', '--path', main], lane, environment)).toBe(0)
+		expect(cost_cli.run(['--over', '0', '--path', main], { cwd: lane, environment })).toBe(0)
 		expect(output()).toContain('over')
 	})
 })

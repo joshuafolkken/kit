@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_change_flash } from './run-board-change-flash'
 import { run_board_labels } from './run-board-labels'
+import { run_board_notice_trace } from './run-board-notice-trace'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
 import { run_board_spot } from './run-board-spot'
@@ -71,6 +73,7 @@ const UNMARKED = {
 	keyed: [],
 	sweep: undefined,
 	lamps: [],
+	traces: [],
 	rules: [],
 	strips: [],
 }
@@ -78,7 +81,7 @@ const UNMARKED = {
 describe('run_board_spin.spun', () => {
 	it('records the title’s, a running row’s and a loading spinner’s spots by display width', () => {
 		const lines = [`${SPOT} backlogrun  ✅ 0/1  ⏳ ${SPOT}`, '', `${SPOT} 🔍 1  a`]
-		const { spots } = spun(lines, '⠋', WIDE)
+		const { spots } = spun(lines, '⠋', { size: WIDE })
 
 		// `⠋ backlogrun  ` is 14 columns, `✅ 0/1  ` 8 with its two-column ✅, `⏳ ` 3 with its ⏳.
 		expect(places(spots)).toStrictEqual([
@@ -91,13 +94,13 @@ describe('run_board_spin.spun', () => {
 	it('draws every placeholder as the frame and leaves a frame with none as it was', () => {
 		const lines = [`${SPOT} run`, 'still']
 
-		expect(spun(lines, '⠙', WIDE).lines).toStrictEqual(['⠙ run', 'still'])
-		expect(spun(['▶ run'], '⠙', WIDE)).toStrictEqual(UNMARKED)
+		expect(spun(lines, '⠙', { size: WIDE }).lines).toStrictEqual(['⠙ run', 'still'])
+		expect(spun(['▶ run'], '⠙', { size: WIDE })).toStrictEqual(UNMARKED)
 	})
 
 	it('counts the rows a wrapped line takes and keeps the colors in effect at the spot', () => {
 		const lines = ['x'.repeat(25), `${GREEN}ab${SPOT}${ESCAPE}[39m`, `${'y'.repeat(12)}${SPOT}`]
-		const { spots } = spun(lines, '⠋', { rows: 24, columns: 10 })
+		const { spots } = spun(lines, '⠋', { size: { rows: 24, columns: 10 } })
 
 		expect(spots).toStrictEqual([
 			{ row: 4, column: 3, style: GREEN },
@@ -108,7 +111,9 @@ describe('run_board_spin.spun', () => {
 	it('records no spot below the rows the frame is kept within', () => {
 		const lines = [`${SPOT} run`, 'a', `${SPOT} row`]
 
-		expect(places(spun(lines, '⠋', { rows: 2, columns: 80 }).spots)).toStrictEqual([[1, 1]])
+		expect(places(spun(lines, '⠋', { size: { rows: 2, columns: 80 } }).spots)).toStrictEqual([
+			[1, 1],
+		])
 		expect(places(spun(lines, '⠋').spots)).toStrictEqual([
 			[1, 1],
 			[3, 1],
@@ -131,6 +136,46 @@ describe('run_board_spin.spin_bytes', () => {
 
 const SPOTS = [{ row: 1, column: 1, style: '' }]
 const SPINNING = { spots: SPOTS, typing: NO_TYPING }
+// A two-letter notice's trace writes: one per letter step, then the lit bar.
+const NOTICE_STEPS = [0, 50, 100]
+
+it('ac-8de5883d cools and restores a flash on spinner turns even without spinner spots', async () => {
+	const { ports, writes } = spin_ports(START)
+	const line = { key: 'a', row: 1, index: 0, prefix_columns: 0, text: 'a' }
+	const base = run_board_change_flash.next(undefined, [line], START)
+	const flash = run_board_change_flash.next(base, [{ ...line, text: 'b' }], START)
+
+	await spin_to_second(
+		{ spots: [], typing: NO_TYPING, flash },
+		{ ...ports, write_drawn: ports.write },
+	)
+	const overlays = writes.filter(({ text }) => text.includes('[1;1H'))
+
+	expect(overlays[0]?.at_ms).toBe(START + SPINNER_INTERVAL_MS)
+	expect(overlays.at(-1)?.at_ms).toBe(
+		START + run_board_change_flash.COOL_FRAMES * SPINNER_INTERVAL_MS,
+	)
+	expect(overlays.at(-1)?.text).toBe(`${ESCAPE}[1;1Hb`)
+})
+
+it('writes a placed notice trace on its letter steps until the bar is lit', async () => {
+	const { ports, writes } = spin_ports(START)
+	const place = { row: 2, column: 5, text: ' ab ' }
+	const notice_trace = { trace: { key: 'notice', start_ms: START }, place }
+
+	await spin_to_second(
+		{ spots: [], typing: NO_TYPING, notice_trace },
+		{ ...ports, write_drawn: ports.write },
+	)
+	const traced = writes.filter(({ text }) => text.includes(`${ESCAPE}[2;5H`))
+	const lit_ms = NOTICE_STEPS.at(-1) ?? 0
+	const lit = traced.find(({ at_ms }) => at_ms === START + lit_ms)
+
+	expect(traced.map(({ at_ms }) => at_ms - START)).toStrictEqual(
+		expect.arrayContaining(NOTICE_STEPS),
+	)
+	expect(lit?.text).toContain(run_board_notice_trace.traced(place.text, lit_ms, Math.random))
+})
 
 describe('run_board_spin.spin_to_second', () => {
 	it('turns the spinners on every interval until the next second, writing nothing but the turns', async () => {
@@ -179,7 +224,7 @@ const STRIP_FRAME = [
 ]
 
 describe('run_board_spin — the lamp strips (joshuafolkken/kit#8376)', () => {
-	const drawn = spun(STRIP_FRAME, '⠋', WIDE)
+	const drawn = spun(STRIP_FRAME, '⠋', { size: WIDE })
 
 	it('records a strip above the throughput rule only, in the panel’s first row’s columns', () => {
 		const panel = drawn.lamps.filter((lamp) => lamp.panel_row === 0).map((lamp) => lamp.column)
@@ -203,7 +248,7 @@ describe('run_board_spin — the lamp strips (joshuafolkken/kit#8376)', () => {
 describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', () => {
 	it('takes each row’s key out of the frame and records the row it starts on, its spinner kept a placeholder', () => {
 		const lines = ['x'.repeat(25), keyed('done', 7, `${SPOT} ✅ 7`), keyed('lanes', 8, 'off')]
-		const { lines: written, keyed: rows } = spun(lines, '⠋', { rows: 4, columns: 10 })
+		const { lines: written, keyed: rows } = spun(lines, '⠋', { size: { rows: 4, columns: 10 } })
 
 		expect(written).toStrictEqual(['x'.repeat(25), '⠋ ✅ 7', 'off'])
 		expect(rows).toStrictEqual([
@@ -213,7 +258,7 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 
 	it('records no keyed row that wraps, so a row typed shorter never moves the lines below it', () => {
 		const lines = [keyed('done', 7, 'x'.repeat(25)), keyed('lanes', 8, 'short')]
-		const { keyed: rows } = spun(lines, '⠋', { rows: 24, columns: 10 })
+		const { keyed: rows } = spun(lines, '⠋', { size: { rows: 24, columns: 10 } })
 
 		expect(rows).toStrictEqual([
 			{ key: 'lanes:8', index: 1, row: 4, text: 'short', prefix_columns: 0 },
@@ -233,7 +278,7 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 			letters.every((letter) => writes.some(({ at_ms }) => at_ms === START + letter * LETTER_MS)),
 		).toBe(true)
 		expect(writes[0]?.text).toBe(type_bytes(typing, first_ms))
-		expect(writes[0]?.text).toContain(`${ESCAPE}[3;1Hxx${ESCAPE}[0m█`)
+		expect(writes[0]?.text).toContain(`${ESCAPE}[3;1Hxx█`)
 	})
 })
 
@@ -302,7 +347,7 @@ describe('run_board_spin — the header’s now line (joshuafolkken/kit#8103)', 
 	const THIRD_ROW = `${ESCAPE}[3;1H`
 
 	it('records the columns before the key, its spinner a spot that still turns', () => {
-		const { spots, keyed: rows } = spun(['a', 'b', NOW], '⠋', WIDE)
+		const { spots, keyed: rows } = spun(['a', 'b', NOW], '⠋', { size: WIDE })
 
 		expect(places(spots)).toStrictEqual([[3, 6]])
 		expect(rows).toStrictEqual([
@@ -317,15 +362,15 @@ describe('run_board_spin — the header’s now line (joshuafolkken/kit#8103)', 
 	})
 
 	it('writes the spinner’s turn and the typed words together, the spinner redrawn in the prefix', () => {
-		const [row] = spun(['a', 'b', NOW], '⠋', WIDE).keyed
+		const [row] = spun(['a', 'b', NOW], '⠋', { size: WIDE }).keyed
 		const typing = { seen: new Set<string>(), lines: row ? [{ ...row, start_ms: START }] : [] }
 		const at_ms = START + LETTER_MS
 		const bytes = type_bytes(typing, at_ms)
 
-		expect(bytes).toBe(`${THIRD_ROW}KIT  ${spinner_of(at_ms)} 5″  > #8${ESCAPE}[0m█${ESCAPE}[K`)
+		expect(bytes).toBe(`${THIRD_ROW}KIT  ${spinner_of(at_ms)} 5″  > #8█${ESCAPE}[K`)
 	})
 
 	it('records no now line that wraps', () => {
-		expect(spun(['a', 'b', NOW], '⠋', { rows: 24, columns: 20 }).keyed).toStrictEqual([])
+		expect(spun(['a', 'b', NOW], '⠋', { size: { rows: 24, columns: 20 } }).keyed).toStrictEqual([])
 	})
 })

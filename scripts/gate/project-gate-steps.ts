@@ -139,8 +139,10 @@ async function run_steps(
 	steps: ReadonlyArray<GateStepDefinition>,
 	reused: ReadonlyMap<string, string>,
 	directory: string,
-	budget: StepBudget,
+	budget: StepBudget | undefined,
 ): Promise<ReadonlyArray<GateStepResult>> {
+	const selected_budget = budget ?? gate_run_steps.default_budget()
+
 	return await core_budget.with_held_mark(
 		async () =>
 			await bounded_pool.bounded_map(steps, SEQUENTIAL, async (step) => {
@@ -149,9 +151,15 @@ async function run_steps(
 
 				if (reused_at !== undefined) return gate_run_steps.reused_result(gate_step, reused_at)
 
-				return await run_claimed(step, gate_step, budget)
+				return await run_claimed(step, gate_step, selected_budget)
 			}),
 	)
+}
+
+interface ProjectRunOptions {
+	directory?: string | undefined
+	reuse?: StepRecords | undefined
+	budget?: StepBudget | undefined
 }
 
 /**
@@ -162,11 +170,11 @@ async function run_steps(
  * moved under since it last passed is reused rather than run (`project-step-reuse.ts`). A step that
  * runs first claims its cores in the machine-wide budget and waits while it is full.
  */
-async function run_project_steps(
-	directory: string = process.cwd(),
-	reuse?: StepRecords,
-	budget: StepBudget = gate_run_steps.default_budget(),
-): Promise<ReadonlyArray<GateStepResult>> {
+async function run_project_steps({
+	directory = process.cwd(),
+	reuse,
+	budget,
+}: ProjectRunOptions = {}): Promise<ReadonlyArray<GateStepResult>> {
 	const read = read_project_steps(directory)
 	if ('error' in read) return [definition_failure(directory, read.error)]
 	if (reuse === undefined) return await run_steps(read.steps, new Map(), directory, budget)
@@ -197,7 +205,7 @@ async function run_for(
 
 	const records = { ...reuse, is_forced: run.is_forced === true }
 
-	return await run_project_steps(process.cwd(), records, budget)
+	return await run_project_steps({ reuse: records, budget })
 }
 
 const project_gate_steps = { run_for, run_project_steps }

@@ -32,7 +32,7 @@ const UNREAD: PlanSignals = {
 const SIGNALS: PlanSignals = { ...UNREAD, moved_source_lines: new Map([[SOURCE, SOURCE_LINES]]) }
 
 function declared(lines: number): Array<OpenIssueData> {
-	const body = `## 背景\n\n- 規模見積もり: 約 ${String(DECLARED_FILES)} ファイル / ${String(lines)} 行（テスト除く）\n`
+	const body = `## 背景\n\n- 規模見積もり: 約 ${String(DECLARED_FILES)} ファイル / ${String(lines)} 行（テスト含む）\n`
 
 	return [{ number: ISSUE, title: 'lane', createdAt: PLANNED_AT, labels: [], body }]
 }
@@ -63,6 +63,7 @@ describe('lane_plan_moves.sources_of', () => {
 	it.each([
 		['no unlisted namesake', BASE, new Set(BASE)],
 		['a directory claim', [SOURCE, 'scripts/test/'], new Set(BASE)],
+		['a glob claim', [SOURCE, 'scripts/test/test-symbol-users*.ts'], new Set(BASE)],
 		['no base listing', MOVE_PLAN, undefined],
 		[
 			'an edited SKILL.md beside an added one',

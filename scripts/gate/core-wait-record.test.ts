@@ -11,6 +11,18 @@ const WAITED_MS = ADMITTED_AT - CLAIMED_AT
 const LANE = '4382'
 const CPU_DEADLINE = 'cpu-deadline'
 
+function admission_fixture(overflows: boolean): Admission {
+	const budget = { cores: 1, memory_mb: Infinity }
+	const overflow = { waited_ms: WAITED_MS, ledger: { cores: 2, memory_mb: 0 }, budget }
+
+	return {
+		overflow: overflows ? overflow : undefined,
+		granted: 1,
+		waited_ms: WAITED_MS,
+		decision: { reason: CPU_DEADLINE, budget, reading: { busy_cores: 1, available_mb: undefined } },
+	}
+}
+
 describe('core_wait_record.wait_of', () => {
 	it('is the command, the wait and the lane of a claim that waited', () => {
 		const claim = { command: 'lint', lane: LANE, wait_reason: 'cores', claimed_at: CLAIMED_AT }
@@ -36,14 +48,27 @@ describe('core_wait_record.wait_of', () => {
 	})
 })
 
-describe('core_wait_record.record_admitted', () => {
+describe('core_wait_record.record_admitted explicit sink', () => {
+	it('passes explicit admission evidence to the sink', async () => {
+		const sink = vi.fn<WaitSink>().mockResolvedValue(undefined)
+		const claim = { command: 'lint', claimed_at: CLAIMED_AT }
+		const admission = admission_fixture(true)
+
+		await core_wait_record.record_admitted(claim, ADMITTED_AT, { sink, admission })
+
+		expect(sink).toHaveBeenCalledExactlyOnceWith(
+			core_wait_record.wait_of(claim, ADMITTED_AT, admission),
+		)
+		expect(sink).toHaveBeenCalledWith(expect.objectContaining({ overflow: true, waited_ms: 0 }))
+	})
+
 	it('hands a wait to the sink', async () => {
 		const sink = vi.fn<WaitSink>().mockResolvedValue(undefined)
 
 		await core_wait_record.record_admitted(
 			{ command: 'lint', wait_reason: 'cores', claimed_at: CLAIMED_AT },
 			ADMITTED_AT,
-			sink,
+			{ sink },
 		)
 
 		expect(sink).toHaveBeenCalledExactlyOnceWith({ command: 'lint', waited_ms: WAITED_MS })
@@ -52,23 +77,11 @@ describe('core_wait_record.record_admitted', () => {
 	it('hands nothing to the sink for a claim that never waited', async () => {
 		const sink = vi.fn<WaitSink>().mockResolvedValue(undefined)
 
-		await core_wait_record.record_admitted({ claimed_at: CLAIMED_AT }, ADMITTED_AT, sink)
+		await core_wait_record.record_admitted({ claimed_at: CLAIMED_AT }, ADMITTED_AT, { sink })
 
 		expect(sink).not.toHaveBeenCalled()
 	})
 })
-
-function admission_fixture(overflows: boolean): Admission {
-	const budget = { cores: 1, memory_mb: Infinity }
-	const overflow = { waited_ms: WAITED_MS, ledger: { cores: 2, memory_mb: 0 }, budget }
-
-	return {
-		overflow: overflows ? overflow : undefined,
-		granted: 1,
-		waited_ms: WAITED_MS,
-		decision: { reason: CPU_DEADLINE, budget, reading: { busy_cores: 1, available_mb: undefined } },
-	}
-}
 
 describe('core_wait_record admission evidence', () => {
 	it.each([false, true])(

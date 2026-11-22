@@ -5,7 +5,7 @@ import { issue_lint } from './issue-lint'
 import { issue_spill } from './issue-spill'
 import { size_estimate } from './size-estimate'
 
-const ESTIMATE = '- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）'
+const ESTIMATE = '- 規模見積もり: 約 2 ファイル / 40 行（テスト含む）'
 const ACCEPTANCE = '## 受け入れ条件'
 const LEFT_ONE = '- [ ] left one'
 const LEFT_ONE_TAIL = '  wrapped tail of left one'
@@ -196,13 +196,13 @@ describe('issue_spill.follow_up_body and the implement budget', () => {
 		const body = issue_spill.follow_up_body(reasoned, [over_budget])
 
 		expect(body).not.toContain(REASON)
-		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, SLOW)).toContain(OVER_BUDGET)
+		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, { rate: SLOW })).toContain(OVER_BUDGET)
 	})
 
 	it('files an over-budget spill with the caller reason line', () => {
 		const body = issue_spill.follow_up_body(SUBJECT, [over_budget, REASON])
 
 		expect(body).toContain(`${over_budget}\n${REASON}\n`)
-		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, SLOW)).toBeUndefined()
+		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, { rate: SLOW })).toBeUndefined()
 	})
 })

@@ -8,6 +8,7 @@ import { lane_state } from './lane-state'
 interface LaneUse {
 	occupied: number
 	seated: number
+	seat_holders?: ReadonlyArray<string> | undefined
 	unknown: ReadonlyArray<string>
 }
 
@@ -47,7 +48,15 @@ async function read(
 	const open = lanes ?? (await lane_registry.list_lanes())
 	const occupancy = await occupancy_of(open, table)
 	const seated = lane_registry.used_seats(open).length
-	const use = { occupied: occupancy.occupied.length, seated, unknown: occupancy.unknown }
+	const seat_holders = open
+		.filter((lane) => lane_registry.holds_seat(lane))
+		.map((lane) => lane.issue)
+	const use = {
+		occupied: occupancy.occupied.length,
+		seated,
+		seat_holders,
+		unknown: occupancy.unknown,
+	}
 
 	return { ...occupancy, use }
 }

@@ -15,6 +15,7 @@ const GAP = '  '
 const { ROW_INDENT } = run_board_fit
 const RULE = '─'
 const RULE_LEAD = `${RULE}${RULE}`
+const TRAILING_RULE = new RegExp(`${RULE}+$`, 'u')
 const RULE_WIDTH = 50
 const OPEN_MARK = '▾'
 const FOLDED_MARK = '▸'
@@ -96,32 +97,66 @@ function row_count(lines: ReadonlyArray<PlanLine>): number {
 	return lines.filter((line) => line.row !== undefined && line.is_seat !== true).length
 }
 
-// A label saying how many its section holds: `⏳ queued 10`.
-function counted(label: string, count: number): string {
-	return `${label} ${String(count)}`
+// A label saying how many its section holds, `tally` after the count: `⏳ queued 10 (🔺 2)`.
+function counted(label: string, count: number, tally = ''): string {
+	return `${label} ${String(count)}${tally}`
 }
 
 function counted_head(section: PlanSection): Array<string> {
-	const { label, lines } = section
+	const { label, lines, tally } = section
 
-	return heading_lines(label === undefined ? undefined : counted(label, row_count(lines)))
+	return heading_lines(label === undefined ? undefined : counted(label, row_count(lines), tally))
 }
 
-// The sections a person folds with the key named `key`, each rule saying how many rows it holds.
-function keyed(key: SectionKey, sections: ReadonlyArray<PlanSection>): Array<PlanSection> {
-	return sections.map((section) => ({ ...section, key, head: counted_head(section) }))
+// The sections a person folds with the key named `key`, each rule saying how many rows it holds,
+// `tally` (`run_board_priority.tally_of`) after the count, folded or not (joshuafolkken/kit#8511), and
+// `tail` at the rule's right end (joshuafolkken/kit#8512).
+function keyed(
+	key: SectionKey,
+	sections: ReadonlyArray<PlanSection>,
+	tally?: string,
+	tail?: string,
+): Array<PlanSection> {
+	return sections.map((section) => {
+		const tallied = { ...section, key, tally, tail }
+
+		return { ...tallied, head: counted_head(tallied) }
+	})
+}
+
+// A rule with `tail` right-aligned at its end: the rule gives up the tail's columns and one blank,
+// keeping at least `RULE_LEAD` before it (joshuafolkken/kit#8474), so a tail too wide for the rule runs
+// past it. A tail that would run past the pane's `columns` is left out, so the rule still ends at the
+// pane edge (joshuafolkken/kit#8514).
+function tailed(rule: string, tail: string | undefined, columns = Infinity): string {
+	if (tail === undefined) return rule
+
+	const body = rule.replace(TRAILING_RULE, '')
+	const room = Math.max(
+		RULE_LEAD.length,
+		rule.length - body.length - run_board_fit.width_of(tail) - 1,
+	)
+	const line = `${body}${RULE.repeat(room)} ${tail}`
+
+	return run_board_fit.width_of(line) > columns ? rule : line
 }
 
 // A head whose rule runs on to `width`, the column the lane rows' titles end in
-// (joshuafolkken/kit#5520); a head drawn under a blank line alone stays as it is.
-function widened(head: ReadonlyArray<string>, width: number): Array<string> {
+// (joshuafolkken/kit#5520), `tail` at its end unless it would pass the pane's `columns`; a head drawn
+// under a blank line alone stays as it is.
+function widened(
+	head: ReadonlyArray<string>,
+	width: number,
+	tail?: string,
+	columns?: number,
+): Array<string> {
 	const rule = head.at(-1) ?? ''
 
 	if (rule === '') return [...head]
 
 	const fill = RULE.repeat(Math.max(0, width - run_board_fit.width_of(rule)))
 
-	return [...head.slice(0, -1), `${rule}${fill}`]
+	return [...head.slice(0, -1), tailed(`${rule}${fill}`, tail, columns)]
 }
 
 // Where an open head draws the rule character its ▾ gives up: in the first run of rules longer than
@@ -215,6 +250,7 @@ const run_board_render_section = {
 	open_head,
 	plan_section,
 	row_count,
+	tailed,
 	tight_columns_rule,
 	widened,
 }

@@ -92,13 +92,20 @@ function fold_plan(state: BoardData): BoardData {
 
 	const settled = { ...state, plan_fetch: undefined }
 
-	if (answer.value === undefined) return { ...settled, failed_ms: state.attempted_ms }
+	// A run of failures keeps the first one's time, so a plan that never lands ages past the retry
+	// window and the slot points at the findings (joshuafolkken/kit#8475).
+	if (answer.value === undefined) {
+		const failed_ms = state.failed_ms ?? state.attempted_ms
+
+		return { ...settled, failed_ms, plan_error: answer.error }
+	}
 
 	return {
 		...settled,
 		plan: with_titles(answer.value, state),
 		fetched_ms: state.attempted_ms,
 		failed_ms: undefined,
+		plan_error: undefined,
 	}
 }
 
@@ -284,6 +291,44 @@ function fold_issue_count(state: BoardData): BoardData {
 	return { ...state, issue_count: answer.value, issue_count_fetch: undefined }
 }
 
+// The pinned issues are asked as often as the plan, once the plan has named the repository; a read in
+// flight is not launched again (joshuafolkken/kit#8606). Unlike the plan and the count, an ended run
+// keeps asking: the pins are issues a person watches outside the run, which close after it ends.
+function is_pinned_due(state: BoardData, gather: Gather): boolean {
+	if (state.pinned_fetch !== undefined) return false
+
+	return is_due(state.pinned_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+}
+
+function launch_pinned(state: BoardData, gather: Gather): BoardData {
+	const { read_pinned } = gather.ports
+	const repo = repo_of(state)
+
+	if (repo === undefined || read_pinned === undefined || !is_pinned_due(state, gather)) return state
+
+	const pinned_fetch = run_board_fetch.launch(read_pinned.bind(undefined, repo), undefined)
+
+	return { ...state, pinned_fetch, pinned_attempted_ms: gather.now_ms }
+}
+
+// A failed read answers `undefined`, which keeps the pins last read; the next interval asks again.
+function fold_pinned(state: BoardData): BoardData {
+	const answer = state.pinned_fetch?.answer()
+
+	if (answer === undefined) return state
+
+	return { ...state, pinned: answer.value ?? state.pinned, pinned_fetch: undefined }
+}
+
+// The reads of the repository the plan names: its issue count and its pinned issues.
+function launch_repository(state: BoardData, gather: Gather): BoardData {
+	return launch_pinned(launch_issue_count(state, gather), gather)
+}
+
+function fold_repository(state: BoardData): BoardData {
+	return fold_pinned(fold_issue_count(state))
+}
+
 // At the `settled` pace, waits for a read in flight to land.
 async function settle(pending: Fetch<unknown> | undefined, pace: Pace): Promise<void> {
 	if (pending !== undefined && pace === 'settled') await pending.landed
@@ -309,15 +354,16 @@ function keep_snapshot(before: BoardData, after: BoardData, gather: Gather): voi
 }
 
 // The reads the plan has to land first: the closed children are read off its listing, and the issue
-// count asks for the repository it names.
+// count and the pinned issues ask for the repository it names.
 async function gather_after_plan(planned: BoardData, gather: Gather): Promise<BoardData> {
-	const opened = fold_issue_count(fold_closed(fold_plan(planned)))
-	const closing = launch_issue_count(launch_closed(opened, gather), gather)
+	const opened = fold_repository(fold_closed(fold_plan(planned)))
+	const closing = launch_repository(launch_closed(opened, gather), gather)
 
 	await settle(closing.closed_fetch, gather.pace)
 	await settle(closing.issue_count_fetch, gather.pace)
+	await settle(closing.pinned_fetch, gather.pace)
 
-	return fold_issue_count(fold_rate_limit(fold_closed(closing)))
+	return fold_repository(fold_rate_limit(fold_closed(closing)))
 }
 
 // Folds what landed and launches what is due — the plan first, since the reads after it need it; the

@@ -5,13 +5,14 @@ import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_row, type RowFrame } from './run-board-render-row'
 import { run_board_render_title } from './run-board-render-title'
 
-// The column every rule runs on to (joshuafolkken/kit#5520): where a running lane row whose title fills
-// the title column ends in this pane, kept within it. It measures that row rather than the drawn ones,
+// The column every rule runs on to (joshuafolkken/kit#5520): where a running lane row's head ends when
+// its title fills the title column, kept within the pane. It measures that row rather than the drawn ones,
 // so the rules keep one width with no lane row, with any number of them and whatever their titles
-// (joshuafolkken/kit#8247).
+// (joshuafolkken/kit#8247). A pane narrower than that row's head runs every rule to its edge
+// (joshuafolkken/kit#8663).
 
-const { TITLE_LIMIT, fitted_limit } = run_board_render_title
-const { head_text, row_draw, row_fit } = run_board_render_row
+const { TITLE_LIMIT } = run_board_render_title
+const { head_text } = run_board_render_row
 // The digit count a board with no lane row measures by, as the board's issue numbers are.
 const PROBE_DIGITS = 4
 
@@ -46,10 +47,8 @@ function rule_width(frame: RowFrame): number {
 		cells: run_board_render_lanes.lane_cells_of(frame.header, [probe]),
 		is_lane_row: true,
 	}
-	const fit = row_fit(indent, probe, lane_frame)
-	const draw = row_draw(indent, probe, lane_frame, fit)
-	const title_limit = fitted_limit(probe, frame.columns, draw, fit) ?? TITLE_LIMIT
-	const end = run_board_fit.width_of(`${indent}${head_text(probe, { ...lane_frame, title_limit })}`)
+	const head = head_text(probe, { ...lane_frame, title_limit: TITLE_LIMIT })
+	const end = run_board_fit.width_of(`${indent}${head}`)
 
 	return Math.min(end, frame.columns ?? Infinity)
 }

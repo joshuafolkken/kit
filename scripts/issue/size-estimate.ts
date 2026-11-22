@@ -104,13 +104,15 @@ function guide_for(rate?: ImplementRate): ReturnType<typeof split_assess.guide_f
 	return split_assess.guide_for(IMPLEMENT_BUDGET, rate)
 }
 
+// The measured implement rate and per-axis growth a judgment reads; each falls back when missing.
+interface SizeRates {
+	rate?: ImplementRate | undefined
+	growth?: SizeRatios | undefined
+}
+
 // The declared estimate, its verdict judged on the grown counts, or `undefined` when there is none or
 // it does not parse.
-function parse(
-	body: string,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
-): SizeMeasurement | undefined {
+function parse(body: string, { rate, growth }: SizeRates = {}): SizeMeasurement | undefined {
 	const read = estimate_schema.safeParse(issue_body_keys.size_counts(declared(body, PREFIX) ?? ''))
 
 	if (!read.success) return undefined
@@ -162,25 +164,21 @@ function is_excused(body: string, route: string | undefined): boolean {
 }
 
 // The counts and any guide overrun, shared by filing refusals and `backlog:next`'s offer note.
-function exceeded(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
+function exceeded(estimate: SizeMeasurement, { rate, growth }: SizeRates = {}): string {
 	if (estimate.verdict === split_assess.SINGLE_VERDICT) return projected(estimate, growth)
 	const guide = guide_for(rate)
 
 	return `${projected(estimate, growth)} exceeds the guide (more than ${String(guide.files)} files or ${String(guide.lines)} lines)`
 }
 
-function refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
-	return `${exceeded(estimate, rate, growth)} — file it split (\`--route split\`) or declare ${size_estimate_target.reason_hint()}; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+function refusal(estimate: SizeMeasurement, rates: SizeRates = {}): string {
+	return `${exceeded(estimate, rates)} — file it split (\`--route split\`) or declare ${size_estimate_target.reason_hint()}; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The declared estimate when it is over the guide, whatever excuses it; `undefined` under it or with
 // no parsable estimate.
-function guide_exceeded(
-	body: string,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
-): SizeMeasurement | undefined {
-	const estimate = parse(body, rate, growth)
+function guide_exceeded(body: string, rates: SizeRates = {}): SizeMeasurement | undefined {
+	const estimate = parse(body, rates)
 
 	return estimate?.verdict === split_assess.SPLIT_VERDICT ? estimate : undefined
 }
@@ -191,10 +189,9 @@ function guide_exceeded(
 function over_guide(
 	body: string,
 	route: string | undefined,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
+	rates: SizeRates = {},
 ): SizeMeasurement | undefined {
-	return is_excused(body, route) ? undefined : guide_exceeded(body, rate, growth)
+	return is_excused(body, route) ? undefined : guide_exceeded(body, rates)
 }
 
 // joshuafolkken/kit#5935: a split filing passes the guide at filing, yet a lane still lands past its
@@ -203,10 +200,9 @@ function over_guide(
 function split_over_guide(
 	body: string,
 	route: string | undefined,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
+	rates: SizeRates = {},
 ): SizeMeasurement | undefined {
-	return route === SPLIT_ROUTE_LABEL ? guide_exceeded(body, rate, growth) : undefined
+	return route === SPLIT_ROUTE_LABEL ? guide_exceeded(body, rates) : undefined
 }
 
 // The declared estimate when it is over the cap (joshuafolkken/kit#5502); a split filing, or a declared
@@ -215,10 +211,10 @@ function split_over_guide(
 function over_cap(
 	body: string,
 	route: string | undefined,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
+	rates: SizeRates = {},
 ): SizeMeasurement | undefined {
-	const estimate = parse(body, rate, growth)
+	const estimate = parse(body, rates)
+	const { rate, growth } = rates
 
 	if (estimate === undefined || is_excused(body, route)) return undefined
 
@@ -237,14 +233,14 @@ function route_of(labels: ReadonlyArray<string>): string | undefined {
 }
 
 // The counts against the cap, shared by the filing refusal and `backlog:next`'s size note.
-function capped(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
+function capped(estimate: SizeMeasurement, { rate, growth }: SizeRates = {}): string {
 	const { cap } = guide_for(rate)
 
 	return `${projected(estimate, growth)} exceeds the cap (more than ${String(cap.files)} files or ${String(cap.lines)} lines) with no \`${REASON_PREFIX}\``
 }
 
-function cap_refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
-	return `${capped(estimate, rate, growth)} — with separately-mergeable parts, file an ordered epic of \`--route split\` children (the mechanical changes first, the child that switches the setting on last); one deliverable, declare ${size_estimate_target.reason_hint()}; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+function cap_refusal(estimate: SizeMeasurement, rates: SizeRates = {}): string {
+	return `${capped(estimate, rates)} — with separately-mergeable parts, file an ordered epic of \`--route split\` children (the mechanical changes first, the child that switches the setting on last); one deliverable, declare ${size_estimate_target.reason_hint()}; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The implement minutes the grown declared lines take at the measured rate; only the lines are read,
@@ -260,7 +256,7 @@ function projected_minutes(
 // The most declared lines whose grown count projects within the size bar at `rate` — the one number
 // the filing refusal, `lane:plan`'s lines axis and `backlog:next`'s note judge by
 // (joshuafolkken/kit#7074); `undefined` with no usable rate.
-function declared_lines_bar(rate?: ImplementRate, growth?: SizeRatios): number | undefined {
+function declared_lines_bar({ rate, growth }: SizeRates = {}): number | undefined {
 	const lines = lane_implement_rate.lines_for(BAR_MINUTES, rate)
 
 	return lines === undefined
@@ -269,12 +265,8 @@ function declared_lines_bar(rate?: ImplementRate, growth?: SizeRatios): number |
 }
 
 // The declared estimate of a body with no declared reason it stays one deliverable.
-function unreasoned(
-	body: string,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
-): SizeMeasurement | undefined {
-	return is_reasoned(body) ? undefined : parse(body, rate, growth)
+function unreasoned(body: string, rates: SizeRates = {}): SizeMeasurement | undefined {
+	return is_reasoned(body) ? undefined : parse(body, rates)
 }
 
 interface BarOverrun {
@@ -291,9 +283,9 @@ function bar_overrun(
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): BarOverrun | undefined {
-	const estimate = unreasoned(body, rate, growth)
+	const estimate = unreasoned(body, { rate, growth })
 	if (estimate === undefined || rate === undefined) return undefined
-	const bar = declared_lines_bar(rate, growth)
+	const bar = declared_lines_bar({ rate, growth })
 
 	return bar !== undefined && estimate.lines > bar ? { estimate, rate, bar } : undefined
 }
@@ -305,7 +297,7 @@ function overrun_text(overrun: BarOverrun, growth?: SizeRatios): string {
 	const measured = `${rate.median.toFixed(1)} implement min / 100 lines over ${String(rate.lanes)} lane(s)`
 	const limit = `the ${String(BAR_MINUTES)}-minute size bar (${String(BAR_BUDGETS)} × the ${String(IMPLEMENT_BUDGET)}-minute implement budget: at most ${String(bar)} declared line(s))`
 
-	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over ${limit}`
+	return `${exceeded(estimate, { rate, growth })} and projects ${String(minutes)} implement minute(s) at ${measured}, over ${limit}`
 }
 
 // The estimate over the size bar — the filing refuses it; `backlog:next` offers it with a note and the
@@ -357,21 +349,41 @@ function target_problem(
 	return size_estimate_target.problem(minutes, declared(body, REASON_PREFIX))
 }
 
+function guide_refusal(
+	body: string,
+	route: string | undefined,
+	rates: SizeRates,
+): string | undefined {
+	const estimate = over_guide(body, route, rates)
+
+	return estimate === undefined ? undefined : refusal(estimate, rates)
+}
+
 // The filing refusal for an estimate over the cap, else over the size bar at `rate`, else over the
 // guide, else over the lane target. A missing or malformed estimate is `problems`' refusal, not this one.
 function guide_problem(
 	body: string,
 	route: string | undefined,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
+	rates: SizeRates = {},
 ): string | undefined {
-	const over = over_cap(body, route, rate, growth)
+	const over = over_cap(body, route, rates)
 
-	if (over !== undefined) return cap_refusal(over, rate, growth)
-	const estimate = over_guide(body, route, rate, growth)
-	const guide_refusal = estimate === undefined ? undefined : refusal(estimate, rate, growth)
+	if (over !== undefined) return cap_refusal(over, rates)
+	const { rate, growth } = rates
 
-	return budget_problem(body, rate, growth) ?? guide_refusal ?? target_problem(body, rate, growth)
+	return (
+		budget_problem(body, rate, growth) ??
+		guide_refusal(body, route, rates) ??
+		target_problem(body, rate, growth)
+	)
+}
+
+// The declared estimate a tests-included count is compared with: `undefined` also for an estimate
+// filed excluding tests (joshuafolkken/kit#8589), which counts a different thing — the guide applies.
+function comparable_size(body: string): SizeMeasurement | undefined {
+	const is_excluding = issue_body_keys.excludes_tests(declared(body, PREFIX) ?? '')
+
+	return is_excluding ? undefined : parse(body)
 }
 
 // The declared file count, or `undefined` when there is no estimate or it does not parse.
@@ -382,6 +394,7 @@ function declared_files(body: string): number | undefined {
 const size_estimate = {
 	budget_note,
 	capped,
+	comparable_size,
 	declared,
 	declared_files,
 	declared_lines_bar,

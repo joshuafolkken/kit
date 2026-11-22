@@ -21,6 +21,8 @@ const KEYS = {
 	compatibility: { ja: '互換性', en: 'Compatibility' },
 	release: { ja: 'リリース分類', en: 'Release classification' },
 	judgement: { ja: '人の判断', en: 'Human judgement' },
+	post_merge_check: { ja: 'マージ後の確認', en: 'Post-merge check' },
+	pre_merge_visual_reason: { ja: 'マージ前の目視の理由', en: 'Pre-merge visual reason' },
 	decision_rule: { ja: '判定規則', en: 'Decision rule' },
 	close_condition: { ja: '中止条件', en: 'Close condition' },
 	priority: { ja: '優先度', en: 'Priority' },
@@ -68,6 +70,9 @@ const VALUES = {
 	cannot_split: { ja: '分けられない', en: 'cannot split' },
 	better_unsplit: { ja: '分けない方が良い', en: 'better not split' },
 	slower_overall: { ja: '全体が遅くなる', en: 'slower overall' },
+	// The kinds an epic's declared order opens with at creation (joshuafolkken/kit#8636).
+	unverifiable_in_one_pass: { ja: '1 パスで検証できない', en: 'unverifiable in one pass' },
+	other_wait: { ja: '別の待ちがある', en: 'waits on another' },
 } as const satisfies Record<string, Row>
 
 const HEADINGS = {
@@ -85,14 +90,17 @@ const HEADINGS = {
 
 // The size estimate's value: `<files>` and `<lines>` stand for its counts.
 const SIZE_VALUES = {
-	ja: '約 <files> ファイル / <lines> 行（テスト除く）',
-	en: 'about <files> files / <lines> lines (excluding tests)',
+	ja: '約 <files> ファイル / <lines> 行（テスト含む）',
+	en: 'about <files> files / <lines> lines (including tests)',
 } as const satisfies Row
-// Full- or half-width parentheses alike: the two read the same to the person typing the line.
+// Full- or half-width parentheses alike: the two read the same to the person typing the line. The
+// "excluding tests" spelling, in either column, is an Issue filed before tests counted
+// (joshuafolkken/kit#8589); its counts still parse, and `counting` names the spelling.
 const SIZE_PATTERNS = [
-	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト除く[）)]$/u,
-	/^about\s*(?<files>\d+)\s*files?\s*\/\s*(?<lines>\d+)\s*lines?\s*\(excluding tests\)$/iu,
+	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト(?<counting>含む|除く)[）)]$/u,
+	/^about\s*(?<files>\d+)\s*files?\s*\/\s*(?<lines>\d+)\s*lines?\s*\((?<counting>including|excluding) tests\)$/iu,
 ]
+const EXCLUDING_TESTS: ReadonlySet<string> = new Set(['除く', 'excluding'])
 
 type IssueBodyKey = keyof typeof KEYS
 type IssueBodyValue = keyof typeof VALUES
@@ -166,6 +174,11 @@ function size_counts(text: string): Record<string, string> | undefined {
 	return SIZE_PATTERNS.map((pattern) => pattern.exec(text)?.groups).find(Boolean)
 }
 
+// Whether a size estimate's value is the "excluding tests" spelling an Issue filed before #8589 used.
+function excludes_tests(text: string): boolean {
+	return EXCLUDING_TESTS.has(size_counts(text)?.['counting']?.toLowerCase() ?? '')
+}
+
 // The row whose text in any column is `text`.
 function row_named(rows: Record<string, Row>, text: string): Row | undefined {
 	return Object.values(rows).find((row) => COLUMNS.some((at) => row[at] === text))
@@ -228,6 +241,7 @@ const issue_body_keys = {
 	prefix,
 	prefix_variants,
 	size_counts,
+	excludes_tests,
 	size_value,
 	TABLES,
 	value,

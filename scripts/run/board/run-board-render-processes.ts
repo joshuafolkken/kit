@@ -1,3 +1,4 @@
+import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import type { BoardHeader, BoardUsage } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
@@ -5,6 +6,8 @@ import type { NamedFigure, ProcessGroups } from './run-board-process-groups'
 import { run_board_render_lanes } from './run-board-render-lanes'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
+import { run_board_row_key } from './run-board-row-key'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import type { UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
@@ -59,6 +62,7 @@ const LABELS = {
 }
 
 interface Labeled {
+	id: string
 	label: string
 	figure: UsageFigure
 	is_detail: boolean
@@ -73,7 +77,7 @@ function named(entry: NamedFigure, room = DETAIL_ROOM): Labeled {
 	const count = count_of(entry.instances)
 	const label = `${title_of(entry.name, room - count.length)}${count}`
 
-	return { label, figure: entry.figure, is_detail: true }
+	return { id: entry.name, label, figure: entry.figure, is_detail: true }
 }
 
 // A group's line and its parts' lines, the parts only where it has any.
@@ -82,7 +86,10 @@ function group_of(
 	figure: UsageFigure,
 	parts: ReadonlyArray<Labeled>,
 ): Array<Labeled> {
-	return [{ label, figure, is_detail: false }, ...parts]
+	return [
+		{ id: label, label, figure, is_detail: false },
+		...parts.map((part) => ({ ...part, id: `${label}:${part.id}` })),
+	]
 }
 
 function named_group(
@@ -97,12 +104,23 @@ function named_group(
 	)
 }
 
+// The supervisor's row is keyed by its pid, so the matrix board sees another one take over
+// (joshuafolkken/kit#8470, `run_board_frame_diff.events`).
+function supervisor_id(pid: number | undefined): string {
+	return pid === undefined ? 'supervisor' : `supervisor:${String(pid)}`
+}
+
 function backlogrun_group(backlogrun: ProcessGroups['backlogrun']): Array<Labeled> {
 	const lanes = `${LABELS.lanes}${count_of(backlogrun.lanes.count)}`
 	const own = [
-		{ label: LABELS.supervisor, figure: backlogrun.supervisor, is_detail: true },
-		{ label: LABELS.parent, figure: backlogrun.parent, is_detail: true },
-		{ label: lanes, figure: backlogrun.lanes.figure, is_detail: true },
+		{
+			id: supervisor_id(backlogrun.supervisor_pid),
+			label: LABELS.supervisor,
+			figure: backlogrun.supervisor,
+			is_detail: true,
+		},
+		{ id: 'parent', label: LABELS.parent, figure: backlogrun.parent, is_detail: true },
+		{ id: 'lanes', label: lanes, figure: backlogrun.lanes.figure, is_detail: true },
 	]
 
 	return group_of(LABELS.backlogrun, backlogrun.total, own)
@@ -131,12 +149,16 @@ function padded(text: string, width: number): string {
 	return `${text}${' '.repeat(Math.max(0, width - run_board_fit.width_of(text)))}`
 }
 
-function screen_part(usage: BoardUsage): DetailPart {
+function screen_part(usage: BoardUsage, is_flash_keyed: boolean): DetailPart {
 	const lines = labeled_of(usage).map((entry) => {
 		const cells = column_cells(entry.figure, usage.scale, GAUGE)
 
 		return {
-			text: `${INDENT}${padded(label_text(entry), LABEL_WIDTH)}${CELL_GAP}${cells}`,
+			text: run_board_row_key.flashed(
+				`${INDENT}${padded(label_text(entry), LABEL_WIDTH)}${CELL_GAP}${cells}`,
+				`process:${entry.id}`,
+				is_flash_keyed,
+			),
 			is_detail: entry.is_detail,
 		}
 	})
@@ -191,15 +213,18 @@ function summary_of(usage: BoardUsage): string {
 	return groups.join(SUMMARY_GAP)
 }
 
-// `undefined` where the frame read no usage.
+// `undefined` where the frame read no usage; the time to the first lane at its rule's right end.
 function processes_part(header: BoardHeader): DetailPart | undefined {
 	const { usages } = header
 
 	if (usages === undefined) return undefined
 
-	const part = header.spinner === undefined ? plain_part(usages) : screen_part(usages)
+	const is_flash_keyed = run_board_theme_defs.live_of(header.theme).flash === true
+	const part =
+		header.spinner === undefined ? plain_part(usages) : screen_part(usages, is_flash_keyed)
+	const tail = run_board_first_lane.part(header.activity)
 
-	return { ...part, label: LABEL, summary: summary_of(usages) }
+	return { ...part, label: LABEL, summary: summary_of(usages), tail }
 }
 
 const run_board_render_processes = { processes_part }

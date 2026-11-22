@@ -194,4 +194,15 @@ describe('run_board_cli.run --once record keys', () => {
 		expect(made.read_local).not.toHaveBeenCalled()
 		expect(made.frames).toStrictEqual([`${RECORDED}recorded 0s ago\n`])
 	})
+
+	it('reads past the record kept for its theme in other icons (#8505)', async () => {
+		const store = memory_store()
+		const made = board(store)
+
+		store.save(once_key('wargames', false), { text: RECORDED, saved_ms: made.clock.now_ms })
+		await run_board_cli.run(['--once', '--theme', 'wargames', '--icons', 'letters'], made.ports)
+
+		expect(made.read_local).toHaveBeenCalled()
+		expect(store.load(once_key('wargames', false, 'letters'))?.text).toBe(made.frames[0])
+	})
 })

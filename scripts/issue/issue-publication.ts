@@ -94,7 +94,13 @@ function require_first_party(repo: string): void {
 
 // Validate the entire batch before the first atomic body+labels publication. An interrupted batch
 // can be retried: published children are skipped, pending children still require all checks.
-async function publish(epic_number: number, repo: string): Promise<void> {
+// `is_selected` narrows the batch to the children a caller owns — a lane's ship publishes only the
+// children it filed, never a sibling another lane left prepared (joshuafolkken/kit#8542).
+async function publish(
+	epic_number: number,
+	repo: string,
+	is_selected: (child: EpicChild) => boolean = () => true,
+): Promise<void> {
 	require_first_party(repo)
 	const epic = await epic_live.child(epic_number, repo)
 	const checks = epic_validate.validate_epic({ ...epic, body: epic.body })
@@ -103,11 +109,12 @@ async function publish(epic_number: number, repo: string): Promise<void> {
 		throw new Error('Publication withheld: epic is incomplete')
 	}
 
-	const children = await Promise.all(
+	const listed = await Promise.all(
 		epic_parse
 			.parse_task_list_issue_numbers(epic.body)
 			.map(async (number) => await read_child(number, repo)),
 	)
+	const children = listed.filter(({ child }) => is_selected(child))
 	for (const child of children) validate_child(child, epic)
 
 	for (const child of children) {

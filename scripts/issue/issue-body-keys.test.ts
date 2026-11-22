@@ -20,6 +20,7 @@ const OTHER_BODY_TEXT: ReadonlySet<string> = new Set([
 	'- 範囲（paths）:',
 	'- 層:',
 	'- 必要な権限:',
+	'- 順序の理由:',
 	'- 規模承認のパス:',
 	'- 規模承認の行数:',
 	'- 規模承認のファイル数:',
@@ -85,7 +86,13 @@ describe('issue_body_keys in either language', () => {
 		vi.stubEnv(LANG_KEY, 'en')
 
 		expect(issue_body_keys.line('kind', NON_BUG)).toBe(ENGLISH_NON_BUG)
-		expect(issue_body_keys.size_value('1', '20')).toBe('about 1 files / 20 lines (excluding tests)')
+		expect(issue_body_keys.size_value('1', '20')).toBe('about 1 files / 20 lines (including tests)')
+	})
+
+	it('writes the Japanese size value with tests included under a Japanese session', () => {
+		vi.stubEnv(LANG_KEY, 'ja')
+
+		expect(issue_body_keys.size_value('1', '20')).toBe('約 1 ファイル / 20 行（テスト含む）')
 	})
 
 	it.each([
@@ -102,10 +109,15 @@ describe('issue_body_keys in either language', () => {
 		expect(issue_body_keys.canonical_line(raw)).toBe(expected)
 	})
 
-	it.each(['約 2 ファイル / 30 行(テスト除く)', 'about 2 files / 30 lines (excluding tests)'])(
-		'reads the size counts of %s',
-		(text) => {
-			expect({ ...issue_body_keys.size_counts(text) }).toStrictEqual({ files: '2', lines: '30' })
-		},
-	)
+	it.each([
+		['約 2 ファイル / 30 行(テスト含む)', false],
+		['about 2 files / 30 lines (including tests)', false],
+		['約 2 ファイル / 30 行(テスト除く)', true],
+		['about 2 files / 30 lines (excluding tests)', true],
+	])('reads the size counts of %s', (text, excluding) => {
+		const { files, lines } = issue_body_keys.size_counts(text) ?? {}
+
+		expect({ files, lines }).toStrictEqual({ files: '2', lines: '30' })
+		expect(issue_body_keys.excludes_tests(text)).toBe(excluding)
+	})
 })

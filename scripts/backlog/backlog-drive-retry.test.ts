@@ -45,8 +45,19 @@ it('retries a parked native dependent through the existing command (ac-846abec4)
 	expect(run_event_stream_emit.current_events).toHaveBeenCalledWith(true)
 	expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
 		['run:add', String(PARKED), '--retry'],
-		true,
+		{ should_forward_stderr: true },
 	)
+})
+
+// joshuafolkken/kit#8599: `run:add --retry` re-admits a withdrawn issue, so a merge does not retry one.
+it('leaves a parked dependent a person withdrew for that person', async () => {
+	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([
+		{ pos: 1, kind: 'park', text: `#${String(PARKED)} stopped`, at: SINCE },
+		{ pos: 2, kind: 'withdraw', text: `#${String(PARKED)} withdrawn by a person`, at: LATER },
+	])
+	await backlog_drive_retry.after_merge(CAUSE)
+
+	expect(josh_command.josh_run).not.toHaveBeenCalled()
 })
 
 it.each(['OPEN', 'UNKNOWN'])(
@@ -181,7 +192,7 @@ it('goes on retrying the round after a protected dependent (ac-a55c13d2)', async
 
 	expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
 		['run:add', String(SIBLING), '--retry'],
-		true,
+		{ should_forward_stderr: true },
 	)
 })
 

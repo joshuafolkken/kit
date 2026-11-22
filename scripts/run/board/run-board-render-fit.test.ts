@@ -99,12 +99,10 @@ describe('run_board_render.render in a short pane', () => {
 describe('run_board_render.render_no_run with a footer', () => {
 	it('ends on the footer where the pane holds it, and gives it way where it does not', () => {
 		const tall = run_board_render.render_no_run(NOW, {
-			size: { rows: 3, columns: WIDE },
-			footer: FOOTER,
+			bounds: { size: { rows: 3, columns: WIDE }, footer: FOOTER },
 		})
 		const short = run_board_render.render_no_run(NOW, {
-			size: { rows: 2, columns: WIDE },
-			footer: FOOTER,
+			bounds: { size: { rows: 2, columns: WIDE }, footer: FOOTER },
 		})
 
 		expect(tall.slice(1)).toStrictEqual(FOOTER)

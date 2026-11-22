@@ -2,6 +2,7 @@ import { availableParallelism, cpus } from 'node:os'
 import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_admission, type LedgerEntry } from './core-admission'
+import { core_weights } from './core-weights'
 import { machine_capacity, type MachineReading, type MemoryReading } from './machine-capacity'
 
 vi.mock('execa', async () => {
@@ -69,6 +70,35 @@ describe('machine_capacity.machine_budget — the budget the ledger admits again
 			busy_excess: 0,
 			is_overloaded: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#8473: an ESLint claim under its declared peak was added back whole, and the budget
+// passed the machine.
+describe('machine_capacity.machine_budget — claims under their declared memory', () => {
+	const total_mb = 18_432
+	const available_mb = 9400
+	const reading = { busy_cores: 0, available_mb, total_mb }
+
+	it('adds back no more than the memory in use, and never past the machine', () => {
+		// The claims #8473 ran: the heap-cap ESLint claim beside the type check, past the memory in use.
+		const ledger = {
+			cores: 0,
+			memory_mb: core_weights.ESLINT_HEAP_MB + core_weights.MEMORY_MB.type_check,
+		}
+		const { memory_mb } = machine_capacity.machine_budget(CORES, reading, ledger)
+
+		expect(ledger.memory_mb).toBeGreaterThan(total_mb - available_mb)
+		expect(memory_mb).toBeLessThanOrEqual(total_mb)
+		expect(memory_mb).toBeLessThanOrEqual(available_mb + (total_mb - available_mb))
+	})
+
+	it('adds back the whole ledger while it is within the memory in use', () => {
+		const ledger = { cores: 0, memory_mb: LEDGER_MEMORY_MB }
+
+		expect(machine_capacity.machine_budget(CORES, reading, ledger).memory_mb).toBe(
+			available_mb + LEDGER_MEMORY_MB,
+		)
 	})
 })
 

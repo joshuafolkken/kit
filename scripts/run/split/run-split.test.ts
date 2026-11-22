@@ -1,3 +1,6 @@
+import { epic_body } from '#scripts/epic/epic-body'
+import { epic_cli } from '#scripts/epic/epic-cli'
+import { epic_cli_chain } from '#scripts/epic/epic-cli-chain'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_split } from './run-split'
@@ -86,11 +89,15 @@ const CHILDREN = ['11', '12']
 const ORDER_REASON = '--order-reason'
 const SPLIT = { issue: '10', children: CHILDREN, title: TITLE }
 const INDEPENDENT = { ...SPLIT, is_ordered: false, chains: [], order_reasons: [] }
-const ORDERED = { ...INDEPENDENT, is_ordered: true, order_reasons: ['#10 -> #11 -> #12: uses #10'] }
+const ORDERED = {
+	...INDEPENDENT,
+	is_ordered: true,
+	order_reasons: ['#10 -> #11 -> #12: 1 パスで検証できない — uses #10'],
+}
 const SECOND_INTO_LAST = '#11 -> #12'
 const OUTSIDER = '#11 -> #99'
 const JOIN = ['#10 -> #12', SECOND_INTO_LAST]
-const JOIN_REASONS = JOIN.map((chain) => `${chain}: #12 reads the earlier one`)
+const JOIN_REASONS = JOIN.map((chain) => `${chain}: 別の待ちがある — #12 reads the earlier one`)
 const JOINED = { ...INDEPENDENT, chains: JOIN, order_reasons: JOIN_REASONS }
 const JOIN_ARGV = [
 	...JOIN.flatMap((chain) => ['--chain', chain]),
@@ -140,12 +147,14 @@ describe('run_split.split — an epic already tracks the issue', () => {
 		expect(state.calls).toStrictEqual(SET_ASIDE_AND_PLACE)
 	})
 
-	it('chains an ordered split after the issue with `--after`', async () => {
+	it('chains an ordered split after the issue with `--after` and its `--order-reason`', async () => {
 		tracking_with.mockResolvedValue(TRACKED)
 
 		await run_split.split(ORDERED)
 
-		expect(epic_run).toHaveBeenCalledWith(['--add', '20', '11', '12', '--after', '10'])
+		const placement = ['--after', '10', ORDER_REASON, ...ORDERED.order_reasons]
+
+		expect(epic_run).toHaveBeenCalledWith(['--add', '20', ...CHILDREN, ...placement])
 	})
 
 	it('passes each `--chain` to `epic --add` as given', async () => {
@@ -161,6 +170,7 @@ describe('run_split.split — an epic already tracks the issue', () => {
 		[{ ...INDEPENDENT, chains: [OUTSIDER] }],
 		[{ ...ORDERED, order_reasons: [] }],
 		[{ ...JOINED, order_reasons: JOIN_REASONS.slice(1) }],
+		[{ ...ORDERED, order_reasons: ['#10 -> #11 -> #12: uses #10'] }],
 	])('refuses `--chain` in %j before writing anything', async (request) => {
 		tracking_with.mockResolvedValue(TRACKED)
 
@@ -168,6 +178,29 @@ describe('run_split.split — an epic already tracks the issue', () => {
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'chain', done: [] })
 		expect(state.calls).toStrictEqual([])
+	})
+})
+
+// The `## Decisions` record `epic --add` writes for the argv `run:split` handed it, read by `epic`'s
+// own parser rather than restated here.
+function added_decision(argv: ReadonlyArray<string>): string | undefined {
+	const parsed = epic_cli.parse_add_arguments(argv)
+	if (parsed === undefined || parsed.chain_refusal !== undefined) return undefined
+	const chains = epic_cli_chain.declared_of(parsed)
+
+	return epic_body.format_added_order(chains, parsed.order_reasons ?? [])
+}
+
+describe('run_split.split — an ordered split into an existing epic records its reason', () => {
+	it('hands `epic --add` the chain and reason it writes under `## Decisions`', async () => {
+		tracking_with.mockResolvedValue(TRACKED)
+
+		await run_split.split(ORDERED)
+
+		const decision = added_decision(epic_run.mock.calls[0]?.[0] ?? [])
+
+		expect(decision).toContain('- Order: `#10 -> #11 -> #12`, declared by `josh epic --add`')
+		expect(decision).toContain('- Reasoning: 1 パスで検証できない — uses #10')
 	})
 })
 

@@ -66,6 +66,11 @@ function row_of(lines: ReadonlyArray<string>): string | undefined {
 	return lines.find((line) => line.includes(String(ISSUE)))
 }
 
+// The lanes rule, whose end draws the tallies (joshuafolkken/kit#8514).
+function lanes_rule(lines: ReadonlyArray<string>): string | undefined {
+	return lines.find((line) => line.includes('🧵'))
+}
+
 describe('run_board_tick.tick — a parked child a person closed', () => {
 	it.each<[string, Partial<ClosedIssue>, string]>([
 		['withdrawn when closed as not planned', { is_not_planned: true }, '🚫'],
@@ -81,7 +86,7 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 				'u',
 			),
 		)
-		expect(lines[0]).toContain('💤 0')
+		expect(lanes_rule(lines)).toContain('💤 0')
 	})
 
 	it('draws it without a time when its close time could not be read', async () => {
@@ -98,7 +103,7 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 		const lines = await frame_after({ closed: new Map(), is_whole: true })
 
 		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
-		expect(lines[0]).toContain('⏳ 1  💤 0')
+		expect(lanes_rule(lines)).toContain('✅ 0/1')
 	})
 })
 

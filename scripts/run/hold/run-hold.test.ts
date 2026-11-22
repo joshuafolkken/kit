@@ -1,7 +1,8 @@
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 
 const make_directory = temporary_directory('suite')
@@ -65,6 +66,36 @@ describe('claiming and releasing', () => {
 		expect(() => {
 			run_hold.release_hold(run_hold.hold_path(LINKED_WORKTREE))
 		}).not.toThrow()
+	})
+})
+
+// joshuafolkken/kit#8482: the claim names its session's transcript, which `run:board` reads the single
+// run's newest operation from; a claim outside a session names none.
+function claimed(transcript: string | undefined): Record<string, unknown> | undefined {
+	const target = run_hold.hold_path(MAIN_WORKTREE)
+
+	vi.spyOn(run_carry_conversation, 'own_transcript').mockReturnValue(transcript)
+	run_hold.write_hold(target, ISSUE)
+
+	const read = run_hold.read_hold(target)
+
+	return read.kind === 'held' ? { ...read.hold } : undefined
+}
+
+describe('the claiming session’s transcript', () => {
+	const TRANSCRIPT = '/sessions/claim.jsonl'
+
+	afterEach(() => vi.restoreAllMocks())
+
+	it('records the transcript the session resolves', () => {
+		expect(claimed(TRANSCRIPT)?.['owner_transcript']).toBe(TRANSCRIPT)
+	})
+
+	it('leaves the field out where no transcript resolves, the record still held', () => {
+		const hold = claimed(undefined)
+
+		expect(hold).toBeDefined()
+		expect(hold).not.toHaveProperty('owner_transcript')
 	})
 })
 

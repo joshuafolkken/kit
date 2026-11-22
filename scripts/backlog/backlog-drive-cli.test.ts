@@ -161,10 +161,9 @@ describe('backlog_drive_cli.merge', () => {
 
 		await expect(backlog_drive_cli.merge('2500', '4242')).resolves.toStrictEqual(MERGED)
 		expect(backlog_drive_retry.after_merge).toHaveBeenCalledWith(2500)
-		expect(run).toHaveBeenCalledWith(
-			['run:merge', '2500', '--owner', '4242', '--driver'],
-			expect.any(Boolean),
-		)
+		expect(run).toHaveBeenCalledWith(['run:merge', '2500', '--owner', '4242', '--driver'], {
+			should_forward_stderr: true,
+		})
 		vi.restoreAllMocks()
 	})
 

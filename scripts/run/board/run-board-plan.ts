@@ -46,8 +46,19 @@ async function classify_quietly(
 	return await backlog_plan_read.classify(opted_in, exclude, open)
 }
 
+// The live listing rejects with gh's reason, so the board's fetch carries it into `plan_error` and the
+// notice slot names what a person fixes (`gh auth login`, `gh not found`; joshuafolkken/kit#8507).
+// A listing read but not parsed stays `undefined`: the board keeps its plan and retries.
+async function fetch_open_or_reason(): Promise<OpenListing | undefined> {
+	const { listing, error } = await backlog_plan_read.read_open()
+
+	if (error !== undefined) throw new Error(error)
+
+	return listing
+}
+
 const LIVE_PORTS: PlanPorts = {
-	fetch_open: backlog_plan_read.fetch_open,
+	fetch_open: fetch_open_or_reason,
 	fetch_opted_in: auto_ok_cli.fetch_opted_in,
 	classify: classify_quietly,
 }
@@ -243,7 +254,7 @@ async function read_plan(
 	}
 }
 
-const run_board_plan = { GH_CALLS_PHASE, GH_NOT_MODIFIED_PHASE, read_plan }
+const run_board_plan = { GH_CALLS_PHASE, GH_NOT_MODIFIED_PHASE, fetch_open_or_reason, read_plan }
 
 export { run_board_plan }
 export type { PlanPorts }
