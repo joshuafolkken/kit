@@ -1,20 +1,13 @@
+import { run_board_escape } from './run-board-escape'
 import { run_board_fit } from './run-board-fit'
 
 // joshuafolkken/kit#8003: a drawn line cut to its first columns with its colors and links kept, so a
 // row being typed (`run-board-type-rows.ts`) shows the part typed so far as the whole row draws it. A
-// color escape (SGR) and a link's escapes (OSC 8) take no column; the cut closes both after it.
+// color escape (SGR) and a link's escapes (OSC 8, tmux-wrapped or not — `run-board-escape.ts`) take no
+// column; the cut closes both after it.
 
 const ESC = '\u{1B}'
-const BEL = '\u{7}'
-// A color escape, or a link's opening or closing escape ended by BEL or ST; captured, so a split keeps it.
-const ESCAPE = new RegExp(
-	String.raw`(${ESC}\[[\d;]*m|${ESC}\]8;[^${BEL}${ESC}]*(?:${BEL}|${ESC}\\))`,
-	'u',
-)
-const LINK_START = `${ESC}]8;`
-const LINK_CLOSE = `${ESC}]8;;${BEL}`
-// A link's closing escape: one with no URI, ended by BEL or ST.
-const LINK_CLOSE_ENDS = [`;${BEL}`, `;${ESC}\\`]
+const { LINK_CLOSE, is_escape } = run_board_escape
 const RESET = `${ESC}[0m`
 const SEGMENTER = new Intl.Segmenter()
 
@@ -33,17 +26,18 @@ function graphemes(text: string): Array<Piece> {
 // The line's escapes, each no column, and its characters, each as wide as it draws.
 function pieces_of(line: string): Array<Piece> {
 	return line
-		.split(ESCAPE)
-		.flatMap((part) => (part.startsWith(ESC) ? { text: part, width: 0 } : graphemes(part)))
+		.split(run_board_escape.LINE_ESCAPE)
+		.flatMap((part) => (is_escape(part) ? { text: part, width: 0 } : graphemes(part)))
 }
 
-// Whether the last link escape kept opens a link — one the cut leaves open.
-function is_link_open(kept: ReadonlyArray<Piece>): boolean {
-	const last = kept.findLast((piece) => piece.text.startsWith(LINK_START))
+// The escape closing the link the cut leaves open — the last link escape kept opens one — wrapped as
+// its opening is; none when no link is left open.
+function link_close_of(kept: ReadonlyArray<Piece>): string {
+	const last = kept.findLast((piece) => run_board_escape.is_link(piece.text))
 
-	if (last === undefined) return false
+	if (last === undefined || !run_board_escape.is_link_open(last.text)) return ''
 
-	return LINK_CLOSE_ENDS.every((end) => !last.text.endsWith(end))
+	return run_board_escape.link_close_for(last.text)
 }
 
 // `line` cut to its first `columns` columns; a character two columns wide the cut would split is left
@@ -56,9 +50,8 @@ function cut_styled(line: string, columns: number): string {
 		return used <= columns
 	})
 	const text = kept.map((piece) => piece.text).join('')
-	const close = is_link_open(kept) ? LINK_CLOSE : ''
 
-	return `${text}${close}${RESET}`
+	return `${text}${link_close_of(kept)}${RESET}`
 }
 
 // One piece of a line's tail, `used` columns in once it is drawn: every escape, so the colors and links
