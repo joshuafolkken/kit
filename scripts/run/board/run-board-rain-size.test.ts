@@ -97,6 +97,15 @@ describe('run_board_reveal_rain.beats_of on a terminal narrower than the board',
 		])
 	})
 
+	it('starts a wide character landing on a row’s last column on the next row, as the terminal does', () => {
+		const [first = '', second = ''] = passed_rows('012345678漢x').map((row) =>
+			stripVTControlCharacters(row),
+		)
+
+		expect(first).toBe('012345678 ')
+		expect(second.startsWith('漢x')).toBe(true)
+	})
+
 	it('closes an underline at the end of each row it runs over', () => {
 		const [first = '', second = ''] = passed_rows(`0123456${UNDERLINE}789abc${OFF}`)
 
@@ -112,6 +121,12 @@ describe('run_board_reveal_rain.beats_of — how each beat is written', () => {
 
 		expect(texts.every((text) => drawn_rows(text).length > 0)).toBe(true)
 		expect(texts.some((text) => text.includes('\n'))).toBe(false)
+	})
+
+	it('rains no beat on a terminal with no rows', () => {
+		expect([...beats_of(WIDE, random, { size: { columns: SIZE.columns, rows: 0 } })]).toStrictEqual(
+			[],
+		)
 	})
 
 	it('rains over the widest line and the frame rows without a terminal size', () => {

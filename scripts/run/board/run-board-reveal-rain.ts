@@ -49,7 +49,7 @@ const CURSOR_ESCAPE = new RegExp(String.raw`${ESC}\[[\d;?]*[A-Za-ln-z]`, 'gu')
 const BLANK: Column = { text: ' ', width: 1, lead: '', between: '' }
 const BEHIND: RainCell = { kind: 'behind' }
 const { LINK_CLOSE, RESET, pieces_of } = run_board_cut_styled
-const { wrapped } = run_board_drop_screen
+const { WIDE_PAIR, wrapped } = run_board_drop_screen
 const { synced } = run_board_screen
 const CLOSE = `${LINK_CLOSE}${RESET}`
 const PROBE = 'x'
@@ -90,6 +90,11 @@ function padded(row: ReadonlyArray<Column>, width: number): Array<Column> {
 	return [...row, ...Array.from({ length: width - row.length }, () => BLANK)]
 }
 
+// The columns a column starts: two for a wide character's first, one otherwise.
+function column_span(column: Column): number {
+	return column.width > 1 ? WIDE_PAIR : 1
+}
+
 // The lines wrapped at the terminal's columns as a redraw wraps them, cut to its rows, and every
 // screen row and cell of the terminal filled, so the rain falls over the whole screen.
 function screen_grid(
@@ -97,7 +102,7 @@ function screen_grid(
 	size: TerminalSize,
 ): Array<Array<Column>> {
 	const columns = Math.max(1, size.columns)
-	const rows = lines.flatMap((line) => wrapped(line, columns)).slice(0, size.rows)
+	const rows = lines.flatMap((line) => wrapped(line, columns, column_span)).slice(0, size.rows)
 	const blanks = Array.from({ length: size.rows - rows.length }, (): Array<Column> => [])
 
 	return [...rows, ...blanks].map((row) => padded(row, columns))
