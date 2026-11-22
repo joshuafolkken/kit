@@ -1,7 +1,7 @@
 // joshuafolkken/kit#8567: the escapes a drawn board line carries, recognized in one place. A color
 // (SGR), a link (OSC 8, ended by BEL or ST) and, inside tmux, a link wrapped in tmux's DCS passthrough
-// (a DCS opened by `ESC P` and `tmux;`, ended by `ESC \`, every inner ESC doubled — `terminal-link` writes it when `$TMUX` is set) take
-// no column, and none of their bytes is the board's text.
+// (a DCS opened by `ESC P` and `tmux;`, ended by `ESC \`, every inner ESC doubled — `terminal-link`
+// writes it when `$TMUX` is set) take no column, and none of their bytes is the board's text.
 
 const ESC = '\u{1B}'
 const BEL = '\u{7}'
