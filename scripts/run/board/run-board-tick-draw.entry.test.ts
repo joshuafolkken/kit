@@ -68,7 +68,7 @@ describe('run_board_tick_draw.panel_of', () => {
 		expect(panel_of(WARGAMES, { area })).toStrictEqual({ painter: LAMP_PAINTER, area })
 	})
 
-	// joshuafolkken/kit#8674: bttf's rows do not type, so its area opens on the live board's own flag.
+	// joshuafolkken/kit#8674: bttf's area opens on the live board's own flag, whether or not its rows type.
 	it('hands the bttf flux on a live board whose rows do not type', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const bttf = { ...MATRIX, theme: 'bttf' as const, types_rows: false, is_live: true }
@@ -136,6 +136,13 @@ describe('run_board_tick_draw.entry_of', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
 		expect(entry_of(WARGAMES)).toBe('type')
+	})
+
+	// joshuafolkken/kit#8683: bttf types its new rows as wargames does — one typing style for every theme.
+	it('types the bttf board’s new rows', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(entry_of({ ...MATRIX, theme: 'bttf' })).toBe('type')
 	})
 
 	it.each([

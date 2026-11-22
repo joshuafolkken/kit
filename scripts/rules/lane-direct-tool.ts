@@ -8,6 +8,7 @@ import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
+import { direct_vitest_run } from './direct-vitest-run'
 import { timed_rerun } from './timed-rerun'
 
 // A dispatched lane child is stopped from running a heavy tool directly. The core budget
@@ -36,6 +37,12 @@ import { timed_rerun } from './timed-rerun'
 // chain, pipe, redirection, group, substitution, comment, env prefix or timer leaves it to the refusal,
 // as does a multi-worker eslint, which no reservation makes safe. The wrapped line runs in the directory
 // it was typed in (`reserved-run.ts` → `command_directory`).
+//
+// **A vitest line `test:related` can carry is rewritten to it instead** (joshuafolkken/kit#8686): vitest's
+// `-u [type]` takes an optional value, so `vitest run -u <file>` behind `reserved-run` read the file as
+// that value and ran the whole suite. `test:related` splits files from flags and hands vitest the files
+// first. What it can carry is `direct_vitest_run.is_carried_arguments` — `--project` / `--config`,
+// another subcommand, a spaced flag value and a word needing shell quoting stay behind `reserved-run`.
 
 const ESLINT = 'eslint'
 const VITEST = 'vitest'
@@ -47,15 +54,26 @@ const TOOL_WEIGHTS: Readonly<Partial<Record<string, number>>> = {
 }
 const SINGLE_CORE = 1
 const RESERVED_RUN = 'pnpm josh reserved-run'
+const TEST_RELATED = 'pnpm josh test:related'
+const RUN_SUBCOMMAND = 'run'
+// The words `test:related` reads as meant and the shell reads unquoted: a flag (`-u`, `--reporter=dot`)
+// or a path (a `.` or `/` in it). A bare word (`3` of `--maxWorkers 3`) would be read as a file, and so
+// would a path after a flag that may take it as a spaced value (`--outputFile report.json`) — only the
+// update flag, the one this rewrite exists for, is read as taking none.
+const FLAG_WORD = /^-[\w./:=@,+-]*$/u
+const PATH_WORD = /^[\w@+-]*[./][\w./@+-]*$/u
+const FLAG_PREFIX = '-'
+const FLAG_VALUE_SEPARATOR = '='
+const UPDATE_FLAGS: ReadonlySet<string> = new Set(['-u', '--update'])
 // Read on the quote-blanked line: a quoted `;` or `|` is text. `2>&1` applies to the wrapper alike.
 const MULTI_COMMAND_SYNTAX = /[;|&<>()`#\n]|\$\(/u
 const KEPT_REDIRECT = /2>&1/gu
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/u
 
 const RESERVED_NOTE =
-	'↻ lane direct tool: a lane child ran a heavy tool directly, so the line was wrapped in ' +
-	'`pnpm josh reserved-run <weight> --` to claim its cores beside the other lanes. Prefer ' +
-	'`pnpm josh lint:related` / `test:related` / `cspell:dot` — `docs/josh-commands-automation.md`.'
+	'↻ lane direct tool: a heavy tool run directly was rewritten — vitest to ' +
+	'`pnpm josh test:related`, else behind `pnpm josh reserved-run <weight> --` to claim its cores. ' +
+	'Prefer `pnpm josh lint:related` / `test:related` / `cspell:dot` — `docs/josh-commands-automation.md`.'
 
 // The heavy tools the line launches outside a `reserved-run`. The cut is quote-aware, so a tool name
 // inside a quoted argument (`git commit -m "run eslint"`) is never read as a command; a quoted script
@@ -97,7 +115,40 @@ function can_wrap(line: string, cores: number): boolean {
 	return !command_memory.runs_multi_worker_eslint(line, cores)
 }
 
-// The line behind `reserved-run` at its largest tool's weight, or `undefined` where it must be refused.
+// True when `previous` is a flag that may take the next word as its spaced value.
+function may_take_value(previous: string | undefined): boolean {
+	if (previous?.startsWith(FLAG_PREFIX) !== true) return false
+
+	return !previous.includes(FLAG_VALUE_SEPARATOR) && !UPDATE_FLAGS.has(previous)
+}
+
+function is_rewritable_word(argument: string, previous: string | undefined): boolean {
+	if (FLAG_WORD.test(argument)) return true
+
+	return PATH_WORD.test(argument) && !may_take_value(previous)
+}
+
+function is_test_related_call(call: ToolCall | undefined): call is ToolCall {
+	return call?.name === VITEST && direct_vitest_run.is_carried_arguments(call.args)
+}
+
+// The `test:related` line for a lone vitest call it can carry, `run` dropped; `undefined` otherwise.
+function test_related_line(calls: ReadonlyArray<ToolCall>): string | undefined {
+	const [call] = calls
+
+	if (calls.length !== 1 || !is_test_related_call(call)) return undefined
+
+	const args = call.args[0] === RUN_SUBCOMMAND ? call.args.slice(1) : call.args
+
+	if (args.some((argument, index) => !is_rewritable_word(argument, args[index - 1]))) {
+		return undefined
+	}
+
+	return [TEST_RELATED, ...args].join(' ')
+}
+
+// The line rewritten to `test:related` when it can carry it, else behind `reserved-run` at its largest
+// tool's weight; `undefined` where it must be refused.
 function reserved_command(
 	command: string,
 	cores: number = os.availableParallelism(),
@@ -109,7 +160,7 @@ function reserved_command(
 
 	const weight = Math.max(...calls.map((call) => weight_of(call, cores)))
 
-	return `${RESERVED_RUN} ${String(weight)} -- ${line}`
+	return test_related_line(calls) ?? `${RESERVED_RUN} ${String(weight)} -- ${line}`
 }
 
 function is_lane_bash(call: GuardedCall, context: HookContext): boolean {
@@ -145,9 +196,9 @@ function is_lane_direct_tool_in(command: string, context: HookContext): boolean 
 
 const LANE_DIRECT_TOOL_REASON =
 	'⛔ lane child running `eslint` / `vitest` / `cspell` / `tsc` directly, or multi-worker eslint: ' +
-	'it overlaps the other lanes. Run `pnpm josh lint:related`, `pnpm josh test:related`, ' +
-	'`pnpm josh cspell:dot` or `pnpm josh reserved-run <weight> -- <command>`, eslint at ' +
-	'`--concurrency off`. Only a one-command line is wrapped for you. Refused on every occurrence.'
+	'it overlaps the other lanes. Run `pnpm josh test:related <file>… [-u]` (snapshot updates too), ' +
+	'`pnpm josh lint:related`, `pnpm josh cspell:dot` or `pnpm josh reserved-run <weight> -- <command>`, ' +
+	'eslint `--concurrency off`. One-command lines are rewritten for you. Refused on every occurrence.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry; the shape is `lane-switch-main.ts`'s.
 const ROW = {
@@ -161,7 +212,7 @@ const ROW = {
 		title: 'Lane child running a heavy tool directly',
 		topic: '`docs/josh-commands-automation.md` → `josh reserved-run`',
 		fires:
-			"a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`, inside `sh -c`), or eslint with `--concurrency` other than `off` / `1` by any path, `reserved-run` included. A one-command line is rewritten behind `pnpm josh reserved-run <weight> --` at the gate's weight; a chained, piped, redirected or env-prefixed line and a multi-worker eslint are refused, every occurrence",
+			"a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`, inside `sh -c`), or eslint with `--concurrency` other than `off` / `1` by any path, `reserved-run` included. A one-command line is rewritten: a vitest run `test:related` can carry to `pnpm josh test:related <file>… [-u]`, anything else behind `pnpm josh reserved-run <weight> --` at the gate's weight; a chained, piped, redirected or env-prefixed line and a multi-worker eslint are refused, every occurrence",
 		quiet: 'not a lane child, or the run goes through `pnpm josh` with single-worker eslint',
 	},
 }
