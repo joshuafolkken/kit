@@ -94,8 +94,8 @@ function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'
 	return has_label_name(labels, RUN_SOLO_LABEL) ? { is_solo: true } : {}
 }
 
-// A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
-// child does; its tail names the decision that resumes it.
+// A child parked on a decision, or withdrawn while its open issue still waits on a person, is a 🙋 row,
+// as an untouched `needs-decision` child is; its tail names the decision that resumes it.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
 	const is_asked = run_board_parked_decision.is_parked_decision(number, status, read)
 	const labels = read.labels.get(number)
