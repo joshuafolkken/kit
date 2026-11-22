@@ -100,6 +100,7 @@ pnpm josh run:board --chat --fresh     # the same, read from scratch past the on
 pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
 pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
 pnpm josh run:board --theme matrix     # green phosphor text and the TRACE gauge
+pnpm josh run:board --theme bttf       # grey text, slate rules, header in time-circuit colors
 pnpm josh run:board --icons letters    # every icon as two-letter capitals
 pnpm josh run:board --once --timing    # one frame, then how long each phase of it took
 pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
@@ -124,6 +125,9 @@ pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
 - `--theme matrix` — draws as `--theme wargames` does, red and amber kept, with the text as written (only `wargames` draws capitals; `run-board-theme-defs.ts` → `capitals`), uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No lamps or typed rows.
 - `--theme matrix` — a live board types three lead lines in bright green, erasing each, then shows `Knock, knock, Josh.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.
 - `--theme matrix` — a live board traces a new header notice between redraws: its letters spin as rain glyphs and lock from the left, then a green inverse bar blinks and the notice stays bright a while; the change flash leaves its columns alone. A notice already there when the board opens draws as it is; none with no TTY or color (`run-board-notice-turn.ts`, `run-board-notice-trace.ts`).
+- `--theme bttf` — names the board `josh-flux` and types its opening line as written; no alert, lamps or typing sound.
+- `--theme bttf` — uncolored text in grey, dim text at 55% of it, `─` rules in slate; state colors kept.
+- `--theme bttf` — the header’s rows in the time circuits’ red, green and amber, the colon at 30% (`run-board-tint.ts`).
 - `--frame` — one live-form frame in a state its flags fix, for reading what only a live board draws; no frame record, cue or screen control (`run-board-frame-preview.ts`). `--notice <row state>` (`running`, `merged`, …) with `--issue <n>` and `--repeat` (`×2`) sets the notice; `--mute` draws `🔇`; `--columns` / `--rows` the size (120×40); `--ansi` keeps SGR.
 - `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat`, `--every` and `--frame` ignore it.
 - `--timing` — on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`) and the GC within it (`run-board-stall.ts`).
