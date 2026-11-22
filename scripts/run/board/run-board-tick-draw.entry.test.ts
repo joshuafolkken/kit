@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DropScreen } from './run-board-drop-screen'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_rain_drop } from './run-board-rain-drop'
 import type { BoardState } from './run-board-state'
 import type { Theme } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
@@ -114,14 +115,17 @@ function size(): { rows: number; columns: number } {
 	return WIDE
 }
 
-// A live redraw of a frame in `theme`, on a terminal drawing color: the state its turns carry.
-function redrawn_state(theme: Theme, drop?: DropScreen): BoardState {
+// A live redraw of a frame in `theme`, on a terminal drawing color and opened at the redraw: the state
+// its turns carry.
+function redrawn_state(theme: Theme, drop?: DropScreen, flash?: BoardState['flash']): BoardState {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 	const { FRESH_STATE, layout_for } = run_board_tick
 	const { ports } = harness(LOCAL, [])
-	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms, drop }
-	const redraw = { ports: { ...ports, types_rows: true, theme, size }, now_ms: START }
+	const plan = plan_titled('a')
+	const state = { ...FRESH_STATE, plan, run_started_ms: LOCAL.started_ms, drop, flash }
+	const live = { ...ports, types_rows: true, theme, size, opened_ms: START }
+	const redraw = { ports: live, now_ms: START }
 
 	return drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
 }
@@ -169,12 +173,16 @@ describe('run_board_tick_draw.draw_display with the drop', () => {
 // joshuafolkken/kit#8369: a redraw carries the last frame's pour spans on while a drop they sped up can
 // still be on screen, so the drops neither jump back up nor vanish mid-fall; an older span is let go.
 // The pour spans the matrix board's next redraw keeps, the last frame having carried `span`.
-function carried(span: TypingSpan): ReadonlyArray<TypingSpan> {
+function last_drop(): DropScreen {
 	const last = redrawn_state('matrix').drop
 
 	if (last === undefined) throw new Error('the matrix board drew no drop')
 
-	return redrawn_state('matrix', { ...last, pours: [span] }).drop?.pours ?? []
+	return last
+}
+
+function carried(span: TypingSpan): ReadonlyArray<TypingSpan> {
+	return redrawn_state('matrix', { ...last_drop(), pours: [span] }).drop?.pours ?? []
 }
 
 describe('run_board_tick_draw.draw_display with the last frame’s pours', () => {
@@ -188,5 +196,49 @@ describe('run_board_tick_draw.draw_display with the last frame’s pours', () =>
 
 	it('lets go of a span older than the slowest drop’s time on screen', () => {
 		expect(carried(STALE)).not.toContainEqual(STALE)
+	})
+})
+
+// joshuafolkken/kit#8629: a redraw carries the last frame's deja vu rains on the same way.
+function carried_deja(span: TypingSpan): ReadonlyArray<TypingSpan> {
+	return redrawn_state('matrix', { ...last_drop(), deja_spans: [span] }).drop?.deja_spans ?? []
+}
+
+// The matrix board's flash, replaying its first row from the fixture's start.
+function replaying_flash(): NonNullable<BoardState['flash']> {
+	const { flash } = redrawn_state('matrix')
+	const key = flash?.lines[0]?.key
+
+	if (flash === undefined || key === undefined) throw new Error('the matrix board flashed no row')
+
+	return { ...flash, deja_vu: [{ key, start_ms: run_board_fixture.START }] }
+}
+
+describe('run_board_tick_draw.draw_display with the last frame’s deja vu rains', () => {
+	const { START } = run_board_fixture
+	const RECENT = { from_ms: START - 2000, to_ms: START - 1000 }
+	const STALE = { from_ms: START - 3_600_000, to_ms: START - 3_599_000 }
+
+	it('keeps a deja vu’s rain while its drops can still be on screen', () => {
+		expect(carried_deja(RECENT)).toStrictEqual([RECENT])
+	})
+
+	it('lets go of one older than the slowest drop’s time on screen', () => {
+		expect(carried_deja(STALE)).toStrictEqual([])
+	})
+
+	it('keeps the end of a rain two deja vus merged, past one deja vu’s second', () => {
+		const MERGED = { from_ms: START - 2000, to_ms: START - 500 }
+
+		expect(carried_deja(MERGED)).toStrictEqual([MERGED])
+	})
+
+	it('starts a rain from the first frame of a row the flash replays', () => {
+		expect(redrawn_state('matrix', last_drop(), replaying_flash()).drop?.deja_spans).toStrictEqual([
+			{
+				from_ms: START,
+				to_ms: START + run_board_rain_drop.DEJA_STEPS * run_board_rain_drop.DROP_MS,
+			},
+		])
 	})
 })

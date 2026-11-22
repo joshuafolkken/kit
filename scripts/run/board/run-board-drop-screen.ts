@@ -25,6 +25,9 @@ interface DropScreen {
 	// The merged spans the rain pours over (`run-board-rain-pour.ts`), kept across redraws while a drop
 	// they sped up can still be on screen; none before a row types.
 	pours?: ReadonlyArray<TypingSpan> | undefined
+	// One span from each deja vu's first frame, as long as its rain enters (joshuafolkken/kit#8629), kept
+	// while a drop it poured can still be on screen.
+	deja_spans?: ReadonlyArray<TypingSpan> | undefined
 }
 
 interface ScreenPlace {
