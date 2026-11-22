@@ -10,9 +10,9 @@ import { run_board_standing, type StandingHeader } from './run-board-standing'
 // The end of the header's second line (joshuafolkken/kit#8107): the sound switch where the board reads
 // one, then what holds over frames (`run-board-standing.ts`), else the last notice the board picked —
 // when, its cue's icon and name, what sounded it, `×2` where it sounded again (joshuafolkken/kit#8595)
-// — faint once its cause no longer holds (joshuafolkken/kit#8475). Every frame draws the slot; `--once`, `--chat` and Telegram read no
-// switch and draw the slot without it. `--frame` draws the switch and the notice its flags fix
-// (`run-board-frame-preview.ts`).
+// — faint once its cause no longer holds (joshuafolkken/kit#8475). Every frame draws the slot;
+// `--once`, `--chat` and Telegram read no switch and draw the slot without it. `--frame` draws the
+// switch and the notice its flags fix (`run-board-frame-preview.ts`).
 
 const { STATE_ICONS, minute_of } = run_board_labels
 const SOUND_ON = '🔊'
