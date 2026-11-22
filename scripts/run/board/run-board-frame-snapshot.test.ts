@@ -26,6 +26,8 @@ beforeEach(() => {
 	vi.stubEnv('JOSH_BOARD_ICONS', undefined)
 	vi.stubEnv('FORCE_COLOR', '3')
 	vi.stubEnv('NO_COLOR', undefined)
+	// The header clock draws local time, so the zone is pinned for the snapshot to match on every machine.
+	vi.stubEnv('TZ', 'UTC')
 })
 
 afterEach(() => {
