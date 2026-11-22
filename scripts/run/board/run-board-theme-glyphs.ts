@@ -145,13 +145,14 @@ function opened(open: Open, segment: string): Open {
 }
 
 // Share the escape walk with renderers that must restore the line's existing bold and dim.
-// joshuafolkken/kit#8591: a line splits at its escapes (`run-board-escape.ts`), so `draw` is given its
+// joshuafolkken/kit#8591: a frame splits at its escapes (`run-board-escape.ts`), so `draw` is given its
 // text only — a link's body or tmux's passthrough is kept as it came; a color escape updates `open`.
+// joshuafolkken/kit#8649: a cursor move is an escape of its own too, so the spinner glyph after it is drawn.
 function mapped(frame: string, draw: (text: string, open: Open) => string): string {
 	let open = PLAIN
 
 	return frame
-		.split(run_board_escape.LINE_ESCAPE)
+		.split(run_board_escape.FRAME_ESCAPE)
 		.map((part) => {
 			if (!run_board_escape.is_escape(part)) return draw(part, open)
 			open = opened(open, part.slice(ESC.length))

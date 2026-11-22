@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_header_names } from './run-board-header-names'
 import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_labels } from './run-board-labels'
 import { run_board_render_throughput } from './run-board-render-throughput'
+import { run_board_spin } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_case } from './run-board-theme-case'
@@ -253,6 +255,35 @@ describe('run_board_theme.restyle from its cache', () => {
 		const lines = FRAME.split('\n')
 
 		expect(lines.map((line) => whole_frame(line))).toStrictEqual(whole_frame(FRAME).split('\n'))
+	})
+})
+
+// joshuafolkken/kit#8649: the spinner's write, its spot with no color before it or with one, in the theme's glyphs.
+const { SPINNER_FRAMES } = run_board_labels
+const SPINNER_DOT = new RegExp(`[${SPINNER_FRAMES.join('')}]`, 'u')
+
+function spun(theme: 'matrix' | 'wargames' | undefined, style: string): string {
+	vi.stubEnv('FORCE_COLOR', '0')
+	const spot = { row: 3, column: 5, style }
+	const writes = SPINNER_FRAMES.map((frame) => run_board_spin.spin_bytes([spot], frame))
+	const themed = writes.map((write) => run_board_theme.restyle(theme, write))
+
+	return stripVTControlCharacters(themed.join(''))
+}
+
+describe('run_board_theme.restyle on a spinner write', () => {
+	it.each([
+		['wargames', '│││╱╱───╲╲'],
+		['matrix', 'ｦｱｳｴｵｶｷｹｺｻ'],
+	] as const)('turns the %s spinner in its glyphs, with a color or none', (theme, glyphs) => {
+		const drawn = ['', NAMED_CYAN].map((style) => spun(theme, style))
+
+		expect(drawn).toStrictEqual([glyphs, glyphs])
+		expect(drawn.join('')).not.toMatch(SPINNER_DOT)
+	})
+
+	it('keeps the spinner dots with no theme', () => {
+		expect(spun(undefined, '')).toBe(SPINNER_FRAMES.join(''))
 	})
 })
 
