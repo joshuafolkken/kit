@@ -26,11 +26,18 @@ type KeySection =
 	| 'notice'
 	| 'plan'
 
-// A line's key, the line without it, and the part of the line before the key — drawn whole, never typed.
+// joshuafolkken/kit#8607: a keyed line's end mark — what follows it (the watch panel beside the header)
+// is drawn whole in its own columns, never typed with the row.
+// `run-board-spot.ts` holds E000 and E003–E007.
+const END = '\u{E008}'
+
+// A line's key, the line without it (up to its end mark), the part of the line before the key and the
+// part after its end mark — both drawn whole, never typed.
 interface Split {
 	key: string | undefined
 	text: string
 	prefix: string
+	suffix: string
 }
 
 // The key of the row `id` names in `section`: an issue row's number, the now line's text.
@@ -47,25 +54,40 @@ function keyed(section: KeySection | undefined, id: number | string, text: strin
 }
 
 function split_key(line: string): Split {
-	const open = line.indexOf(OPEN)
-	const close = line.indexOf(CLOSE, open)
+	const [body = '', ...rest] = line.split(END)
+	const suffix = rest.join('')
+	const open = body.indexOf(OPEN)
+	const close = body.indexOf(CLOSE, open)
 
-	if (open === -1 || close === -1) return { key: undefined, text: line, prefix: '' }
+	if (open === -1 || close === -1) return { key: undefined, text: body, prefix: '', suffix }
 
-	const prefix = line.slice(0, open)
+	const prefix = body.slice(0, open)
 
 	return {
-		key: line.slice(open + OPEN.length, close),
-		text: `${prefix}${line.slice(close + CLOSE.length)}`,
+		key: body.slice(open + OPEN.length, close),
+		text: `${prefix}${body.slice(close + CLOSE.length)}`,
 		prefix,
+		suffix,
 	}
 }
 
 function without_key(line: string): string {
-	return split_key(line).text
+	const { text, suffix } = split_key(line)
+
+	return `${text}${suffix}`
 }
 
-const run_board_row_key = { key_of, keyed, split_key, without_key }
+// `line` redrawn as `drawn` — its key-free text, cut or padded — with `suffix` after its end mark, its
+// key kept where it was; a line with no key takes `suffix` straight after.
+function rekeyed(line: string, drawn: string, suffix: string): string {
+	const { key, prefix } = split_key(line)
+
+	if (key === undefined) return `${drawn}${suffix}`
+
+	return `${prefix}${OPEN}${key}${CLOSE}${drawn.slice(prefix.length)}${END}${suffix}`
+}
+
+const run_board_row_key = { key_of, keyed, rekeyed, split_key, without_key }
 
 export { run_board_row_key }
 export type { KeySection }
