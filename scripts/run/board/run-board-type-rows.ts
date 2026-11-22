@@ -3,6 +3,7 @@ import { run_board_decode } from './run-board-decode'
 import { run_board_fit } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
+import { run_board_row_key } from './run-board-row-key'
 import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs, type LiveDefinition } from './run-board-theme-defs'
 import { run_board_type_glow } from './run-board-type-glow'
@@ -79,8 +80,12 @@ type TypingStart = Pick<TypingLine, 'start_ms' | 'under'>
 
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
 const NO_SAVED: ReadonlyMap<string, string> = new Map()
-// The header's notice and now rows (`run-board-header-notice.ts`, `run-board-header-time.ts`).
-const HEADER_KEYS: ReadonlyArray<string> = ['notice:', 'now:']
+// The key prefixes of the header's notice and now rows (`run-board-header-notice.ts`,
+// `run-board-header-time.ts`), in the key format `run-board-row-key.ts` owns.
+const HEADER_KEYS: ReadonlyArray<string> = [
+	run_board_row_key.key_of('notice', ''),
+	run_board_row_key.key_of('now', ''),
+]
 
 // The typing a live board starts from: where its theme's trill sounds over the header alone, only the
 // header's rows are heard (joshuafolkken/kit#8697).

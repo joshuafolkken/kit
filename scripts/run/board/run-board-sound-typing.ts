@@ -21,7 +21,8 @@ const NOTES: ReadonlyArray<Note> = Array.from({ length: TRILL_PAIRS }, () => TEL
 // `left_ms`, given with `on`, is how long the letters still type: the trill stops itself then rather
 // than at the next `set(false)`, which a slow gather can hold up (joshuafolkken/kit#8523). Without it
 // (the intro) the trill sounds until `set(false)`. `ended`, given with `left_ms`, is called once the
-// trill stops itself that way — its letters typed through — and never on `set(false)` or `stop`; `typed`
+// trill stops itself that way — its letters typed through, or an off that arrives once they have by the
+// clock though the timer has not yet fired — and never on an earlier `set(false)` or `stop`; `typed`
 // sounds the theme's typed-end once (joshuafolkken/kit#8697).
 interface TypingSound {
 	set: (is_on: boolean, left_ms?: number, ended?: () => void) => void
@@ -35,10 +36,19 @@ interface TypingPorts {
 	// Calls `fire` after `ms`; the returned function cancels it. A timer that holds no process open
 	// when left out.
 	after?: (ms: number, fire: () => void) => () => void
+	// The clock the letters' end is read by; `Date.now` when left out.
+	now?: () => number
+}
+
+// The moment the armed letters type through and who is told then.
+interface End {
+	at_ms: number
+	ended: (() => void) | undefined
 }
 
 // The trill's state: whether it is on, whether the board has closed it for good, the player sounding
-// it, the WAV once written and the cancel of the timer that stops it once its letters type through.
+// it, the WAV once written, the cancel of the timer that stops it once its letters type through and
+// that timer's end.
 interface Held {
 	is_on: boolean
 	is_stopped: boolean
@@ -46,6 +56,7 @@ interface Held {
 	file: string | undefined
 	generation: symbol | undefined
 	disarm: (() => void) | undefined
+	end?: End | undefined
 }
 
 function after(ms: number, fire: () => void): () => void {
@@ -137,6 +148,7 @@ interface Switch {
 function arm(held: Held, ports: TypingPorts, { left_ms, ended }: Switch): void {
 	disarm(held)
 	if (left_ms === undefined || !held.is_on) return
+	held.end = { at_ms: (ports.now ?? Date.now)() + left_ms, ended }
 	held.disarm = (ports.after ?? after)(left_ms, () => {
 		held.disarm = undefined
 		turn(held, ports, false)
@@ -144,10 +156,23 @@ function arm(held: Held, ports: TypingPorts, { left_ms, ended }: Switch): void {
 	})
 }
 
+// On an off, the armed `ended` where its letters have typed through by now though its timer has not yet
+// fired: the off is then the letters' end by the clock, not a switch apart (joshuafolkken/kit#8697).
+function due_end(held: Held, ports: TypingPorts): (() => void) | undefined {
+	const { end } = held
+
+	if (end === undefined || held.disarm === undefined) return undefined
+
+	return (ports.now ?? Date.now)() >= end.at_ms ? end.ended : undefined
+}
+
 function set(held: Held, ports: TypingPorts, switched: Switch): void {
 	if (held.is_stopped) return
+	const ended = switched.is_on ? undefined : due_end(held, ports)
+
 	turn(held, ports, switched.is_on)
 	arm(held, ports, switched)
+	ended?.()
 }
 
 // The board's trill, off until a line types; `stop` ends it for good as the board closes.
