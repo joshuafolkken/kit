@@ -56,9 +56,9 @@ describe('run_ship_scoped.scoped_pair — the caller', () => {
 
 		const expected = { [test_related_caller.CALLER_ENVIRONMENT]: `ship ${STAGE}` }
 
-		expect(josh_run_mock.mock.calls.map((call) => call[3] as unknown)).toStrictEqual([
-			expected,
-			expected,
+		expect(josh_run_mock.mock.calls.map((call) => call[1] as unknown)).toStrictEqual([
+			{ should_forward_stderr: true, environment: expected },
+			{ should_forward_stderr: true, environment: expected },
 		])
 	})
 })

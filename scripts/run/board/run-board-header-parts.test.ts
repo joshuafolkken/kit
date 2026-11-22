@@ -11,7 +11,12 @@ describe('run_board_header_parts', () => {
 	it('leads the progress line with its key where the board types rows', () => {
 		const split = run_board_row_key.split_key(keyed_progress({ is_keyed: true }, PROGRESS))
 
-		expect(split).toStrictEqual({ key: plan_key({ is_keyed: true }), text: PROGRESS, prefix: '' })
+		expect(split).toStrictEqual({
+			key: plan_key({ is_keyed: true }),
+			text: PROGRESS,
+			prefix: '',
+			suffix: '',
+		})
 	})
 
 	it('keys nothing where the board types no rows', () => {

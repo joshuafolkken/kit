@@ -11,11 +11,11 @@ function end_args(end: DriveEnd): ReadonlyArray<string> {
 }
 
 async function finish(end: DriveEnd): Promise<void> {
-	const report = await josh_command.josh_run(['run:report'], should_forward_stderr)
+	const report = await josh_command.josh_run(['run:report'], { should_forward_stderr })
 
 	if (report.code !== SUCCESS_EXIT_CODE) throw new Error('run:report failed')
 	console.error(report.out)
-	const ended = await josh_command.josh_run(end_args(end), should_forward_stderr)
+	const ended = await josh_command.josh_run(end_args(end), { should_forward_stderr })
 
 	if (ended.code !== SUCCESS_EXIT_CODE) throw new Error('run:carry --end failed')
 }

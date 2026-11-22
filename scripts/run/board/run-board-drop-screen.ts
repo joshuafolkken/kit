@@ -57,13 +57,40 @@ function cells_of(piece: StyledPiece): Array<ScreenCell> {
 	]
 }
 
-// The line's cells cut into screen rows of `columns`; an empty line still takes its row.
-function rows_of(line: string, columns: number): Array<Array<ScreenCell>> {
-	const cells = run_board_cut_styled.styled_pieces(line).flatMap((piece) => cells_of(piece))
-	const count = Math.max(1, Math.ceil(cells.length / columns))
+// A line's cells cut into screen rows of `columns`, as the terminal wraps it: a character two columns
+// wide that would start on a row's last column starts the next row, leaving that column blank. An
+// empty line still takes its row. The matrix rain wraps its grid with it too (`run-board-reveal-rain.ts`).
+function wrapped<Cell>(
+	cells: ReadonlyArray<Cell>,
+	columns: number,
+	span_of: (cell: Cell) => number,
+): Array<Array<Cell>> {
+	let row: Array<Cell> = []
+	const rows = [row]
 
-	return Array.from({ length: count }, (_row, index) =>
-		cells.slice(index * columns, (index + 1) * columns),
+	for (const cell of cells) {
+		// A cell that does not fit what is left of a started row starts the next one.
+		if (row.length > 0 && row.length + span_of(cell) > columns) {
+			row = []
+			rows.push(row)
+		}
+
+		row.push(cell)
+	}
+
+	return rows
+}
+
+// The columns a cell starts: two for a wide character's first cell, one otherwise.
+function screen_span(cell: ScreenCell): number {
+	return cell.is_wide && cell.text !== '' ? WIDE_PAIR : 1
+}
+
+function rows_of(line: string, columns: number): Array<Array<ScreenCell>> {
+	return wrapped(
+		run_board_cut_styled.styled_pieces(line).flatMap((piece) => cells_of(piece)),
+		columns,
+		screen_span,
 	)
 }
 
@@ -111,7 +138,7 @@ function is_kept(screen: DropScreen, place: ScreenPlace): boolean {
 	return cell_at(screen, place).is_wide
 }
 
-const run_board_drop_screen = { cell_at, is_kept, key_of, screen_of }
+const run_board_drop_screen = { WIDE_PAIR, cell_at, is_kept, key_of, screen_of, wrapped }
 
 export { run_board_drop_screen }
 export type { DropScreen, FrameSpots, ScreenCell, ScreenPlace }

@@ -12,6 +12,7 @@ import {
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
+import type { PinnedIssue } from './run-board-pinned-graphql'
 import { run_board_priority } from './run-board-priority'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
@@ -31,6 +32,8 @@ import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_rule_width } from './run-board-rule-width'
 import type { Thanks } from './run-board-thanks-csv'
 import type { ThroughputRow } from './run-board-throughput'
+import { run_board_watch_panel } from './run-board-watch-panel'
+import { run_board_watch_row } from './run-board-watch-row'
 
 // The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
 // terminal. The header says where the run is; under it the run's own rows, then the ones waiting on a
@@ -67,6 +70,8 @@ interface BoardView extends FrameBounds {
 	throughput?: ReadonlyArray<ThroughputRow> | undefined
 	// Whether the throughput rows end on the lamp panel (`run-board-lamps.ts`).
 	has_lamps?: boolean | undefined
+	// The repository's pinned issues, drawn as the watch panel at the header's right.
+	pinned?: ReadonlyArray<PinnedIssue> | undefined
 }
 
 function bare(text: string): PlanLine {
@@ -209,7 +214,7 @@ function plan_parts(
 	header: BoardHeader,
 	notes: ReadonlyArray<BoardNote>,
 	size: TerminalSize | undefined,
-): Pick<FrameParts, 'below' | 'columns' | 'plan' | 'rule_width'> {
+): Pick<FrameParts, 'below' | 'columns' | 'plan'> & { rule_width: number } {
 	const { layout } = header
 	const frame = frame_of(header, notes, size)
 	const widths = { rule_width: run_board_rule_width.rule_width(frame), columns: size?.columns }
@@ -219,11 +224,20 @@ function plan_parts(
 	return { plan: active_sections(layout, frame), ...widths, below: below_sections(layout, frame) }
 }
 
+// The header with the pinned issues' watch panel at its right (joshuafolkken/kit#8607), then the
+// session a stopped run resumes from.
+function above_of(view: BoardView, rule_width: number): Array<string> {
+	const rows = (view.pinned ?? []).map((pin) => run_board_watch_row.watch_row(view.header, pin))
+	const header = run_board_header.header_lines(view.header)
+
+	return [...run_board_watch_panel.composed(header, rows, rule_width), ...resume_lines(view.resume)]
+}
+
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
+	const plan = plan_parts(header, notes, view.size)
 	const parts = {
-		above,
+		above: above_of(view, plan.rule_width),
 		throughput: run_board_render_throughput.throughput_part(
 			view.throughput,
 			view.has_lamps,
@@ -234,7 +248,7 @@ function render(view: BoardView): Array<string> {
 			hold: header.quota_hold,
 			has_lamps: view.has_lamps,
 		}),
-		...plan_parts(header, notes, view.size),
+		...plan,
 		processes: run_board_render_processes.processes_part(header),
 		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),
 		thanks: thanks_part(view.thanks, view.link, view.size?.columns),

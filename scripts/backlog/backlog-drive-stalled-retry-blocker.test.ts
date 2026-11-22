@@ -74,7 +74,9 @@ describe('backlog_drive_stalled_retry.sweep — a blocker triage recorded on the
 		given([blocker(), blocker('CLOSED', BEFORE_PARK, OTHER_BLOCKER)])
 		await next_sweep()
 
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('retries a park restated at the cap once its blocker closed (ac-430e3c48)', async () => {
@@ -84,7 +86,9 @@ describe('backlog_drive_stalled_retry.sweep — a blocker triage recorded on the
 		given([blocker()], capped, [retry, retry, capped])
 		await next_sweep()
 
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 })
 

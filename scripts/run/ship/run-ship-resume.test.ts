@@ -46,7 +46,7 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 	async function scoped_gate(): ReturnType<typeof real_scoped.scoped_gate> {
 		return await actual.run_ship_scoped.run_phases([
 			scoped_pair,
-			async () => await josh_run_mock(['gate'], true),
+			async () => await josh_run_mock(['gate'], { should_forward_stderr: true }),
 		])
 	}
 

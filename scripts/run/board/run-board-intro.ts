@@ -27,7 +27,7 @@ interface RainSource {
 
 type IntroPorts = Pick<
 	BoardPorts,
-	'icons' | 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound'
+	'icons' | 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound' | 'size'
 > & {
 	rain?: RainSource
 }
@@ -243,7 +243,9 @@ async function rain(
 	const { random, is_colored } = ports.rain ?? LIVE_RAIN
 
 	if (is_colored()) {
-		await listen(run_board_reveal_rain.beats_of(drawn, random), { ...ports, write }, keys)
+		const beats = run_board_reveal_rain.beats_of(drawn, random, { size: ports.size?.() })
+
+		await listen(beats, { ...ports, write }, keys)
 	}
 
 	write(drawn)

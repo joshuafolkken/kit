@@ -146,14 +146,16 @@ describe('run_review_early_push.push', () => {
 
 		expect(await run_review_early_push.push('2')).toBe(0)
 		expect(existing).toHaveBeenCalledWith('4907')
-		expect(josh_run).toHaveBeenCalledExactlyOnceWith([...PUSH, '--body-file', DRAFT], true)
+		expect(josh_run).toHaveBeenCalledExactlyOnceWith([...PUSH, '--body-file', DRAFT], {
+			should_forward_stderr: true,
+		})
 		expect(early_push_record.record).toHaveBeenCalledWith('review', 'pushed', 2)
 	})
 
 	it('pushes without a body file when no draft exists', async () => {
 		await run_review_early_push.push()
 
-		expect(josh_run).toHaveBeenCalledExactlyOnceWith(PUSH, true)
+		expect(josh_run).toHaveBeenCalledExactlyOnceWith(PUSH, { should_forward_stderr: true })
 	})
 
 	it('returns the push’s own exit code', async () => {

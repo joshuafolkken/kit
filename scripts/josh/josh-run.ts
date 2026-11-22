@@ -39,6 +39,12 @@ interface ExtraOptions {
 	cwd?: string
 }
 
+interface JoshRunOptions {
+	should_forward_stderr?: boolean | undefined
+	timeout_ms?: number | undefined
+	environment?: Readonly<Record<string, string>> | undefined
+}
+
 function extra_options(
 	timeout_ms: number | undefined,
 	environment: Readonly<Record<string, string>> | undefined,
@@ -71,9 +77,7 @@ async function run_with_options(
 
 async function josh_run(
 	args: ReadonlyArray<string>,
-	should_forward_stderr = false,
-	timeout_ms?: number,
-	environment?: Readonly<Record<string, string>>,
+	{ should_forward_stderr = false, timeout_ms, environment }: JoshRunOptions = {},
 ): Promise<JoshResult> {
 	return await run_with_options(args, should_forward_stderr, extra_options(timeout_ms, environment))
 }

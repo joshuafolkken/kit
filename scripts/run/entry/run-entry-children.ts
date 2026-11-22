@@ -59,12 +59,10 @@ async function josh_line(step: string, argv: ReadonlyArray<string>): Promise<str
 	const result = await timed(
 		step,
 		async () =>
-			await josh_command.josh_run(
-				argv,
+			await josh_command.josh_run(argv, {
 				should_forward_stderr,
-				undefined,
-				run_ship_lap.environment(`${ENTRY_SCOPE} › ${step}`),
-			),
+				environment: run_ship_lap.environment(`${ENTRY_SCOPE} › ${step}`),
+			}),
 	)
 
 	return result.code === 0 ? first_line(result.out) : 'unknown'
@@ -105,7 +103,7 @@ async function ask_resume(issue_number: string): Promise<Resume> {
 	const asked = await timed(
 		STEP.RESUME,
 		async () =>
-			await josh_command.josh_run(['run:cut', '--resume', issue_number], should_forward_stderr),
+			await josh_command.josh_run(['run:cut', '--resume', issue_number], { should_forward_stderr }),
 	)
 
 	const [token = '', ...section] = asked.out.split(NEWLINE)

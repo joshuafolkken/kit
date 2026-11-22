@@ -1,4 +1,3 @@
-import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
@@ -7,13 +6,15 @@ import type { KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import type { RainCell } from './run-board-rain'
 import { run_board_reveal_rain } from './run-board-reveal-rain'
+import { run_board_reveal_rain_fixture } from './run-board-reveal-rain-fixture'
 import { run_board_theme } from './run-board-theme'
 
 // joshuafolkken/kit#8519: the matrix board's first frame revealed behind the code rain — the frame's
 // columns keep their characters, colors and widths, the rain's glyphs take one column each, and a key,
 // no pauses or no color draw the frame whole at once.
 
-const { CLOSE, CURSOR_HOME, beats_of, grid_of, is_colored, row_of } = run_board_reveal_rain
+const { CLOSE, beats_of, grid_of, is_colored, row_of } = run_board_reveal_rain
+const { drawn_rows } = run_board_reveal_rain_fixture
 const ESC = '\u{1B}'
 const GREEN = `${ESC}[32m`
 const OFF = `${ESC}[0m`
@@ -123,20 +124,13 @@ describe('run_board_reveal_rain.row_of', () => {
 })
 
 describe('run_board_reveal_rain.beats_of', () => {
-	it('pads every row to the widest line', () => {
-		expect(grid_of('ab\nc').map((row) => row.length)).toStrictEqual([2, 2])
-	})
-
 	it('draws every frame from the top-left, one column a cell, at the frame width', () => {
 		const beats = [...beats_of(`${GREEN}漢字${OFF}ab\ncd`, () => HALF)]
-		const widths = beats.flatMap((beat) =>
-			stripVTControlCharacters(beat.text.slice(CURSOR_HOME.length))
-				.split('\n')
-				.map((line) => run_board_fit.width_of(line)),
-		)
+		const rows = beats.map((beat) => drawn_rows(beat.text))
+		const widths = rows.flat().map((line) => run_board_fit.width_of(line))
 
 		expect(beats.length).toBeGreaterThan(1)
-		expect(beats.every((beat) => beat.text.startsWith(CURSOR_HOME))).toBe(true)
+		expect(rows.every((drawn) => drawn.length === 2)).toBe(true)
 		expect(beats.every((beat) => beat.ms === RAIN_MS)).toBe(true)
 		expect(new Set(widths)).toStrictEqual(new Set([6]))
 	})
@@ -159,7 +153,7 @@ describe('run_board_intro.opening in the matrix theme', () => {
 		const revealed = written.slice(before)
 
 		expect(revealed.length).toBeGreaterThan(2)
-		expect(revealed.slice(0, -1).every((text) => text.startsWith(CURSOR_HOME))).toBe(true)
+		expect(revealed.slice(0, -1).every((text) => drawn_rows(text).length > 0)).toBe(true)
 		expect(revealed.at(-1)).toBe(run_board_theme.restyle(THEME, `${SCREEN}${FRAME}`))
 	})
 
@@ -182,7 +176,7 @@ describe('run_board_intro.rain', () => {
 		press()
 		await pending
 		expect(written).toHaveLength(2)
-		expect(written[0]?.startsWith(CURSOR_HOME)).toBe(true)
+		expect(drawn_rows(written[0] ?? '')).not.toHaveLength(0)
 		expect(written[1]).toBe(run_board_theme.restyle(THEME, FRAME))
 		expect(released()).toBe(true)
 	})

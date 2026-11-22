@@ -199,6 +199,7 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		throughput: display.throughput,
 		has_lamps: has_lamps(redraw.ports),
 		thanks: display.thanks,
+		pinned: display.pinned,
 		link: redraw.ports.link,
 		...bounds,
 	})

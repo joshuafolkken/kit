@@ -123,7 +123,7 @@ describe('backlog_drive_after_merge — a parked child', () => {
 		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '' })
 
 		await expect(backlog_drive_after_merge.resolve(ISSUE)).resolves.toBe(true)
-		expect(run).toHaveBeenLastCalledWith(CLEAR, true)
+		expect(run).toHaveBeenLastCalledWith(CLEAR, { should_forward_stderr: true })
 		vi.restoreAllMocks()
 	})
 })
