@@ -65,8 +65,9 @@ function frames_between(start_ms: number, now_ms: number): number {
 	return Math.floor(now_ms / FRAME_MS) - Math.floor(start_ms / FRAME_MS)
 }
 
-function failures_in(text: string): number {
-	return text.split(FAILED).length - 1
+// Counted on the row as produced: a theme may draw 💥 as other glyphs (`KeyedLine.source`).
+function failures_in(line: KeyedLine): number {
+	return (line.source ?? line.text).split(FAILED).length - 1
 }
 
 // A lane newly failed: one more 💥 on its row — a recovered lane keeps its earlier 🚢💥 in its
@@ -74,7 +75,7 @@ function failures_in(text: string): number {
 function is_failure(before: KeyedLine | undefined, line: KeyedLine): boolean {
 	if (before === undefined || !line.key.startsWith(LANE_KEY)) return false
 
-	return failures_in(line.text) > failures_in(before.text)
+	return failures_in(line) > failures_in(before)
 }
 
 function supervisor_in(lines: ReadonlyArray<KeyedLine>): KeyedLine | undefined {

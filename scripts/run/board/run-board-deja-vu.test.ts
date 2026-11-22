@@ -100,6 +100,10 @@ describe('run_board_deja_vu.bytes', () => {
 		expect(bytes(failed(), since.ms + FRAME_MS, since, keep)).toBe('')
 		expect(bytes(failed(), since.ms, { ms: since.ms - FRAME_MS }, keep)).not.toBe('')
 	})
+
+	it('writes nothing for a replay whose row is no longer drawn', () => {
+		expect(bytes({ ...failed(), lines: [] }, 0, undefined, keep)).toBe('')
+	})
 })
 
 describe('run_board_deja_vu.next', () => {

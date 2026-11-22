@@ -46,6 +46,7 @@ function flash_lines(drawn: FlashDrawn, ports: FlashPorts): Array<KeyedLine> {
 			row: starts[index] ?? 1,
 			prefix_columns: 0,
 			text: run_board_theme.restyle(ports.theme, text, ports.icons),
+			source: text,
 		}))
 
 	return lines.filter(

@@ -57,6 +57,13 @@ function flash_rows(state: BoardState, rows: Array<BoardRow>): BoardState {
 	return drawn_from(state, LOCAL, { ports: live, now_ms: START }, layout)
 }
 
+// A live matrix redraw at the start, on the default icons.
+function matrix_redraw(): Parameters<typeof run_board_tick_flash.flash_of>[2] {
+	const { ports } = harness(LOCAL, [])
+
+	return { ports: { ...ports, theme: 'matrix', is_tty: true, opened_ms: START }, now_ms: START }
+}
+
 afterEach(() => vi.unstubAllEnvs())
 
 describe('run_board_tick_flash.flash_of through a matrix redraw', () => {
@@ -102,11 +109,7 @@ describe('run_board_tick_flash.flash_of over a lamp', () => {
 	it('never flashes a lamp’s cell, which the lamps write themselves', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		vi.stubEnv('NO_COLOR', undefined)
-		const { ports } = harness(LOCAL, [])
-		const redraw = {
-			ports: { ...ports, theme: 'matrix' as const, is_tty: true, opened_ms: START },
-			now_ms: START,
-		}
+		const redraw = matrix_redraw()
 		const lamp = { row: 1, column: 2, panel_row: 0, group: 0, lamp: 0 }
 		const drawn = { lines: ['12'], keyed: [], spots: [], lamps: [lamp] }
 		const base = run_board_tick_flash.flash_of(undefined, drawn, redraw, FRESH_STATE.typing)
@@ -114,6 +117,22 @@ describe('run_board_tick_flash.flash_of over a lamp', () => {
 		const flash = run_board_tick_flash.flash_of(base, changed, redraw, FRESH_STATE.typing)
 
 		expect(flash?.cells.map((cell) => cell.column)).toStrictEqual([1])
+	})
+})
+
+describe('run_board_tick_flash.flash_of deja vu', () => {
+	it('ac-3a46d3cd replays a lane that failed though the matrix draws its 💥 as other glyphs', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		vi.stubEnv('NO_COLOR', undefined)
+		const redraw = matrix_redraw()
+		const keyed = [{ index: 2, key: 'lanes:1', row: 3, text: '', prefix_columns: 0 }]
+		const drawn = { lines: ['', '', '🔨 #1 4m 🚢'], keyed, spots: [] }
+		const base = run_board_tick_flash.flash_of(undefined, drawn, redraw, FRESH_STATE.typing)
+		const failed = { ...drawn, lines: ['', '', '💥 #1 4m 🚢💥'] }
+		const flash = run_board_tick_flash.flash_of(base, failed, redraw, FRESH_STATE.typing)
+
+		expect(flash?.lines.at(-1)?.text).not.toContain('💥')
+		expect(flash?.deja_vu.map((entry) => entry.key)).toStrictEqual(['lanes:1'])
 	})
 })
 

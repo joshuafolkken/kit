@@ -119,6 +119,10 @@ describe('run_board_process_groups.groups_of within the backlogrun', () => {
 		expect(groups_for(ROOTS).backlogrun.supervisor.memory_bytes).toBe(30)
 	})
 
+	it('ac-3a46d3cd carries the supervisor’s pid, which keys its row', () => {
+		expect(groups_for(ROOTS).backlogrun.supervisor_pid).toBe(SUPERVISOR)
+	})
+
 	it('puts the run’s session and its descendants under the parent', () => {
 		expect(groups_for(ROOTS).backlogrun.parent.memory_bytes).toBe(100)
 	})
