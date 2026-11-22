@@ -2,7 +2,9 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import { run_board_intro_fixture } from './run-board-intro-fixture'
+import { run_board_jump_screen } from './run-board-jump-screen'
 import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_theme } from './run-board-theme'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
@@ -250,5 +252,34 @@ describe('run_board_intro.opening', () => {
 		expect(written).toContain(line_of(`${LINE.slice(0, -1)}${CURSOR}`))
 		await opened.reveal?.('a\nb')
 		expect(written.slice(-2)).toStrictEqual(['A', '\nB'])
+	})
+})
+
+// joshuafolkken/kit#8677: the bttf first frame arrives out of the time jump.
+const ARRIVE_THEME = 'bttf'
+const COLORED = { random: (): number => 0, is_colored: (): boolean => true }
+
+describe('run_board_intro.arrive', () => {
+	it('is the bttf theme’s reveal', () => {
+		expect(run_board_intro.ARRIVE_THEMES.has(ARRIVE_THEME)).toBe(true)
+	})
+
+	it('plays the arrival from a cleared screen, then writes the frame whole', async () => {
+		const { written, ports } = recorded(instant)
+		const drawn = run_board_theme.restyle(ARRIVE_THEME, FRAME)
+		const beats = run_board_jump_screen.arrive_beats(drawn, undefined)
+
+		await run_board_intro.arrive(FRAME, { ...ports, rain: COLORED }, NO_KEYS, ARRIVE_THEME)
+		expect(written).toHaveLength(beats.length + 1)
+		expect(written[0]).toContain('\u{1B}[H\u{1B}[J')
+		expect(written.at(-1)).toBe(drawn)
+	})
+
+	it('writes the frame at once where stdout draws no color', async () => {
+		const { written, ports } = recorded(instant)
+		const uncolored = { ...COLORED, is_colored: (): boolean => false }
+
+		await run_board_intro.arrive(FRAME, { ...ports, rain: uncolored }, NO_KEYS, ARRIVE_THEME)
+		expect(written).toStrictEqual([run_board_theme.restyle(ARRIVE_THEME, FRAME)])
 	})
 })

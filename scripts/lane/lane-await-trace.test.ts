@@ -71,8 +71,9 @@ describe('process_trace_default', () => {
 	})
 })
 
-const OTHER_PID = 7477
-const PARENT_PID = 7478
+// Derived from the live pid: a fixed pid can be the worker's own on a CI runner, which the trace excludes.
+const OTHER_PID = process.pid + 1
+const PARENT_PID = process.pid + 2
 
 function process_row(pid: number, parent: number, command = 'node'): string {
 	return `${String(pid)} ${String(parent)} 00:00 0 S Fri Nov 13 00:00:00 2026 ${command}`

@@ -4,14 +4,10 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { describe, expect, it } from 'vitest'
 
 const ISSUE = '5029'
-// The prompt-cache TTL and the tool-search switch (joshuafolkken/kit#8096) ride on a child's
-// environment but are Claude Code settings, not lane marks; the blanked outer command is a fresh start,
-// not a mark (joshuafolkken/kit#7593).
-const NOT_MARKS: ReadonlySet<string> = new Set([
-	'CLAUDE_CODE_PROMPT_CACHE_TTL',
-	'ENABLE_TOOL_SEARCH',
-	outer_command.KEY,
-])
+// The prompt-cache TTL rides on a child's environment but is a Claude Code setting, not a lane mark;
+// the blanked outer command is a fresh start, not a mark (joshuafolkken/kit#7593). The tool-search
+// switch is no longer set at all (joshuafolkken/kit#8703).
+const NOT_MARKS: ReadonlySet<string> = new Set(['CLAUDE_CODE_PROMPT_CACHE_TTL', outer_command.KEY])
 
 function marks_set_by(environment: Record<string, string>): Array<string> {
 	return Object.keys(environment).filter((key) => !NOT_MARKS.has(key))

@@ -1,3 +1,4 @@
+import { run_board_jump_screen } from './run-board-jump-screen'
 import type { KeyReading } from './run-board-keys'
 import { run_board_labels, type Paint } from './run-board-labels'
 import type { Random } from './run-board-rain'
@@ -35,6 +36,8 @@ type Reveal = (frame: string) => Promise<void>
 
 // joshuafolkken/kit#8519: the themes whose first frame is revealed behind the code rain.
 const RAIN_THEMES: ReadonlySet<Theme> = new Set<Theme>(['matrix'])
+// joshuafolkken/kit#8677: the themes whose first frame arrives out of the time jump.
+const ARRIVE_THEMES: ReadonlySet<Theme> = new Set<Theme>(['bttf'])
 const LIVE_RAIN: RainSource = {
 	random: Math.random,
 	is_colored: run_board_reveal_rain.is_colored,
@@ -229,31 +232,40 @@ async function reveal(
 	if (rest.length > 0) write(rest.map((beat) => beat.text).join(''))
 }
 
-// joshuafolkken/kit#8519: the first frame, as the theme draws it, revealed behind one pass of the code
-// rain (`run-board-reveal-rain.ts`), then written whole as every later frame is drawn — at once where a
-// key skips the rain, where the ports carry no pauses, or where stdout draws no color.
-async function rain(
-	frame: string,
-	ports: IntroPorts,
-	keys: KeyReading,
-	theme: Theme,
-): Promise<void> {
-	const write = ports.write_drawn ?? ports.write
-	const drawn = run_board_theme.restyle(theme, frame, ports.icons)
-	const { random, is_colored } = ports.rain ?? LIVE_RAIN
+// The beats a first frame, as the theme draws it, is revealed behind.
+type BeatsOf = (drawn: string, ports: IntroPorts, random: Random) => Iterator<Beat>
 
-	if (is_colored()) {
-		const beats = run_board_reveal_rain.beats_of(drawn, random, { size: ports.size?.() })
+// The first frame, as the theme draws it, revealed behind `cover`'s beats, then written whole as
+// every later frame is drawn — at once where a key skips the beats, where the ports carry no pauses, or
+// where stdout draws no color.
+function behind(cover: BeatsOf): typeof reveal {
+	return async (frame, ports, keys, theme) => {
+		const write = ports.write_drawn ?? ports.write
+		const drawn = run_board_theme.restyle(theme, frame, ports.icons)
+		const { random, is_colored } = ports.rain ?? LIVE_RAIN
 
-		await listen(beats, { ...ports, write }, keys)
+		if (is_colored()) await listen(cover(drawn, ports, random), { ...ports, write }, keys)
+		write(drawn)
 	}
-
-	write(drawn)
 }
 
-// The theme's own reveal: behind the rain, or a block at a time.
+// joshuafolkken/kit#8519: the first frame revealed behind one pass of the code rain
+// (`run-board-reveal-rain.ts`).
+const rain = behind((drawn, ports, random) =>
+	run_board_reveal_rain.beats_of(drawn, random, { size: ports.size?.() }),
+)
+
+// joshuafolkken/kit#8677: the bttf first frame arriving out of the time jump — black, three flashes,
+// then the thaw (`run-board-jump-screen.ts`).
+const arrive = behind((drawn, ports) =>
+	run_board_jump_screen.arrive_beats(drawn, ports.size?.()).values(),
+)
+
+// The theme's own reveal: behind the rain, arriving out of the jump, or a block at a time.
 function revealer(theme: Theme): typeof reveal {
-	return RAIN_THEMES.has(theme) ? rain : reveal
+	if (RAIN_THEMES.has(theme)) return rain
+
+	return ARRIVE_THEMES.has(theme) ? arrive : reveal
 }
 
 // The first read starts at once, but returns or throws only once the intro is over, so a failed read
@@ -296,12 +308,14 @@ function opening<Read>(
 }
 
 const run_board_intro = {
+	ARRIVE_THEMES,
 	ERASE_LINE_END,
 	LINE_START,
 	LIVE_RAIN,
 	RAIN_THEMES,
 	REVEAL_LINE_MS,
 	after,
+	arrive,
 	listen,
 	opening,
 	play,
