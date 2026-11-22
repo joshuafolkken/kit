@@ -108,6 +108,13 @@ describe('run_board_panel_draw.cell_bytes', () => {
 
 		expect(bytes).toBe('\u{1B}[1;3H\u{1B}[31mY\u{1B}[39m')
 	})
+
+	it.each(['1', '3'])('draws a named background as it is at color level %s', (level) => {
+		vi.stubEnv('FORCE_COLOR', level)
+		const bytes = cell_bytes({ row: 1, column: 3, text: 'Y', bg: 'bgYellow' })
+
+		expect(bytes).toBe('\u{1B}[1;3H\u{1B}[43mY\u{1B}[49m')
+	})
 })
 
 describe('run_board_panel_draw.panel_bytes', () => {
