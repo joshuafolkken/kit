@@ -265,6 +265,38 @@ describe('run_board_cli.run --theme refused', () => {
 	})
 })
 
+// joshuafolkken/kit#8505: the icons a board draws, refused as the theme is.
+describe('run_board_cli.run --icons', () => {
+	it('names the icons in the usage', () => {
+		expect(run_board_cli.USAGE).toContain('[--icons emoji|letters|shapes]')
+	})
+
+	it('draws a board in no theme in letters where --icons asks', async () => {
+		const pictographic = /\p{Extended_Pictographic}/u
+
+		expect(await frame_of(['--once'])).toMatch(pictographic)
+		expect(await frame_of(['--once', '--icons', 'letters'])).not.toMatch(pictographic)
+	})
+
+	it('names JOSH_BOARD_ICONS when it, not --icons, names no icons', async () => {
+		vi.stubEnv('JOSH_BOARD_ICONS', 'nope')
+		const { ports } = harness(LOCAL, [])
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		await expect(run_board_cli.run(['--once'], ports)).resolves.toBe(1)
+		expect(stderr).toHaveBeenCalledWith(
+			`JOSH_BOARD_ICONS=nope names no icons (emoji, letters, shapes)\n${run_board_cli.USAGE}\n`,
+		)
+		stderr.mockRestore()
+	})
+
+	it('draws --chat whatever JOSH_BOARD_ICONS holds', async () => {
+		vi.stubEnv('JOSH_BOARD_ICONS', 'nope')
+
+		expect(await frame_of(['--chat'])).toContain('a')
+	})
+})
+
 // The frame of a read carrying the throughput rows.
 async function throughput_frame(argv: Array<string>): Promise<string> {
 	const local = { ...LOCAL, events: [LAUNCH], throughput: [IDLE_ROW] }

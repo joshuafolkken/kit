@@ -1,3 +1,4 @@
+import type { Icons } from './run-board-icons'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyInput, KeyReading } from './run-board-keys'
 import { run_board_rain, type RainCell, type Random } from './run-board-rain'
@@ -51,10 +52,14 @@ function* beats_of(frame: string, random: Random): Generator<Beat> {
 }
 
 // The last frame drawn as the theme drew it, where the theme rains; none elsewhere.
-function drawn_of(frame: string | undefined, theme: Theme | undefined): string | undefined {
+function drawn_of(
+	frame: string | undefined,
+	theme: Theme | undefined,
+	icons: Icons | undefined,
+): string | undefined {
 	if (frame === undefined || theme === undefined || !RAIN_THEMES.has(theme)) return undefined
 
-	return run_board_theme.restyle(theme, frame)
+	return run_board_theme.restyle(theme, frame, icons)
 }
 
 // The last frame wiped, a key ending it at once; nothing plays without a frame, a rain theme, color or
@@ -65,7 +70,7 @@ async function wipe(
 	keys: KeyReading,
 	theme: Theme | undefined,
 ): Promise<void> {
-	const drawn = drawn_of(frame, theme)
+	const drawn = drawn_of(frame, theme, ports.icons)
 	const { random, is_colored } = ports.rain ?? LIVE_RAIN
 	if (drawn === undefined || !is_colored()) return
 

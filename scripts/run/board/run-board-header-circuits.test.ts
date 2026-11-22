@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_header_time } from './run-board-header-time'
+import type { Icons } from './run-board-icons'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout } from './run-board-layout'
 import type { Phase } from './run-board-phase'
@@ -51,12 +52,12 @@ function circuits(extra: Partial<BoardHeader> = {}): BoardHeader {
 }
 
 // The header as a live frame draws it: its placeholders drawn — the clocks' colons lit
-// (joshuafolkken/kit#8476) — then the theme.
-function drawn(board: BoardHeader, theme?: Theme): Array<string> {
+// (joshuafolkken/kit#8476) — then the theme in its icons.
+function drawn(board: BoardHeader, theme?: Theme, icons?: Icons): Array<string> {
 	return run_board_header
 		.header_lines({ ...board, theme })
 		.map((line) => run_board_spot.drawn(line, SPINNER))
-		.map((line) => stripVTControlCharacters(run_board_theme.restyle(theme, line)))
+		.map((line) => stripVTControlCharacters(run_board_theme.restyle(theme, line, icons)))
 }
 
 describe('run_board_header.header_lines time circuits', () => {
@@ -87,7 +88,7 @@ describe('run_board_header.header_lines time circuits', () => {
 
 describe('run_board_header.header_lines time circuits in a theme', () => {
 	it.each(['wargames', 'matrix'] as const)('draws %s’s clocks ET / NW / T0', (theme) => {
-		const lines = drawn(circuits(), theme)
+		const lines = drawn(circuits(), theme, 'letters')
 
 		expect(lines[0]).toContain(`ET ${minute_of(NOW + 15 * MINUTE)}  -  15′00″`)
 		expect(lines[1]).toContain(`NW ${minute_of(NOW)}  +2°10′00″`)
@@ -96,6 +97,19 @@ describe('run_board_header.header_lines time circuits in a theme', () => {
 			new RegExp(String.raw`T0 ${minute_of(STARTED)}  \S {10}RN 1 RUNNING$`, 'u'),
 		)
 	})
+
+	it.each(['wargames', 'matrix'] as const)(
+		'draws %s’s clocks -> / () / ^^ in shapes (#8505)',
+		(theme) => {
+			const lines = drawn(circuits(), theme, 'shapes')
+
+			expect(lines[0]).toContain(`-> ${minute_of(NOW + 15 * MINUTE)}  -  15′00″`)
+			expect(lines[1]).toContain(`() ${minute_of(NOW)}  +2°10′00″`)
+			expect(lines[2]).toMatch(
+				new RegExp(String.raw`\^\^ ${minute_of(STARTED)}  \S {10}>> 1 RUNNING$`, 'u'),
+			)
+		},
+	)
 })
 
 describe('run_board_header_time.time_parts width', () => {
