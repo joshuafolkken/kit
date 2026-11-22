@@ -7,6 +7,7 @@ import { run_board_data_ports } from './run-board-data-ports'
 import { run_board_every } from './run-board-every'
 import { run_board_exit_record } from './run-board-exit-record'
 import { run_board_fold_store } from './run-board-fold-store'
+import { run_board_frame_preview } from './run-board-frame-preview'
 import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
@@ -39,8 +40,8 @@ const FRESH_FLAG = '--fresh'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const { SIGINT_EXIT_CODE, SIGTERM_EXIT_CODE } = run_board_exit_record
-const USAGE =
-	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--timing]'
+const { FRAME_FLAG, FRAME_USAGE } = run_board_frame_preview
+const USAGE = `Usage: josh run:board [--once | --chat [--fresh] | --every <minutes> | ${FRAME_USAGE}] [--theme wargames|matrix] [--timing]`
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const { FRESH_STATE, tick } = run_board_tick
 const { CHAT_KEY, fresh } = run_board_frame_store
@@ -260,8 +261,35 @@ async function draw(
 	else await draw_still(ports, theme, is_timing)
 }
 
+// `--frame`: one frame in the state its flags fix (`run-board-frame-preview.ts`).
+async function draw_frame(
+	rest: ReadonlyArray<string>,
+	ports: BoardPorts,
+	theme: Theme | undefined,
+): Promise<number> {
+	const options = run_board_frame_preview.options_of(rest)
+
+	if (options === undefined) return refuse()
+	await run_board_frame_preview.draw(ports, options, theme)
+
+	return SUCCESS_EXIT_CODE
+}
+
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
 	return flag === EVERY_FLAG && rest.length === 1
+}
+
+// The modes that answer their own exit code — `--every` and `--frame` — else undefined.
+async function own_answer(
+	flag: string,
+	rest: ReadonlyArray<string>,
+	ports: BoardPorts | undefined,
+	theme: Theme | undefined,
+): Promise<number | undefined> {
+	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
+	if (flag === FRAME_FLAG) return await draw_frame(rest, ports_for(ports, false, theme), theme)
+
+	return undefined
 }
 
 function is_fresh_chat(flag: string, rest: ReadonlyArray<string>): boolean {
@@ -298,7 +326,9 @@ async function run(given: ReadonlyArray<string>, ports?: BoardPorts): Promise<nu
 	if (choice === undefined) return refuse(run_board_theme.refusal(argv, environment))
 	const [flag = '', ...rest] = choice.argv
 
-	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
+	const answered = await own_answer(flag, rest, ports, choice.theme)
+
+	if (answered !== undefined) return answered
 	if (is_refused(flag, rest)) return refuse()
 
 	await draw(flag, chat_ports(flag, rest, ports), choice.theme, is_timing)

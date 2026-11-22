@@ -11,7 +11,8 @@ import { run_board_standing, type StandingHeader } from './run-board-standing'
 // one, then what holds over frames (`run-board-standing.ts`), else the last notice the board picked —
 // its cue's icon, what sounded it, when, `×2` where it sounded again — faint once its cause no longer
 // holds (joshuafolkken/kit#8475). Every frame draws the slot; `--once`, `--chat` and Telegram read no
-// switch and draw the slot without it.
+// switch and draw the slot without it. `--frame` draws the switch and the notice its flags fix
+// (`run-board-frame-preview.ts`).
 
 const { STATE_ICONS, minute_of } = run_board_labels
 const SOUND_ON = '🔊'

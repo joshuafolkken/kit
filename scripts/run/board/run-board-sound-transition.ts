@@ -148,7 +148,13 @@ function held_causes(snapshot: SoundSnapshot): Array<Cause> {
 	return [...snapshot.rows.values(), ...[...snapshot.run].map((condition) => RUN_SOUNDS[condition])]
 }
 
-const run_board_sound_transition = { cause_of, held_causes, loudest_cause, snapshot_of }
+const run_board_sound_transition = {
+	ROW_SOUNDS,
+	cause_of,
+	held_causes,
+	loudest_cause,
+	snapshot_of,
+}
 
 export { run_board_sound_transition }
 export type { Cause, SoundHeader, SoundSnapshot }
