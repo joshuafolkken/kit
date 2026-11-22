@@ -175,15 +175,16 @@ function stale_text(reading: QuotaReading, now_ms: number): string | undefined {
 }
 
 // A single `—` where the provider reported no window, so none read stays apart from 0%, in the window
-// label's column.
-function cells_text(reading: QuotaReading | undefined, now_ms: number): string {
+// label's column. Gauge-less where `is_short` (joshuafolkken/kit#8695).
+function cells_text(reading: QuotaReading | undefined, now_ms: number, is_short: boolean): string {
 	const windows = windows_of(reading)
 
 	if (windows.length === 0) return run_board_render_quota_cell.label_cell(NONE)
+	const cells = windows.map((window) => cell_of(window, now_ms, per_task_in(reading, window)))
 
-	return run_board_render_quota_cell.row_text(
-		windows.map((window) => cell_of(window, now_ms, per_task_in(reading, window))),
-	)
+	return is_short
+		? run_board_render_quota_cell.short_row_text(cells)
+		: run_board_render_quota_cell.row_text(cells)
 }
 
 // A provider row's body and the age note it ends on, which a lamp panel may leave off
@@ -194,8 +195,12 @@ interface RowText {
 }
 
 // Age annotates the observation; values and warning colors remain readable as it ages.
-function reading_text(reading: QuotaReading | undefined, now_ms: number): RowText {
-	const cells = cells_text(reading, now_ms)
+function reading_text(
+	reading: QuotaReading | undefined,
+	now_ms: number,
+	is_short: boolean,
+): RowText {
+	const cells = cells_text(reading, now_ms, is_short)
 	const stale = reading?.windows.length ? stale_text(reading, now_ms) : undefined
 	if (stale === undefined) return { text: cells }
 
@@ -234,12 +239,12 @@ function name_cell(name: string): string {
 }
 
 // Claude's row reads its hold while a usage limit or an authentication failure stops the run's launches.
-function row_of(provider: QuotaProvider, view: QuotaView): RowText {
+function row_of(provider: QuotaProvider, view: QuotaView, is_short: boolean): RowText {
 	const { hold, now_ms } = view
 	const body =
 		provider === 'claude' && hold !== undefined
 			? { text: hold_text(hold, now_ms) }
-			: reading_text(view.quotas?.[provider], now_ms)
+			: reading_text(view.quotas?.[provider], now_ms, is_short)
 	const text = run_board_row_key.flashed(
 		`${INDENT}${name_cell(name_of(provider, view))}${body.text}`,
 		`quota:${provider}`,
@@ -271,23 +276,23 @@ function counts_text(reading: QuotaReading | undefined, now_ms: number): string 
 	return ` ${COUNT_MARK}${texts.join('/')}`
 }
 
-// Nothing where the allowances could not be read.
-function rate_limit_rows(view: QuotaView): Array<string> {
+// Nothing where the allowances could not be read; gauge-less, starting the panel's sixth row, where the
+// frame `has_lamps` (joshuafolkken/kit#8695).
+function rate_limit_rows(view: QuotaView, has_lamps: boolean): Array<string> {
 	const { rate_limit, now_ms } = view
 	if (rate_limit === undefined) return []
 
-	const body = run_board_render_quota_github.row_text(rate_limit, now_ms)
+	const body = run_board_render_quota_github.row_text(rate_limit, now_ms, has_lamps)
+	const text = run_board_row_key.flashed(
+		`${INDENT}${name_cell(name_of('github', view))}${body}`,
+		'quota:github',
+		view.is_flash_keyed,
+	)
 
-	return [
-		run_board_row_key.flashed(
-			`${INDENT}${name_cell(name_of('github', view))}${body}`,
-			'quota:github',
-			view.is_flash_keyed,
-		),
-	]
+	return [run_board_quota_lamps.github_row(text, has_lamps)]
 }
 
-// `GitHub REST 38% 1877/5000 ↻12:33 · ▶ GraphQL 1% 48/5000 ↻12:40`.
+// `GitHub REST 38% 1877/5000 ↻12:33 · ▶ GQL 1% 48/5000 ↻12:40`.
 function rate_limit_summary(view: QuotaView): Array<string> {
 	const { rate_limit, now_ms } = view
 	if (rate_limit === undefined) return []
@@ -307,9 +312,16 @@ function summary_of(view: QuotaView): string {
 	return [...parts, ...rate_limit_summary(view)].join(SEPARATOR)
 }
 
+// Under a lamp panel the provider rows go gauge-less together where one draws two windows, which would
+// reach the panel (joshuafolkken/kit#8695); a row of one window fits beside it with its gauge.
+function is_short_of(view: QuotaView, has_lamps: boolean): boolean {
+	return has_lamps && PROVIDERS.some((provider) => windows_of(view.quotas?.[provider]).length > 1)
+}
+
 // The provider rows, the first two starting their panels where the frame `has_lamps`, then GitHub's.
 function usage_lines(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
-	const providers = providers_of(view).map((provider) => row_of(provider, view))
+	const is_short = is_short_of(view, has_lamps)
+	const providers = providers_of(view).map((provider) => row_of(provider, view, is_short))
 	const texts = run_board_quota_lamps.provider_rows(
 		providers.map((row) => row.text),
 		has_lamps,
@@ -321,7 +333,7 @@ function usage_lines(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
 			is_detail: false,
 			aside: has_lamps ? providers[index]?.aside : undefined,
 		})),
-		...rate_limit_rows(view).map((text) => ({ text, is_detail: false })),
+		...rate_limit_rows(view, has_lamps).map((text) => ({ text, is_detail: false })),
 	]
 }
 

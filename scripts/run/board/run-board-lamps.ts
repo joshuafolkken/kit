@@ -4,9 +4,10 @@ import { run_board_labels, type Paint, type TextColor } from './run-board-labels
 import { run_board_spot } from './run-board-spot'
 
 // The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): from two columns past the
-// throughput rows' NOW, a `■` every other column up to the section's rule, on five rows — the `24h` and
-// `7d` rows, the blank line under them, and the usage section's first two provider rows
-// (joshuafolkken/kit#8277) — lit yellow, yellow, red, yellow, red from the top, out on every row at half
+// throughput rows' NOW, a `■` every other column up to the section's rule, on six rows — the `24h` and
+// `7d` rows, the blank line under them, the usage section's first two provider rows
+// (joshuafolkken/kit#8277) and GitHub's row (joshuafolkken/kit#8695) — lit yellow, yellow, red, yellow,
+// red, yellow from the top, out on every row at half
 // yellow, dimmed (named `yellow` dimmed where the terminal has no 24-bit color; joshuafolkken/kit#8305).
 // Lamps blink four to a group, each group on its own period and phase, about four in ten lit; whether
 // one is lit is read off the moment, its group and its place alone.
@@ -37,9 +38,9 @@ const OUT_DIVISOR = 2
 type Shade = Exclude<Paint, TextColor>
 const { red, yellow } = GAUGE_SHADES
 // The panel's rows from the top: the `24h` and `7d` rows (`0`, `1`), the blank line under them, and the
-// usage section's first two provider rows.
-const PANEL_ROWS = { gap: 2, first_usage: 3, second_usage: 4 }
-const SHADES: ReadonlyArray<Shade> = [yellow, yellow, red, yellow, red]
+// usage section's first two provider rows, then GitHub's.
+const PANEL_ROWS = { gap: 2, first_usage: 3, second_usage: 4, github: 5 }
+const SHADES: ReadonlyArray<Shade> = [yellow, yellow, red, yellow, red, yellow]
 
 // Where a panel starts and the column its rule ends at.
 interface PanelSpan {

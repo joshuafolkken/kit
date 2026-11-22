@@ -1,3 +1,4 @@
+import { run_board_cut_styled } from './run-board-cut-styled'
 import {
 	run_board_fit,
 	type DetailPart,
@@ -10,6 +11,7 @@ import {
 import { run_board_flash_parts } from './run-board-flash-parts'
 import { run_board_lamps, type PanelSpan } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
+import { run_board_spot } from './run-board-spot'
 
 // A live `run:board`'s sections folded and unfolded by one key each (joshuafolkken/kit#4172): every
 // section starts as the last board left it, and what a person folds is saved to `~/.claude/josh/board.json`
@@ -158,6 +160,9 @@ function widened_parts(parts: FrameParts): FrameParts {
 
 // No panel: every panel started is dropped.
 const NO_PANEL: PanelSpan = { start: 0, end: 0 }
+const { LAMP_START } = run_board_spot
+// A cut row's last column and the blank after it, before the panel's start.
+const CUT_GAP = 2
 
 // Every panel starts where the throughput rows' does and runs on to the end of the throughput rule, its
 // head's widest line (joshuafolkken/kit#8236, joshuafolkken/kit#8277); none where no throughput row starts
@@ -185,10 +190,6 @@ function is_line_clear(line: DetailLine, span: PanelSpan): boolean {
 	return column === undefined || column < span.start
 }
 
-function is_clear(lines: ReadonlyArray<DetailLine>, span: PanelSpan): boolean {
-	return lines.every((line) => is_line_clear(line, span))
-}
-
 // A line reaching the panel's start with the trailing note its text ends on left off; one clear of it
 // keeps its note.
 function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
@@ -199,16 +200,27 @@ function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
 	return { ...line, text: `${text.slice(0, index)}${text.slice(index + aside.length)}` }
 }
 
-// The usage rows run their panels both or neither: where one's text reaches the panel's start, the
-// reaching rows' asides — a stale reading's age — are left off so both run them
-// (joshuafolkken/kit#8644); none where one reaches it still, or where the span has no room for a panel.
+// A line reaching the panel's start still, cut a blank short of it with its panel's start kept: the
+// panel is always kept beside the usage rows (joshuafolkken/kit#8695).
+function cut_line(line: DetailLine, span: PanelSpan): DetailLine {
+	const { text } = line
+	if (is_line_clear(line, span)) return line
+
+	const index = text.indexOf(LAMP_START)
+	const before = run_board_cut_styled.cut_styled(text.slice(0, index), span.start - CUT_GAP)
+
+	return { ...line, text: `${before} ${text.slice(index)}` }
+}
+
+// The usage rows run their panels on every row: where one's text reaches the panel's start, the
+// reaching rows' asides — a stale reading's age — are left off first (joshuafolkken/kit#8644), then a
+// row reaching it still is cut (joshuafolkken/kit#8695); none where the span has no room for a panel.
 function rows_fit(usage: DetailPart, span: PanelSpan): RowsFit {
 	if (run_board_lamps.count_of(span.end - span.start) === 0) return { usage, rows: NO_PANEL }
-	if (is_clear(usage.lines, span)) return { usage, rows: span }
 
-	const bare = { ...usage, lines: usage.lines.map((line) => without_aside(line, span)) }
+	const lines = usage.lines.map((line) => cut_line(without_aside(line, span), span))
 
-	return is_clear(bare.lines, span) ? { usage: bare, rows: span } : { usage, rows: NO_PANEL }
+	return { usage: { ...usage, lines }, rows: span }
 }
 
 // The usage rule's row started as a panel row where the panel rains and the rows under it run theirs

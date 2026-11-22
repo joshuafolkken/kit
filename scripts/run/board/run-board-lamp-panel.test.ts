@@ -37,6 +37,7 @@ const SAMPLE_RULE_WIDTH = 114
 const SAMPLE_ROW_END = 67
 const SAMPLE_LAMP_COLUMN = 70
 const SAMPLE_LAMPS = 23
+const PANEL_ROWS = 6
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -147,9 +148,11 @@ function panel_parts(usage_rows: ReadonlyArray<string>, has_panel: boolean): Fra
 		now_ms: START,
 		has_lamps: has_panel,
 	})
-	const lines = run_board_quota_lamps
-		.provider_rows(usage_rows, has_panel)
-		.map((text) => ({ text, is_detail: false }))
+	const [github = '', ...providers] = usage_rows.toReversed()
+	const lines = [
+		...run_board_quota_lamps.provider_rows(providers.toReversed(), has_panel),
+		run_board_quota_lamps.github_row(github, has_panel),
+	].map((text) => ({ text, is_detail: false }))
 
 	return {
 		above: [],
@@ -184,35 +187,35 @@ function lamp_starts(lines: ReadonlyArray<string>): Array<number> {
 		.map((line) => width_of(line.split(LAMP)[0] ?? ''))
 }
 
-describe('the lamp panel’s five rows (joshuafolkken/kit#8277)', () => {
-	it('runs on throughput’s two rows, the blank line and usage’s first two rows alike', () => {
+describe('the lamp panel’s six rows (joshuafolkken/kit#8277, joshuafolkken/kit#8695)', () => {
+	it('runs on throughput’s two rows, the blank line, usage’s first two rows and GitHub’s alike', () => {
 		const lines = panel_frame(ROWS_TEXT)
 		const lamped = lines.filter((line) => line.includes(LAMP))
 		const [start] = lamp_starts(lines)
 		const leads = lamped.slice(2).map((line) => line.slice(0, line.indexOf(LAMP)).trimEnd())
 
-		expect(lamped).toHaveLength(5)
-		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: 5 }, () => start))
+		expect(lamped).toHaveLength(PANEL_ROWS)
+		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: PANEL_ROWS }, () => start))
 		for (const line of lamped) expect(line.split(LAMP)).toHaveLength(PANEL_LAMPS + 1)
-		expect(leads).toStrictEqual(['', ...ROWS_TEXT.slice(0, 2)])
+		expect(leads).toStrictEqual(['', ...ROWS_TEXT])
 	})
 
-	it('draws none on GitHub’s row or the usage rule', () => {
-		const unlit = panel_frame(ROWS_TEXT).filter(
-			(text) => text.includes('GITHUB') || text.includes('usage'),
-		)
+	it('draws none on the usage rule', () => {
+		const unlit = panel_frame(ROWS_TEXT).filter((text) => text.includes('usage'))
 
-		expect(unlit).toHaveLength(2)
+		expect(unlit).toHaveLength(1)
 		expect(unlit.join('')).not.toContain(LAMP)
 	})
 
-	it('drops both usage rows’ lamps where one row reaches the panel, keeping the throughput three', () => {
-		const long = 'x'.repeat(width_of(texts(false)[0] ?? '') + 1)
+	it('cuts a row reaching the panel a blank short of it, keeping every row’s lamps', () => {
+		const start = width_of(texts(false)[0] ?? '') + GAP
+		const long = 'x'.repeat(start + 1)
 		const lines = panel_frame([ROWS_TEXT[0] ?? '', long, ROWS_TEXT[2] ?? ''])
+		const cut = lines.find((line) => line.startsWith('x')) ?? ''
 
-		expect(lines.filter((line) => line.includes(LAMP))).toHaveLength(3)
-		expect(lines).toContain(long)
-		expect(lines).toContain(ROWS_TEXT[0])
+		expect(lines.filter((line) => line.includes(LAMP))).toHaveLength(PANEL_ROWS)
+		expect(cut.slice(0, cut.indexOf(LAMP))).toBe(`${'x'.repeat(start - GAP)}${' '.repeat(GAP)}`)
+		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: PANEL_ROWS }, () => start))
 	})
 
 	it('gives way with the throughput rows: a pane that cuts them draws the usage rows unlit', () => {
