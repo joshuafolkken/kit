@@ -62,6 +62,17 @@ describe('visual_check_lint.problems — passed', () => {
 	it('passes a criterion asking a person to look when the pre-merge reason is declared', () => {
 		expect(visual_check_lint.problems(body_with([REASON], [VISUAL_CRITERION]))).toStrictEqual([])
 	})
+})
+
+describe('visual_check_lint.problems — the looker named another way', () => {
+	it.each([
+		'- [ ] マージ前にユーザーが実ボードの見た目を確認している',
+		'- [ ] レビュアーが目視で表示を確かめている',
+		'- [ ] 手動で見た目を確認している',
+		'- [ ] A reviewer has checked the visual layout before merge',
+	])('refuses a criterion naming the looker another way: %s', (criterion) => {
+		expect(visual_check_lint.problems(body_with([NOT_NEEDED], [criterion]))).toHaveLength(1)
+	})
 
 	it('refuses an unfilled placeholder reason', () => {
 		const placeholder = '- マージ前の目視の理由: <理由>'

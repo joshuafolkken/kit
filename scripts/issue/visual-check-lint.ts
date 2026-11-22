@@ -20,7 +20,37 @@ const PLACEHOLDER_PREFIX = '<'
 const VISUAL = /目視|見た目|visual|appearance/iu
 // A criterion is refused only when it names the person who looks: a line that merely mentions a visual
 // check, or rules one out, is not one only a person can meet.
-const PERSON = /人が|人の目|人間|human|person|manual/iu
+const PERSON_TERMS = [
+	'人が',
+	'人の目',
+	'人間',
+	'人手',
+	'手動',
+	'ユーザー',
+	'利用者',
+	'レビュア',
+	'レビューア',
+	'あなた',
+	'担当者',
+	'オーナー',
+]
+const PERSON_WORDS = new Set([
+	'human',
+	'person',
+	'people',
+	'user',
+	'users',
+	'reviewer',
+	'reviewers',
+	'maintainer',
+	'maintainers',
+	'owner',
+	'owners',
+	'you',
+	'manual',
+	'manually',
+])
+const NON_LETTERS = /[^a-z]+/u
 // The template's other judgement kinds: a reason naming one is not a visual check alone.
 const OTHER_JUDGEMENT = /方針|外部|アカウント|policy|external|account/iu
 
@@ -40,13 +70,22 @@ function judgement_problem(body: string): string | undefined {
 	return `\`${JUDGEMENT_NEEDED}\` names only a pre-merge visual check — ${REWRITE}`
 }
 
+function names_person(line: string): boolean {
+	if (PERSON_TERMS.some((term) => line.includes(term))) return true
+
+	return line
+		.toLowerCase()
+		.split(NON_LETTERS)
+		.some((word) => PERSON_WORDS.has(word))
+}
+
 function criteria_problems(body: string): ReadonlyArray<string> {
 	const section = markdown_section.section_lines(body, CRITERIA_HEADING).join('\n')
 
 	return markdown_section
 		.unfenced_lines(section)
 		.map((line) => line.trim())
-		.filter((line) => VISUAL.test(line) && PERSON.test(line))
+		.filter((line) => VISUAL.test(line) && names_person(line))
 		.map((line) => `a criterion asks a person to look: \`${line}\` — ${REWRITE}`)
 }
 
