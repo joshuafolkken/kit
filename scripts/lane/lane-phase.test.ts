@@ -84,6 +84,13 @@ describe('mark_implement — resume scope', () => {
 		expect(emit).toHaveBeenCalledTimes(2)
 	})
 
+	it('does not write again after a gate resume', async () => {
+		await lane_phase.mark_implement(LANE, source)
+		push_event('resume', `#${ISSUE} resumed (gate)`)
+		await lane_phase.mark_implement(LANE, source)
+		expect(emit).toHaveBeenCalledOnce()
+	})
+
 	it('ignores another issue resuming', async () => {
 		await lane_phase.mark_implement(LANE, source)
 		push_event('resume', '#34440 resumed')

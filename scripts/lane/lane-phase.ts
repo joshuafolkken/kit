@@ -30,14 +30,20 @@ function is_implement_event(event: RunEvent): boolean {
 	)
 }
 
-// The current session's events: since its launch, or since its resume when a cut was adopted, so a
-// resumed session marks its own first edit (`lane:stats` → `resume → progress`, joshuafolkken/kit#8583).
+// A resume back into implementation. A gate resume re-arms nothing: its progress is the ship launch, and
+// an edit after it would redraw a running ship as implementing.
+function is_implementation_resume(event: RunEvent, issue: string): boolean {
+	return run_event_resume.is_resume_of(event, issue) && !run_event_resume.is_gate_resume(event)
+}
+
+// The current session's events: since its launch, or since its implementation resume, so a resumed
+// session marks its own first edit (`lane:stats` → `resume → progress`, joshuafolkken/kit#8583).
 function since_own_session(
 	events: ReadonlyArray<RunEvent>,
 	issue: string,
 ): ReadonlyArray<RunEvent> {
 	const attempt = run_event_scope.since_own_launch(events, issue)
-	const resume = attempt.findLastIndex((event) => run_event_resume.is_resume_of(event, issue))
+	const resume = attempt.findLastIndex((event) => is_implementation_resume(event, issue))
 
 	return attempt.slice(resume + 1)
 }
