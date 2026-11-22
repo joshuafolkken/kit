@@ -176,6 +176,8 @@ interface BoardView {
 	rules?: ReadonlyArray<RuleCell> | undefined
 	// Where the last frame has a lamp strip above a section rule, filled as a row types (`run-board-strip.ts`).
 	strips?: ReadonlyArray<StripCell> | undefined
+	// Where the last frame drew its header clocks' colons, blinked between redraws (`run-board-colon.ts`).
+	colons?: ReadonlyArray<Spot> | undefined
 	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
 	typing: Typing
 	// The rows and run conditions the last frame sounded over, and the standing cue waiting to replay

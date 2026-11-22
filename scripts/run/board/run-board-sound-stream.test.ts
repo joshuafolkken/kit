@@ -147,10 +147,14 @@ describe('run_board_sound_stream fallback', () => {
 		const spawner = vi.fn().mockReturnValueOnce(first.child).mockReturnValueOnce(second.child)
 		const started = vi.fn()
 
-		run_board_sound_player.loop(audio_file(), { started, failed: vi.fn() }, 'linux', {
-			...first.ports,
-			spawner,
-		})
+		run_board_sound_player.loop(
+			audio_file(),
+			{ started, failed: vi.fn() },
+			{
+				platform: 'linux',
+				ports: { ...first.ports, spawner },
+			},
+		)
 		first.events.dispatchEvent(new Event('error'))
 		await setImmediate()
 

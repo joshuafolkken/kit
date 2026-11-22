@@ -110,7 +110,9 @@ describe('run_board_tick.tick over a worker round that threw', () => {
 
 describe('run_board_render.render_no_run over failed reads', () => {
 	it('cuts a long reason so the line keeps to its width', () => {
-		const [line = ''] = render_no_run(START, {}, { read_failed_ms: START, read_error: LONG_REASON })
+		const [line = ''] = render_no_run(START, {
+			failure: { read_failed_ms: START, read_error: LONG_REASON },
+		})
 		const drawn = stripVTControlCharacters(line)
 
 		expect(drawn).toContain(`${'x'.repeat(REASON_LIMIT - 1)}…`)
@@ -118,7 +120,7 @@ describe('run_board_render.render_no_run over failed reads', () => {
 	})
 
 	it('ends on the minute when the failure carries no reason', () => {
-		const [line = ''] = render_no_run(START, {}, { read_failed_ms: START, read_error: '' })
+		const [line = ''] = render_no_run(START, { failure: { read_failed_ms: START, read_error: '' } })
 
 		expect(stripVTControlCharacters(line)).toMatch(/❗ read \d{2}:\d{2}$/u)
 	})

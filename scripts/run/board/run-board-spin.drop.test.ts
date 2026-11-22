@@ -98,3 +98,33 @@ describe('run_board_spin — the drop between redraws (joshuafolkken/kit#8367)',
 		expect(themed.every((text) => text === '')).toBe(true)
 	})
 })
+
+// joshuafolkken/kit#8370: a typing row is written over the drops of its own turn, above the rain.
+describe('run_board_spin — a typing row over the drop', () => {
+	it('writes the typing row after the drop on the same turn', async () => {
+		const order: Array<string> = []
+		const { ports } = drop_ports(START)
+		const keyed = [{ key: 'now:A', index: 0, row: 1, text: 'ABCDEF', prefix_columns: 0 }]
+		const frame = { keyed, known: new Set(['now:A']) }
+		const base = run_board_type_rows.next(
+			NO_TYPING,
+			{ keyed: [], known: new Set<string>() },
+			START,
+			true,
+		)
+		const typing = run_board_type_rows.next(base, frame, START, true)
+		const sequenced = {
+			...ports,
+			write: (raw: string) => {
+				order.push(raw.includes('\u{1B}[1;1HA') ? 'typed' : 'other')
+			},
+			write_drawn: () => {
+				order.push('drop')
+			},
+		}
+
+		await spin_to_second({ spots: [], typing, drop: SCREEN }, sequenced)
+
+		expect(order.slice(0, 2)).toStrictEqual(['drop', 'typed'])
+	})
+})

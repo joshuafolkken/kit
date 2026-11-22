@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#3430: the board's top lines — which state wins, what the plan line says when a
 // fetch has failed, and how the progress counts are drawn from the layout. joshuafolkken/kit#3444: two
@@ -68,8 +69,11 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 	}
 }
 
+// The header's lines with a live frame's clock colons drawn lit (joshuafolkken/kit#8476).
 function lines_of(board: BoardHeader): Array<string> {
-	return run_board_header.header_lines(board).map((line) => stripVTControlCharacters(line))
+	return run_board_header
+		.header_lines(board)
+		.map((line) => stripVTControlCharacters(run_board_spot.drawn(line, run_board_spot.SPOT)))
 }
 
 function title_of(board: BoardHeader): string {

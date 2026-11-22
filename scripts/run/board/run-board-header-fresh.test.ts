@@ -4,6 +4,7 @@ import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#3784: the header's third line's time and words are emphasized for about three
 // seconds after they update — on a live screen only.
@@ -66,7 +67,10 @@ describe('run_board_header.header_lines fresh event', () => {
 	it('keeps every column where it stands while an event is fresh', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const plain = beating(0, { spinner: undefined }).map((line) => stripVTControlCharacters(line))
-		const fresh = beating(0).map((line) => stripVTControlCharacters(line))
+		// A live frame draws its clocks' colons lit (joshuafolkken/kit#8476).
+		const fresh = beating(0).map((line) =>
+			stripVTControlCharacters(run_board_spot.drawn(line, SPINNER)),
+		)
 
 		expect(fresh.slice(0, 2)).toStrictEqual(plain.slice(0, 2))
 	})

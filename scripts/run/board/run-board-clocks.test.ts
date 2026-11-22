@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_clocks, type ClockHeader } from './run-board-clocks'
 import { run_board_labels } from './run-board-labels'
+import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#8478: the header's clock column — the finish over now over the start, all dated once
 // one falls on another day, the finish `--:--` where none is known and the end once the run ended. The
@@ -15,7 +16,7 @@ const NOW = new Date(2026, 10, 22, 12, 0).getTime()
 const STARTED = NOW - HOUR
 
 function header(extra: Partial<ClockHeader> = {}): ClockHeader {
-	return { now_ms: NOW, started_ms: STARTED, ended_ms: undefined, ...extra }
+	return { now_ms: NOW, started_ms: STARTED, ended_ms: undefined, form: 'screen', ...extra }
 }
 
 describe('run_board_clocks.clocks_of', () => {
@@ -53,5 +54,34 @@ describe('run_board_clocks.clocks_of finish and start', () => {
 		const ended = NOW - MINUTE
 
 		expect(clocks_of(header({ ended_ms: ended }), NOW + HOUR)[0]).toBe(`🎯 ${minute_of(ended)}`)
+	})
+})
+
+// joshuafolkken/kit#8476: a live screen's running clocks carry their colons as placeholders the spin
+// blinks; an ended run's, a chat's and a frame with no spinner keep them lit.
+const LIVE = { spinner: run_board_spot.SPOT }
+
+function marked(ms: number): string {
+	return minute_of(ms).split(':').join(run_board_spot.COLON)
+}
+
+describe('run_board_clocks.clocks_of colons', () => {
+	it('marks every running clock’s colon on a live screen, with no color of its own', () => {
+		const finish = NOW + HOUR
+
+		expect(clocks_of(header(LIVE), finish)).toStrictEqual([
+			`🎯 ${marked(finish)}`,
+			`🕒 ${marked(NOW)}`,
+			`🚀 ${marked(STARTED)}`,
+		])
+		expect(clocks_of(header(LIVE), finish).join('')).not.toContain('\u{1B}')
+	})
+
+	it('keeps the colons lit once the run ended, in a chat and with no spinner', () => {
+		const ended = clocks_of(header({ ...LIVE, ended_ms: NOW - MINUTE }), undefined)
+		const chat = clocks_of(header({ ...LIVE, form: 'chat' }), undefined)
+		const still = clocks_of(header(), undefined)
+
+		for (const clocks of [ended, chat, still]) expect(clocks[1]).toBe(`🕒 ${minute_of(NOW)}`)
 	})
 })

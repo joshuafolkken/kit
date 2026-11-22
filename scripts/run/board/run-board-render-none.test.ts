@@ -17,13 +17,13 @@ describe('run_board_render_none.render_no_run', () => {
 	})
 
 	it('says why the read failed in place of no run', () => {
-		const [line = ''] = render_no_run(NOW, {}, { read_failed_ms: NOW, read_error: 'gone' })
+		const [line = ''] = render_no_run(NOW, { failure: { read_failed_ms: NOW, read_error: 'gone' } })
 
 		expect(line).not.toContain(WORDS.no_run)
 		expect(line).toContain('gone')
 	})
 
 	it('ends on the footer it is given', () => {
-		expect(render_no_run(NOW, { footer: FOOTER }).at(-1)).toBe('footer')
+		expect(render_no_run(NOW, { bounds: { footer: FOOTER } }).at(-1)).toBe('footer')
 	})
 })

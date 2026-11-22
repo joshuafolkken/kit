@@ -11,7 +11,7 @@ import type { BoardNote } from './run-board-notes'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
-import { run_board_spin, type Spun } from './run-board-spin'
+import { run_board_spin, type Spot, type Spun } from './run-board-spin'
 import { run_board_standing } from './run-board-standing'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
@@ -114,7 +114,11 @@ function bounds_of(ports: DrawPorts): FrameBounds {
 
 // A drawn frame, every note it was drawn from — shown or not (joshuafolkken/kit#8117) — and the pane it
 // was kept within.
-type Drawn = Spun & { notes: ReadonlyArray<BoardNote>; size: TerminalSize | undefined }
+type Drawn = Spun & {
+	notes: ReadonlyArray<BoardNote>
+	size: TerminalSize | undefined
+	colons: ReadonlyArray<Spot>
+}
 
 // The theme rows whose lamp choice the panel reads.
 type LampDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'lamps'>>>>
@@ -199,8 +203,11 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		...bounds,
 	})
 	const spun = run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
+	// joshuafolkken/kit#8476: the clocks' colons found as the theme draws them, in its colors.
+	const themed = lines.map((line) => run_board_theme.restyle(redraw.ports.theme, line))
+	const colons = run_board_spin.colons_in(themed, bounds.size)
 
-	return { ...spun, notes, size: bounds.size }
+	return { ...spun, notes, size: bounds.size, colons }
 }
 
 // Whether a drop falls down the board between redraws: a live board on a terminal drawing color, in a
@@ -257,6 +264,13 @@ function draw(ports: Pick<DrawPorts, 'write'>, lines: ReadonlyArray<string>): vo
 	ports.write(`${lines.join('\n')}\n`)
 }
 
+// The places the frame drew that the spin turns between redraws.
+function turned_of(drawn: Drawn): Pick<Drawn, 'spots' | 'sweep' | 'lamps' | 'traces' | 'colons'> {
+	const { spots, sweep, lamps, traces, colons } = drawn
+
+	return { spots, sweep, lamps, traces, colons }
+}
+
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the
 // frame is written, so the notice shows on the frame it sounds on — and the trill switched on while a
 // row types, apart from the cue, so both sound on one frame (joshuafolkken/kit#8250).
@@ -273,11 +287,10 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 		run_board_type_rows.left_ms(typing, redraw.now_ms),
 	)
 
-	const { spots, sweep, lamps, traces } = drawn
 	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
 	const drop = drop_of(redraw, drawn, typing, state.drop)
 
-	return { ...state, ...display.carried, spots, sweep, lamps, traces, ...decoded, typing, drop }
+	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop }
 }
 
 const run_board_tick_draw = {

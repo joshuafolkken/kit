@@ -59,7 +59,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--icons emoji|letters|shapes] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wargames|matrix] [--icons emoji|letters|shapes] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -80,6 +80,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: MATRIX_THEME, note: 'green phosphor text and the TRACE gauge' },
 				{ arguments: '--icons letters', note: 'every icon as two-letter capitals' },
 				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
+				{ arguments: '--frame --mute', note: 'one live frame, muted, at a fixed size' },
 			],
 			flags: [
 				{
@@ -158,9 +159,14 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 						'a live board types three lead lines in bright green, erasing each, then shows `KNOCK, KNOCK, JOSH.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.',
 				},
 				{
+					names: ['--frame'],
+					description:
+						'one live-form frame in a state its flags fix, for reading what only a live board draws; no frame record, cue or screen control (`run-board-frame-preview.ts`). `--notice <row state>` (`running`, `merged`, …) with `--issue <n>` and `--repeat` (`×2`) sets the notice; `--mute` draws `🔇`; `--columns` / `--rows` the size (120×40); `--ansi` keeps SGR.',
+				},
+				{
 					names: ['--timing'],
 					description:
-						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.',
+						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat`, `--every` and `--frame` ignore it.',
 				},
 				{
 					names: ['--timing'],

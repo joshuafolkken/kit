@@ -51,10 +51,15 @@ function plan_of(children: Array<EpicChild>, { tracked, first }: Epics): BoardPl
 	}
 }
 
+// The blockers the row waits on and the epics around it; none when omitted.
+interface ReasonOptions {
+	waits?: ReadonlyArray<string>
+	epics?: Epics
+}
+
 function reason(
 	child: EpicChild,
-	waits: ReadonlyArray<string> = [],
-	epics: Epics = {},
+	{ waits = [], epics = {} }: ReasonOptions = {},
 ): RowReason | undefined {
 	const read = {
 		plan: plan_of([child], epics),
@@ -74,7 +79,7 @@ it('leads a pending row in no epic with 📰 and the epic placement step', () =>
 })
 
 it('names the plan record command for a pending child with no recorded plan', () => {
-	expect(reason(row(PENDING_BODY), [], { tracked: EPIC })).toStrictEqual({
+	expect(reason(row(PENDING_BODY), { epics: { tracked: EPIC } })).toStrictEqual({
 		icon: WAIT_ICONS.publication,
 		tail: `→ plan record: pnpm josh issue:plan ${String(ROW)} --planned`,
 	})
@@ -83,7 +88,7 @@ it('names the plan record command for a pending child with no recorded plan', ()
 it('names the epic publish command once a planned child sits in its epic', () => {
 	const planned = row(PENDING_BODY, [], [RUN_LANE_LABEL, PLANNED_LABEL])
 
-	expect(reason(planned, [], { tracked: EPIC })).toStrictEqual({
+	expect(reason(planned, { epics: { tracked: EPIC } })).toStrictEqual({
 		icon: WAIT_ICONS.publication,
 		tail: `→ publish: pnpm josh issue:file --publish ${String(EPIC)}`,
 	})
@@ -94,7 +99,7 @@ it('names the epic publish command once a planned child sits in its epic', () =>
 it('names the publish command of an epic that has not opted in', () => {
 	const planned = row(PENDING_BODY, [], [RUN_LANE_LABEL, PLANNED_LABEL])
 
-	expect(reason(planned, [], { first: OTHER_EPIC })).toStrictEqual({
+	expect(reason(planned, { epics: { first: OTHER_EPIC } })).toStrictEqual({
 		icon: WAIT_ICONS.publication,
 		tail: `→ publish: pnpm josh issue:file --publish ${String(OTHER_EPIC)}`,
 	})
@@ -103,7 +108,7 @@ it('names the publish command of an epic that has not opted in', () => {
 it('names the opted-in epic over an earlier listed one', () => {
 	const planned = row(PENDING_BODY, [], [RUN_LANE_LABEL, PLANNED_LABEL])
 
-	expect(reason(planned, [], { tracked: EPIC, first: OTHER_EPIC })).toStrictEqual({
+	expect(reason(planned, { epics: { tracked: EPIC, first: OTHER_EPIC } })).toStrictEqual({
 		icon: WAIT_ICONS.publication,
 		tail: `→ publish: pnpm josh issue:file --publish ${String(EPIC)}`,
 	})
@@ -112,7 +117,7 @@ it('names the opted-in epic over an earlier listed one', () => {
 it('says publication before a blocker the row also waits on', () => {
 	const blocked = row(PENDING_BODY, [{ number: BLOCKER, repo: REPO }])
 
-	expect(reason(blocked, [String(BLOCKER)])).toStrictEqual(EPIC_PLACEMENT)
+	expect(reason(blocked, { waits: [String(BLOCKER)] })).toStrictEqual(EPIC_PLACEMENT)
 })
 
 it('says nothing of publication once the filing has published', () => {

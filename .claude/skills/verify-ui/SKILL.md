@@ -7,7 +7,8 @@ argument-hint: '[route] [route...]'
 # Verify the rendered screen
 
 A rendered-UI change is not done until someone has looked at it (`CLAUDE.md` → completion gate);
-passing tests are not that look.
+passing tests are not that look. A change to the terminal board's display (`scripts/run/board/`)
+takes the Terminal UI section below instead of steps 1–3.
 
 ## 1. Decide which routes to capture
 
@@ -51,9 +52,24 @@ Read every produced image with the Read tool — capturing without opening does 
 Check the change's intent: element present, placed, sized, spaced, colored and worded as intended;
 nothing else disappeared or moved; the layout holds at the captured viewport.
 
+## Terminal UI
+
+The board is text, so read it: do not look for a screenshot command, and do not stop.
+
+1. List the states the change affects, of: a notice or none, repeat, mute, theme (default,
+   `wargames`, `matrix`), a narrow width.
+2. Per state, run `pnpm josh run:board --frame` once with the flags that fix it (`--notice <row state>`
+   such as `merged` or `stopped`,
+   `--issue <n>`, `--repeat`, `--mute`, `--theme <name>`, `--columns <n>`) and read the output: layout,
+   wording, column alignment and width as intended. For a color change add `--ansi` and read the SGR codes.
+
+Read everything the text shows. Only how a color looks, animation and sound are left to a person:
+write them in the issue's `## 背景` as `マージ後の確認: <where to look>`; this is not a stop before the merge.
+
 ## 4. Report
 
 - **Matches the intent**: route by route, what you checked, with the image paths (on the E2E
   fallback, the `path` option).
 - **Does not match**: route, intended result, what the image shows, image path. Fix and capture again.
 - **Could not capture**: the report from step 2, unchanged. This is not a pass.
+- **Terminal UI**: state by state, the command run and the frame lines you read.
