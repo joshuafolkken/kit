@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import type { BoardRow } from './run-board-layout'
+import type { PinnedIssue } from './run-board-pinned-graphql'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
@@ -14,6 +15,16 @@ const TALL = 200
 const COLUMNS = 160
 // Narrower than a lane row's full title, wide enough for every rule's own label and column heads.
 const NARROW = 60
+// joshuafolkken/kit#8663: narrower than the rule width (about 118), and wider than it but narrower than
+// a whole lane row with its tail.
+const UNDER_RULE = 100
+const OVER_RULE = 122
+// The closed pin's row is the panel's widest.
+const CLOSED_PIN = 8591
+const PINNED: ReadonlyArray<PinnedIssue> = [
+	{ number: CLOSED_PIN, is_closed: true, closed_ms: NOW },
+	{ number: 8353, is_closed: false, closed_ms: undefined },
+]
 const FIRST_LANE = 8240
 const LANE_COUNT = 4
 const SHORT_TITLE = 'Short'
@@ -35,7 +46,12 @@ function lanes(count: number, title = SHORT_TITLE): Array<BoardRow> {
 	return Array.from({ length: count }, (_, index) => lane(FIRST_LANE + index, title))
 }
 
-function rendered(active: Array<BoardRow>, is_themed: boolean, columns: number): Array<string> {
+function rendered(
+	active: Array<BoardRow>,
+	is_themed: boolean,
+	columns: number,
+	pinned: ReadonlyArray<PinnedIssue> = [],
+): Array<string> {
 	const board = header({
 		layout: { ...EMPTY_LAYOUT, active, unreached: [lane(FIRST_LANE - 1, SHORT_TITLE)] },
 		occupied_count: active.length,
@@ -48,6 +64,7 @@ function rendered(active: Array<BoardRow>, is_themed: boolean, columns: number):
 		notes: [note(NOW, 'seen')],
 		size: { rows: TALL, columns },
 		folded: new Set(),
+		pinned,
 	})
 
 	return lines.map((line) => stripVTControlCharacters(line))
@@ -108,3 +125,32 @@ describe.each([false, true])('run_board_render rule width (themed: %s)', (is_the
 		expect(new Set(widths)).toStrictEqual(new Set([NARROW]))
 	})
 })
+
+describe.each([false, true])(
+	'run_board_render rule width between panes (themed: %s)',
+	(is_themed) => {
+		it('ends every rule at the pane edge where the pane is narrower than the rule width', () => {
+			const widths = [
+				...rule_widths([], is_themed, UNDER_RULE),
+				...rule_widths(lanes(1), is_themed, UNDER_RULE),
+			]
+
+			expect(new Set(widths)).toStrictEqual(new Set([UNDER_RULE]))
+		})
+
+		it('keeps the rule width where the pane is wider than it but narrower than a whole lane row', () => {
+			const wide = rule_widths([], is_themed)
+			const over = rule_widths(lanes(1), is_themed, OVER_RULE)
+
+			expect(Math.max(...wide)).toBeLessThan(OVER_RULE)
+			expect(new Set(over)).toStrictEqual(new Set(wide))
+		})
+
+		it('ends the watch panel’s widest pin at the pane edge where the pane is narrower than the rule width', () => {
+			const lines = rendered([], is_themed, UNDER_RULE, PINNED)
+			const pin = lines.find((line) => line.includes(`✅ ${String(CLOSED_PIN)}`)) ?? ''
+
+			expect(width_of(pin)).toBe(UNDER_RULE)
+		})
+	},
+)
