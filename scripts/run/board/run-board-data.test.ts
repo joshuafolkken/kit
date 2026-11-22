@@ -108,6 +108,18 @@ describe('run_board_data.posted and received', () => {
 		expect(posted(data).in_flight).toStrictEqual([])
 		expect(received(posted(data), READ).plan).toBe(data.plan)
 	})
+
+	it('names a pinned-issue read in flight and holds it on the board’s side', () => {
+		const pinned_fetch: BoardData['pinned_fetch'] = {
+			landed: new Promise(vi.fn()),
+			answer: () => undefined,
+		}
+		const post = posted({ ...FRESH_DATA, pinned_fetch, pinned_attempted_ms: START })
+
+		expect(post.in_flight).toStrictEqual(['pinned_fetch'])
+		expect(received(post, READ).pinned_fetch).toBeDefined()
+		expect(relaunched(post)).toMatchObject({ in_flight: [], pinned_attempted_ms: undefined })
+	})
 })
 
 describe('run_board_data.relaunched', () => {

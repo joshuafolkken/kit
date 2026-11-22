@@ -292,7 +292,8 @@ function fold_issue_count(state: BoardData): BoardData {
 }
 
 // The pinned issues are asked as often as the plan, once the plan has named the repository; a read in
-// flight is not launched again (joshuafolkken/kit#8606).
+// flight is not launched again (joshuafolkken/kit#8606). Unlike the plan and the count, an ended run
+// keeps asking: the pins are issues a person watches outside the run, which close after it ends.
 function is_pinned_due(state: BoardData, gather: Gather): boolean {
 	if (state.pinned_fetch !== undefined) return false
 
@@ -353,7 +354,7 @@ function keep_snapshot(before: BoardData, after: BoardData, gather: Gather): voi
 }
 
 // The reads the plan has to land first: the closed children are read off its listing, and the issue
-// count asks for the repository it names.
+// count and the pinned issues ask for the repository it names.
 async function gather_after_plan(planned: BoardData, gather: Gather): Promise<BoardData> {
 	const opened = fold_repository(fold_closed(fold_plan(planned)))
 	const closing = launch_repository(launch_closed(opened, gather), gather)
