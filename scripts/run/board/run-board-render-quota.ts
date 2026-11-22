@@ -286,7 +286,7 @@ function github_text(view: QuotaView, rate_limit: GithubRateLimit, is_short: boo
 	)
 }
 
-// Nothing where the allowances could not be read; gauge-less, starting the panel's sixth row, where the
+// Nothing where the allowances could not be read; gauge-less, starting the panel's last row, where the
 // frame `has_lamps`, carrying its gauged text for a frame whose panel is dropped (joshuafolkken/kit#8695).
 function rate_limit_rows(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
 	if (view.rate_limit === undefined) return []

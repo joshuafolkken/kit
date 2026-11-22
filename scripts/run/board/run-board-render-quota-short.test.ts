@@ -14,7 +14,7 @@ import { run_board_spot } from './run-board-spot'
 import type { ThroughputRow } from './run-board-throughput'
 
 // joshuafolkken/kit#8695: the usage rows beside a lamp panel — gauge-less where a row draws 5h and 7d,
-// GitHub's always — so the panel stays on every usage row, six rows down to GitHub's.
+// GitHub's always — so the panel stays on every usage row, down to GitHub's last row.
 
 const { LAMP } = run_board_spot
 const { rows_part } = run_board_render_throughput
