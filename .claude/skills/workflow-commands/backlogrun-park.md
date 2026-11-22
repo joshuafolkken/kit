@@ -96,7 +96,7 @@ A recommendation the child lacked the permission to take → the parent runs
 "decision-autonomy"): a scoped size approval, a premise the body constrains, a run-tooling defect to
 file. A `必要な権限` off the vocabulary → refused by `run:park`; a close is `親（issue:close）`, a filing
 `親（issue:file …）`, shipping in another Issue's PR `親（lane:fold <N> --into #<M>）` (`docs/josh-commands-run.md` → "`josh run:park`"). An option whose `必要な権限` is `親` → carry it out first, then adopt it with
-`--done <what was done>`; one naming `issue:file` → `--done "filed #<M>"`; one naming `issue:close` or `lane:fold` → no `--done`, the adopt closes or folds it (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"). A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
+`--done <what was done>`; one naming `issue:file` → `--done "filed #<M>"` (it carries `- 順序の理由:`, "Splitting a child mid-run"); one naming `issue:close` or `lane:fold` → no `--done`, the adopt closes or folds it (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"). A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
 decision, `run:park <N> --clear`, `run:add <N> --retry`. A park splitting `<N>` → `split-assessment.md`
 → "Two or more always means an epic" (plan, publish) before adopting; `backlog:triage` refuses an unplanned
 prepared `#M` (`docs/josh-commands-backlog.md` → "`josh backlog:triage`").

@@ -2,8 +2,8 @@
 	"reason": "#8661 adds the serial carve-off refusal (run-park-serial.ts) and one trigger-plus-pointer line each in split-assessment.md and backlogrun-park.md, in the existing bold Trigger format",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 57,
-		"ai_cost.on_demand_bytes": 336,
+		"scripts.code_lines": 63,
+		"ai_cost.on_demand_bytes": 399,
 		"prose.excess_bold": 2
 	}
 }

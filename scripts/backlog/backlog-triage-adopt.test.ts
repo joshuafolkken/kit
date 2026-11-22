@@ -368,7 +368,7 @@ describe('backlog:triage --apply --adopt — arguments', () => {
 
 		expect(order).toStrictEqual([])
 		expect(console.error).toHaveBeenCalledWith(
-			expect.stringContaining('[--done <the parent action'),
+			expect.stringContaining('[--done <the parent action taken>]'),
 		)
 	})
 })

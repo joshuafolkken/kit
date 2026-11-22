@@ -185,6 +185,22 @@ function shape_problem(park: ParkBody): string | undefined {
 	return park.options.map((option) => option_problem(option)).find(Boolean) ?? pick_problem(park)
 }
 
+// Whether adopting `option` leaves the parked Issue waiting on the Issue it files: a filing that
+// neither closes nor folds it (`backlog-triage-adopt.ts` blocks it by the filed Issue).
+function waits_on(option: ParkOption | undefined): boolean {
+	if (!is_parent_action(option) || !names_command(option, FILING_COMMAND)) return false
+
+	return !names_command(option, CLOSE_COMMAND) && !names_command(option, FOLD_COMMAND)
+}
+
+// A filing the parked Issue waits on naming no order kind (joshuafolkken/kit#8661): `run:park` refuses
+// it while the child can still add the line, so an adopt never meets it.
+function serial_problem(park: ParkBody): string | undefined {
+	return park.options
+		.map((option) => run_park_serial.problem_of(option, waits_on(option)))
+		.find(Boolean)
+}
+
 function permission_problem(park: ParkBody): string | undefined {
 	return park.options
 		.map((option) =>
@@ -198,7 +214,7 @@ function permission_problem(park: ParkBody): string | undefined {
 function problem_of(body: string): string | undefined {
 	const park = parse(body)
 
-	return shape_problem(park) ?? permission_problem(park)
+	return shape_problem(park) ?? permission_problem(park) ?? serial_problem(park)
 }
 
 // Whether `body` meets the schema's structure — a park, even one whose permission `problem_of` names.
@@ -284,12 +300,6 @@ function done_needed(body: string, number: number): boolean {
 	return parent_action(body, number) && !is_taken
 }
 
-// Whether adopting option `number` leaves the parked Issue waiting on the Issue it files: a filing that
-// neither closes nor folds it (`backlog-triage-adopt.ts` blocks it by the filed Issue).
-function waits_on_filing(body: string, number: number): boolean {
-	return filing_action(body, number) && !close_action(body, number) && !fold_action(body, number)
-}
-
 function is_parents(option: ParkOption): boolean {
 	return option.tier === AUTO_TIER && option.permission === AUTO_PERMISSION
 }
@@ -317,7 +327,7 @@ function adopt_problem(body: string, number: number): string | undefined {
 	if (option === undefined) return `${OPTIONS_HEADING} lists no option ${String(number)}`
 	if (option.tier === PERSON_TIER) return `option ${String(number)} is tier C, a person's to take`
 
-	return run_park_serial.problem_of(option, waits_on_filing(body, number))
+	return run_park_serial.problem_of(option, waits_on(option))
 }
 
 // The recommended option a parent may adopt (`adopt_problem` passes it) — what `backlog:triage --pass`

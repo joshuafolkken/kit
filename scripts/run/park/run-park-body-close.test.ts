@@ -75,7 +75,9 @@ describe('run_park_body free-text parent actions', () => {
 	})
 
 	it('accepts the park rewritten with the parent close, adopted as a close (ac-f4dcd316)', () => {
-		const body = park_of(PICK, CLOSE, '親（issue:file --route interrupt --blocks-finder）')
+		const filing =
+			'親（issue:file --route interrupt --blocks-finder）\n   - 順序の理由: 別の待ちがある — 上流'
+		const body = park_of(PICK, CLOSE, filing)
 
 		expect(run_park_body.problem_of(body)).toBeUndefined()
 		expect(run_park_body.close_action(body, 1)).toBe(true)
