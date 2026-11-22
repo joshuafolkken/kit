@@ -40,6 +40,7 @@ const UNREAD: Required<DataPorts> = {
 	read_thanks: never,
 	read_rate_limit: never,
 	read_issue_count: never,
+	read_pinned: never,
 	snapshot: { load: never, save: never },
 }
 
