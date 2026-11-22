@@ -119,6 +119,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review',
 				},
 				{
+					arguments: '<N>',
+					note: 'the same, re-run after `pending`: the opening runs in the background past the `ship:wait` chunk, and the re-run waits on that run (a `--join` first waits on it too)',
+				},
+				{
 					arguments: '<N> --from check:related',
 					note: 'resume at the stage a stop named, once the run settled it',
 				},

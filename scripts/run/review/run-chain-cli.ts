@@ -8,6 +8,7 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_ship_args } from '#scripts/run/ship/run-ship-args'
 import { run_chain, type ChainRun, type ChainStage, type ChainStop } from './run-chain'
+import { run_chain_background } from './run-chain-background'
 import { run_chain_gates } from './run-chain-gates'
 import { run_chain_join } from './run-chain-join'
 
@@ -29,6 +30,7 @@ const OPTIONS = {
 	join: { type: 'boolean' },
 	fixing: { type: 'boolean' },
 	ship: { type: 'string' },
+	worker: { type: 'boolean' },
 } as const
 
 interface ChainValues {
@@ -38,13 +40,16 @@ interface ChainValues {
 	is_join: boolean
 	is_fixing: boolean
 	ship: string | undefined
+	is_worker: boolean
 }
 
-// `stages` is the list from `--from` on; `undefined` for a `--from` no stage carries.
+// `stages` is the list from `--from` on; `undefined` for a `--from` no stage carries. `is_worker` marks
+// the background run an opening call started (`run-chain-background.ts`).
 interface ChainArguments {
 	issue: string
 	from?: string
 	is_join: boolean
+	is_worker: boolean
 	stages: ReadonlyArray<ChainStage> | undefined
 }
 
@@ -108,6 +113,7 @@ function arguments_from(
 		issue,
 		...(values.from !== undefined && { from: values.from }),
 		is_join: values.is_join,
+		is_worker: values.is_worker,
 		stages: stages_of(issue, values),
 	}
 }
@@ -125,6 +131,7 @@ function parse(argv: ReadonlyArray<string>): ChainArguments | undefined {
 		is_join: values.join === true,
 		is_fixing: values.fixing === true,
 		ship: values.ship,
+		is_worker: values.worker === true,
 	})
 }
 
@@ -163,13 +170,18 @@ async function record_run(
 	})
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const parsed = parse(argv)
+// The opening half runs in the background so the call returns before the prompt cache expires
+// (joshuafolkken/kit#8705); a join waits first on an opening worker not yet read.
+function is_backgrounded(parsed: ChainArguments): boolean {
+	if (parsed.is_worker) return false
 
-	if (parsed === undefined) return refuse(USAGE)
-	const { stages } = parsed
+	return !parsed.is_join || run_chain_background.has_worker(parsed.issue)
+}
 
-	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
+async function run_in_place(
+	parsed: ChainArguments,
+	stages: ReadonlyArray<ChainStage>,
+): Promise<number> {
 	const started_ms = Date.now()
 	const chain = await run_chain.run_stages(stages, parsed.issue, (text) => {
 		console.info(text)
@@ -180,6 +192,21 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	console.info(run_chain.done_report(stages, parsed.issue))
 
 	return run_chain.SUCCESS_EXIT_CODE
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = parse(argv)
+
+	if (parsed === undefined) return refuse(USAGE)
+	const { stages } = parsed
+
+	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
+	if (is_backgrounded(parsed)) return await run_chain_background.open(parsed.issue, argv)
+	const code = await run_in_place(parsed, stages)
+
+	if (parsed.is_worker) run_chain_background.finish(parsed.issue, code)
+
+	return code
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

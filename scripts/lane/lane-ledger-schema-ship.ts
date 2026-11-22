@@ -85,11 +85,12 @@ const chain_schema = z.object({
 // One `josh run:chain` stage on `issue`, appended as it ends so a run killed or stopped part way still
 // leaves the stages it finished (joshuafolkken/kit#8286): `at` is the stage's end, as on a `stage` line,
 // so its start is `at` less `elapsed_ms`, and `result` is `stopped` on the stage the run stopped at
-// (non-zero exit or a hold).
+// (non-zero exit or a hold), and `pending` on a stage whose wait was cut at the chunk below the
+// prompt-cache TTL with its work still running, which is no stop (joshuafolkken/kit#8705).
 const chain_stage_entry_schema = chain_stage_schema.extend({
 	kind: z.literal(KIND.CHAIN_STAGE),
 	issue: z.number(),
-	result: z.enum(['passed', 'stopped']),
+	result: z.enum(['passed', 'stopped', 'pending']),
 })
 // The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
 // so a preflight `unplanned` stop after it is told apart in `lane:stats` (joshuafolkken/kit#5203).
@@ -177,6 +178,7 @@ type ChainEntry = z.infer<typeof chain_schema>
 type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
 type ChainStageEntry = z.infer<typeof chain_stage_schema>
 type ChainStageLedgerRecord = Omit<z.infer<typeof chain_stage_entry_schema>, 'kind'>
+type ChainStageResult = ChainStageLedgerRecord['result']
 type ChainRefusal = NonNullable<ChainEntry['refusal']>
 type PreflightEntry = z.infer<typeof preflight_schema>
 type PreflightLedgerRecord = Omit<PreflightEntry, 'kind' | 'at'>
@@ -200,6 +202,7 @@ export type {
 	ChainRefusal,
 	ChainStageEntry,
 	ChainStageLedgerRecord,
+	ChainStageResult,
 	PreflightEntry,
 	PreflightLedgerRecord,
 	UnpinnedPath,

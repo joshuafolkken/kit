@@ -3,6 +3,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_chain_background } from './run-chain-background'
 import { run_chain_cli } from './run-chain-cli'
 
 const josh_run_mock = vi.hoisted(() =>
@@ -52,6 +53,11 @@ beforeEach(() => {
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
+	// The opening's background run in place, as its worker runs it (joshuafolkken/kit#8705).
+	vi.spyOn(run_chain_background, 'open').mockImplementation(
+		async (_issue, argv) => await run_chain_cli.run([...argv, run_chain_background.WORKER_FLAG]),
+	)
+	vi.spyOn(run_chain_background, 'finish').mockReturnValue()
 	totals_answer(undefined)
 	printed.length = 0
 

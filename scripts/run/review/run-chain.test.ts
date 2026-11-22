@@ -2,6 +2,7 @@ import { derive_check } from '#scripts/document/derive-check'
 import { lane_ledger_write_chain_stage } from '#scripts/lane/lane-ledger-write-chain-stage'
 import { describe, expect, it, vi } from 'vitest'
 import { run_chain, type ChainStage, type StageRunner } from './run-chain'
+import { run_review } from './run-review'
 
 const SELFCHECK = 'review:selfcheck'
 const CHECK_RELATED = 'check:related'
@@ -136,6 +137,23 @@ describe('run_chain — a held stage and the reports', () => {
 		await run_chain.run_stages([stage], ISSUE, vi.fn())
 
 		expect(record.mock.calls.map(([line]) => line.result)).toStrictEqual(['stopped'])
+		record.mockRestore()
+	})
+
+	// joshuafolkken/kit#8705: a wait cut at the chunk is no stop.
+	it('marks a stage whose wait was cut at the chunk pending, not stopped', async () => {
+		const record = vi
+			.spyOn(lane_ledger_write_chain_stage, 'record_chain_stage')
+			.mockResolvedValue(undefined)
+		const stage: ChainStage = { name: RUN_REVIEW, argv: [RUN_REVIEW], next: () => '' }
+		const runner = vi.fn<StageRunner>(async () => ({
+			code: run_review.PENDING_EXIT_CODE,
+			out: '',
+		}))
+
+		await run_chain.run_stages([stage], ISSUE, vi.fn(), runner)
+
+		expect(record.mock.calls.map(([line]) => line.result)).toStrictEqual(['pending'])
 		record.mockRestore()
 	})
 

@@ -352,6 +352,7 @@ Open the review, or --join to join, attest, record and recheck it; --ship then s
 
 ```bash
 pnpm josh run:chain <N>                                                  # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review
+pnpm josh run:chain <N>                                                  # the same, re-run after `pending`: the opening runs in the background past the `ship:wait` chunk, and the re-run waits on that run (a `--join` first waits on it too)
 pnpm josh run:chain <N> --from check:related                             # resume at the stage a stop named, once the run settled it
 pnpm josh run:chain <N> --unpinned-ok "only logs"                        # forwarded to run:review as given
 pnpm josh run:chain <N> --accept-metrics "<why>" --from metrics-totals   # after a metrics-totals stop (a total grew, asked right after check:related): run:review records the growth as `metrics --accept` does

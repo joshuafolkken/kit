@@ -6,6 +6,7 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_chain_background } from './run-chain-background'
 import { run_chain_cli } from './run-chain-cli'
 
 const josh_run_mock = vi.hoisted(() =>
@@ -40,6 +41,7 @@ const MAIN_LINE = [
 	[RUN_REVIEW],
 ]
 const STOP_EXIT = 2
+const PENDING_EXIT = 4
 const UNPINNED_OK = ['--unpinned-ok', 'only logs']
 const ACCEPT_METRICS = ['--accept-metrics', 'a new command']
 const TITLE = 'Title #5630'
@@ -59,11 +61,20 @@ function stop_at(name: string): void {
 	}))
 }
 
+// The opening's background run in place, as its worker runs it (joshuafolkken/kit#8705).
+function run_worker_in_place(): void {
+	vi.spyOn(run_chain_background, 'open').mockImplementation(
+		async (_issue, argv) => await run_chain_cli.run([...argv, run_chain_background.WORKER_FLAG]),
+	)
+	vi.spyOn(run_chain_background, 'finish').mockReturnValue()
+}
+
 // The metrics and scoped-green asks (`run-chain-gates.ts`) answer green unless a test says otherwise.
 beforeEach(() => {
 	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
 	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+	run_worker_in_place()
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	info_lines.length = 0
@@ -279,5 +290,46 @@ describe('run_chain_cli.run — the ledger line', () => {
 		await run_chain_cli.run([ISSUE, FROM, RUN_CUT])
 
 		expect(record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8705: the opening runs as a background worker the call waits on for one chunk.
+describe('run_chain_cli.run — the background opening', () => {
+	it('hands the opening, --from included, to the background run with the call’s arguments', async () => {
+		const open = vi.spyOn(run_chain_background, 'open').mockResolvedValue(PENDING_EXIT)
+		const argv = [ISSUE, FROM, CHECK_RELATED]
+
+		await expect(run_chain_cli.run(argv)).resolves.toBe(PENDING_EXIT)
+		expect(open).toHaveBeenCalledWith(ISSUE, argv)
+		expect(ran()).toStrictEqual([])
+	})
+
+	it('runs the stages in place in the worker and leaves its exit code for the wait', async () => {
+		const finish = vi.spyOn(run_chain_background, 'finish').mockReturnValue()
+
+		stop_at(CHECK_RELATED)
+		await run_chain_cli.run([ISSUE, run_chain_background.WORKER_FLAG])
+
+		expect(finish).toHaveBeenCalledWith(ISSUE, 1)
+	})
+
+	it('waits on an unread opening worker before a join runs any stage', async () => {
+		vi.spyOn(run_chain_background, 'has_worker').mockReturnValue(true)
+		const open = vi.spyOn(run_chain_background, 'open').mockResolvedValue(STOP_EXIT)
+
+		await expect(run_chain_cli.run([ISSUE, '--join'])).resolves.toBe(STOP_EXIT)
+		expect(open).toHaveBeenCalledOnce()
+		expect(ran()).toStrictEqual([])
+	})
+
+	it('runs a join in place when no opening worker is unread', async () => {
+		vi.spyOn(run_chain_background, 'has_worker').mockReturnValue(false)
+		const open = vi.spyOn(run_chain_background, 'open')
+
+		josh_run_mock.mockResolvedValue({ code: STOP_EXIT, out: '' })
+		await run_chain_cli.run([ISSUE, '--join'])
+
+		expect(open).not.toHaveBeenCalled()
+		expect(ran()).toHaveLength(1)
 	})
 })
