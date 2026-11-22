@@ -120,6 +120,20 @@ function starts_of(lines: ReadonlyArray<string>, columns: number): Array<number>
 	})
 }
 
+// The keyed row of a split line at `index`, on screen `row`; none for a line with no key. What follows
+// its end mark (joshuafolkken/kit#8607) rides along, drawn whole after the typed text.
+function keyed_line(
+	{ key, text, prefix, suffix }: ReturnType<typeof run_board_row_key.split_key>,
+	index: number,
+	row: number,
+): Array<KeyedLine> {
+	if (key === undefined) return []
+
+	const line = { key, index, row, text, prefix_columns: run_board_fit.width_of(prefix) }
+
+	return [suffix === '' ? line : { ...line, suffix }]
+}
+
 // Each line with its placeholders drawn as `frame` and its key taken out, and the keyed ones — their
 // placeholders kept, so a typing row draws the spinner's frame of the moment it is written.
 function keyed_of(
@@ -128,25 +142,20 @@ function keyed_of(
 	starts: ReadonlyArray<number>,
 ): Pick<Spun, 'lines' | 'keyed'> {
 	const split = lines.map((line) => run_board_row_key.split_key(line))
-	const keyed = split.flatMap(({ key, text, prefix }, index) =>
-		key === undefined
-			? []
-			: {
-					key,
-					index,
-					row: starts[index] ?? 1,
-					text,
-					prefix_columns: run_board_fit.width_of(prefix),
-				},
-	)
+	const keyed = split.flatMap((line, index) => keyed_line(line, index, starts[index] ?? 1))
 
-	return { lines: split.map((line) => run_board_spot.drawn(line.text, frame)), keyed }
+	return {
+		lines: split.map((line) => run_board_spot.drawn(`${line.text}${line.suffix}`, frame)),
+		keyed,
+	}
 }
 
 // A keyed row types only on screen and within one screen row: a row typed shorter than it wraps would
 // take fewer rows and move every line below it off the spots recorded for them.
 function can_type(line: KeyedLine, rows: number, columns: number): boolean {
-	return line.row <= rows && run_board_fit.height_of(line.text, columns) === 1
+	return (
+		line.row <= rows && run_board_fit.height_of(`${line.text}${line.suffix ?? ''}`, columns) === 1
+	)
 }
 
 // The sweep under the line the `″` placeholder is drawn in, where the line below it has room for one.

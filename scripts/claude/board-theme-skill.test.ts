@@ -46,6 +46,9 @@ describe('board-theme skill', () => {
 	})
 
 	it.each([
+		'Measure the original',
+		'matches the original item by item',
+		'items changed on purpose',
 		"Put the demo's code in the Issue body when filing",
 		'which element takes which color',
 		"leaves the existing themes'\n  look unchanged",

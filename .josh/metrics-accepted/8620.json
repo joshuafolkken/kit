@@ -1,0 +1,9 @@
+{
+	"reason": "#8620 adds the reproduce-first principle, its one-line CLAUDE.md pointer and the board-theme measuring step the Issue asks for",
+	"date": "2026-11-22",
+	"growth": {
+		"rules.lines": 8,
+		"ai_cost.resident_bytes": 196,
+		"ai_cost.on_demand_bytes": 1194
+	}
+}

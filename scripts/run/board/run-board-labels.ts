@@ -328,16 +328,13 @@ const GAUGE_SHADES = {
 	red: { rgb: '255;69;58', named: 'red' },
 } as const satisfies Readonly<Record<string, Shade>>
 
-const { two_digits, clock_of, minute_of } = figure_format
+const { day_of, clock_of, minute_of } = figure_format
 const { minute_span_of, span_of } = run_board_length
 
 // The local `MM-DD HH:MM` of a moment, for one that may fall on another day — when a waiting row may
 // start, in the condition column it is the widest value of (joshuafolkken/kit#4288).
 function day_minute_of(ms: number): string {
-	const date = new Date(ms)
-	const day = [date.getMonth() + 1, date.getDate()].map((value) => two_digits(value))
-
-	return `${day.join('-')} ${minute_of(ms)}`
+	return `${day_of(ms)} ${minute_of(ms)}`
 }
 
 function is_shade(color: Paint): color is Shade {

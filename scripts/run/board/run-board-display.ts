@@ -31,7 +31,7 @@ type DisplayHeader = Omit<BoardHeader, PortField> & { layout: BoardLayout }
 type Carried = Pick<BoardState, 'sound_snapshot' | 'sound_pending' | 'notice'>
 
 interface BoardDisplay
-	extends Pick<BoardState, 'thanks'>, Pick<LocalRead, 'resume' | 'throughput'> {
+	extends Pick<BoardState, 'pinned' | 'thanks'>, Pick<LocalRead, 'resume' | 'throughput'> {
 	header: DisplayHeader
 	notes: ReadonlyArray<BoardNote>
 	// The cue the frame sounds where the board sounds one.
@@ -180,6 +180,7 @@ function assemble_display(
 		resume: local.resume,
 		throughput: local.throughput,
 		thanks: state.thanks,
+		pinned: state.pinned,
 		cue,
 		carried: sound,
 	}
