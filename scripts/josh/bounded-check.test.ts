@@ -19,6 +19,8 @@ const RED_EXIT_CODE = 1
 const GREEN_EXIT_CODE = 0
 const SYNC_EXIT_CODE = 7
 const LONG_CHUNK_MS = 60_000
+// Past every platform's pid range, so no process holds it.
+const GONE_PID = 2 ** 31 - 2
 const CALL: BoundedCall = { command: COMMAND, entry: { is_bounded: true }, args: ['--full'] }
 const LANE_SOURCE = { [lane_child_marker.KEY]: ISSUE, [outer_command.KEY]: COMMAND }
 const create_directory = temporary_directory()
@@ -136,8 +138,30 @@ function result_directory(exit_code: string): string {
 describe('josh wait --result', () => {
 	it('reads an exit code that is not an integer as a failure, never as green', async () => {
 		vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+		vi.spyOn(console, 'error').mockReturnValue(undefined)
 
 		expect(await run_wait_cli.run(['--result', result_directory('')])).toBe(RED_EXIT_CODE)
+	})
+
+	it('reads a check killed before writing its exit code as a failure, not as pending', async () => {
+		vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+		vi.spyOn(console, 'error').mockReturnValue(undefined)
+		const directory = create_directory('bounded-killed-')
+
+		writeFileSync(run_wait_cli.result_path(directory, 'log'), CHECK_OUTPUT)
+		writeFileSync(run_wait_cli.result_path(directory, 'pid'), String(GONE_PID))
+
+		expect(await run_wait_cli.collect(directory, no_chunk())).toBe(RED_EXIT_CODE)
+	})
+
+	it('stays pending while the launch it recorded is still running', async () => {
+		vi.spyOn(console, 'info').mockReturnValue(undefined)
+		const directory = create_directory('bounded-running-')
+
+		writeFileSync(run_wait_cli.result_path(directory, 'log'), CHECK_OUTPUT)
+		writeFileSync(run_wait_cli.result_path(directory, 'pid'), String(process.pid))
+
+		expect(await run_wait_cli.collect(directory, no_chunk())).toBe(run_wait_cli.PENDING_EXIT_CODE)
 	})
 
 	it.each([

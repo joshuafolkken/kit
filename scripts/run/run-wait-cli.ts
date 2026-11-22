@@ -48,8 +48,9 @@ const ARGUMENT_OPTIONS = {
 	file: { type: 'string' },
 	result: { type: 'string' },
 } as const
-// A bounded check's result directory: the detached launch's log, and the exit code its child writes.
-const RESULT_FILES = { log: 'check.log', exit: 'exit-code' } as const
+// A bounded check's result directory: the detached launch's log and pid, and the exit code its child
+// writes.
+const RESULT_FILES = { log: 'check.log', exit: 'exit-code', pid: 'pid' } as const
 // The line `detached_launch` stamps at the head of a log, which the check itself never printed.
 const LOG_HEADER = /^\n=== .* ===\n/u
 
@@ -129,20 +130,43 @@ function result_path(directory: string, file: keyof typeof RESULT_FILES): string
 	return path.join(directory, RESULT_FILES[file])
 }
 
+// A check killed by a signal never emits `exit`, so its launch being gone also ends the wait.
+function is_launch_gone(directory: string): boolean {
+	const pid_path = result_path(directory, 'pid')
+
+	if (!existsSync(pid_path)) return false
+	const probe = pid_probe(readFileSync(pid_path, 'utf8'))
+
+	return probe !== undefined && probe() === true
+}
+
+function is_finished(directory: string): boolean {
+	return existsSync(result_path(directory, 'exit')) || is_launch_gone(directory)
+}
+
+// The exit code the check wrote; a missing or malformed one reads as a failure, never as green.
+function exit_code_of(directory: string): number {
+	const exit_path = result_path(directory, 'exit')
+	const text = existsSync(exit_path) ? readFileSync(exit_path, 'utf8') : ''
+
+	if (EXIT_CODE_TEXT.test(text)) return Number(text)
+	console.error('wait: the check ended without writing its exit code — killed by a signal?')
+
+	return FAILURE_EXIT_CODE
+}
+
 // The finished check's own output and exit code, as its synchronous run would have left them.
 function replay(directory: string): number {
 	const log = readFileSync(result_path(directory, 'log'), 'utf8')
 
-	const exit_code = readFileSync(result_path(directory, 'exit'), 'utf8')
-
 	process.stdout.write(log.replace(LOG_HEADER, ''))
 
-	return EXIT_CODE_TEXT.test(exit_code) ? Number(exit_code) : FAILURE_EXIT_CODE
+	return exit_code_of(directory)
 }
 
 // One chunk of a bounded check: its result once it finishes inside, else `pending` and the next wait.
 async function collect(directory: string, options: WaitOptions): Promise<number> {
-	const verdict = await wait_for(() => existsSync(result_path(directory, 'exit')), options)
+	const verdict = await wait_for(() => is_finished(directory), options)
 
 	if (verdict === VERDICT.DONE) return replay(directory)
 	console.info(

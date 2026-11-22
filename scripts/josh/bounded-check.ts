@@ -111,7 +111,10 @@ function launch(call: BoundedCall, dependencies: Dependencies): string | undefin
 		{ [RESULT_KEY]: directory },
 	)
 
-	return launched.kind === 'launched' ? directory : undefined
+	if (launched.kind !== 'launched') return undefined
+	writeFileSync(run_wait_cli.result_path(directory, 'pid'), String(launched.pid))
+
+	return directory
 }
 
 // A check that could not start detached runs synchronously, as it would outside a lane child.
