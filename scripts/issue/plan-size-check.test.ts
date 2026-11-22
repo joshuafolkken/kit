@@ -134,7 +134,9 @@ const EIGHT_SCRIPTS = Array.from(
 	{ length: 8 },
 	(_, index) => `- \`scripts/a/s${String(index)}.ts\``,
 )
-const EIGHT_NAMED = 'names 8 file(s)'
+const EIGHT_NAMED = 'names 8 file(s), tests included'
+// An estimate filed before #8589 counted no tests.
+const SIX_FILES_EXCLUDING_TESTS = `${SIZE_PREFIX} 約 6 ファイル / 110 行（テスト除く）`
 const CONSUMERS = [plan_consumers_section.HEADING, '- なし（no concept）']
 
 function named_plan(lines: ReadonlyArray<string>): string {
@@ -171,6 +173,15 @@ describe('plan_size_check.overrun_of — named files against the estimate', () =
 
 		expect(plan_size_check.overrun_of(named_plan(EIGHT_SCRIPTS), body_of([]))).toBeUndefined()
 		expect(info).toHaveBeenCalledWith(expect.stringContaining(EIGHT_NAMED))
+		info.mockRestore()
+	})
+
+	it('does not compare a plan with an estimate filed excluding tests', () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const body = body_of([SIX_FILES_EXCLUDING_TESTS])
+
+		expect(plan_size_check.overrun_of(named_plan(EIGHT_SCRIPTS), body)).toBeUndefined()
+		expect(info).toHaveBeenCalledWith(expect.stringContaining('no size estimate to compare'))
 		info.mockRestore()
 	})
 })

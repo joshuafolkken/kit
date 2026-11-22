@@ -159,7 +159,7 @@ const ship_lap_schema = z.object({
 })
 
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's
-// measured diff, test files excluded, so `lane:stats` reads how far estimates miss the guide's
+// measured diff, test files included (joshuafolkken/kit#8589), so `lane:stats` reads how far estimates miss the guide's
 // counting (joshuafolkken/kit#5384). Written before the merge, while the branch is still checked out.
 // `missed` marks a diff past the split cap (the notice bar before joshuafolkken/kit#7579): a size the pre-dispatch assessment let through, as
 // the started lane is never split (joshuafolkken/kit#7183).

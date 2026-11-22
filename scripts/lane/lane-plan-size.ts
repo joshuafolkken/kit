@@ -6,7 +6,6 @@ import { size_estimate } from '#scripts/issue/size-estimate'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { declared_growth } from '#scripts/split/declared-growth'
 import { split_assess, type SplitGuide } from '#scripts/split/split-assess'
-import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
@@ -20,7 +19,7 @@ import { lane_stage_budget } from './lane-stage-budget'
 // the size estimate times the period's files ratio is refused, not recorded, and the lane splits the rest
 // off rather than writing why it stays one. Two lanes declared at 4 files planned 9 with that comment
 // and shipped 16 and 18, their implement step twice the median. Files count as the declaration counts
-// them (`size-estimate.ts`): tests excluded, documents and snapshots included, and a generated artifact
+// them (`size-estimate.ts`): tests, documents and snapshots included, and a generated artifact
 // planned beside its source (`codex_hooks.GENERATED_SOURCES`) excluded. An Issue with no
 // declaration — an epic — or one declaring 0 files, as `lane:stats` skips it, is never refused.
 //
@@ -89,7 +88,6 @@ interface FilesOver {
 	limit: number
 	kept: ReadonlyArray<string>
 	split_off: ReadonlyArray<string>
-	tests: ReadonlyArray<string>
 }
 
 interface MeasureOver {
@@ -117,7 +115,7 @@ interface Declared {
 
 function declared_of(issue: number, issues: ReadonlyArray<OpenIssueData>): Declared | undefined {
 	const body = issues.find((candidate) => candidate.number === issue)?.body
-	const size = body === undefined ? undefined : size_estimate.declared_size(body)
+	const size = body === undefined ? undefined : size_estimate.comparable_size(body)
 
 	return size === undefined || size.files === 0 ? undefined : size
 }
@@ -168,7 +166,7 @@ function files_approved(
 	)
 }
 
-// Estimate paths and the actual diff exclude the same tests and run records. Generated pairs are
+// Estimate paths and the actual diff count tests and exclude run records alike. Generated pairs are
 // grouped by `split_assess.units_of`, so no caller can split an artifact from its source.
 function is_counted(file: string): boolean {
 	return split_assess.is_deliverable({ path: file, changed_lines: 0 })
@@ -188,11 +186,11 @@ function files_over(
 		return undefined
 	}
 
-	const tests = plan.paths.filter((file) => test_declared_logic.is_test_file(file))
-	const kept = counted.filter((file) => units.slice(0, limit).flat().includes(file))
-	const split_off = counted.filter((file) => units.slice(limit).flat().includes(file))
+	const kept_files = new Set(split_assess.kept_units(units, limit).flat())
+	const kept = counted.filter((file) => kept_files.has(file))
+	const split_off = counted.filter((file) => !kept_files.has(file))
 
-	return { reason: 'files', declared, limit, kept, split_off, tests }
+	return { reason: 'files', declared, limit, kept, split_off }
 }
 
 // The files an earlier clear held — the recorded history, else, for a cleared record that predates it,
@@ -333,9 +331,9 @@ function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
 	return over !== undefined && (plan.single === true || plan.sized === true)
 }
 
-// The size `over` measured: the plan's files (tests excluded) and the lines axis's projection, else none.
+// The size `over` measured: the plan's counted files and the lines axis's projection, else none.
 function measured_of(plan: LanePlan, over: Oversize): { files: number; lines: number } {
-	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
+	const files = plan.paths.filter((file) => is_counted(file)).length
 
 	return { files, lines: over.reason === 'lines' ? over.measured : 0 }
 }
@@ -395,8 +393,8 @@ const SINGLE_HINT =
 function files_text(issue: number, over: FilesOver): string {
 	const planned = [...over.kept, ...over.split_off]
 	const counted = split_assess.units_of(planned, new Set()).length
-	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
-	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
+	const bar = `${String(counted)} files (tests included, generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
+	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept].join(' ')
 
 	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
 }

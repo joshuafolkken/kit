@@ -11,7 +11,7 @@ function body(files: number, criterion: string): string {
 	return [
 		'## 背景',
 		'',
-		`- 規模見積もり: 約 ${String(files)} ファイル / 80 行（テスト除く）`,
+		`- 規模見積もり: 約 ${String(files)} ファイル / 80 行（テスト含む）`,
 		'',
 		'## 受け入れ条件',
 		'',
@@ -30,6 +30,7 @@ const REFUSED = [
 const PASSED = [
 	{ name: 'an aggregation alone', files: 1, criterion: AGGREGATION },
 	{ name: 'a measurement alone, the prior split Issue', files: 1, criterion: MEASUREMENT },
+	{ name: 'an aggregation script with its test and a listing', files: 4, criterion: AGGREGATION },
 	{
 		name: 'a before / after comparison recorded nowhere on an Issue',
 		files: 6,

@@ -1,0 +1,96 @@
+import { rmSync } from 'node:fs'
+import path from 'node:path'
+import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
+import { lane_spent } from '#scripts/lane/lane-spent'
+import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AddPorts } from './run-add'
+import { run_add_cli } from './run-add-cli'
+
+// joshuafolkken/kit#8599: an issue a person withdrew from the live run (`lane:withdraw`) goes back in
+// only on an explicit `run:add <N> --retry`, as a new attempt the offer reads again; a bare `run:add`
+// asks for `--retry`, and a merge stays refused.
+
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('run-add-cli-withdrawn-test-')
+const GIT_DIRECTORY = path.join(scratch, 'repository.git')
+const ISSUE = '8353'
+const INVOCATION = 'backlogrun #8353 --only'
+const RETRY_ARGS = [ISSUE, '--retry']
+const CARRY = run_carry.carry_path(GIT_DIRECTORY)
+const CHILD_LAUNCH = 'child-launch'
+
+const OPEN_PORTS: AddPorts = {
+	read_issue: async () => ({ is_open: true, blockers: [] }),
+	apply_label: async () => true,
+	clear_label: async () => true,
+}
+
+function stream(): string {
+	return run_event_stream.target_of(GIT_DIRECTORY)
+}
+
+function is_offer_excluded(): boolean {
+	const events = run_event_stream.read_events(stream())
+
+	return backlog_drive_restore.offer_exclude(events).includes(ISSUE)
+}
+
+function withdrawn(...settled: ReadonlyArray<string>): void {
+	const at = new Date().toISOString()
+
+	run_carry.begin_carry(CARRY, INVOCATION, run_carry.NO_OWNER, new Date())
+	run_event_stream.append(stream(), CHILD_LAUNCH, `#${ISSUE} dispatched`, at)
+	run_event_stream.append(stream(), 'withdraw', `#${ISSUE} withdrawn by a person`, at)
+
+	for (const kind of settled) run_event_stream.append(stream(), kind, `#${ISSUE} settled`, at)
+
+	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue(
+		run_event_stream.read_events(stream()),
+	)
+}
+
+beforeEach(() => {
+	vi.spyOn(lane_spent, 'lanes_in_use').mockResolvedValue({ working: [], unread: [] })
+	vi.spyOn(run_event_stream_emit, 'current_events').mockResolvedValue([])
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(GIT_DIRECTORY)
+	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+	vi.spyOn(run_event_stream_emit, 'stream_target').mockResolvedValue(stream())
+	vi.spyOn(console, 'info').mockImplementation(vi.fn())
+	run_carry.end_carry(CARRY)
+	rmSync(stream(), { force: true })
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
+describe('run:add — an issue a person withdrew from the live run', () => {
+	it('re-admits it on --retry, so the offer reads it again', async () => {
+		withdrawn()
+		expect(is_offer_excluded()).toBe(true)
+
+		expect(await run_add_cli.run(RETRY_ARGS, OPEN_PORTS)).toBe(0)
+		expect(console.info).toHaveBeenCalledWith(`queued #${ISSUE} · next free lane`)
+		expect(is_offer_excluded()).toBe(false)
+	})
+
+	it('asks for --retry on a bare run:add and leaves it withdrawn', async () => {
+		withdrawn()
+		const apply_label = vi.fn(OPEN_PORTS.apply_label)
+
+		expect(await run_add_cli.run([ISSUE], { ...OPEN_PORTS, apply_label })).toBe(1)
+		expect(console.info).toHaveBeenCalledWith(`refused #${ISSUE} · use --retry`)
+		expect(apply_label).not.toHaveBeenCalled()
+	})
+
+	it('still refuses a withdrawn issue whose later launch merged', async () => {
+		withdrawn(CHILD_LAUNCH, 'merge')
+
+		expect(await run_add_cli.run(RETRY_ARGS, OPEN_PORTS)).toBe(1)
+		expect(console.info).toHaveBeenCalledWith(`refused #${ISSUE} · not a mechanical stop`)
+	})
+})

@@ -12,7 +12,12 @@ function body_with(...lines: ReadonlyArray<string>): string {
 }
 
 function estimate(files: number, lines: number): string {
-	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト除く）`
+	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト含む）`
+}
+
+// joshuafolkken/kit#8589: the declared lines are the non-test lines plus the test lines.
+function estimate_with_tests(files: number, lines: { code: number; tests: number }): string {
+	return estimate(files, lines.code + lines.tests)
 }
 
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
@@ -72,6 +77,18 @@ describe('size_estimate.problems', () => {
 describe('size_estimate.guide_problem', () => {
 	it('passes an estimate under the guide', () => {
 		expect(size_estimate.guide_problem(UNDER_GUIDE, undefined)).toBeUndefined()
+	})
+
+	it('refuses an estimate with few non-test lines and many test lines', () => {
+		const body = body_with(estimate_with_tests(3, { code: 40, tests: 130 }))
+
+		expect(size_estimate.guide_problem(body, undefined)).toContain('3 file(s) / 170 line(s)')
+	})
+
+	it('reads an estimate filed before tests counted by its declared counts', () => {
+		const body = body_with('- 規模見積もり: 約 3 ファイル / 120 行（テスト除く）')
+
+		expect(size_estimate.declared_size(body)).toMatchObject({ files: 3, lines: 120 })
 	})
 
 	it('refuses an estimate over the guide on both axes', () => {

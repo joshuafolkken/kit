@@ -32,7 +32,7 @@ const UNREAD: PlanSignals = {
 const SIGNALS: PlanSignals = { ...UNREAD, moved_source_lines: new Map([[SOURCE, SOURCE_LINES]]) }
 
 function declared(lines: number): Array<OpenIssueData> {
-	const body = `## 背景\n\n- 規模見積もり: 約 ${String(DECLARED_FILES)} ファイル / ${String(lines)} 行（テスト除く）\n`
+	const body = `## 背景\n\n- 規模見積もり: 約 ${String(DECLARED_FILES)} ファイル / ${String(lines)} 行（テスト含む）\n`
 
 	return [{ number: ISSUE, title: 'lane', createdAt: PLANNED_AT, labels: [], body }]
 }

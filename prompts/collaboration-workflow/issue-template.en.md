@@ -22,7 +22,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 <for a behavior change: `- Enforcement: <the hook, lint or gate that stops it>` (none: `- Enforcement: measurement only`)>
 <for a behavior change: `- Measurement: <the number that shows a violation (command name)>`>
 <optional: `- Priority: critical（condition <1-3>）`, `- Priority: high（<basis>）` or `- Priority: normal`>
-<the diff estimate: `- Size estimate: about <N> files / <M> lines (excluding tests)`, counting docs, snapshots and command listings>
+<the diff estimate: `- Size estimate: about <N> files / <M> lines (including tests)`, counting test changes, docs, snapshots and command listings>
 <past the guide, cap or bar (`split-assessment.md` → "The question") as one Issue: `- No-split reason: <reason>`; past the lane target: `- No-split reason: <kind> — <reason>` (kinds in "The question")>
 <each figure a decision used: ``- Premise: `<command>` <comparison> <figure>`` (one figure per line)>
 

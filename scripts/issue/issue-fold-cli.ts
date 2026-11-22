@@ -50,7 +50,7 @@ function read_arguments(argv: ReadonlyArray<string>): FoldArguments | undefined 
 }
 
 // The size half, single-sourced from `split:assess`: the same counting, the
-// same guide. `undefined` when the diff says nothing about size — no changed non-test file, or a diff
+// same guide. `undefined` when the diff says nothing about size — no changed file it counts, or a diff
 // that cannot be read (no base, not a checkout) — which `fold_verdict` answers as `undetermined`
 // rather than folding on no evidence. `issue:file` asks it too.
 async function size_verdict(): Promise<SplitVerdict | undefined> {

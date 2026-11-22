@@ -37,7 +37,7 @@ function unique_names(files: ReadonlyArray<string>): Set<string> {
 	)
 }
 
-// `counted` are the plan's counted files (tests excluded); a directory or glob claim moves nothing.
+// `counted` are the plan's counted files (tests included); a directory or glob claim moves nothing.
 function sources_of(
 	counted: ReadonlyArray<string>,
 	base_files: ReadonlySet<string> | undefined,

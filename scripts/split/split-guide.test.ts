@@ -7,6 +7,7 @@ const MEASURED = { median: 3.7, lanes: 1 }
 const GUIDE = split_assess.guide_for(BUDGET_MINUTES, MEASURED)
 const SMALL_GUIDE = { files: 2, lines: 50, cap: { files: 3, lines: 75 } }
 const SMALL_GUIDE_TEXT = 'guide 2 files / 50 lines'
+const OVER_SMALL_GUIDE = '51\t0\tscripts/a.ts'
 
 describe('guide_for', () => {
 	it.each([6, 17.7, 24])('floors a measured guide at the fallback for rate %s', (median) => {
@@ -51,7 +52,7 @@ describe('a shared derived guide', () => {
 	})
 
 	it('uses the supplied guide for assessment, reasons and notices (ac-1c2e6b58)', () => {
-		const raw = '51\t0\tscripts/a.ts\n500\t0\tscripts/a.test.ts'
+		const raw = OVER_SMALL_GUIDE
 		const measured = split_assess.assess(raw, { guide: SMALL_GUIDE })
 
 		expect(measured).toEqual({ files: 1, lines: 51, verdict: 'split', guide: SMALL_GUIDE })
@@ -62,7 +63,7 @@ describe('a shared derived guide', () => {
 	})
 
 	it('defaults to the attached guide while explicit arguments take precedence (ac-9e07d12c)', () => {
-		const measured = split_assess.assess('51\t0\tscripts/a.ts', { guide: SMALL_GUIDE })
+		const measured = split_assess.assess(OVER_SMALL_GUIDE, { guide: SMALL_GUIDE })
 
 		expect(split_assess.reason(measured)).toContain(SMALL_GUIDE_TEXT)
 		expect(split_assess.notice(measured)).toContain(SMALL_GUIDE_TEXT)

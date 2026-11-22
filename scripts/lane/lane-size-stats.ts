@@ -4,7 +4,7 @@ import type { LedgerEntry, SizeEntry } from './lane-ledger-schema'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_table_rows, type TableOptions } from './lane-table-rows'
 
-// Compare actual non-test changes with the declaration for merged lanes only. A followup retry
+// Compare actual changes, tests included, with the declaration for merged lanes only. A followup retry
 // may record size twice; use the latest measurement before each merge (joshuafolkken/kit#5384). A merge
 // recorded `missed` past the split cap counts as a pre-split miss, listed with its declared and actual
 // size so the pre-dispatch assessment can be tuned (joshuafolkken/kit#7183). The cap check drops a
