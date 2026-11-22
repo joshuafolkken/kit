@@ -128,6 +128,14 @@ function parked_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
 	)
 }
 
+// The parks the drive may retry on its own. One a person withdrew is theirs to put back with
+// `run:add --retry`, which re-admits it, so no automatic retry takes it (joshuafolkken/kit#8599).
+function retryable_parks(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
+	const withdrawn = new Set(withdrawn_issues(events).map(Number))
+
+	return new Set([...parked_issues(events)].filter((issue) => !withdrawn.has(issue)))
+}
+
 // The issues this invocation launched or settled — any other dispatched lane was carried in from an
 // earlier invocation.
 function mentioned_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<string> {
@@ -168,4 +176,5 @@ export const backlog_drive_restore = {
 	without_readmitted,
 	settled_issues,
 	parked_issues,
+	retryable_parks,
 }

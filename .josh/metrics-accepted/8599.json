@@ -2,6 +2,6 @@
 	"reason": "re-admission of withdrawn issues on run:add --retry: readmit port in the live drive, the withdrawn check in run:add, and the stalled sweep leaving withdrawn parks (#8599)",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 54
+		"scripts.code_lines": 57
 	}
 }

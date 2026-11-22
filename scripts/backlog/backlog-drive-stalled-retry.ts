@@ -102,14 +102,11 @@ function latest_parks(events: ReadonlyArray<RunEvent>): Map<number, RunEvent> {
 	return parks
 }
 
-// The parks the sweep may re-offer. An issue a person withdrew is theirs to put back with
-// `run:add --retry`, which now re-admits it, so the sweep leaves it (joshuafolkken/kit#8599).
+// The parks the sweep may re-offer: none a person withdrew (`backlog_drive_restore.retryable_parks`).
 function offerable_parks(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, RunEvent> {
-	const parks = latest_parks(events)
+	const retryable = backlog_drive_restore.retryable_parks(events)
 
-	for (const issue of backlog_drive_restore.withdrawn_issues(events)) parks.delete(Number(issue))
-
-	return parks
+	return new Map([...latest_parks(events)].filter(([issue]) => retryable.has(issue)))
 }
 
 // Still open, still `run:stalled` and free of a protected label `run:add` would refuse.
