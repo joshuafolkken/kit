@@ -232,6 +232,11 @@ function picked_option(body: string): ParkOption | undefined {
 	return park.options.find((candidate) => candidate.number === number)
 }
 
+// Whether the recommended option needs the parent's permission — an act the child cannot carry out.
+function parent_pick(body: string): boolean {
+	return is_parent_action(picked_option(body))
+}
+
 // The recommended option and its tier, or no recommendation; `undefined` for a body off the schema's
 // structure. A park written before the permission vocabulary (joshuafolkken/kit#7818) still reads as a
 // stop on the board, though `problem_of` names its permission.
@@ -390,6 +395,7 @@ const run_park_body = {
 	fold_target,
 	is_park,
 	parent_action,
+	parent_pick,
 	permission_of: permission_of_option,
 	permissions_of,
 	problem_of,

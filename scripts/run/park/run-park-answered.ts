@@ -3,6 +3,7 @@ import type { AnswerVerdict, Evidence } from '#scripts/agent/answer-verdict'
 import { issue_sources, type SourcesRead } from '#scripts/issue/issue-sources'
 import { session_cite } from '#scripts/issue/session-cite'
 import { session_language } from '#scripts/josh/session-language'
+import { run_park_body } from './run-park-body'
 
 // **A park asks a person only what the Issue has not already decided** (joshuafolkken/kit#6531).
 // Before any write, `answer_judge` reads the question against the Issue's trusted sources: an answered
@@ -79,12 +80,16 @@ function outcome(issue_number: string, verdict: AnswerVerdict): ParkCheck {
 	return { exit_code: answered(issue_number, verdict) }
 }
 
-// A note annotates a permitted park; an exit code stops it before any write.
+// A note annotates a permitted park; an exit code stops it before any write. A recommendation only the
+// parent can carry out (filing, closing, folding) is a hand-off, not a question: an answer the Issue
+// already holds is still one the child cannot act on, so it parks without the judgment
+// (joshuafolkken/kit#8726).
 async function refusal_of(
 	issue_number: string,
 	question: string,
 	directory: string,
 ): Promise<ParkCheck> {
+	if (run_park_body.parent_pick(question)) return undefined
 	const read = await issue_sources.read_sources(issue_number)
 
 	if (read.kind !== 'sources') return { exit_code: read_failure(issue_number, read) }
