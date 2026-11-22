@@ -203,8 +203,10 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		...bounds,
 	})
 	const spun = run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
-	// joshuafolkken/kit#8476: the clocks' colons found as the theme draws them, in its colors.
-	const themed = lines.map((line) => run_board_theme.restyle(redraw.ports.theme, line))
+	// joshuafolkken/kit#8476: the clocks' colons found as the theme draws them, in its colors and in the
+	// icons every write draws (joshuafolkken/kit#8505), so the restyle reuses those writes' cache.
+	const { theme, icons } = redraw.ports
+	const themed = lines.map((line) => run_board_theme.restyle(theme, line, icons))
 	const colons = run_board_spin.colons_in(themed, bounds.size)
 
 	return { ...spun, notes, size: bounds.size, colons }
