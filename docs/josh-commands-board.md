@@ -101,6 +101,7 @@ pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Tel
 pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
 pnpm josh run:board --theme matrix     # green phosphor text and the TRACE gauge
 pnpm josh run:board --once --timing    # one frame, then how long each phase of it took
+pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
 ```
 
 **Options:**
@@ -119,7 +120,8 @@ pnpm josh run:board --once --timing    # one frame, then how long each phase of 
 - `--theme wargames` — bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).
 - `--theme matrix` — draws as `--theme wargames` does, red and amber kept, with uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No lamps or typed rows.
 - `--theme matrix` — a live board types three lead lines in bright green, erasing each, then shows `KNOCK, KNOCK, JOSH.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.
-- `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.
+- `--frame` — one live-form frame in a state its flags fix, for reading what only a live board draws; no frame record, cue or screen control (`run-board-frame-preview.ts`). `--notice <row state>` (`running`, `merged`, …) with `--issue <n>` and `--repeat` (`×2`) sets the notice; `--mute` draws `🔇`; `--columns` / `--rows` the size (120×40); `--ansi` keeps SGR.
+- `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat`, `--every` and `--frame` ignore it.
 - `--timing` — on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`) and the GC within it (`run-board-stall.ts`).
 
 <!-- /usage -->
@@ -239,7 +241,7 @@ While the run is at its `planning` stage, the one row it launches next — a nam
 
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
+**Output / exit codes:** exits 0; an unknown argument, a bad `--every` or a bad `--frame` flag exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
 
 The live board writes why it ended to `.josh/tmp/run-board-exit.json` in the checkout.
 
