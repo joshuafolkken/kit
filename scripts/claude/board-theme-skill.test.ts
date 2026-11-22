@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { closeSync, openSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { epic_chain_kind } from '#scripts/epic/epic-chain-kind'
 import { package_path } from '#scripts/init/init-paths'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
@@ -174,6 +175,51 @@ describe('board-theme skill', () => {
 			expect(skill).toContain(example)
 		},
 	)
+})
+
+const SPLIT_FILE = 'theme-split.md'
+const ORDER_REASON = /--order-reason "#<seam> -> #<effect>: (?<reason>[^"]+)"/u
+const SEAM_CHAIN = [1, 2]
+
+function section_of(markdown: string, heading: string): string {
+	return markdown.split(heading)[1]?.split('\n## ', 1)[0] ?? ''
+}
+
+describe('board-theme skill theme split', () => {
+	const skill = read_skill_file('SKILL.md')
+	const split = read_skill_file(SPLIT_FILE)
+
+	it('points step 5 at the seam-then-parallel split', () => {
+		const step = section_of(skill, '## 5. File the Issue once the user decides')
+
+		expect(step).toContain('seam child, then parallel effect children')
+		expect(step).toContain(`(${SPLIT_FILE})`)
+	})
+
+	it.each([
+		"the theme's row in `THEME_DEFS` with every field",
+		'the colors',
+		'the switches of the existing effects',
+		'the signal each effect reads',
+		'the draw order',
+		'the shared timing constants',
+		'a function that draws nothing',
+		'It touches its own files and tests only, never a shared file',
+		'Declare no dependency between effect children',
+		'Compare the planned paths',
+		'move that socket into the seam child',
+		'after every effect child has\n  merged',
+		'"6. After the first merge"',
+	])('the split carries the rule "%s"', (rule) => {
+		expect(split).toContain(rule)
+	})
+
+	it('gives an order reason the epic accepts for each seam-to-effect chain', () => {
+		const reason = ORDER_REASON.exec(split)?.groups?.['reason'] ?? ''
+
+		expect(reason).not.toBe('')
+		expect(epic_chain_kind.find_refusal([{ chain: SEAM_CHAIN, reason }])).toBeUndefined()
+	})
 })
 
 describe('board-theme skill demo shape', () => {

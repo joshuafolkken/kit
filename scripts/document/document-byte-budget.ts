@@ -59,6 +59,7 @@ function block_ceiling(size: number): number {
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 4096 },
 	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 8192 },
+	{ path: '.claude/skills/board-theme/theme-split.md', bytes: 4096 },
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 4096 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 4096 },
