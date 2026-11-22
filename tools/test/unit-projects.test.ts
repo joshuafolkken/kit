@@ -288,6 +288,23 @@ describe('the unit environment blanks the board theme', () => {
 	})
 })
 
+// joshuafolkken/kit#8684: a snapshot drawing local time was recorded green on a +0700 machine and failed
+// in CI, which runs in UTC.
+describe('the unit environment pins the time zone to UTC', () => {
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('pins TZ for %s', (name) => {
+		expect(project(name).env['TZ']).toBe('UTC')
+	})
+
+	it('pins UTC over an inherited zone', () => {
+		expect(unit_environment({ TZ: 'Asia/Bangkok' })['TZ']).toBe('UTC')
+	})
+
+	it('draws local time in UTC in a test process', () => {
+		expect(process.env['TZ']).toBe('UTC')
+		expect(new Date(0).getHours()).toBe(0)
+	})
+})
+
 // joshuafolkken/kit#4301: execa and zod were the suite's two largest import costs, paid again by every
 // isolated file; an optimizer without them would silently pay them again.
 describe('the dependency optimizer pre-bundles the packages most test files load', () => {
