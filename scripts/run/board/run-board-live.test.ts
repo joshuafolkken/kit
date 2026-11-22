@@ -78,6 +78,14 @@ describe('run_board_live.live_of', () => {
 	})
 })
 
+// joshuafolkken/kit#8683: the bttf board types its notices, operations and rows, with no sound and no
+// other live effect.
+describe('run_board_live.live_of bttf', () => {
+	it('reads only the rows typed from the bttf definition', () => {
+		expect(run_board_live.live_of('bttf')).toStrictEqual({ ...NO_LIVE, types_rows: true })
+	})
+})
+
 describe('run_board_live.watch', () => {
 	it('dims default rules once before the screen control bytes on every redraw', async () => {
 		vi.stubEnv('FORCE_COLOR', '3')
