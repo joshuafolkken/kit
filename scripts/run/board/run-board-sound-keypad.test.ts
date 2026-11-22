@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { run_board_sound_dtmf } from './run-board-sound-dtmf'
 import { run_board_sound_keypad } from './run-board-sound-keypad'
 import { run_board_sound_wav } from './run-board-sound-wav'
+import { run_board_theme_defs } from './run-board-theme-defs'
 
 const { BEEP_MS, LETTERS_PER_BEEP, LINE, beat_keys, key_of, typing_samples, typing_wav } =
 	run_board_sound_keypad
@@ -116,5 +117,6 @@ describe('run_board_sound_keypad.typing_wav — the bttf keypad loop as a cached
 
 	it('keys the beats on the line the bttf theme types', () => {
 		expect(LINE).toBe("Roads? Where we're going, we don't need roads.")
+		expect(run_board_theme_defs.THEME_DEFS.bttf.intro.line).toBe(LINE)
 	})
 })
