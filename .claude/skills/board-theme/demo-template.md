@@ -148,12 +148,12 @@ function moment_of(key, step) {
 // The two rows above the board: the scene playing, then the keys with the chosen one picked out.
 function caption_rows(key, moment) {
 	const { name, note } = SCENES[key]
-	const playing = moment.is_gap ? `[${key}] ${name} - normal display, two seconds, then it plays again` : `[${key}] ${name} - ${note}`
+	const title = moment.is_gap ? `[${key}] ${name} - normal display, two seconds, then it plays again` : `[${key}] ${name} - ${note}`
 	const line = `  KEYS  ${Object.entries(SCENES).map(([each, scene]) => `${each} ${scene.name}`).join('   ')}   Q QUIT`
 	const keys = row_of(line, CAPTION)
 	const at = line.indexOf(`${key} ${name}`)
 	for (let x = at; x < Math.min(W, at + key.length + 1 + name.length); x++) keys[x][1] = CHOSEN
-	return [row_of(`  ${playing}`, moment.is_gap ? CAPTION : WHITE), keys]
+	return [row_of(`  ${title}`, moment.is_gap ? CAPTION : WHITE), keys]
 }
 
 // One frame: the caption rows, then the board at the moment's tick with the scene's effect drawn.
@@ -199,7 +199,7 @@ async function main() {
 	process.on('SIGINT', () => process.exit(0))
 	out(`${ESC}?1049h${ESC}?25l${ESC}2J`)
 	listen()
-	await play(Number(process.env.DEMO_STEPS ?? Infinity))
+	await play(Number(process.env.DEMO_STEPS || Infinity))
 	process.exit(0)
 }
 
