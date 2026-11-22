@@ -179,9 +179,19 @@ function with_holder_plans(
 	return new Map([...declared, ...added])
 }
 
-// Whether `other` holds its files ahead of `plan`: it was cleared, or it planned first. A cleared lane
-// may already be editing, so a kept place in line never takes its files from it.
-function goes_before(other: LanePlan, plan: LanePlan): boolean {
+// The issues whose body declares a person's judgement before the merge (`issue_auto_ok`).
+type Stops = ReadonlySet<number>
+
+// Whether `other` holds its files ahead of `plan`. When only one of them stops for a person before its
+// merge, the self-completing one goes first, cleared or not: the other's wait would last until that
+// check is done (joshuafolkken/kit#8575), and the stopping lane gives its lane back on its next check.
+// Otherwise it was cleared, or it planned first. A cleared lane may already be editing, so a kept place
+// in line never takes its files from it.
+function goes_before(other: LanePlan, plan: LanePlan, stops: Stops): boolean {
+	const is_other_stopping = stops.has(other.issue)
+
+	if (is_other_stopping !== stops.has(plan.issue)) return !is_other_stopping
+
 	return other.cleared === true || other.planned_at < plan.planned_at
 }
 
@@ -191,18 +201,24 @@ function earlier_holders(
 	plan: LanePlan,
 	holders: ReadonlyArray<number>,
 	directory: string,
+	stops: Stops = new Set(),
 ): Array<number> {
 	return holders.filter((holder) => {
 		const other = holder === plan.issue ? undefined : read(holder, directory)
 
-		return other !== undefined && goes_before(other, plan)
+		return other !== undefined && goes_before(other, plan, stops)
 	})
 }
 
 // The first file of `plan` that a lane in `declared` — its recorded plan, else its body — holds ahead of
 // it. `lane:plan` yields on it, and a named run holds the yielded issue back on the same answer.
-function clash_of(plan: LanePlan, declared: Declared, directory: string): Clash | undefined {
-	const holders = earlier_holders(plan, [...declared.keys()], directory)
+function clash_of(
+	plan: LanePlan,
+	declared: Declared,
+	directory: string,
+	stops: Stops = new Set(),
+): Clash | undefined {
+	const holders = earlier_holders(plan, [...declared.keys()], directory, stops)
 
 	return backlog_overlap.path_clash(new Set(plan.paths), declared, holders)
 }
@@ -246,4 +262,4 @@ const lane_plan = {
 }
 
 export { lane_plan }
-export type { LanePlan }
+export type { LanePlan, Stops }
