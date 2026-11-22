@@ -274,10 +274,16 @@ describe('reserved_command — vitest runs test:related can carry', () => {
 		['npx vitest run --config=vitest.config.ts scripts/a.test.ts', CORES - 1],
 		['vitest list scripts/a.test.ts', CORES - 1],
 		['vitest run -t name', CORES - 1],
+		['vitest run --outputFile report.json scripts/a.test.ts', CORES - 1],
+		['vitest run --dir src/x', CORES - 1],
 	])('keeps %j behind reserved-run at its gate weight', (command, weight) => {
 		expect(lane_direct_tool.reserved_command(command, CORES)).toBe(
 			`pnpm josh reserved-run ${String(weight)} -- ${command}`,
 		)
+	})
+
+	it('names both rewrite targets in the rewrite note', () => {
+		expect(lane_direct_tool.RESERVED_NOTE).toContain('vitest to `pnpm josh test:related`')
 	})
 
 	it('hands the rewritten line through the refusal', () => {

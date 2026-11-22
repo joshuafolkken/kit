@@ -2,6 +2,6 @@
 	"reason": "lane-direct-tool gains the test:related rewrite for vitest lines (#8686): the vitest -u [type] option swallowed a following file behind reserved-run and ran the whole suite",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 23
+		"scripts.code_lines": 33
 	}
 }

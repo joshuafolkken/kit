@@ -57,9 +57,14 @@ const RESERVED_RUN = 'pnpm josh reserved-run'
 const TEST_RELATED = 'pnpm josh test:related'
 const RUN_SUBCOMMAND = 'run'
 // The words `test:related` reads as meant and the shell reads unquoted: a flag (`-u`, `--reporter=dot`)
-// or a path (a `.` or `/` in it). A bare word (`3` of `--maxWorkers 3`) would be read as a file.
+// or a path (a `.` or `/` in it). A bare word (`3` of `--maxWorkers 3`) would be read as a file, and so
+// would a path after a flag that may take it as a spaced value (`--outputFile report.json`) — only the
+// update flag, the one this rewrite exists for, is read as taking none.
 const FLAG_WORD = /^-[\w./:=@,+-]*$/u
 const PATH_WORD = /^[\w@+-]*[./][\w./@+-]*$/u
+const FLAG_PREFIX = '-'
+const FLAG_VALUE_SEPARATOR = '='
+const UPDATE_FLAGS: ReadonlySet<string> = new Set(['-u', '--update'])
 // Read on the quote-blanked line: a quoted `;` or `|` is text. `2>&1` applies to the wrapper alike.
 const MULTI_COMMAND_SYNTAX = /[;|&<>()`#\n]|\$\(/u
 const KEPT_REDIRECT = /2>&1/gu
@@ -110,8 +115,17 @@ function can_wrap(line: string, cores: number): boolean {
 	return !command_memory.runs_multi_worker_eslint(line, cores)
 }
 
-function is_rewritable_word(argument: string): boolean {
-	return FLAG_WORD.test(argument) || PATH_WORD.test(argument)
+// True when `previous` is a flag that may take the next word as its spaced value.
+function may_take_value(previous: string | undefined): boolean {
+	if (previous?.startsWith(FLAG_PREFIX) !== true) return false
+
+	return !previous.includes(FLAG_VALUE_SEPARATOR) && !UPDATE_FLAGS.has(previous)
+}
+
+function is_rewritable_word(argument: string, previous: string | undefined): boolean {
+	if (FLAG_WORD.test(argument)) return true
+
+	return PATH_WORD.test(argument) && !may_take_value(previous)
 }
 
 function is_test_related_call(call: ToolCall | undefined): call is ToolCall {
@@ -126,7 +140,9 @@ function test_related_line(calls: ReadonlyArray<ToolCall>): string | undefined {
 
 	const args = call.args[0] === RUN_SUBCOMMAND ? call.args.slice(1) : call.args
 
-	if (args.some((argument) => !is_rewritable_word(argument))) return undefined
+	if (args.some((argument, index) => !is_rewritable_word(argument, args[index - 1]))) {
+		return undefined
+	}
 
 	return [TEST_RELATED, ...args].join(' ')
 }
