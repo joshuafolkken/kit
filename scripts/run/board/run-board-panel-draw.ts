@@ -69,6 +69,15 @@ interface PanelDraw {
 
 type PanelPorts = Pick<BoardPorts, 'write' | 'write_drawn'>
 
+// The area's rows from the rule's line: `AREA_ROWS`, fewer where the frame ends first or the usage
+// section does — at the second blank line under the rule, as before the GitHub row is read.
+function rows_from(lines: ReadonlyArray<string>, rule_index: number): number {
+	const under = lines.slice(rule_index, rule_index + AREA_ROWS)
+	const blanks = [...under.keys()].filter((at) => run_board_fit.width_of(under[at] ?? '') === 0)
+
+	return blanks[1] ?? under.length
+}
+
 // The frame's area found from its lamps on screen: the rule's row above the first lamp's, ended where that
 // rule ends; none with no lamp on screen.
 function area_of(
@@ -79,9 +88,15 @@ function area_of(
 	const [first] = lamps
 
 	if (first === undefined) return undefined
-	const rule = lines[starts.indexOf(first.row) - 1] ?? ''
+	const rule_index = starts.indexOf(first.row) - 1
+	const rule = lines[rule_index] ?? ''
 
-	return { top: first.row - 1, end: run_board_fit.width_of(rule), rows: AREA_ROWS, lamps }
+	return {
+		top: first.row - 1,
+		end: run_board_fit.width_of(rule),
+		rows: rows_from(lines, rule_index),
+		lamps,
+	}
 }
 
 // `text` on `bg`: a style name (`bgYellow`) as it is; a shade as a 24-bit background where the terminal

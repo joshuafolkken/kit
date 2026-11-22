@@ -118,12 +118,12 @@ function speed_cell(area: PanelArea, left: number, tick: number, motion: Motion)
 }
 
 // The first column the figure takes, none where it would reach past the frame's lamp places into the
-// throughput rows.
+// throughput rows, or past the area's last row (joshuafolkken/kit#8712: no GitHub row yet).
 function left_of(area: PanelArea): number | undefined {
 	const left = area.end - FIGURE_WIDTH + 1
 	const start = Math.min(...area.lamps.map((lamp) => lamp.column))
 
-	return left >= start ? left : undefined
+	return left >= start && area.rows > FIGURE_ROWS ? left : undefined
 }
 
 function blanks_of(area: PanelArea, left: number): Array<PanelCell> {

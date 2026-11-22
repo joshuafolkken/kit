@@ -19,6 +19,7 @@ const { PANEL_TICK_MS, area_of, panel_bytes } = run_board_panel_draw
 const { rgb_of } = run_board_paint_fixture
 const PANEL = Array.from({ length: 8 }, () => run_board_spot.LAMP).join(' ')
 const ROWS = [`  24h  5  ${PANEL}`, `   7d     ${PANEL}`]
+const USAGE = ['', '── usage ──', '  Claude', '  Codex', '  GitHub']
 const STARTS = [1, 2, 3]
 const WIDE_END = 100
 const USAGE_ROW = 4
@@ -29,8 +30,8 @@ const JUMP = { start_ms: 0, letters: 30 }
 // The jump itself: the last letter typed, on an even panel tick.
 const JUMP_MS = JUMP.letters * PANEL_TICK_MS
 
-function area_with(rule: string): PanelArea {
-	const lines = [rule, ...ROWS]
+function area_with(rule: string, usage = USAGE): PanelArea {
+	const lines = [rule, ...ROWS, ...usage, '', '── lanes ──']
 	const lamps = run_board_lamp_spots.lamps_in(lines, STARTS, WIDE_END)
 	const area = area_of(lines, STARTS, lamps)
 
@@ -69,7 +70,17 @@ describe('run_board_flux_panel.FLUX_PAINTER cells', () => {
 		expect(LEFT + FIGURE_WIDTH - 1).toBe(WIDE.end)
 	})
 
-	// joshuafolkken/kit#8712: seven rows under the rule, through the GitHub row, and none past it.
+	it('blanks only the lamp places where the figure would reach into the throughput rows', () => {
+		const cells = FLUX_PAINTER.cells(NARROW, AT)
+
+		expect(cells).toStrictEqual(
+			NARROW.lamps.map((lamp) => ({ row: lamp.row, column: lamp.column, text: ' ' })),
+		)
+	})
+})
+
+// joshuafolkken/kit#8712: seven rows under the rule, through the GitHub row, and none past it.
+describe('run_board_flux_panel.FLUX_PAINTER rows', () => {
 	it('covers seven rows under the rule across the figure, idle and flooded', () => {
 		const flooded = { ms: JUMP_MS, is_burst: false, jump: JUMP }
 
@@ -86,11 +97,11 @@ describe('run_board_flux_panel.FLUX_PAINTER cells', () => {
 		}
 	})
 
-	it('blanks only the lamp places where the figure would reach into the throughput rows', () => {
-		const cells = FLUX_PAINTER.cells(NARROW, AT)
+	it('blanks only the lamp places before the GitHub row is drawn', () => {
+		const short = area_with('─'.repeat(WIDE_END), USAGE.slice(0, -1))
 
-		expect(cells).toStrictEqual(
-			NARROW.lamps.map((lamp) => ({ row: lamp.row, column: lamp.column, text: ' ' })),
+		expect(FLUX_PAINTER.cells(short, AT)).toStrictEqual(
+			short.lamps.map((lamp) => ({ row: lamp.row, column: lamp.column, text: ' ' })),
 		)
 	})
 })
