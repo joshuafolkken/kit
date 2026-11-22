@@ -158,6 +158,14 @@ describe('lane_plan_probe.probe when the holder stops for a person', () => {
 	})
 })
 
+describe('lane_plan_probe.stops_of', () => {
+	it('reads a listed issue with no body as completing on its own', () => {
+		const listed = [{ ...running(HOLDER), body: undefined }, running(LANE, HUMAN_BODY)]
+
+		expect(lane_plan_probe.stops_of(listed)).toEqual(new Set([LANE]))
+	})
+})
+
 describe('lane_plan_probe.sized_listing (joshuafolkken/kit#7596)', () => {
 	it('starts the size signals read before the listing is requested', async () => {
 		signals_of.mockClear()

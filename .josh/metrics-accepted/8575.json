@@ -2,6 +2,6 @@
 	"reason": "#8575 adds the human-stop comparison to lane:plan's overlap order (goes_before) and the listing's stops read in clash_among",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 16
+		"scripts.code_lines": 22
 	}
 }

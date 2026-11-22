@@ -148,6 +148,7 @@ const lane_plan_probe = {
 	record_cleared,
 	running_of,
 	sized_listing,
+	stops_of,
 }
 
 export { lane_plan_probe }

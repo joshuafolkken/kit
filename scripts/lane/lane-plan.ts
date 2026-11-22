@@ -231,19 +231,25 @@ function is_yielded(issue: number, directory: string): boolean {
 // what a named run holds the issue back on, as `backlog:next` does on the same kept plan
 // (joshuafolkken/kit#4926). Without it the run relaunches the issue at once, and the lane yields again.
 // `scope`, the issue's own declaration read through `with_plans`, stands in for the kept paths, so a
-// plan comment fixed since the yield is what is held (joshuafolkken/kit#6798).
+// plan comment fixed since the yield is what is held (joshuafolkken/kit#6798). `stops` orders the
+// overlap as `lane:plan` does (joshuafolkken/kit#8575).
+interface YieldHold {
+	scope?: ReadonlySet<string> | undefined
+	stops?: Stops | undefined
+}
+
 function is_yield_held(
 	issue: number,
 	declared: Declared,
 	directory: string,
-	scope?: ReadonlySet<string>,
+	{ scope, stops }: YieldHold = {},
 ): boolean {
 	const plan = read(issue, directory)
 
 	if (plan?.yielded !== true) return false
 	const held = scope === undefined ? plan : { ...plan, paths: [...scope] }
 
-	return clash_of(held, declared, directory) !== undefined
+	return clash_of(held, declared, directory, stops) !== undefined
 }
 
 const lane_plan = {
