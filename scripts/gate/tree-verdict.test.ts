@@ -55,9 +55,9 @@ describe('tree_verdict.read', () => {
 	})
 
 	it('answers nothing once an environment value a check reads changes', async () => {
-		vi.stubEnv('TZ', 'UTC')
+		vi.stubEnv('NODE_ENV', 'test')
 		await tree_verdict.record(GREEN, same_tree, target)
-		vi.stubEnv('TZ', 'Asia/Tokyo')
+		vi.stubEnv('NODE_ENV', 'production')
 
 		expect(tree_verdict.read(TREE, target)).toBeUndefined()
 	})

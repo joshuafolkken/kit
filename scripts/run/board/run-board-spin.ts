@@ -372,7 +372,17 @@ async function spin_to_second(turning: Turning, ports: SpinPorts): Promise<void>
 		: turn_until(turning, ports, second_ms))
 }
 
-const run_board_spin = { REDRAW_MS, SPOT, colons_in, spin_bytes, spin_to_second, spun, starts_of }
+const run_board_spin = {
+	REDRAW_MS,
+	SPOT,
+	colons_in,
+	lamp_moment,
+	painting,
+	spin_bytes,
+	spin_to_second,
+	spun,
+	starts_of,
+}
 
 export { run_board_spin }
 export type { Spun, Turning }

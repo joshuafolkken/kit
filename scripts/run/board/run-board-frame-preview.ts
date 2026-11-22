@@ -1,7 +1,9 @@
 import { parseArgs, stripVTControlCharacters } from 'node:util'
-import type { TerminalSize } from './run-board-fit'
+import { run_board_fit, type TerminalSize } from './run-board-fit'
 import type { Notice } from './run-board-header-notice'
+import { run_board_panel_draw, type PanelCell } from './run-board-panel-draw'
 import { run_board_sound_transition, type Cause } from './run-board-sound-transition'
+import { run_board_spin, type Turning } from './run-board-spin'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_theme_defs } from './run-board-theme-defs'
@@ -17,6 +19,8 @@ const FRAME_USAGE =
 	'--frame [--notice <row state> [--issue <n>] [--repeat]] [--mute] [--columns <n>] [--rows <n>] [--ansi]'
 const DEFAULT_SIZE: TerminalSize = { rows: 40, columns: 120 }
 const COUNT = /^[1-9]\d*$/u
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+const { panel_bytes } = run_board_panel_draw
 const OPTIONS = {
 	notice: { type: 'string' },
 	issue: { type: 'string' },
@@ -111,8 +115,8 @@ function notice_of(options: FrameOptions, now_ms: number): Notice | undefined {
 }
 
 // The live ports in the live screen form, with the size and sound switch fixed, the rows typing where
-// the theme's live board types them (so its lamp panel shows), no cue sounded and no frame store; the
-// frame is collected so its escapes can be left off.
+// the theme's live board types them, marked live (so its lamp panel shows though its rows do not
+// type), no cue sounded and no frame store; the frame is collected so its escapes can be left off.
 function fixed_ports(
 	ports: BoardPorts,
 	options: FrameOptions,
@@ -127,9 +131,68 @@ function fixed_ports(
 		size: () => options.size,
 		sound: () => !options.is_muted,
 		types_rows: run_board_theme_defs.live_of(theme).types_rows,
+		is_live: true,
 		cue: undefined,
 		frames: undefined,
 	}
+}
+
+function graphemes(text: string): Array<string> {
+	return Array.from(GRAPHEMES.segment(text), ({ segment }) => segment)
+}
+
+// A plain line as one entry per screen column: each grapheme in its first, '' in each further one a
+// wide grapheme takes.
+function columns_of(line: string): Array<string> {
+	return graphemes(line).flatMap((grapheme) => [
+		grapheme,
+		...Array.from({ length: run_board_fit.width_of(grapheme) - 1 }, () => ''),
+	])
+}
+
+// The wide grapheme over `index` blanked whole, so a cell written over part of it leaves no half.
+function opened(columns: Array<string>, index: number): void {
+	const lead = columns.findLastIndex((entry, at) => at <= index && entry !== '')
+	const width = run_board_fit.width_of(columns[lead] ?? '')
+
+	if (width > 1 && lead + width > index) columns.fill(' ', lead, lead + width)
+}
+
+// A cell's text written over a line's columns from its column, the line padded out to it.
+function placed(columns: Array<string>, cell: PanelCell): void {
+	const start = cell.column - 1
+	const text = graphemes(cell.text)
+
+	opened(columns, start)
+	opened(columns, start + text.length - 1)
+	columns.push(...Array.from({ length: Math.max(0, start - columns.length) }, () => ' '))
+	columns.splice(start, text.length, ...text)
+}
+
+// The plain frame with the cells laid over it, each at its 1-based row and column as the live board's
+// cursor writes place it.
+function overlaid(text: string, cells: ReadonlyArray<PanelCell>): string {
+	const lines = text.split('\n').map((line) => columns_of(line))
+
+	for (const cell of cells) {
+		const line = lines[cell.row - 1]
+
+		if (line !== undefined) placed(line, cell)
+	}
+
+	return lines.map((line) => line.join('')).join('\n')
+}
+
+// The frame with the theme's painter drawn as the live board's first turn draws it (joshuafolkken/kit#8674):
+// its cells' escapes after the frame under `--ansi`, else laid over the plain lines.
+function painted(text: string, drawn: Turning, options: FrameOptions, now_ms: number): string {
+	const panel = run_board_spin.painting(drawn)
+	const at = run_board_spin.lamp_moment(drawn, now_ms)
+
+	if (options.is_ansi) return panel === undefined ? text : text + panel_bytes(panel, at, undefined)
+	const cells = panel === undefined ? [] : panel.painter.cells(panel.area, at)
+
+	return overlaid(stripVTControlCharacters(text), cells)
 }
 
 async function draw(
@@ -155,13 +218,12 @@ async function draw(
 		notice: notice_of(options, ports.now()),
 	}
 
-	await run_board_tick.tick(state, run_board_theme.themed(fixed, theme))
-	const text = parts.join('')
+	const drawn = await run_board_tick.tick(state, run_board_theme.themed(fixed, theme))
 
-	ports.write(options.is_ansi ? text : stripVTControlCharacters(text))
+	ports.write(painted(parts.join(''), drawn, options, ports.now()))
 }
 
-const run_board_frame_preview = { FRAME_FLAG, FRAME_USAGE, draw, options_of }
+const run_board_frame_preview = { FRAME_FLAG, FRAME_USAGE, draw, options_of, overlaid, painted }
 
 export { run_board_frame_preview }
 export type { FrameOptions }

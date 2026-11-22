@@ -1,0 +1,7 @@
+{
+	"reason": "The board-theme demo template now carries key-picked looping scenes and a two-row caption (#8687); both skill files stay inside their byte budgets",
+	"date": "2026-11-22",
+	"growth": {
+		"ai_cost.on_demand_bytes": 1990
+	}
+}

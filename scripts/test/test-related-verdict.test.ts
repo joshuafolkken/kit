@@ -64,9 +64,9 @@ describe('test_related_verdict.run', () => {
 	})
 
 	it('runs again when verification inputs change', async () => {
-		vi.stubEnv('TZ', 'UTC')
+		vi.stubEnv('NODE_ENV', 'test')
 		await test_related_verdict.run([], fresh)
-		vi.stubEnv('TZ', 'Asia/Tokyo')
+		vi.stubEnv('NODE_ENV', 'production')
 		await test_related_verdict.run([], fresh)
 		expect(fresh).toHaveBeenCalledTimes(2)
 	})

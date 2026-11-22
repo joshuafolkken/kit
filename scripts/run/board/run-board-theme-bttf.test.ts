@@ -56,7 +56,7 @@ describe('run_board_theme_defs bttf', () => {
 		expect(run_board_icons.default_of('bttf')).toBe('shapes')
 		expect(BTTF.alert(1)).toBeUndefined()
 		expect(BTTF.typing(LETTER_MS)).toBeUndefined()
-		expect(BTTF.lamps).toBe(false)
+		expect(BTTF.lamps).toBe(true)
 	})
 
 	it('keeps the colon blinking every half second', () => {

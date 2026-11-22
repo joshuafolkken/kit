@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_flux_panel } from './run-board-flux-panel'
 import { run_board_idle_rain } from './run-board-idle-rain'
 import { run_board_lamp_spots } from './run-board-lamp-spots'
 import { run_board_lamps } from './run-board-lamps'
@@ -76,12 +77,12 @@ describe('run_board_panel_painters.RAIN_PAINTER', () => {
 })
 
 describe('run_board_theme_defs.panel_of', () => {
-	it('hands the wargames lamps and the matrix rain, and nothing in no theme', () => {
+	it('hands the wargames lamps, the matrix rain and the bttf flux, and nothing in no theme', () => {
 		const { panel_of } = run_board_theme_defs
 
 		expect(panel_of('wargames')).toBe(LAMP_PAINTER)
 		expect(panel_of('matrix')).toBe(RAIN_PAINTER)
-		expect(panel_of('bttf')).toBeUndefined()
+		expect(panel_of('bttf')).toBe(run_board_flux_panel.FLUX_PAINTER)
 		expect(panel_of(undefined)).toBeUndefined()
 	})
 })
