@@ -5,7 +5,7 @@ import type { TerminalSize } from './run-board-fit'
 import type { FrameBounds } from './run-board-fold'
 import type { BoardHeader } from './run-board-header'
 import type { RainMoment } from './run-board-idle-rain'
-import { run_board_jump_start } from './run-board-jump-start'
+import { run_board_jump_start, type JumpState } from './run-board-jump-start'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
@@ -376,7 +376,7 @@ function effects_of(
 	state: BoardState,
 	frame: FrameEffects,
 	redraw: Redraw,
-): Pick<BoardState, 'rules' | 'strips' | 'panel' | 'notice_trace' | 'jump' | 'arrive_ms'> {
+): Pick<BoardState, 'rules' | 'strips' | 'panel' | 'notice_trace'> & JumpState {
 	const { drawn, notice_trace } = frame
 	const panel = panel_of(redraw.ports, drawn)
 	const jump_frame = {
@@ -387,10 +387,9 @@ function effects_of(
 		area: panel?.area,
 		now_ms: redraw.now_ms,
 	}
-	const jump = run_board_jump_start.jump_of(state.jump, jump_frame)
-	const arrive_ms = run_board_jump_start.arrive_of(state.arrive_ms, jump_frame)
+	const jumped = run_board_jump_start.jump_state(state, jump_frame)
 
-	return { ...decoded_of(redraw.ports, drawn), panel, notice_trace, jump, arrive_ms }
+	return { ...decoded_of(redraw.ports, drawn), panel, notice_trace, ...jumped }
 }
 
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the

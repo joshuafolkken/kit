@@ -5,7 +5,7 @@ import { run_board_jump } from './run-board-jump'
 import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 import { run_board_jump_start, type JumpFrame } from './run-board-jump-start'
 import type { CueName } from './run-board-sound-cues'
-import { run_board_type_rows } from './run-board-type-rows'
+import { run_board_type_rows, type KeyedLine } from './run-board-type-rows'
 
 const { arrive_of, jump_of } = run_board_jump_start
 const { END_TICKS, THAW_AT, THAW_TICKS, TICK_MS, WASH_TICKS } = run_board_jump
@@ -159,5 +159,40 @@ describe('run_board_jump_start.arrive_of', () => {
 		const matrix = { ...live, theme: 'matrix' as const }
 
 		expect(arrive_of(undefined, frame_of({ ports: matrix, area }))).toBeUndefined()
+	})
+})
+
+describe('run_board_jump_start.jump_state — the lane swap', () => {
+	const merged: KeyedLine = {
+		key: `lanes:${String(ISSUE)}`,
+		row: LANE_ROW + 1,
+		index: LANE_ROW,
+		text: 'gone',
+		prefix_columns: 0,
+	}
+	const left = LINES.slice(0, LANE_ROW)
+
+	function dropped(): JumpFrame {
+		return frame_of({ drawn: { lines: left, spots: [], size: undefined, keyed: [] } })
+	}
+
+	it('ac-066a13f7 starts the jump on the row the merged lane left, drawing it back', () => {
+		const last = { lane_memory: { lines: [merged], left: [] } }
+		const { jump, lane_memory } = run_board_jump_start.jump_state(last, dropped())
+
+		if (jump === undefined) throw new Error('no jump started on the merged row')
+		expect(lane_memory).toStrictEqual({ lines: [], left: [merged] })
+		expect(jump.run.lane).toStrictEqual({ row: LANE_ROW, text: 'gone' })
+		expect(jump.scene.lane).toBe(LANE_ROW)
+		expect(jump.gone).toMatchObject({ row: LANE_ROW })
+		expect(jump.gone?.cells.map((cell) => cell.text).join('')).toBe('gone')
+	})
+
+	it('ac-0cd6f361 draws no merged row back where none left', () => {
+		const state = run_board_jump_start.jump_state({}, frame_of())
+
+		expect(state.jump?.run.lane).toBeUndefined()
+		expect(state.jump?.gone).toBeUndefined()
+		expect(state.lane_memory).toStrictEqual({ lines: [], left: [] })
 	})
 })
