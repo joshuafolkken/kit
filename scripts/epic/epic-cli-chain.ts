@@ -1,5 +1,6 @@
 import { session_cite } from '#scripts/issue/session-cite'
 import { epic_body, type OrderReason } from './epic-body'
+import { epic_chain_kind } from './epic-chain-kind'
 import { epic_chains, type InsertPosition } from './epic-chains'
 import { epic_cli_argv, type EpicArgv } from './epic-cli-argv'
 import {
@@ -217,8 +218,17 @@ function find_missing_reason_refusal(
 	return `The declared order \`${chain}\` has no \`${ORDER_REASON_FLAG} "${chain}: <reason>"\`; every declared chain needs its reason. Nothing was written.`
 }
 
-// The reasons given for the declared chains, or a refusal — a value that does not fit, or a declared
-// chain left without its reason.
+// A creation or promotion — the subjects whose children are known — asks each declared order for its
+// kind (`epic-chain-kind.ts`); `--add` does not.
+function find_kind_refusal(
+	reasons: ReadonlyArray<OrderReason>,
+	subject: ChainSubject,
+): string | undefined {
+	return subject.children === undefined ? undefined : epic_chain_kind.find_refusal(reasons)
+}
+
+// The reasons given for the declared chains, or a refusal — a value that does not fit, a declared
+// chain left without its reason, or a creation's order with no kind.
 function read_order_reasons(
 	parsed: EpicArgv,
 	subject: ChainSubject,
@@ -231,7 +241,9 @@ function read_order_reasons(
 	})
 	const order_reasons = values.flatMap((value) => to_order_reason(value) ?? [])
 	const chain_refusal =
-		find_reason_refusal(values, declared) ?? find_missing_reason_refusal(order_reasons, declared)
+		find_reason_refusal(values, declared) ??
+		find_missing_reason_refusal(order_reasons, declared) ??
+		find_kind_refusal(order_reasons, subject)
 	if (chain_refusal !== undefined) return { chain_refusal }
 
 	return { order_reasons }

@@ -124,8 +124,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one; the
 	// premise row (joshuafolkken/kit#7021) crossed the 16384 one; the before-merge criterion of the
 	// human-judgement declaration (joshuafolkken/kit#8246) crossed the 20480 one.
-	// The template's en column (joshuafolkken/kit#7211).
-	{ path: 'prompts/collaboration-workflow/issue-template.en.md', bytes: 8192 },
+	// The template's en column (joshuafolkken/kit#7211); the declared-order kind rows
+	// (joshuafolkken/kit#8636) crossed the 8192 one — the table mirrors every key, so it cannot shrink.
+	{ path: 'prompts/collaboration-workflow/issue-template.en.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 24_576 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },

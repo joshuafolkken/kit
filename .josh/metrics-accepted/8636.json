@@ -1,0 +1,9 @@
+{
+	"reason": "#8636 adds the declared-order kind check (epic-chain-kind.ts) and its two body-key kinds plus guidance rows",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 41,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 382
+	}
+}

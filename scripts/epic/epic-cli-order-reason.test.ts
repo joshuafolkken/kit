@@ -22,11 +22,12 @@ describe('epic_cli.parse_create_arguments — a declared order needs its reason'
 	})
 
 	it('takes --ordered with the reason for its chain', () => {
-		const argv = [TITLE, '101', '102', ORDERED, REASON, `${ORDERED_CHAIN}: #102 uses #101`]
+		const why = '1 パスで検証できない — #102 uses #101'
+		const argv = [TITLE, '101', '102', ORDERED, REASON, `${ORDERED_CHAIN}: ${why}`]
 		const parsed = epic_cli.parse_create_arguments(argv)
 
 		expect(parsed?.chain_refusal).toBeUndefined()
-		expect(parsed?.order_reasons).toStrictEqual([{ chain: [101, 102], reason: '#102 uses #101' }])
+		expect(parsed?.order_reasons).toStrictEqual([{ chain: [101, 102], reason: why }])
 	})
 
 	it('refuses a --chain left without a reason beside one that has its own', () => {
