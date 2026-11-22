@@ -17,7 +17,7 @@ import { epic_split_reach } from './epic-split-reach'
 import { epic_untrack } from './epic-untrack'
 
 const FLAGS =
-	'[--ordered | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
+	'[--ordered | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <kind> — <reason>" ...] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,

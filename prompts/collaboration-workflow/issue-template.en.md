@@ -129,6 +129,8 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 | value   | 分けられない         | cannot split                   |
 | value   | 分けない方が良い     | better not split               |
 | value   | 全体が遅くなる       | slower overall                 |
+| value   | 1 パスで検証できない | unverifiable in one pass       |
+| value   | 別の待ちがある       | waits on another               |
 | heading | 概要                 | Summary                        |
 | heading | 背景                 | Background                     |
 | heading | 現象                 | Symptom                        |

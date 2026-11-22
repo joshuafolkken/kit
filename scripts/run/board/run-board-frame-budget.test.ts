@@ -311,6 +311,18 @@ describe('run_board_rain_drop draw budget', () => {
 
 		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
 	})
+
+	// joshuafolkken/kit#8627: a poured drop's head sums its hurried steps in closed form, so the
+	// frames after the typing ends stay within one step too.
+	it('writes a step within one step while the poured drops hurry after the typing', () => {
+		const spent = Array.from({ length: DRAWS }, (_, index) => {
+			const at_ms = START + index * SECOND_MS
+
+			return drop_ms(at_ms, [{ from_ms: at_ms - 10 * SECOND_MS, to_ms: at_ms - SECOND_MS }])
+		})
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
 })
 
 // joshuafolkken/kit#8626: the reveal's and the wipe's tails run one to two screens long, so a whole pass

@@ -70,6 +70,9 @@ const VALUES = {
 	cannot_split: { ja: '分けられない', en: 'cannot split' },
 	better_unsplit: { ja: '分けない方が良い', en: 'better not split' },
 	slower_overall: { ja: '全体が遅くなる', en: 'slower overall' },
+	// The kinds an epic's declared order opens with at creation (joshuafolkken/kit#8636).
+	unverifiable_in_one_pass: { ja: '1 パスで検証できない', en: 'unverifiable in one pass' },
+	other_wait: { ja: '別の待ちがある', en: 'waits on another' },
 } as const satisfies Record<string, Row>
 
 const HEADINGS = {

@@ -30,7 +30,7 @@ is a `declaration_mismatch` that stops `epic:next` and the run.
 
 At creation (or `--promote`) pass one `--chain` per line above; children added later take `pnpm josh epic --add <E> <N…> --chain "#D -> #X"`,
 which may name existing children, so joins and branches through a hub need no hand edit. Each chain
-needs its `--order-reason "<chain>: <reason>"` (`SKILL.md` → "Creating an epic").
+needs its `--order-reason "<chain>: <reason>"`, opening with `<kind> — ` at creation or `--promote` (`SKILL.md` → "Creating an epic").
 
 **Delete a declared order with `pnpm josh epic --remove <E> <M> <N> [<N2> …]`, never a hand edit.**
 Each consecutive pair is one order. **The ends are never reconnected** (`#A -> #B -> #C` minus

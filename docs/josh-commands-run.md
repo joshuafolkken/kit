@@ -115,9 +115,9 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` 
 Set a run aside and place its split or prerequisite into an epic in one call.
 
 ```bash
-pnpm josh run:split 1091 --children 1102,1103 --title "Split 1091"                                  # independent split
-pnpm josh run:split A --children B --ordered --order-reason "#A -> #B: B calls the parser A adds"   # B after A
-pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"                               # 1104 first
+pnpm josh run:split 1091 --children 1102,1103 --title "Split 1091"                                                        # independent split
+pnpm josh run:split A --children B --ordered --order-reason "#A -> #B: unverifiable in one pass — B needs A live first"   # B after A
+pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"                                                     # 1104 first
 ```
 
 **Options:**
@@ -125,7 +125,7 @@ pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"           
 - `--children <N1,N2,...>` — the filed split issues, comma-separated.
 - `--ordered` — `<issue>` first, then the children in that order.
 - `--chain <chain>` — repeatable; one chain line (`#A -> #B`) among `<issue>` and the children, passed to `epic` as given — joins and branches without `--ordered`.
-- `--order-reason "<chain>: <reason>"` — repeatable; required once for each declared chain (the `--ordered` chain, or each `--chain`): what the later issue takes from the earlier one, passed to `epic` as given. A declared chain without one is refused before anything is set aside.
+- `--order-reason "<chain>: <reason>"` — repeatable; required once for each declared chain (the `--ordered` chain, or each `--chain`): what the later issue takes from the earlier one, opening with its kind (`epic`'s `--order-reason`), passed to `epic` as given. A declared chain without one, or without its kind, is refused before anything is set aside.
 - `--prerequisite <P>` — the filed issue that has to land first; `<issue>` is paused on it.
 - `--title <title>` — the new epic’s title; required when no epic tracks `<issue>` yet.
 
