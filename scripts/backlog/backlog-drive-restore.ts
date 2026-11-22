@@ -107,14 +107,18 @@ function is_readmitted(
 }
 
 // An exclusion less the issues a later `run:add --retry` put back: the drive added them when it
-// collected the withdrawn or yield-capped child, or carried them in on its `--exclude`.
+// collected the withdrawn or yield-capped child, or carried them in on its `--exclude`. One the retried
+// attempt settled again — merged, say — stays out.
 function without_readmitted(
 	exclude: ReadonlyArray<string>,
 	events: ReadonlyArray<RunEvent>,
 ): ReadonlyArray<string> {
 	const current = run_event_retry.current_attempts(events)
+	const settled = settled_issues(events)
 
-	return exclude.filter((issue) => !is_readmitted(events, current, issue))
+	return exclude.filter(
+		(issue) => settled.has(Number(issue)) || !is_readmitted(events, current, issue),
+	)
 }
 
 // The issues this run found waiting for their measurement sample (joshuafolkken/kit#6503): a drive

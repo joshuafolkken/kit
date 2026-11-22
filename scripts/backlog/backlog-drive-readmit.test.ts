@@ -81,6 +81,12 @@ describe('backlog_drive_restore — a yield-capped park a retry put back', () =>
 		expect(backlog_drive_restore.without_readmitted([CHILD], again)).toStrictEqual([CHILD])
 	})
 
+	it('keeps a retried yield-capped child out once the retried attempt merged', () => {
+		const merged = [...CAPPED_RETRIED, event(4, 'merge', '#2508 merged')]
+
+		expect(backlog_drive_restore.without_readmitted([CHILD], merged)).toStrictEqual([CHILD])
+	})
+
 	it('keeps a child parked for another cause out after a retry', () => {
 		const other = [event(2, 'park', '#2508 parked (run:stalled: ship-stop cap)'), RETRY]
 
