@@ -47,6 +47,9 @@ words:
   - ncat
   # The Xcode launcher `launched-call.ts` looks past, so `xcrun security` reaches the keychain check (#7198).
   - xcrun
+  # Phone-keypad letter groups the bttf keypad beep maps letters through (#8698).
+  - pqrs
+  - wxyz
   # The option-parsing convention the #7198 review cites for `security -qi` flag clusters.
   - getopt
   # `security -pstop`, an attached-prompt spelling the #7198 round-2 review quotes in its record.

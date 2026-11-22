@@ -219,7 +219,7 @@ const THEME_DEFS = {
 		idle: BTTF.dim,
 		plain: { dim: BTTF.dim },
 		circuits: [BTTF.destination, BTTF.present, BTTF.departed],
-		intro: { line: "Roads? Where we're going, we don't need roads.", letter_ms: 50, hold_ms: 2000 },
+		intro: { line: run_board_sound_keypad.LINE, letter_ms: 50, hold_ms: 2000 },
 		alert: no_alert,
 		// joshuafolkken/kit#8674: the flux capacitor, the lamp gauge and the speed readout at idle.
 		lamps: true,
