@@ -4,7 +4,8 @@ import type { BoardRow, RowReason } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
 import { run_board_render_title, type RowCut } from './run-board-render-title'
 
-const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, title_of } = run_board_render_title
+const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, fitted_limit, reason_text, title_of } =
+	run_board_render_title
 
 const SECOND = 1000
 const NOW = 1_000_000
@@ -191,5 +192,26 @@ describe('run_board_render_title.fitted on a parked row with a linked reason', (
 
 		expect(line.endsWith(ELLIPSIS)).toBe(true)
 		expect(run_board_fit.width_of(line)).toBe(FLOOR_PANE)
+	})
+})
+
+// joshuafolkken/kit#8590: a section whose title column is narrower than `TITLE_LIMIT`, the decision
+// rows' as wide as their widest title.
+const SECTION_LIMIT = 20
+const SHARED = 5
+
+describe('run_board_render_title.fitted at a section title column', () => {
+	it('draws a whole row at the section title column (ac-fb1412e6)', () => {
+		const row = row_of({ state: 'human', reason: UNTRIAGED })
+		const whole = draw_of(row)({ title_limit: SECTION_LIMIT, reason_cut: 0 })
+
+		expect(fitted(row, WIDE_PANE, draw_of(row), { limit: SECTION_LIMIT })).toBe(whole)
+	})
+
+	it('narrows the title from the section title column (ac-fb1412e6)', () => {
+		const row = row_of({ state: 'human', reason: UNTRIAGED })
+		const fit = { limit: SECTION_LIMIT, shared: SHARED }
+
+		expect(fitted_limit(row, WIDE_PANE, draw_of(row), fit)).toBe(SECTION_LIMIT - SHARED)
 	})
 })

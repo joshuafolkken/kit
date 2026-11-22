@@ -89,13 +89,21 @@ interface RowFit {
 	// A waiting row whose title is padded to the title column all the same — a queued row's, so its
 	// path starts where a waiting row's reason does (joshuafolkken/kit#8257).
 	is_title_padded?: boolean
+	// The title column's width, where a section draws it narrower than `TITLE_LIMIT` — the decision
+	// rows', as wide as their widest title (joshuafolkken/kit#8590).
+	limit?: number | undefined
+}
+
+// The row drawn whole: its title at its title column, its reason uncut.
+function whole_of(fit: RowFit): RowCut {
+	return fit.limit === undefined ? WHOLE : { title_limit: fit.limit, reason_cut: 0 }
 }
 
 // The columns a row's head runs past the pane at its whole title; none where it is not kept.
 function head_overrun(fit: RowFit, columns: number | undefined): number {
 	if (fit.head === undefined || fit.is_head_kept !== true) return 0
 
-	return overrun_of(fit.head(WHOLE), true, columns)
+	return overrun_of(fit.head(whole_of(fit)), true, columns)
 }
 
 // The columns the row's title cell takes as drawn: a waiting row's title is not padded unless its fit
@@ -106,8 +114,9 @@ function is_padded(row: BoardRow, fit: RowFit): boolean {
 
 function drawn_width(row: BoardRow, fit: RowFit): number {
 	const title = (row.title?.length ?? 0) + (fit.lead ?? 0)
+	const limit = whole_of(fit).title_limit
 
-	return is_padded(row, fit) ? TITLE_LIMIT : Math.min(TITLE_LIMIT, title)
+	return is_padded(row, fit) ? limit : Math.min(limit, title)
 }
 
 // The row's title once it has given up `overrun` columns, never under the floor.
@@ -141,7 +150,7 @@ function row_overrun(
 	fit: RowFit = {},
 ): number {
 	const line = overrun_of(
-		draw(WHOLE),
+		draw(whole_of(fit)),
 		fit.is_line_kept === true || row.reason !== undefined,
 		columns,
 	)
@@ -171,7 +180,7 @@ function fitted(
 ): string {
 	const title_limit = fitted_limit(row, columns, draw, fit)
 
-	if (title_limit === undefined) return draw(WHOLE)
+	if (title_limit === undefined) return draw(whole_of(fit))
 
 	return reason_fitted(row, columns, title_limit, draw)
 }

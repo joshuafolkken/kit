@@ -83,6 +83,12 @@ function title_text(row: BoardRow, frame: RowFrame): string {
 	return `${FILED_LEAD}${title_of(title, frame.title_limit - FILED_LEAD.length)}`
 }
 
+// The columns a row's title takes cut to the frame's title column, its ✚ among them — what a section
+// as wide as its widest title is measured by (joshuafolkken/kit#8590).
+function title_width(row: BoardRow, frame: RowFrame): number {
+	return title_text(row, frame).length
+}
+
 // The time padded by its net time to the time column — blanks where a row has none — so the net times
 // end in one column, and its bracketed stops padded to the stops column, so what follows starts in one
 // (joshuafolkken/kit#7992). A row with nothing after it is trimmed at its end (`row_text`).
@@ -234,6 +240,7 @@ function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 		is_head_kept: frame.is_lane_row === true,
 		shared: is_tailed ? frame.shared : undefined,
 		is_title_padded: is_title_padded(row, frame),
+		limit: frame.title_limit,
 	}
 }
 
@@ -271,6 +278,7 @@ const run_board_render_row = {
 	row_fit,
 	row_line,
 	shared_overrun,
+	title_width,
 }
 
 export { run_board_render_row }

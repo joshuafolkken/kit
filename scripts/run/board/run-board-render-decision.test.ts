@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_render_row } from './run-board-render-row'
 import { run_board_row_key } from './run-board-row-key'
 
-const { EMPTY_LAYOUT, header, unfinished } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, header, unfinished } = run_board_render_fixture
+const { GAP } = run_board_render_row
 const ISSUE = 6253
 const COLUMNS = 65
 const ROWS = 100
@@ -79,4 +81,53 @@ describe('run board decision tails', () => {
 			expect(key).toBe(`${section}:${String(ISSUE)}`)
 		},
 	)
+})
+
+// joshuafolkken/kit#8590: a decision row's action starts right after the section's widest title.
+const SHORT = { number: 8432, title: 'Shorten board notice text' }
+const LONG = { number: 5272, title: 'Upgrade TypeScript to 7 and fix forward' }
+const LANE = 7001
+const WIDE_COLUMNS = 200
+const SLEEP = { from_ms: NOW - 40 * MINUTE, to_ms: NOW - 10 * MINUTE }
+
+function decision_row(issue: { number: number; title: string }): BoardRow {
+	return { ...row_of(false), ...issue, reason: { tail: '→ decide' } }
+}
+
+// A running lane row with a time and a stop, so the frame's time and stops columns are wide.
+function lane_row(): BoardRow {
+	const status = { state: 'running' as const, started_ms: NOW - MINUTE, gaps: [SLEEP] }
+
+	return { ...row_of(false), number: LANE, state: 'running', status, reason: undefined }
+}
+
+function decision_lines(): Array<string> {
+	const layout = {
+		...EMPTY_LAYOUT,
+		active: [lane_row()],
+		people: [decision_row(SHORT), decision_row(LONG)],
+	}
+	const lines = run_board_render.render({
+		header: header({ layout }),
+		notes: [],
+		size: { rows: ROWS, columns: WIDE_COLUMNS },
+	})
+
+	return lines.map((line) => stripVTControlCharacters(line))
+}
+
+function line_with(lines: ReadonlyArray<string>, number: number): string {
+	return lines.find((line) => line.includes(String(number))) ?? ''
+}
+
+describe('run board decision columns', () => {
+	it('starts the action two columns after the widest title, no time column between (ac-fb1412e6, ac-138a93d6)', () => {
+		const lines = decision_lines()
+		const long = line_with(lines, LONG.number)
+		const short = line_with(lines, SHORT.number)
+		const action = long.indexOf(LONG.title) + LONG.title.length + GAP.length
+
+		expect(long.indexOf('→')).toBe(action)
+		expect(short.indexOf('→')).toBe(action)
+	})
 })
