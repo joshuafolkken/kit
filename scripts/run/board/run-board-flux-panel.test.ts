@@ -97,12 +97,16 @@ describe('run_board_flux_panel.FLUX_PAINTER rows', () => {
 		}
 	})
 
-	it('blanks only the lamp places before the GitHub row is drawn', () => {
+	it('draws the figure through the last usage row where no GitHub row is drawn', () => {
 		const short = area_with('─'.repeat(WIDE_END), USAGE.slice(0, -1))
-
-		expect(FLUX_PAINTER.cells(short, AT)).toStrictEqual(
-			short.lamps.map((lamp) => ({ row: lamp.row, column: lamp.column, text: ' ' })),
+		const below = FLUX_PAINTER.cells(short, AT).filter(
+			(cell) => cell.row > short.top && cell.column >= LEFT,
 		)
+
+		expect(new Set(below.map((cell) => cell.row - short.top))).toStrictEqual(
+			new Set([1, 2, 3, 4, 5, 6]),
+		)
+		expect(below.some((cell) => cell.text.trim() !== '')).toBe(true)
 	})
 })
 

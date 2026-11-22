@@ -118,16 +118,22 @@ function speed_cell(area: PanelArea, left: number, tick: number, motion: Motion)
 }
 
 // The first column the figure takes, none where it would reach past the frame's lamp places into the
-// throughput rows, or past the area's last row (joshuafolkken/kit#8712: no GitHub row yet).
+// throughput rows.
 function left_of(area: PanelArea): number | undefined {
 	const left = area.end - FIGURE_WIDTH + 1
 	const start = Math.min(...area.lamps.map((lamp) => lamp.column))
 
-	return left >= start && area.rows > FIGURE_ROWS ? left : undefined
+	return left >= start ? left : undefined
+}
+
+// The figure's rows the area holds: all of them under the GitHub row, its top ones where the area ends
+// first — the rate limit not read, joshuafolkken/kit#8712.
+function rows_shown(area: PanelArea): number {
+	return Math.min(FIGURE_ROWS, area.rows - 1)
 }
 
 function blanks_of(area: PanelArea, left: number): Array<PanelCell> {
-	return Array.from({ length: FIGURE_ROWS * FIGURE_WIDTH }, (_, index) => ({
+	return Array.from({ length: rows_shown(area) * FIGURE_WIDTH }, (_, index) => ({
 		row: area.top + 1 + Math.floor(index / FIGURE_WIDTH),
 		column: left + (index % FIGURE_WIDTH),
 		text: BLANK,
@@ -141,10 +147,15 @@ function figure_cells(area: PanelArea, left: number, at: PanelMoment): Array<Pan
 	const gauge = { row: top, column: left + FLUX_WIDTH + GAP }
 	const flux = { row: top, column: left }
 
-	return [
-		...blanks_of(area, left),
+	const bottom = top + rows_shown(area)
+	const figure = [
 		...flux_cells(flux, tick, motion.range_at(tick), motion.flux),
 		...gauge_cells(gauge, tick, motion.range_at, motion.gauge),
+	]
+
+	return [
+		...blanks_of(area, left),
+		...figure.filter((cell) => cell.row < bottom),
 		speed_cell(area, left, tick, motion),
 	]
 }
