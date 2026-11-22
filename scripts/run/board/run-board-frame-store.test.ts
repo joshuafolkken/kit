@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync, writeFileSync } from 'node:fs'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_frame_store } from './run-board-frame-store'
 
 const { CHAT_KEY, FRESH_MS, file_store, fresh, latest_writer, memory_store, once_key, path_of } =
@@ -133,5 +133,32 @@ describe('run_board_frame_store.fresh', () => {
 	it('keeps a still frame drawn on a terminal apart from a piped one', () => {
 		expect(once_key(undefined, true)).not.toBe(once_key(undefined, false))
 		expect(once_key('wargames', true)).not.toBe(once_key('wargames', false))
+	})
+})
+
+// joshuafolkken/kit#8616: a piped frame forced into color is recorded apart from an uncolored one.
+describe('run_board_frame_store.once_key — the colors stdout draws', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it.each([undefined, 'wargames', 'matrix'] as const)(
+		'keys %s by the forced color depth',
+		(theme) => {
+			vi.stubEnv('FORCE_COLOR', '0')
+			const plain = once_key(theme, false)
+
+			vi.stubEnv('FORCE_COLOR', '1')
+
+			expect(once_key(theme, false)).toBe(`${plain}-color4`)
+		},
+	)
+
+	it.each(['1', undefined])('draws a pipe in color under FORCE_COLOR alone, NO_COLOR=%s', (no) => {
+		vi.stubEnv('FORCE_COLOR', undefined)
+		vi.stubEnv('NO_COLOR', no)
+		expect(once_key(undefined, false)).toBe('once-pipe')
+		vi.stubEnv('FORCE_COLOR', '3')
+		expect(once_key(undefined, false)).toBe('once-pipe-color24')
 	})
 })

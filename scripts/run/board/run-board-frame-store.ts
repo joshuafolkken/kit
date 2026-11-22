@@ -1,3 +1,5 @@
+import { WriteStream } from 'node:tty'
+import { styleText } from 'node:util'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
@@ -13,6 +15,7 @@ const FRAME_PREFIX = 'josh-run-board-frame-'
 const FRESH_MS = MS_PER_MINUTE
 const CHAT_KEY = 'chat'
 const ONCE_KEY = 'once'
+const COLOR_PROBE = 'x'
 
 interface RecordedFrame {
 	text: string
@@ -153,6 +156,15 @@ function save_only(store: FrameStore | undefined): FrameStore | undefined {
 	return { load: no_record, save: store.save }
 }
 
+// joshuafolkken/kit#8616: the colors this process's stdout draws in — none, or the color depth — so a
+// frame forced into color (`FORCE_COLOR`) is never answered by one recorded without, nor the reverse.
+// `styleText` decides from stdout and the color variables, as every color on the frame does.
+function colors_drawn(): string | undefined {
+	if (styleText('red', COLOR_PROBE) === COLOR_PROBE) return undefined
+
+	return `color${String(WriteStream.prototype.getColorDepth())}`
+}
+
 // A still frame in a theme is drawn in its own colors, and one on a terminal carries its links, so each
 // theme and each output keeps its own record; icons other than the theme's default keep theirs too
 // (joshuafolkken/kit#8505).
@@ -160,7 +172,9 @@ function once_key(theme: Theme | undefined, is_tty: boolean, icons?: Icons): str
 	const output = is_tty ? 'tty' : 'pipe'
 	const drawn = icons === run_board_icons.default_of(theme) ? undefined : icons
 
-	return [ONCE_KEY, theme, drawn, output].filter((part) => part !== undefined).join('-')
+	return [ONCE_KEY, theme, drawn, output, colors_drawn()]
+		.filter((part) => part !== undefined)
+		.join('-')
 }
 
 function is_fresh(age_ms: number): boolean {
