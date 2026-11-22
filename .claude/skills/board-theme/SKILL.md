@@ -32,20 +32,21 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
 ## 3. Build the demo
 
 - Copy the code block of [`demo-template.md`](demo-template.md) to
-  `.josh/tmp/scratch/<theme>-theme-demo.mjs` and write the effects there in JS. It draws the step 0
-  frame. Run it only through `pnpm josh scratch:run <path>`.
-- Keep the board's paces (a letter every 50 ms, a spinner frame every 80 ms) — less drift later.
-- Sound: synthesize a WAV and play it from an HTML page in a browser — `scratch:run` starts no child
-  process, so no `afplay`.
+  `.josh/tmp/scratch/<theme>-theme-demo.mjs`; write the effects in JS on the step 0 frame. Run it
+  only through `pnpm josh scratch:run <path>`.
+- A number key picks a scene from its start; it loops, two seconds of normal display between
+  plays; the top two rows name the scene and list the keys; `Q` quits. Other axes: letter keys, a
+  third row. `DEMO_STEPS=<n>` checks it headless.
+- Keep the board's paces (a letter every 50 ms, a spinner frame every 80 ms).
+- Sound: a WAV played from an HTML page (`scratch:run` spawns nothing).
 
 ## 4. Show it
 
-- Write the run command in every reply. One variant per argument; no argument tours them all. The
-  caption names the variant playing — the user compared more than ten.
+- Every reply: the one command, no argument, alone in its code block, no trailing comment.
 - Write "behavior checked, look unchecked".
 - One change per reply, in two stages: the demo that matches the original item by item beside the
-  measured numbers; once the user passes it, three variants each adding a touch. A rejected variant
-  may stay; note its name.
+  measured numbers; once passed, three variant scenes each adding a touch. A rejected one may stay;
+  note its name.
 
 ## 5. File the Issue once the user decides
 
