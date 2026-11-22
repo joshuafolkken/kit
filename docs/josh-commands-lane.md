@@ -235,6 +235,20 @@ The `recording command` table times one call of `lane:plan`, `run:entry`, `revie
 left out, as for `lint:related`. The time includes the launcher's start and any `dist` rebuild, so the `run:entry`
 row sets beside it the sum of the ledger's `run:entry › …` step medians (`lane-record-command-stats.ts`).
 
+The `first request model` table reads each lane session's first request, one row per model and an `all` row
+(`lane-prefix-stats.ts`):
+
+- `median context (tokens)`: input plus cache reads and writes — the fixed prefix every later request reads again.
+- `ToolSearch sessions` / `ToolSearch share (%)`: the sessions that called `ToolSearch` at least once.
+- A session with no answered request is left out.
+
+Each value is one cell:
+
+```sh
+pnpm josh lane:value cell --table "first request model" --row claude-opus-5-5 --column "median context (tokens)" --since 2026-11-19T00:00Z
+pnpm josh lane:value cell --table "first request model" --row all --column "ToolSearch share (%)" --since 2026-11-19T00:00Z
+```
+
 The followup row is `followup (driver, outside lane net)`; `--why` groups a followup over budget as `driver followup over budget (outside lane net)`, apart from the lane's own causes (`lane-why-period.ts`). Its `open issues` matches each lane's ledger cause key (the last CI check) as well as the stage names, through `lane:why`'s matcher (`lane-why-causes.ts`).
 
 `--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
