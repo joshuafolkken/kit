@@ -11,18 +11,27 @@ const GAP = '  '
 // When the reads off this machine last failed, and why.
 type ReadFailure = Pick<BoardHeader, 'read_error' | 'read_failed_ms'>
 
+// The frame's bounds and the last read failure; unbounded and no failure when omitted.
+interface NoRunOptions {
+	bounds?: FrameBounds
+	failure?: ReadFailure
+}
+
 // No run read here — or the reads failed, which the line says, and why, in place of `no run`: a read
 // that failed cannot tell whether a run is there.
-function render_no_run(
-	now_ms: number,
-	bounds: FrameBounds = {},
-	failure: ReadFailure = {},
-): Array<string> {
-	const { read_failed_ms, read_error } = failure
+function no_run_line(now_ms: number, { read_failed_ms, read_error }: ReadFailure): string {
 	const warning = run_board_header.warning_of(WORDS.read, read_failed_ms, read_error)
 	const said = warning === undefined ? WORDS.no_run : undefined
 	const parts = [`■ ${run_board_header_names.BOARD_NAME}`, said, clock_of(now_ms), warning]
-	const above = [parts.filter((part) => part !== undefined).join(GAP)]
+
+	return parts.filter((part) => part !== undefined).join(GAP)
+}
+
+function render_no_run(
+	now_ms: number,
+	{ bounds = {}, failure = {} }: NoRunOptions = {},
+): Array<string> {
+	const above = [no_run_line(now_ms, failure)]
 	const notes = { head: [], lines: [], hidden: 0 }
 
 	return run_board_fold.bounded(

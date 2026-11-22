@@ -59,7 +59,7 @@ describe('run_board_sound_player.loop raw rate', () => {
 	it('tells each raw player the rate the WAV header records', () => {
 		const { ports, spawner } = failing_ports()
 
-		run_board_sound_player.loop(rated_wav(CLICK_RATE), handlers(), 'linux', ports)
+		run_board_sound_player.loop(rated_wav(CLICK_RATE), handlers(), { platform: 'linux', ports })
 
 		expect(spawner.mock.calls.map(([, args]) => args)).toStrictEqual([
 			[RAW, '--format=s16le', RATE_FLAG, MONO],
@@ -73,7 +73,7 @@ describe('run_board_sound_player.loop raw rate', () => {
 		const told = handlers()
 		const missing = path.join(create_directory(DIRECTORY_PREFIX), 'missing.wav')
 
-		run_board_sound_player.loop(missing, told, 'linux', ports)
+		run_board_sound_player.loop(missing, told, { platform: 'linux', ports })
 
 		expect(told.failed).toHaveBeenCalledOnce()
 		expect(spawner).not.toHaveBeenCalled()

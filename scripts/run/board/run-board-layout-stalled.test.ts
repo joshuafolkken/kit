@@ -147,8 +147,8 @@ describe('run_board_layout live backlog retry', () => {
 		])
 		const read = { titles: new Map(), labels: new Map(), is_backlog_live: true }
 
-		expect(
-			run_board_layout.local_layout_of(statuses, undefined, read).active[0]?.reason,
-		).toStrictEqual(RETRY)
+		expect(run_board_layout.local_layout_of(statuses, { read }).active[0]?.reason).toStrictEqual(
+			RETRY,
+		)
 	})
 })
