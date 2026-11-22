@@ -4,7 +4,6 @@ import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { run_record_path } from '#scripts/josh/run-record-path'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
-import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { declared_growth } from './declared-growth'
 import { split_cap } from './split-cap'
 
@@ -12,15 +11,16 @@ import { split_cap } from './split-cap'
 //
 // `split-assessment.md` → "The question" asks two things, and only the second is mechanical: does the
 // change exceed what one verification gate confirms in one pass, the guide being more than
-// `FILE_GUIDE` changed files or more than `LINE_GUIDE` changed lines, test files excluded. The first — are there two or more
+// `FILE_GUIDE` changed files or more than `LINE_GUIDE` changed lines, test files included. The first — are there two or more
 // separately-mergeable deliverables — stays a judgement, so this answers the size question alone and
 // never claims to have decided the split.
 //
-// Counting excludes run records via `run_record_path` and test files via `test_declared_logic.is_test_file`. The
-// "test files excluded" clause in the guide and the `*.test.ts` / `*.e2e.ts` spelling are one fact;
-// a second copy here would let the two drift.
+// Counting excludes run records via `run_record_path` only. Test files count: a lane's test changes
+// track its cut rate more closely than its other lines do (joshuafolkken/kit#8589).
 
 type SplitVerdict = 'split' | 'single'
+// The files that split as one (`units_of`).
+type Unit = ReadonlyArray<string>
 
 // One file's contribution to the change size: its path, and the lines it added plus the lines it
 // removed. A binary file, which `git diff --numstat` prints as `-`, contributes zero changed lines.
@@ -117,7 +117,7 @@ function parse_numstat(raw: string): Array<FileChange> {
 function is_deliverable(change: FileChange): boolean {
 	const file = git_path_quoting.unquote(change.path)
 
-	return !test_declared_logic.is_test_file(file) && !run_record_path.is_run_record(file)
+	return !run_record_path.is_run_record(file)
 }
 
 function is_scripts_module(file: string): boolean {
@@ -169,6 +169,40 @@ function units_of(files: ReadonlyArray<string>, added: ReadonlySet<string>): Arr
 	})
 }
 
+const TEST_SUFFIX = /\.(?:test|e2e)\.ts$/u
+
+// The module a test file covers, or the path itself for any other file.
+function module_of(file: string): string {
+	return file.replace(TEST_SUFFIX, '.ts')
+}
+
+// The units a split-off cut keeps together: a unit led by a test joins its planned module's unit, so
+// a files refusal never splits a test off the module it covers (joshuafolkken/kit#8589).
+function test_groups(units: ReadonlyArray<Unit>): Array<Array<Unit>> {
+	const home = units.map((unit, index) => {
+		const at = units.findIndex((other) => other.includes(module_of(unit[0] ?? '')))
+
+		return at === -1 ? index : at
+	})
+
+	return units.flatMap((_, index) =>
+		home[index] === index ? [units.filter((__, other) => home[other] === index)] : [],
+	)
+}
+
+// The leading units that fit within `limit`, a test and its module never cut apart (`test_groups`).
+// The first group stays whole even past `limit`, so the cut never keeps nothing.
+function kept_units(units: ReadonlyArray<Unit>, limit: number): Array<Unit> {
+	const kept: Array<Unit> = []
+
+	for (const group of test_groups(units)) {
+		if (kept.length > 0 && kept.length + group.length > limit) break
+		kept.push(...group)
+	}
+
+	return kept
+}
+
 // `split` when **either** guide is exceeded — the AND form never fired, even on the lanes cut twice
 // mid-implementation (joshuafolkken/kit#5384). A filing's declared estimate and `backlog:next`'s offer
 // are judged by this same call (`issue/size-estimate.ts`).
@@ -216,9 +250,9 @@ const SPLIT_TAIL =
 	'over the guide — the size condition for a split is met (separability is a separate judgement)'
 const SINGLE_TAIL = 'under the guide on both axes — one Issue, however separable'
 
-// What was counted. Test files are already dropped from the counts, so the text says so.
+// What was counted. Test files are in the counts, so the text says so.
 function counted(measurement: SizeMeasurement): string {
-	return `${String(measurement.files)} changed file(s), ${String(measurement.lines)} changed line(s), tests excluded`
+	return `${String(measurement.files)} changed file(s), ${String(measurement.lines)} changed line(s), tests included`
 }
 
 function guide_text(guide: SplitGuide): string {
@@ -331,6 +365,7 @@ const split_assess = {
 	policy_text,
 	reason,
 	units_of,
+	kept_units,
 	verdict_for,
 }
 

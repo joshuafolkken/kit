@@ -29,7 +29,7 @@ const FILE = 'scripts/followup/followup-job-rerun.ts'
 const PROBED = 'scripts/lane/probed.ts'
 const SUCCESS = 0
 const LISTING_LIMIT = 100
-const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
+const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）\n'
 const PLAN = [String(LANE), FILE]
 const WARNING = 'size warning (hunks)'
 

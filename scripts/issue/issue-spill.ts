@@ -104,7 +104,7 @@ function estimate_line(estimate: string): string | undefined {
 
 	if (groups === undefined) return undefined
 
-	return `${ESTIMATE_PREFIX} 約 ${String(groups['files'])} ファイル / ${String(groups['lines'])} 行（テスト除く）`
+	return `${ESTIMATE_PREFIX} 約 ${String(groups['files'])} ファイル / ${String(groups['lines'])} 行（テスト含む）`
 }
 
 // `--reason "<reason>"` as the reason line `size_estimate` excuses the size bar with, or

@@ -8,6 +8,7 @@ import { split_assess_cli } from './split-assess-cli'
 const NO_DELETE = '0'
 const A_TS = 'scripts/a.ts'
 const TAB_PATH = 'scripts/a\tb.ts'
+const A_TEST = 'scripts/a.test.ts'
 const OBSERVATION_RECORD = '.josh/observations/6391.md'
 const GUIDE_TEXT = 'guide 8 files / 200 lines'
 const HOOK_SOURCE = '.claude/settings.json'
@@ -91,25 +92,29 @@ describe('parse_numstat', () => {
 	})
 })
 
-describe('measure excludes test files from both counts', () => {
+describe('measure counts test files in both counts', () => {
 	it.each(['quote"name.test.ts', 'tab\tname.e2e.ts', 'line\nname.test.ts'])(
-		'excludes a C-quoted test path: %j',
+		'counts a C-quoted test path: %j',
 		(file) => {
 			const raw = add_row(201, JSON.stringify(file))
 
-			expect(split_assess.assess(raw)).toStrictEqual({ files: 0, lines: 0, verdict: 'single' })
+			expect(split_assess.assess(raw)).toStrictEqual({ files: 1, lines: 201, verdict: 'split' })
 		},
 	)
 
-	it('drops *.test.ts and *.e2e.ts from files and lines', () => {
-		const raw = [
-			add_row(40, A_TS),
-			add_row(500, 'scripts/a.test.ts'),
-			add_row(500, 'scripts/a.e2e.ts'),
-		].join('\n')
+	it('counts *.test.ts and *.e2e.ts in files and lines', () => {
+		const raw = [add_row(40, A_TS), add_row(500, A_TEST), add_row(500, 'scripts/a.e2e.ts')].join(
+			'\n',
+		)
 		const measurement = split_assess.assess(raw)
 
-		expect(measurement).toMatchObject({ files: 1, lines: 40 })
+		expect(measurement).toMatchObject({ files: 3, lines: 1040 })
+	})
+
+	it('splits a change with few non-test lines and many test lines', () => {
+		const raw = [add_row(40, A_TS), add_row(180, A_TEST)].join('\n')
+
+		expect(split_assess.assess(raw).verdict).toBe('split')
 	})
 })
 
@@ -174,10 +179,10 @@ describe('is_over_cap is one and a half times the guide', () => {
 })
 
 describe('reason', () => {
-	it('reports the excluded-test counting and the guide on a single verdict', () => {
+	it('reports the included-test counting and the guide on a single verdict', () => {
 		const reason = split_assess.reason({ files: 2, lines: 30, verdict: 'single' })
 
-		expect(reason).toContain('2 changed file(s), 30 changed line(s), tests excluded')
+		expect(reason).toContain('2 changed file(s), 30 changed line(s), tests included')
 		expect(reason).toContain('under the guide on both axes')
 	})
 

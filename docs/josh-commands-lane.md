@@ -307,7 +307,7 @@ runs with no `cpu_ms` left out. It only reports: a core weight is changed in its
 The `catch rate` table and `candidates:`: `lane-catch-rate-stats.ts`.
 
 Under the size table, the implement-rate table (`lane-implement-rate.ts`) prints the median `implement` minutes per 100
-actual non-test lines over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
+actual lines, tests included, over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
 issue to the last `size` measured before the merge, lanes with no size, no interval or zero lines left out.
 
 The row's last two columns, `estimate ratio first` and `estimate ratio median`, measure the run board's finish estimate
@@ -538,7 +538,7 @@ A lane dispatched before its holder, with commits, waits instead, keeping its se
 
 A `run:planned` candidate's plan comment (the latest trusted one carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body: one naming a running lane's file is held back before dispatch; a path its body only cites holds nothing.
 
-A first plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
+A first plan over twice the files its `- 規模見積もり:` declares (tests included) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
 
 Hunks outside planned files over 2× declared files, or declared lines × recent ratio (min 160 per new file) over 200, also split; logged.
 

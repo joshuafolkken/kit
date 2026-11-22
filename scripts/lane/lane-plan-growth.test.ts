@@ -5,7 +5,7 @@ import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-siz
 
 const ISSUE = 6594
 const PLANNED_AT = '2026-11-06T00:00:00.000Z'
-const BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト除く）\n'
+const BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト含む）\n'
 const ISSUES: ReadonlyArray<OpenIssueData> = [
 	{ number: ISSUE, title: 'Growth', createdAt: PLANNED_AT, labels: [], body: BODY },
 ]

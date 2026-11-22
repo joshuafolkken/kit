@@ -76,6 +76,15 @@ describe('each rule number agrees with its source in code', () => {
 		)
 	})
 
+	it('states that the split guide counts test files, as split_assess.is_deliverable does', () => {
+		const is_test_counted = split_assess.is_deliverable({ path: 'a.test.ts', changed_lines: 1 })
+		const content = read_unwrapped(SPLIT_SKILL)
+
+		expect(is_test_counted).toBe(true)
+		expect(content).toContain('Over guide? Test files,')
+		expect(content).not.toContain('test files excluded')
+	})
+
 	it('names the review round cap in the heading of review.md', () => {
 		expect(read_repo_file(REVIEW_PROMPT)).toContain('## Review round cap (2 rounds)')
 		expect(read_unwrapped(REVIEW_PROMPT)).not.toContain(TWO_REVIEWS)

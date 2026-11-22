@@ -143,13 +143,13 @@ describe('issue_spill_cli.run --distinct', () => {
 	it('writes the given estimate into the filed body', async () => {
 		const body = await filed_body([...ARGV, DISTINCT, '6677'])
 
-		expect(body).toContain('- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）')
+		expect(body).toContain('- 規模見積もり: 約 2 ファイル / 40 行（テスト含む）')
 	})
 
 	it('writes the given --reason as the reason line after the estimate', async () => {
 		const body = await filed_body([...ARGV, '--reason', '1 コミットで入れないと壊れる'])
 
-		expect(body).toContain('行（テスト除く）\n- 分割しない理由: 1 コミットで入れないと壊れる\n')
+		expect(body).toContain('行（テスト含む）\n- 分割しない理由: 1 コミットで入れないと壊れる\n')
 	})
 
 	it('never carries the premise lines of an untrusted #N into the filing', async () => {
