@@ -6,6 +6,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 
 const BOARD_THEME = '--theme wargames'
 const MATRIX_THEME = '--theme matrix'
+const BTTF_THEME = '--theme bttf'
 
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
@@ -59,7 +60,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wargames|matrix] [--icons emoji|letters|shapes] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wargames|matrix|bttf] [--icons emoji|letters|shapes] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -78,6 +79,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{ arguments: BOARD_THEME, note: 'cyan phosphor text and dashed rules' },
 				{ arguments: MATRIX_THEME, note: 'green phosphor text and the TRACE gauge' },
+				{ arguments: BTTF_THEME, note: 'grey text, slate rules, header in time-circuit colors' },
 				{ arguments: '--icons letters', note: 'every icon as two-letter capitals' },
 				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
 				{ arguments: '--frame --mute', note: 'one live frame, muted, at a fixed size' },
@@ -167,6 +169,21 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: [MATRIX_THEME],
 					description:
 						'a live board traces a new header notice between redraws: its letters spin as rain glyphs and lock from the left, then a green inverse bar blinks and the notice stays bright a while; the change flash leaves its columns alone. A notice already there when the board opens draws as it is; none with no TTY or color (`run-board-notice-turn.ts`, `run-board-notice-trace.ts`).',
+				},
+				{
+					names: [BTTF_THEME],
+					description:
+						'names the board `josh-flux` and types its opening line as written; no alert, lamps or typing sound.',
+				},
+				{
+					names: [BTTF_THEME],
+					description:
+						'uncolored text in grey, dim text at 55% of it, `─` rules in slate; state colors kept.',
+				},
+				{
+					names: [BTTF_THEME],
+					description:
+						'the header’s rows in the time circuits’ red, green and amber, the colon at 30% (`run-board-tint.ts`).',
 				},
 				{
 					names: ['--frame'],

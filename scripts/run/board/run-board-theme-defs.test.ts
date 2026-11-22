@@ -76,7 +76,7 @@ describe('run_board_theme_defs.THEMES', () => {
 
 describe('run_board_theme_defs.names_of', () => {
 	it('names a row added to the table', () => {
-		expect(names_of(WIDER)).toStrictEqual(['wargames', 'matrix', 'amber'])
+		expect(names_of(WIDER)).toStrictEqual(['wargames', 'matrix', 'bttf', 'amber'])
 	})
 
 	it('gives a list the worker check accepts the added theme from', () => {

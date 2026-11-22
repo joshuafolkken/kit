@@ -238,7 +238,7 @@ describe('run_board_cli.run --theme rows', () => {
 
 describe('run_board_cli.run --theme refused', () => {
 	it('names the theme in the usage', () => {
-		expect(run_board_cli.USAGE).toContain('[--theme wargames|matrix]')
+		expect(run_board_cli.USAGE).toContain('[--theme wargames|matrix|bttf]')
 	})
 
 	it('draws --chat and pushes --every whatever JOSH_BOARD_THEME holds', async () => {
@@ -260,7 +260,7 @@ describe('run_board_cli.run --theme refused', () => {
 
 		await expect(run_board_cli.run(['--once'], ports)).resolves.toBe(1)
 		expect(stderr).toHaveBeenCalledWith(
-			`JOSH_BOARD_THEME=nope names no theme (wargames, matrix)\n${run_board_cli.USAGE}\n`,
+			`JOSH_BOARD_THEME=nope names no theme (wargames, matrix, bttf)\n${run_board_cli.USAGE}\n`,
 		)
 		stderr.mockRestore()
 	})

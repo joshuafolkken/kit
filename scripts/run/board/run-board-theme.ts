@@ -6,8 +6,9 @@ import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_option, type OptionSpec } from './run-board-option'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme_case } from './run-board-theme-case'
-import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
+import { run_board_theme_defs, type Theme, type ThemeDefinition } from './run-board-theme-defs'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
+import { run_board_tint } from './run-board-tint'
 
 // joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
 // is given in the cyan glow of the film's terminal phosphor and every rule as a run of `-`, so each
@@ -28,10 +29,7 @@ const THEME_OPTION: OptionSpec<Theme> = {
 const RULE = '─'
 const RULE_RUN = /─+/gu
 const DASH = '-'
-// The escapes that end a color and fall back to the terminal's default foreground: the default
-// foreground itself, and a reset.
-const DEFAULT_FOREGROUND = '\u{1B}[39m'
-const RESET = '\u{1B}[0m'
+const { lit, open_of } = run_board_tint
 // joshuafolkken/kit#8207: the themed lines kept — past a few frames of a resident board, so its spinner
 // and redraws hit the cache while a board left for days holds no more.
 const LINE_LIMIT = 1024
@@ -82,14 +80,6 @@ function refusal(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): s
 	return run_board_option.refusal(argv, environment, THEME_OPTION)
 }
 
-// The escape that opens the theme's color, as `painted` draws it — `''` where stdout draws no color,
-// so the theme draws no escape where the board's own colors would not.
-function phosphor_open(paint: Paint): string {
-	const sample = run_board_labels.painted(paint, DASH)
-
-	return sample.slice(0, sample.indexOf(DASH))
-}
-
 // What `styleText` and the color depth read to decide whether, and in how many colors, stdout draws,
 // as far as a running board can see it change: stdout's TTY and the color variables (a test stubs
 // them); the terminal's other variables (`TMUX`, `CI`, …) are fixed before the board starts.
@@ -106,43 +96,41 @@ function phosphor(look: Look): string {
 
 	if (inputs === memo.inputs) return memo.open
 	memo.inputs = inputs
-	memo.open = phosphor_open(THEME_DEFS[look.theme].paint)
+	memo.open = open_of(THEME_DEFS[look.theme].paint)
 	memo.lines.clear()
 
 	return memo.open
 }
 
-function lit(open: string, line: string): string {
-	if (open === '' || line === '') return line
-
-	const resumed = line
-		.split(DEFAULT_FOREGROUND)
-		.join(open)
-		.split(RESET)
-		.join(RESET + open)
-
-	return open + resumed + DEFAULT_FOREGROUND
-}
-
-// Only uncolored dashes take the rule paint; render colors and tone colors keep their foreground.
+// Only uncolored rule glyphs take the rule paint; render colors and tone colors keep their foreground.
 function dimmed(rule: Paint, text: string): string {
 	return run_board_theme_glyphs.mapped(text, (part, open) =>
 		open.is_colored ? part : part.split(DASH).join(run_board_labels.painted(rule, DASH)),
 	)
 }
 
-// joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
-function restyled_line(open: string, look: Look, line: string): string {
-	const definition = THEME_DEFS[look.theme]
-	const kept = run_board_label_pair.dropped(line)
-	const ruled = kept.split(RULE).join(DASH)
+// The line's text as the theme writes it: rules as `-` where the theme has no plain look, icons as
+// text, capitals where it draws them; a plain look draws every uncolored rule run and dim text in its
+// own paints (joshuafolkken/kit#8673), else a heading's `-` take the rule paint.
+function written(definition: ThemeDefinition, look: Look, kept: string, is_rule: boolean): string {
+	const { plain, rule } = definition
+	const ruled = plain === undefined ? kept.split(RULE).join(DASH) : kept
 	const glyphs = run_board_theme_glyphs.textual(ruled, look)
 	const text = definition.capitals ? run_board_theme_case.capitals(glyphs) : glyphs
-	const is_rule = run_board_label_pair.heading_lead(stripVTControlCharacters(kept)) !== undefined
 
-	return is_rule
-		? lit(phosphor_open(definition.rule.text), dimmed(definition.rule.dash, text))
-		: lit(open, text)
+	if (plain !== undefined) return run_board_tint.plain_drawn({ ...plain, rule: rule.dash }, text)
+
+	return is_rule ? dimmed(rule.dash, text) : text
+}
+
+// joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
+function restyled_line(open: string, look: Look, line: string): string {
+	const definition: ThemeDefinition = THEME_DEFS[look.theme]
+	const kept = run_board_label_pair.dropped(line)
+	const is_rule = run_board_label_pair.heading_lead(stripVTControlCharacters(kept)) !== undefined
+	const text = written(definition, look, kept, is_rule)
+
+	return lit(is_rule ? open_of(definition.rule.text) : open, text)
 }
 
 // joshuafolkken/kit#8207: a line drawn before is taken from the cache — most lines of a redraw, and of
