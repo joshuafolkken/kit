@@ -83,18 +83,35 @@ const CORE_WEIGHTS = {
 
 // joshuafolkken/kit#6331: whole-tree typed lint holds the root TypeScript program and every
 // module's import/export metadata, and ran out of V8's default heap — in CI and locally alike.
-// `eslint-heap.ts` launches eslint under this heap; the lint reservations below are read off it too
-// (joshuafolkken/kit#6684), so the ledger cannot reserve less than the heap eslint may grow to.
+// `eslint-heap.ts` launches eslint under this heap. It is a crash ceiling, not what eslint holds.
 const ESLINT_HEAP_MIB = 8192
 const BYTES_PER_MIB = 1_048_576
 const BYTES_PER_MB = 1_000_000
 
-// The heap cap in the ledger's megabytes, rounded up — the eslint peak `josh lane:stats` recorded
-// (joshuafolkken/kit#6684) sits under it.
-const ESLINT_PEAK_MB = Math.ceil((ESLINT_HEAP_MIB * BYTES_PER_MIB) / BYTES_PER_MB)
+// **What one eslint process held, read off the lane ledger** (joshuafolkken/kit#8587): the largest
+// single-process reading of the `kind:"load"` samples (`lane-process-load.ts`), rounded up to a
+// hundred — its maximum, not its p90, because an under-reserved run is what swapped in
+// joshuafolkken/kit#6684. That Issue's peak was the machine-wide sum of every lane's eslint in one
+// sample, not one run, so reserving the heap cap held several runs' worth per run and admitted
+// eslint one at a time past four lanes. The readings and their period are on joshuafolkken/kit#8587.
+const LEDGER_PEAK_MB = {
+	eslint: 2600,
+} as const satisfies Readonly<Record<string, number>>
+
+// The heap cap in the ledger's megabytes, rounded up.
+const ESLINT_HEAP_MB = Math.ceil((ESLINT_HEAP_MIB * BYTES_PER_MIB) / BYTES_PER_MB)
+
+// **An eslint run's reservation: its measured peak, or the heap cap while none is measured.**
+// Without a ledger reading nothing bounds eslint below the heap it may grow to, so the claim falls
+// back to the whole cap — the safe side, at the cost of admitting one eslint at a time.
+function eslint_claim_mb(measured_peak_mb?: number): number {
+	return measured_peak_mb ?? ESLINT_HEAP_MB
+}
+
+const ESLINT_PEAK_MB = eslint_claim_mb(LEDGER_PEAK_MB.eslint)
 
 // **Memory reservations cover peak resident size, rounded up.** Lint and the whole-tree scan share
-// the whole-tree peak, the eslint heap cap. Unit workers use a whole-suite reading because a small subset misses their
+// eslint's measured single-process peak. Unit workers use a whole-suite reading because a small subset misses their
 // later growth (joshuafolkken/kit#4528). Metrics uses the cache-miss peak because its parent retains
 // its heap beside the merge-base child (joshuafolkken/kit#4595). E2E reserves the full Playwright
 // process tree, including the dev server, once per run rather than per worker (joshuafolkken/kit#5413).
@@ -128,11 +145,14 @@ const TOOL_MEMORY: Readonly<Partial<Record<string, keyof typeof MEMORY_MB>>> = {
 
 const core_weights = {
 	CORE_WEIGHTS,
+	ESLINT_HEAP_MB,
 	ESLINT_HEAP_MIB,
 	LEDGER_P90,
+	LEDGER_PEAK_MB,
 	MEASURED,
 	MEMORY_MB,
 	TOOL_MEMORY,
+	eslint_claim_mb,
 	tenth_rounded_up,
 	whole_cores,
 }

@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import { run_board_intro_fixture } from './run-board-intro-fixture'
@@ -158,6 +159,15 @@ describe('run_board_intro.reveal', () => {
 		await reveal('one', { ...ports, write_drawn }, NO_KEYS, THEME)
 		expect(write_drawn.mock.calls).toStrictEqual([['ONE']])
 		expect(written).toStrictEqual([])
+	})
+})
+
+describe('run_board_intro.reveal in its icons', () => {
+	it('draws the frame in the icons the ports ask for (#8505)', async () => {
+		const { written, ports } = recorded(never)
+
+		await reveal('🔄', { write: ports.write, icons: 'letters' }, NO_KEYS, THEME)
+		expect(stripVTControlCharacters(written.join(''))).toBe('RN')
 	})
 })
 

@@ -1,7 +1,9 @@
 import { stripVTControlCharacters } from 'node:util'
 import { CacheableMemory } from '@cacheable/memory'
+import { run_board_icons, type Icons } from './run-board-icons'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
+import { run_board_option, type OptionSpec } from './run-board-option'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme_case } from './run-board-theme-case'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
@@ -15,10 +17,14 @@ import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 // (`run-board-theme-tones.ts`). It is put on the frame as it is written, once, so no render module
 // carries it; a color a render module gives (red, yellow, …) is kept, the cyan resumed after it.
 
-const THEME_FLAG = '--theme'
 const THEME_ENV = 'JOSH_BOARD_THEME'
 const { THEMES, THEME_DEFS } = run_board_theme_defs
-const THEME_NAMES: ReadonlySet<string> = new Set(THEMES)
+const THEME_OPTION: OptionSpec<Theme> = {
+	flag: '--theme',
+	env: THEME_ENV,
+	noun: 'theme',
+	names: THEMES,
+}
 const RULE = '─'
 const RULE_RUN = /─+/gu
 const DASH = '-'
@@ -49,36 +55,15 @@ const memo: Memo = {
 	lines: new CacheableMemory({ lruSize: LINE_LIMIT, useClone: false }),
 }
 
-interface Named {
-	name: string | undefined
-	argv: Array<string>
-}
-
 interface ThemeChoice {
 	theme: Theme | undefined
 	argv: Array<string>
 }
 
-function is_theme(name: string): name is Theme {
-	return THEME_NAMES.has(name)
-}
-
-// `--theme <name>` and the arguments left without it; a flag with no name names `''`, which no theme is.
-function from_flag(argv: ReadonlyArray<string>): Named | undefined {
-	const at = argv.indexOf(THEME_FLAG)
-
-	if (at === -1) return undefined
-
-	return {
-		name: argv[at + 1] ?? '',
-		argv: argv.filter((_, index) => index !== at && index !== at + 1),
-	}
-}
-
-function from_environment(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): Named {
-	const name = environment[THEME_ENV]
-
-	return { name: name === '' ? undefined : name, argv: [...argv] }
+// What a themed line is drawn with: its theme and how its icons are drawn (`run-board-icons.ts`).
+interface Look {
+	theme: Theme
+	icons: Icons
 }
 
 // The theme `--theme` names, else `JOSH_BOARD_THEME`, with the arguments left; `undefined` for a name
@@ -87,18 +72,14 @@ function choose(
 	argv: ReadonlyArray<string>,
 	environment: NodeJS.ProcessEnv,
 ): ThemeChoice | undefined {
-	const { name, argv: rest } = from_flag(argv) ?? from_environment(argv, environment)
+	const chosen = run_board_option.choose(argv, environment, THEME_OPTION)
 
-	if (name === undefined) return { theme: undefined, argv: rest }
-
-	return is_theme(name) ? { theme: name, argv: rest } : undefined
+	return chosen && { theme: chosen.name, argv: chosen.argv }
 }
 
 // The line that names `JOSH_BOARD_THEME` where it, not `--theme`, gave the name `choose` refused.
 function refusal(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): string {
-	if (argv.includes(THEME_FLAG)) return ''
-
-	return `${THEME_ENV}=${environment[THEME_ENV] ?? ''} names no theme (${THEMES.join(', ')})\n`
+	return run_board_option.refusal(argv, environment, THEME_OPTION)
 }
 
 // The escape that opens the theme's color, as `painted` draws it — `''` where stdout draws no color,
@@ -118,14 +99,14 @@ function color_inputs(): string {
 	return [String(process.stdout.isTTY), ...named].join('\n')
 }
 
-// joshuafolkken/kit#8207: the theme color's escape, made again only when the theme or what decides
+// joshuafolkken/kit#8207: the theme color's escape, made again only when the look or what decides
 // stdout's color changes; the lines drawn in the colors before are dropped with it.
-function phosphor(theme: Theme): string {
-	const inputs = `${theme}\n${color_inputs()}`
+function phosphor(look: Look): string {
+	const inputs = `${look.theme}\n${look.icons}\n${color_inputs()}`
 
 	if (inputs === memo.inputs) return memo.open
 	memo.inputs = inputs
-	memo.open = phosphor_open(THEME_DEFS[theme].paint)
+	memo.open = phosphor_open(THEME_DEFS[look.theme].paint)
 	memo.lines.clear()
 
 	return memo.open
@@ -151,11 +132,12 @@ function dimmed(rule: Paint, text: string): string {
 }
 
 // joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
-function restyled_line(open: string, theme: Theme, line: string): string {
-	const definition = THEME_DEFS[theme]
+function restyled_line(open: string, look: Look, line: string): string {
+	const definition = THEME_DEFS[look.theme]
 	const kept = run_board_label_pair.dropped(line)
 	const ruled = kept.split(RULE).join(DASH)
-	const text = run_board_theme_case.capitals(run_board_theme_glyphs.textual(ruled, theme))
+	const glyphs = run_board_theme_glyphs.textual(ruled, look)
+	const text = run_board_theme_case.capitals(glyphs)
 	const is_rule = run_board_label_pair.heading_lead(stripVTControlCharacters(kept)) !== undefined
 
 	return is_rule
@@ -164,12 +146,12 @@ function restyled_line(open: string, theme: Theme, line: string): string {
 }
 
 // joshuafolkken/kit#8207: a line drawn before is taken from the cache — most lines of a redraw, and of
-// a spinner's write, are the ones the write before drew. The cache is cleared with the theme.
-function remembered(open: string, theme: Theme, line: string): string {
+// a spinner's write, are the ones the write before drew. The cache is cleared with the look.
+function remembered(open: string, look: Look, line: string): string {
 	const kept = memo.lines.get<string>(line)
 
 	if (kept !== undefined) return kept
-	const drawn = restyled_line(open, theme, line)
+	const drawn = restyled_line(open, look, line)
 
 	memo.lines.set(line, drawn)
 
@@ -177,7 +159,7 @@ function remembered(open: string, theme: Theme, line: string): string {
 }
 
 // Only heading rules take the gauge's dim; restoring intensity keeps a surrounding bold heading.
-function default_line(line: string): string {
+function dimmed_rules(line: string): string {
 	const plain = stripVTControlCharacters(run_board_label_pair.untitled(line))
 
 	if (run_board_label_pair.heading_lead(plain) === undefined) return line
@@ -191,29 +173,34 @@ function default_line(line: string): string {
 	)
 }
 
+// joshuafolkken/kit#8505: in no theme, icons drawn as letters or shapes take their tone's color and
+// nothing else — no capitals, no rule of `-`, no theme color.
+function default_line(line: string, icons: Icons): string {
+	return run_board_theme_glyphs.textual(dimmed_rules(line), { theme: undefined, icons })
+}
+
 // A frame is drawn a line at a time: the transforms change only text within a line, and a render
 // module closes every color on the line it opens it (`styleText`), so the color `textual` reads
 // across a line's end is the default it reads at a line's start. Its titles keep their marks, for
-// the reveal that writes a title as one block (joshuafolkken/kit#8224).
-function marked(theme: Theme | undefined, frame: string): string {
-	if (theme === undefined) {
-		return frame
-			.split('\n')
-			.map((line) => default_line(line))
-			.join('\n')
-	}
+// the reveal that writes a title as one block (joshuafolkken/kit#8224). Unset icons are the theme's
+// default (`run-board-icons.ts`).
+function marked(
+	theme: Theme | undefined,
+	frame: string,
+	icons: Icons = run_board_icons.default_of(theme),
+): string {
+	const lines = frame.split('\n')
 
-	const open = phosphor(theme)
+	if (theme === undefined) return lines.map((line) => default_line(line, icons)).join('\n')
+	const look = { theme, icons }
+	const open = phosphor(look)
 
-	return frame
-		.split('\n')
-		.map((line) => remembered(open, theme, line))
-		.join('\n')
+	return lines.map((line) => remembered(open, look, line)).join('\n')
 }
 
 // The frame as the theme draws it, its title marks dropped.
-function restyle(theme: Theme | undefined, frame: string): string {
-	return run_board_label_pair.untitled(marked(theme, frame))
+function restyle(theme: Theme | undefined, frame: string, icons?: Icons): string {
+	return run_board_label_pair.untitled(marked(theme, frame, icons))
 }
 
 // The lines the cache holds, never past `LINE_LIMIT`.
@@ -221,9 +208,9 @@ function kept_lines(): number {
 	return memo.lines.size
 }
 
-// Ports whose every write is put through the theme, named so the header draws the theme's alert level;
-// what the theme already drew goes past it.
-function themed<P extends Pick<BoardPorts, 'write' | 'theme' | 'write_drawn'>>(
+// Ports whose every write is put through the theme and the ports' icons, named so the header draws
+// the theme's alert level; what the theme already drew goes past it.
+function themed<P extends Pick<BoardPorts, 'icons' | 'theme' | 'write' | 'write_drawn'>>(
 	ports: P,
 	theme: Theme | undefined,
 ): P {
@@ -231,7 +218,7 @@ function themed<P extends Pick<BoardPorts, 'write' | 'theme' | 'write_drawn'>>(
 		...ports,
 		theme,
 		write: (frame: string) => {
-			ports.write(restyle(theme, frame))
+			ports.write(restyle(theme, frame, ports.icons))
 		},
 		write_drawn: ports.write,
 	}

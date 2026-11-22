@@ -1,6 +1,7 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import type { LaneSpan } from './lane-net-time'
+import { lane_phase } from './lane-phase'
 import { lane_stop_stats } from './lane-stop-stats'
 
 // The stops a lane's time between ship stages went to (joshuafolkken/kit#5646): each `park` event of
@@ -9,7 +10,6 @@ import { lane_stop_stats } from './lane-stop-stats'
 // resume and the re-ship) is attributed to it rather than left to the call kinds.
 
 const { EVENT_KIND } = run_event_stream
-const IMPLEMENT_SUFFIX = ' implement'
 const REPLAN_NOTE = 're-plan'
 const RE_RUN_LEAD = 'ship ×'
 const RE_RUN_TAIL = ' re-run'
@@ -47,10 +47,7 @@ function mark_of(event: RunEvent, issue: number): ReadonlyArray<PauseMark> {
 
 // A plan, or the lane turning to implement — after a pause, the lane re-planned.
 function is_planning(event: RunEvent): boolean {
-	return (
-		event.kind === EVENT_KIND.PLAN ||
-		(event.kind === EVENT_KIND.LANE_PHASE && event.text.endsWith(IMPLEMENT_SUFFIX))
-	)
+	return event.kind === EVENT_KIND.PLAN || lane_phase.is_implement_event(event)
 }
 
 // The ship runs counted so far, and the stages the last one started.

@@ -100,6 +100,7 @@ pnpm josh run:board --chat --fresh     # the same, read from scratch past the on
 pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
 pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
 pnpm josh run:board --theme matrix     # green phosphor text and the TRACE gauge
+pnpm josh run:board --icons letters    # every icon as two-letter capitals
 pnpm josh run:board --once --timing    # one frame, then how long each phase of it took
 pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
 ```
@@ -111,9 +112,10 @@ pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
 - `--fresh` — with `--chat`: reads from scratch past the record, and records what it drew; the `run:handoff-lanes` chain passes it right after a merge.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
 - `--theme wargames` — draws uncolored text in phosphor cyan, rules as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board (`backlogrun` too), `--theme` wins. A live board types its opening line, reveals its first frame block by block, left to right, 75 ms a line (a key skips it), then types each new issue row, `█` after it. Unknown names are refused; `--chat` and `--every` never take it.
-- `--theme wargames` — draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`; one table, `run-board-theme-glyphs.ts`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.
+- `--theme wargames` — draws the board as a text terminal does: the text in capitals (escapes and link URLs as written) and the spinner as `│ ╱ ─ ╲`; each icon as `--icons` draws it, `shapes` unless set; the columns line up as without it.
+- `--icons <emoji|letters|shapes>` — `emoji` as drawn; `letters` as ASCII of their width (`🚨` → `P1`; `run-board-theme-glyphs.ts`); `shapes` a state as a shape where it has one (`🔄` → `>>`, `🔗` → `<-`, `⏸` → `║`). Unset: `emoji` with no theme, else `shapes`. No theme: tone color only. `JOSH_BOARD_ICONS` sets it, `--icons` wins; unknown names refused; not for `--chat` / `--every`.
 - `--theme wargames` — drops an icon drawn beside the label that says what it marks (`CPU`, `QUEUED`), keeping one before a value (`CP 67%`): in a column’s rule its place is the rule, a heading reads `V -- NAME`, a row label moves into its place. One helper marks them (`run-board-label-pair.ts`); no theme and `--chat` draw as before.
-- `--theme wargames` — colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`DC`), green done (`OK`), bold white in progress (`RN`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.
+- `--theme wargames` — colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`\O`), green done (`OK`), bold white in progress (`>>`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.
 - `--theme wargames` — ends the `📈 throughput` rule on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.
 - `--theme wargames` — no alert while throughput is unread or cut for height: only that rule carries it.
 - `--theme wargames` — a live board runs a WOPR lamp panel on `24h`, `7d`, the blank line and usage’s first two provider rows (both or neither): past `NOW`, a `■` every other column to the throughput rule’s end, yellow, yellow, red, yellow, red, out in dimmed half yellow on every row (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.
@@ -140,7 +142,7 @@ The header is three lines in four columns, the time circuits — names, clocks, 
 
 The first column is the board's state mark and `josh-board` (linked to kit; a single run draws its own name), the kit version the run's supervisor recorded as it started (linked to kit's releases; `v<version>+<commits since the release>` in kit itself, `-` with no supervisor record), then the repository's name. The other columns stay aligned however wide it grows.
 
-The second column is the clocks: `🎯` the estimated finish once the plan is read (`--:--` before it or while the run is stopped, when it ended once it has), `🕒` now, `🚀` the run's start (`--:--` unread). All three draw `HH:MM` on one day and `MM-DD HH:MM` once any falls on another; none has a color of its own. Themes draw them `ET`, `NW` and `T0`.
+The second column is the clocks: `🎯` the estimated finish once the plan is read (`--:--` before it or while the run is stopped, when it ended once it has), `🕒` now, `🚀` the run's start (`--:--` unread). All three draw `HH:MM` on one day and `MM-DD HH:MM` once any falls on another; none has a color of its own. `--icons` draws them as any icon.
 
 The third column is signed times in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day): `-` what is left to the finish (`--′--″` unknown, `0″` ended), `+` how long the run has gone (stopped at its end), then the third line's spinner and age. The sign and eight digits keep one width; the spinner keeps its cell past an hour.
 
