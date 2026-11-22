@@ -50,6 +50,7 @@ const AMBER: ThemeDefinition = {
 	intro: { line: 'READY', letter_ms: 1, hold_ms: 1 },
 	alert: run_board_header_defcon.field_of,
 	lamps: false,
+	rule_lamped: false,
 	spinner: '|',
 	live: OFF_LIVE,
 	typing: run_board_sound_typing.teletype_wav,
@@ -105,6 +106,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			alert: run_board_header_defcon.field_of,
 			lamps: true,
 			panel: run_board_panel_painters.LAMP_PAINTER,
+			rule_lamped: true,
 			spinner: '│╱─╲',
 			live: { ...OFF_LIVE, sweep: true, types_rows: true, trill: true, codes: true },
 			typing: run_board_sound_typing.teletype_wav,
@@ -145,12 +147,15 @@ describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 			alert: run_board_header_trace.field_of,
 			lamps: true,
 			panel: run_board_panel_painters.RAIN_PAINTER,
+			rule_lamped: true,
 			spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 			live: MATRIX_LIVE,
 			typing: run_board_sound_click.typing_wav,
 		})
 	})
+})
 
+describe('run_board_theme_defs.THEME_DEFS paints', () => {
 	it('shares the TRACE palette and each theme idle color without copying paints', () => {
 		expect(THEME_DEFS.matrix.rule.dash).toBe(run_board_header_trace.SHADES.dark)
 		expect(THEME_DEFS.matrix.rule.text).toBe(run_board_header_trace.SHADES.mid)

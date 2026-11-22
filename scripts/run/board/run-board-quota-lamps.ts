@@ -23,7 +23,7 @@ function provider_rows(rows: ReadonlyArray<string>, has_lamps: boolean): Array<s
 	})
 }
 
-// GitHub's row, ending on where the panel's sixth row starts where the frame `has_lamps`.
+// GitHub's row, ending on where the panel's last row starts where the frame `has_lamps`.
 function github_row(row: string, has_lamps: boolean): string {
 	return has_lamps ? `${row} ${start_of(PANEL_ROWS.github)}` : row
 }
