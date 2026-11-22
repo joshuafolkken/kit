@@ -1,0 +1,7 @@
+{
+	"reason": "Moving the placement functions out of run-board-spin.ts adds the new module's own imports, bounds/keyed types and export (+17); the moved code itself is unchanged",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 17
+	}
+}
