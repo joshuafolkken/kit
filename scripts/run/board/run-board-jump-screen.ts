@@ -2,6 +2,7 @@ import { run_board_drop_screen, type DropScreen, type ScreenCell } from './run-b
 import type { TerminalSize } from './run-board-fit'
 import { run_board_jump, type JumpRun } from './run-board-jump'
 import { run_board_jump_paint, type JumpScene, type PaintCell } from './run-board-jump-paint'
+import { run_board_lane_swap, type LaneSwap } from './run-board-lane-swap'
 import { run_board_notice_turn, type NoticePlace } from './run-board-notice-turn'
 import type { PanelArea } from './run-board-panel-draw'
 import type { Beat } from './run-board-reveal-blocks'
@@ -17,6 +18,7 @@ import type { Typing } from './run-board-type-rows'
 
 const { ARRIVE_TICKS, TICK_MS, is_running, tick_of } = run_board_jump
 const { arrive_cells, jump_cells } = run_board_jump_paint
+const { swapped } = run_board_lane_swap
 const { parsed } = run_board_rgb
 const { synced } = run_board_screen
 
@@ -31,14 +33,22 @@ const BACKGROUND = /48;2;(\d+);(\d+);(\d+)/u
 // `run_board_type_rows.NO_TYPING` would cycle through `run-board-intro.ts`).
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
 
+// The merged lane's row the jump draws back (joshuafolkken/kit#8711): its row, 0-based, and its cells as
+// the theme drew them.
+interface GoneRow {
+	row: number
+	cells: ReadonlyArray<ScreenCell>
+}
+
 // A jump being drawn: its timeline, the board's cells as the theme drew them, the rows it is painted
-// over, and the cells it leaves alone — the notice's place and the animation area.
+// over, the cells it leaves alone — the notice's place and the animation area — and the merged row.
 interface JumpDraw {
 	run: JumpRun
 	screen: DropScreen
 	scene: JumpScene
 	place?: NoticePlace | undefined
 	panel?: PanelArea | undefined
+	gone?: GoneRow | undefined
 }
 
 function key_of(row: number, column: number): string {
@@ -115,11 +125,19 @@ function keyed(cells: ReadonlyArray<PaintCell>, screen: DropScreen): Map<string,
 	)
 }
 
-// The cells the jump changes at `ms` from the board as drawn, by `row;column`.
+function swap_of(gone: GoneRow | undefined): LaneSwap | undefined {
+	if (gone === undefined) return undefined
+
+	return { row: gone.row, cells: gone.cells.map((cell, x) => paint_cell(cell, x, gone.row)) }
+}
+
+// The cells the jump changes at `ms` from the board as drawn, by `row;column`: the lane swap's row
+// under the jump's paint.
 function painted_at(draw: JumpDraw, ms: number | undefined): Map<string, string> {
 	if (ms === undefined || !is_running(draw.run, ms)) return new Map()
 	const plain = cells_of(draw)
-	const painted = jump_cells(plain, tick_of(draw.run, ms), draw.run.letters, draw.scene)
+	const t = tick_of(draw.run, ms)
+	const painted = jump_cells(swapped(plain, t, swap_of(draw.gone)), t, draw.run.letters, draw.scene)
 	const changed = painted.filter((cell, index) => {
 		const base = plain[index]
 
@@ -197,7 +215,7 @@ function jump_bytes(
 	].join('')
 }
 
-const run_board_jump_screen = { FRAME_MS, arrive_beats, jump_bytes }
+const run_board_jump_screen = { FRAME_MS, NO_TYPING, arrive_beats, jump_bytes }
 
 export { run_board_jump_screen }
-export type { JumpDraw }
+export type { GoneRow, JumpDraw }
