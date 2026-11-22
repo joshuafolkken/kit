@@ -277,8 +277,6 @@ function shared_overrun(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number 
 const run_board_render_row = {
 	GAP,
 	head_text,
-	row_draw,
-	row_fit,
 	row_line,
 	shared_overrun,
 	title_width,
