@@ -229,7 +229,7 @@ function arrive_cells(cells: ReadonlyArray<PaintCell>, tick: number): Array<Pain
 	return cells.map((cell) => ({ ...cell, fg }))
 }
 
-const run_board_jump_paint = { ICE, TINTS, arrive_cells, jump_cells, noise }
+const run_board_jump_paint = { HEADER_ROWS, ICE, TINTS, arrive_cells, jump_cells, noise }
 
 export { run_board_jump_paint }
 export type { JumpScene, PaintCell }

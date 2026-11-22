@@ -372,19 +372,21 @@ function effects_of(
 	state: BoardState,
 	frame: FrameEffects,
 	redraw: Redraw,
-): Pick<BoardState, 'rules' | 'strips' | 'panel' | 'notice_trace' | 'jump'> {
+): Pick<BoardState, 'rules' | 'strips' | 'panel' | 'notice_trace' | 'jump' | 'arrive_ms'> {
 	const { drawn, notice_trace } = frame
 	const panel = panel_of(redraw.ports, drawn)
-	const jump = run_board_jump_start.jump_of(state.jump, {
+	const jump_frame = {
 		...frame,
 		ports: redraw.ports,
 		notice: frame.header.notice,
 		turn: notice_trace,
 		area: panel?.area,
 		now_ms: redraw.now_ms,
-	})
+	}
+	const jump = run_board_jump_start.jump_of(state.jump, jump_frame)
+	const arrive_ms = run_board_jump_start.arrive_of(state.arrive_ms, jump_frame)
 
-	return { ...decoded_of(redraw.ports, drawn), panel, notice_trace, jump }
+	return { ...decoded_of(redraw.ports, drawn), panel, notice_trace, jump, arrive_ms }
 }
 
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the

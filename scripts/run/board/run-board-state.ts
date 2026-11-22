@@ -207,6 +207,8 @@ interface BoardView {
 	notice_trace?: NoticeTurn | undefined
 	// The bttf time jump the last frame drew, painted between redraws (`run-board-jump-screen.ts`).
 	jump?: JumpDraw | undefined
+	// When the bttf panel's arrival started, kept once the board first draws its area (`run-board-jump-start.ts`).
+	arrive_ms?: number | undefined
 }
 
 type BoardState = BoardData & BoardView

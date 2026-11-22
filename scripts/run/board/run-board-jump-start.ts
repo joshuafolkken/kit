@@ -3,7 +3,7 @@ import { run_board_drop_screen, type FrameSpots } from './run-board-drop-screen'
 import type { TerminalSize } from './run-board-fit'
 import type { Notice } from './run-board-header-notice'
 import { run_board_jump, type JumpRun } from './run-board-jump'
-import type { JumpScene } from './run-board-jump-paint'
+import { run_board_jump_paint, type JumpScene } from './run-board-jump-paint'
 import type { JumpDraw } from './run-board-jump-screen'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_notice_trace } from './run-board-notice-trace'
@@ -21,12 +21,13 @@ import type { Typing } from './run-board-type-rows'
 
 const JUMP_THEMES: ReadonlySet<Theme> = new Set(['bttf'])
 // The header's rows, which the merging lane's row is never among.
-const HEADER_ROWS = 3
+const { HEADER_ROWS } = run_board_jump_paint
+const { THAW_AT, TICK_MS } = run_board_jump
 
 // What a frame gives the jump: its ports, the notice it shows and its trace, its cells, the rows
 // typing, the animation area where it is out, and its moment.
 interface JumpFrame {
-	ports: Pick<BoardPorts, 'theme' | 'is_tty' | 'icons'>
+	ports: Pick<BoardPorts, 'theme' | 'is_tty' | 'icons' | 'opened_ms'>
 	notice: Notice | undefined
 	turn: NoticeTurn | undefined
 	drawn: FrameSpots & { size: TerminalSize | undefined }
@@ -93,7 +94,17 @@ function jump_of(last: JumpDraw | undefined, frame: JumpFrame): JumpDraw | undef
 	return run === undefined ? undefined : draw_of(run, frame)
 }
 
-const run_board_jump_start = { jump_of }
+// When the panel's arrival started, kept once set: a live jump board's first frame with the animation
+// area out starts it at its thaw — the intro's beats draw no panel, so the figure thaws from ice and the
+// readout brakes from 88 as the painter takes over.
+function arrive_of(last_ms: number | undefined, frame: JumpFrame): number | undefined {
+	if (last_ms !== undefined || frame.area === undefined) return last_ms
+	if (frame.ports.opened_ms === undefined || !is_jump_board(frame.ports)) return undefined
+
+	return frame.now_ms - THAW_AT * TICK_MS
+}
+
+const run_board_jump_start = { arrive_of, jump_of }
 
 export { run_board_jump_start }
 export type { JumpFrame }

@@ -82,6 +82,8 @@ interface Turning {
 	notice_trace?: NoticeTurn | undefined
 	// The bttf time jump painted over the board (`run-board-jump-screen.ts`).
 	jump?: JumpDraw | undefined
+	// When the bttf panel's arrival started (`run-board-jump-start.ts`).
+	arrive_ms?: number | undefined
 }
 
 // What changed since the last turn was written: the spinner's frame, the sweep's cell, the colons'
@@ -289,7 +291,7 @@ function lamp_moment(turning: Turning, at_ms: number): PanelMoment {
 
 	const is_burst = run_board_type_rows.is_typing(turning.typing, step_ms)
 
-	return { ms: at_ms, is_burst, jump: turning.jump?.run }
+	return { ms: at_ms, is_burst, jump: turning.jump?.run, arrive_ms: turning.arrive_ms }
 }
 
 // The drops, then the turn built and written over them — a typing row drawn above the rain

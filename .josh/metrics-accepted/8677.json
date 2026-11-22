@@ -2,6 +2,6 @@
 	"reason": "#8677 adds the bttf time jump and arrival (five new board modules) with their required colocated tests",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 730
+		"scripts.code_lines": 740
 	}
 }

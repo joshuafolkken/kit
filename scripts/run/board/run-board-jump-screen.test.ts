@@ -68,6 +68,24 @@ describe('run_board_jump_screen.jump_bytes', () => {
 	})
 })
 
+describe('run_board_jump_screen.jump_bytes around the other painters', () => {
+	it('leaves the notice place and the animation area to their own painters', () => {
+		const lamp = { row: 3, column: 3, panel_row: 0, panel_rows: 1, group: 0, lamp: 0 }
+		const draw = {
+			...draw_of(['ABC', 'DEF', 'GHI']),
+			place: { row: 1, column: 1, text: 'AB' },
+			panel: { top: 3, end: 4, rows: 1, lamps: [lamp] },
+		}
+		const written = jump_bytes(draw, WASH_MS, undefined)
+
+		expect(written).not.toContain(`${ESC}[1;1H`)
+		expect(written).not.toContain(`${ESC}[1;2H`)
+		expect(written).toContain(`${ESC}[1;3H`)
+		expect(written).not.toContain(`${ESC}[3;2H`)
+		expect(written).toContain(`${ESC}[3;1H`)
+	})
+})
+
 describe('run_board_jump_screen.arrive_beats', () => {
 	const beats = arrive_beats(`${STYLE}AB${ESC}[0m\n${STYLE}CD${ESC}[0m`, undefined)
 

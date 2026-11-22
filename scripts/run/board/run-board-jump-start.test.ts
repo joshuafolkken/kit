@@ -6,8 +6,8 @@ import { run_board_jump_start, type JumpFrame } from './run-board-jump-start'
 import type { CueName } from './run-board-sound-cues'
 import { run_board_type_rows } from './run-board-type-rows'
 
-const { jump_of } = run_board_jump_start
-const { TICK_MS, WASH_TICKS, THAW_TICKS } = run_board_jump
+const { arrive_of, jump_of } = run_board_jump_start
+const { TICK_MS, WASH_TICKS, THAW_TICKS, THAW_AT } = run_board_jump
 
 const ISSUE = 8677
 const NOW = 1000
@@ -89,5 +89,31 @@ describe('run_board_jump_start.jump_of once running', () => {
 		const over = NOW + (letters + WASH_TICKS + THAW_TICKS) * TICK_MS
 
 		expect(jump_of(first, frame_of({ now_ms: over }))).toBeUndefined()
+	})
+})
+
+describe('run_board_jump_start.arrive_of', () => {
+	const area = { top: 1, end: 2, rows: 2, lamps: [] }
+	const live = { theme: 'bttf' as const, is_tty: true, opened_ms: 0 }
+
+	it('starts the arrival at its thaw on a live bttf board first drawing its area', () => {
+		const started = arrive_of(undefined, frame_of({ ports: live, area }))
+
+		expect(started).toBe(NOW - THAW_AT * TICK_MS)
+	})
+
+	it('keeps the arrival once it is set', () => {
+		const later = frame_of({ ports: live, area, now_ms: NOW + TICK_MS })
+
+		expect(arrive_of(NOW, later)).toBe(NOW)
+		expect(arrive_of(NOW, frame_of())).toBe(NOW)
+	})
+
+	it('starts no arrival without the area, off a live board, or in another theme', () => {
+		expect(arrive_of(undefined, frame_of({ ports: live }))).toBeUndefined()
+		expect(arrive_of(undefined, frame_of({ area }))).toBeUndefined()
+		const matrix = { ...live, theme: 'matrix' as const }
+
+		expect(arrive_of(undefined, frame_of({ ports: matrix, area }))).toBeUndefined()
 	})
 })
