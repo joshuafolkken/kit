@@ -41,6 +41,27 @@ describe('board-theme demo template', () => {
 		expect(blocks[0]).toMatch(/readFileSync\(new URL\(.*-frame\.ans/u)
 		expect(read_skill_file(TEMPLATE_FILE)).not.toContain('NO_COLOR')
 	})
+
+	it.each([
+		['scenes a key picks', 'const SCENES = {'],
+		['raw-mode key input', 'process.stdin.setRawMode(true)'],
+		['a Q quit', "if (ch === 'q' || ch === '\\u0003') process.exit(0)"],
+		['a two-second gap between loops', 'const GAP_TICKS = 40'],
+		['a frame count for a check without a terminal', 'process.env.DEMO_STEPS'],
+	])('holds %s', (_name, code) => {
+		expect(blocks[0]).toContain(code)
+	})
+
+	it('picks no variants by argument', () => {
+		expect(blocks[0]).not.toContain('VARIANTS')
+		expect(read_skill_file(TEMPLATE_FILE)).not.toContain('[variant]')
+	})
+
+	it('runs with one command and no argument', () => {
+		expect(read_skill_file(TEMPLATE_FILE)).toContain(
+			'pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs\n```',
+		)
+	})
 })
 
 describe('board-theme skill', () => {
@@ -78,4 +99,22 @@ describe('board-theme skill', () => {
 			expect(skill).toContain(example)
 		},
 	)
+})
+
+describe('board-theme skill demo shape', () => {
+	const skill = read_skill_file('SKILL.md')
+
+	it.each([
+		'A number key picks a scene from its start',
+		'two seconds of normal display',
+		'the top two rows name the scene and list the keys',
+		'`DEMO_STEPS=<n>`',
+		'the one command, no argument, alone in its code block, no trailing comment',
+	])('carries the rule "%s"', (rule) => {
+		expect(skill).toContain(rule)
+	})
+
+	it('no longer plays one variant per argument', () => {
+		expect(skill).not.toContain('One variant per argument')
+	})
 })
