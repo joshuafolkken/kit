@@ -230,6 +230,12 @@ describe('backlog_waves.build — issues that declare the same file', () => {
 			[SECOND],
 		])
 	})
+
+	it('prints the two issues as the longest serial chain', () => {
+		const text = backlog_waves.format_waves(input, CONTEXT, scope)
+
+		expect(text).toContain(`Longest serial chain: 2 — ${backlog_fixture.cite(FIRST)} → `)
+	})
 })
 
 describe('backlog_waves.build — a running issue', () => {
