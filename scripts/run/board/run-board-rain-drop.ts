@@ -303,25 +303,43 @@ function drop_bytes(
 	return [...left, ...lit].join('')
 }
 
+// The span a deja vu rains over from its first frame.
+function deja_span(from_ms: number): TypingSpan {
+	return { from_ms, to_ms: from_ms + DEJA_STEPS * DROP_MS }
+}
+
 // The screen with the spans the rain pours over: this frame's rows typing and the last frame's spans a
-// drop they sped up can still be on screen for, merged — and, apart, one span from each deja vu's first
-// frame (`deja_starts`) its drops can still be on screen for.
+// drop they sped up can still be on screen for, merged — and, merged apart, the deja vus' rains
+// (`deja_spans`, each from `deja_span`) still on screen, so two deja vus rain once on their shared steps.
 function poured(
 	screen: DropScreen,
 	spans: ReadonlyArray<TypingSpan>,
 	now_ms: number,
-	deja_starts: ReadonlyArray<number> = [],
+	deja_spans: ReadonlyArray<TypingSpan> = [],
 ): DropScreen {
 	const since_ms = now_ms - reach_ms(screen, run_board_idle_rain.pace_of(0))
-	const kept = spans.filter((span) => span.to_ms > since_ms)
-	const deja_spans = [...new Set(deja_starts)]
-		.map((from_ms) => ({ from_ms, to_ms: from_ms + DEJA_STEPS * DROP_MS }))
-		.filter((span) => span.to_ms > since_ms)
+	const { merged } = run_board_rain_pour
 
-	return { ...screen, pours: run_board_rain_pour.merged(kept), deja_spans }
+	function on_screen(span: TypingSpan): boolean {
+		return span.to_ms > since_ms
+	}
+
+	return {
+		...screen,
+		pours: merged(spans.filter((span) => on_screen(span))),
+		deja_spans: merged(deja_spans.filter((span) => on_screen(span))),
+	}
 }
 
-const run_board_rain_drop = { DEJA_STEPS, DROP_MS, drop_bytes, falls_at, head_row, poured }
+const run_board_rain_drop = {
+	DEJA_STEPS,
+	DROP_MS,
+	deja_span,
+	drop_bytes,
+	falls_at,
+	head_row,
+	poured,
+}
 
 export { run_board_rain_drop }
 export type { Fall, Share }

@@ -18,7 +18,7 @@ import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_defs, type LiveDefs, type ThemeDefinition } from './run-board-theme-defs'
 import { run_board_tick_flash } from './run-board-tick-flash'
-import { run_board_type_rows, type Typing } from './run-board-type-rows'
+import { run_board_type_rows, type Typing, type TypingSpan } from './run-board-type-rows'
 
 // The frame one `run:board` redraw draws (`run-board-tick.ts`) from what `run-board-display.ts`
 // assembled: the header over the laid-out rows, the notes under them, written with its spinners at this
@@ -230,11 +230,15 @@ interface DropFlash {
 	flash: Flash | undefined
 }
 
-// The first frame of every deja vu whose rain can still be on screen: the last drop's and the flash's.
-function deja_starts_of(last: DropFlash): Array<number> {
-	const carried = (last.drop?.deja_spans ?? []).map((span) => span.from_ms)
+// The rain of every deja vu that can still be on screen: the last drop's, carried whole so a merged span
+// keeps its end, and one from each of the flash's replays' first frame.
+function deja_spans_of(last: DropFlash): Array<TypingSpan> {
+	const replays = (last.flash?.deja_vu ?? []).map((entry) => entry.start_ms)
 
-	return [...carried, ...(last.flash?.deja_vu ?? []).map((entry) => entry.start_ms)]
+	return [
+		...(last.drop?.deja_spans ?? []),
+		...replays.map((start) => run_board_rain_drop.deja_span(start)),
+	]
 }
 
 // The frame's cells the drop falls down, where one falls — as the theme draws them, since the drop is
@@ -254,7 +258,7 @@ function drop_of(
 	const screen = run_board_drop_screen.screen_of({ ...drawn, lines }, typing, drawn.size)
 	const spans = [...(last.drop?.pours ?? []), ...run_board_type_rows.spans_of(typing)]
 
-	return run_board_rain_drop.poured(screen, spans, redraw.now_ms, deja_starts_of(last))
+	return run_board_rain_drop.poured(screen, spans, redraw.now_ms, deja_spans_of(last))
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the

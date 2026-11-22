@@ -293,7 +293,8 @@ function drop_ms(
 		run_board_type_rows.NO_TYPING,
 		PANE,
 	)
-	const poured = run_board_rain_drop.poured(screen, pours, at_ms, deja_starts)
+	const deja = deja_starts.map((start) => run_board_rain_drop.deja_span(start))
+	const poured = run_board_rain_drop.poured(screen, pours, at_ms, deja)
 
 	run_board_rain_drop.drop_bytes(poured, at_ms, at_ms - run_board_rain_drop.DROP_MS)
 

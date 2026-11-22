@@ -227,6 +227,12 @@ describe('run_board_tick_draw.draw_display with the last frame’s deja vu rains
 		expect(carried_deja(STALE)).toStrictEqual([])
 	})
 
+	it('keeps the end of a rain two deja vus merged, past one deja vu’s second', () => {
+		const MERGED = { from_ms: START - 2000, to_ms: START - 500 }
+
+		expect(carried_deja(MERGED)).toStrictEqual([MERGED])
+	})
+
 	it('starts a rain from the first frame of a row the flash replays', () => {
 		expect(redrawn_state('matrix', last_drop(), replaying_flash()).drop?.deja_spans).toStrictEqual([
 			{

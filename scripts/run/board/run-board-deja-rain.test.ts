@@ -9,7 +9,8 @@ import { run_board_type_rows } from './run-board-type-rows'
 // second, at the pour's doubled pace, with trails 40% to 100% of the screen, painting over the text and
 // hurrying once its last drop is in.
 
-const { DEJA_STEPS, DROP_MS, drop_bytes, falls_at, head_row, poured } = run_board_rain_drop
+const { DEJA_STEPS, DROP_MS, deja_span, drop_bytes, falls_at, head_row, poured } =
+	run_board_rain_drop
 const { POUR } = run_board_idle_rain
 const START_MS = 100 * MS_PER_SECOND
 const COLUMNS = 40
@@ -33,7 +34,12 @@ function screen_of(lines: ReadonlyArray<string>, deja_starts: ReadonlyArray<numb
 		{ columns: COLUMNS, rows: lines.length },
 	)
 
-	return poured(screen, [], START_MS, deja_starts)
+	return poured(
+		screen,
+		[],
+		START_MS,
+		deja_starts.map((start) => deja_span(start)),
+	)
 }
 
 function blank(rows: number): DropScreen {
@@ -158,5 +164,25 @@ describe('run_board_rain_drop.poured deja vu spans', () => {
 			{ from_ms: START_MS, to_ms: START_MS + MS_PER_SECOND },
 		])
 		expect(screen_of(lines, [START_MS - 100 * MS_PER_SECOND]).deja_spans).toEqual([])
+	})
+
+	it('merges two deja vus under a second apart into one rain, the later one’s end kept', () => {
+		const lines = Array.from({ length: ROWS }, () => '')
+		const later_ms = START_MS + 3 * DROP_MS
+
+		expect(screen_of(lines, [START_MS, later_ms]).deja_spans).toEqual([
+			{ from_ms: START_MS, to_ms: later_ms + MS_PER_SECOND },
+		])
+	})
+
+	it('pours six drops a step, not twelve, on the steps two deja vus share', () => {
+		const later_ms = START_MS + 3 * DROP_MS
+		const screen = screen_of(
+			Array.from({ length: TALL_ROWS }, () => ''),
+			[START_MS, later_ms],
+		)
+		const counts = counts_by_step(covering(screen, later_ms + 2 * MS_PER_SECOND))
+
+		expect(new Set(counts.values())).toEqual(new Set([PER_STEP]))
 	})
 })
