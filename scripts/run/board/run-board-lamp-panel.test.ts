@@ -4,6 +4,7 @@ import { run_board_fit, type FrameParts } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_fold } from './run-board-fold'
 import type { BoardRow } from './run-board-layout'
+import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_quota_lamps } from './run-board-quota-lamps'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -292,8 +293,9 @@ describe('run_board_tick_draw.has_lamps', () => {
 	})
 })
 
-// A live redraw of a frame with throughput rows, on a terminal drawing color; `types_rows` as given.
-function redrawn(types_rows: boolean): { lamps: number; marks: number } {
+// A live redraw of a frame with throughput rows, on a terminal drawing color; `types_rows` as given —
+// its lamps, the marks it wrote and whether its turns carry the lamps' painter (joshuafolkken/kit#8676).
+function redrawn(types_rows: boolean): { lamps: number; marks: number; is_painted: boolean } {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { ports, frames } = harness(LOCAL, [])
 	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
@@ -304,18 +306,23 @@ function redrawn(types_rows: boolean): { lamps: number; marks: number } {
 	const drawn = drawn_from(state, local, redraw, { ...layout_for(state, local, START), active })
 	const written = stripVTControlCharacters(frames.join(''))
 
-	return { lamps: drawn.lamps?.length ?? 0, marks: written.split(LAMP_MARK).length - 1 }
+	return {
+		lamps: drawn.lamps?.length ?? 0,
+		marks: written.split(LAMP_MARK).length - 1,
+		is_painted: drawn.panel?.painter === run_board_panel_painters.LAMP_PAINTER,
+	}
 }
 
 describe('run_board_tick_draw.draw_display with lamps', () => {
 	it('draws the panel and keeps its lamps for the turns where the board has lamps', () => {
-		const { lamps, marks } = redrawn(true)
+		const { lamps, marks, is_painted } = redrawn(true)
 
 		expect(lamps).toBeGreaterThanOrEqual(2 * FEWEST)
 		expect(marks).toBe(lamps)
+		expect(is_painted).toBe(true)
 	})
 
 	it('draws and keeps none where it has none', () => {
-		expect(redrawn(false)).toStrictEqual({ lamps: 0, marks: 0 })
+		expect(redrawn(false)).toStrictEqual({ lamps: 0, marks: 0, is_painted: false })
 	})
 })

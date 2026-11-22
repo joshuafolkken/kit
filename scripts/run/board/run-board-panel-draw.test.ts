@@ -101,6 +101,13 @@ describe('run_board_panel_draw.cell_bytes', () => {
 			'\u{1B}[1;3H\u{1B}[48;2;70;255;110m\u{1B}[38;2;255;70;50mY\u{1B}[39m\u{1B}[49m',
 		)
 	})
+
+	it('draws no background below 24-bit color, its text in the named color', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		const bytes = cell_bytes({ row: 1, column: 3, text: 'Y', fg: SHADE, bg: BACK })
+
+		expect(bytes).toBe('\u{1B}[1;3H\u{1B}[31mY\u{1B}[39m')
+	})
 })
 
 describe('run_board_panel_draw.panel_bytes', () => {

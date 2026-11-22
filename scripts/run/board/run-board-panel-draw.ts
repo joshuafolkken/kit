@@ -78,12 +78,13 @@ function area_of(
 	return { top: first.row - 1, end: run_board_fit.width_of(rule), rows: AREA_ROWS, lamps }
 }
 
-// `text` on `bg`: a shade as a 24-bit background where the terminal draws one, else its named color.
+// `text` on `bg`: a shade as a 24-bit background where the terminal draws one, else no background — a
+// named color is a foreground, which would repaint the text rather than back it.
 function backed(bg: Paint | undefined, text: string): string {
 	if (bg === undefined) return text
 	const painted = run_board_labels.painted(bg, text)
 
-	if (!painted.startsWith(FOREGROUND_RGB)) return painted
+	if (!painted.startsWith(FOREGROUND_RGB)) return text
 
 	return `${BACKGROUND_RGB}${painted.slice(FOREGROUND_RGB.length, -DEFAULT_FOREGROUND.length)}${DEFAULT_BACKGROUND}`
 }
