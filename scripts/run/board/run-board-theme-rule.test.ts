@@ -111,7 +111,7 @@ describe('run_board_theme matrix rule boundaries', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
 		expect(run_board_theme.restyle('matrix', '⏳ WAIT')).toBe(
-			`${RGB_MATRIX}${RGB_MID}HD${RGB_MATRIX} WAIT${DEFAULT_FOREGROUND}`,
+			`${RGB_MATRIX}${RGB_MID}..${RGB_MATRIX} WAIT${DEFAULT_FOREGROUND}`,
 		)
 	})
 
@@ -133,7 +133,7 @@ describe('run_board_theme matrix rule boundaries', () => {
 		const drawn = run_board_theme.restyle('matrix', '── LANES ──\n⏳ WAIT')
 
 		expect(drawn).toContain(`${ESCAPE}[32m-${ESCAPE}[32m`)
-		expect(drawn).toContain(`${ESCAPE}[32mHD${ESCAPE}[32m`)
+		expect(drawn).toContain(`${ESCAPE}[32m..${ESCAPE}[32m`)
 		expect(drawn).not.toContain('[38;2;')
 	})
 })

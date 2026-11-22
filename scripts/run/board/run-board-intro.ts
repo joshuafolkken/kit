@@ -25,7 +25,10 @@ interface RainSource {
 	is_colored: () => boolean
 }
 
-type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound'> & {
+type IntroPorts = Pick<
+	BoardPorts,
+	'icons' | 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound'
+> & {
 	rain?: RainSource
 }
 type Reveal = (frame: string) => Promise<void>
@@ -217,7 +220,7 @@ async function reveal(
 	theme: Theme,
 ): Promise<void> {
 	const write = ports.write_drawn ?? ports.write
-	const lines = run_board_theme.marked(theme, frame).split('\n')
+	const lines = run_board_theme.marked(theme, frame, ports.icons).split('\n')
 	const beats = lines.flatMap((line, index) => line_beats(line, index)).values()
 
 	await listen(beats, { ...ports, write }, keys)
@@ -236,7 +239,7 @@ async function rain(
 	theme: Theme,
 ): Promise<void> {
 	const write = ports.write_drawn ?? ports.write
-	const drawn = run_board_theme.restyle(theme, frame)
+	const drawn = run_board_theme.restyle(theme, frame, ports.icons)
 	const { random, is_colored } = ports.rain ?? LIVE_RAIN
 
 	if (is_colored()) {

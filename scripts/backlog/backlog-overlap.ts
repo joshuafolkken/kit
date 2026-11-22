@@ -4,6 +4,7 @@ import type { SoloSelection } from '#scripts/epic/epic-solo'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state, type LaneRecords } from '#scripts/lane/lane-state'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
+import { backlog_human_stop_order, type Overlapping } from './backlog-human-stop-order'
 import { backlog_overlap_glob } from './backlog-overlap-glob'
 
 // Which candidates may not run side by side because their bodies declare overlapping paths.
@@ -184,6 +185,9 @@ interface SeparateContext {
 	repo: string
 	// The holders' lane state records, so a clash names a paused holder (joshuafolkken/kit#4270).
 	lanes?: LaneRecords | undefined
+	// The keys of the issues that gave their lane back; one that stops for a person keeps its slot
+	// (`backlog-human-stop-order.ts`). Absent, none did.
+	yielded?: ReadonlySet<string> | undefined
 }
 
 // The path each of `holders` declares, mapped to the issue that holds it.
@@ -301,6 +305,19 @@ function merged_notice(
 	return parts.length === 0 ? undefined : parts.join('\n')
 }
 
+// Whether `left` declares a path that overlaps one `right` declares — the pair the human-stop order
+// reads before the walk.
+function overlapping(declared: Declared, context: SeparateContext): Overlapping {
+	return (left, right) => {
+		const claims = [...paths_of(right, declared, context.repo)].map((path): [string, number] => [
+			path,
+			right.number,
+		])
+
+		return clash_of(new Map(claims), paths_of(left, declared, context.repo)) !== undefined
+	}
+}
+
 // `selection` with every offered candidate that declares a path overlapping one a running lane or
 // an earlier candidate already declares moved to `withheld`, in offer order.
 function separate(
@@ -316,7 +333,13 @@ function separate(
 		notes: [],
 	}
 
-	for (const child of selection.offered) visit(walk, child, paths_of(child, declared, context.repo))
+	const order = backlog_human_stop_order.ordered(
+		selection.offered,
+		overlapping(declared, context),
+		context.yielded,
+	)
+
+	for (const child of order) visit(walk, child, paths_of(child, declared, context.repo))
 
 	const notice = merged_notice(selection.notice, walk.notes)
 	const withheld = [...walk.withheld, ...selection.withheld]

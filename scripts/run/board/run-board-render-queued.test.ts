@@ -189,7 +189,9 @@ function wargames_lines(overrides: Parameters<typeof header>[0]): Array<string> 
 		run_board_spot.SPOT,
 	)
 
-	return stripVTControlCharacters(untitled(run_board_theme.marked('wargames', drawn))).split('\n')
+	return stripVTControlCharacters(
+		untitled(run_board_theme.marked('wargames', drawn, 'letters')),
+	).split('\n')
 }
 
 describe('run_board_render.render queued rule tail on a themed screen', () => {
