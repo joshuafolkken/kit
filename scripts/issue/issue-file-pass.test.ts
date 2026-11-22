@@ -26,7 +26,7 @@ const NO_DUPLICATES = { report: 'Duplicates: none', candidates: [] }
 const REFUSED_BODY = '## 背景\n\n- 種別: 不具合\n- 人の判断: 不要\n'
 
 const CLEAR_ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
-const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
+const JUDGEMENT_NEEDED = '- 人の判断: 要（方針の判断）'
 
 // Every local check passes: a judgement-needed body is not opted into `auto-ok`, so it owes no run label.
 const SUMMARY = '## 概要\n\n要約\n\n'

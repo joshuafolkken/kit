@@ -30,7 +30,7 @@ const BODY_FILE_FLAG = '--body-file'
 const FIRST = 'First filing'
 const SECOND = 'Second filing'
 const THIRD = 'Third filing'
-const JUDGEMENT = '- 人の判断: 要（目視確認）'
+const JUDGEMENT = '- 人の判断: 要（方針の判断）'
 const VALID_BODY = [
 	'## 概要',
 	'',

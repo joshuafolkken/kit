@@ -1,0 +1,9 @@
+{
+	"reason": "New visual-check-lint module refusing pre-merge visual-check bodies (#8568), plus template pointer lines naming it",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 51,
+		"rules.lines": 3,
+		"ai_cost.on_demand_bytes": 766
+	}
+}

@@ -34,7 +34,7 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 		'## 背景',
 		'',
 		'- 種別: 非不具合',
-		'- 人の判断: 要（目視確認）',
+		'- 人の判断: 要（方針の判断）',
 		...declarations,
 		'',
 		sections,
