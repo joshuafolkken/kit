@@ -41,8 +41,8 @@ const SPLIT_MARKERS: ReadonlyArray<string> = [
 	'**The default is not to split.**',
 	'Two questions have to answer yes **together**',
 	SPLIT_GUIDE,
-	// Test files are excluded so that adding tests does not push a change past the split threshold.
-	'(test files excluded)',
+	// Test files count: a lane's test changes track its cut rate (joshuafolkken/kit#8589).
+	'Over guide? Test files,',
 ]
 
 // The reason, without which the next reader restores the old test as an obvious simplification. It

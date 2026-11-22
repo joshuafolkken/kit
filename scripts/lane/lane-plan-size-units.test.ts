@@ -44,20 +44,23 @@ describe('lane_plan_size.oversize grouping through the split notice', () => {
 
 		oversize_of([MODULE, MODULE_TEST, IMPORTER])
 
-		expect(units_of).toHaveBeenCalledWith([MODULE, IMPORTER], new Set([MODULE]))
+		expect(units_of).toHaveBeenCalledWith(
+			[MODULE, MODULE_TEST, IMPORTER],
+			new Set([MODULE, MODULE_TEST]),
+		)
 		units_of.mockRestore()
 	})
 })
 
 describe('lane_plan_size.oversize on a new scripts module', () => {
 	it('does not split a new module from its importer when the importer is counted in the plan', () => {
-		expect(oversize_of([MODULE, MODULE_TEST, IMPORTER])).toBeUndefined()
+		expect(oversize_of([MODULE, IMPORTER])).toBeUndefined()
 	})
 
 	it('still splits on the pair alone without a base listing', () => {
 		const unlisted = { ...SIGNALS, base_files: undefined }
 
-		expect(oversize_of([MODULE, MODULE_TEST, IMPORTER], unlisted)).toMatchObject({
+		expect(oversize_of([MODULE, IMPORTER], unlisted)).toMatchObject({
 			reason: 'files',
 			split_off: [IMPORTER],
 		})

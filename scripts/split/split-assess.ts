@@ -4,7 +4,6 @@ import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { run_record_path } from '#scripts/josh/run-record-path'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
-import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { declared_growth } from './declared-growth'
 import { split_cap } from './split-cap'
 
@@ -12,13 +11,12 @@ import { split_cap } from './split-cap'
 //
 // `split-assessment.md` → "The question" asks two things, and only the second is mechanical: does the
 // change exceed what one verification gate confirms in one pass, the guide being more than
-// `FILE_GUIDE` changed files or more than `LINE_GUIDE` changed lines, test files excluded. The first — are there two or more
+// `FILE_GUIDE` changed files or more than `LINE_GUIDE` changed lines, test files included. The first — are there two or more
 // separately-mergeable deliverables — stays a judgement, so this answers the size question alone and
 // never claims to have decided the split.
 //
-// Counting excludes run records via `run_record_path` and test files via `test_declared_logic.is_test_file`. The
-// "test files excluded" clause in the guide and the `*.test.ts` / `*.e2e.ts` spelling are one fact;
-// a second copy here would let the two drift.
+// Counting excludes run records via `run_record_path` only. Test files count: a lane's test changes
+// track its cut rate more closely than its other lines do (joshuafolkken/kit#8589).
 
 type SplitVerdict = 'split' | 'single'
 
@@ -117,7 +115,7 @@ function parse_numstat(raw: string): Array<FileChange> {
 function is_deliverable(change: FileChange): boolean {
 	const file = git_path_quoting.unquote(change.path)
 
-	return !test_declared_logic.is_test_file(file) && !run_record_path.is_run_record(file)
+	return !run_record_path.is_run_record(file)
 }
 
 function is_scripts_module(file: string): boolean {
@@ -216,9 +214,9 @@ const SPLIT_TAIL =
 	'over the guide — the size condition for a split is met (separability is a separate judgement)'
 const SINGLE_TAIL = 'under the guide on both axes — one Issue, however separable'
 
-// What was counted. Test files are already dropped from the counts, so the text says so.
+// What was counted. Test files are in the counts, so the text says so.
 function counted(measurement: SizeMeasurement): string {
-	return `${String(measurement.files)} changed file(s), ${String(measurement.lines)} changed line(s), tests excluded`
+	return `${String(measurement.files)} changed file(s), ${String(measurement.lines)} changed line(s), tests included`
 }
 
 function guide_text(guide: SplitGuide): string {

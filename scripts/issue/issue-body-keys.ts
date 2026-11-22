@@ -87,13 +87,15 @@ const HEADINGS = {
 
 // The size estimate's value: `<files>` and `<lines>` stand for its counts.
 const SIZE_VALUES = {
-	ja: '約 <files> ファイル / <lines> 行（テスト除く）',
-	en: 'about <files> files / <lines> lines (excluding tests)',
+	ja: '約 <files> ファイル / <lines> 行（テスト含む）',
+	en: 'about <files> files / <lines> lines (including tests)',
 } as const satisfies Row
-// Full- or half-width parentheses alike: the two read the same to the person typing the line.
+// Full- or half-width parentheses alike: the two read the same to the person typing the line. The
+// "excluding tests" spelling, in either column, is an Issue filed before tests counted
+// (joshuafolkken/kit#8589); its counts still parse, read against the guide as they stand.
 const SIZE_PATTERNS = [
-	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト除く[）)]$/u,
-	/^about\s*(?<files>\d+)\s*files?\s*\/\s*(?<lines>\d+)\s*lines?\s*\(excluding tests\)$/iu,
+	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト(?:含む|除く)[）)]$/u,
+	/^about\s*(?<files>\d+)\s*files?\s*\/\s*(?<lines>\d+)\s*lines?\s*\((?:including|excluding) tests\)$/iu,
 ]
 
 type IssueBodyKey = keyof typeof KEYS

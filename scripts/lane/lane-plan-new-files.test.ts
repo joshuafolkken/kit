@@ -69,11 +69,17 @@ describe('lane_plan_size.oversize floored by the plan new files', () => {
 describe('lane_plan_size.oversize on paths that floor nothing', () => {
 	// Two of each, so counting either kind would floor the plan past the bar.
 	it.each([
-		['test files', ['scripts/issue/issue-kind-cli.test.ts', 'scripts/issue/kind.test.ts']],
 		['directory claims', ['scripts/issue/new/', 'scripts/issue/other/']],
 		['glob claims', ['scripts/issue/new-*.ts', 'scripts/issue/other-*.ts']],
 	])('does not count new %s', (_kind, added) => {
 		expect(oversize_of([...BASE, ...added])).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#8589: tests count as the estimate counts them.
+	it('floors the plan on new test files as on any new file', () => {
+		const added = ['scripts/issue/issue-kind-cli.test.ts', 'scripts/issue/kind.test.ts']
+
+		expect(oversize_of([...BASE, ...added])).toMatchObject({ reason: 'lines' })
 	})
 
 	it('reads no file as new without a base listing', () => {

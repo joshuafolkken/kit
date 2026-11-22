@@ -90,8 +90,8 @@ describe('lane_plan_size.oversize', () => {
 		})
 	})
 
-	it('does not count test files toward the bar', () => {
-		expect(oversize_of([...files(8), TEST_FILE])).toBeUndefined()
+	it('counts test files toward the bar', () => {
+		expect(oversize_of([...files(8), TEST_FILE])).toMatchObject({ split_off: [TEST_FILE] })
 	})
 
 	it.each([
@@ -379,11 +379,9 @@ describe('lane_plan_size.refusal_text', () => {
 	it('names the split-off files, the `--route split` filing and the replan on the kept files', () => {
 		const text = text_of(oversize_of([...files(9), TEST_FILE]))
 
-		expect(text).toContain('Split off: scripts/lane/file-9.ts')
+		expect(text).toContain(`Split off: scripts/lane/file-9.ts, ${TEST_FILE}`)
 		expect(text).toContain('pnpm josh issue:file "<title>" --body-file <body.md> --route split')
-		expect(text).toContain(
-			`pnpm josh lane:plan ${String(ISSUE)} ${files(8).join(' ')} ${TEST_FILE}`,
-		)
+		expect(text).toContain(`pnpm josh lane:plan ${String(ISSUE)} ${files(8).join(' ')}\`, and ship`)
 		expect(text).toContain('split-assessment.md → "The question"')
 	})
 })

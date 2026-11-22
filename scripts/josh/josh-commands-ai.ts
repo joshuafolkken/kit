@@ -675,7 +675,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'split:assess': {
 		script: 'scripts/split/split-assess-cli.ts',
 		description:
-			'Measure the branch change size (tests excluded) and answer the split assessment size question: split | single',
+			'Measure the branch change size (tests included) and answer the split assessment size question: split | single',
 		category: 'AI tools',
 		reference: ['[--json]', 'automation', ['none']],
 		usage: {

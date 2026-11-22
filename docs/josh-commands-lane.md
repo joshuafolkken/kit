@@ -538,7 +538,7 @@ A lane dispatched before its holder, with commits, waits instead, keeping its se
 
 A `run:planned` candidate's plan comment (the latest trusted one carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body: one naming a running lane's file is held back before dispatch; a path its body only cites holds nothing.
 
-A first plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
+A first plan over twice the files its `- 規模見積もり:` declares (tests included) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does. A generated artifact planned beside its source (`.codex/hooks.json` beside `.claude/settings.json`, from `codex_hooks.GENERATED_SOURCES`) is not counted; planned without its source, it counts.
 
 Hunks outside planned files over 2× declared files, or declared lines × recent ratio (min 160 per new file) over 200, also split; logged.
 

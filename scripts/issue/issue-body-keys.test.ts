@@ -85,7 +85,13 @@ describe('issue_body_keys in either language', () => {
 		vi.stubEnv(LANG_KEY, 'en')
 
 		expect(issue_body_keys.line('kind', NON_BUG)).toBe(ENGLISH_NON_BUG)
-		expect(issue_body_keys.size_value('1', '20')).toBe('about 1 files / 20 lines (excluding tests)')
+		expect(issue_body_keys.size_value('1', '20')).toBe('about 1 files / 20 lines (including tests)')
+	})
+
+	it('writes the Japanese size value with tests included under a Japanese session', () => {
+		vi.stubEnv(LANG_KEY, 'ja')
+
+		expect(issue_body_keys.size_value('1', '20')).toBe('約 1 ファイル / 20 行（テスト含む）')
 	})
 
 	it.each([
@@ -102,10 +108,12 @@ describe('issue_body_keys in either language', () => {
 		expect(issue_body_keys.canonical_line(raw)).toBe(expected)
 	})
 
-	it.each(['約 2 ファイル / 30 行(テスト除く)', 'about 2 files / 30 lines (excluding tests)'])(
-		'reads the size counts of %s',
-		(text) => {
-			expect({ ...issue_body_keys.size_counts(text) }).toStrictEqual({ files: '2', lines: '30' })
-		},
-	)
+	it.each([
+		'約 2 ファイル / 30 行(テスト含む)',
+		'about 2 files / 30 lines (including tests)',
+		'約 2 ファイル / 30 行(テスト除く)',
+		'about 2 files / 30 lines (excluding tests)',
+	])('reads the size counts of %s', (text) => {
+		expect({ ...issue_body_keys.size_counts(text) }).toStrictEqual({ files: '2', lines: '30' })
+	})
 })
