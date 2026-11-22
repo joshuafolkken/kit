@@ -15,8 +15,8 @@ const QUIET: PlanSignals = {
 	split_filed: false,
 }
 
-function issues_declaring(counting: string): Array<OpenIssueData> {
-	const body = `## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト${counting}）\n`
+function issues_declaring(counting: string, declared = '4'): Array<OpenIssueData> {
+	const body = `## 背景\n\n- 規模見積もり: 約 ${declared} ファイル / 70 行（テスト${counting}）\n`
 
 	return [{ number: ISSUE, title: 'lane', createdAt: PLANNED_AT, labels: [], body }]
 }
@@ -39,6 +39,13 @@ describe('lane_plan_size.oversize with test files', () => {
 			kept: [...files(7), module_test],
 			split_off: ['scripts/lane/file-8.ts'],
 		})
+	})
+
+	it('keeps a first test group larger than the limit whole rather than keeping nothing', () => {
+		const plan = { issue: ISSUE, paths: ['a.ts', 'a.test.ts', 'b.ts'], planned_at: PLANNED_AT }
+		const over = lane_plan_size.oversize(plan, issues_declaring('含む', '1'), undefined, QUIET)
+
+		expect(over).toMatchObject({ kept: ['a.ts', 'a.test.ts'], split_off: ['b.ts'] })
 	})
 
 	it('does not hold a plan to an estimate filed excluding tests', () => {

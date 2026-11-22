@@ -191,11 +191,12 @@ function test_groups(units: ReadonlyArray<Unit>): Array<Array<Unit>> {
 }
 
 // The leading units that fit within `limit`, a test and its module never cut apart (`test_groups`).
+// The first group stays whole even past `limit`, so the cut never keeps nothing.
 function kept_units(units: ReadonlyArray<Unit>, limit: number): Array<Unit> {
 	const kept: Array<Unit> = []
 
 	for (const group of test_groups(units)) {
-		if (kept.length + group.length > limit) break
+		if (kept.length > 0 && kept.length + group.length > limit) break
 		kept.push(...group)
 	}
 
