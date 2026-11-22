@@ -5,6 +5,7 @@ import { run_board_every, type RecordPorts } from './run-board-every'
 import { run_board_frame_store } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import type { RoundState } from './run-board-gather-thread'
+import { run_board_icons, type Icons } from './run-board-icons'
 import { run_board_round_change, type RoundInputs } from './run-board-round-change'
 import { run_board_state, type BoardPorts, type BoardState } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
@@ -19,12 +20,14 @@ const FORCE_HYPERLINK = 'FORCE_HYPERLINK'
 // What the worker records with, read off the board's terminal.
 interface RecordSetup {
 	theme: Theme | undefined
+	icons: Icons | undefined
 	is_tty: boolean
 	is_linked: boolean
 }
 
 const setup_schema = z.object({
 	theme: z.enum(run_board_theme.THEMES).optional(),
+	icons: z.enum(run_board_icons.ICONS).optional(),
 	is_tty: z.boolean(),
 	is_linked: z.boolean(),
 })
@@ -44,8 +47,8 @@ function link(text: string, url: string): string {
 	return linked.replace(`${LINK_OPEN}${url}`, () => `${LINK_OPEN_WITH_ID}${url}`)
 }
 
-function setup_of(theme: Theme | undefined): RecordSetup {
-	return { theme, is_tty: process.stdout.isTTY, is_linked: terminalLink.isSupported }
+function setup_of(theme: Theme | undefined, icons?: Icons): RecordSetup {
+	return { theme, icons, is_tty: process.stdout.isTTY, is_linked: terminalLink.isSupported }
 }
 
 // What a worker is started with (`run-board-gather-thread.ts` → `WorkerSeed`).
@@ -82,6 +85,7 @@ function record_ports(setup: RecordSetup, ports: Pick<BoardPorts, 'now' | 'frame
 		is_tty: setup.is_tty,
 		form: 'screen',
 		theme: setup.theme,
+		icons: setup.icons,
 	}
 }
 
@@ -119,7 +123,10 @@ function started_with(given: unknown): WorkerStart {
 
 	if (!parsed.success) return { seed: undefined, record: undefined }
 	const { seed, setup } = parsed.data
-	const record = setup === undefined ? undefined : live_recorder({ ...setup, theme: setup.theme })
+	const record =
+		setup === undefined
+			? undefined
+			: live_recorder({ ...setup, theme: setup.theme, icons: setup.icons })
 
 	return { seed, record }
 }

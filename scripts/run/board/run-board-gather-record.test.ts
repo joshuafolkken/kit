@@ -19,7 +19,7 @@ const { CHAT_KEY, once_key } = run_board_frame_store
 const { RECORD_EVERY_MS } = run_board_every
 const SECOND_MS = 1000
 const ROUNDS = 12
-const SETUP: RecordSetup = { theme: undefined, is_tty: true, is_linked: false }
+const SETUP: RecordSetup = { theme: undefined, icons: 'emoji', is_tty: true, is_linked: false }
 const TERMINAL_ONCE = once_key(undefined, true)
 const ESCAPE = '\u{1B}'
 const OSC = `${ESCAPE}]`
@@ -210,11 +210,20 @@ describe('run_board_gather_record.round_recorder’s frames', () => {
 		expect(store.load(CHAT_KEY)?.text).not.toContain(ESCAPE)
 	})
 
-	it('keys the once frame by the theme and terminal it was started with', () => {
-		const { saves } = recorded({ ...SETUP, theme: 'wargames', is_tty: false }, round_of(START))
+	it.each([
+		['shapes', '->'],
+		['emoji', '🎯'],
+	] as const)(
+		'keys the once frame by the theme, icons %s and terminal it was started with (#8505)',
+		(icons, clock) => {
+			const setup: RecordSetup = { ...SETUP, theme: 'wargames', icons, is_tty: false }
+			const { store, saves } = recorded(setup, round_of(START))
+			const key = once_key('wargames', false, icons)
 
-		expect(saves).toContain(once_key('wargames', false))
-	})
+			expect(saves).toContain(key)
+			expect(store.load(key)?.text).toContain(`${clock} `)
+		},
+	)
 })
 
 // joshuafolkken/kit#8161: `--chat` answers from the frame the worker recorded, as it did from the

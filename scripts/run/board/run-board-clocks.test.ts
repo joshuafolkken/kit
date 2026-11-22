@@ -4,8 +4,8 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#8478: the header's clock column — the finish over now over the start, all dated once
-// one falls on another day, the finish `--:--` where none is known and the end once the run ended, and a
-// themed screen's start `T0`.
+// one falls on another day, the finish `--:--` where none is known and the end once the run ended. The
+// icons stay emoji; a theme's glyph table draws them (joshuafolkken/kit#8505).
 
 const { clocks_of } = run_board_clocks
 const { day_minute_of, minute_of } = run_board_labels
@@ -54,14 +54,6 @@ describe('run_board_clocks.clocks_of finish and start', () => {
 		const ended = NOW - MINUTE
 
 		expect(clocks_of(header({ ended_ms: ended }), NOW + HOUR)[0]).toBe(`🎯 ${minute_of(ended)}`)
-	})
-
-	it('draws a themed screen’s start T0, and 🚀 with no theme or in a chat', () => {
-		const start = minute_of(STARTED)
-
-		expect(clocks_of(header({ theme: 'wargames' }), undefined)[2]).toBe(`T0 ${start}`)
-		expect(clocks_of(header(), undefined)[2]).toBe(`🚀 ${start}`)
-		expect(clocks_of(header({ theme: 'wargames', form: 'chat' }), undefined)[2]).toBe(`🚀 ${start}`)
 	})
 })
 

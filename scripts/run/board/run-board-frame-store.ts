@@ -2,6 +2,8 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { z } from 'zod'
+import { run_board_icons, type Icons } from './run-board-icons'
+import type { Theme } from './run-board-theme-defs'
 
 // The last frame `run:board --chat` and `--once` drew, kept per checkout and per form in `/tmp`, so a
 // progress question asked again within a minute is answered from it without reading anything — a read
@@ -152,11 +154,13 @@ function save_only(store: FrameStore | undefined): FrameStore | undefined {
 }
 
 // A still frame in a theme is drawn in its own colors, and one on a terminal carries its links, so each
-// theme and each output keeps its own record.
-function once_key(theme: string | undefined, is_tty: boolean): string {
+// theme and each output keeps its own record; icons other than the theme's default keep theirs too
+// (joshuafolkken/kit#8505).
+function once_key(theme: Theme | undefined, is_tty: boolean, icons?: Icons): string {
 	const output = is_tty ? 'tty' : 'pipe'
+	const drawn = icons === run_board_icons.default_of(theme) ? undefined : icons
 
-	return theme === undefined ? `${ONCE_KEY}-${output}` : `${ONCE_KEY}-${theme}-${output}`
+	return [ONCE_KEY, theme, drawn, output].filter((part) => part !== undefined).join('-')
 }
 
 function is_fresh(age_ms: number): boolean {

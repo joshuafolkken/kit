@@ -198,7 +198,7 @@ describe('run_board_cli.live_ports cue', () => {
 		const voiced = vi.spyOn(run_board_sound_typing, 'voiced')
 		const typing = vi.spyOn(THEME_DEFS.matrix, 'typing').mockReturnValue('click.wav')
 
-		run_board_cli.live_ports(true, 'matrix')
+		run_board_cli.live_ports(true, { theme: 'matrix', icons: 'shapes' })
 		expect(voiced.mock.calls[0]?.[0]()).toBe('click.wav')
 		expect(typing).toHaveBeenCalledWith(THEME_DEFS.matrix.intro.letter_ms)
 		vi.restoreAllMocks()
