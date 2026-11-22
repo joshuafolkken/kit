@@ -136,7 +136,7 @@ The header is three lines in four columns, the time circuits — names, clocks, 
 
 ```
 ▶ josh-board    🎯 16:25  - 2°18′11″  💪  11% ■────  🧠  29% ■■───  💾 2.6M/s ■────
-  v1.3153.0+1   🕒 14:07  + 1°33′55″  🔊 10:42 alert · #<N> stopped
+  v1.3153.0+1   🕒 14:07  + 1°33′55″  🔊 10:42 🛑 alert · #<N> stopped
   kit           🚀 12:33  ⠦       4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
@@ -150,7 +150,7 @@ The tallies, counts, plan read in flight and saved plan's age are on the section
 
 The fourth column is the machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate, five-cell bars) over the notice slot over the third line's words.
 
-The notice slot holds a live board's sound switch (`🔊` on, `🔇` off) and the last notice, sounded or muted: `🔊 10:42 alert · #<N> stopped` — time, cue, cause; `(repeat)` on a replay, `🔊 —` before the first. `--once`, `--chat` and Telegram draw the slot without the switch.
+The notice slot holds a live board's sound switch (`🔊` on, `🔇` off) and the last notice, sounded or muted: `🔊 10:42 🛑 alert · #<N> stopped` — time, the cue's icon and name, then the issue and its words (the run's words alone where no issue sounded it); `×2` on a replay, `🔊 —` before the first. `--once`, `--chat` and Telegram draw the slot without the switch.
 
 While a running run's stream holds an outage with no `online` after it, last seen (`offline` or `offline-tick`) within two sampler ticks, `📴` (named in the legend) stands in the notice slot with the time since the network went down, in yellow. The connection events never count as the run's newest event.
 
