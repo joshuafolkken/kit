@@ -1,7 +1,0 @@
-{
-	"reason": "#8356 adds the matrix row decode and the idle rain in the lamp panel: two new modules (decode, idle rain) and their wiring",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 172
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "The scope cap adds the Expansion result and its scope-line wording (code lines), and prompts/refactoring.md states the cap the scan now applies (on-demand bytes)",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 16,
-		"ai_cost.on_demand_bytes": 164
-	}
-}

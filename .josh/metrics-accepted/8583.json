@@ -1,7 +1,0 @@
-{
-	"reason": "Adds the resume → progress row and the resume events it reads (#8583)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 56
-	}
-}

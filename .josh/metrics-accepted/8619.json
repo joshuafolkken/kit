@@ -1,7 +1,0 @@
-{
-	"reason": "New run:add --retry --withdrawn flag: a small expansion module and its CLI wiring (#8619)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 68
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "One constant puts the cursor on the second row on entering the alternate screen (#8653)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "unicorn 80 prefer-options-parameter: options interfaces (PlayerOptions, NoRunOptions, LocalLayoutOptions) and the helpers split out to keep complexity <=5 add 12 code lines",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "New pinned-issue reader and its read cycle in run:board (#8606) — a new feature, not duplication",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 98
-	}
-}

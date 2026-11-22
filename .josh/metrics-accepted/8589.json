@@ -1,8 +1,0 @@
-{
-	"reason": "Round 1 fixes: legacy excluding-tests estimates are not compared (comparable_size), and a split-off cut keeps a test with its module (kept_units)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 29,
-		"ai_cost.on_demand_bytes": 51
-	}
-}

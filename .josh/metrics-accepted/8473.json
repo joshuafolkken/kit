@@ -1,7 +1,0 @@
-{
-	"reason": "Bug fix #8473: cap the memory budget at the memory in use and hold large claims from overflow under pressure; +11 code lines are the fix itself",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

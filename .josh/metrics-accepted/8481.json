@@ -1,7 +1,0 @@
-{
-	"reason": "Fit lane-row times to their eight-column cell: a shared width-fitting length helper and the net time length getter (#8481)",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

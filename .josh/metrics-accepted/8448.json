@@ -1,7 +1,0 @@
-{
-	"reason": "GuardOptionsで任意の時刻とcontextの契約を明示するため。引数移行と利用者更新を含む差分全体のコード純増は3行で、別の実行処理は追加しない。",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

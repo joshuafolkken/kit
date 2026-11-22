@@ -1,9 +1,0 @@
-{
-	"reason": "epic --add now requires and records an --order-reason for --before/--after; the refusal, its record and the guidance lines naming the new form are the growth",
-	"date": "2026-11-21",
-	"growth": {
-		"scripts.code_lines": 26,
-		"ai_cost.on_demand_bytes": 131,
-		"prose.long_paragraphs": 1
-	}
-}

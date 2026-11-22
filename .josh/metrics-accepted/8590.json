@@ -1,7 +1,0 @@
-{
-	"reason": "decision section frame (title column at widest title, no time column), RowFit title column limit, and title-equal question check for #8590",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}
