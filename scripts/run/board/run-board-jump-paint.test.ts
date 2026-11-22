@@ -107,6 +107,35 @@ describe('run_board_jump_paint.jump_cells — the wash and the thaw', () => {
 	})
 })
 
+describe('run_board_jump_paint.jump_cells — the fire trails', () => {
+	const TRAIL_ROW = 7
+	const TRAILS = { ...SCENE, trails: [TRAIL_ROW] }
+
+	it('burns the trail rows under the wash, the head white-hot on its own ground', () => {
+		const painted = jump_cells([cell_at(0, TRAIL_ROW), cell_at(0, 0)], 0, LETTERS, TRAILS)
+		const fg = mixed(WHITE, TINTS[0] ?? GREY, 0.6)
+
+		expect(painted[0]).toMatchObject({ text: '█', fg, bg: scaled(parsed('255;255;235'), 0.9) })
+		expect(painted[1]).toMatchObject({ text: 'a' })
+	})
+
+	it('burns over the thaw rather than thawing from ice', () => {
+		const cells = [cell_at(0, TRAIL_ROW), cell_at(0, 0)]
+		const [flame, thawing] = jump_cells(cells, WASH_TICKS, LETTERS, TRAILS)
+
+		expect(flame?.fg).not.toStrictEqual(ICE)
+		expect(flame?.text).not.toBe('a')
+		expect(thawing?.fg).toStrictEqual(ICE)
+	})
+
+	it('burns on once the thaw is over until the trail burns out', () => {
+		const trail = [cell_at(0, TRAIL_ROW)]
+
+		expect(jump_cells(trail, 57, LETTERS, TRAILS)[0]?.text).not.toBe('a')
+		expect(jump_cells(trail, 58, LETTERS, TRAILS)).toStrictEqual(trail)
+	})
+})
+
 describe('run_board_jump_paint.arrive_cells', () => {
 	it('is black, then lit by each flash, then thaws from ice, and leaves the board once over', () => {
 		const cells = [cell_at(0, 0)]

@@ -7,7 +7,7 @@ import type { CueName } from './run-board-sound-cues'
 import { run_board_type_rows } from './run-board-type-rows'
 
 const { arrive_of, jump_of } = run_board_jump_start
-const { TICK_MS, WASH_TICKS, THAW_TICKS, THAW_AT } = run_board_jump
+const { END_TICKS, TICK_MS, THAW_AT } = run_board_jump
 
 const ISSUE = 8677
 const NOW = 1000
@@ -48,7 +48,26 @@ describe('run_board_jump_start.jump_of', () => {
 		expect(draw?.run.issue).toBe(ISSUE)
 		expect(draw?.scene.lane).toBe(LANE_ROW)
 	})
+})
 
+describe('run_board_jump_start.jump_of — the fire trails', () => {
+	it('burns the fire trails on the blank rows above the throughput rule and the lanes rule', () => {
+		const lines = [
+			'header',
+			'',
+			'── 📈 throughput ──',
+			'x',
+			'',
+			'── 🧵 lanes ──',
+			LINES[LANE_ROW] ?? '',
+		]
+		const draw = jump_of(undefined, frame_of({ drawn: { lines, spots: [], size: undefined } }))
+
+		expect(draw?.scene.trails).toStrictEqual([1, 4])
+	})
+})
+
+describe('run_board_jump_start.jump_of — other cues and themes', () => {
 	it('starts on no other cue, nor after the first letter', () => {
 		const launch = frame_of({ notice: notice_of('launch') })
 
@@ -86,7 +105,7 @@ describe('run_board_jump_start.jump_of once running', () => {
 	it('draws nothing once the jump is over', () => {
 		const first = jump_of(undefined, frame_of())
 		const letters = first?.run.letters ?? 0
-		const over = NOW + (letters + WASH_TICKS + THAW_TICKS) * TICK_MS
+		const over = NOW + (letters + END_TICKS) * TICK_MS
 
 		expect(jump_of(first, frame_of({ now_ms: over }))).toBeUndefined()
 	})

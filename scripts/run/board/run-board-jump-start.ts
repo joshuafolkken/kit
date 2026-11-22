@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_board_drop_screen, type FrameSpots } from './run-board-drop-screen'
+import { run_board_fire_trail } from './run-board-fire-trail'
 import type { TerminalSize } from './run-board-fit'
 import type { Notice } from './run-board-header-notice'
 import { run_board_jump, type JumpRun } from './run-board-jump'
@@ -81,6 +82,7 @@ function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 		rows: screen.rows.length,
 		lane: lane_of(texts, run.issue),
 		panel: area === undefined ? undefined : { top: area.top - 1, rows: area.rows },
+		trails: run_board_fire_trail.rows_of(texts),
 	}
 
 	return { run, screen, scene, place: frame.turn?.place, panel: area }
