@@ -277,3 +277,13 @@ describe('issue:lint aggregation split (joshuafolkken/kit#5190)', () => {
 		expect(report).toHaveBeenCalledWith(expect.stringContaining('--route split'))
 	})
 })
+
+describe('issue:lint pre-merge visual check (joshuafolkken/kit#8568)', () => {
+	it('rejects the #8505 body that waits for a person to look before merge', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const body = `${declaring('- 人の判断: 要（マージ前の目視確認 — 実ボードでの見た目）')}\n- [ ] マージ前に人が実ボードの見た目を確認している\n`
+
+		expect(await lint_body(body)).toBe(1)
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('- マージ後の確認:'))
+	})
+})

@@ -12,6 +12,7 @@ import { issue_priority } from './issue-priority'
 import { issue_template_section } from './issue-template-section'
 import { measure_declaration } from './measure-declaration'
 import { size_estimate } from './size-estimate'
+import { visual_check_lint } from './visual-check-lint'
 
 // `josh issue:lint <path>` — read an Issue body from a file and print `ok`, or every template problem
 // one per line, exiting non-zero. It reads a path rather than stdin so it can
@@ -55,6 +56,7 @@ function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<s
 		...measure_declaration.problems(body),
 		...size_estimate.problems(body),
 		...aggregation_split.problems(body),
+		...visual_check_lint.problems(body),
 		issue_auto_ok.decision_problem(body),
 		issue_priority.order_problem(body),
 	]
