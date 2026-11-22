@@ -75,14 +75,14 @@ function written(draw: PanelDraw | undefined): { drawn: Array<string>; themed: A
 }
 
 describe('run_board_panel_draw.area_of', () => {
-	it('places the area on the throughput rule’s row and the six under it, ended at the rule’s end', () => {
+	it('places the area on the throughput rule’s row and the seven under it, ended at the rule’s end', () => {
 		expect(area_of(LINES, STARTS, LAMPS)).toStrictEqual({
 			top: 1,
 			end: RULE.length,
 			rows: AREA_ROWS,
 			lamps: LAMPS,
 		})
-		expect(AREA_ROWS).toBe(7)
+		expect(AREA_ROWS).toBe(8)
 	})
 
 	it('places none where the frame draws no lamp — a narrow or colorless terminal', () => {

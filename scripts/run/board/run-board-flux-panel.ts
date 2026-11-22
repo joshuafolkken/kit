@@ -11,7 +11,7 @@ import {
 import { run_board_rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8674: the bttf theme's painter of the animation area at idle — the lamp gauge right
-// at the throughput rule's end, the flux capacitor two columns left of it, both over the six rows under
+// at the throughput rule's end, the flux capacitor two columns left of it, both over the seven rows under
 // the rule, and the speed readout in the rule over the capacitor. The frame's lamp places and the usage
 // rule are blanked across the area; where the throughput rows leave too little room, only the lamp
 // places are blanked.

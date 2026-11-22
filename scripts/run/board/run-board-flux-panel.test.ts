@@ -24,6 +24,10 @@ const WIDE_END = 100
 const USAGE_ROW = 4
 const SPEED_OFFSET = 3
 const AT = { ms: 0, is_burst: false }
+const FIGURE_ROWS = 7
+const JUMP = { start_ms: 0, letters: 30 }
+// The jump itself: the last letter typed, on an even panel tick.
+const JUMP_MS = JUMP.letters * PANEL_TICK_MS
 
 function area_with(rule: string): PanelArea {
 	const lines = [rule, ...ROWS]
@@ -65,6 +69,23 @@ describe('run_board_flux_panel.FLUX_PAINTER cells', () => {
 		expect(LEFT + FIGURE_WIDTH - 1).toBe(WIDE.end)
 	})
 
+	// joshuafolkken/kit#8712: seven rows under the rule, through the GitHub row, and none past it.
+	it('covers seven rows under the rule across the figure, idle and flooded', () => {
+		const flooded = { ms: JUMP_MS, is_burst: false, jump: JUMP }
+
+		for (const at of [AT, flooded]) {
+			const cells = FLUX_PAINTER.cells(WIDE, at)
+			const below = cells.filter((cell) => cell.row > WIDE.top && cell.column >= LEFT)
+
+			expect(new Set(below.map((cell) => cell.row - WIDE.top))).toStrictEqual(
+				new Set([1, 2, 3, 4, 5, 6, 7]),
+			)
+			expect(new Set(below.map((cell) => `${String(cell.row)} ${String(cell.column)}`)).size).toBe(
+				FIGURE_ROWS * FIGURE_WIDTH,
+			)
+		}
+	})
+
 	it('blanks only the lamp places where the figure would reach into the throughput rows', () => {
 		const cells = FLUX_PAINTER.cells(NARROW, AT)
 
@@ -91,9 +112,6 @@ describe('run_board_flux_panel.FLUX_PAINTER timing', () => {
 // joshuafolkken/kit#8677: the figure through a jump and through the arrival — the speed at 88 blinking
 // white, the capacitor flooded, and back to cruising once each is over.
 
-const JUMP = { start_ms: 0, letters: 30 }
-// The jump itself: the last letter typed, on an even panel tick.
-const JUMP_MS = JUMP.letters * PANEL_TICK_MS
 const ARRIVE_OVER_MS = 3200
 const TOP_WHITE = '255;255;255'
 

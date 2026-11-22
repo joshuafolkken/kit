@@ -2,15 +2,15 @@ import type { TextColor } from './run-board-labels'
 import type { PanelCell } from './run-board-panel-draw'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 
-// joshuafolkken/kit#8674: the bttf theme's lamp gauge — ten columns of nineteen lamps read off the
+// joshuafolkken/kit#8674: the bttf theme's lamp gauge — ten columns of twenty-three lamps read off the
 // film's cabin shots, a cell of braille holding four lamps of one column. Each column is a green bar from
-// the bottom and an amber one from the thirteenth row, lit apart, under one red row; the board holds still
+// the bottom and an amber one from the seventeenth row, lit apart, under one red row; the board holds still
 // inside a speed range and springs past its new height when the range changes.
 
 const { mixed, parsed, scaled, shade_of } = run_board_rgb
 
 const LED_COLUMNS = 10
-const GREEN_ROWS = 12
+const GREEN_ROWS = 16
 const AMBER_ROWS = 6
 // From the top: one red row, the amber ones, the green ones.
 const LAMP_ROWS = 1 + AMBER_ROWS + GREEN_ROWS
@@ -25,9 +25,17 @@ const EMPTY = '-'
 
 // A cell is four lamps of one column, top to bottom, each a lamp row from the top or none, and takes
 // one color, so each cell holds one band only: the red row ends the first cell, the six amber rows fill
-// the second and half the third, and the twelve green rows fill the last three — two lamps' height dark
+// the second and half the third, and the sixteen green rows fill the last four — two lamps' height dark
 // between the amber and the green, where the film has a dim row.
-const LED_SLOTS = ['- - - 0', '1 2 3 4', '5 6 - -', '7 8 9 10', '11 12 13 14', '15 16 17 18']
+const LED_SLOTS = [
+	'- - - 0',
+	'1 2 3 4',
+	'5 6 - -',
+	'7 8 9 10',
+	'11 12 13 14',
+	'15 16 17 18',
+	'19 20 21 22',
+]
 
 // A column's lit lamps: the green bar's and the amber one's heights, and whether its red row is on.
 interface Bars {
@@ -60,18 +68,19 @@ const SLOTS = LED_SLOTS.map((cell) =>
 		.filter((slot) => slot.is_slot),
 )
 
-const CLIMBED_GREEN = '12 9 0 9 0 10 9 0 12 9'
+const CLIMBED_GREEN = '16 13 0 13 0 14 13 0 16 13'
 
 // Each range, with, in the top one, its red row. The lowest is the idle board: the third, the fifth and
-// the eighth columns stay out.
+// the eighth columns stay out. joshuafolkken/kit#8712: a lit green bar stands four rows taller than the
+// nineteen-lamp gauge's, so its top stays on the same lamp row; an out column stays out.
 const RANGES: ReadonlyArray<SpeedRange> = [
-	{ below: 45, green: '9 9 0 9 0 9 9 0 9 9', amber: '0 0 0 0 0 0 0 0 0 0' },
-	{ below: 60, green: '10 9 0 9 0 11 9 0 12 9', amber: '0 0 0 0 0 0 0 0 1 0' },
+	{ below: 45, green: '13 13 0 13 0 13 13 0 13 13', amber: '0 0 0 0 0 0 0 0 0 0' },
+	{ below: 60, green: '14 13 0 13 0 15 13 0 16 13', amber: '0 0 0 0 0 0 0 0 1 0' },
 	{ below: 75, green: CLIMBED_GREEN, amber: '2 0 0 0 0 0 0 3 5 1' },
 	{ below: 87.5, green: CLIMBED_GREEN, amber: '5 2 0 0 0 0 0 4 6 3' },
 	{
 		below: Infinity,
-		green: '12 12 12 12 12 12 12 12 11 12',
+		green: '16 16 16 16 16 16 16 16 15 16',
 		amber: '6 3 6 6 6 6 6 6 0 6',
 		red: '1 1 1 1 1 1 1 1 0 1',
 	},

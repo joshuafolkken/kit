@@ -7,7 +7,8 @@ import { run_board_screen } from './run-board-screen'
 import type { BoardPorts } from './run-board-state'
 
 // joshuafolkken/kit#8676: the animation area a theme draws its own cells in — the throughput rule's row and
-// the six under it (the `24h` and `7d` rows, the blank line, the usage rule and its first two rows), up to
+// the seven under it (the `24h` and `7d` rows, the blank line, the usage rule and its first three rows —
+// through GitHub's, joshuafolkken/kit#8712), up to
 // the rule's end. The theme hands a painter (`ThemeDefinition.panel`); this module places the area, wakes
 // the turn every `PANEL_TICK_MS` where the painter ticks and writes only the cells that changed, past the
 // theme (`write_drawn`).
@@ -16,8 +17,8 @@ import type { BoardPorts } from './run-board-state'
 
 const CSI = '\u{1B}['
 const PANEL_TICK_MS = 50
-// The throughput rule's row and the six under it.
-const AREA_ROWS = 7
+// The throughput rule's row and the seven under it.
+const AREA_ROWS = 8
 const FOREGROUND_RGB = `${CSI}38;2;`
 const BACKGROUND_RGB = `${CSI}48;2;`
 const DEFAULT_FOREGROUND = `${CSI}39m`

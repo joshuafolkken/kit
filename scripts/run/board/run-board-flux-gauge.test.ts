@@ -9,7 +9,7 @@ import { run_board_rgb } from './run-board-rgb'
 const { BANDS, FLOOD_WHITE, bars_at, change_before, gauge_cells, range_of } = run_board_flux_gauge
 const { rgb_of } = run_board_paint_fixture
 const ORIGIN = { row: 3, column: 40 }
-const CELLS = 6
+const CELLS = 7
 const MIN_CONTRAST = 4.5
 const CHANGE_TICK = 10
 
@@ -37,13 +37,13 @@ describe('run_board_flux_gauge.range_of', () => {
 })
 
 describe('run_board_flux_gauge.gauge_cells', () => {
-	it('draws the idle first column as nine green lamps from the bottom', () => {
+	it('draws the idle first column as thirteen green lamps from the bottom, its top lamp row as before', () => {
 		const cells = gauge_cells(ORIGIN, 0, constant(0)).filter(
 			(cell) => cell.column === ORIGIN.column,
 		)
 
-		expect(cells.map((cell) => cell.row)).toStrictEqual([3, 4, 5, 6, 7, 8])
-		expect(cells.map((cell) => cell.text)).toStrictEqual([' ', ' ', ' ', '⣀', '⣿', '⣿'])
+		expect(cells.map((cell) => cell.row)).toStrictEqual([3, 4, 5, 6, 7, 8, 9])
+		expect(cells.map((cell) => cell.text)).toStrictEqual([' ', ' ', ' ', '⣀', '⣿', '⣿', '⣿'])
 		expect(cells[4]).toMatchObject({
 			fg: { rgb: '50;235;90', named: 'green' },
 			bg: { rgb: '15;71;27', named: 'green' },
@@ -78,6 +78,13 @@ describe('run_board_flux_gauge.gauge_cells', () => {
 	})
 })
 
+// joshuafolkken/kit#8712: twenty-three lamps a column — one red, six amber, a gap of two, sixteen green.
+describe('run_board_flux_gauge.gauge_cells lamps', () => {
+	it('lights all twenty-three lamps of a full column in the settled top range', () => {
+		expect(column_cells(constant(4), 0)).toStrictEqual(['⣀', '⣿', '⠛', '⣿', '⣿', '⣿', '⣿'])
+	})
+})
+
 describe('run_board_flux_gauge spring', () => {
 	it('finds the last range change within the spring and the ticks since it', () => {
 		expect(change_before(CHANGE_TICK - 1, climbing)).toBeUndefined()
@@ -91,9 +98,9 @@ describe('run_board_flux_gauge spring', () => {
 			(since) => bars_at({ range: 1, change: { before: 0, since } })[0]?.green,
 		)
 
-		expect(heights).toStrictEqual([11, 12, 9, 10])
-		expect(bars_at({ range: 1, change: { before: 0, since: 1 } })[8]?.green).toBe(12)
-		expect(bars_at({ range: 1, change: undefined })[0]?.green).toBe(10)
+		expect(heights).toStrictEqual([15, 16, 13, 14])
+		expect(bars_at({ range: 1, change: { before: 0, since: 1 } })[8]?.green).toBe(16)
+		expect(bars_at({ range: 1, change: undefined })[0]?.green).toBe(14)
 	})
 
 	it('holds the red row out while the top range is still springing', () => {
@@ -121,6 +128,12 @@ function climb_green(since: number): number | undefined {
 
 function texts(tick: number, range: number): Array<string> {
 	return gauge_cells(ORIGIN, tick, constant(range)).map((cell) => cell.text)
+}
+
+function column_texts(tick: number, column: number): Array<string> {
+	return gauge_cells(ORIGIN, tick, constant(TOP))
+		.filter((cell) => cell.column === ORIGIN.column + column)
+		.map((cell) => cell.text)
 }
 
 describe('run_board_flux_gauge jump', () => {
@@ -159,5 +172,7 @@ describe('run_board_flux_gauge jump', () => {
 		expect(texts(BLINK_TICK, TOP)).not.toStrictEqual(texts(0, TOP))
 		expect(texts(BLINK_TICK * 2, TOP)).toStrictEqual(texts(0, TOP))
 		expect(texts(BLINK_TICK, TOP - 1)).toStrictEqual(texts(0, TOP - 1))
+		// The sixteenth green lamp, the fourth cell's top, is the one out.
+		expect(column_texts(BLINK_TICK, 0)[3]).toBe('⣶')
 	})
 })
