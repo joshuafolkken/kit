@@ -81,12 +81,14 @@ describe('machine_capacity.machine_budget — claims under their declared memory
 	const reading = { busy_cores: 0, available_mb, total_mb }
 
 	it('adds back no more than the memory in use, and never past the machine', () => {
+		// The claims #8473 ran: the heap-cap ESLint claim beside the type check, past the memory in use.
 		const ledger = {
 			cores: 0,
-			memory_mb: core_weights.MEMORY_MB.lint + core_weights.MEMORY_MB.type_check,
+			memory_mb: core_weights.ESLINT_HEAP_MB + core_weights.MEMORY_MB.type_check,
 		}
 		const { memory_mb } = machine_capacity.machine_budget(CORES, reading, ledger)
 
+		expect(ledger.memory_mb).toBeGreaterThan(total_mb - available_mb)
 		expect(memory_mb).toBeLessThanOrEqual(total_mb)
 		expect(memory_mb).toBeLessThanOrEqual(available_mb + (total_mb - available_mb))
 	})
