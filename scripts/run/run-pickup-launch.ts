@@ -31,7 +31,9 @@ function reason(result: JoshResult): string {
 }
 
 async function launch_line(issue: string): Promise<string> {
-	const result = await josh_command.josh_run(['lane:launch', issue], true)
+	const result = await josh_command.josh_run(['lane:launch', issue], {
+		should_forward_stderr: true,
+	})
 	const cite = session_cite.issue(issue)
 
 	if (result.code === SUCCESS_EXIT_CODE) return `${cite} launched — pid ${result.out}`
@@ -65,10 +67,9 @@ async function launch(epics: ReadonlyArray<string>): Promise<PickupLaunch> {
 
 	if (repo === undefined) return { lines: [UNREADABLE_REPO], is_refused: true }
 
-	const offer = await josh_command.josh_run(
-		['epic:next', ...epics, '--repo', repo, '--lanes'],
-		true,
-	)
+	const offer = await josh_command.josh_run(['epic:next', ...epics, '--repo', repo, '--lanes'], {
+		should_forward_stderr: true,
+	})
 
 	if (offer.code !== SUCCESS_EXIT_CODE) {
 		return { lines: [`epic:next refused — ${reason(offer)}`], is_refused: true }

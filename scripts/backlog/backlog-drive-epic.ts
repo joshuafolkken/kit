@@ -34,7 +34,9 @@ const TRIAGE: OfferRead = { ...WAIT, verdict: epic_triage.TRIAGE_VERDICT }
 async function ask_next(epic: string): Promise<ReadonlyArray<string> | undefined> {
 	const repo = await git_gh_repo.repo_get_name_with_owner()
 	if (repo === undefined) return undefined
-	const result = await josh_command.josh_run(['epic:next', epic, '--repo', repo, '--lanes'], true)
+	const result = await josh_command.josh_run(['epic:next', epic, '--repo', repo, '--lanes'], {
+		should_forward_stderr: true,
+	})
 
 	return result.code === SUCCESS_EXIT_CODE ? result.out.trim().split('\n') : undefined
 }

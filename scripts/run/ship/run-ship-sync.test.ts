@@ -148,8 +148,11 @@ describe('run_ship_sync.sync_stage — the local commit hooks', () => {
 
 		await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)
 
-		expect(josh_run_mock.mock.calls[0]?.[3]).toStrictEqual({
-			[pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off',
+		expect(josh_run_mock.mock.calls[0]?.[1]).toStrictEqual({
+			should_forward_stderr: true,
+			environment: {
+				[pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off',
+			},
 		})
 	})
 })
@@ -273,7 +276,10 @@ describe('run_ship_sync.followup_stage — the ship marker', () => {
 		await run_ship_sync.followup_stage(TITLE, NOTIFY)
 
 		expect(josh_run_mock.mock.calls[0]?.[0]).toStrictEqual(FOLLOWUP)
-		expect(josh_run_mock.mock.calls[0]?.[3]).toStrictEqual(followup_section.SHIPPED_ENVIRONMENT)
+		expect(josh_run_mock.mock.calls[0]?.[1]).toStrictEqual({
+			should_forward_stderr: true,
+			environment: followup_section.SHIPPED_ENVIRONMENT,
+		})
 	})
 })
 

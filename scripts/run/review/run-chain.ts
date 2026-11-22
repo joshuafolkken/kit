@@ -188,7 +188,7 @@ async function josh_stage(argv: ReadonlyArray<string>): Promise<JoshResult> {
 	const [command = ''] = argv
 	const caller = test_related_caller.environment(`run:chain ${command}`)
 
-	return await josh_command.josh_run(argv, true, undefined, caller)
+	return await josh_command.josh_run(argv, { should_forward_stderr: true, environment: caller })
 }
 
 async function held(stage: ChainStage, issue: string): Promise<ChainStop | undefined> {

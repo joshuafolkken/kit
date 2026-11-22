@@ -148,7 +148,9 @@ async function push(slots_argument?: string): Promise<number> {
 		return SUCCESS_EXIT_CODE
 	}
 
-	const result = await josh_command.josh_run([...PUSH_ARGS, ...(await body_arguments())], true)
+	const result = await josh_command.josh_run([...PUSH_ARGS, ...(await body_arguments())], {
+		should_forward_stderr: true,
+	})
 
 	await early_push_record.record(
 		'review',

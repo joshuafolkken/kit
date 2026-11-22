@@ -100,7 +100,10 @@ describe('run_ship_reviewer.reviewed', () => {
 
 		expect(await open?.()).toHaveProperty('code', OK)
 		expect(await review?.()).toHaveProperty('code', OK)
-		expect(josh_run_mock).toHaveBeenCalledWith(OPEN, true, undefined, PRIORITY_ENVIRONMENT)
+		expect(josh_run_mock).toHaveBeenCalledWith(OPEN, {
+			should_forward_stderr: true,
+			environment: PRIORITY_ENVIRONMENT,
+		})
 		expect(write_text_stamp).toHaveBeenCalledWith(expect.any(String), 'the brief')
 	})
 })
@@ -147,12 +150,10 @@ describe('run_ship_reviewer — the core-budget priority mark', () => {
 	it('attests under the core-budget priority mark', async () => {
 		await run_ship_reviewer.attest_phase()
 
-		expect(josh_run_mock).toHaveBeenCalledWith(
-			['review:attest', '--check'],
-			true,
-			undefined,
-			PRIORITY_ENVIRONMENT,
-		)
+		expect(josh_run_mock).toHaveBeenCalledWith(['review:attest', '--check'], {
+			should_forward_stderr: true,
+			environment: PRIORITY_ENVIRONMENT,
+		})
 	})
 })
 

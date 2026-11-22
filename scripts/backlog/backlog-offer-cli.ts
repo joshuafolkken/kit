@@ -226,10 +226,9 @@ async function read_budget(
 	return await run_startup.phase(
 		'conditions',
 		async () => {
-			const result = await josh_command.josh_run(
-				budget_argv(values, offer.answer),
+			const result = await josh_command.josh_run(budget_argv(values, offer.answer), {
 				should_forward_stderr,
-			)
+			})
 
 			return result.code === SUCCESS_EXIT_CODE ? budget_of(result.out) : undefined
 		},

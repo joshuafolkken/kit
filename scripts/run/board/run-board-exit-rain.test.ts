@@ -5,6 +5,7 @@ import { run_board_fixture } from './run-board-fixture'
 import type { IntroPorts } from './run-board-intro'
 import type { KeyInput, KeyReading } from './run-board-keys'
 import { run_board_live } from './run-board-live'
+import { run_board_reveal_rain_fixture } from './run-board-reveal-rain-fixture'
 import { run_board_screen } from './run-board-screen'
 import type { Theme } from './run-board-theme'
 
@@ -14,6 +15,7 @@ import type { Theme } from './run-board-theme'
 
 const { beats_of, gated, wipe } = run_board_exit_rain
 const { harness, plan_titled } = run_board_fixture
+const { drawn_rows } = run_board_reveal_rain_fixture
 const SCREEN = run_board_screen.screen_of('live')
 const ESC = '\u{1B}'
 const CLEARED = `${ESC}[H${ESC}[J`
@@ -72,10 +74,6 @@ function recorded(intro_sleep: Sleep): { written: Array<string>; ports: IntroPor
 			rain: RAIN,
 		},
 	}
-}
-
-function rows_of(text: string): Array<string> {
-	return stripVTControlCharacters(text).split('\n')
 }
 
 // A keyboard whose keys a test types, Ctrl-C told to `interrupt`.
@@ -141,15 +139,25 @@ describe('run_board_exit_rain.beats_of — the rain takes the frame away', () =>
 	it('shows the frame where the rain has not reached it', () => {
 		const [first = { text: '' }] = beats_of(FRAME, RAIN.random)
 
-		expect(rows_of(first.text)).toEqual(['ONE', 'TWO'])
+		expect(drawn_rows(first.text)).toEqual(['ONE', 'TWO'])
 	})
 
 	it('blanks the cells the rain has passed and erases the screen last', () => {
 		const beats = [...beats_of(FRAME, RAIN.random)]
 		const last_pass = beats.at(-2)?.text ?? ''
 
-		expect(rows_of(last_pass)[0]?.trim()).toBe('')
+		expect(drawn_rows(last_pass)[0]?.trim()).toBe('')
 		expect(beats.at(-1)?.text).toBe(CLEARED)
+	})
+
+	it('wipes every row and column of the terminal, a line wider than it wrapped', () => {
+		const size = { columns: 4, rows: 5 }
+		const texts = [...beats_of(`${FRAME}\n12345`, RAIN.random, size)].map((beat) => beat.text)
+		const rows = texts.slice(0, -1).map((text) => drawn_rows(text))
+
+		expect(drawn_rows(texts[0] ?? '')).toEqual(['ONE ', 'TWO ', '1234', '5   ', ' '.repeat(4)])
+		expect(rows.every((drawn) => drawn.length === size.rows)).toBe(true)
+		expect(rows.flat().every((row) => row.length === size.columns)).toBe(true)
 	})
 })
 

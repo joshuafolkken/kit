@@ -1,3 +1,4 @@
+import type { TerminalSize } from './run-board-fit'
 import type { Icons } from './run-board-icons'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyInput, KeyReading } from './run-board-keys'
@@ -45,9 +46,9 @@ function wiping(cell: RainCell): RainCell {
 	return cell
 }
 
-// Every frame of the wipe, the last the screen erased whole.
-function* beats_of(frame: string, random: Random): Generator<Beat> {
-	yield* run_board_reveal_rain.beats_of(frame, random, wiping)
+// Every frame of the wipe over the terminal, the last the screen erased whole.
+function* beats_of(frame: string, random: Random, size?: TerminalSize): Generator<Beat> {
+	yield* run_board_reveal_rain.beats_of(frame, random, { read: wiping, size })
 	yield CLEARED
 }
 
@@ -62,6 +63,11 @@ function drawn_of(
 	return run_board_theme.restyle(theme, frame, icons)
 }
 
+// The ports writing past the theme, as the board's own frames are.
+function drawing(ports: IntroPorts): IntroPorts {
+	return { ...ports, write: ports.write_drawn ?? ports.write }
+}
+
 // The last frame wiped, a key ending it at once; nothing plays without a frame, a rain theme, color or
 // the ports' pauses.
 async function wipe(
@@ -74,9 +80,7 @@ async function wipe(
 	const { random, is_colored } = ports.rain ?? LIVE_RAIN
 	if (drawn === undefined || !is_colored()) return
 
-	const write = ports.write_drawn ?? ports.write
-
-	await run_board_intro.listen(beats_of(drawn, random), { ...ports, write }, keys)
+	await run_board_intro.listen(beats_of(drawn, random, ports.size?.()), drawing(ports), keys)
 }
 
 // Nothing to wipe until the live board says how.

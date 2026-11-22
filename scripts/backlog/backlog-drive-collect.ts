@@ -46,7 +46,7 @@ async function collected(issue: string, owner: string): Promise<MergeResult> {
 	const argv = run_merge_driver.argv_of({ child: issue, owner, output: lane?.output })
 	const ran = await staged(
 		STAGE.MERGE,
-		async () => await josh_command.josh_run(argv, should_forward_stderr),
+		async () => await josh_command.josh_run(argv, { should_forward_stderr }),
 	)
 	const result = run_merge_driver.read(ran.out) ?? unprinted(ran.code)
 

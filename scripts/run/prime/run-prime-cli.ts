@@ -33,7 +33,7 @@ function first_line(result: JoshResult): string {
 async function step(argv: ReadonlyArray<string>): Promise<JoshResult | undefined> {
 	const result = await run_startup.phase(
 		`initialization ${argv[0] ?? ''}`,
-		async () => await josh_command.josh_run(argv, should_forward_stderr),
+		async () => await josh_command.josh_run(argv, { should_forward_stderr }),
 		{
 			edge_of: (value) => (value.code === SUCCESS_EXIT_CODE ? 'done' : 'failed'),
 		},
