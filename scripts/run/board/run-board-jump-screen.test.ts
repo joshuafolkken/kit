@@ -42,6 +42,19 @@ describe('run_board_jump_screen.jump_bytes', () => {
 		expect(jump_bytes(undefined, WASH_MS, undefined)).toBe('')
 	})
 
+	it('ac-066a13f7 draws the merged lane row back over the row it left, then clears it', () => {
+		const draw = { ...draw_of(['AB', 'CD']), gone: { row: 1, cells: [cell('X'), cell('Y')] } }
+		const cleared_ms = WASH_MS + run_board_jump.CLEAR_AT * TICK_MS
+
+		const washed = jump_bytes(draw, WASH_MS, undefined)
+		const cleared = jump_bytes(draw, cleared_ms, undefined)
+
+		expect(washed.indexOf('X')).toBeGreaterThan(washed.indexOf(`${ESC}[2;1H`))
+		expect(washed.indexOf('Y')).toBeGreaterThan(washed.indexOf(`${ESC}[2;2H`))
+		expect(jump_bytes(draw_of(['AB', 'CD']), WASH_MS, undefined)).not.toContain('X')
+		expect(['C', 'D', 'X', 'Y'].filter((letter) => cleared.includes(letter))).toStrictEqual([])
+	})
+
 	it('writes nothing again within the frame it last wrote', () => {
 		const draw = draw_of(['AB', 'CD'])
 

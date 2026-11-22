@@ -90,3 +90,23 @@ describe('run_board_frame_diff.changed', () => {
 		expect(run_board_frame_diff.changed([line('界')], [line('')])).toStrictEqual([])
 	})
 })
+
+describe('run_board_frame_diff.departures', () => {
+	it('ac-066a13f7 names the lane rows the last frame drew and this one does not', () => {
+		const merged = line('🚢 #1', 'lanes:1', 4)
+		const before = [merged, line('🔨 #2', 'lanes:2', 5), line('now', 'now:x', 6)]
+		const after = [line('🔨 #2', 'lanes:2', 4)]
+
+		expect(run_board_frame_diff.departures(before, after)).toStrictEqual([merged])
+	})
+
+	it('names no row that stays or that is not a lane', () => {
+		const before = [line('🔨 #2', 'lanes:2', 5), line('now', 'now:x', 6)]
+
+		expect(run_board_frame_diff.departures(before, [line('🔨 #2', 'lanes:2', 3)])).toStrictEqual([])
+	})
+
+	it('leaves the events unchanged when a lane row leaves', () => {
+		expect(keys_of([line('🔨 #1', 'lanes:1')], [])).toStrictEqual([])
+	})
+})

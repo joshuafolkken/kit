@@ -23,8 +23,9 @@ const {
 const RUN = { start_ms: 1000, letters: 10 }
 const LETTERS = 30
 const CRUISE = 40
-// The jump is over this many ticks after it: its fire trails burned out (58 ticks, crossing in 20).
-const OVER_TICK = 78
+// The jump is over this many ticks after it: the next lane's row thawed in (arriving at 70, over 40),
+// past its fire trails burning out at 78.
+const OVER_TICK = 110
 // The thaw is over this many ticks after it: its wash and its thaw, when the speed is back at cruise.
 const THAWED_TICK = 58
 
@@ -41,7 +42,7 @@ describe('run_board_jump.tick_of', () => {
 })
 
 describe('run_board_jump.is_running / is_over', () => {
-	it('runs from the first letter until the wash, the thaw and the fire trails are done', () => {
+	it('runs from the first letter until the wash, the thaw, the fire trails and the lane swap are done', () => {
 		expect(is_running(RUN, RUN.start_ms - 1)).toBe(false)
 		expect(is_running(RUN, RUN.start_ms)).toBe(true)
 		expect(is_running(RUN, ms_at(OVER_TICK - 1))).toBe(true)

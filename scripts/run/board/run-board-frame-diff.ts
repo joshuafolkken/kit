@@ -106,7 +106,27 @@ function events(
 	]
 }
 
-const run_board_frame_diff = { CSI, FRAME_MS, HEAD, cells_of, changed, events, frames_between }
+// joshuafolkken/kit#8711: the lane rows the last frame drew and this one does not — a lane that merged
+// or otherwise left the section. Kept apart from `events`, whose rows replay where they stand.
+function departures(
+	before: ReadonlyArray<KeyedLine>,
+	lines: ReadonlyArray<KeyedLine>,
+): Array<KeyedLine> {
+	const keys = new Set(lines.map((line) => line.key))
+
+	return before.filter((line) => line.key.startsWith(LANE_KEY) && !keys.has(line.key))
+}
+
+const run_board_frame_diff = {
+	CSI,
+	FRAME_MS,
+	HEAD,
+	cells_of,
+	changed,
+	departures,
+	events,
+	frames_between,
+}
 
 export { run_board_frame_diff }
 export type { ChangedCell }
