@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { lane_prefix_stats, type SessionPrefix } from './lane-prefix-stats'
 import { lane_stats } from './lane-stats'
 import type { ToolCall } from './lane-transcript-calls'
+import { lane_transcript_stats } from './lane-transcript-stats'
 
 // joshuafolkken/kit#8704: `lane:stats` reports a lane child's first-request context per model and the
 // share of lane sessions that called ToolSearch, so a jump in the fixed prefix shows in one table.
@@ -102,7 +103,22 @@ describe('lane_prefix_stats.first_request', () => {
 	})
 })
 
-describe('lane_prefix_stats.read_prefixes', () => {
+describe('lane_prefix_stats.first_request — a first request with no timestamp', () => {
+	it('is placed at the session first timestamp', () => {
+		const untimed = JSON.parse(assistant_line({ request: 'r1', at: FIRST_AT, input: 500 }))
+		const raw = [
+			JSON.stringify({ ...untimed, timestamp: undefined }),
+			assistant_line({ request: 'r2', at: LATER_AT, input: 90_000 }),
+		].join('\n')
+
+		expect(lane_prefix_stats.first_request('s1', raw)).toMatchObject({
+			at_ms: Date.parse(LATER_AT),
+			tokens: 602,
+		})
+	})
+})
+
+describe('lane_prefix_stats.prefixes_of', () => {
 	it('reads every lane session written to in the window and drops the ones with no request', () => {
 		const directory = make_directory('lane-prefix-stats-test-')
 
@@ -112,7 +128,11 @@ describe('lane_prefix_stats.read_prefixes', () => {
 		)
 		writeFileSync(path.join(directory, 'b.jsonl'), '')
 
-		const prefixes = lane_prefix_stats.read_prefixes([directory], { since_ms: 0, until_ms: NOW })
+		const sessions = lane_transcript_stats.read_sessions([directory], {
+			since_ms: 0,
+			until_ms: NOW,
+		})
+		const prefixes = lane_prefix_stats.prefixes_of(sessions)
 
 		expect(prefixes.map((one) => [one.session_id, one.tokens])).toStrictEqual([['a', 1002]])
 	})

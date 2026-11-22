@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
@@ -179,31 +179,52 @@ function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow): string {
 	].join('\n')
 }
 
-// The tool calls of every lane session under `directories` that was still written to in `window` — a
-// transcript last modified before the period holds no call in it, so it is never read. A delegated
-// unit's transcript is not a lane session, and its time is already inside the parent's wait for it.
-// A session's own transcript sits directly in its lane's directory, so that directory is its lane.
-function read_calls(directories: ReadonlyArray<string>, window: StatsWindow): Array<ToolCall> {
+interface LaneSession {
+	file: SessionFile
+	raw: string
+}
+
+// Every lane session under `directories` that was still written to in `window`, read once for each
+// table that reads it — a transcript last modified before the period holds no call in it, so it is
+// never read. A delegated unit's transcript is not a lane session, and its time is already inside the
+// parent's wait for it.
+function read_sessions(
+	directories: ReadonlyArray<string>,
+	window: StatsWindow,
+): Array<LaneSession> {
 	return cost_transcript
 		.list_sessions_across(directories)
 		.filter((file) => !file.is_delegated && file.modified_ms >= window.since_ms)
-		.flatMap((file) =>
-			lane_transcript_calls.parse(
-				{ session_id: file.session_id, lane: path.dirname(file.path) },
-				cost_transcript.read_raw(file),
-			),
-		)
+		.map((file) => ({ file, raw: cost_transcript.read_raw(file) }))
+}
+
+// The sessions' tool calls; a session's own transcript sits directly in its lane's directory, so that
+// directory is its lane.
+function calls_of(sessions: ReadonlyArray<LaneSession>): Array<ToolCall> {
+	return sessions.flatMap(({ file, raw }) =>
+		lane_transcript_calls.parse(
+			{ session_id: file.session_id, lane: path.dirname(file.path) },
+			raw,
+		),
+	)
+}
+
+function read_calls(directories: ReadonlyArray<string>, window: StatsWindow): Array<ToolCall> {
+	return calls_of(read_sessions(directories, window))
 }
 
 const lane_transcript_stats = {
+	calls_of,
 	command_segments,
 	durations,
 	in_period,
 	josh_commands,
 	read_calls,
+	read_sessions,
 	solo_calls,
 	table,
 	verification_commands,
 }
 
+export type { LaneSession }
 export { lane_transcript_stats }

@@ -2,6 +2,6 @@
 	"reason": "New lane:stats table for the lane child first-request context and ToolSearch share (#8704)",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 105
+		"scripts.code_lines": 116
 	}
 }

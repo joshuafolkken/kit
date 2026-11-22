@@ -1,7 +1,7 @@
-import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import type { ToolCall } from './lane-transcript-calls'
+import type { LaneSession } from './lane-transcript-stats'
 
 // joshuafolkken/kit#8704: a lane child's fixed prefix grew by a third and no `lane:stats` row showed
 // it. The table reads each lane session's first request — the context every later request re-reads —
@@ -42,27 +42,21 @@ function records_of(raw: string): Array<UsageRecord> {
 }
 
 // The session's first priced request, `undefined` when the transcript holds none — a session cut
-// before its first answer has no prefix to measure.
+// before its first answer has no prefix to measure. A first request written without a timestamp is
+// placed at the session's first timestamped one, so the period still holds it.
 function first_request(session_id: string, raw: string): SessionPrefix | undefined {
-	const [first] = cost_usage.dedupe(records_of(raw))
+	const records = cost_usage.dedupe(records_of(raw))
+	const [first] = records
+	const at_ms = records.find((record) => record.at_ms !== undefined)?.at_ms
 
-	if (first?.at_ms === undefined) return undefined
+	if (first === undefined || at_ms === undefined) return undefined
 
-	const tokens = cost_usage.billed_input(first.totals)
-
-	return { session_id, model: first.model, at_ms: first.at_ms, tokens }
+	return { session_id, model: first.model, at_ms, tokens: cost_usage.billed_input(first.totals) }
 }
 
-// The first request of every lane session under `directories` written to in `window`; a delegated
-// unit is not a lane child, so its transcript is skipped as `read_calls` skips it.
-function read_prefixes(
-	directories: ReadonlyArray<string>,
-	window: StatsWindow,
-): Array<SessionPrefix> {
-	return cost_transcript
-		.list_sessions_across(directories)
-		.filter((file) => !file.is_delegated && file.modified_ms >= window.since_ms)
-		.flatMap((file) => first_request(file.session_id, cost_transcript.read_raw(file)) ?? [])
+// The first request of each lane session `lane_transcript_stats.read_sessions` read.
+function prefixes_of(sessions: ReadonlyArray<LaneSession>): Array<SessionPrefix> {
+	return sessions.flatMap(({ file, raw }) => first_request(file.session_id, raw) ?? [])
 }
 
 function searched_sessions(calls: ReadonlyArray<ToolCall>): Set<string> {
@@ -115,7 +109,7 @@ function table(
 	].join('\n')
 }
 
-const lane_prefix_stats = { first_request, read_prefixes, table }
+const lane_prefix_stats = { first_request, prefixes_of, table }
 
 export type { SessionPrefix }
 export { lane_prefix_stats }

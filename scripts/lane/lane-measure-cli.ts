@@ -136,14 +136,14 @@ async function period_records(
 	const human_waits = is_human_read
 		? await lane_human_wait_read.read_for(context, events, window)
 		: []
-	const directories = transcript_directories(context)
+	const sessions = lane_transcript_stats.read_sessions(transcript_directories(context), window)
 
 	return {
 		entries: await lane_ledger_archive.read_history(context),
 		events,
-		calls: lane_transcript_stats.read_calls(directories, window),
+		calls: lane_transcript_stats.calls_of(sessions),
 		human_waits,
-		prefixes: lane_prefix_stats.read_prefixes(directories, window),
+		prefixes: lane_prefix_stats.prefixes_of(sessions),
 	}
 }
 
