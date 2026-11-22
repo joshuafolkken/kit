@@ -244,5 +244,5 @@ const run_board_sound_player = {
 	start,
 }
 
-export type { Player, PlayerOptions, Playing, SoundPorts, SoundSpawner, StartHandlers }
+export type { Player, Playing, SoundPorts, SoundSpawner, StartHandlers }
 export { run_board_sound_player }
