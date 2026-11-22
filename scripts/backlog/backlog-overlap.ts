@@ -162,8 +162,10 @@ function paths_meet(left: ReadonlySet<string>, right: ReadonlySet<string>): bool
 }
 
 // Each candidate's key mapped to the keys of the other candidates whose declared paths overlap its
-// own — the pairs `separate` never runs side by side. Symmetric, and not transitive: A meeting B and B
-// meeting C leaves A and C free to run together (joshuafolkken/kit#8571).
+// own, by the comparison `separate` holds candidates apart on — over the paths as given, so a bare
+// file name `separate` would first resolve (`with_resolved_names`) meets only its own spelling here.
+// Symmetric, and not transitive: A meeting B and B meeting C leaves A and C free to run together
+// (joshuafolkken/kit#8571).
 function overlap_neighbors(
 	candidates: ReadonlyArray<OverlapCandidate>,
 ): ReadonlyMap<string, ReadonlySet<string>> {
