@@ -5,7 +5,7 @@ import { run_board_rgb, type Rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8675: the bttf jump's twin fire trails.
 
-const { COLUMNS_PER_TICK, FIRE_TICKS, FLAMES, HEAD_TICKS, fire_of, rows_of, trail_cells } =
+const { COLUMNS_PER_TICK, FIRE_TICKS, FLAMES, HEAD_TICKS, fire_of, padded, rows_of, trail_cells } =
 	run_board_fire_trail
 const { parsed, scaled } = run_board_rgb
 const GREY: Rgb = [100, 100, 100]
@@ -91,6 +91,21 @@ describe('run_board_fire_trail.trail_cells — the flames', () => {
 
 		expect(burning.at(-1)).toStrictEqual(cell_at(0, ROW + 1))
 		expect(trail_cells(cells, -1, [ROW], half)).toStrictEqual(cells)
+	})
+})
+
+describe('run_board_fire_trail.padded', () => {
+	it('fills the trail rows out to the screen width with blank cells, leaving the others', () => {
+		const letter = { text: 'a', style: 'S', is_wide: false }
+		const screen = {
+			rows: [[letter], []],
+			columns: 3,
+			skips: new Set<string>(),
+			typing_rows: new Set<number>(),
+		}
+		const blank = { text: ' ', style: '', is_wide: false }
+
+		expect(padded(screen, [1]).rows).toStrictEqual([[letter], [blank, blank, blank]])
 	})
 })
 

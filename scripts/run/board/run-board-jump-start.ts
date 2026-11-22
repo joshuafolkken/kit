@@ -76,13 +76,19 @@ function lane_of(lines: ReadonlyArray<string>, issue: number | undefined): numbe
 function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 	const { ports, drawn, area } = frame
 	const lines = drawn.lines.map((line) => run_board_theme.restyle(ports.theme, line, ports.icons))
-	const screen = run_board_drop_screen.screen_of({ ...drawn, lines }, frame.typing, drawn.size)
-	const texts = screen.rows.map((row) => row.map((cell) => cell.text).join(''))
+	const drawn_screen = run_board_drop_screen.screen_of(
+		{ ...drawn, lines },
+		frame.typing,
+		drawn.size,
+	)
+	const texts = drawn_screen.rows.map((row) => row.map((cell) => cell.text).join(''))
+	const trails = run_board_fire_trail.rows_of(texts)
+	const screen = run_board_fire_trail.padded(drawn_screen, trails)
 	const scene: JumpScene = {
 		rows: screen.rows.length,
 		lane: lane_of(texts, run.issue),
 		panel: area === undefined ? undefined : { top: area.top - 1, rows: area.rows },
-		trails: run_board_fire_trail.rows_of(texts),
+		trails,
 	}
 
 	return { run, screen, scene, place: frame.turn?.place, panel: area }

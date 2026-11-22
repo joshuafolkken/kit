@@ -2,6 +2,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Notice } from './run-board-header-notice'
 import { run_board_jump } from './run-board-jump'
+import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 import { run_board_jump_start, type JumpFrame } from './run-board-jump-start'
 import type { CueName } from './run-board-sound-cues'
 import { run_board_type_rows } from './run-board-type-rows'
@@ -32,6 +33,14 @@ function frame_of(overrides: Partial<JumpFrame> = {}): JumpFrame {
 	}
 }
 
+function trail_draw(lines: ReadonlyArray<string>): JumpDraw {
+	const draw = jump_of(undefined, frame_of({ drawn: { lines, spots: [], size: undefined } }))
+
+	if (draw === undefined) throw new Error('no jump started')
+
+	return draw
+}
+
 beforeEach(() => {
 	vi.stubEnv('FORCE_COLOR', '3')
 })
@@ -51,19 +60,22 @@ describe('run_board_jump_start.jump_of', () => {
 })
 
 describe('run_board_jump_start.jump_of — the fire trails', () => {
-	it('burns the fire trails on the blank rows above the throughput rule and the lanes rule', () => {
-		const lines = [
-			'header',
-			'',
-			'── 📈 throughput ──',
-			'x',
-			'',
-			'── 🧵 lanes ──',
-			LINES[LANE_ROW] ?? '',
-		]
-		const draw = jump_of(undefined, frame_of({ drawn: { lines, spots: [], size: undefined } }))
+	const THROUGHPUT_RULE = '── 📈 throughput ──'
+	const LANE_LINE = LINES[LANE_ROW] ?? ''
 
-		expect(draw?.scene.trails).toStrictEqual([1, 4])
+	it('burns the fire trails on the blank rows above the throughput rule and the lanes rule', () => {
+		const lines = ['header', '', THROUGHPUT_RULE, 'x', '', '── 🧵 lanes ──', LANE_LINE]
+
+		expect(trail_draw(lines).scene.trails).toStrictEqual([1, 4])
+	})
+
+	it('fills the blank trail rows out with cells, so the head burns on a real board', () => {
+		const draw = trail_draw(['header', '', THROUGHPUT_RULE, LANE_LINE])
+		const jumped_ms = NOW + draw.run.letters * TICK_MS
+		const written = run_board_jump_screen.jump_bytes(draw, jumped_ms, undefined)
+
+		expect(draw.screen.rows[1]).toHaveLength(draw.screen.columns)
+		expect(written).toMatch(/\[2;1H.*█/u)
 	})
 })
 
