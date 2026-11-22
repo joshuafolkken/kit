@@ -55,6 +55,20 @@ describe('backlog_yield_cap.times_of', () => {
 
 		expect(times_of(events, ISSUE)).toStrictEqual([at])
 	})
+
+	// joshuafolkken/kit#8665: the yields that tripped the cap a retry lifted do not trip it again.
+	it('counts only the yields after the issue was retried', () => {
+		const before = Array.from({ length: YIELD_CAP }, (_, index) => ago(index * MS_PER_MINUTE))
+		const yielded = `#${ISSUE} yielded its lane: held by #6798 · at: entry`
+		const events = [
+			...before.map((at) => note(yielded, at)),
+			{ pos: 1, kind: run_event_stream.EVENT_KIND.ADD, text: `retry #${ISSUE}`, at: ago(0) },
+			{ ...note(yielded, ago(0)), pos: 2 },
+		]
+
+		expect(times_of(events, ISSUE)).toStrictEqual([ago(0)])
+		expect(is_tripped(times_of(events, ISSUE), NOW)).toBe(false)
+	})
 })
 
 describe('backlog_yield_cap.capped', () => {
