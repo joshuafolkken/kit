@@ -87,8 +87,8 @@ interface QuotaView {
 	rate_limit?: GithubRateLimit | undefined
 	// Whether the frame runs the WOPR lamp panel (`run-board-quota-lamps.ts`).
 	has_lamps?: boolean | undefined
-	// Whether the panel rains (matrix), running the rule's row as a panel row too (joshuafolkken/kit#8647).
-	has_rain?: boolean | undefined
+	// Whether the panel runs over the rule's row too (joshuafolkken/kit#8647, joshuafolkken/kit#8702).
+	has_rule_lamps?: boolean | undefined
 }
 
 // The windows the provider reported, shortest first — the order its row and its summary both read.
@@ -363,7 +363,7 @@ function usage_part(view: QuotaView): DetailPart | undefined {
 		lines,
 		label: LABEL,
 		summary: summary_of(view),
-		is_rule_lamped: has_lamps && view.has_rain === true,
+		is_rule_lamped: has_lamps && view.has_rule_lamps === true,
 	}
 }
 

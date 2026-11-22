@@ -34,7 +34,7 @@ const DIM = `${ESCAPE}[2m`
 // The red rows' out color before joshuafolkken/kit#8305, which no out lamp is drawn in now.
 const OUT_RED = '38;2;128;35;29'
 const OUT_YELLOW = '38;2;128;107;5'
-const PANEL = [0, 1, 2, 3, 4]
+const PANEL = [0, 1, 2, 3, 4, 5, 6]
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -161,18 +161,19 @@ describe('run_board_lamps.start_column', () => {
 })
 
 describe('run_board_lamps colors', () => {
-	it('lights the panel’s five rows yellow, yellow, red, yellow, red, never blinking', () => {
+	// joshuafolkken/kit#8702: seven rows, the usage rule's row among them.
+	it('lights the panel’s seven rows yellow, yellow, yellow, red, red, yellow, red, never blinking', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
-		const rows = [0, 1, 2, 3, 4].map((row) => lamp_text(row, true))
+		const rows = [0, 1, 2, 3, 4, 5, 6].map((row) => lamp_text(row, true))
 		const colors = rows.map((text) => (text.includes(LIT_RED) ? 'red' : 'yellow'))
 
-		expect(colors).toEqual(['yellow', 'yellow', 'red', 'yellow', 'red'])
-		expect(rows.filter((text) => text.includes(LIT_YELLOW))).toHaveLength(3)
+		expect(colors).toEqual(['yellow', 'yellow', 'yellow', 'red', 'red', 'yellow', 'red'])
+		expect(rows.filter((text) => text.includes(LIT_YELLOW))).toHaveLength(4)
 		expect(rows.join('') + lamp_text(1, false)).not.toContain(BLINK)
 	})
 
-	it('names the panel’s rows under the throughput rows', () => {
-		expect(PANEL_ROWS).toEqual({ gap: 2, first_usage: 3, second_usage: 4, github: 5 })
+	it('names the panel’s rows under the throughput rows, the usage rule’s among them', () => {
+		expect(PANEL_ROWS).toEqual({ gap: 2, rule: 3, first_usage: 4, second_usage: 5, github: 6 })
 	})
 
 	it('draws every row’s lamp out at half yellow, dimmed, the start placeholder too', () => {
@@ -211,7 +212,7 @@ describe('run_board_lamps.look_text (joshuafolkken/kit#8376)', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
 		expect(run_board_lamps.look_text('yellow')).toBe(lamp_text(0, true))
-		expect(run_board_lamps.look_text('red')).toBe(lamp_text(PANEL_ROWS.gap, true))
+		expect(run_board_lamps.look_text('red')).toBe(lamp_text(PANEL_ROWS.rule, true))
 		expect(run_board_lamps.look_text('out')).toBe(lamp_text(0, false))
 	})
 })

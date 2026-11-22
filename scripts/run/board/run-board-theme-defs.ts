@@ -87,6 +87,9 @@ interface ThemeDefinition {
 	// joshuafolkken/kit#8676: the painter that draws the animation area where the lamp panel shows
 	// (`run-board-panel-draw.ts`); a theme with none draws nothing there between redraws.
 	panel?: PanelPainter
+	// joshuafolkken/kit#8702: whether the lamp panel runs over the usage rule's row too, the rule cut two
+	// columns before the panel (`run-board-fold.ts` → `rule_lamped`), so the panel shows unbroken.
+	rule_lamped: boolean
 	// Glyphs spread over the board spinner's cycle, in order (joshuafolkken/kit#8366).
 	spinner: string
 	live: LiveDefinition
@@ -142,6 +145,7 @@ const THEME_DEFS = {
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
 		panel: run_board_panel_painters.LAMP_PAINTER,
+		rule_lamped: true,
 		spinner: '│╱─╲',
 		live: {
 			sweep: true,
@@ -180,6 +184,7 @@ const THEME_DEFS = {
 		alert: run_board_header_trace.field_of,
 		lamps: true,
 		panel: run_board_panel_painters.RAIN_PAINTER,
+		rule_lamped: true,
 		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 		live: {
 			sweep: false,
@@ -211,6 +216,8 @@ const THEME_DEFS = {
 		// joshuafolkken/kit#8674: the flux capacitor, the lamp gauge and the speed readout at idle.
 		lamps: true,
 		panel: run_board_flux_panel.FLUX_PAINTER,
+		// The flux figure sits in the panel's area, which a lamped rule row would move.
+		rule_lamped: false,
 		spinner: '│╱─╲',
 		// joshuafolkken/kit#8683: its notices, operations and rows type as the other themes' do, silently.
 		live: { ...NO_LIVE, types_rows: true },
@@ -252,9 +259,18 @@ function panel_of(theme: Theme | undefined): PanelPainter | undefined {
 	return definition.panel
 }
 
+// Whether a theme's lamp panel runs over the usage rule's row (joshuafolkken/kit#8702); none in no theme.
+function is_rule_lamped(theme: Theme | undefined): boolean {
+	if (theme === undefined) return false
+	const definition: ThemeDefinition = THEME_DEFS[theme]
+
+	return definition.rule_lamped
+}
+
 const run_board_theme_defs = {
 	THEMES,
 	THEME_DEFS,
+	is_rule_lamped,
 	live_of,
 	names_of,
 	panel_of,

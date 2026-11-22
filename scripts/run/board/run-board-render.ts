@@ -72,8 +72,8 @@ interface BoardView extends FrameBounds {
 	throughput?: ReadonlyArray<ThroughputRow> | undefined
 	// Whether the throughput rows end on the lamp panel (`run-board-lamps.ts`).
 	has_lamps?: boolean | undefined
-	// Whether the lamp panel rains (matrix): the usage rule's row then carries the panel as well.
-	has_rain?: boolean | undefined
+	// Whether the usage rule's row carries the lamp panel as well (joshuafolkken/kit#8702).
+	has_rule_lamps?: boolean | undefined
 	// The repository's pinned issues, drawn as the watch panel at the header's right.
 	pinned?: ReadonlyArray<PinnedIssue> | undefined
 }
@@ -258,7 +258,7 @@ function figure_parts(
 			...header,
 			hold: header.quota_hold,
 			has_lamps,
-			has_rain: view.has_rain,
+			has_rule_lamps: view.has_rule_lamps,
 			is_flash_keyed,
 		}),
 	}

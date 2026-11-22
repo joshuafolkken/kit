@@ -51,17 +51,17 @@ const PANEL_START = width_of(rows_part(ROWS, false).lines[0]?.text ?? '') + GAP
 interface Panel {
 	usage_rows?: ReadonlyArray<string>
 	has_lamps?: boolean
-	has_rain?: boolean
+	has_rule_lamps?: boolean
 }
 
 // A live frame's throughput and usage sections, the rule run on to `PANEL_WIDTH` past the panel's start.
 function panel_parts(panel: Panel): FrameParts {
-	const { usage_rows = ROWS_TEXT, has_lamps = true, has_rain = true } = panel
+	const { usage_rows = ROWS_TEXT, has_lamps = true, has_rule_lamps = true } = panel
 	const usage = run_board_render_quota.usage_part({
 		quotas: { claude: undefined, codex: undefined },
 		now_ms: START,
 		has_lamps,
-		has_rain,
+		has_rule_lamps,
 	})
 	const lines = run_board_quota_lamps
 		.provider_rows(usage_rows, has_lamps)
@@ -110,7 +110,7 @@ describe('the usage rule’s row on a rain frame', () => {
 	})
 
 	it.each([
-		['a frame with no rain', { has_rain: false }],
+		['a theme that lamps no rule (bttf)', { has_rule_lamps: false }],
 		['a frame with no lamps', { has_lamps: false }],
 	])('draws the rule whole with %s', (_, panel: Panel) => {
 		const rule = usage_rule(frame_of(panel))
@@ -270,7 +270,11 @@ describe('run_board_tick_draw’s whole draw', () => {
 		expect(marks).toBe(lamps)
 	})
 
-	it('runs the panel on the usage rule’s row on a matrix board only', () => {
-		expect(redrawn('matrix').rows).toBe(redrawn('wargames').rows + 1)
+	// joshuafolkken/kit#8702: the wargames panel runs over the rule's row as matrix's does; bttf's does not.
+	it('runs the panel on the usage rule’s row on matrix and wargames boards, not bttf', () => {
+		const { rows } = redrawn('wargames')
+
+		expect(redrawn('matrix').rows).toBe(rows)
+		expect(redrawn('bttf').rows).toBe(rows - 1)
 	})
 })

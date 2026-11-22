@@ -4,11 +4,10 @@ import { run_board_labels, type Paint, type TextColor } from './run-board-labels
 import { run_board_spot } from './run-board-spot'
 
 // The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): from two columns past the
-// throughput rows' NOW, a `■` every other column up to the section's rule, on six rows — the `24h` and
-// `7d` rows, the blank line under them, the usage section's first two provider rows
-// (joshuafolkken/kit#8277) and GitHub's row (joshuafolkken/kit#8695) — lit yellow, yellow, red, yellow,
-// red, yellow from the top, out on every row at half
-// yellow, dimmed (named `yellow` dimmed where the terminal has no 24-bit color; joshuafolkken/kit#8305).
+// throughput rows' NOW, a `■` every other column up to the section's rule, on seven rows — the `24h` and
+// `7d` rows, the blank line under them, the usage section's rule (joshuafolkken/kit#8702), its first two
+// provider rows (joshuafolkken/kit#8277) and GitHub's row (joshuafolkken/kit#8695) — lit yellow, yellow,
+// yellow, red, red, yellow, red from the top, out on every row at half yellow, dimmed (named `yellow` dimmed where the terminal has no 24-bit color; joshuafolkken/kit#8305).
 // Lamps blink four to a group, each group on its own period and phase, about four in ten lit; whether
 // one is lit is read off the moment, its group and its place alone.
 
@@ -37,10 +36,10 @@ const MIX_SEED = 1
 const OUT_DIVISOR = 2
 type Shade = Exclude<Paint, TextColor>
 const { red, yellow } = GAUGE_SHADES
-// The panel's rows from the top: the `24h` and `7d` rows (`0`, `1`), the blank line under them, and the
-// usage section's first two provider rows, then GitHub's.
-const PANEL_ROWS = { gap: 2, first_usage: 3, second_usage: 4, github: 5 }
-const SHADES: ReadonlyArray<Shade> = [yellow, yellow, red, yellow, red, yellow]
+// The panel's rows from the top: the `24h` and `7d` rows (`0`, `1`), the blank line under them, the
+// usage section's rule, its first two provider rows, then GitHub's.
+const PANEL_ROWS = { gap: 2, rule: 3, first_usage: 4, second_usage: 5, github: 6 }
+const SHADES: ReadonlyArray<Shade> = [yellow, yellow, yellow, red, red, yellow, red]
 
 // Where a panel starts and the column its rule ends at.
 interface PanelSpan {
@@ -134,7 +133,7 @@ function start_of(row: number): string {
 }
 
 // A rule ended two columns before the panel's `start`, starting a panel there as the rows around it do
-// (joshuafolkken/kit#8647); its marker is out in the blank line's shade, a rain frame's only.
+// (joshuafolkken/kit#8647) — in a theme that lamps the rule (joshuafolkken/kit#8702); its marker is out.
 function rule_started(rule: string, start: number): string {
 	let cut = ''
 
@@ -143,7 +142,7 @@ function rule_started(rule: string, start: number): string {
 		cut += character
 	}
 
-	return `${cut}${start_of(PANEL_ROWS.gap)}`
+	return `${cut}${start_of(PANEL_ROWS.rule)}`
 }
 
 // The text before a dropped panel's marker up to its last figure: the marker's color escapes hold no

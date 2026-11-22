@@ -209,7 +209,7 @@ describe('the usage rows beside the panel (joshuafolkken/kit#8695)', () => {
 
 	it('rains on the rule’s row as well, a seventh panel row on a rain frame', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
-		const lines = frame_of({ ...view_of(true, true), has_rain: true })
+		const lines = frame_of({ ...view_of(true, true), has_rule_lamps: true })
 
 		expect(lamped(lines)).toHaveLength(PANEL_ROWS + 1)
 		expect(lamped(lines).some((line) => line.includes('usage'))).toBe(true)

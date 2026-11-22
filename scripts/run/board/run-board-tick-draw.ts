@@ -29,7 +29,7 @@ import { run_board_type_rows, type Typing, type TypingSpan } from './run-board-t
 // the board's ports.
 
 const { SPOT } = run_board_spin
-const { THEME_DEFS, live_of, panel_of: panel_painter_of } = run_board_theme_defs
+const { THEME_DEFS, live_of, panel_of: panel_painter_of, is_rule_lamped } = run_board_theme_defs
 
 // The ports a frame is drawn through — no read among them, so the worker thread draws the frames it
 // records through the same ones (`run-board-gather-record.ts`).
@@ -161,6 +161,12 @@ function has_rain(ports: LivePorts): boolean {
 	return has_lamps(ports) && live_of(ports.theme).rain
 }
 
+// Whether the lamp panel runs over the usage rule's row: where the panel shows, in a theme whose
+// definition lamps the rule (joshuafolkken/kit#8702).
+function has_rule_lamps(ports: LivePorts): boolean {
+	return has_lamps(ports) && is_rule_lamped(ports.theme)
+}
+
 // The idle rain's moment a rain frame's lamps are drawn at — none where the panel does not rain, so its
 // lamps are drawn as `■` (joshuafolkken/kit#8647).
 function rain_of(redraw: Pick<Redraw, 'ports' | 'now_ms'>): RainMoment | undefined {
@@ -226,7 +232,7 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		resume: display.resume,
 		throughput: display.throughput,
 		has_lamps: has_lamps(redraw.ports),
-		has_rain: has_rain(redraw.ports),
+		has_rule_lamps: has_rule_lamps(redraw.ports),
 		thanks: display.thanks,
 		pinned: display.pinned,
 		link: redraw.ports.link,
@@ -396,6 +402,7 @@ const run_board_tick_draw = {
 	has_drop,
 	has_lamps,
 	has_rain,
+	has_rule_lamps,
 	has_strip,
 	panel_of,
 }
