@@ -89,16 +89,18 @@ function is_instruction_document(target: string, root: string = process.cwd()): 
 // The harness's own session files (backgrounded output, persisted results) cannot be delegated either.
 // Only what the harness writes is exempt — the scratchpad holds real subject material and still counts.
 const SESSION_TEMP_SEGMENT = /^claude-\d+$/u
-const SESSION_STATE_SEGMENTS = cost_transcript.TRANSCRIPT_ROOT.split(path.sep)
 // Both halves of `tasks/<id>.output` are required: `tasks/` alone is a common repository directory.
 const HARNESS_OUTPUT_DIRECTORY = 'tasks'
 const HARNESS_OUTPUT_EXTENSION = '.output'
 const FILE_SEGMENT_INDEX = -1
 const PARENT_SEGMENT_INDEX = -2
 
-// The state root holds no subject code, so it is exempt whole.
+// The state root holds no subject code, so it is exempt whole. It is read per call, not at module
+// load, so an importer's partial `cost_transcript` mock does not break loading this module.
 function has_state_root(segments: ReadonlyArray<string>, index: number): boolean {
-	return SESSION_STATE_SEGMENTS.every((segment, offset) => segments[index + offset] === segment)
+	return cost_transcript.TRANSCRIPT_ROOT.split(path.sep).every(
+		(segment, offset) => segments[index + offset] === segment,
+	)
 }
 
 function is_harness_output(segments: ReadonlyArray<string>): boolean {
