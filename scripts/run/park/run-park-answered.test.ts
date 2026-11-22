@@ -91,6 +91,50 @@ describe('run_park_answered.refusal_of', () => {
 	})
 })
 
+// joshuafolkken/kit#8726: the #8655 shape — the Issue decided on a follow-up filing only the parent can do.
+function park_body(permission: string): string {
+	return [
+		'## Close #8655 as near the boundary, or file the follow-up?',
+		'### 選択肢',
+		'1. File the follow-up with needs-decision, then close #8655',
+		'   - 層: A',
+		`   - 必要な権限: ${permission}`,
+		'2. Close #8655 as near the boundary',
+		'   - 層: A',
+		'   - 必要な権限: 親（issue:close）',
+		'### 推奨',
+		'1 the decision rule chose a follow-up Issue',
+	].join('\n')
+}
+
+describe('run_park_answered.refusal_of a recommendation by permission', () => {
+	it.each([
+		['ja', 'Issue はこの問いに答え済みです（Reuse issue_sources）'],
+		['en', 'The Issue already answers this question (Reuse issue_sources)'],
+	])(
+		"parks an answered question whose pick is the parent's filing, noting the decision in %s (ac-ad90d0c5)",
+		async (lang, expected) => {
+			vi.stubEnv(session_language.ENV_KEY, lang)
+			judge_mock.mockResolvedValue(ANSWERED)
+
+			await expect(
+				run_park_answered.refusal_of(ISSUE, park_body('親（issue:file …）'), DIRECTORY),
+			).resolves.toEqual({ note: expect.stringContaining(expected) })
+			expect(console.error).not.toHaveBeenCalled()
+			vi.unstubAllEnvs()
+		},
+	)
+
+	it('still refuses an answered question whose pick the child can run (ac-0a784e00)', async () => {
+		judge_mock.mockResolvedValue(ANSWERED)
+
+		await expect(
+			run_park_answered.refusal_of(ISSUE, park_body('なし'), DIRECTORY),
+		).resolves.toEqual({ exit_code: 1 })
+		expect(printed()).toContain('already answers this question')
+	})
+})
+
 describe('run_park_answered.refusal_of failures', () => {
 	it('refuses a failed judgment with its cause and retry, before any write', async () => {
 		judge_mock.mockResolvedValue({

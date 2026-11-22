@@ -419,7 +419,7 @@ A body off the schema is refused before any write, naming the missing piece, pri
 A body on the schema is then judged against the Issue's trusted sources before any write (`scripts/run/park/run-park-answered.ts`); `--clear` is not judged, and the `backlog:drive` yield-cap park is a `run:stalled` stop, not a `run:park`.
 
 - **Unanswered** — parks as below.
-- **Answered** — exit `1`, no write: `Park refused: …` with each quote and its source, then record `Auto-decided: …` with `issue:comment` and continue.
+- **Answered** — exit `1`, no write: `Park refused: …` with each quote and its source, then record `Auto-decided: …` with `issue:comment` and continue. When the pick needs `親` permission the child cannot act on the answer, so it parks as a hand-off with a note naming the Issue's decision.
 - **Failed** — exit `1`, no write: `Park failed: <cause>.` and `Retry: <how>`; follow the printed `Retry:` line.
 
 The parent reads the tiers and the recommendation with `backlog:triage --apply <N> --adopt <k>` (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"): a tier A or B option of a recommending park is the parent's.
