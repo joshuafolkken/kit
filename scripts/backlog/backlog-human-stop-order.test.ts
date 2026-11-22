@@ -12,9 +12,12 @@ const { REPO } = backlog_fixture
 const HUMAN = 8501
 const AUTO = 8502
 const OTHER = 8503
+const LATER = 8504
+const RUNNING = 8505
 const HUMAN_BODY = '## 背景\n\n- 人の判断: 要（マージ前の目視確認）\n'
 const AUTO_BODY = '## 背景\n\n- 人の判断: 不要\n'
 const SHARED = 'scripts/run/ship/run-ship.ts'
+const HELD = 'scripts/run/ship/run-ship-steps.ts'
 const IDLE: BusyRead = { kind: 'idle' }
 
 function child(number: number, body?: string): EpicChild {
@@ -31,10 +34,16 @@ function order_of(children: ReadonlyArray<EpicChild>): Array<number> {
 }
 
 describe('backlog_human_stop_order.ordered', () => {
-	it('moves a human-stop candidate behind the overlapping self-completing one', () => {
+	it('moves the overlapping self-completing candidate up into the human-stop slot', () => {
 		const order = order_of([child(HUMAN, HUMAN_BODY), child(OTHER), child(AUTO, AUTO_BODY)])
 
-		expect(order).toStrictEqual([OTHER, AUTO, HUMAN])
+		expect(order).toStrictEqual([AUTO, HUMAN, OTHER])
+	})
+
+	it('moves up only the first of two overlapping self-completing candidates', () => {
+		const children = [child(HUMAN, HUMAN_BODY), child(OTHER), child(AUTO), child(LATER)]
+
+		expect(order_of(children)).toStrictEqual([AUTO, HUMAN, OTHER, LATER])
 	})
 
 	it('keeps a human-stop candidate already behind the self-completing one', () => {
@@ -79,5 +88,26 @@ describe('backlog_overlap.separate with a human-stop candidate', () => {
 
 		expect(selection.offered.map((entry) => entry.number)).toStrictEqual([AUTO])
 		expect(selection.withheld.map((entry) => entry.number)).toStrictEqual([HUMAN])
+	})
+
+	it('offers the human-stop one in its slot when a running lane withholds the other', () => {
+		const offered = [
+			child(HUMAN, `${HUMAN_BODY}- \`${SHARED}\` を直す\n`),
+			child(OTHER),
+			child(AUTO, `${AUTO_BODY}- \`${SHARED}\` と \`${HELD}\` を直す\n`),
+		]
+		const running = { number: RUNNING, body: `- \`${HELD}\` を直す` }
+		const declared = backlog_overlap.declared_of([...offered, running])
+		const read: BusyRead = {
+			kind: 'busy',
+			issues: [{ number: RUNNING, title: 'running', createdAt: '2026-11-22T00:00:00Z' }],
+		}
+		const selection = backlog_overlap.separate({ offered, withheld: [] }, declared, {
+			read,
+			repo: REPO,
+		})
+
+		expect(selection.offered.map((entry) => entry.number)).toStrictEqual([HUMAN, OTHER])
+		expect(selection.withheld.map((entry) => entry.number)).toStrictEqual([AUTO])
 	})
 })
