@@ -91,6 +91,12 @@ function pause_of(number: number, read: RowRead, status?: ItemStatus): RowReason
 	return run_board_review_stop.reason_of({ number, labels }, read) ?? pause
 }
 
+// A question that only repeats the row's title says nothing the title does not, so the action stands
+// alone (joshuafolkken/kit#8590).
+function decide_of(number: number, question: string, read: RowRead): string {
+	return question === read.titles.get(number) ? '→ decide' : `→ decide: ${question}`
+}
+
 function reason_of(
 	number: number,
 	reason: string | undefined,
@@ -104,7 +110,7 @@ function reason_of(
 
 	if (question === '') return undefined
 
-	return { tail: `→ decide: ${question}${note_of(parts.note)}` }
+	return { tail: `${decide_of(number, question, read)}${note_of(parts.note)}` }
 }
 
 function plan_reason(number: number, plan: BoardPlan): RowReason | undefined {
