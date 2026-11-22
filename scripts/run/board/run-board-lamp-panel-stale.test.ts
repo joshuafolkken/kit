@@ -58,9 +58,13 @@ function reading_of(age_minutes: number | undefined): QuotaReading {
 	return { windows: [window], taken_ms, per_task: { [SEVEN_DAYS]: 0.5 } }
 }
 
-function usage_of(age_minutes: number | undefined, has_panel: boolean): DetailPart | undefined {
+function usage_of(
+	age_minutes: number | undefined,
+	has_panel: boolean,
+	claude_age = 0,
+): DetailPart | undefined {
 	return run_board_render_quota.usage_part({
-		quotas: { claude: reading_of(0), codex: reading_of(age_minutes) },
+		quotas: { claude: reading_of(claude_age), codex: reading_of(age_minutes) },
 		scheduler_provider: 'claude',
 		now_ms: NOW_MS,
 		has_lamps: has_panel,
@@ -140,6 +144,18 @@ describe('a stale reading’s age on the lamp panel’s usage rows (joshuafolkke
 
 		expect(lamped(lines)).toBe(PANEL_ROWS)
 		expect(codex_of(lines)).not.toContain('(time unknown)')
+	})
+})
+
+describe('a stale age on a usage row that fits the panel (joshuafolkken/kit#8644)', () => {
+	it('keeps the age on a row that fits beside one whose age is left off', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const frame = drawn(usage_of(FOUR_DIGITS, true, THREE_DIGITS), rows_part(ROWS, true))
+		const claude = frame.find((line) => line.includes('Claude')) ?? ''
+
+		expect(lamped(frame)).toBe(PANEL_ROWS)
+		expect(claude).toContain(`${String(THREE_DIGITS)}′`)
+		expect(codex_of(frame)).not.toContain('′')
 	})
 })
 

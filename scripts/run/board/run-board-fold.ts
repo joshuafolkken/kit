@@ -179,31 +179,34 @@ interface RowsFit {
 	rows: PanelSpan
 }
 
-function is_clear(lines: ReadonlyArray<DetailLine>, span: PanelSpan): boolean {
-	return lines.every((line) => {
-		const column = run_board_lamps.start_column(line.text)
+function is_line_clear(line: DetailLine, span: PanelSpan): boolean {
+	const column = run_board_lamps.start_column(line.text)
 
-		return column === undefined || column < span.start
-	})
+	return column === undefined || column < span.start
 }
 
-// A line with the trailing note its text ends on left off.
-function without_aside(line: DetailLine): DetailLine {
+function is_clear(lines: ReadonlyArray<DetailLine>, span: PanelSpan): boolean {
+	return lines.every((line) => is_line_clear(line, span))
+}
+
+// A line reaching the panel's start with the trailing note its text ends on left off; one clear of it
+// keeps its note.
+function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
 	const { text, aside } = line
 	const index = aside === undefined ? -1 : text.lastIndexOf(aside)
-	if (aside === undefined || index === -1) return line
+	if (aside === undefined || index === -1 || is_line_clear(line, span)) return line
 
 	return { ...line, text: `${text.slice(0, index)}${text.slice(index + aside.length)}` }
 }
 
-// The usage rows run their panels both or neither: where one's text reaches the panel's start, their
-// asides — a stale reading's age — are left off so both run them (joshuafolkken/kit#8644); none where
-// one reaches it still, or where the span has no room for a panel at all.
+// The usage rows run their panels both or neither: where one's text reaches the panel's start, the
+// reaching rows' asides — a stale reading's age — are left off so both run them
+// (joshuafolkken/kit#8644); none where one reaches it still, or where the span has no room for a panel.
 function rows_fit(usage: DetailPart, span: PanelSpan): RowsFit {
 	if (run_board_lamps.count_of(span.end - span.start) === 0) return { usage, rows: NO_PANEL }
 	if (is_clear(usage.lines, span)) return { usage, rows: span }
 
-	const bare = { ...usage, lines: usage.lines.map((line) => without_aside(line)) }
+	const bare = { ...usage, lines: usage.lines.map((line) => without_aside(line, span)) }
 
 	return is_clear(bare.lines, span) ? { usage: bare, rows: span } : { usage, rows: NO_PANEL }
 }
