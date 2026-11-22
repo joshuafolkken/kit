@@ -57,6 +57,9 @@ const MOVED_EXIT_CODE = 2
 // The `--join` exit code of an unpinned change the background `test:pinned` found
 // (joshuafolkken/kit#4770). `josh ship` never drains it, whatever the reviewer fixed.
 const UNPINNED_EXIT_CODE = 3
+// The exit code of a wait cut at the chunk below the prompt-cache TTL with its work still running —
+// `--join --chunk`'s gate and `run:chain`'s background opening (joshuafolkken/kit#8309, #8705).
+const PENDING_EXIT_CODE = 4
 // `josh ship` opens the interaction brief itself, so its `run:review` opens code's alone.
 const CODE_ONLY_FLAG = '--code-only'
 
@@ -122,6 +125,7 @@ const run_review = {
 	GATE_RED,
 	GATE_RUNNING,
 	MOVED_EXIT_CODE,
+	PENDING_EXIT_CODE,
 	UNPINNED_EXIT_CODE,
 	adopt_verdict,
 	format_timing,

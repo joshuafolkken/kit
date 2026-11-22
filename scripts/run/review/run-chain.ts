@@ -1,9 +1,14 @@
 import { derive_check } from '#scripts/document/derive-check'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import type { ChainRefusal, ChainStageEntry } from '#scripts/lane/lane-ledger-schema-ship'
+import type {
+	ChainRefusal,
+	ChainStageEntry,
+	ChainStageResult,
+} from '#scripts/lane/lane-ledger-schema-ship'
 import { lane_ledger_write_chain_stage } from '#scripts/lane/lane-ledger-write-chain-stage'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { test_related_caller } from '#scripts/test/test-related-caller'
+import { run_review } from './run-review'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -215,6 +220,14 @@ async function run_stage(
 	return await held(stage, issue)
 }
 
+// A stage whose wait was cut at the chunk with its work still running is `pending`, not a stop
+// (joshuafolkken/kit#8705).
+function stage_result(stop: ChainStop | undefined): ChainStageResult {
+	if (stop === undefined) return 'passed'
+
+	return stop.code === run_review.PENDING_EXIT_CODE ? 'pending' : 'stopped'
+}
+
 // One stage run and timed from its start through its hold, its `chain-stage` ledger line appended as it
 // ends, so a run killed or stopped part way still leaves the stages it finished (joshuafolkken/kit#8286).
 async function timed_stage(
@@ -231,7 +244,7 @@ async function timed_stage(
 		at: new Date(started_ms).toISOString(),
 		elapsed_ms: ended_ms - started_ms,
 	}
-	const result = stop === undefined ? 'passed' : 'stopped'
+	const result = stage_result(stop)
 	// Dated at its end, as it is appended, so a long stage never stops the ledger tail's backward scan.
 	const at = new Date(ended_ms).toISOString()
 
