@@ -297,6 +297,44 @@ describe('run_board_theme_glyphs.mapped', () => {
 			['d-', false],
 		])
 	})
+
+	// joshuafolkken/kit#8649: a cursor move is an escape that leaves bold, dim and color as they were.
+	it('keeps bold, dim and color across a cursor move and draws the text after it', () => {
+		const drawn: Array<[string, string, boolean]> = []
+		const line = `${BOLD}${RED}a${ESCAPE}[1;5Hb${ESCAPE}[2;5Hc`
+		const mapped = run_board_theme_glyphs.mapped(line, (text, open) => {
+			drawn.push([text, open.intensity, open.is_colored])
+
+			return text.toUpperCase()
+		})
+
+		expect(mapped).toBe(`${BOLD}${RED}A${ESCAPE}[1;5HB${ESCAPE}[2;5HC`)
+		expect(drawn.filter(([text]) => text !== '')).toStrictEqual([
+			['a', BOLD, true],
+			['b', BOLD, true],
+			['c', BOLD, true],
+		])
+	})
+})
+
+// joshuafolkken/kit#8649: a spinner write opens on a cursor move with no color before its glyph.
+describe('run_board_theme_glyphs.textual after a cursor move', () => {
+	const MOVE = `${ESCAPE}[3;5H`
+
+	beforeEach(() => {
+		vi.stubEnv('FORCE_COLOR', '0')
+	})
+
+	it.each([
+		['wargames', '│'],
+		['matrix', 'ｦ'],
+	] as const)('turns the spinner glyph after a cursor move on the %s board', (theme, glyph) => {
+		expect(textual(`${MOVE}⠋`, { theme, icons: 'shapes' })).toBe(`${MOVE}${glyph}`)
+	})
+
+	it('keeps the spinner dot after a cursor move with no theme and `emoji`', () => {
+		expect(textual(`${MOVE}⠋`, { theme: undefined, icons: 'emoji' })).toBe(`${MOVE}⠋`)
+	})
 })
 
 describe('run_board_theme_glyphs.textual in bold or dim', () => {
