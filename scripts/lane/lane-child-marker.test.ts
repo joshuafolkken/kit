@@ -19,15 +19,15 @@ describe('env_for', () => {
 		expect(lane_child_marker.env_for(ISSUE)).toStrictEqual({
 			[lane_child_marker.KEY]: ISSUE,
 			CLAUDE_CODE_PROMPT_CACHE_TTL: '5m',
-			ENABLE_TOOL_SEARCH: 'false',
 			[outer_command.KEY]: '',
 		})
 	})
 
-	// joshuafolkken/kit#8096: tool search deferred the launched Monitor, SendMessage and TaskStop, so a
-	// child spent a ToolSearch round trip before first using one; the child loads them up front.
-	it('turns tool search off so launched tools need no ToolSearch round trip', () => {
-		expect(lane_child_marker.env_for(ISSUE)).toMatchObject({ ENABLE_TOOL_SEARCH: 'false' })
+	// joshuafolkken/kit#8703: turning tool search off put rarely used tool definitions on every
+	// request's prefix, so the child leaves the setting at its deferred default.
+	it('leaves tool search on so rarely used tool definitions stay off the prefix', () => {
+		expect(lane_child_marker.env_for(ISSUE)).not.toHaveProperty('ENABLE_TOOL_SEARCH')
+		expect(lane_child_marker.overrun_env_for(ISSUE)).not.toHaveProperty('ENABLE_TOOL_SEARCH')
 	})
 
 	// The mark is composed from a digits-only issue number, so a malformed one fails here rather than
