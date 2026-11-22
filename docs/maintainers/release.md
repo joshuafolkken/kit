@@ -10,14 +10,14 @@ Merged work has landed since the last version change and you want it published. 
 
 1. Ask whether a release is owed with [`josh release:scope`](../josh-commands-automation.md#josh-releasescope). `unknown` never means skip.
 2. Run [`josh release`](../josh-commands-automation.md#josh-release). It raises the version from the merges since the last one, merges the release pull request and waits for the version tag. Its dry-run option only reports.
-3. The tag starts the publish jobs to GitHub Packages and public npm ([publishing.md](./publishing.md#publishing-to-public-npm)).
+3. The tag starts the publish job to public npm, the only registry kit publishes to ([publishing.md](./publishing.md#publishing-to-public-npm)).
 
 [`josh bump`](../josh-commands-automation.md#josh-bump) is the manual alternative; after a manual bump, update `docs/` before committing.
 
 ## Check it worked
 
 - `josh release` ends with the tag found.
-- The public registry serves the new version — query it the way [publishing.md](./publishing.md#one-time-public-npm-setup) describes, since a plain lookup can answer from GitHub Packages.
+- The public registry serves the new version — query it the way [publishing.md](./publishing.md#one-time-public-npm-setup) describes, since a plain lookup can answer with the last version left in GitHub Packages.
 
 ## Common failures
 

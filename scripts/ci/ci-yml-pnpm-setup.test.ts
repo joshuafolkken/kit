@@ -27,8 +27,8 @@ const NODE_VERSION_STEP = 'Verify Node.js version'
 const PUBLISH_YML = '.github/workflows/publish.yml'
 const RUNTIME_WORKFLOWS_DIR = '.github/workflows'
 const PUBLISH_JOBS = ['pack', 'create-release']
-// joshuafolkken/kit#4633: the jobs holding the publish rights install nothing and run no `pnpm`.
-const CREDENTIALED_JOBS = ['publish-github', 'publish-npm']
+// joshuafolkken/kit#4633: the job holding the publish rights installs nothing and runs no `pnpm`.
+const CREDENTIALED_JOBS = ['publish-npm']
 const INSTALL_COMMAND = 'pnpm install --frozen-lockfile --ignore-scripts'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const WHEN_INSTALLING = "inputs.install == 'true'"
