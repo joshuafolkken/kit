@@ -147,7 +147,12 @@ describe('run_board_header_notice.part_of keyed', () => {
 		const on = run_board_row_key.split_key(part_of({ ...keyed, is_sound_on: true }) ?? '')
 		const off = run_board_row_key.split_key(part_of({ ...keyed, is_sound_on: false }) ?? '')
 
-		expect(on).toStrictEqual({ key: `notice:${words}`, text: `🔊 ${words}`, prefix: '🔊 ' })
+		expect(on).toStrictEqual({
+			key: `notice:${words}`,
+			text: `🔊 ${words}`,
+			prefix: '🔊 ',
+			suffix: '',
+		})
 		expect(off.key).toBe(on.key)
 		expect(key_of({ ...keyed, is_sound_on: false })).toBe(on.key)
 	})

@@ -23,13 +23,15 @@ const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 
 // A keyed row on screen: its key, its line in the frame, its row on screen (1-based), its text as the
 // frame draws it and the columns before its key — drawn whole, so only the rest types
-// (joshuafolkken/kit#8103: the header's now line types its words, not its time).
+// (joshuafolkken/kit#8103: the header's now line types its words, not its time), and what follows its
+// end mark, drawn whole in its own columns after the text (joshuafolkken/kit#8607: the watch panel).
 interface KeyedLine {
 	key: string
 	index: number
 	row: number
 	text: string
 	prefix_columns: number
+	suffix?: string | undefined
 }
 
 // joshuafolkken/kit#8457: a row typing over the saved frame's line of its key carries that line, drawn
@@ -140,10 +142,26 @@ function text_of(line: TypingLine, now_ms: number, is_decoding: boolean | undefi
 	return typed_text(line, now_ms)
 }
 
+// `drawn` held to the row's own columns — cut where the block or the saved line runs past them, padded
+// where shorter — then what follows its end mark, so that stays in its columns while the row types.
+function with_suffix(line: TypingLine, drawn: string): string {
+	if (line.suffix === undefined) return drawn
+
+	const columns = run_board_fit.width_of(line.text)
+	const held =
+		run_board_fit.width_of(drawn) > columns
+			? run_board_cut_styled.cut_styled(drawn, columns)
+			: drawn
+
+	const padding = ' '.repeat(Math.max(0, columns - run_board_fit.width_of(held)))
+
+	return `${held}${padding}${line.suffix}`
+}
+
 // The row as `text_of` draws it, its spinners at their frame of that moment.
 function shown(line: TypingLine, now_ms: number, is_decoding: boolean | undefined): string {
 	return run_board_spot.drawn(
-		text_of(line, now_ms, is_decoding),
+		with_suffix(line, text_of(line, now_ms, is_decoding)),
 		run_board_labels.spinner_of(now_ms),
 	)
 }

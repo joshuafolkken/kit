@@ -4,6 +4,7 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_row_key } from './run-board-row-key'
 import { run_board_theme } from './run-board-theme'
 import { run_board_watch_panel } from './run-board-watch-panel'
 
@@ -11,6 +12,7 @@ import { run_board_watch_panel } from './run-board-watch-panel'
 
 const { GAP, MIN_HEADER_WIDTH, composed } = run_board_watch_panel
 const { width_of } = run_board_fit
+const { keyed } = run_board_row_key
 const { NOW, header, lines_of, rule } = run_board_render_fixture
 const RULE_WIDTH = 80
 const HEADER = ['▶ josh-board  🎯 11-22 12:23', '  v1.3473.0+362', '  kit  🚀 11-21 18:35']
@@ -38,7 +40,21 @@ describe('composed', () => {
 
 		expect(plain).toBe(`${long.slice(0, LIMIT - 1)}…${GAP}${ROWS[0] ?? ''}`)
 	})
+})
 
+describe('composed on a typing header line', () => {
+	it('keeps the pin row and its padding out of a keyed header line’s typed text', () => {
+		const words = '#8093 · WRITE'
+		const [line = ''] = composed([`KIT > ${keyed('now', words, words)}`], ROWS, RULE_WIDTH)
+		const { key, text, suffix } = run_board_row_key.split_key(line)
+
+		expect([key, text]).toEqual([`now:${words}`, `KIT > ${words}`])
+		expect(suffix.trimStart()).toBe(ROWS[0])
+		expect(width_of(`${text}${suffix}`)).toBe(RULE_WIDTH)
+	})
+})
+
+describe('composed left as it is', () => {
 	it('leaves the header as it is with no pins', () => {
 		expect(composed(HEADER, [], RULE_WIDTH)).toEqual(HEADER)
 	})

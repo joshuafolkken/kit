@@ -1,5 +1,6 @@
 import { run_board_cut_styled } from './run-board-cut-styled'
 import { run_board_fit } from './run-board-fit'
+import { run_board_row_key } from './run-board-row-key'
 
 // joshuafolkken/kit#8607: the pinned issues' watch panel laid over the header's first lines, one pin a
 // line, its widest line ending on the rules' right end. A header line running into the panel is cut
@@ -13,14 +14,18 @@ const MIN_HEADER_WIDTH = 40
 
 const { width_of } = run_board_fit
 
-// `line` in exactly `limit` columns: cut with `…` where it is wider, padded where it is narrower.
-function fitted(line: string, limit: number): string {
+// `line` cut with `…` to `limit` columns, the pin `row` after it in its own columns. The padding and the
+// pin follow the line's end mark, so a typing header row types its own words alone
+// (`run-board-row-key.ts`).
+function fitted(line: string, row: string, limit: number): string {
+	const { text } = run_board_row_key.split_key(line)
 	const cut =
-		width_of(line) > limit
-			? `${run_board_cut_styled.cut_styled(line, limit - ELLIPSIS.length)}${ELLIPSIS}`
-			: line
+		width_of(text) > limit
+			? `${run_board_cut_styled.cut_styled(text, limit - ELLIPSIS.length)}${ELLIPSIS}`
+			: text
+	const padding = ' '.repeat(Math.max(0, limit - width_of(cut)))
 
-	return `${cut}${' '.repeat(Math.max(0, limit - width_of(cut)))}`
+	return run_board_row_key.rekeyed(line, cut, `${padding}${GAP}${row}`)
 }
 
 // The header `lines` with the panel's `rows` at their right, the panel ending at `rule_width`.
@@ -36,7 +41,7 @@ function composed(
 	return lines.map((line, index) => {
 		const row = rows[index]
 
-		return row === undefined ? line : `${fitted(line, limit)}${GAP}${row}`
+		return row === undefined ? line : fitted(line, row, limit)
 	})
 }
 
