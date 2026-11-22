@@ -7,7 +7,7 @@ import { run_board_rgb, type Rgb } from './run-board-rgb'
 // the bottom and an amber one from the thirteenth row, lit apart, under one red row; the board holds still
 // inside a speed range and springs past its new height when the range changes.
 
-const { parsed, scaled, shade_of } = run_board_rgb
+const { mixed, parsed, scaled, shade_of } = run_board_rgb
 
 const LED_COLUMNS = 10
 const GREEN_ROWS = 12
@@ -103,19 +103,44 @@ interface RangeChange {
 	since: number
 }
 
-// What the board shows at a tick: its range and the change it is springing from.
+// joshuafolkken/kit#8677: through a jump's run up the change to the top range climbs evenly over `climb`
+// ticks rather than springing (there is no room past the top); while the capacitor floods the lit dots
+// go `FLOOD_WHITE` of the way to white on their own ground, which keeps their contrast. Settled on the
+// top range, the green bars' top lamps blink every `BLINK_TICKS`.
+interface GaugeLook {
+	climb?: number | undefined
+	is_flooded?: boolean | undefined
+}
+
+// What the board shows at a tick: its range, the change it is springing from, the ticks a climb to the
+// top takes, and whether the top green lamps are out on a blink.
 interface GaugeMoment {
 	range: number
 	change: RangeChange | undefined
+	climb?: number | undefined
+	is_blink?: boolean | undefined
 }
+
+const WHITE = parsed('255;255;255')
+const FLOOD_WHITE = 0.08
+const BLINK_TICKS = 2
+const BLINK_PHASES = 2
+const TOP_RANGE = RANGES.length - 1
 
 // The speed range a speed is in, the first whose `below` is over it.
 function range_of(speed: number): number {
 	return RANGES.findIndex((range) => speed < range.below)
 }
 
-function change_before(tick: number, range_at: (tick: number) => number): RangeChange | undefined {
-	const since = SPRING.findIndex((_, back) => range_at(tick - back) !== range_at(tick - back - 1))
+// The last change within `back` ticks before a tick, the spring's length by default.
+function change_before(
+	tick: number,
+	range_at: (tick: number) => number,
+	back = SPRING.length,
+): RangeChange | undefined {
+	const since = Array.from({ length: back }).findIndex(
+		(_, ago) => range_at(tick - ago) !== range_at(tick - ago - 1),
+	)
 
 	if (since === -1) return undefined
 
@@ -131,9 +156,30 @@ function sprung(to: number, from: number, since: number | undefined, rows: numbe
 	return Math.min(rows, Math.max(0, to + past))
 }
 
+// A bar's height `since` ticks into a climb of `climb` ticks `from` one height `to` another.
+function climbed(to: number, from: number, since: number, climb: number): number {
+	return Math.round(from + (to - from) * Math.min(1, (since + 1) / climb))
+}
+
+// How a bar moves at a moment: a climb to the top through a jump's run up, else the spring.
+function height_of(moment: GaugeMoment): (to: number, from: number, rows: number) => number {
+	const { change, climb } = moment
+
+	if (change === undefined || climb === undefined || moment.range !== TOP_RANGE) {
+		return (to, from, rows) => sprung(to, from, change?.since, rows)
+	}
+
+	return (to, from) => climbed(to, from, change.since, climb)
+}
+
 // The range at an index, the lowest past either end.
 function speed_range(index: number): SpeedRange {
 	return RANGES[index] ?? IDLE_RANGE
+}
+
+// A full green bar with its top lamp out on a blink.
+function blinked(green: number, blink: number): number {
+	return green === GREEN_ROWS ? green - blink : green
 }
 
 // Every column's bar heights at a moment, sprung from the range before where it just changed; the red
@@ -141,14 +187,22 @@ function speed_range(index: number): SpeedRange {
 function bars_at(moment: GaugeMoment): Array<Bars> {
 	const range = speed_range(moment.range)
 	const from = speed_range(moment.change?.before ?? moment.range)
-	const since = moment.change?.since
+	const height = height_of(moment)
 	const is_settled = moment.change === undefined
+	const blink = moment.is_blink === true ? 1 : 0
 
 	return range.green.map((green, column) => ({
-		green: sprung(green, from.green[column] ?? green, since, GREEN_ROWS),
-		amber: sprung(range.amber[column] ?? 0, from.amber[column] ?? 0, since, AMBER_ROWS),
+		green: blinked(height(green, from.green[column] ?? green, GREEN_ROWS), blink),
+		amber: height(range.amber[column] ?? 0, from.amber[column] ?? 0, AMBER_ROWS),
 		is_red: is_settled && range.red[column] === 1,
 	}))
+}
+
+// Whether the top green lamps are out at a tick: on every other `BLINK_TICKS`, settled on the top range.
+function is_blink(range: number, change: RangeChange | undefined, tick: number): boolean {
+	const phase = Math.floor(tick / BLINK_TICKS) % BLINK_PHASES
+
+	return range === TOP_RANGE && change === undefined && phase === 1
 }
 
 // Whether a lamp, a row from the top, is lit in a column.
@@ -165,9 +219,14 @@ function band_of(row: number): Band {
 	return row <= AMBER_ROWS ? BANDS.amber : BANDS.green
 }
 
+// A lit dot's color: its band's, a little whiter while the capacitor floods.
+function lit_rgb(band: Band, white: number): Rgb {
+	return mixed(band.rgb, WHITE, white)
+}
+
 // A cell's text and colors: its lit lamps' dots in their band's color on a share of it, or a blank —
 // the board draws nothing where it is out.
-function led_cell(bars: Bars, cell: number): Pick<PanelCell, 'text' | 'fg' | 'bg'> {
+function led_cell(bars: Bars, cell: number, white: number): Pick<PanelCell, 'text' | 'fg' | 'bg'> {
 	const slots = SLOTS[cell] ?? []
 	const lit = slots.filter((slot) => is_lit(bars, slot.row))
 
@@ -177,9 +236,18 @@ function led_cell(bars: Bars, cell: number): Pick<PanelCell, 'text' | 'fg' | 'bg
 
 	return {
 		text: String.fromCodePoint(BRAILLE + bits),
-		fg: shade_of(band.rgb, band.named),
+		fg: shade_of(lit_rgb(band, white), band.named),
 		bg: shade_of(scaled(band.rgb, band.ground), band.named),
 	}
+}
+
+// The gauge's moment at a tick, its range at each tick read from `range_at`; a climb looks back over
+// its own length.
+function moment_at(tick: number, range_at: (tick: number) => number, climb?: number): GaugeMoment {
+	const range = range_at(tick)
+	const change = change_before(tick, range_at, Math.max(SPRING.length, climb ?? 0))
+
+	return { range, change, climb, is_blink: is_blink(range, change, tick) }
 }
 
 // The gauge's cells at a tick from its top left on screen, its range at each tick read from `range_at`.
@@ -187,20 +255,23 @@ function gauge_cells(
 	origin: { row: number; column: number },
 	tick: number,
 	range_at: (tick: number) => number,
+	look: GaugeLook = {},
 ): Array<PanelCell> {
-	const moment = { range: range_at(tick), change: change_before(tick, range_at) }
+	const moment = moment_at(tick, range_at, look.climb)
+	const white = look.is_flooded === true ? FLOOD_WHITE : 0
 
 	return bars_at(moment).flatMap((bars, column) =>
 		SLOTS.map((_, cell) => ({
 			row: origin.row + cell,
 			column: origin.column + column,
-			...led_cell(bars, cell),
+			...led_cell(bars, cell, white),
 		})),
 	)
 }
 
 const run_board_flux_gauge = {
 	BANDS,
+	FLOOD_WHITE,
 	LED_COLUMNS,
 	bars_at,
 	change_before,
@@ -209,3 +280,4 @@ const run_board_flux_gauge = {
 }
 
 export { run_board_flux_gauge }
+export type { GaugeLook }

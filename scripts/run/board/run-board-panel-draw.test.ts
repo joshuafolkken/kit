@@ -8,8 +8,16 @@ import { run_board_spot } from './run-board-spot'
 // right-aligned to the rule's end, its cells drawn in a character, a color and a background, on every
 // `PANEL_TICK_MS` step where the painter ticks.
 
-const { AREA_ROWS, PANEL_TICK_MS, area_of, cell_bytes, panel_bytes, tick_after, write_panel } =
-	run_board_panel_draw
+const {
+	AREA_ROWS,
+	PANEL_TICK_MS,
+	area_of,
+	cell_bytes,
+	looked,
+	panel_bytes,
+	tick_after,
+	write_panel,
+} = run_board_panel_draw
 const { LAMP } = run_board_spot
 const START = Date.parse('2026-11-22T09:00:00.000Z')
 const RULE = `── throughput ${'─'.repeat(40)}`
@@ -191,5 +199,34 @@ describe('run_board_spin.spin_to_second with a ticking painter', () => {
 		expect(steps).toStrictEqual(
 			Array.from({ length: 1000 / PANEL_TICK_MS }, (_, index) => index * PANEL_TICK_MS),
 		)
+	})
+})
+
+// joshuafolkken/kit#8677: the painter's cells lit as the jump or the arrival lights the board, before
+// they are diffed.
+
+// A painter drawing one 24-bit cell and one in a palette color on the area's top row.
+const SHADED: PanelPainter = {
+	is_idle: true,
+	is_ticking: true,
+	cells: (area) => [
+		{ row: area.top, column: area.end, text: '●', fg: SHADE },
+		{ row: area.top, column: area.end - 1, text: '●', fg: 'red' },
+	],
+}
+
+describe('run_board_panel_draw.looked', () => {
+	it('leaves the painter’s cells as they are outside a jump and an arrival', () => {
+		const draw = draw_of(SHADED)
+
+		expect(looked(draw, AT)).toStrictEqual(SHADED.cells(draw.area, AT))
+	})
+
+	it('lights only the 24-bit cells as the arrival does, the first beat dark', () => {
+		const draw = draw_of(SHADED)
+		const [shaded, named] = looked(draw, { ...AT, arrive_ms: AT.ms })
+
+		expect(shaded?.fg).not.toStrictEqual(SHADE)
+		expect(named?.fg).toBe('red')
 	})
 })

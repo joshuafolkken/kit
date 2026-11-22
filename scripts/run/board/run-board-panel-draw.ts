@@ -1,4 +1,6 @@
 import { run_board_fit } from './run-board-fit'
+import type { JumpRun } from './run-board-jump'
+import { run_board_jump_figure } from './run-board-jump-figure'
 import { run_board_labels, type Paint } from './run-board-labels'
 import type { Lamp } from './run-board-lamp-spots'
 import { run_board_screen } from './run-board-screen'
@@ -21,10 +23,13 @@ const BACKGROUND_RGB = `${CSI}48;2;`
 const DEFAULT_FOREGROUND = `${CSI}39m`
 const DEFAULT_BACKGROUND = `${CSI}49m`
 
-// The moment a painter draws at, and whether a row is typing then.
+// The moment a painter draws at, and whether a row is typing then; the bttf time jump running then and
+// the moment the board's arrival began, where one is (joshuafolkken/kit#8677).
 interface PanelMoment {
 	ms: number
 	is_burst: boolean
+	jump?: JumpRun | undefined
+	arrive_ms?: number | undefined
 }
 
 // One cell on screen, 1-based, drawn as `text` in `fg` on `bg`; a background is a shade, or a named
@@ -103,10 +108,15 @@ function keyed(cells: ReadonlyArray<PanelCell>): Map<string, string> {
 	)
 }
 
+// The painter's cells at a moment, thawed or flashed where a jump or the arrival lights the board.
+function looked(draw: PanelDraw, at: PanelMoment): ReadonlyArray<PanelCell> {
+	return run_board_jump_figure.figure_look(draw.painter.cells(draw.area, at), at)
+}
+
 // The cells that changed since `since` drawn as they are `at`, every one with no `since`.
 function panel_bytes(draw: PanelDraw, at: PanelMoment, since: PanelMoment | undefined): string {
-	const now = keyed(draw.painter.cells(draw.area, at))
-	const before = keyed(since === undefined ? [] : draw.painter.cells(draw.area, since))
+	const now = keyed(looked(draw, at))
+	const before = keyed(since === undefined ? [] : looked(draw, since))
 
 	return [...now]
 		.filter(([key, bytes]) => before.get(key) !== bytes)
@@ -141,6 +151,7 @@ const run_board_panel_draw = {
 	PANEL_TICK_MS,
 	area_of,
 	cell_bytes,
+	looked,
 	panel_bytes,
 	tick_after,
 	write_panel,

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_flux_gauge } from './run-board-flux-gauge'
+import { run_board_paint_fixture } from './run-board-paint-fixture'
 import { run_board_rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8674: the bttf lamp gauge — the speed ranges, each column's cells in braille, the
 // red row once the top range settles, and the spring past a new height when the range changes.
 
-const { BANDS, bars_at, change_before, gauge_cells, range_of } = run_board_flux_gauge
+const { BANDS, FLOOD_WHITE, bars_at, change_before, gauge_cells, range_of } = run_board_flux_gauge
+const { rgb_of } = run_board_paint_fixture
 const ORIGIN = { row: 3, column: 40 }
 const CELLS = 6
 const MIN_CONTRAST = 4.5
@@ -97,5 +99,65 @@ describe('run_board_flux_gauge spring', () => {
 	it('holds the red row out while the top range is still springing', () => {
 		expect(bars_at({ range: 4, change: { before: 3, since: 0 } })[0]?.is_red).toBe(false)
 		expect(bars_at({ range: 4, change: undefined })[0]?.is_red).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#8677: the gauge through a jump — the climb to the top range, the flooded dots and the
+// top green lamps' blink.
+
+const TOP = 4
+const CLIMB = 10
+const BLINK_TICK = 2
+
+function lit_cells(look: { is_flooded?: boolean }): Array<{ fg: string; bg: string }> {
+	return gauge_cells(ORIGIN, 0, constant(TOP), look)
+		.filter((cell) => cell.text !== ' ')
+		.map((cell) => ({ fg: rgb_of(cell.fg) ?? '', bg: rgb_of(cell.bg) ?? '' }))
+}
+
+function climb_green(since: number): number | undefined {
+	return bars_at({ range: TOP, change: { before: 0, since }, climb: CLIMB })[0]?.green
+}
+
+function texts(tick: number, range: number): Array<string> {
+	return gauge_cells(ORIGIN, tick, constant(range)).map((cell) => cell.text)
+}
+
+describe('run_board_flux_gauge jump', () => {
+	it('keeps every flooded dot at a contrast of at least 4.5 on its band ground', () => {
+		const { contrast, parsed } = run_board_rgb
+		const cells = lit_cells({ is_flooded: true })
+
+		expect(cells.length).toBeGreaterThan(0)
+
+		for (const cell of cells) {
+			expect(contrast(parsed(cell.fg), parsed(cell.bg))).toBeGreaterThanOrEqual(MIN_CONTRAST)
+		}
+	})
+
+	it('whitens the lit dots while flooded and leaves their ground as it was', () => {
+		const plain = lit_cells({})
+		const flooded = lit_cells({ is_flooded: true })
+
+		const { mixed, parsed } = run_board_rgb
+		const whiter = mixed(parsed(plain[0]?.fg ?? ''), parsed('255;255;255'), FLOOD_WHITE)
+
+		expect(flooded.map((cell) => cell.bg)).toStrictEqual(plain.map((cell) => cell.bg))
+		expect(flooded[0]?.fg).toBe(whiter.join(';'))
+	})
+
+	it('climbs evenly to the top range over the climb instead of springing past it', () => {
+		const heights = Array.from({ length: CLIMB }, (_, since) => climb_green(since) ?? 0)
+		const settled = bars_at({ range: TOP, change: undefined })[0]?.green
+
+		expect(heights).toStrictEqual(heights.toSorted((first, second) => first - second))
+		expect(heights[0]).toBeLessThan(settled ?? 0)
+		expect(heights.at(-1)).toBe(settled)
+	})
+
+	it('blinks the full green bars out every other two ticks, settled on the top range only', () => {
+		expect(texts(BLINK_TICK, TOP)).not.toStrictEqual(texts(0, TOP))
+		expect(texts(BLINK_TICK * 2, TOP)).toStrictEqual(texts(0, TOP))
+		expect(texts(BLINK_TICK, TOP - 1)).toStrictEqual(texts(0, TOP - 1))
 	})
 })

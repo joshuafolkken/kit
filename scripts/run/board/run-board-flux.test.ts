@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_flux } from './run-board-flux'
+import { run_board_paint_fixture } from './run-board-paint-fixture'
+import { run_board_rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8674: the flux capacitor's lamps in a Y, the light running in from the outer ends
 // at each speed range's pace, and the red bar across the stem.
 
-const { FLUX_LAMPS, FLUX_ROWS, FLUX_WIDTH, flux_cells, lamp_look } = run_board_flux
+const { FLOOD, FLOOD_DIM, FLUX_LAMPS, FLUX_ROWS, FLUX_WIDTH, WHITE_TICKS, flux_cells, lamp_look } =
+	run_board_flux
+const { rgb_of } = run_board_paint_fixture
+const MIN_CONTRAST = 4.5
 const ORIGIN = { row: 10, column: 20 }
 const LIT = '●'
 const DIM = '∙'
@@ -72,5 +77,60 @@ describe('run_board_flux.flux_cells', () => {
 			text: LIT,
 			fg: { rgb: '115;110;90', named: 'white' },
 		})
+	})
+})
+
+// joshuafolkken/kit#8677: the capacitor through a jump — orange before the flood, a white box first,
+// then white dots on a darkening gray, every one readable.
+
+const WHITE = '255;255;255'
+const DIM_TICK = 20
+const STEM = { row: 14, column: 26 }
+// The box reaches a column past either side of the picture; the bar is nine cells long.
+const SIDES = 2
+const BAR_LENGTH = 9
+
+function flooded(
+	flood: number,
+): Array<{ row: number; column: number; text: string; bg: string | undefined }> {
+	return flux_cells(ORIGIN, 0, 0, { flood, is_orange: false }).map((cell) => ({
+		row: cell.row,
+		column: cell.column,
+		text: cell.text,
+		bg: rgb_of(cell.bg),
+	}))
+}
+
+describe('run_board_flux.flux_cells through a jump', () => {
+	it('lights every lamp orange the two ticks before the flood', () => {
+		const lamps = flux_cells(ORIGIN, 0, 0, { is_orange: true }).filter((cell) => cell.text === LIT)
+
+		expect(lamps).toHaveLength(FLUX_LAMPS.length)
+		expect(new Set(lamps.map((cell) => rgb_of(cell.fg)))).toStrictEqual(new Set(['230;110;60']))
+	})
+
+	it('washes the whole box white with no lamp drawn for the first ticks of the flood', () => {
+		const cells = flooded(0)
+
+		expect(new Set(cells.map((cell) => cell.bg))).toStrictEqual(new Set([WHITE]))
+		expect(cells.some((cell) => cell.text === LIT)).toBe(false)
+		expect(cells).toHaveLength(FLUX_ROWS * (FLUX_WIDTH + SIDES) + BAR_LENGTH + FLUX_LAMPS.length)
+	})
+
+	it('then stands white dots and a red bar on the darkening gray', () => {
+		const first = flooded(WHITE_TICKS)
+		const last = flooded(DIM_TICK)
+		const stem = last.filter((cell) => cell.row === STEM.row && cell.column === STEM.column)
+
+		expect(first[0]?.bg).toBe(FLOOD.join(';'))
+		expect(last[0]?.bg).toBe(FLOOD_DIM.join(';'))
+		expect(stem.map((cell) => cell.text)).toStrictEqual([' ', '━', LIT])
+	})
+
+	it('keeps a white dot at a contrast of at least 4.5 on both grays', () => {
+		const white = run_board_rgb.parsed(WHITE)
+
+		expect(run_board_rgb.contrast(white, FLOOD)).toBeGreaterThanOrEqual(MIN_CONTRAST)
+		expect(run_board_rgb.contrast(white, FLOOD_DIM)).toBeGreaterThanOrEqual(MIN_CONTRAST)
 	})
 })
