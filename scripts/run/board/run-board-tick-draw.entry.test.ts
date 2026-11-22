@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DropScreen } from './run-board-drop-screen'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_flux_panel } from './run-board-flux-panel'
 import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import type { BoardState } from './run-board-state'
@@ -67,9 +68,20 @@ describe('run_board_tick_draw.panel_of', () => {
 		expect(panel_of(WARGAMES, { area })).toStrictEqual({ painter: LAMP_PAINTER, area })
 	})
 
+	// joshuafolkken/kit#8674: bttf's rows do not type, so its area opens on the live board's own flag.
+	it('hands the bttf flux on a live board whose rows do not type', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const bttf = { ...MATRIX, theme: 'bttf' as const, types_rows: false, is_live: true }
+
+		expect(panel_of(bttf, { area })).toStrictEqual({
+			painter: run_board_flux_panel.FLUX_PAINTER,
+			area,
+		})
+	})
+
 	it.each([
 		['no theme', { ...MATRIX, theme: undefined }],
-		['the bttf theme, with no painter yet', { ...MATRIX, theme: 'bttf' as const }],
+		['the bttf theme off a live board', { ...MATRIX, theme: 'bttf' as const, types_rows: false }],
 		[ONCE, { ...MATRIX, is_tty: false }],
 	])('hands none with %s', (_, ports) => {
 		vi.stubEnv('FORCE_COLOR', '3')

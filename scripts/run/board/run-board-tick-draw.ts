@@ -41,6 +41,7 @@ type DrawPorts = Pick<
 	| 'is_tty'
 	| 'form'
 	| 'types_rows'
+	| 'is_live'
 	| 'theme'
 	| 'icons'
 	| 'size'
@@ -129,14 +130,19 @@ type Drawn = Spun & {
 // The theme rows whose lamp choice the panel reads.
 type LampDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'lamps'>>>>
 
-// Whether the board's rows type in a theme whose definition draws lamps (joshuafolkken/kit#8359).
-function is_lamp_theme(ports: Pick<DrawPorts, 'types_rows' | 'theme'>, defs: LampDefs): boolean {
-	if (ports.types_rows !== true || ports.theme === undefined) return false
+type LampPorts = Pick<DrawPorts, 'types_rows' | 'is_live' | 'theme'>
+
+// Whether a live board — its rows typing, or the board live though they do not (joshuafolkken/kit#8674)
+// — is drawn in a theme whose definition draws lamps (joshuafolkken/kit#8359).
+function is_lamp_theme(ports: LampPorts, defs: LampDefs): boolean {
+	const is_live = ports.types_rows === true || ports.is_live === true
+
+	if (!is_live || ports.theme === undefined) return false
 
 	return defs[ports.theme]?.lamps === true
 }
 
-type LivePorts = Pick<DrawPorts, 'types_rows' | 'theme' | 'is_tty'>
+type LivePorts = Pick<DrawPorts, 'types_rows' | 'is_live' | 'theme' | 'is_tty'>
 
 // Whether the board draws on a terminal drawing color.
 function is_colored_tty(ports: Pick<DrawPorts, 'is_tty'>): boolean {
