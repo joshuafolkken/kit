@@ -3,7 +3,7 @@ import type { Paint } from './run-board-labels'
 import type { PanelCell } from './run-board-panel-draw'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 
-// joshuafolkken/kit#8674: the bttf theme's flux capacitor at idle — round lamps in a Y over six rows,
+// joshuafolkken/kit#8674: the bttf theme's flux capacitor at idle — round lamps in a Y over seven rows,
 // light running in from the three outer ends at once, and the red bar across the stem. The arrival and
 // the jump light it otherwise (their own children of the epic).
 
@@ -21,12 +21,14 @@ const DIM = '∙'
 
 // The capacitor from its top left, a lamp drawn as its step — how far along its line it is, 0 the
 // outer end: each arm three lamps running two columns in for a row down, the middle (step 3, never lit)
-// on the fourth row, the stem two lamps under it.
+// on the fourth row, the stem three lamps under it, lit one at a time from its bottom as each arm
+// (joshuafolkken/kit#8712).
 const FLUX_PICTURE = [
 	'0           0',
 	'  1       1  ',
 	'    2   2    ',
 	'      3      ',
+	'      2      ',
 	'      1      ',
 	'      0      ',
 ] as const
@@ -43,8 +45,9 @@ const FLUX_PACES: ReadonlyArray<{ ticks: number; light: number }> = [
 	{ ticks: 1, light: 1 },
 ]
 
-// The red bar: always there on the fifth row, crossing the stem with the same length either side.
-const BAR_ROW = 4
+// The red bar: always there on the sixth row, across the stem's middle lamp with the same length either
+// side.
+const BAR_ROW = 5
 const BAR_HALF = 4
 const BAR_LENGTH = BAR_HALF + 1 + BAR_HALF
 const STEM_COLUMN = 6

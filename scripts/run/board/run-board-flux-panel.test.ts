@@ -19,14 +19,19 @@ const { PANEL_TICK_MS, area_of, panel_bytes } = run_board_panel_draw
 const { rgb_of } = run_board_paint_fixture
 const PANEL = Array.from({ length: 8 }, () => run_board_spot.LAMP).join(' ')
 const ROWS = [`  24h  5  ${PANEL}`, `   7d     ${PANEL}`]
+const USAGE = ['', '── usage ──', '  Claude', '  Codex', '  GitHub']
 const STARTS = [1, 2, 3]
 const WIDE_END = 100
 const USAGE_ROW = 4
 const SPEED_OFFSET = 3
 const AT = { ms: 0, is_burst: false }
+const FIGURE_ROWS = 7
+const JUMP = { start_ms: 0, letters: 30 }
+// The jump itself: the last letter typed, on an even panel tick.
+const JUMP_MS = JUMP.letters * PANEL_TICK_MS
 
-function area_with(rule: string): PanelArea {
-	const lines = [rule, ...ROWS]
+function area_with(rule: string, usage = USAGE): PanelArea {
+	const lines = [rule, ...ROWS, ...usage, '', '── lanes ──']
 	const lamps = run_board_lamp_spots.lamps_in(lines, STARTS, WIDE_END)
 	const area = area_of(lines, STARTS, lamps)
 
@@ -74,6 +79,37 @@ describe('run_board_flux_panel.FLUX_PAINTER cells', () => {
 	})
 })
 
+// joshuafolkken/kit#8712: seven rows under the rule, through the GitHub row, and none past it.
+describe('run_board_flux_panel.FLUX_PAINTER rows', () => {
+	it('covers seven rows under the rule across the figure, idle and flooded', () => {
+		const flooded = { ms: JUMP_MS, is_burst: false, jump: JUMP }
+
+		for (const at of [AT, flooded]) {
+			const cells = FLUX_PAINTER.cells(WIDE, at)
+			const below = cells.filter((cell) => cell.row > WIDE.top && cell.column >= LEFT)
+
+			expect(new Set(below.map((cell) => cell.row - WIDE.top))).toStrictEqual(
+				new Set([1, 2, 3, 4, 5, 6, 7]),
+			)
+			expect(new Set(below.map((cell) => `${String(cell.row)} ${String(cell.column)}`)).size).toBe(
+				FIGURE_ROWS * FIGURE_WIDTH,
+			)
+		}
+	})
+
+	it('draws the figure through the last usage row where no GitHub row is drawn', () => {
+		const short = area_with('─'.repeat(WIDE_END), USAGE.slice(0, -1))
+		const below = FLUX_PAINTER.cells(short, AT).filter(
+			(cell) => cell.row > short.top && cell.column >= LEFT,
+		)
+
+		expect(new Set(below.map((cell) => cell.row - short.top))).toStrictEqual(
+			new Set([1, 2, 3, 4, 5, 6]),
+		)
+		expect(below.some((cell) => cell.text.trim() !== '')).toBe(true)
+	})
+})
+
 describe('run_board_flux_panel.FLUX_PAINTER timing', () => {
 	it('runs from the first frame and wakes on its own tick', () => {
 		expect(FLUX_PAINTER).toMatchObject({ is_idle: true, is_ticking: true })
@@ -91,9 +127,6 @@ describe('run_board_flux_panel.FLUX_PAINTER timing', () => {
 // joshuafolkken/kit#8677: the figure through a jump and through the arrival — the speed at 88 blinking
 // white, the capacitor flooded, and back to cruising once each is over.
 
-const JUMP = { start_ms: 0, letters: 30 }
-// The jump itself: the last letter typed, on an even panel tick.
-const JUMP_MS = JUMP.letters * PANEL_TICK_MS
 const ARRIVE_OVER_MS = 3200
 const TOP_WHITE = '255;255;255'
 
