@@ -124,7 +124,7 @@ interface BoardLayout {
 }
 
 // What an active row is named and classified by — each issue's title and labels.
-interface RowRead extends PauseRead {
+interface RowRead extends PauseRead, Pick<BoardPlan, 'now_ms' | 'review_stops'> {
 	decision_questions?: ReadonlyMap<number, string> | undefined
 	is_backlog_live?: boolean | undefined
 	titles: ReadonlyMap<number, string>

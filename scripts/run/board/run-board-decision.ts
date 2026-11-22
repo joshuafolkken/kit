@@ -12,6 +12,7 @@ import type {
 	RowReason,
 } from './run-board-layout-types'
 import { run_board_pause } from './run-board-pause'
+import { run_board_review_stop } from './run-board-review-stop'
 import type { ItemStatus } from './run-board-status'
 
 // A blocker the decision read walked to, with the title its listing or view carries.
@@ -80,13 +81,23 @@ function read_question(number: number, read: RowRead): string {
 	return read.decision_questions?.get(number) ?? read.titles.get(number) ?? ''
 }
 
+// joshuafolkken/kit#8592: a stop no comment records — a relaunched lane paused, then labelled by hand —
+// shows its review stop's action when it has one, else the fallback's own next action.
+function pause_of(number: number, read: RowRead, status?: ItemStatus): RowReason | undefined {
+	const pause = run_board_pause.reason_of(number, read, status)
+	if (pause?.tail !== run_board_pause.FALLBACK) return pause
+	const labels = read.labels.get(number) ?? []
+
+	return run_board_review_stop.reason_of({ number, labels }, read) ?? pause
+}
+
 function reason_of(
 	number: number,
 	reason: string | undefined,
 	read: RowRead,
 	status?: ItemStatus,
 ): RowReason | undefined {
-	const pause = run_board_pause.reason_of(number, read, status)
+	const pause = pause_of(number, read, status)
 	if (pause !== undefined) return pause
 	const parts = parts_of(reason)
 	const question = question_of(parts.question) ?? read_question(number, read)

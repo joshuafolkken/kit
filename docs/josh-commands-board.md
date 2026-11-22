@@ -199,8 +199,8 @@ The park comment of `run:stalled` (the `run:merge` park and `run:park --escalate
 The action is normally `pnpm josh ship --log <N>`, `pnpm josh run:cut --end` for a stale hand-off or handed-off cut, and a `parent:` sentence for an escalation.
 A trusted comment carrying a next-action marker that cites itself as evidence is read as a stop and becomes the reason in place of any older park. A backfill citing another comment, and an earlier `run:stalled` comment without a marker, are not read as stops.
 
-Even with no explanation, the row links to the latest stop comment. A failed fetch or a stop before launch shows `Reason unavailable: inspect issue` (linking to the Issue),
-and an adoption by `backlog:triage --adopt` after the stop shows `adopted option <n> · relaunching` (linking to the adoption comment). Without link support, or in chat/plain, check from the Issue number at the start of the row (on the CLI, `pnpm josh issue:read <N>`).
+With no explanation, the row links to the latest stop comment. A failed fetch or a stop before launch shows `person: read the issue and decide (no stop recorded)` (linking to the Issue; a 🙋 row's review stop action replaces it),
+and an adoption by `backlog:triage --adopt` after the stop shows `adopted option <n> · relaunching` (linking to the adoption). Without links, or in chat/plain, use the row's Issue number (`pnpm josh issue:read <N>`).
 
 A row waiting on a parent's action shows the park's action (linking to the park). The condition: the latest park recommends a parent's action (`必要な権限: 親…`), and the adoption after it took the recommendation without `parent action done:`.
 
