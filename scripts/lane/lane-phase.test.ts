@@ -34,6 +34,10 @@ const emit_plan = vi.mocked(run_event_plan.emit_plan)
 const ISSUE = '3444'
 const LANE = `/home/dev/.kit-lanes/${ISSUE}`
 
+function push_event(kind: string, text: string): void {
+	events.push({ pos: events.length, at: '2026-11-04T00:01:00.000Z', kind, text })
+}
+
 afterEach(() => {
 	emit.mockClear()
 	emit_plan.mockClear()
@@ -61,15 +65,30 @@ describe('mark_implement — launch scope', () => {
 		await lane_phase.mark_implement(LANE, source)
 		expect(emit).toHaveBeenCalledOnce()
 		expect(emit_plan).toHaveBeenCalledOnce()
-		events.push({
-			pos: events.length,
-			at: '2026-11-04T00:01:00.000Z',
-			kind: 'child-launch',
-			text: `#${ISSUE} dispatched`,
-		})
+		push_event('child-launch', `#${ISSUE} dispatched`)
 		await lane_phase.mark_implement(LANE, source)
 		expect(emit).toHaveBeenCalledTimes(2)
 		expect(emit_plan).toHaveBeenCalledTimes(2)
+	})
+})
+
+// joshuafolkken/kit#8583: a resumed session marks its own first edit, once.
+describe('mark_implement — resume scope', () => {
+	const source = { [lane_child_marker.KEY]: ISSUE }
+
+	it('writes again after a resume, then not again within that resume', async () => {
+		await lane_phase.mark_implement(LANE, source)
+		push_event('resume', `#${ISSUE} resumed`)
+		await lane_phase.mark_implement(LANE, source)
+		await lane_phase.mark_implement(LANE, source)
+		expect(emit).toHaveBeenCalledTimes(2)
+	})
+
+	it('ignores another issue resuming', async () => {
+		await lane_phase.mark_implement(LANE, source)
+		push_event('resume', '#34440 resumed')
+		await lane_phase.mark_implement(LANE, source)
+		expect(emit).toHaveBeenCalledOnce()
 	})
 })
 
