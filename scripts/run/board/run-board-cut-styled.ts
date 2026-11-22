@@ -43,7 +43,7 @@ function link_close_of(kept: ReadonlyArray<Piece>): string {
 // joshuafolkken/kit#8632: the reset closing a cut of `pieces` — none for a line with no escape, so a
 // colorless board stays free of escapes.
 function reset_for(pieces: ReadonlyArray<Piece>): string {
-	return pieces.some((piece) => piece.width === 0) ? RESET : ''
+	return pieces.some((piece) => is_escape(piece.text)) ? RESET : ''
 }
 
 // `line` cut to its first `columns` columns; a character two columns wide the cut would split is left
