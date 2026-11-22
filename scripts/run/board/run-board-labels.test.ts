@@ -2,6 +2,8 @@ import { styleText } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import { run_board_phase } from './run-board-phase'
+import { run_board_spin } from './run-board-spin'
+import { run_board_theme_defs } from './run-board-theme-defs'
 
 // joshuafolkken/kit#3430: every time the board draws is an `HH:MM:SS` clock or a span.
 // joshuafolkken/kit#3486: its words are English whatever the session language.
@@ -43,7 +45,6 @@ describe('run_board_labels.bar_of', () => {
 		expect(bar_of(1, 4, 8)).toBe('■■──────')
 		expect(bar_of(0, 0, 4)).toBe('────')
 		expect(bar_of(5, 4, 4)).toBe('■■■■')
-		expect(bar_of(0, 1)).toHaveLength(10)
 	})
 
 	// joshuafolkken/kit#3452: a centered square done (joshuafolkken/kit#3498), a dimmed thin line left where the output has color.
@@ -129,6 +130,16 @@ describe('run_board_labels.spinner_of', () => {
 		expect(spinner_of(SPINNER_INTERVAL_MS)).toBe('⠙')
 		expect(spinner_of(10 * SPINNER_INTERVAL_MS)).toBe('⠋')
 		expect(SPINNER_INTERVAL_MS).toBe(80)
+	})
+
+	// joshuafolkken/kit#8478: the time circuits change no pace — the spinner's, the times' redraw and the
+	// themes' typing.
+	it('keeps the redraw at one second and each theme’s typing pace', () => {
+		const { THEME_DEFS } = run_board_theme_defs
+
+		expect(run_board_spin.REDRAW_MS).toBe(SECOND)
+		expect(THEME_DEFS.wargames.intro.letter_ms).toBe(50)
+		expect(THEME_DEFS.matrix.intro.letter_ms).toBe(50)
 	})
 })
 

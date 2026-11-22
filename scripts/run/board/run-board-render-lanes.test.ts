@@ -97,8 +97,11 @@ describe('run_board_render_lanes.number_text lane share colors', () => {
 })
 
 describe('run_board_render_lanes.lanes_section', () => {
-	it('draws no section without lines', () => {
-		expect(lanes_section([], CELLS, header())).toStrictEqual([])
+	// joshuafolkken/kit#8514: the lanes rule's tail carries the run's tallies, so it is drawn without a row.
+	it('draws the lanes rule with its tallies without lines', () => {
+		expect(lanes_section([], CELLS, header())).toStrictEqual([
+			expect.objectContaining({ label: LANES_LABEL, lines: [], tail: '✅ 0/0  🔄 0  💤 0' }),
+		])
 	})
 
 	it('heads the lines with a rule with ⏰ over the elapsed column where no cells are drawn', () => {

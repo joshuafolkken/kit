@@ -118,6 +118,20 @@ describe('run_board_spin.spin_to_second with lamps', () => {
 	})
 })
 
+describe('run_board_spin.spin_to_second with the idle rain', () => {
+	it('runs the rain before the first frame is out', async () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const { ports, drawn } = lamp_ports(START)
+		const unseen = { seen: undefined, lines: [] }
+		const raining = { ...turning_of(spun(LINES, '⠋', WIDE).lamps, unseen), is_rain: true }
+
+		await spin_to_second(raining, ports)
+
+		expect(drawn[0]?.match(CELL)?.length).toBe(16)
+		expect(drawn.join('')).not.toContain(LAMP_MARK)
+	})
+})
+
 // joshuafolkken/kit#8237: while a row types, every group changes on every step.
 const TYPED_LAMPS = spun(LINES, '⠋', WIDE).lamps
 

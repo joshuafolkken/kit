@@ -29,7 +29,9 @@ interface PauseRead {
 	pause_reasons?: ReadonlyMap<number, PauseRecord> | undefined
 }
 
-const FALLBACK = 'Reason unavailable: inspect issue'
+// joshuafolkken/kit#8592: no stop names a reason, so the row says what a person does next, in the
+// `person:` form a stop's next action takes (`issue-outcome.ts`).
+const FALLBACK = 'person: read the issue and decide (no stop recorded)'
 
 // A next action the comment records about itself, as a `run:stalled` park does (joshuafolkken/kit#7852);
 // a backfill citing another comment is that stop's reason, never a stop of its own.

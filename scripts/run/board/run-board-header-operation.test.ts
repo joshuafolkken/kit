@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { SessionOperations } from './run-board-operation-read'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -8,10 +9,12 @@ import { run_board_spot } from './run-board-spot'
 
 // joshuafolkken/kit#3757: the header's third line draws the newest operation of a child the board
 // draws as running, the same on a screen and in a chat. joshuafolkken/kit#3767: its spinner under the
-// `⏰` and `💓`, its time in their format under their digits, its kind's icon under the `💪`, and the
-// child's newest event where that is newer than its newest operation.
+// `⏰`, its time in its format under its digits, its kind's icon under the `💪`, and the
+// child's newest event where that is newer than its newest operation. joshuafolkken/kit#8478: the
+// time circuits — the third line's spinner in the signs' column under `-` and `+`, its time under
+// their digits, after the start clock.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_render_fixture
 const SECOND = 1000
 const THIRD = 2
 // No kit version and no repository are read, so the name column draws `-` under the board's name and
@@ -19,10 +22,13 @@ const THIRD = 2
 const NAME = '▶ josh-board'
 const NAME_BLANK = ' '.repeat(NAME.length)
 const VERSION_CELL = '  -'.padEnd(NAME.length)
-const BEAT_LINE = `${VERSION_CELL}  💓    1′00″  💪 -  🧠 -  💾 -`
+const START = `🚀 ${run_board_labels.minute_of(STARTED)}`
+const FIRST_LINE = `${NAME}  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -`
+const SECOND_LINE = `${VERSION_CELL}  🕒 ${run_board_labels.minute_of(NOW)}  +2°10′00″  —`
 const GATE_TEXT = '🔧 #7 · Bash pnpm josh gate'
-// The third line with no spinner turning: its place blank, two columns wide as the `💓`.
-const STILL_LINE = `${NAME_BLANK}           4″  ${GATE_TEXT}`
+const THIRD_HEAD = `${NAME_BLANK}  ${START}  `
+// The third line with no spinner turning: its place in the signs' column blank.
+const STILL_LINE = `${THIRD_HEAD}       4″  ${GATE_TEXT}`
 const OPERATIONS: SessionOperations = {
 	lanes: [
 		{ issue: 7, operation: { kind: 'Bash', target: 'pnpm josh gate', at_ms: NOW - 4 * SECOND } },
@@ -55,11 +61,11 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 		expect(third_of({ operations: OPERATIONS })).toBe(STILL_LINE)
 	})
 
-	it('lines the spinner up under the ⏰ and 💓, the time under their digits, the icon under 💪', () => {
+	it('lines the spinner up under the signs, the time under their digits, the icon under 💪', () => {
 		expect(header_lines_of({ operations: OPERATIONS, spinner: '⠙' })).toStrictEqual([
-			`${NAME}  ⏰ 2°10′00″  ✅  1/2 ■■■■■─────  🔄 1  ⏳ 0  💤 0`,
-			BEAT_LINE,
-			`${NAME_BLANK}  ⠙        4″  ${GATE_TEXT}`,
+			FIRST_LINE,
+			SECOND_LINE,
+			`${THIRD_HEAD}⠙      4″  ${GATE_TEXT}`,
 		])
 	})
 
@@ -76,12 +82,45 @@ describe('run_board_header.header_lines with a session’s operation', () => {
 		}
 
 		expect(third_of({ operations: OPERATIONS, activity, spinner: '⠙' })).toBe(
-			`${NAME_BLANK}  ⠙        1″  🚦 #7 · ship gate`,
+			`${THIRD_HEAD}⠙      1″  🚦 #7 · ship gate`,
 		)
 	})
 
 	it('counts the running children where no operation was read', () => {
-		expect(third_of({}).trim()).toBe('🔄 1 running')
+		expect(third_of({})).toBe(`${THIRD_HEAD}${' '.repeat(9)}  🔄 1 running`)
+	})
+})
+
+// joshuafolkken/kit#8482: the root checkout's single run beside the lanes weighs in with their newest.
+describe('run_board_header.header_lines with a root checkout’s single run', () => {
+	const ROOT_ISSUE = 12
+
+	function root_layout(state: BoardRow['state']): BoardLayout {
+		return { ...LAYOUT, root: { name: 'fullrun', row: row(ROOT_ISSUE, state) } }
+	}
+
+	function with_root(age_ms: number): SessionOperations {
+		const operation = { kind: 'Read', target: 'run-hold.ts', at_ms: NOW - age_ms } as const
+
+		return { ...OPERATIONS, lanes: [...OPERATIONS.lanes, { issue: ROOT_ISSUE, operation }] }
+	}
+
+	it('writes the running single run’s operation where it is newer than the lanes’', () => {
+		const third = third_of({ layout: root_layout('running'), operations: with_root(2 * SECOND) })
+
+		expect(third).toBe(`${THIRD_HEAD}       2″  🔧 #12 · Read run-hold.ts`)
+	})
+
+	it('keeps the lane’s operation where the single run’s is older', () => {
+		const third = third_of({ layout: root_layout('running'), operations: with_root(MINUTE) })
+
+		expect(third).toBe(STILL_LINE)
+	})
+
+	it('reads no operation of a single run not drawn as running', () => {
+		const third = third_of({ layout: root_layout('stopped'), operations: with_root(SECOND) })
+
+		expect(third).toBe(STILL_LINE)
 	})
 })
 
@@ -98,12 +137,15 @@ describe('run_board_header — the third line’s key', () => {
 		expect(run_board_header.now_key(header({ layout: LAYOUT, ...keyed }))).toBe(GATE_KEY)
 	})
 
-	it('keys nothing where the third line names no words, nor where the board types no rows', () => {
+	it('keys no now line where the third line names no words, nor where the board types no rows', () => {
 		const empty = header({ is_keyed: true })
 
 		expect(run_board_header.now_key(empty)).toBeUndefined()
+		// joshuafolkken/kit#8457: the progress line carries a key of its own.
 		expect(
-			lines_of(empty).every((line) => run_board_row_key.split_key(line).key === undefined),
+			lines_of(empty).every(
+				(line) => run_board_row_key.split_key(line).key?.startsWith('now:') !== true,
+			),
 		).toBe(true)
 		expect(third_of({ operations: OPERATIONS })).toBe(STILL_LINE)
 	})

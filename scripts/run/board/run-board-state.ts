@@ -2,6 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { RuleCell } from './run-board-codes'
 import type { BoardDisplay } from './run-board-display'
+import type { DropScreen } from './run-board-drop-screen'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameStore } from './run-board-frame-store'
@@ -9,12 +10,14 @@ import type { GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
 import type { Notice } from './run-board-header-notice'
 import type { WorkerHeap } from './run-board-heap'
+import type { Icons } from './run-board-icons'
 import { run_board_idle } from './run-board-idle'
 import type { IssueCount } from './run-board-issue-count'
 import type { KeyInput } from './run-board-keys'
 import type { Lamp } from './run-board-lamp-spots'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
+import type { PinnedIssue } from './run-board-pinned-graphql'
 import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
 import type { CueName } from './run-board-sound-cues'
@@ -65,6 +68,8 @@ interface BoardPorts {
 	types_rows?: boolean | undefined
 	// The theme the frame is drawn in (`run-board-theme.ts`), whose alert display the header adds.
 	theme?: Theme | undefined
+	// How the icons are drawn (`run-board-icons.ts`); unset, the theme's default.
+	icons?: Icons | undefined
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
 	// next one; none where the frame is drawn whole — one frame, a pipe, a chat.
 	size?: (() => TerminalSize) | undefined
@@ -87,6 +92,8 @@ interface BoardPorts {
 	read_rate_limit?: (() => Promise<GithubRateLimit | undefined>) | undefined
 	// The repository's open and closed issues (`run-board-issue-count.ts`); none where none is read.
 	read_issue_count?: ((repo: string) => Promise<IssueCount | undefined>) | undefined
+	// The repository's pinned issues (`run-board-pinned-graphql.ts`); none where none is read.
+	read_pinned?: ((repo: string) => Promise<ReadonlyArray<PinnedIssue> | undefined>) | undefined
 	// Sends one chat frame off-screen, for `--every` alone.
 	push: (frame: string) => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
@@ -125,6 +132,8 @@ interface BoardData extends GatherRead {
 	attempted_ms: number | undefined
 	fetched_ms: number | undefined
 	failed_ms: number | undefined
+	// Why the last plan read failed, while it does (joshuafolkken/kit#8475).
+	plan_error?: string | undefined
 	// The run's children read closed, kept for the run: a closed issue's answer does not change.
 	closed: ReadonlyMap<number, ClosedIssue>
 	closed_fetch: Fetch<ClosedAnswer> | undefined
@@ -147,6 +156,11 @@ interface BoardData extends GatherRead {
 	issue_count: IssueCount | undefined
 	issue_count_fetch: Fetch<IssueCount | undefined> | undefined
 	issue_count_attempted_ms: number | undefined
+	// The repository's pinned issues — the last read kept while a read fails — the read in flight, and
+	// when it was last launched (joshuafolkken/kit#8606).
+	pinned: ReadonlyArray<PinnedIssue> | undefined
+	pinned_fetch: Fetch<ReadonlyArray<PinnedIssue> | undefined> | undefined
+	pinned_attempted_ms: number | undefined
 }
 
 // What the frame keeps between redraws: its spinners, typing, sound and notice, and the total it
@@ -160,10 +174,18 @@ interface BoardView {
 	sweep?: Sweep | undefined
 	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
+	// Whether those cells run the idle rain in place of the lamps (`run-board-idle-rain.ts`).
+	is_rain?: boolean | undefined
+	// The last frame's cells on screen where a drop falls down it between redraws (`run-board-rain-drop.ts`).
+	drop?: DropScreen | undefined
+	// Where the last frame drew its worst-level TRACE field, blinked between redraws (`run-board-trace-spot.ts`).
+	traces?: ReadonlyArray<Spot> | undefined
 	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).
 	rules?: ReadonlyArray<RuleCell> | undefined
 	// Where the last frame has a lamp strip above a section rule, filled as a row types (`run-board-strip.ts`).
 	strips?: ReadonlyArray<StripCell> | undefined
+	// Where the last frame drew its header clocks' colons, blinked between redraws (`run-board-colon.ts`).
+	colons?: ReadonlyArray<Spot> | undefined
 	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
 	typing: Typing
 	// The rows and run conditions the last frame sounded over, and the standing cue waiting to replay
@@ -180,12 +202,23 @@ type BoardState = BoardData & BoardView
 // on its worker thread, a single frame's where it draws.
 type DataPorts = Pick<
 	BoardPorts,
-	'read_plan' | 'read_closed' | 'snapshot' | 'read_thanks' | 'read_rate_limit' | 'read_issue_count'
+	| 'read_plan'
+	| 'read_closed'
+	| 'snapshot'
+	| 'read_thanks'
+	| 'read_rate_limit'
+	| 'read_issue_count'
+	| 'read_pinned'
 >
 
 // The reads a board folds in on a later step, which hold a promise and so stay on the thread that launched them.
 type FetchKey =
-	'plan_fetch' | 'closed_fetch' | 'thanks_fetch' | 'rate_limit_fetch' | 'issue_count_fetch'
+	| 'plan_fetch'
+	| 'closed_fetch'
+	| 'thanks_fetch'
+	| 'rate_limit_fetch'
+	| 'issue_count_fetch'
+	| 'pinned_fetch'
 
 // `BoardData` as the worker thread posts it beside its reads off this machine: each read in flight
 // named rather than held.
@@ -228,6 +261,9 @@ const FRESH_DATA: BoardData = {
 	issue_count: undefined,
 	issue_count_fetch: undefined,
 	issue_count_attempted_ms: undefined,
+	pinned: undefined,
+	pinned_fetch: undefined,
+	pinned_attempted_ms: undefined,
 }
 
 const FRESH_VIEW: BoardView = {

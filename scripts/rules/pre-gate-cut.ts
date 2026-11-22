@@ -109,7 +109,7 @@ function current_state(context: HookContext): LaneCutState {
 			run_cut.carried_cut_sync(now, run_cut.worktree_git_directory_sync(context.cwd)),
 		marked_issue: lane_child_marker.marked_issue(context.env),
 		is_reviewer: agent_session_role.is_reviewer(context.env),
-		context_verdict: () => cost_cli.session_verdict(context.cwd, context.env),
+		context_verdict: () => cost_cli.session_verdict({ cwd: context.cwd, environment: context.env }),
 	}
 }
 

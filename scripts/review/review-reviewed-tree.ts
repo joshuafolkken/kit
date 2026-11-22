@@ -52,7 +52,7 @@ async function record(unsettled: ReadonlyArray<string> = []): Promise<void> {
 		const { files, base } = await gate_tree.read_gate_tree()
 		const blobs = review_round_one_blobs.capture(Object.keys(files))
 
-		review_stamps.reviewed_stamp.write(settled_files(files, unsettled), undefined, base, blobs)
+		review_stamps.reviewed_stamp.write(settled_files(files, unsettled), { base, blobs })
 	} catch {
 		/* no record widens the next round rather than narrowing it */
 	}

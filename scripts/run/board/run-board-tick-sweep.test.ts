@@ -1,9 +1,10 @@
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import type { BoardRow } from './run-board-layout'
 import { run_board_spot } from './run-board-spot'
 import type { BoardState } from './run-board-state'
+import { run_board_theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
@@ -37,7 +38,8 @@ describe('run_board_tick — the sweep (joshuafolkken/kit#8240)', () => {
 			const redraw = { ports: { ...ports, theme, size: () => PANE }, now_ms: START + AGED_MS }
 			const drawn = drawn_from(state, local, redraw, layout_for(state, local, START))
 
-			expect(drawn.sweep).toStrictEqual(theme === 'wargames' ? { row: 4, left: 5 } : undefined)
+			// Column 18: the header's name column is `josh-wopr`'s width (joshuafolkken/kit#8604).
+			expect(drawn.sweep).toStrictEqual(theme === 'wargames' ? { row: 4, left: 18 } : undefined)
 		},
 	)
 
@@ -47,6 +49,63 @@ describe('run_board_tick — the sweep (joshuafolkken/kit#8240)', () => {
 
 		expect(drawn.sweep).toBeUndefined()
 		expect(drawn.spots).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#8391: a no-run frame keeps no blinking cell from the run frame before it.
+describe('run_board_tick — the blinking cells of a no-run frame (joshuafolkken/kit#8391)', () => {
+	it('drops the last frame’s lamps, TRACE field and clock colons when it draws no run', async () => {
+		const { ports } = harness(undefined, [plan_titled('a')])
+		const trace = { row: 1, column: 1, style: '' }
+		const lamp = { row: 2, column: 2, panel_row: 0, group: 0, lamp: 0 }
+		const blinking = { ...FRESH_STATE, lamps: [lamp], traces: [trace], colons: [trace] }
+		const drawn = await tick(blinking, ports)
+
+		expect(drawn.lamps).toBeUndefined()
+		expect(drawn.traces).toBeUndefined()
+		expect(drawn.colons).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8476: a live run frame records its clocks' colons in the theme's 24-bit colors.
+describe('run_board_tick — the clock colons of a run frame (joshuafolkken/kit#8476)', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it.each(['matrix', 'wargames'] as const)(
+		'records %s’s three colons in its 24-bit color',
+		(theme) => {
+			vi.stubEnv('FORCE_COLOR', '3')
+			const { ports } = harness(LOCAL, [])
+			const state: BoardState = { ...FRESH_STATE, run_started_ms: LOCAL.started_ms }
+			const redraw = { ports: { ...ports, theme, size: () => PANE }, now_ms: START + AGED_MS }
+			const drawn = drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
+			const styles = (drawn.colons ?? []).map(({ style }) => style)
+
+			expect(styles).toHaveLength(3)
+			expect(styles.filter((style) => !style.includes('[38;2;'))).toStrictEqual([])
+		},
+	)
+})
+
+// joshuafolkken/kit#8505: the colons are found in the icons every write draws, not the theme's default.
+describe('run_board_tick — the clock colons in the ports’ icons (joshuafolkken/kit#8505)', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('restyles the frame for its colons in the ports’ icons', () => {
+		const { ports } = harness(LOCAL, [])
+		const state: BoardState = { ...FRESH_STATE, run_started_ms: LOCAL.started_ms }
+		const look = { theme: 'wargames', icons: 'letters' } as const
+		const redraw = { ports: { ...ports, ...look, size: () => PANE }, now_ms: START + AGED_MS }
+		const restyle = vi.spyOn(run_board_theme, 'restyle')
+
+		drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
+
+		expect(restyle).toHaveBeenCalled()
+		expect(restyle.mock.calls.map((call) => call[2])).not.toContain(undefined)
 	})
 })
 

@@ -1,0 +1,7 @@
+{
+	"reason": "#8370 adds the matrix now-line glow (new run-board-type-glow.ts) and keeps a glowing row drawn for its half second",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 59
+	}
+}

@@ -33,8 +33,8 @@ function sources(): ScopedSources {
 function plant_green(): ScopedSources {
 	const planted = sources()
 
-	review_stamps.lint_related_stamp.write(tree_of(), planted.lint, BASE)
-	review_stamps.test_related_stamp.write(tree_of(), planted.test, BASE)
+	review_stamps.lint_related_stamp.write(tree_of(), { target: planted.lint, base: BASE })
+	review_stamps.test_related_stamp.write(tree_of(), { target: planted.test, base: BASE })
 
 	return planted
 }

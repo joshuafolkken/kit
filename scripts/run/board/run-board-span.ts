@@ -15,6 +15,8 @@ interface BoardSpan {
 	invocation: string
 	started_ms: number
 	ended_ms: number | undefined
+	// A single run's session transcript, as its hold records it (`run-board-single.ts`).
+	transcript?: string | undefined
 }
 
 const { moment_of } = run_event_scope

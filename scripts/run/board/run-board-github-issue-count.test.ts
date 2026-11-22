@@ -15,6 +15,8 @@ const { PLAN_RETRY_MS, gather_github } = run_board_github
 const { FRESH_STATE } = run_board_state
 const REPO = 'joshuafolkken/kit'
 const COUNT: IssueCount = { open: 87, closed: 6912 }
+// The plan's one issue running, so the frame draws the lanes rule the count ends.
+const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
 type ReadCount = (repo: string) => Promise<IssueCount | undefined>
 
@@ -137,11 +139,11 @@ describe('run_board_tick.tick issue count', () => {
 		expect(state.issue_count).toStrictEqual(COUNT)
 	})
 
-	it('draws the count it read on the first line of the frame', async () => {
-		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+	it('draws the count it read at the end of the lanes rule', async () => {
+		const { ports, frames } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 
 		await run_board_tick.tick(FRESH_STATE, { ...ports, read_issue_count: async () => await COUNT })
 
-		expect(frames.at(-1)?.split('\n', 1)[0]).toContain('📮 87/6,912')
+		expect(frames.at(-1)).toMatch(/ lanes .*📮 87\/6,912$/mu)
 	})
 })

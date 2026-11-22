@@ -60,6 +60,10 @@ interface PlanSection extends Foldable {
 	lines: ReadonlyArray<PlanLine>
 	fold?: ((cut: ReadonlyArray<PlanLine>) => string) | undefined
 	key?: SectionKey | undefined
+	// The priorities among its rows after its count, ` (🔺 2)`, open or folded (joshuafolkken/kit#8511).
+	tally?: string | undefined
+	// Drawn at the right end of its rule, open or folded (joshuafolkken/kit#8512).
+	tail?: string | undefined
 }
 
 // The newest notes shown, and how many older ones are already past the section's limit.
@@ -72,11 +76,12 @@ interface NotesPart extends Foldable {
 }
 
 // A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once;
-// `summary` is what its folded heading says.
+// `summary` is what its folded heading says; `tail` is drawn at the right end of its rule.
 interface DetailPart extends Foldable {
 	head: ReadonlyArray<string>
 	lines: ReadonlyArray<{ text: string; is_detail: boolean }>
 	summary?: string | undefined
+	tail?: string | undefined
 }
 
 // A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around
@@ -100,6 +105,8 @@ interface FrameParts {
 	footer: ReadonlyArray<string>
 	// The column every rule runs on to: where a lane row's full title ends (`run-board-rule-width.ts`).
 	rule_width?: number | undefined
+	// The pane's width: a rule's tail that would run past it is left out (joshuafolkken/kit#8514).
+	columns?: number | undefined
 }
 
 // One thing that gives way: a part as a whole, the processes' details, one note (the oldest shown),
@@ -201,8 +208,9 @@ function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<
 
 	const kept = kept_lines(section, cut)
 
-	// A section with every line cut goes; one drawn with none keeps its head (joshuafolkken/kit#7281).
-	if (kept.length === 0 && section.lines.length > 0) return []
+	// A section with every line cut goes; one drawn with none keeps its head (joshuafolkken/kit#7281),
+	// as does one with a tail, so the tail stays drawn (joshuafolkken/kit#8512).
+	if (kept.length === 0 && section.lines.length > 0 && section.tail === undefined) return []
 
 	return [...section.head, ...kept, ...fold_lines(section, cut)]
 }
@@ -210,7 +218,9 @@ function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<
 // Whether a section draws any of its rows, open or folded; a head kept with none draws no row, so the
 // plan's `more N` never reads as its hidden rows (joshuafolkken/kit#7281).
 function draws_row(section: PlanSection, cut: ReadonlySet<PlanLine>): boolean {
-	return section.lines.length > 0 && section_lines(section, cut).length > 0
+	if (section.lines.length === 0) return false
+
+	return section.is_folded === true || kept_lines(section, cut).length > 0
 }
 
 // The cut rows no folding section counts; a seat line is no row.

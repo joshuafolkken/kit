@@ -1,3 +1,4 @@
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { review_round } from '#scripts/review/review-round'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,6 +12,7 @@ const movement_mock = vi.hoisted(() => vi.fn())
 const stopped_on_mock = vi.hoisted(() => vi.fn())
 const mark_stopped_mock = vi.hoisted(() => vi.fn())
 const interaction_status_mock = vi.hoisted(() => vi.fn(async (): Promise<unknown> => undefined))
+const resolutions_mock = vi.hoisted(() => vi.fn(async (): Promise<ReadonlyArray<unknown>> => []))
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -30,6 +32,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: () => false },
 }))
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
+vi.mock('#scripts/lane/lane-resolve', () => ({ lane_resolve: { resolutions: resolutions_mock } }))
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 
@@ -57,6 +60,7 @@ vi.mock('#scripts/review/review-reviewed-tree', () => ({
 }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
+const { run_ship_review_checkpoint } = await import('./run-ship-review-checkpoint')
 
 // joshuafolkken/kit#4620: a round 1 recorded before the ship is reused while the tree holds still, and
 // each round 1 the ship acts on leaves its verdict in the lane ledger.
@@ -72,6 +76,7 @@ const HIGH = 'bug-risks:high:a.ts:4'
 const UNSETTLED = 'unsettled'
 const MEDIUM = 'bug-risks:medium:a.ts:7'
 const LOW = 'tests:low:a.ts'
+const RESOLVED = [{ created_at: '2026-11-02T00:00:00Z', body: '## Lane conflict resolved' }]
 
 type JoshRun = (argv: ReadonlyArray<string>) => Promise<{ code: number; out: string }>
 
@@ -183,6 +188,53 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
 		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('blocking'))
 		expect(mark_stopped_mock).toHaveBeenCalledWith(Number(ISSUE), true)
+	})
+})
+
+// joshuafolkken/kit#8379: the rerun of a stale issue says so on its launch prompt; joshuafolkken/kit#8494:
+// so does the round after a conflict resolution, over the stale rerun.
+describe('run_ship_review_steps.review_stage — the launch trigger of round 1', () => {
+	it.each([
+		[true, [], review_prompt_level.RETRY.STALE],
+		[false, [], 'initial'],
+		[false, RESOLVED, review_prompt_level.RETRY.POST_CONFLICT],
+		[true, RESOLVED, review_prompt_level.RETRY.POST_CONFLICT],
+	])('names the launch trigger when stale is %s', async (is_stale, resolved, trigger) => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		resolutions_mock.mockResolvedValueOnce(resolved)
+
+		await run_ship_review_steps.review_stage(ISSUE, is_stale)
+
+		const [prompt] = review_in_mock.mock.calls[0] as [string]
+
+		expect(review_prompt_level.trigger_of(prompt)).toBe(trigger)
+	})
+})
+
+// joshuafolkken/kit#8492: a provider the checkpoint reruns on a missing or mismatched attestation says
+// so on its launch prompt; one it runs with no retry keeps the first launch's trigger. A relaunch after
+// a conflict resolution stays an attestation rerun (joshuafolkken/kit#8494).
+describe('run_ship_review_steps.review_stage — an attestation rerun of round 1', () => {
+	it.each([
+		[review_prompt_level.RETRY.ATTEST, [], review_prompt_level.RETRY.ATTEST],
+		[review_prompt_level.RETRY.ATTEST, RESOLVED, review_prompt_level.RETRY.ATTEST],
+		[undefined, [], 'initial'],
+	])('names the launch trigger when the checkpoint passes %s', async (retry, resolved, trigger) => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		resolutions_mock.mockResolvedValueOnce(resolved)
+		vi.spyOn(run_ship_review_checkpoint, 'run').mockImplementationOnce(
+			async (_issue, _stage, phases) => {
+				const [, provider] = phases.find(([name]) => name === 'provider') ?? []
+
+				return (await provider?.(retry)) ?? { code: FAILED, out: 'no provider step' }
+			},
+		)
+
+		await run_ship_review_steps.review_stage(ISSUE, false)
+
+		const [prompt] = review_in_mock.mock.calls[0] as [string]
+
+		expect(review_prompt_level.trigger_of(prompt)).toBe(trigger)
 	})
 })
 

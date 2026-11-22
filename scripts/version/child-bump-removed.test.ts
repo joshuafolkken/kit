@@ -87,7 +87,7 @@ async function run_gate(): Promise<number> {
 // nothing ran and the gate exited non-zero. It is now a child's ordinary second gate.
 describe('the bump→gate ordering refusal is gone', () => {
 	it('runs every lane gate check over a moved tree that carries no version bump', async () => {
-		review_stamps.gate_stamp.write(BEFORE_FIX, STAMP_PATH, BASE)
+		review_stamps.gate_stamp.write(BEFORE_FIX, { target: STAMP_PATH, base: BASE })
 
 		const code = await run_gate()
 

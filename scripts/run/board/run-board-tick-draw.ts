@@ -1,4 +1,6 @@
 import type { BoardDisplay } from './run-board-display'
+import { run_board_drop_screen, type DropScreen } from './run-board-drop-screen'
+import type { TerminalSize } from './run-board-fit'
 import type { FrameBounds } from './run-board-fold'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -6,10 +8,13 @@ import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
+import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
-import { run_board_spin, type Spun } from './run-board-spin'
+import { run_board_spin, type Spot, type Spun } from './run-board-spin'
+import { run_board_standing } from './run-board-standing'
 import type { BoardPorts, BoardState } from './run-board-state'
+import { run_board_theme } from './run-board-theme'
 import { run_board_theme_defs, type LiveDefs, type ThemeDefinition } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
@@ -31,6 +36,7 @@ type DrawPorts = Pick<
 	| 'form'
 	| 'types_rows'
 	| 'theme'
+	| 'icons'
 	| 'size'
 	| 'footer'
 	| 'folded'
@@ -106,8 +112,13 @@ function bounds_of(ports: DrawPorts): FrameBounds {
 	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
-// A drawn frame and every note it was drawn from — shown or not (joshuafolkken/kit#8117).
-type Drawn = Spun & { notes: ReadonlyArray<BoardNote> }
+// A drawn frame, every note it was drawn from — shown or not (joshuafolkken/kit#8117) — and the pane it
+// was kept within.
+type Drawn = Spun & {
+	notes: ReadonlyArray<BoardNote>
+	size: TerminalSize | undefined
+	colons: ReadonlyArray<Spot>
+}
 
 // The theme rows whose lamp choice the panel reads.
 type LampDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'lamps'>>>>
@@ -119,13 +130,34 @@ function is_lamp_theme(ports: Pick<DrawPorts, 'types_rows' | 'theme'>, defs: Lam
 	return defs[ports.theme]?.lamps === true
 }
 
+type LivePorts = Pick<DrawPorts, 'types_rows' | 'theme' | 'is_tty'>
+
+// Whether the board draws on a terminal drawing color.
+function is_colored_tty(ports: Pick<DrawPorts, 'is_tty'>): boolean {
+	return ports.is_tty && run_board_lamps.is_colored()
+}
+
 // The lamp panel shows where the rows type — a live board in a theme that draws lamps — on a terminal
 // drawing color (joshuafolkken/kit#8236).
-function has_lamps(
-	ports: Pick<DrawPorts, 'types_rows' | 'theme' | 'is_tty'>,
-	defs: LampDefs = THEME_DEFS,
-): boolean {
-	return is_lamp_theme(ports, defs) && ports.is_tty && run_board_lamps.is_colored()
+function has_lamps(ports: LivePorts, defs: LampDefs = THEME_DEFS): boolean {
+	return is_lamp_theme(ports, defs) && is_colored_tty(ports)
+}
+
+// Whether the lamp panel's cells run the idle rain: where the panel shows, in a theme whose live board
+// rains there (joshuafolkken/kit#8356).
+function has_rain(ports: LivePorts): boolean {
+	return has_lamps(ports) && live_of(ports.theme).rain
+}
+
+// How a new row enters: typed where the rows type; in a theme whose live board decodes them, decoded on
+// a terminal drawing color and shown at once on one drawing none (joshuafolkken/kit#8356).
+type RowEntry = 'type' | 'decode' | 'none'
+
+function entry_of(ports: LivePorts, defs: LiveDefs = THEME_DEFS): RowEntry {
+	if (ports.types_rows !== true) return 'none'
+	if (!live_of(ports.theme, defs).decode) return 'type'
+
+	return is_colored_tty(ports) ? 'decode' : 'none'
 }
 
 // Whether the section rules run code while a row types: a theme whose live board decodes them, where its
@@ -155,10 +187,11 @@ function decoded_of(
 	}
 }
 
-// The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen.
+// The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen;
+// its findings carry why the reads under it fail (`run-board-standing.ts`).
 function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Drawn {
 	const bounds = bounds_of(redraw.ports)
-	const { notes } = display
+	const notes = [...display.notes, ...run_board_standing.notes_of(header)]
 	const lines = run_board_render.render({
 		header,
 		notes,
@@ -170,27 +203,74 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		...bounds,
 	})
 	const spun = run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
+	// joshuafolkken/kit#8476: the clocks' colons found as the theme draws them, in its colors and in the
+	// icons every write draws (joshuafolkken/kit#8505), so the restyle reuses those writes' cache.
+	const { theme, icons } = redraw.ports
+	const themed = lines.map((line) => run_board_theme.restyle(theme, line, icons))
+	const colons = run_board_spin.colons_in(themed, bounds.size)
 
-	return { ...spun, notes }
+	return { ...spun, notes, size: bounds.size, colons }
+}
+
+// Whether a drop falls down the board between redraws: a live board on a terminal drawing color, in a
+// theme whose live board drops one (joshuafolkken/kit#8367) — the lamps' gate, by the theme's own switch.
+function has_drop(ports: LivePorts, defs: LiveDefs = THEME_DEFS): boolean {
+	if (ports.types_rows !== true || !live_of(ports.theme, defs).drop) return false
+
+	return is_colored_tty(ports)
+}
+
+// The frame's cells the drop falls down, where one falls — as the theme draws them, since the drop is
+// written past the theme and puts each cell it leaves back as it was on screen — with the spans the rain
+// pours over: the last frame's carried on, this frame's rows typing added (joshuafolkken/kit#8369).
+function drop_of(
+	redraw: Redraw,
+	drawn: Drawn,
+	typing: Typing,
+	last: DropScreen | undefined,
+): DropScreen | undefined {
+	const { ports } = redraw
+
+	if (!has_drop(ports)) return undefined
+	const lines = drawn.lines.map((line) => run_board_theme.restyle(ports.theme, line, ports.icons))
+	const screen = run_board_drop_screen.screen_of({ ...drawn, lines }, typing, drawn.size)
+	const spans = [...(last?.pours ?? []), ...run_board_type_rows.spans_of(typing)]
+
+	return run_board_rain_drop.poured(screen, spans, redraw.now_ms)
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
 // rows the plan brings were already there — so the frame the plan arrives on is the first base. What
-// counts as known is `run_board_row_sections.known_of`'s, over the notes the frame was drawn from.
+// counts as known is `run_board_row_sections.known_of`'s, over the notes the frame was drawn from; the
+// lines a saved plan's frame draws faint type over it on the frame the live plan lands on
+// (joshuafolkken/kit#8457).
 function typing_of(
 	state: BoardState,
 	drawn: Pick<Drawn, 'keyed' | 'notes'>,
 	header: LaidHeader,
 	redraw: Redraw,
 ): Typing {
-	const is_on = redraw.ports.types_rows === true && state.plan !== undefined
-	const frame = { keyed: drawn.keyed, known: run_board_row_sections.known_of(header, drawn.notes) }
+	const entry = entry_of(redraw.ports)
+	const is_on = entry !== 'none' && state.plan !== undefined
+	const frame = {
+		keyed: drawn.keyed,
+		known: run_board_row_sections.known_of(header, drawn.notes),
+		faint: run_board_row_sections.faint_keys_of(header),
+		is_decoding: entry === 'decode',
+	}
 
 	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
 }
 
 function draw(ports: Pick<DrawPorts, 'write'>, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
+}
+
+// The places the frame drew that the spin turns between redraws.
+function turned_of(drawn: Drawn): Pick<Drawn, 'spots' | 'sweep' | 'lamps' | 'traces' | 'colons'> {
+	const { spots, sweep, lamps, traces, colons } = drawn
+
+	return { spots, sweep, lamps, traces, colons }
 }
 
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the
@@ -204,15 +284,28 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	const typing = typing_of(state, drawn, header, redraw)
 
 	draw(redraw.ports, run_board_type_rows.typed_lines(drawn.lines, typing, redraw.now_ms))
-	redraw.ports.typing_sound?.set(run_board_type_rows.is_typing(typing, redraw.now_ms))
+	redraw.ports.typing_sound?.set(
+		run_board_type_rows.is_typing(typing, redraw.now_ms),
+		run_board_type_rows.left_ms(typing, redraw.now_ms),
+	)
 
-	const { spots, sweep, lamps } = drawn
-	const { rules, strips } = decoded_of(redraw.ports, drawn)
+	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
+	const drop = drop_of(redraw, drawn, typing, state.drop)
 
-	return { ...state, ...display.carried, spots, sweep, lamps, rules, strips, typing }
+	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop }
 }
 
-const run_board_tick_draw = { bounds_of, decoded_of, draw, draw_display, has_lamps, has_strip }
+const run_board_tick_draw = {
+	bounds_of,
+	decoded_of,
+	draw,
+	draw_display,
+	entry_of,
+	has_drop,
+	has_lamps,
+	has_rain,
+	has_strip,
+}
 
 export { run_board_tick_draw }
 export type { DrawPorts, Redraw }

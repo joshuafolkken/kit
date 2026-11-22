@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
@@ -8,12 +9,14 @@ import {
 	type BoardRow,
 } from './run-board-layout'
 import { run_board_priority } from './run-board-priority'
+import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
+import { run_board_theme } from './run-board-theme'
 
 // joshuafolkken/kit#4383: a row draws its priority between its number and its kind — 🚨 critical,
-// 🔺 high, two blanks otherwise — so every title starts in one column, and the header's ⏳ count names
-// the priorities waiting among it.
+// 🔺 high, two blanks otherwise — so every title starts in one column, and the queued and waiting
+// headings' counts name the priorities among their rows (joshuafolkken/kit#8511).
 
 const { EMPTY_LAYOUT, header, lines_of } = run_board_render_fixture
 const { cell_of, tally_of } = run_board_priority
@@ -52,6 +55,11 @@ function board_lines(): Array<string> {
 
 function line_of(lines: ReadonlyArray<string>, number: number): string {
 	return lines.find((line) => line.includes(String(number))) ?? ''
+}
+
+// joshuafolkken/kit#8609: wargames draws the headings in capitals, matrix as written.
+function heading_in(theme: 'wargames' | 'matrix', text: string): string {
+	return theme === 'wargames' ? text.toUpperCase() : text
 }
 
 function title_column(lines: ReadonlyArray<string>, number: number): number {
@@ -102,23 +110,19 @@ describe('run_board_priority.cell_of', () => {
 })
 
 describe('run_board_priority.tally_of', () => {
-	it('counts the waiting rows by priority, critical first', () => {
+	it('counts the rows by priority, critical first', () => {
 		const rows = [row(CRITICAL, 'critical'), row(HIGH, 'high'), row(1, 'high'), row(NORMAL)]
 
-		expect(tally_of(queued(rows))).toBe(' (🚨 1 🔺 2)')
+		expect(tally_of(rows)).toBe(' (🚨 1 🔺 2)')
 	})
 
-	it('names only the priorities present and leaves out running and settled rows', () => {
-		const active = [row(CRITICAL, 'critical', 'running'), row(DONE, 'critical', 'merged')]
-		const layout = { ...queued([row(HIGH, 'high')]), active }
-
-		expect(tally_of(layout)).toBe(' (🔺 1)')
+	it('names only the priorities present', () => {
+		expect(tally_of([row(HIGH, 'high'), row(NORMAL)])).toBe(' (🔺 1)')
 	})
 
-	it('draws nothing when no waiting row has a priority', () => {
-		const layout = queued([row(NORMAL)])
-
-		expect(tally_of(layout)).toBe('')
+	it('draws nothing, never (🔺 0), when no row has a priority', () => {
+		expect(tally_of([row(NORMAL)])).toBe('')
+		expect(tally_of([])).toBe('')
 	})
 })
 
@@ -137,8 +141,63 @@ describe('run_board_render.render — the priority column', () => {
 
 		expect(new Set(columns).size).toBe(1)
 	})
+})
 
-	it('names the waiting priorities beside the header’s ⏳ count', () => {
-		expect(board_lines().join('\n')).toContain('⏳ 3 (🚨 1 🔺 1)')
+describe('run_board_render.render — the headings’ priorities', () => {
+	it('names the queued priorities beside the queued heading’s count, none in the header', () => {
+		const lines = board_lines()
+
+		expect(lines.join('\n')).toContain('⏳ queued 3 (🚨 1 🔺 1) ─')
+		expect(lines[0]).not.toContain('⏳')
+	})
+
+	it('counts an epic’s children in the queued heading’s priorities', () => {
+		const rows = [row(HIGH, 'high'), row(NORMAL)]
+		const epic = { kind: 'epic', epic: DONE, title: 'Epic', rows } as const
+		const layout = { ...EMPTY_LAYOUT, queued: [epic] }
+
+		expect(lines_of(header({ layout })).join('\n')).toContain('⏳ queued 2 (🔺 1) ─')
+	})
+
+	it('names the waiting priorities beside the waiting heading’s count', () => {
+		const layout = { ...EMPTY_LAYOUT, unreached: [row(HIGH, 'high'), row(NORMAL)] }
+
+		expect(lines_of(header({ layout })).join('\n')).toContain('🔗 waiting 2 (🔺 1) ─')
+	})
+
+	it.each(['wargames', 'matrix'] as const)(
+		'reads the headings’ priorities as P1 / P2 in %s, none in its header',
+		(theme) => {
+			const rows = [row(CRITICAL, 'critical'), row(HIGH, 'high'), row(NORMAL)]
+			const layout = { ...queued(rows), unreached: [row(DONE, 'high')] }
+			const frame = lines_of(header({ layout })).join('\n')
+			const drawn = stripVTControlCharacters(run_board_theme.restyle(theme, frame))
+
+			expect(drawn).toContain(heading_in(theme, 'queued 3 (P1 1 P2 1)'))
+			expect(drawn).toContain(heading_in(theme, 'waiting 1 (P2 1)'))
+			expect(drawn.split('\n', 1)[0]).not.toContain('(P')
+		},
+	)
+
+	it('draws a heading with no priority row as its count alone, never (🔺 0)', () => {
+		const layout = queued([row(NORMAL)])
+		const text = lines_of(header({ layout })).join('\n')
+
+		expect(text).toContain('⏳ queued 1 ─')
+		expect(text).not.toContain('(🔺')
+	})
+})
+
+describe('run_board_render.render — a folded heading’s priorities', () => {
+	it('keeps the priorities after the count on a folded heading', () => {
+		const layout = { ...queued([row(HIGH, 'high')]), unreached: [row(CRITICAL, 'critical')] }
+		const folded = new Set(['queued', 'waiting'] as const)
+		const text = run_board_render
+			.render({ header: header({ layout }), notes: [], folded })
+			.map((line) => stripVTControlCharacters(line))
+			.join('\n')
+
+		expect(text).toContain('▸ ⏳ queued ── 1 (🔺 1) ──')
+		expect(text).toContain('▸ 🔗 waiting ── 1 (🚨 1) ──')
 	})
 })

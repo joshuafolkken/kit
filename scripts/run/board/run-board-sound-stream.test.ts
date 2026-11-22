@@ -16,7 +16,10 @@ const PIPE_OPTIONS = { detached: true, stdio: ['pipe', 'ignore', 'ignore'], wind
 function audio_file(pcm = PCM): string {
 	const file = path.join(create_directory('sound-stream-'), 'loop.wav')
 
-	writeFileSync(file, Buffer.concat([Buffer.alloc(run_board_sound_wav.HEADER_BYTES), pcm]))
+	const { HEADER_BYTES, SAMPLE_RATE, wav_of } = run_board_sound_wav
+	const header = wav_of(new Int16Array(0), SAMPLE_RATE).subarray(0, HEADER_BYTES)
+
+	writeFileSync(file, Buffer.concat([header, pcm]))
 
 	return file
 }
@@ -144,10 +147,14 @@ describe('run_board_sound_stream fallback', () => {
 		const spawner = vi.fn().mockReturnValueOnce(first.child).mockReturnValueOnce(second.child)
 		const started = vi.fn()
 
-		run_board_sound_player.loop(audio_file(), { started, failed: vi.fn() }, 'linux', {
-			...first.ports,
-			spawner,
-		})
+		run_board_sound_player.loop(
+			audio_file(),
+			{ started, failed: vi.fn() },
+			{
+				platform: 'linux',
+				ports: { ...first.ports, spawner },
+			},
+		)
 		first.events.dispatchEvent(new Event('error'))
 		await setImmediate()
 

@@ -145,7 +145,7 @@ function background_lines(origin: string, measurements: string): ReadonlyArray<s
 		issue_body_keys.line('purpose', 'improvement'),
 		issue_body_keys.line('judgement', 'not_needed'),
 		issue_body_keys.line('priority', 'normal'),
-		`${issue_body_keys.prefix('size')} 約 <N> ファイル / <M> 行（テスト除く）`,
+		`${issue_body_keys.prefix('size')} 約 <N> ファイル / <M> 行（テスト含む）`,
 		`${issue_body_keys.prefix('source')} ${measurements} の計測（\`measured:unmet\`）`,
 		'',
 		`${origin} で足した機構は、後続計測 ${measurements} で期待効果に届かなかった。効かない機構は利用者の実行時間・読む量・保守の負担を増やすので、撤去するか、効く範囲に縮小する。`,

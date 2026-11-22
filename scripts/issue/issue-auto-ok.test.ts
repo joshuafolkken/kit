@@ -192,3 +192,16 @@ describe('issue_auto_ok.decision_problem', () => {
 		expect(issue_auto_ok.decision_problem(body)).toBeUndefined()
 	})
 })
+
+describe('issue_auto_ok.judgement_reason', () => {
+	it('reads the reason a needed declaration gives', () => {
+		expect(issue_auto_ok.judgement_reason(NEEDED_BODY)).toBe('（外部アカウント）')
+	})
+
+	it.each([NOT_NEEDED_BODY, UNDECLARED_BODY, BOTH_BODY])(
+		'is undefined unless judgement is needed: %s',
+		(body) => {
+			expect(issue_auto_ok.judgement_reason(body)).toBeUndefined()
+		},
+	)
+})

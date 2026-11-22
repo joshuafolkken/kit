@@ -101,12 +101,10 @@ describe('test_related_red.record_red', () => {
 
 		await test_related_red.record_red(red_run())
 
-		expect(review_stamps.test_related_red_stamp.write).toHaveBeenCalledWith(
-			BEFORE.files,
-			undefined,
-			BASE,
-			{ [OWED_SOURCE]: 'no-base', [FAILED_TEST]: 'failed' },
-		)
+		expect(review_stamps.test_related_red_stamp.write).toHaveBeenCalledWith(BEFORE.files, {
+			base: BASE,
+			blobs: { [OWED_SOURCE]: 'no-base', [FAILED_TEST]: 'failed' },
+		})
 	})
 })
 
@@ -122,12 +120,10 @@ describe('test_related_red.record_red — passed files', () => {
 		await test_related_red.record_red(red_run())
 
 		expect(test_related_reuse.blobs).toHaveBeenCalledWith(directory, [PASSED_TEST])
-		expect(review_stamps.test_related_red_stamp.write).toHaveBeenCalledWith(
-			BEFORE.files,
-			undefined,
-			BASE,
-			{ [PASSED_TEST]: PASSED_DIGEST, [OWED_SOURCE]: 'no-base', [FAILED_TEST]: 'failed' },
-		)
+		expect(review_stamps.test_related_red_stamp.write).toHaveBeenCalledWith(BEFORE.files, {
+			base: BASE,
+			blobs: { [PASSED_TEST]: PASSED_DIGEST, [OWED_SOURCE]: 'no-base', [FAILED_TEST]: 'failed' },
+		})
 	})
 })
 
@@ -191,8 +187,7 @@ describe('test_related_red.read_red', () => {
 		expect(since_green.read_moved_parts).toHaveBeenCalledWith(
 			review_stamps.test_related_red_stamp,
 			gate_labels.UNIT_LABEL,
-			undefined,
-			BEFORE,
+			{ tree: BEFORE },
 		)
 	})
 

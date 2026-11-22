@@ -4,6 +4,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { main_merge } from '#scripts/git/main-merge'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
+import { lane_registered_branch } from './lane-registered-branch'
 import { lane_resolve_hunks } from './lane-resolve-hunks'
 
 // `josh lane:resolve <issue>` — the merge-conflict path of `backlogrun-recovery.md` as one verdict
@@ -17,7 +18,6 @@ const OVERLAP_CONDITION = 2
 const REPEAT_CONDITION = 3
 const HEAD = 'HEAD'
 const MERGE_HEAD = 'MERGE_HEAD'
-const LANE_BRANCH_SUFFIX = '-lane'
 
 type ResolveOutcome =
 	| { kind: 'resolved' }
@@ -30,11 +30,19 @@ function is_resolution(comment: IssueComment): boolean {
 	return comment.is_trusted === true && comment.body.trimStart().startsWith(RESOLUTION_HEADING)
 }
 
-async function resolution_count(issue: string): Promise<number | undefined> {
+// The Issue's resolution comments, oldest first, or `undefined` when its comments cannot be read —
+// the step-back's count and the post-conflict review trigger (joshuafolkken/kit#8494) read the same list.
+async function resolutions(issue: string): Promise<ReadonlyArray<IssueComment> | undefined> {
 	const json = await git_gh_issue_read.issue_list_comments(issue)
 	const comments = await issue_read.parse_comments(json)
 
-	return comments?.filter((comment) => is_resolution(comment)).length
+	return comments?.filter((comment) => is_resolution(comment))
+}
+
+async function resolution_count(issue: string): Promise<number | undefined> {
+	const found = await resolutions(issue)
+
+	return found?.length
 }
 
 async function side_diff(base: string, side: string, file: string): Promise<string> {
@@ -81,7 +89,7 @@ async function judge_merge(): Promise<ResolveOutcome> {
 // another checkout is refused rather than judged against one issue and merged into another.
 async function wrong_branch(issue: string): Promise<ResolveOutcome | undefined> {
 	const branch = await git_command.branch()
-	const expected = `${issue}${LANE_BRANCH_SUFFIX}`
+	const expected = await lane_registered_branch.read(issue)
 
 	if (branch === expected) return undefined
 
@@ -116,7 +124,7 @@ function verdict_line(outcome: Exclude<ResolveOutcome, { kind: 'refused' }>): st
 	return [...words, ...outcome.files].join(' ')
 }
 
-const lane_resolve = { RESOLUTION_HEADING, LANE_BRANCH_SUFFIX, resolve, verdict_line, wrong_branch }
+const lane_resolve = { RESOLUTION_HEADING, resolutions, resolve, verdict_line, wrong_branch }
 
 export { lane_resolve }
 export type { ResolveOutcome }

@@ -47,7 +47,7 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 	return [...BACKGROUND, ...declarations, '', SECTIONS].join('\n')
 }
 
-const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
+const JUDGEMENT_NEEDED = '- 人の判断: 要（方針の判断）'
 const VALID_BODY = body_of(JUDGEMENT_NEEDED)
 
 const work = temporary_directory('suite')('issue-file-cli-')

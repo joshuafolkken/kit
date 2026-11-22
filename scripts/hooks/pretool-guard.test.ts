@@ -373,7 +373,7 @@ describe('pretool_guard.emit — the pipefail rewrite beside other guards', () =
 		const rewrite = rule_rewrite.rewrite(raw_payload)
 		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 
-		pretool_guard.emit(raw_payload, outcome(SHELL_BODY_REASON, undefined, undefined), rewrite)
+		pretool_guard.emit(raw_payload, outcome(SHELL_BODY_REASON, undefined, undefined), { rewrite })
 		const envelope = write.mock.calls.map((call) => String(call[0])).join('')
 
 		write.mockRestore()

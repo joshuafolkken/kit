@@ -112,12 +112,6 @@ describe('run_board_display.assemble_display', () => {
 		expect(after.cue).toBe('launch')
 		expect(after.header.notice?.cause.issue).toBe(RUNNING)
 	})
-
-	it('pins the baseline total the next frame carries to the plan’s first count', () => {
-		const display = assembled(planned(), [running_row()], START)
-
-		expect(display.carried.baseline_total).toBe(1)
-	})
 })
 
 describe('run_board_tick_draw.draw_display', () => {

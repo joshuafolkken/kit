@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import type { LaneInfo } from '#scripts/lane/lane-registry'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_body_keys } from './issue-body-keys'
@@ -10,6 +11,7 @@ import { issue_premise_unmet_cli } from './issue-premise-unmet-cli'
 // is read back.
 
 const mocks = vi.hoisted(() => ({
+	find_open_lane: vi.fn<(issue: string) => Promise<LaneInfo | undefined>>(),
 	issue_get_body: vi.fn<(issue_number: string) => Promise<string | undefined>>(),
 	issue_comment: vi.fn<(issue_number: string, body: string) => Promise<string>>(),
 	issue_close:
@@ -40,7 +42,10 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({ git_gh_pr_read: { pr_exists: mocks.pr_exists } }))
 
 vi.mock('#scripts/lane/lane-registry', () => ({
-	lane_registry: { lane_root_directory: async (): Promise<string> => '/lanes' },
+	lane_registry: {
+		lane_root_directory: async (): Promise<string> => '/lanes',
+		find_open_lane: mocks.find_open_lane,
+	},
 }))
 
 vi.mock('#scripts/epic/epic-close', () => ({
@@ -48,6 +53,7 @@ vi.mock('#scripts/epic/epic-close', () => ({
 }))
 
 const ISSUE = '7249'
+const BASE = 'origin/main'
 const FLAG = '--evidence-file'
 const make_directory = temporary_directory('suite')
 const work = make_directory('issue-premise-unmet-cli-')
@@ -69,6 +75,16 @@ function record(name: string): void {
 
 // Every read answers the admitted case: a declared body, a clean lane branch and no pull request.
 function reset_reads(): void {
+	mocks.find_open_lane.mockReset().mockResolvedValue({
+		issue: ISSUE,
+		directory: `/lanes/${ISSUE}`,
+		branch: `${ISSUE}-lane`,
+		seat: undefined,
+		development_port: undefined,
+		preview_port: undefined,
+		output: undefined,
+		is_stranded: false,
+	})
 	mocks.issue_get_body.mockReset().mockResolvedValue(DECLARED_BODY)
 	mocks.commit_count_beyond.mockReset().mockResolvedValue(0)
 	mocks.status.mockReset().mockResolvedValue('')
@@ -135,6 +151,27 @@ const REFUSALS = [
 ]
 
 describe('issue_premise_unmet_cli.run — refused with nothing written', () => {
+	it('checks the registered slug branch before closing (ac-8429)', async () => {
+		const branch = `${ISSUE}-legacy-implementation`
+
+		mocks.find_open_lane.mockResolvedValue({
+			issue: ISSUE,
+			branch,
+			directory: `/lanes/${ISSUE}`,
+			seat: undefined,
+			development_port: undefined,
+			preview_port: undefined,
+			output: undefined,
+			is_stranded: false,
+		})
+		mocks.pr_exists.mockResolvedValue(true)
+
+		expect(await issue_premise_unmet_cli.run([ISSUE, FLAG, EVIDENCE_FILE])).toBe(1)
+		expect(mocks.commit_count_beyond).toHaveBeenCalledWith(BASE, branch)
+		expect(mocks.pr_exists).toHaveBeenCalledWith(branch)
+		expect(calls).toStrictEqual([])
+	})
+
 	it.each(REFUSALS)('refuses $name', async ({ arrange }) => {
 		arrange()
 
@@ -175,7 +212,7 @@ describe('issue_premise_unmet_cli.run — admitted', () => {
 		expect(calls).toStrictEqual(['comment', 'close', 'release'])
 		expect(mocks.issue_close).toHaveBeenCalledWith(ISSUE, undefined, 'not_planned')
 		expect(mocks.release).toHaveBeenCalledWith(['--release', ISSUE])
-		expect(mocks.commit_count_beyond).toHaveBeenCalledWith('origin/main', `${ISSUE}-lane`)
+		expect(mocks.commit_count_beyond).toHaveBeenCalledWith(BASE, `${ISSUE}-lane`)
 		expect(mocks.status).toHaveBeenCalledWith(path.join('/lanes', ISSUE))
 		expect(mocks.close_completed_epics).toHaveBeenCalledWith({
 			issue_number: ISSUE,

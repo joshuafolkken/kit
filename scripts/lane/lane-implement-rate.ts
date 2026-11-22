@@ -4,7 +4,7 @@ import { lane_size_stats } from './lane-size-stats'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
-// How long implementation takes per 100 actual non-test lines, over the period's merged lanes: the
+// How long implementation takes per 100 actual lines, tests included, over the period's merged lanes: the
 // `implement` interval joined by issue to the size measured before the merge. The divisor is the
 // actual count, not the declared one — a declaration's growth is `split_assess`'s own factor, never
 // applied twice (joshuafolkken/kit#6021).

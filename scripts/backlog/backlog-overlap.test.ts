@@ -20,8 +20,7 @@ const THIRD = 3303
 const RUNNING = 3304
 const SHARED = 'scripts/run/ship/run-ship.ts'
 const IDLE: BusyRead = { kind: 'idle' }
-// The directory the glob `scripts/lines/**` names.
-const LINES_DIRECTORY = 'scripts/lines/'
+const LINES_GLOB = 'scripts/lines/**'
 const RUN_DIRECTORY = 'scripts/run/'
 
 // The paths joshuafolkken/kit#3582 and joshuafolkken/kit#3586 declared, abridged.
@@ -81,12 +80,15 @@ describe('backlog_overlap.declared_paths', () => {
 		)
 	})
 
-	it('reads a directory glob as the directory it names', () => {
+	it('keeps a glob as the pattern it writes, never as a file', () => {
 		const body = '`scripts/lines/**`, `tools/metrics/*.ts` and `.github/workflows/`'
+		const declared = backlog_overlap.declared_paths(body)
 
-		expect(backlog_overlap.declared_paths(body)).toStrictEqual(
-			new Set([LINES_DIRECTORY, 'tools/metrics/', '.github/workflows/']),
+		expect(declared).toStrictEqual(
+			new Set([LINES_GLOB, 'tools/metrics/*.ts', '.github/workflows/']),
 		)
+		expect([...declared].filter((path) => backlog_overlap.is_file_claim(path))).toStrictEqual([])
+		expect(backlog_overlap.is_file_claim(SHARED)).toBe(true)
 	})
 
 	it('drops a directory one segment deep and an issue reference', () => {
@@ -151,6 +153,36 @@ describe('backlog_overlap — a document under docs/', () => {
 		const declared = new Map([[RUNNING, new Set([rule])]])
 
 		expect(backlog_overlap.path_clash(new Set([rule]), declared, [RUNNING])?.path).toBe(rule)
+	})
+})
+
+// joshuafolkken/kit#8495: the untracked scratch directory never reaches a lane's change.
+describe('backlog_overlap — the scratch directory', () => {
+	const SCRATCH = '- 一時検査は `.josh/tmp/scratch/` に置く'
+
+	it('holds no candidate back on the scratch directory a running lane declares', () => {
+		const selection = separate(
+			[
+				[FIRST, SCRATCH],
+				[RUNNING, SCRATCH],
+			],
+			busy(RUNNING),
+		)
+
+		expect(numbers(selection.offered)).toContain(FIRST)
+	})
+
+	it('still holds a candidate back on a code file both declare beside it', () => {
+		const body = `${SCRATCH} と \`${SHARED}\``
+		const selection = separate(
+			[
+				[FIRST, body],
+				[RUNNING, body],
+			],
+			busy(RUNNING),
+		)
+
+		expect(numbers(selection.withheld)).toStrictEqual([FIRST])
 	})
 })
 
@@ -272,7 +304,7 @@ describe('backlog_overlap.running_clash', () => {
 	it('answers the path a candidate declares inside what a running issue declares', () => {
 		expect(backlog_overlap.running_clash(child(FIRST), DECLARED, HOLDING)).toStrictEqual({
 			path: 'scripts/lines/effective-limit.ts',
-			claimed: LINES_DIRECTORY,
+			claimed: LINES_GLOB,
 			holder: RUNNING,
 		})
 	})
@@ -288,5 +320,25 @@ describe('backlog_overlap.running_clash', () => {
 		const elsewhere = { ...child(FIRST), repo: 'joshuafolkken/other' }
 
 		expect(backlog_overlap.running_clash(elsewhere, DECLARED, HOLDING)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8571: the overlap pairs the ranking counts as dependents.
+describe('backlog_overlap.overlap_neighbors', () => {
+	const NEIGHBORS = backlog_overlap.overlap_neighbors([
+		{ key: 'lint', paths: backlog_overlap.declared_paths(LINT_BODY) },
+		{ key: 'limits', paths: backlog_overlap.declared_paths(LIMITS_BODY) },
+		{ key: 'run', paths: backlog_overlap.declared_paths(RUN_BODY) },
+		{ key: 'none', paths: new Set() },
+	])
+
+	it('answers an overlapping pair on both sides', () => {
+		expect([...(NEIGHBORS.get('lint') ?? [])]).toStrictEqual(['limits'])
+		expect([...(NEIGHBORS.get('limits') ?? [])]).toStrictEqual(['lint'])
+	})
+
+	it('answers none for a candidate on its own paths or with nothing declared', () => {
+		expect(NEIGHBORS.get('run')?.size).toBe(0)
+		expect(NEIGHBORS.get('none')?.size).toBe(0)
 	})
 })

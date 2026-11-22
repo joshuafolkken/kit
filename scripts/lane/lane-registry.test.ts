@@ -96,6 +96,22 @@ it('keeps a stopped tree and its saved seat while returning the reservation', as
 	expect(lane_registry.used_seats(lanes)).toEqual([])
 })
 
+it('recognizes an adopted PR branch only in its issue directory', () => {
+	const adopted_branch = '1490-legacy-feature'
+	const block = lane_block('1490').replace('1490-lane', () => adopted_branch)
+
+	expect(lane_registry.parse_block(block, LANE_ROOT)?.branch).toBe(adopted_branch)
+	expect(
+		lane_registry.parse_block(
+			block.replace(`${LANE_ROOT}/1490`, () => MAIN_TREE),
+			LANE_ROOT,
+		),
+	).toBeUndefined()
+	expect(
+		lane_registry.parse_block(block.replace(adopted_branch, '1491-legacy-feature'), LANE_ROOT),
+	).toBeUndefined()
+})
+
 describe('reading the open lanes', () => {
 	it('reports the lane work trees and ignores the main one', async () => {
 		open_on_disk('1490', '6')

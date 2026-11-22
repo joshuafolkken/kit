@@ -97,7 +97,8 @@ describe('run_board_render.render an earlier run’s lane row', () => {
 
 // joshuafolkken/kit#7098: 🧳 follows the title, where the phase's icon was hidden behind it.
 describe('run_board_earlier.earlier_marked', () => {
-	const FINISH = '🎯 ~09:30'
+	// joshuafolkken/kit#8478: the finish draws no `~`.
+	const FINISH = '🎯 09:30'
 
 	it.each([
 		[

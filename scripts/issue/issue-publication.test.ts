@@ -124,6 +124,15 @@ it('recovers an interrupted publish without recreating or republishing completed
 	expect_published()
 })
 
+// joshuafolkken/kit#8542: a lane's ship publishes only its own children, never an unplanned sibling.
+it('validates and publishes only the selected children of the epic', async () => {
+	rows.set(FIRST, { ...read(FIRST), labels: [PLANNED] })
+	await issue_publication.publish(EPIC, REPO, (row) => row.number === FIRST)
+	expect(issue_publication_state.is_pending(read(FIRST).body)).toBe(false)
+	expect(issue_publication_state.is_pending(read(LAST).body)).toBe(true)
+	expect(write).toHaveBeenCalledOnce()
+})
+
 it('skips already published children on a duplicate publication', async () => {
 	ready()
 	await issue_publication.publish(EPIC, REPO)

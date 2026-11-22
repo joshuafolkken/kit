@@ -1,21 +1,44 @@
 import type { KeyReading } from './run-board-keys'
+import { run_board_labels, type Paint } from './run-board-labels'
+import type { Random } from './run-board-rain'
 import { run_board_reveal_blocks, type Beat } from './run-board-reveal-blocks'
+import { run_board_reveal_rain } from './run-board-reveal-rain'
 import type { BoardPorts, Pace } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
-import { run_board_theme_defs, type IntroDefinition } from './run-board-theme-defs'
+import { run_board_theme_defs, type IntroDefinition, type IntroLeads } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
 // The line a live board in a theme types before its first frame, a letter at a time with a block cursor after
 // the last letter typed, then holds without the cursor — the first frame's read runs meanwhile, and the
-// frame is drawn over the line once both are done. A key skips the rest; the key is spent on the skip,
-// not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last written.
+// frame is drawn over the line once both are done. A theme with lead lines types and erases each first,
+// then shows its line at once (joshuafolkken/kit#8441). A key skips the rest; the key is spent on the
+// skip, not on a fold. Each beat rewrites the whole line, so the screen always matches the beat last
+// written.
 
 const { LINE_MS: REVEAL_LINE_MS, beats_of } = run_board_reveal_blocks
 const LINE_START = '\r'
 const ERASE_LINE_END = '\u{1B}[K'
 
-type IntroPorts = Pick<BoardPorts, 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound'>
+// The rain's random source, and whether stdout draws its colors; a test pins both.
+interface RainSource {
+	random: Random
+	is_colored: () => boolean
+}
+
+type IntroPorts = Pick<
+	BoardPorts,
+	'icons' | 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound'
+> & {
+	rain?: RainSource
+}
 type Reveal = (frame: string) => Promise<void>
+
+// joshuafolkken/kit#8519: the themes whose first frame is revealed behind the code rain.
+const RAIN_THEMES: ReadonlySet<Theme> = new Set<Theme>(['matrix'])
+const LIVE_RAIN: RainSource = {
+	random: Math.random,
+	is_colored: run_board_reveal_rain.is_colored,
+}
 
 // The theme's line typed a letter at a time (joshuafolkken/kit#8349: the line and its pauses are the
 // theme's row).
@@ -26,31 +49,32 @@ function letter_beats({ line, letter_ms }: IntroDefinition): ReadonlyArray<Beat>
 	}))
 }
 
-// Each beat written, then its pause raced against the skip; a skip writes no further beat, and the
-// beats left unwritten are handed back.
+// Each beat taken and written, then its pause raced against the skip; a skip takes no further beat,
+// so the beats left unwritten stay in `beats` — made one at a time, a skip makes no more.
 async function beat_through(
-	beats: ReadonlyArray<Beat>,
+	beats: Iterator<Beat>,
 	ports: IntroPorts & { intro_sleep: (ms: number) => Promise<void> },
 	skip: { pressed: Promise<undefined>; is_pressed: () => boolean },
-): Promise<ReadonlyArray<Beat>> {
-	const [beat, ...rest] = beats
-	if (beat === undefined || skip.is_pressed()) return beats
+): Promise<void> {
+	if (skip.is_pressed()) return
+	const beat = beats.next()
+	if (beat.done === true) return
 
-	ports.write(beat.text)
-	await Promise.race([ports.intro_sleep(beat.ms), skip.pressed])
-
-	return await beat_through(rest, ports, skip)
+	ports.write(beat.value.text)
+	await Promise.race([ports.intro_sleep(beat.value.ms), skip.pressed])
+	await beat_through(beats, ports, skip)
 }
 
-// Beats played only where the ports carry their pauses, the beats left unwritten handed back; the key
-// listened for goes back to folding once they end.
+// Beats played only where the ports carry their pauses, the beats left unwritten left in `beats`; the
+// key listened for goes back to folding once they end. Whether all of them played, no key skipping
+// them.
 async function listen(
-	beats: ReadonlyArray<Beat>,
+	beats: Iterator<Beat>,
 	ports: IntroPorts,
 	keys: KeyReading,
-): Promise<ReadonlyArray<Beat>> {
+): Promise<boolean> {
 	const { intro_sleep } = ports
-	if (intro_sleep === undefined) return beats
+	if (intro_sleep === undefined) return false
 
 	const held: { is_pressed: boolean; release: (() => void) | undefined } = {
 		is_pressed: false,
@@ -65,36 +89,115 @@ async function listen(
 	const skip = { pressed, is_pressed: (): boolean => held.is_pressed }
 
 	try {
-		return await beat_through(beats, { ...ports, intro_sleep }, skip)
+		await beat_through(beats, { ...ports, intro_sleep }, skip)
 	} finally {
 		held.release?.()
 	}
+
+	return !held.is_pressed
 }
 
-// The letters typed with the trill sounding (joshuafolkken/kit#8250), which stops however they end —
-// typed through or skipped by a key. Where the ports carry no pauses nothing types, so no trill starts.
+// Letters typed with the trill sounding (joshuafolkken/kit#8250), which stops however they end — typed
+// through or skipped by a key, and whether they typed through. Where the ports carry no pauses nothing
+// types, so no trill starts.
 async function letters(
+	beats: ReadonlyArray<Beat>,
 	ports: IntroPorts,
 	keys: KeyReading,
-	intro: IntroDefinition,
-): Promise<ReadonlyArray<Beat>> {
+): Promise<boolean> {
 	const trill = ports.intro_sleep === undefined ? undefined : ports.typing_sound
 
 	trill?.set(true)
 
 	try {
-		return await listen(letter_beats(intro), ports, keys)
+		return await listen(beats.values(), ports, keys)
 	} finally {
 		trill?.set(false)
 	}
 }
 
-// The theme's letters, then its hold, silent, unless a key skipped the letters.
-async function play(ports: IntroPorts, keys: KeyReading, theme: Theme): Promise<void> {
-	const { intro } = run_board_theme_defs.THEME_DEFS[theme]
-	const rest = await letters(ports, keys, intro)
+// The line rewritten as `text` in `paint`; no text erases it.
+function shown(paint: Paint | undefined, text: string): string {
+	return `${LINE_START}${run_board_labels.painted(paint, text)}${ERASE_LINE_END}`
+}
 
-	if (rest.length === 0) await listen([{ text: '', ms: intro.hold_ms }], ports, keys)
+// The lead lines' pace and look: the theme's letter pause and its leads.
+interface LeadPace {
+	letter_ms: number
+	leads: IntroLeads
+}
+
+// joshuafolkken/kit#8441: a lead line typed a letter at a time with the cursor after every letter, as
+// the approved demo draws it.
+function lead_letters(line: string, { letter_ms, leads }: LeadPace): Array<Beat> {
+	return Array.from(line, (_letter, index) => ({
+		text: shown(leads.paint, `${line.slice(0, index + 1)}${run_board_typing.CURSOR}`),
+		ms: letter_ms,
+	}))
+}
+
+// A typed lead line held with the cursor, then erased and followed by its gap.
+function lead_rest(leads: IntroLeads): Array<Beat> {
+	return [
+		{ text: '', ms: leads.hold_ms },
+		{ text: shown(undefined, ''), ms: leads.gap_ms },
+	]
+}
+
+// The lead lines in turn, each one's letters with the trill sounding (joshuafolkken/kit#8365) and its
+// hold and gap silent; whether all of them played, no key ending them.
+async function leads_played(
+	lines: ReadonlyArray<string>,
+	ports: IntroPorts,
+	keys: KeyReading,
+	pace: LeadPace,
+): Promise<boolean> {
+	const [lead, ...rest] = lines
+	if (lead === undefined) return true
+
+	if (
+		!(await letters(lead_letters(lead, pace), ports, keys)) ||
+		!(await listen(lead_rest(pace.leads).values(), ports, keys))
+	) {
+		return false
+	}
+
+	return await leads_played(rest, ports, keys, pace)
+}
+
+// The lead lines, then the theme's line shown at once and held; a key ends the whole of it. Where
+// stdout draws no color nothing plays.
+async function lead_in(
+	ports: IntroPorts,
+	keys: KeyReading,
+	intro: IntroDefinition,
+	leads: IntroLeads,
+): Promise<void> {
+	const line = shown(leads.paint, intro.line)
+
+	if (line === shown(undefined, intro.line)) return
+	const is_played = await leads_played(leads.lines, ports, keys, {
+		letter_ms: intro.letter_ms,
+		leads,
+	})
+
+	if (is_played) await listen([{ text: line, ms: intro.hold_ms }].values(), ports, keys)
+}
+
+// The theme's letters, then its hold, silent, unless a key skipped the letters.
+async function type_in(ports: IntroPorts, keys: KeyReading, intro: IntroDefinition): Promise<void> {
+	const is_typed = await letters(letter_beats(intro), ports, keys)
+
+	if (is_typed) await listen([{ text: '', ms: intro.hold_ms }].values(), ports, keys)
+}
+
+// The theme's lead lines where it has them (joshuafolkken/kit#8441), else its typed line.
+async function play(ports: IntroPorts, keys: KeyReading, theme: Theme): Promise<void> {
+	const { intro }: { intro: IntroDefinition } = run_board_theme_defs.THEME_DEFS[theme]
+
+	await (intro.leads === undefined
+		? type_in(ports, keys, intro)
+		: lead_in(ports, keys, intro, intro.leads))
 }
 
 // A line's beats, each line after the first led by the line break before it.
@@ -117,11 +220,38 @@ async function reveal(
 	theme: Theme,
 ): Promise<void> {
 	const write = ports.write_drawn ?? ports.write
-	const lines = run_board_theme.marked(theme, frame).split('\n')
-	const beats = lines.flatMap((line, index) => line_beats(line, index))
-	const rest = await listen(beats, { ...ports, write }, keys)
+	const lines = run_board_theme.marked(theme, frame, ports.icons).split('\n')
+	const beats = lines.flatMap((line, index) => line_beats(line, index)).values()
+
+	await listen(beats, { ...ports, write }, keys)
+	const rest = [...beats]
 
 	if (rest.length > 0) write(rest.map((beat) => beat.text).join(''))
+}
+
+// joshuafolkken/kit#8519: the first frame, as the theme draws it, revealed behind one pass of the code
+// rain (`run-board-reveal-rain.ts`), then written whole as every later frame is drawn — at once where a
+// key skips the rain, where the ports carry no pauses, or where stdout draws no color.
+async function rain(
+	frame: string,
+	ports: IntroPorts,
+	keys: KeyReading,
+	theme: Theme,
+): Promise<void> {
+	const write = ports.write_drawn ?? ports.write
+	const drawn = run_board_theme.restyle(theme, frame, ports.icons)
+	const { random, is_colored } = ports.rain ?? LIVE_RAIN
+
+	if (is_colored()) {
+		await listen(run_board_reveal_rain.beats_of(drawn, random), { ...ports, write }, keys)
+	}
+
+	write(drawn)
+}
+
+// The theme's own reveal: behind the rain, or a block at a time.
+function revealer(theme: Theme): typeof reveal {
+	return RAIN_THEMES.has(theme) ? rain : reveal
 }
 
 // The first read starts at once, but returns or throws only once the intro is over, so a failed read
@@ -144,9 +274,9 @@ function after<Read>(
 	}
 }
 
-// A board in a theme types its line, its first read held behind it, and reveals its first frame a block at
-// a time; one in none plays nothing, reads at once and draws the frame whole. Called once the screen is
-// entered, since the line starts typing here.
+// A board in a theme types its line, its first read held behind it, and reveals its first frame as the
+// theme does; one in none plays nothing, reads at once and draws the frame whole. Called once the screen
+// is entered, since the line starts typing here.
 function opening<Read>(
 	gather: (pace: Pace) => Promise<Read>,
 	ports: IntroPorts,
@@ -158,7 +288,7 @@ function opening<Read>(
 	return {
 		gather: after(gather, play(ports, keys, theme)),
 		reveal: async (frame) => {
-			await reveal(frame, ports, keys, theme)
+			await revealer(theme)(frame, ports, keys, theme)
 		},
 	}
 }
@@ -166,10 +296,14 @@ function opening<Read>(
 const run_board_intro = {
 	ERASE_LINE_END,
 	LINE_START,
+	LIVE_RAIN,
+	RAIN_THEMES,
 	REVEAL_LINE_MS,
 	after,
+	listen,
 	opening,
 	play,
+	rain,
 	reveal,
 }
 

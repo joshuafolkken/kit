@@ -71,7 +71,7 @@ function refusals_of(
 	const problems = [
 		issue_lint_cli.summary_problem(filing.body),
 		...issue_lint_cli.problems(filing.body, issue_file.labels_of(filing.args, filing.body)),
-		size_estimate.guide_problem(filing.body, filing.args.route, rate, growth),
+		size_estimate.guide_problem(filing.body, filing.args.route, { rate, growth }),
 		issue_sample_required.problem(filing.body),
 		issue_auto_ok.declaration_problem(filing.body),
 		issue_auto_ok.opt_out_problem(auto_ok_filing(filing)),
@@ -239,10 +239,9 @@ async function is_admitted(filing: Filing): Promise<boolean> {
 // The start condition's citation read against GitHub.
 async function is_source_clear(filing: Filing): Promise<boolean> {
 	const is_here = issue_file.is_same_repository(filing.target, filing.current)
-	const problem = await issue_sample_source.problem(
-		filing.body,
-		is_here ? undefined : filing.target,
-	)
+	const problem = await issue_sample_source.problem(filing.body, {
+		repo: is_here ? undefined : filing.target,
+	})
 
 	if (problem === undefined) return true
 	console.error(`✖ ${problem}`)

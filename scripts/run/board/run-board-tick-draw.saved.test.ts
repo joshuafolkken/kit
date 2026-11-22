@@ -10,14 +10,13 @@ import { run_board_tick } from './run-board-tick'
 const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const SECOND = 1000
-const HEADER_LINES = 3
 
 function fetched_at(fetched_ms: number): BoardState {
 	return { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms, fetched_ms }
 }
 
-// The header's lines a redraw writes over a plan read at `fetched_ms` on a board opened at `opened_ms`.
-function header_over(fetched_ms: number, opened_ms: number | undefined): string {
+// The frame a redraw writes over a plan read at `fetched_ms` on a board opened at `opened_ms`.
+function frame_over(fetched_ms: number, opened_ms: number | undefined): string {
 	const { ports, frames } = harness(LOCAL, [])
 	const state = fetched_at(fetched_ms)
 
@@ -28,19 +27,64 @@ function header_over(fetched_ms: number, opened_ms: number | undefined): string 
 		layout_for(state, LOCAL, START),
 	)
 
-	return stripVTControlCharacters(frames.join('')).split('\n').slice(0, HEADER_LINES).join('\n')
+	return stripVTControlCharacters(frames.join(''))
 }
 
+// joshuafolkken/kit#8512: the age ends the queued rule, not the header's first line.
 describe('run_board_tick_draw.draw_display saved plan', () => {
-	it('says 🕘 over a plan read before the board opened', () => {
-		expect(header_over(START - SECOND, START)).toContain('🕘')
+	it('says 🕘 at the queued rule’s end over a plan read before the board opened', () => {
+		const frame = frame_over(START - SECOND, START)
+
+		expect(frame).toMatch(/^.*queued.*─ 🕘 \S+$/mu)
+		expect(frame.split('\n', 1)[0]).not.toContain('🕘')
 	})
 
 	it('says no 🕘 over a plan read after the board opened', () => {
-		expect(header_over(START, START - SECOND)).not.toContain('🕘')
+		expect(frame_over(START, START - SECOND)).not.toContain('🕘')
 	})
 
 	it('says no 🕘 where the board has no opening moment', () => {
-		expect(header_over(START - SECOND, undefined)).not.toContain('🕘')
+		expect(frame_over(START - SECOND, undefined)).not.toContain('🕘')
+	})
+})
+
+// joshuafolkken/kit#8457: where the board types rows, the frame the live plan lands on types every line
+// the saved plan's frame drew faint over its saved text at once.
+describe('run_board_tick_draw.draw_display saved plan typed over', () => {
+	const OPENED = START + SECOND
+	const LANDED = START + 2 * SECOND
+
+	// The typing a board opened at `OPENED` holds after a frame over the saved plan, then one over a plan
+	// read after it opened, its rows typing where `types_rows` says.
+	function landed(types_rows: boolean): BoardState['typing'] {
+		const { ports } = harness(LOCAL, [])
+		const typed_ports = { ...ports, opened_ms: OPENED, types_rows, theme: 'wargames' as const }
+		const saved = fetched_at(START)
+		const base = drawn_from(
+			saved,
+			LOCAL,
+			{ ports: typed_ports, now_ms: OPENED },
+			layout_for(saved, LOCAL, OPENED),
+		)
+		const live = { ...base, fetched_ms: LANDED }
+
+		return drawn_from(
+			live,
+			LOCAL,
+			{ ports: typed_ports, now_ms: LANDED },
+			layout_for(live, LOCAL, LANDED),
+		).typing
+	}
+
+	it('types the progress line over its saved text from the frame the live plan lands on', () => {
+		const lines = landed(true).lines.filter((line) => line.under !== undefined)
+
+		expect(lines.map((line) => [line.key.split(':', 1)[0], line.start_ms])).toStrictEqual([
+			['plan', LANDED],
+		])
+	})
+
+	it('types nothing where the board types no rows', () => {
+		expect(landed(false).lines).toStrictEqual([])
 	})
 })

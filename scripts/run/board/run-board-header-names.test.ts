@@ -6,6 +6,7 @@ const KIT_URL = 'https://github.com/joshuafolkken/kit'
 const RELEASES_URL = `${KIT_URL}/releases`
 const VERSION = 'v1.3153.0+12'
 const REPO = 'joshuafolkken/kit'
+const RUN_NAME = 'fullrun #7'
 
 // Links drawn as Markdown, so a test reads what each cell links to.
 function markdown_link(text: string, url: string): string {
@@ -31,7 +32,19 @@ describe('run_board_header_names.names_of', () => {
 	})
 
 	it('keeps a single run’s own name in the board’s place', () => {
-		expect(names({ run_name: 'fullrun #7' })[0]).toBe('▶ fullrun #7')
+		expect(names({ run_name: RUN_NAME })[0]).toBe(`▶ ${RUN_NAME}`)
+	})
+
+	// joshuafolkken/kit#8604: a themed screen names the board after its theme.
+	it.each([
+		['wargames', 'josh-wopr'],
+		['matrix', 'josh-trace'],
+	] as const)('names the board %s draws %s', (theme, name) => {
+		expect(names({ theme })[0]).toBe(`▶ [${name}](${KIT_URL})`)
+	})
+
+	it('keeps a single run’s own name in a themed screen too', () => {
+		expect(names({ theme: 'wargames', run_name: RUN_NAME })[0]).toBe(`▶ ${RUN_NAME}`)
 	})
 
 	it('draws the recorded kit version, linked to the releases, under the name', () => {

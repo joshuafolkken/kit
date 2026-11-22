@@ -15,4 +15,11 @@ describe('run_board_spot', () => {
 	it('takes one column, as a spinner frame does', () => {
 		expect(run_board_fit.width_of(SPOT)).toBe(run_board_fit.width_of('⠋'))
 	})
+
+	it('restores the TRACE initial without changing the fitted width', () => {
+		const marked = `${run_board_spot.TRACE}RACE ■■■■■`
+
+		expect(drawn(marked, '')).toBe('TRACE ■■■■■')
+		expect(run_board_fit.width_of(marked)).toBe(run_board_fit.width_of(drawn(marked, '')))
+	})
 })

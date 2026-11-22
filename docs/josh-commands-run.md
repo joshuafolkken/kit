@@ -134,9 +134,9 @@ pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"           
 A split found mid-run in one call: the run set aside as `run:pause` sets it aside (stash, comment,
 release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
 already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
-that epic audited with `epic:audit`. Each `--chain` and `--order-reason` goes to `epic` (creation or
-`--add`) as given; under `--after <issue>` no chain is declared, so the `--ordered` reason is read but not
-passed. The last line is `epic #<E>`. An epic listing that cannot tell
+that epic audited with `epic:audit`. `--after <issue>` writes `<issue> -> <children…>`, the chain
+`--ordered` declares, so its `--order-reason` goes with it. Same-file children get no order:
+`backlog:next` keeps overlapping paths apart. The last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
 `needs-decision`. Without `--title` and with no tracking epic, or with a `--chain` `epic` refuses
 (`--chain` beside `--ordered`, a malformed line, a number outside `<issue>` and the children, a cycle
@@ -145,7 +145,7 @@ failed step keeps the hold. A rerun whose tracking epic already lists every chil
 again and goes on to the audit.
 
 `--prerequisite <P>` is `run:pause <issue> --for <P>` with the placement: the relation's own
-`epic --add --before` places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
+`epic --add`'s insertion, called in process with `--before <issue>` (no `--order-reason` read), places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
 <issue> --ordered` (its `--order-reason` cites `<P>`) is created and the relation recorded inside it. The audit, the
 `needs-decision` park and the `--title` refusal are as above.
 
@@ -256,10 +256,10 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 
 - An open epic becomes an unlabelled root of any run, recorded once.
 - Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`; an issue already labelled `priority:critical` or `priority:high` keeps that label alone, still ahead of the queue. Named runs also record additions beside their unchanged invocation.
-- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
+- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
-- `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
-- A reviewed PR may start a repair attempt through `--retry` after a trusted comment newer than its review stop, an open PR, and confirmed worker/ship exit. The retry boundary is recorded once and the previous cut is ended before a replacement worker starts. Merges, withdrawals, splits, protected labels, and active or unreadable owners remain refused.
+- `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed, stalled or withdrawn issues are refused.
+- A reviewed PR may start a repair attempt through `--retry` after a trusted comment newer than its review stop, an open PR, and confirmed worker/ship exit. The retry boundary is recorded once and the previous cut is ended before a replacement worker starts. Merges, splits, protected labels, and active or unreadable owners remain refused.
 - Only such a repair clears `needs-human-merge`, so the next offer dispatches it; its ship re-parks the PR while the diff still needs a person's merge.
 - A live `backlog:drive` runs `--retry` itself on the `run:stalled` causes it can re-offer, 2 times per issue ([labels and run states](./labels-and-run-states.md)); any other cause, or one at that cap, waits for this command.
 
@@ -788,21 +788,21 @@ It runs `git -y`, `followup` and `run:tail` in order, under one header per step.
 
 The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run, forwarded to `run:tail` after the closed issue.
 
-A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate. A pass is reused on an unchanged tree, base, title and body.
+A `preflight` stage first asks every pull-request precondition, so a stop lands before review and gate. A pass is reused on an unchanged tree, base, title and body, except `prepared-children`, which publishes the lane's children; one unplanned refuses.
 
-A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …`. A `--review` ship still runs its `test:pinned` there; the supervised preflight and gate still run.
+A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …`. A `--review` ship still runs `test:pinned` there; the supervised preflight and gate run.
 
 Over a green gate, a clean main move is not merged before the push (`… not merged again; …`): PR CI on the merge ref catches a combined break. A conflicting or unreadable one is merged and gated.
 
-A followup red after a main move is merged, gated and pushed in the followup, printing `followup: the default branch moved …`; only a red there stops.
+A followup red after a main move is merged, gated and pushed there, printing `followup: the default branch moved …`; only a red there stops.
 
-One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
+One precondition is `unplanned`: a branch-diff code file the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**`; a branch with no or a yielded plan record passes.
 
-In scope, run the `lane:plan` command the stop prints (every path) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
+In scope, run the `lane:plan` command the stop prints (every path) and comment the reason on the Issue — on `yield` another lane holds the file: follow its printed instruction; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
 
-`check:related`, `run:review --join` and a lane child's `review:record` print the same notice ahead of the ship, so a file a fix added is planned first.
+`check:related`, `run:review --join` and a lane child's `review:record` print the same notice ahead of the ship, so a file a fix adds is planned first.
 
-A re-run resumes: a per-issue stage record, honored only where git state corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
+A re-run resumes: a per-issue stage record, honored only where git state agrees, skips finished stages; each stage is logged as a `ship-stage` trace event.
 
 A lane child always ships with `--review`, after its in-implement round 1. The `review` stage reuses a round 1 attested on this branch whose tree held, or moved only where round 2 reads, and ends `skipped` (`done` when an owed interaction review then runs); any other round 1 is reviewed again. A gate stage that reuses a green record ends `skipped` too.
 

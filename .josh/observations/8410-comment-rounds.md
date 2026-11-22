@@ -1,0 +1,2 @@
+- rf:none | none | - | 2026-11-20 | #8410
+- rf:comments | low | scripts/gh/git-gh-issue-list.ts:64 | 2026-11-20 | #8410 | - | stale-comment

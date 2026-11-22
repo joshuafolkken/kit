@@ -113,7 +113,7 @@ function record_round_one(
 
 		const blobs = review_round_one_blobs.capture(Object.keys(tree))
 
-		review_stamps.round_one_stamp.write(tree, target, base, blobs)
+		review_stamps.round_one_stamp.write(tree, { target, base, blobs })
 
 		return true
 	} catch {
@@ -187,7 +187,7 @@ function record_briefed(tree: Record<string, string>, base?: string): void {
 	try {
 		const blobs = review_round_one_blobs.capture(Object.keys(tree))
 
-		review_stamps.briefed_stamp.write(tree, undefined, base, blobs)
+		review_stamps.briefed_stamp.write(tree, { base, blobs })
 	} catch {
 		/* no record widens the resume rather than narrowing it */
 	}

@@ -12,7 +12,12 @@ function body_with(...lines: ReadonlyArray<string>): string {
 }
 
 function estimate(files: number, lines: number): string {
-	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト除く）`
+	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト含む）`
+}
+
+// joshuafolkken/kit#8589: the declared lines are the non-test lines plus the test lines.
+function estimate_with_tests(files: number, lines: { code: number; tests: number }): string {
+	return estimate(files, lines.code + lines.tests)
 }
 
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
@@ -74,6 +79,18 @@ describe('size_estimate.guide_problem', () => {
 		expect(size_estimate.guide_problem(UNDER_GUIDE, undefined)).toBeUndefined()
 	})
 
+	it('refuses an estimate with few non-test lines and many test lines', () => {
+		const body = body_with(estimate_with_tests(3, { code: 40, tests: 130 }))
+
+		expect(size_estimate.guide_problem(body, undefined)).toContain('3 file(s) / 170 line(s)')
+	})
+
+	it('reads an estimate filed before tests counted by its declared counts', () => {
+		const body = body_with('- 規模見積もり: 約 3 ファイル / 120 行（テスト除く）')
+
+		expect(size_estimate.declared_size(body)).toMatchObject({ files: 3, lines: 120 })
+	})
+
 	it('refuses an estimate over the guide on both axes', () => {
 		const problem = size_estimate.guide_problem(body_with(estimate(6, 150)), undefined)
 
@@ -107,23 +124,23 @@ describe('size_estimate measured growth', () => {
 		const body = body_with(estimate(6, 150))
 
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1, lines: 1 } }),
 		).toBeUndefined()
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1.5, lines: 1 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1.5, lines: 1 } }),
 		).toBeDefined()
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1.5 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1, lines: 1.5 } }),
 		).toBeDefined()
 	})
 
 	it('falls back only on the missing axis', () => {
 		const body = body_with(estimate(5, 101))
 
-		expect(size_estimate.over_guide(body, undefined, undefined, { files: 1 })).toBeDefined()
-		expect(size_estimate.over_guide(body, undefined, undefined, { lines: 1 })).toBeDefined()
+		expect(size_estimate.over_guide(body, undefined, { growth: { files: 1 } })).toBeDefined()
+		expect(size_estimate.over_guide(body, undefined, { growth: { lines: 1 } })).toBeDefined()
 		expect(
-			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1 }),
+			size_estimate.over_guide(body, undefined, { growth: { files: 1, lines: 1 } }),
 		).toBeUndefined()
 	})
 
@@ -133,9 +150,9 @@ describe('size_estimate measured growth', () => {
 		const files = body_with(estimate(9, 100))
 		const lines = body_with(estimate(8, 101))
 
-		expect(size_estimate.over_cap(within, undefined, undefined, growth)).toBeUndefined()
-		expect(size_estimate.over_cap(files, undefined, undefined, growth)).toBeDefined()
-		expect(size_estimate.over_cap(lines, undefined, undefined, growth)).toBeDefined()
+		expect(size_estimate.over_cap(within, undefined, { growth })).toBeUndefined()
+		expect(size_estimate.over_cap(files, undefined, { growth })).toBeDefined()
+		expect(size_estimate.over_cap(lines, undefined, { growth })).toBeDefined()
 	})
 })
 

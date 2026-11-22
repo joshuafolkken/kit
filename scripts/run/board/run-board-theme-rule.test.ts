@@ -11,10 +11,14 @@ const ESCAPE = '\u{1B}'
 const DEFAULT_FOREGROUND = `${ESCAPE}[39m`
 const RGB_PHOSPHOR = `${ESCAPE}[38;2;62;236;225m`
 const RGB_MATRIX = `${ESCAPE}[38;2;0;215;60m`
+const RGB_MID = `${ESCAPE}[38;2;0;165;40m`
+const RGB_DARK = `${ESCAPE}[38;2;0;100;22m`
+const MATRIX_DASH = `${RGB_DARK}-${RGB_MID}`
 const RGB_DIM = `${ESCAPE}[38;2;31;118;113m`
 // A dim dash as the theme draws it: the dim, then the phosphor cyan resumed after it.
 const DIM_DASH = `${RGB_DIM}-${RGB_PHOSPHOR}`
 const SHORT_RULE = '── LANES ──'
+const ICON_RULE = '── 📈 throughput ──'
 const DIM_RULE = `${ESCAPE}[2m──${ESCAPE}[22m`
 const DIM_HEADING = `${DIM_RULE} LANES ${DIM_RULE}`
 const BOLD = `${ESCAPE}[1m`
@@ -63,25 +67,75 @@ describe('run_board_theme.restyle the section rules', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const dashes = DIM_DASH.repeat(2)
 
-		expect(wargames('── 📈 throughput ──')).toBe(
-			in_phosphor(`${dashes} ${dashes} THROUGHPUT ${dashes}`),
-		)
+		expect(wargames(ICON_RULE)).toBe(in_phosphor(`${dashes} ${dashes} THROUGHPUT ${dashes}`))
 	})
 })
 
 describe('run_board_theme.restyle the section rules, left as they were', () => {
+	it('keeps wargames dim rules and cyan headings without true color', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		const dashes = `${DIM}-${INTENSITY_END}`.repeat(2)
+
+		expect(wargames(SHORT_RULE)).toBe(`${ESCAPE}[36m${dashes} LANES ${dashes}${DEFAULT_FOREGROUND}`)
+	})
+
 	it('draws plain dashes where stdout draws no color', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(wargames(SHORT_RULE)).toBe('-- LANES --')
 	})
 
-	it('leaves the matrix rules in its green body', () => {
+	it('draws matrix rules dark, section names and column titles mid, and body text in its body green', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const dashes = MATRIX_DASH.repeat(2)
+
+		expect(run_board_theme.restyle('matrix', '── LANES ── CPU ──\nBODY')).toBe(
+			`${RGB_MID}${dashes} LANES ${dashes} CPU ${dashes}${DEFAULT_FOREGROUND}\n${RGB_MATRIX}BODY${DEFAULT_FOREGROUND}`,
+		)
+	})
+})
+
+describe('run_board_theme matrix rule boundaries', () => {
+	it.each(['▾ 📈 throughput ──', '▸ 📈 throughput ──', ICON_RULE])(
+		'draws section icons and rules dark in %s',
+		(line) => {
+			vi.stubEnv('FORCE_COLOR', '3')
+			const drawn = run_board_theme.restyle('matrix', line)
+
+			expect(drawn).toContain(MATRIX_DASH.repeat(2))
+			// joshuafolkken/kit#8609: the heading as written.
+			expect(drawn).toContain(`${RGB_MID} throughput `)
+		},
+	)
+
+	it('draws idle glyphs in the matrix mid green on body rows', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(run_board_theme.restyle('matrix', SHORT_RULE)).toBe(
-			`${RGB_MATRIX}-- LANES --${DEFAULT_FOREGROUND}`,
+		expect(run_board_theme.restyle('matrix', '⏳ WAIT')).toBe(
+			`${RGB_MATRIX}${RGB_MID}..${RGB_MATRIX} WAIT${DEFAULT_FOREGROUND}`,
 		)
+	})
+
+	it('keeps renderer colors on rule dashes and text and body gauges', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const red = styleText('red', '── RED ──')
+		const gauge = styleText('cyan', '■──')
+
+		expect(run_board_theme.restyle('matrix', red)).toBe(
+			`${RGB_MID}${red.replaceAll('─', '-').split(DEFAULT_FOREGROUND).join(RGB_MID)}${DEFAULT_FOREGROUND}`,
+		)
+		expect(run_board_theme.restyle('matrix', gauge)).toBe(
+			`${RGB_MATRIX}${gauge.replaceAll('─', '-').split(DEFAULT_FOREGROUND).join(RGB_MATRIX)}${DEFAULT_FOREGROUND}`,
+		)
+	})
+
+	it('falls back to named green for matrix dashes, labels and idle glyphs', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		const drawn = run_board_theme.restyle('matrix', '── LANES ──\n⏳ WAIT')
+
+		expect(drawn).toContain(`${ESCAPE}[32m-${ESCAPE}[32m`)
+		expect(drawn).toContain(`${ESCAPE}[32m..${ESCAPE}[32m`)
+		expect(drawn).not.toContain('[38;2;')
 	})
 })
 
@@ -121,6 +175,30 @@ describe('run_board_theme default section rules', () => {
 		expect(run_board_theme.restyle(undefined, styleText('dim', SHORT_RULE))).toBe(
 			`${DIM}${DIM_RULE}${DIM} LANES ${DIM_RULE}${DIM}${INTENSITY_END}`,
 		)
+	})
+})
+
+// joshuafolkken/kit#8591: a heading's link keeps its escapes whole — the dimmed dashes and the drawn
+// glyphs reach the heading's text only, never the `-` inside a link's id or URL.
+const LINK_URL = 'https://github.com/joshuafolkken/kit/issues?q=is%3Aissue+is%3Aopen'
+const LINK_OPEN = `${ESCAPE}]8;id=josh-run-board;${LINK_URL}\u{7}`
+const LINK_CLOSE = `${ESCAPE}]8;;\u{7}`
+const DCS = `${ESCAPE}P`
+const DOUBLED_ESCAPE = ESCAPE.repeat(2)
+const TMUX_LINK_OPEN = `${DCS}tmux;${DOUBLED_ESCAPE}]8;id=josh-run-board;${LINK_URL}\u{7}${ESCAPE}\\`
+
+describe('run_board_theme.restyle a heading carrying a link', () => {
+	it.each([
+		['wargames', LINK_OPEN],
+		['matrix', LINK_OPEN],
+		['wargames', TMUX_LINK_OPEN],
+		['matrix', TMUX_LINK_OPEN],
+	] as const)('keeps the %s heading link escape %j whole', (theme, open) => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const drawn = run_board_theme.restyle(theme, `── LANES ── IS ${open}51${LINK_CLOSE} ──`)
+
+		expect(drawn.split(open)).toHaveLength(2)
+		expect(drawn).toContain(`${open}51${LINK_CLOSE}`)
 	})
 })
 

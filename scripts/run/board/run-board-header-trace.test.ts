@@ -4,6 +4,7 @@ import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8354: the matrix theme's `TRACE` gauge — one more cell filled per level nearer 1,
@@ -18,11 +19,17 @@ const RED = `${ESCAPE}38;2;255;69;58m`
 const NAMED_GREEN = `${ESCAPE}32m`
 const HALTED = 1
 const CALM = 5
+const CALM_TRACE = 'TRACE ■----'
+const HALTED_TRACE = 'TRACE ■■■■■'
 
-function header_line(extra: Partial<BoardHeader>): string {
-	const board = header({ layout: EMPTY_LAYOUT, lane_limit: 3, theme: 'matrix', ...extra })
+function matrix_board(extra: Partial<BoardHeader>): BoardHeader {
+	return header({ layout: EMPTY_LAYOUT, lane_limit: 3, theme: 'matrix', ...extra })
+}
 
-	return stripVTControlCharacters(run_board_header.header_lines(board)[0] ?? '')
+function alert_of(extra: Partial<BoardHeader>): string {
+	const part = run_board_header.alert_part(matrix_board(extra)) ?? ''
+
+	return stripVTControlCharacters(run_board_spot.drawn(part, ''))
 }
 
 afterEach(() => {
@@ -32,15 +39,15 @@ afterEach(() => {
 
 describe('run_board_header_trace.field_of', () => {
 	it.each([
-		[5, 'TRACE ■----'],
+		[5, CALM_TRACE],
 		[4, 'TRACE ■■---'],
 		[3, 'TRACE ■■■--'],
 		[2, 'TRACE ■■■■-'],
-		[1, 'TRACE ■■■■■'],
+		[1, HALTED_TRACE],
 	])('fills the cells for level %i', (level, text) => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
-		expect(field_of(level)).toBe(text)
+		expect(run_board_spot.drawn(field_of(level), '')).toBe(text)
 	})
 
 	it('draws the filled cells bright and the rest dark in 24-bit color', () => {
@@ -57,10 +64,14 @@ describe('run_board_header_trace.field_of', () => {
 		expect(field_of(CALM)).toContain(`${NAMED_GREEN}■`)
 	})
 
-	it('blinks the whole field in the failure red at level 1', () => {
+	it('draws the static worst field red without terminal blink or markers', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(field_of(HALTED)).toBe(`${BLINK}${RED}TRACE ■■■■■${ESCAPE}39m${ESCAPE}25m`)
+		const field = run_board_spot.drawn(field_of(HALTED), '')
+
+		expect(field).toBe(`${RED}TRACE ■■■■■${ESCAPE}39m`)
+		expect(field).not.toContain(BLINK)
+		expect(field).not.toContain(run_board_spot.TRACE)
 	})
 })
 
@@ -80,17 +91,19 @@ describe('run_board_header_trace.SHADES', () => {
 	})
 })
 
-describe('run_board_header.header_lines with the matrix theme', () => {
-	it('ends the screen header first line on TRACE at the level DEFCON reads', () => {
+// joshuafolkken/kit#8513: the alert rides the throughput rule; the header's first line draws none.
+describe('run_board_header.alert_part with the matrix theme', () => {
+	it('draws TRACE on the screen at the level DEFCON reads', () => {
 		const alert = vi.spyOn(THEME_DEFS.matrix, 'alert')
 		const held = { read_failed_ms: NOW }
 
-		expect(header_line({})).toMatch(/ {2}TRACE ■----$/u)
-		expect(header_line(held)).toMatch(/ {2}TRACE ■■■■■$/u)
+		expect(alert_of({})).toBe(CALM_TRACE)
+		expect(alert_of(held)).toBe(HALTED_TRACE)
 		expect(alert.mock.calls).toStrictEqual([
 			[run_board_header_defcon.level_of(header({ layout: EMPTY_LAYOUT, lane_limit: 3 }))],
 			[HALTED],
 		])
-		expect(header_line({ form: 'chat' })).not.toContain('TRACE')
+		expect(alert_of({ form: 'chat' })).toBe('')
+		expect(run_board_header.header_lines(matrix_board(held))[0]).not.toContain('TRACE')
 	})
 })

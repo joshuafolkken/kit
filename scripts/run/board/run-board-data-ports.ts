@@ -2,6 +2,7 @@ import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { git_gh_transport } from '#scripts/gh/git-gh-transport'
 import { run_board_closed } from './run-board-closed'
 import { run_board_issue_count } from './run-board-issue-count'
+import { run_board_pinned_graphql } from './run-board-pinned-graphql'
 import { run_board_plan_shared } from './run-board-plan-shared'
 import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_snapshot } from './run-board-snapshot'
@@ -29,6 +30,7 @@ function live(): Required<DataPorts> {
 		read_thanks: async () => await run_board_thanks_read.read_thanks(),
 		read_rate_limit: read_rate_limit_with_transport,
 		read_issue_count: async (repo) => await run_board_issue_count.read_issue_count(repo),
+		read_pinned: async (repo) => await run_board_pinned_graphql.read_pinned(repo),
 	}
 }
 

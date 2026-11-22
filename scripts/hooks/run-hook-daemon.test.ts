@@ -88,7 +88,10 @@ function read_log(name: string): string {
 	return existsSync(path_in(name)) ? readFileSync(path_in(name), 'utf8') : ''
 }
 
-async function launch(launcher = LAUNCHER, extra: NodeJS.ProcessEnv = {}): Promise<LaunchResult> {
+async function launch({
+	launcher = LAUNCHER,
+	extra = {},
+}: { launcher?: string; extra?: NodeJS.ProcessEnv } = {}): Promise<LaunchResult> {
 	const child = spawn('sh', [launcher, 'pretool-guard'], {
 		cwd: workspace.root,
 		env: { ...workspace.environment, ...extra },
@@ -119,7 +122,7 @@ function launched_call(): unknown {
 
 // A launch with no daemon starts one; the stub records the directory it was asked to serve.
 async function daemon_directory(launcher = LAUNCHER): Promise<string> {
-	await launch(launcher)
+	await launch({ launcher })
 
 	return await vi.waitFor(() => {
 		const directory = DETACH_PATTERN.exec(read_log(DAEMON_LOG))?.groups?.['directory']
@@ -219,8 +222,8 @@ describe(
 
 			serve_from(await daemon_directory(), answer)
 			rmSync(path_in(NODE_LOG), { force: true })
-			await launch(LAUNCHER, { [CALLER_VARIABLE]: CALLERS[0] })
-			const second = await launch(LAUNCHER, { [CALLER_VARIABLE]: CALLERS[1] })
+			await launch({ extra: { [CALLER_VARIABLE]: CALLERS[0] } })
+			const second = await launch({ extra: { [CALLER_VARIABLE]: CALLERS[1] } })
 
 			expect(second.node_launches).toBe(0)
 			expect(answer.mock.calls.map(([call]) => call.environment[CALLER_VARIABLE])).toStrictEqual(
@@ -304,14 +307,14 @@ describe(
 
 			serve_from(await daemon_directory(INSTALLED_LAUNCHER), answer)
 			rmSync(path_in(NODE_LOG), { force: true })
-			const result = await launch(INSTALLED_LAUNCHER)
+			const result = await launch({ launcher: INSTALLED_LAUNCHER })
 
 			expect(result).toStrictEqual({ status: 0, stdout: '', node_launches: 0 })
 			expect(answer).toHaveBeenCalledWith(launched_call())
 		})
 
 		it('runs the bundle itself and starts a daemon under the project cache when there is none', async () => {
-			const result = await launch(INSTALLED_LAUNCHER)
+			const result = await launch({ launcher: INSTALLED_LAUNCHER })
 
 			expect(result.stdout).toBe(BUNDLE_OUTPUT)
 			await expect(daemon_directory(INSTALLED_LAUNCHER)).resolves.toContain(
@@ -325,7 +328,7 @@ describe(
 
 			execFileSync('mkfifo', [path.join(directory, 'requests')])
 
-			const { stdout } = await launch(INSTALLED_LAUNCHER)
+			const { stdout } = await launch({ launcher: INSTALLED_LAUNCHER })
 
 			expect(stdout).toBe(BUNDLE_OUTPUT)
 			await expect(stopped).resolves.toBe('SIGTERM')

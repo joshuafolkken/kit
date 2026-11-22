@@ -18,7 +18,7 @@ const ISSUES: Array<OpenIssueData> = [
 		title: 'lane',
 		createdAt: PLANNED_AT,
 		labels: [],
-		body: `## 背景\n\n- 規模見積もり: 約 ${String(DECLARED_FILES)} ファイル / 25 行（テスト除く）\n`,
+		body: `## 背景\n\n- 規模見積もり: 約 ${String(DECLARED_FILES)} ファイル / 25 行（テスト含む）\n`,
 	},
 ]
 const QUIET: PlanSignals = {

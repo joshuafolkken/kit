@@ -14,6 +14,12 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // request, publish its prepared filing, or take it into a run.
 type BlockerNeed = 'decide' | 'merge' | 'publish' | 'take'
 
+// A review stop's lane (joshuafolkken/kit#8527): when it stopped, and its directory.
+interface ReviewStop {
+	stopped_ms: number
+	directory: string
+}
+
 // A blocker the run's withheld children stop at, followed through their blockers as the plan was
 // read — the issue a person acts on, with the children it holds.
 interface DecisionBlocker {
@@ -31,6 +37,9 @@ interface BoardPlan extends PauseRead, RetryClock {
 	decision_blockers?: ReadonlyArray<DecisionBlocker> | undefined
 	is_backlog_live?: boolean | undefined
 	human_merge_prs?: ReadonlyMap<number, number> | undefined
+	// Each stopped lane of the repository, by issue, from its lane state record
+	// (`run-board-review-stop.ts`).
+	review_stops?: ReadonlyMap<number, ReviewStop> | undefined
 	// The same snapshot's worker identities that the header counts as occupied seats.
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	waves: WavePlan
@@ -115,13 +124,16 @@ interface BoardLayout {
 }
 
 // What an active row is named and classified by — each issue's title and labels.
-interface RowRead extends PauseRead {
+interface RowRead extends PauseRead, Pick<BoardPlan, 'now_ms' | 'review_stops'> {
 	decision_questions?: ReadonlyMap<number, string> | undefined
 	is_backlog_live?: boolean | undefined
 	titles: ReadonlyMap<number, string>
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
 	// Each planned child's standing blockers, which a touched stalled row waits on in place of its retry.
 	waits?: ReadonlyMap<number, ReadonlyArray<string>> | undefined
+	// What holds a planned child the plan row's reading names (`ReasonOf`), which a touched ⏳ row with
+	// no blocker draws in place of its free-lane retry (joshuafolkken/kit#8497).
+	held_of?: ((number: number) => RowReason | undefined) | undefined
 }
 
 interface Overlay {
@@ -138,6 +150,7 @@ export type {
 	Overlay,
 	QueuedEntry,
 	ReasonOf,
+	ReviewStop,
 	RowRead,
 	RowReason,
 }

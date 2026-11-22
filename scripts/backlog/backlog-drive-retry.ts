@@ -84,7 +84,7 @@ async function retry_all(
 
 async function after_merge(cause: number): Promise<void> {
 	const events = await run_event_stream_emit.current_events(true)
-	const parked = backlog_drive_restore.parked_issues(events)
+	const parked = backlog_drive_restore.retryable_parks(events)
 
 	if (parked.size === 0) return
 	const repo = await git_gh_command.repo_get_name_with_owner()

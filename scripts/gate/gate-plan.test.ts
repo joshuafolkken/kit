@@ -247,7 +247,7 @@ describe('gate_plan.check_weight — the cores a check reserves from the budget'
 	// unchanged. If this sum ever moved past the core count a solo gate would start waiting on itself.
 	// joshuafolkken/kit#7776: a ledger weight is a tenth of a core, so the sum is the core count in whole cores.
 	it('sums a solo gate to exactly the core count, in whole cores', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+		const plan = gate_plan.resolve_gate_plan({ available_cores: MEASURED_CORES })
 		const total = plan.checks.reduce(
 			(sum, check) => sum + gate_plan.check_weight(check, plan, MEASURED_CORES),
 			0,
@@ -260,7 +260,7 @@ describe('gate_plan.check_weight — the cores a check reserves from the budget'
 	// The unit suite's weight is the pool it will open, which `unit_worker_cap` has already sized — not a
 	// second number kept beside the measured table.
 	it('weighs the unit suite at its worker cap', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+		const plan = gate_plan.resolve_gate_plan({ available_cores: MEASURED_CORES })
 
 		expect(gate_plan.check_weight(unit_check(), plan, MEASURED_CORES)).toBe(plan.unit_worker_cap)
 	})
@@ -269,7 +269,7 @@ describe('gate_plan.check_weight — the cores a check reserves from the budget'
 	// — the cores left once the static checks have theirs — and the solo sum still lands on the core
 	// count.
 	it('weighs an uncapped unit suite at the cores left for it', () => {
-		const plan = gate_plan.resolve_gate_plan(MID_SIZED_CORES)
+		const plan = gate_plan.resolve_gate_plan({ available_cores: MID_SIZED_CORES })
 
 		expect(gate_plan.check_weight(unit_check(), plan, MID_SIZED_CORES)).toBe(
 			MID_SIZED_CORES - gate_plan.RESERVED_CORES,
@@ -278,7 +278,7 @@ describe('gate_plan.check_weight — the cores a check reserves from the budget'
 })
 
 function static_memory(label: string): number | undefined {
-	const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+	const plan = gate_plan.resolve_gate_plan({ available_cores: MEASURED_CORES })
 	const check = plan.checks.find((entry) => entry.label === label)
 
 	return check === undefined ? undefined : gate_plan.check_memory(check, plan, MEASURED_CORES)
@@ -287,7 +287,7 @@ function static_memory(label: string): number | undefined {
 // joshuafolkken/kit#3371: a check declares the memory its tool holds beside its cores.
 describe('gate_plan.check_memory — the memory a check holds', () => {
 	it('holds one worker of memory per core the unit suite reserves', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+		const plan = gate_plan.resolve_gate_plan({ available_cores: MEASURED_CORES })
 		const weight = gate_plan.check_weight(unit_check(), plan, MEASURED_CORES)
 
 		expect(gate_plan.check_memory(unit_check(), plan, MEASURED_CORES)).toBe(
@@ -308,7 +308,7 @@ describe('gate_plan.check_memory — the memory a check holds', () => {
 // until the ledger emptied and every later claim from other lanes queued behind it.
 describe('gate_plan.direct_unit_weight — the cores a direct unit run reserves', () => {
 	it('weighs a lone run on the measured machine as the gate weighs its workers, plus vitest itself', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+		const plan = gate_plan.resolve_gate_plan({ available_cores: MEASURED_CORES })
 
 		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0, 0)).toBe(
 			gate_plan.check_weight(unit_check(), plan, MEASURED_CORES) +
@@ -358,7 +358,7 @@ describe('gate_plan.direct_unit_weight — dividing by the live lanes', () => {
 
 describe('gate_plan.format_gate_plan', () => {
 	it('names the width, the cap and the core count', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
+		const plan = gate_plan.resolve_gate_plan({ available_cores: MEASURED_CORES })
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
 			'plan: 6 of 6 checks at once, test:unit at 6 workers (11 cores)',
@@ -368,7 +368,7 @@ describe('gate_plan.format_gate_plan', () => {
 	// An uncapped run has to say so rather than print nothing where the number goes: "unrestricted"
 	// is a decision the plan made, and a blank would read as one it failed to make.
 	it('says so when the unit suite is left uncapped', () => {
-		const plan = gate_plan.resolve_gate_plan(CI_CORES)
+		const plan = gate_plan.resolve_gate_plan({ available_cores: CI_CORES })
 
 		expect(gate_plan.format_gate_plan(plan, CI_CORES)).toContain('test:unit unrestricted')
 	})
@@ -381,7 +381,10 @@ describe('gate_plan.format_gate_plan', () => {
 	// three checks that take no worker count are narrowed by, and the worker count behind it is the
 	// unit suite's share, so a shared gate says on one line how it was cut down and why.
 	it('says how many runs the machine is being shared with', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
+		const plan = gate_plan.resolve_gate_plan({
+			available_cores: MEASURED_CORES,
+			concurrent_runs: LANE_COUNT,
+		})
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
 			'plan: 4 of 6 checks at once, test:unit at 1 workers (11 cores, 6 unit runs or lanes)',

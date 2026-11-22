@@ -49,6 +49,17 @@ it('retries a parked native dependent through the existing command (ac-846abec4)
 	)
 })
 
+// joshuafolkken/kit#8599: `run:add --retry` re-admits a withdrawn issue, so a merge does not retry one.
+it('leaves a parked dependent a person withdrew for that person', async () => {
+	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([
+		{ pos: 1, kind: 'park', text: `#${String(PARKED)} stopped`, at: SINCE },
+		{ pos: 2, kind: 'withdraw', text: `#${String(PARKED)} withdrawn by a person`, at: LATER },
+	])
+	await backlog_drive_retry.after_merge(CAUSE)
+
+	expect(josh_command.josh_run).not.toHaveBeenCalled()
+})
+
 it.each(['OPEN', 'UNKNOWN'])(
 	'protects another unresolved blocker: %s (ac-505a5dfa)',
 	async (state) => {

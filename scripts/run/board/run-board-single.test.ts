@@ -50,6 +50,38 @@ function arrange_lane(
 
 afterEach(() => vi.restoreAllMocks())
 
+// joshuafolkken/kit#8482: the hold's transcript is where the board reads the single run's operations.
+describe('run_board_single — the single run’s transcript', () => {
+	const TRANSCRIPT = '/sessions/single.jsonl'
+
+	it('carries the hold’s transcript on the run’s span', () => {
+		const span = run_board_single.span_of(held({ is_fullrun: true, owner_transcript: TRANSCRIPT }))
+
+		expect(span?.transcript).toBe(TRANSCRIPT)
+	})
+
+	it('reads a running single run’s operations from its transcript, under its issue', () => {
+		const span = {
+			invocation: `fullrun #${String(ISSUE)}`,
+			started_ms: TAKEN_MS,
+			ended_ms: undefined,
+		}
+
+		expect(run_board_single.sources_of({ ...span, transcript: TRANSCRIPT })).toStrictEqual([
+			{ issue: String(ISSUE), log: TRANSCRIPT, root: process.cwd() },
+		])
+		expect(run_board_single.sources_of(span)).toStrictEqual([])
+	})
+
+	it('reads none for a stopped single run or any other run', () => {
+		const span = { invocation: 'backlogrun', started_ms: TAKEN_MS, ended_ms: undefined }
+		const stopped = { ...span, invocation: FULLRUN_12, ended_ms: TAKEN_MS, transcript: TRANSCRIPT }
+
+		expect(run_board_single.sources_of({ ...span, transcript: TRANSCRIPT })).toStrictEqual([])
+		expect(run_board_single.sources_of(stopped)).toStrictEqual([])
+	})
+})
+
 // joshuafolkken/kit#7525: the runs a merge released are read back for the run's ✅ done.
 describe('run_board_single.ended_in', () => {
 	const ENDED_AT = '2026-10-08T09:30:00.000Z'

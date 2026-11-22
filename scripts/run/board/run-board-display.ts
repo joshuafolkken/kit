@@ -3,7 +3,7 @@ import { run_board_activity, type RunActivity } from './run-board-activity'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_cue_decision } from './run-board-cue-decision'
 import { run_board_github } from './run-board-github'
-import { run_board_header, type BoardHeader } from './run-board-header'
+import type { BoardHeader } from './run-board-header'
 import { run_board_layout, type BoardLayout } from './run-board-layout'
 import type { BoardLinks } from './run-board-link'
 import { run_board_notes, type BoardNote, type Titles } from './run-board-notes'
@@ -27,8 +27,8 @@ type PortField = 'form' | 'spinner' | 'is_keyed' | 'theme' | 'is_sound_on' | key
 
 type DisplayHeader = Omit<BoardHeader, PortField> & { layout: BoardLayout }
 
-// What a frame carries to the next: the baseline the plan's first total set and the sound it decided.
-type Carried = Pick<BoardState, 'baseline_total' | 'sound_snapshot' | 'sound_pending' | 'notice'>
+// What a frame carries to the next: the sound it decided.
+type Carried = Pick<BoardState, 'sound_snapshot' | 'sound_pending' | 'notice'>
 
 interface BoardDisplay
 	extends Pick<BoardState, 'thanks'>, Pick<LocalRead, 'resume' | 'throughput'> {
@@ -83,6 +83,7 @@ type LocalHeader = Pick<
 	| 'lane_totals'
 	| 'lane_limit'
 	| 'occupied_count'
+	| 'lane_capacity'
 	| 'found'
 	| 'scheduler_provider'
 	| 'is_investigation_on'
@@ -100,6 +101,7 @@ function local_header(local: LocalRead): LocalHeader {
 		lane_totals: local.lane_totals,
 		lane_limit: local.lane_limit,
 		occupied_count: local.occupied_count,
+		lane_capacity: local.lane_capacity,
 		found: local.found,
 		scheduler_provider: local.scheduler_provider,
 		is_investigation_on: lane_investigation_switch.is_on(),
@@ -148,34 +150,15 @@ function header_of(
 		...local_header(local),
 		seats: seats_of(state, local),
 		layout,
-		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
 		plan_failed_ms: state.failed_ms,
+		plan_error: state.plan_error,
 		read_failed_ms: state.read_failed_ms,
 		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,
 		...gauges_of(state, local),
 		repo: state.plan?.context.repo,
 	}
-}
-
-// The first total the plan gives is the baseline every later arrival is counted against; the run's own
-// children before it are no total. The header counts the root checkout's single runs on top of it.
-function baselines_of(
-	state: BoardState,
-	run_layout: BoardLayout,
-	layout: BoardLayout,
-): { settled: BoardState; baseline_total: number | undefined } {
-	const first_total =
-		state.plan === undefined ? undefined : run_board_header.counts_of(run_layout).total
-	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
-	const baseline_total = run_board_root_layout.baseline_of(
-		settled.baseline_total,
-		run_layout,
-		layout,
-	)
-
-	return { settled, baseline_total }
 }
 
 // The run's frame over `run_layout`, the run's own rows, the root checkout's single runs laid over them.
@@ -187,8 +170,7 @@ function assemble_display(
 ): BoardDisplay {
 	const read = closed_under(known_of(state), state.closed)
 	const layout = run_board_root_layout.layout_of(run_layout, local, read)
-	const { settled, baseline_total } = baselines_of(state, run_layout, layout)
-	const laid = header_of({ ...settled, baseline_total }, local, layout, now_ms)
+	const laid = header_of(state, local, layout, now_ms)
 	const { cue, ...sound } = run_board_cue_decision.decided(state, laid, local.events, now_ms)
 	const parks = run_board_layout.listed_parks(layout)
 
@@ -199,7 +181,7 @@ function assemble_display(
 		throughput: local.throughput,
 		thanks: state.thanks,
 		cue,
-		carried: { baseline_total: settled.baseline_total, ...sound },
+		carried: sound,
 	}
 }
 

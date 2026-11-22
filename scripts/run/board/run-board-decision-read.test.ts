@@ -95,7 +95,17 @@ describe('run_board_decision', () => {
 		expect(
 			run_board_decision.reason_of(PERSON, undefined, { ...read, decision_questions: undefined })
 				?.tail,
-		).toBe(`→ decide: ${TITLE}`)
+		).toBe('→ decide')
+	})
+})
+
+describe('run_board_decision questions', () => {
+	it('drops a recorded question that repeats the title, keeping its note (ac-e2ca6f95)', () => {
+		const read = { titles: new Map([[PERSON, TITLE]]), labels: new Map() }
+
+		expect(run_board_decision.reason_of(PERSON, `needs-decision: ${TITLE}; why`, read)?.tail).toBe(
+			'→ decide (why)',
+		)
 	})
 
 	it('uses the last trusted decision comment heading outside code fences', () => {

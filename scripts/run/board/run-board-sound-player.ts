@@ -13,7 +13,6 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 const BEL = '\u{7}'
 const SPAWN_OPTIONS = { detached: true, stdio: 'ignore', windowsHide: true } as const
 const POWERSHELL_OPTIONS = ['-NoProfile', '-Command']
-const RAW_RATE = '--rate=44100'
 const RAW_CHANNELS = '--channels=1'
 
 interface Player {
@@ -42,6 +41,12 @@ interface SoundPorts {
 interface StartHandlers {
 	started: (child: Playing) => void
 	failed: () => void
+}
+
+// The platform whose players are tried and the ports they spawn and write through; this process's own when omitted.
+interface PlayerOptions {
+	platform?: NodeJS.Platform
+	ports?: SoundPorts
 }
 
 function powershell_literal(file: string): string {
@@ -78,6 +83,23 @@ function players_for(platform: NodeJS.Platform): Array<Player> {
 	return PLAYERS[platform] ?? []
 }
 
+// A spawn that throws as it starts (EMFILE, EAGAIN) is a candidate that failed, as one emitting `error`
+// is, so it never ends the board drawing it (joshuafolkken/kit#8381).
+function spawned(player: Player, file: string, ports: SoundPorts): Playing | undefined {
+	try {
+		return ports.spawner(player.command, player.args(file), SPAWN_OPTIONS)
+	} catch {
+		return undefined
+	}
+}
+
+// A started candidate: one that fails to start goes on to `next`.
+function begin(child: Playing, next: () => void, handlers: StartHandlers): void {
+	child.on('error', next)
+	handlers.started(child)
+	child.unref()
+}
+
 function start_first(
 	file: string,
 	players: Array<Player>,
@@ -91,13 +113,14 @@ function start_first(
 		return
 	}
 
-	const child = launch.ports.spawner(player.command, player.args(file), SPAWN_OPTIONS)
-
-	child.on('error', () => {
+	function next(): void {
 		start_first(file, rest, launch)
-	})
-	launch.handlers.started(child)
-	child.unref()
+	}
+
+	const child = spawned(player, file, launch.ports)
+
+	if (child === undefined) next()
+	else begin(child, next, launch.handlers)
 }
 
 // The file started on the platform's first working candidate, each start and the failure of every
@@ -105,8 +128,7 @@ function start_first(
 function start(
 	file: string,
 	handlers: StartHandlers,
-	platform: NodeJS.Platform = process.platform,
-	ports: SoundPorts = DEFAULT_PORTS,
+	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
 ): void {
 	start_first(file, players_for(platform), { ports, handlers })
 }
@@ -132,16 +154,28 @@ function windows_loop_args(file: string): Array<string> {
 	]
 }
 
+// A raw-PCM player is told the file's own rate, since the WAV header it would read is stripped
+// (joshuafolkken/kit#8365: the matrix click is 48 kHz, the cues 44.1 kHz).
+function raw_rate(file: string): string {
+	return String(run_board_sound_wav.rate_of(file))
+}
+
 const LOOP_PLAYERS: Partial<Record<NodeJS.Platform, Array<Player>>> = {
 	darwin: [{ command: 'osascript', args: mac_loop_args }],
 	win32: [{ command: 'powershell', args: windows_loop_args }],
 	linux: [
-		{ command: 'paplay', args: () => ['--raw', '--format=s16le', RAW_RATE, RAW_CHANNELS] },
+		{
+			command: 'paplay',
+			args: (file) => ['--raw', '--format=s16le', `--rate=${raw_rate(file)}`, RAW_CHANNELS],
+		},
 		{
 			command: 'pw-play',
-			args: () => ['--raw', '--format=s16', RAW_RATE, RAW_CHANNELS, '-'],
+			args: (file) => ['--raw', '--format=s16', `--rate=${raw_rate(file)}`, RAW_CHANNELS, '-'],
 		},
-		{ command: 'aplay', args: () => ['-t', 'raw', '-f', 'S16_LE', '-r', '44100', '-c', '1'] },
+		{
+			command: 'aplay',
+			args: (file) => ['-t', 'raw', '-f', 'S16_LE', '-r', raw_rate(file), '-c', '1'],
+		},
 	],
 }
 
@@ -149,15 +183,19 @@ function loop_players(platform: NodeJS.Platform): Array<Player> {
 	return LOOP_PLAYERS[platform] ?? []
 }
 
+// A Linux loop streams the file's samples to its raw-PCM player; other platforms' players read the file.
+function loop_ports(file: string, platform: NodeJS.Platform, ports: SoundPorts): SoundPorts {
+	return platform === 'linux' ? run_board_sound_stream.ports_for(file, ports) : ports
+}
+
 // Loop inside one audio stream, without closing the output between WAV boundaries.
 function loop(
 	file: string,
 	handlers: StartHandlers,
-	platform: NodeJS.Platform = process.platform,
-	ports: SoundPorts = DEFAULT_PORTS,
+	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
 ): void {
 	try {
-		const output = platform === 'linux' ? run_board_sound_stream.ports_for(file, ports) : ports
+		const output = loop_ports(file, platform, ports)
 
 		start_first(file, loop_players(platform), { ports: output, handlers })
 	} catch {
@@ -167,8 +205,7 @@ function loop(
 
 function play(
 	file: string,
-	platform: NodeJS.Platform = process.platform,
-	ports: SoundPorts = DEFAULT_PORTS,
+	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
 ): void {
 	const handlers: StartHandlers = {
 		started: () => {
@@ -177,7 +214,7 @@ function play(
 		failed: () => ports.write(BEL),
 	}
 
-	start(file, handlers, platform, ports)
+	start(file, handlers, { platform, ports })
 }
 
 // A cue's WAV, synthesized once into the cache (`run-board-sound-wav.ts`), then played; a cue whose
@@ -195,7 +232,7 @@ function play_cue(
 	)
 
 	if (file === undefined) ports.write(BEL)
-	else play(file, platform, ports)
+	else play(file, { platform, ports })
 }
 
 const run_board_sound_player = {

@@ -49,7 +49,7 @@ function run_probe(operation: string, flags?: ReadonlySet<string>): number {
 
 	writeFileSync(script, probe(operation))
 
-	return scratch_run_cli.run([script], root, flags)
+	return scratch_run_cli.run([script], { root, flags })
 }
 
 describe('scratch:run permission arguments', () => {
@@ -74,7 +74,7 @@ describe('scratch:run refusals', () => {
 
 		writeFileSync(outside, MARKER_SCRIPT)
 
-		expect(scratch_run_cli.run([outside], root)).toBe(1)
+		expect(scratch_run_cli.run([outside], { root })).toBe(1)
 		expect(existsSync(path.join(root, 'ran'))).toBe(false)
 	})
 
@@ -84,17 +84,19 @@ describe('scratch:run refusals', () => {
 
 		writeFileSync(script, MARKER_SCRIPT)
 
-		expect(scratch_run_cli.run([script], root, new Set<string>())).toBe(1)
+		expect(scratch_run_cli.run([script], { root, flags: new Set<string>() })).toBe(1)
 		expect(existsSync(path.join(scratch, 'ran'))).toBe(false)
 	})
 
 	it('refuses a call with no script', () => {
-		expect(scratch_run_cli.run([], setup().root)).toBe(1)
+		expect(scratch_run_cli.run([], { root: setup().root })).toBe(1)
 	})
 
 	it('refuses a script that does not exist', () => {
 		expect(
-			scratch_run_cli.run([path.join(JOSH_SCRATCH_DIRECTORY, 'missing.mjs')], setup().root),
+			scratch_run_cli.run([path.join(JOSH_SCRATCH_DIRECTORY, 'missing.mjs')], {
+				root: setup().root,
+			}),
 		).toBe(1)
 	})
 })

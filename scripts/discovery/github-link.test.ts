@@ -50,7 +50,10 @@ function make_fixture(overrides: FixtureOptions = {}): Fixture {
 }
 
 function is_linked(fixture: Fixture): boolean {
-	return github_link.is_linked(fixture.repository, fixture.environment)
+	return github_link.is_linked({
+		repository_path: fixture.repository,
+		environment: fixture.environment,
+	})
 }
 
 describe('github_link.is_linked', () => {

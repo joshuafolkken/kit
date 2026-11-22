@@ -224,7 +224,7 @@ describe('epic_fetch.fetch_epic — naming what it could not read', () => {
 	it('carries the repository the command is running in', async () => {
 		epic_body('- [ ] #1')
 		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 1 }))
-		const snapshot = await epic_fetch.fetch_epic(EPIC, OTHER_REPO, REPO)
+		const snapshot = await epic_fetch.fetch_epic(EPIC, OTHER_REPO, { current_repo: REPO })
 
 		expect(snapshot.current_repo).toBe(REPO)
 	})
@@ -276,7 +276,7 @@ describe('epic_fetch.fetch_epic — the repository the epic itself lives in', ()
 	it('takes the owner allow-list from the repository the command runs in', async () => {
 		epic_body(`- [ ] ${THIRD_PARTY_REPO}#7`)
 		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(UNREAD)
-		const snapshot = await epic_fetch.fetch_epic(EPIC, THIRD_PARTY_REPO, REPO)
+		const snapshot = await epic_fetch.fetch_epic(EPIC, THIRD_PARTY_REPO, { current_repo: REPO })
 
 		expect(get_child).not.toHaveBeenCalled()
 		expect(snapshot.unreadable).toEqual([{ repo: THIRD_PARTY_REPO, number: 7 }])
@@ -286,7 +286,7 @@ describe('epic_fetch.fetch_epic — the repository the epic itself lives in', ()
 		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(body_read('- [ ] #1'))
 		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 1 }))
 
-		await epic_fetch.fetch_epic(EPIC, OTHER_REPO, REPO)
+		await epic_fetch.fetch_epic(EPIC, OTHER_REPO, { current_repo: REPO })
 
 		expect(get_body).toHaveBeenCalledWith(String(EPIC), OTHER_REPO)
 		expect(get_child).toHaveBeenCalledWith('1', OTHER_REPO)

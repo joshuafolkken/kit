@@ -1,0 +1,7 @@
+{
+	"reason": "adopt_owned joins ownership selection and resume in backlog-drive-carried.ts so a scoped run adopts only its own carried lanes (#8460); backlog-drive-cli.ts stays at its line cap",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}

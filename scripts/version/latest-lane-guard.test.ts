@@ -16,11 +16,11 @@ afterEach(() => {
 
 describe('latest_lane_guard.is_lane', () => {
 	it('is true for a lane work tree', () => {
-		expect(latest_lane_guard.is_lane(LANE_CWD, {})).toBe(true)
+		expect(latest_lane_guard.is_lane({ cwd: LANE_CWD, environment: {} })).toBe(true)
 	})
 
 	it('is false for the primary checkout', () => {
-		expect(latest_lane_guard.is_lane(PRIMARY_CWD, {})).toBe(false)
+		expect(latest_lane_guard.is_lane({ cwd: PRIMARY_CWD, environment: {} })).toBe(false)
 	})
 })
 

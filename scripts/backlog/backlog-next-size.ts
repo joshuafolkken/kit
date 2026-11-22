@@ -35,11 +35,11 @@ function limit_note(
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): string | undefined {
-	const capped = size_estimate.over_cap(body, route, rate, growth)
+	const capped = size_estimate.over_cap(body, route, { rate, growth })
 
 	return capped === undefined
 		? size_estimate.budget_note(body, rate, growth)
-		: size_estimate.capped(capped, rate, growth)
+		: size_estimate.capped(capped, { rate, growth })
 }
 
 function guide_note(
@@ -49,12 +49,12 @@ function guide_note(
 	growth?: SizeRatios,
 ): string | undefined {
 	const guide =
-		size_estimate.over_guide(body, route, rate, growth) ??
-		size_estimate.split_over_guide(body, route, rate, growth)
+		size_estimate.over_guide(body, route, { rate, growth }) ??
+		size_estimate.split_over_guide(body, route, { rate, growth })
 
 	return guide === undefined
 		? undefined
-		: `${size_estimate.exceeded(guide, rate, growth)} ${remedy_of(route)}`
+		: `${size_estimate.exceeded(guide, { rate, growth })} ${remedy_of(route)}`
 }
 
 // The cap's or the size bar's overrun, else the guide's.

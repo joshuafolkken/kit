@@ -139,5 +139,6 @@ the gate"): finish it, and file an independent new requirement found in it as an
 
 A split is decided before dispatch: file the new children (Tier A, first-party; `split-assessment.md`
 → "Two or more always means an epic"), then
-`pnpm josh epic --add <E> <N...> [--before <M> | --after <M>]` — never a hand edit. Same criteria as
+`pnpm josh epic --add <E> <N...> [--before <M> | --after <M>] --order-reason "<chain>: <reason>"` —
+never a hand edit. Same criteria as
 `kickoff`. Splitting alone never adds `needs-decision` to the promoted epic.

@@ -1,6 +1,7 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_post_merge_check } from '#scripts/issue/issue-post-merge-check'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -122,6 +123,13 @@ function content_body(issue_number: string, content: BlockRead): string {
 	return content.kind === 'ok' ? content.block : failure_note(issue_number, content.kind)
 }
 
+// Read off the body alone and only when its author is trusted (`issue-post-merge-check.ts`).
+function post_merge_check(content: BlockRead): string | undefined {
+	if (content.kind !== 'ok') return undefined
+
+	return issue_post_merge_check.answer(content.body, content.trust.is_body_trusted)
+}
+
 function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 	const state = reads.state.kind === 'state' ? reads.state.state : undefined
 	const state_failure = state === undefined ? failure_note(issue_number, reads.state.kind) : ''
@@ -138,6 +146,7 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		ship_problems: reads.ship_problems,
 		investigation: reads.investigation,
 		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
+		post_merge_check: post_merge_check(reads.content),
 	}
 }
 
@@ -203,5 +212,5 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // reads the skeleton and reports an unreadable body the same way.
 const run_prep_cli = { failure_note, gather, parse_number, read_summary, run, to_parts }
 
-export type { SummaryRead }
+export type { PrepReads, SummaryRead }
 export { run_prep_cli }

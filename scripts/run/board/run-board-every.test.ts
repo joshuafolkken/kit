@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync } from 'node:fs'
-import type { EpicChild } from '#scripts/epic/epic-graph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_every } from './run-board-every'
@@ -120,25 +119,6 @@ describe('run_board_every.recorder', () => {
 		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
 
 		expect(store.load(run_board_frame_store.CHAT_KEY)?.saved_ms).toBe(fetched_ms)
-	})
-
-	it('records no arrivals counted from the live board’s first total', () => {
-		const { ports } = harness(LOCAL, PLANS)
-		const store = run_board_frame_store.memory_store()
-		const titled = plan_titled('a')
-		const child: EpicChild = {
-			number: 1,
-			repo: titled.context.repo,
-			state: 'OPEN',
-			labels: [],
-			blocked_by: [],
-		}
-		const plan = { ...titled, waves: { waves: [[child]], unreached: [] } }
-		const state = { ...FRESH_STATE, local: LOCAL, plan, fetched_ms: START, baseline_total: 0 }
-
-		run_board_every.recorder({ ...ports, frames: store }, undefined)(state)
-
-		expect(store.load(run_board_frame_store.CHAT_KEY)?.text).not.toMatch(/\(\+\d+\)/u)
 	})
 })
 

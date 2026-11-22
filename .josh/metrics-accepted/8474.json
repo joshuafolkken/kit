@@ -1,0 +1,7 @@
+{
+	"reason": "+9 code lines: the rule-end tail (tailed) and the processes rule's first-lane tail, #8474",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

@@ -128,7 +128,7 @@ const COMMAND_NAME = 'pre-commit-type-check'
 const { stamp_path, clear } = suite_records(COMMAND_NAME)
 
 function record_green(files: Record<string, string>, base?: string): void {
-	review_stamps.gate_stamp.write(files, stamp_path, base)
+	review_stamps.gate_stamp.write(files, { target: stamp_path, base })
 }
 
 async function run_hook(extra_arguments: ReadonlyArray<string> = []): Promise<[number, string]> {

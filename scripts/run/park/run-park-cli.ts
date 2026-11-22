@@ -12,6 +12,7 @@ import { run_park } from './run-park'
 import { run_park_answered, type ParkCheck } from './run-park-answered'
 import { run_park_body } from './run-park-body'
 import { run_park_escalate } from './run-park-escalate'
+import { run_park_post_merge } from './run-park-post-merge'
 import { run_park_release } from './run-park-release'
 import { run_park_write } from './run-park-write'
 
@@ -71,11 +72,17 @@ function is_next_missing(body: string): boolean {
 }
 
 // **A park asks only what the Issue has not answered** (joshuafolkken/kit#6531): after the schema,
-// `run_park_answered` judges the question against the Issue before any write.
+// `run_park_answered` judges the question against the Issue before any write. A visual-check park
+// on an issue that declares a post-merge check is refused first (`run_park_post_merge`,
+// joshuafolkken/kit#8503).
 async function stop_of(request: CommentRequest, directory: string): Promise<ParkCheck> {
 	const { body } = request
 
-	if (run_park_write.is_refused(body) || is_next_missing(body)) {
+	if (
+		run_park_write.is_refused(body) ||
+		is_next_missing(body) ||
+		(await run_park_post_merge.is_refused(request.issue_number, body))
+	) {
 		return { exit_code: FAILURE_EXIT_CODE }
 	}
 

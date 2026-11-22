@@ -42,6 +42,9 @@ interface AddContext {
 	is_retry: boolean
 	done: ReadonlyArray<number>
 	active: ReadonlySet<string>
+	// The issues a person withdrew from this run (`lane:withdraw`): only `--retry` puts one back
+	// (joshuafolkken/kit#8599).
+	withdrawn?: ReadonlySet<number>
 	settled?: ReadonlySet<number>
 	// What the run already tracks, so an epic root is never recorded twice (`run_add_epic.tracked_of`).
 	tracked?: ReadonlySet<number>
@@ -106,14 +109,20 @@ function stops_of(issue: number, context: AddContext): ReadonlyArray<string> {
 		: [RUN_STALLED_LABEL]
 }
 
+function is_stopped(issue: number, labels: ReadonlyArray<string>, context: AddContext): boolean {
+	return (
+		context.done.includes(issue) ||
+		context.withdrawn?.has(issue) === true ||
+		has_label_name(labels, RUN_STALLED_LABEL)
+	)
+}
+
 function retry_required(
 	issue: number,
 	labels: ReadonlyArray<string>,
 	context: AddContext,
 ): boolean {
-	return (
-		!context.is_retry && (context.done.includes(issue) || has_label_name(labels, RUN_STALLED_LABEL))
-	)
+	return !context.is_retry && is_stopped(issue, labels, context)
 }
 
 function terminal_refusal(issue: number, context: AddContext): string | undefined {

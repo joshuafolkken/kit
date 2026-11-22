@@ -8,7 +8,7 @@ point applies this.
 **The default is not to split.** Two questions have to answer yes **together**:
 
 1. Mergeable parts (separability)?
-2. Over guide? (test files excluded) Docs/snapshots/listings/moves (twice) count.
+2. Over guide? Test files, docs/snapshots/listings and moves (twice) count; run records do not.
 
 The same trailing 3-day period as the implement budget;
 median implement minutes per 100 actual changed lines;
@@ -29,7 +29,7 @@ Past the lane target (judged last) that default flips to split; one Issue needs 
 **The entry's split decision and the filing-time fold decision are the same two conditions, stated
 here once** — the fold asks whether *several findings from one session* are one Issue, with the same
 conjunction. `pnpm josh issue:fold "<title>" …` answers `fold` / `separate` / `no-fold-needed`; its size
-half is `pnpm josh split:assess`, called not recomputed. A diff with no readable non-test file answers
+half is `pnpm josh split:assess`, called not recomputed. A diff with no readable counted file answers
 `undetermined`, and the size is the request's estimate. **There is no second criterion.**
 `observation-filing.md`'s observation, the review round cap's branch 2 and `prerequisite.md`'s
 prerequisite each route a second filing through it — `pnpm josh issue:file` asks it itself at the
@@ -41,7 +41,7 @@ run's second filing, never the first, and holds only a `fold`.
 threshold that splits more is required to say why the round-1 measurement does not reach it.**
 
 **The size half is measured, not eyeballed — `pnpm josh split:assess`** counts the branch's changed
-files and lines, test files excluded, and answers `split` / `single` on size alone. Separability stays
+files and lines, test files included, and answers `split` / `single` on size alone. Separability stays
 a judgement, so its `split` is the size condition met, not a decision to divide.
 
 ## Over the guide before the gate

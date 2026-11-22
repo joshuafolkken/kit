@@ -229,7 +229,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--fresh \| --refresh \| --period <days> \| --weekly <rule-id>... \| --prose]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots |
-| `josh run:board` | `[--once \| --chat [--fresh] \| --every <minutes>] [--theme wargames\|matrix] [--timing]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
+| `josh run:board` | `[--once \| --chat [--fresh] \| --every <minutes> \| --frame [<frame flags>]] [--theme wargames\|matrix] [--icons emoji\|letters\|shapes] [--timing]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
 | `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |
 | `josh run:chain` | `<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] \| <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]` | automation | processes, files, git, network | Open the review, or --join to join, attest, record and recheck it; --ship then ships a clean recheck. Stops at the first refusal with its next action |
 | `josh run:cut` | `[--resume] <issue> [--impl] [--handoff <path>]` | automation | files | Cut a lane child before the gate and resume a fresh process |
@@ -264,7 +264,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh ship` | `"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> \| --notify-message-file <path>] \| --log <N>` | automation | git, network | Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step |
 | `josh ship:evidence` | `<N> [--fresh] -- <command...>` | automation | files, processes | Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code) |
 | `josh ship:wait` | `<N>` | automation | files, processes | Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned \| passed \| ended \| pending) |
-| `josh split:assess` | `[--json]` | automation | none | Measure the branch change size (tests excluded) and answer the split assessment size question: split \| single |
+| `josh split:assess` | `[--json]` | automation | none | Measure the branch change size (tests included) and answer the split assessment size question: split \| single |
 | `josh split:recover` | `<origin> <child-issue-url>` | automation | network, files | Recover split-child evidence after verifying an existing child URL, split route and parent |
 | `josh stash:pop` | `<message>` | automation | git | Pop the stash matching this message, not whichever a shared stack has on top |
 | `josh stash:push` | `<message>` | automation | git | Stash the working tree, untracked files included, leaving the observation ledger |

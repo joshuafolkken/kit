@@ -1,0 +1,7 @@
+{
+	"reason": "The notice restores its cue name, separator and the issue's words (#8595): +3 code lines in run-board-header-notice.ts",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

@@ -142,7 +142,7 @@ function write_records(
 		const inputs = recordable_inputs(result, inputs_of)
 
 		if (inputs !== undefined) {
-			check_stamp(inputs).write(tree.files, records(result.label), tree.base)
+			check_stamp(inputs).write(tree.files, { target: records(result.label), base: tree.base })
 		}
 	}
 }

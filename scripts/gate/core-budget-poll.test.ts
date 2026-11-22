@@ -3,6 +3,7 @@ import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type ReserveOptions } from './core-budget'
 import type { WaitSink } from './core-wait-record'
+import { core_weights } from './core-weights'
 import type { MachineReading } from './machine-capacity'
 
 const MEMORY_MB = 2400
@@ -35,8 +36,9 @@ function memory_claim(
 
 async function running_claim(
 	read_machine: () => Promise<MachineReading>,
+	options: ReserveOptions = {},
 ): Promise<ReturnType<typeof core_budget.claim>> {
-	const claim = memory_claim(read_machine)
+	const claim = memory_claim(read_machine, options)
 
 	await core_budget.poll_claim(claim)
 
@@ -165,6 +167,69 @@ describe('memory admission of unit suites', () => {
 	})
 })
 
+// joshuafolkken/kit#8473: the ledger's second `refactor:scan` overflowed beside a running one while
+// memory was pressured, and the machine ran out of free memory.
+const ESLINT_MB = core_weights.MEMORY_MB.eslint_scan
+const PRESSURED_AVAILABLE_MB = 9400
+const TOTAL_MB = 18_432
+const PAST_RAMP_UP_MS = 40_000
+const SATURATED_CORES = 10.96
+const CPU_DEADLINE = 'cpu-deadline'
+const OVERFLOW_PATHS = [
+	{ reason: CPU_DEADLINE, wait_cap_ms: 0, ease_window_ms: PAST_RAMP_UP_MS },
+	{ reason: 'cpu-unrelieved', wait_cap_ms: PAST_RAMP_UP_MS, ease_window_ms: 0 },
+]
+// A run queue past twice the cores lifts the first waiter's exemption from outside load.
+const OVERLOADED_QUEUE = 30
+const SATURATED = { busy_cores: SATURATED_CORES, run_queue: OVERLOADED_QUEUE }
+const PRESSURED = { ...SATURATED, available_mb: PRESSURED_AVAILABLE_MB }
+
+function scan_options(clock: { value: number }): ReserveOptions {
+	return { memory_mb: ESLINT_MB, now: () => clock.value }
+}
+
+async function admission_reason(
+	claim: ReturnType<typeof core_budget.claim>,
+): Promise<string | undefined> {
+	const handle = await core_budget.poll_claim(claim)
+
+	return handle?.admission.decision?.reason
+}
+
+async function second_scan(
+	pressured: boolean,
+	path: (typeof OVERFLOW_PATHS)[number],
+): Promise<string | undefined> {
+	const clock = { value: CAP_MS }
+	const machine = { busy_cores: 0, available_mb: TOTAL_MB, total_mb: TOTAL_MB }
+	const running = await running_claim(async () => machine, scan_options(clock))
+
+	clock.value += PAST_RAMP_UP_MS
+	Object.assign(machine, pressured ? PRESSURED : SATURATED)
+	const waiting = memory_claim(async () => ({ ...machine, memory_pressured: pressured }), {
+		...scan_options(clock),
+		...path,
+		directory: running.directory,
+	})
+
+	try {
+		return await admission_reason(waiting)
+	} finally {
+		core_budget.release(running)
+		core_budget.release(waiting)
+	}
+}
+
+describe('memory admission of a large claim under pressure', () => {
+	it.each(OVERFLOW_PATHS)('holds a second ESLint claim from $reason overflow', async (path) => {
+		expect(await second_scan(true, path)).toBeUndefined()
+	})
+
+	it.each(OVERFLOW_PATHS)('still overflows by $reason with memory to spare', async (path) => {
+		expect(await second_scan(false, path)).toBe(path.reason)
+	})
+})
+
 interface CommandProbe {
 	directory: string
 	machine: { busy_cores: number; available_mb: number }
@@ -248,7 +313,7 @@ describe('normal command CPU overflow evidence', () => {
 			})
 			expect(probe.sink).toHaveBeenCalledExactlyOnceWith(
 				expect.objectContaining({
-					admission_reason: 'cpu-deadline',
+					admission_reason: CPU_DEADLINE,
 					overflow: true,
 					budget_memory_mb: MEMORY_MB,
 					available_mb: MEMORY_MB,

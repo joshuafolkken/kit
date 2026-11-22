@@ -47,7 +47,7 @@ const WAIT_AHEAD_MS = 600_000
 const WAIT = 'wait'
 const QUIET = lane_plan_signals.signals_from(LATER, { hunk_files: [], committed_files: [] }, [], 0)
 const PROBED = 'scripts/lane/probed.ts'
-const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
+const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）\n'
 
 // The plans live under the repository the spy below hands each test afresh.
 const directory = path.join(ROOT, 'lane')
@@ -280,7 +280,7 @@ describe('lane:plan size bar on the probed hunks', () => {
 
 // joshuafolkken/kit#5605: a plan that met the size bar keeps it met across an unread or yielded re-plan,
 // while a plan the entry probe yielded on never met it, so its first `lane:plan` judges the lines axis.
-const LINED = '## 背景\n\n- 規模見積もり: 約 2 ファイル / 160 行（テスト除く）\n'
+const LINED = '## 背景\n\n- 規模見積もり: 約 2 ファイル / 160 行（テスト含む）\n'
 
 describe('lane:plan size bar across a re-plan of a cleared plan', () => {
 	const added = [FREE_FILE, ONE_FILE]

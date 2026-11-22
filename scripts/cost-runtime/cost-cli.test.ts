@@ -110,20 +110,20 @@ describe('cost_cli.run --over', () => {
 	it('answers over when the marginal cost exceeds the limit', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(0)
+		expect(cost_cli.run(['--over', '0'], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(0)
 		expect(stdout().trim()).toBe('over')
 	})
 
 	it('answers under when it does not', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '99999999'], CWD, ANTHROPIC_ENV)).toBe(0)
+		expect(cost_cli.run(['--over', '99999999'], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(0)
 		expect(stdout().trim()).toBe('under')
 	})
 
 	it('says what the measured cost was, not only the verdict', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
-		cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)
+		cost_cli.run(['--over', '0'], { cwd: CWD, environment: ANTHROPIC_ENV })
 
 		expect(output()).toContain('per request')
 	})
@@ -131,12 +131,16 @@ describe('cost_cli.run --over', () => {
 	// The word "under" appears in the missing-transcript message too, so the verdict is checked by the
 	// exit code and the message, not by a substring that both share.
 	it('reports a missing transcript rather than answering a verdict', () => {
-		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run(['--over', '0'], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(
+			FAILURE_EXIT_CODE,
+		)
 		expect(output()).toContain(NO_NAMED_TRANSCRIPT)
 	})
 
 	it('prints the usage line for a bad invocation', () => {
-		expect(cost_cli.run([BAD_FLAG], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run([BAD_FLAG], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(
+			FAILURE_EXIT_CODE,
+		)
 		expect(output()).toContain(cost_cli.USAGE)
 	})
 
@@ -145,7 +149,7 @@ describe('cost_cli.run --over', () => {
 	it('prints the usage line when no threshold is given', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run([], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run([], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(cost_cli.USAGE)
 	})
 })
@@ -159,7 +163,9 @@ describe('cost_cli.run --over own-session identification', () => {
 	it('does not fall back to another session when its own transcript is absent', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.run(['--over', '0'], CWD, OTHER_SESSION_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run(['--over', '0'], { cwd: CWD, environment: OTHER_SESSION_ENV })).toBe(
+			FAILURE_EXIT_CODE,
+		)
 		expect(output()).toContain(NO_NAMED_TRANSCRIPT)
 	})
 
@@ -168,7 +174,9 @@ describe('cost_cli.run --over own-session identification', () => {
 	it('distinguishes a zero-request transcript from a missing one', () => {
 		write_session(SESSION_A, [UNPRICED_LINE])
 
-		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run(['--over', '0'], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(
+			FAILURE_EXIT_CODE,
+		)
 		expect(output()).toContain(NO_REQUESTS)
 		expect(output()).not.toContain(NO_NAMED_TRANSCRIPT)
 	})
@@ -176,7 +184,9 @@ describe('cost_cli.run --over own-session identification', () => {
 	// A Claude session that names no id of its own keeps the mtime fallback: a whole empty corpus reads
 	// as "no transcripts found", not as one named session gone missing.
 	it('reports the whole corpus as empty when the environment names no session', () => {
-		expect(cost_cli.run(['--over', '0'], CWD, ANTHROPIC_NO_ID_ENV)).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.run(['--over', '0'], { cwd: CWD, environment: ANTHROPIC_NO_ID_ENV })).toBe(
+			FAILURE_EXIT_CODE,
+		)
 		expect(output()).toContain(NO_TRANSCRIPTS)
 		expect(output()).not.toContain(NO_NAMED_TRANSCRIPT)
 	})
@@ -193,7 +203,7 @@ describe('cost_cli.run --cut provider source', () => {
 		})
 		const claude = vi.spyOn(cost_corpus, 'load_corpus')
 
-		expect(cost_cli.run(['--cut'], CWD, OPENAI_ENV)).toBe(0)
+		expect(cost_cli.run(['--cut'], { cwd: CWD, environment: OPENAI_ENV })).toBe(0)
 		expect(stdout().trim()).toBe(verdict)
 		expect(claude).not.toHaveBeenCalled()
 	})
@@ -210,7 +220,7 @@ describe('cost_cli.run --cut provider source', () => {
 		})
 
 		expect(OPUS_THRESHOLD).toBeGreaterThan(CONTEXT_CUT_THRESHOLD)
-		expect(cost_cli.run(['--cut'], CWD, OPENAI_ENV)).toBe(0)
+		expect(cost_cli.run(['--cut'], { cwd: CWD, environment: OPENAI_ENV })).toBe(0)
 		expect(stdout().trim()).toBe(verdict)
 	})
 
@@ -218,7 +228,7 @@ describe('cost_cli.run --cut provider source', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 		const codex = vi.spyOn(codex_usage, 'measurement')
 
-		expect(cost_cli.run(['--cut'], CWD, ANTHROPIC_ENV)).toBe(0)
+		expect(cost_cli.run(['--cut'], { cwd: CWD, environment: ANTHROPIC_ENV })).toBe(0)
 		expect(codex).not.toHaveBeenCalled()
 	})
 })
@@ -236,12 +246,14 @@ describe('cost_cli.session_verdict', () => {
 			billed_input_per_request: [tokens],
 		})
 
-		expect(cost_cli.session_verdict(CWD, OPENAI_ENV)).toBe(verdict)
+		expect(cost_cli.session_verdict({ cwd: CWD, environment: OPENAI_ENV })).toBe(verdict)
 		expect(stdout().trim()).toBe('')
 	})
 
 	it('answers unmeasurable when no transcript can be priced', () => {
-		expect(cost_cli.session_verdict(CWD, ANTHROPIC_ENV)).toBe(cost_cli.UNMEASURABLE_VERDICT)
+		expect(cost_cli.session_verdict({ cwd: CWD, environment: ANTHROPIC_ENV })).toBe(
+			cost_cli.UNMEASURABLE_VERDICT,
+		)
 	})
 
 	it('answers unmeasurable when the session has no requests', () => {
@@ -249,7 +261,9 @@ describe('cost_cli.session_verdict', () => {
 			billed_input_per_request: [],
 		})
 
-		expect(cost_cli.session_verdict(CWD, OPENAI_ENV)).toBe(cost_cli.UNMEASURABLE_VERDICT)
+		expect(cost_cli.session_verdict({ cwd: CWD, environment: OPENAI_ENV })).toBe(
+			cost_cli.UNMEASURABLE_VERDICT,
+		)
 	})
 
 	// joshuafolkken/kit#3651: a launch defaults to Claude Code outside a session, but there is still no
@@ -257,8 +271,10 @@ describe('cost_cli.session_verdict', () => {
 	it('answers unmeasurable outside a session, even beside a priced transcript', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 
-		expect(cost_cli.session_verdict(CWD, {})).toBe(cost_cli.UNMEASURABLE_VERDICT)
-		expect(cost_cli.run(['--over', '0'], CWD, {})).toBe(FAILURE_EXIT_CODE)
+		expect(cost_cli.session_verdict({ cwd: CWD, environment: {} })).toBe(
+			cost_cli.UNMEASURABLE_VERDICT,
+		)
+		expect(cost_cli.run(['--over', '0'], { cwd: CWD, environment: {} })).toBe(FAILURE_EXIT_CODE)
 		expect(output()).toContain(cost_cli.USAGE)
 	})
 })
@@ -270,7 +286,7 @@ describe('cost_cli.session_figures', () => {
 			billed_input_per_request: [1, CONTEXT_CUT_THRESHOLD + 1],
 		})
 
-		expect(cost_cli.session_figures(CWD, OPENAI_ENV)).toStrictEqual({
+		expect(cost_cli.session_figures({ cwd: CWD, environment: OPENAI_ENV })).toStrictEqual({
 			verdict: 'over',
 			cost: CONTEXT_CUT_THRESHOLD + 1,
 			threshold: CONTEXT_CUT_THRESHOLD,
@@ -283,7 +299,7 @@ describe('cost_cli.session_figures', () => {
 			model: OPUS,
 		})
 
-		expect(cost_cli.session_figures(CWD, OPENAI_ENV)).toStrictEqual({
+		expect(cost_cli.session_figures({ cwd: CWD, environment: OPENAI_ENV })).toStrictEqual({
 			verdict: 'under',
 			cost: CONTEXT_CUT_THRESHOLD + 1,
 			threshold: OPUS_THRESHOLD,
@@ -293,7 +309,7 @@ describe('cost_cli.session_figures', () => {
 	it('quotes no cost for a session with no requests', () => {
 		vi.spyOn(codex_usage, 'measurement').mockReturnValue({ billed_input_per_request: [] })
 
-		expect(cost_cli.session_figures(CWD, OPENAI_ENV)).toStrictEqual({
+		expect(cost_cli.session_figures({ cwd: CWD, environment: OPENAI_ENV })).toStrictEqual({
 			verdict: cost_cli.UNMEASURABLE_VERDICT,
 			cost: undefined,
 			threshold: CONTEXT_CUT_THRESHOLD,
@@ -301,6 +317,6 @@ describe('cost_cli.session_figures', () => {
 	})
 
 	it('quotes no cost outside a session', () => {
-		expect(cost_cli.session_figures(CWD, {}).cost).toBeUndefined()
+		expect(cost_cli.session_figures({ cwd: CWD, environment: {} }).cost).toBeUndefined()
 	})
 })

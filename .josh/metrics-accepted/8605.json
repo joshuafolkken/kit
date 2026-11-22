@@ -1,0 +1,7 @@
+{
+	"reason": "New public queued_finish_ms and the Placement return the queued-child finish estimates #8605 requires; the stacking stays single-sourced",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

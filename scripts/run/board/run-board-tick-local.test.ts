@@ -1,5 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
@@ -24,6 +26,7 @@ const LAUNCH = {
 const DRAIN = { pos: 2, at: LAUNCH.at, kind: 'drain', text: 'backlog drained' }
 const REPO = 'joshuafolkken/kit'
 const SHORT = { rows: 15, columns: 80 }
+const LANES_WITH_WAIT = 3
 
 // A read that never answers, as a plan read still in flight.
 async function never(): Promise<never> {
@@ -62,6 +65,30 @@ async function loading(events: ReadonlyArray<typeof LAUNCH>): Promise<Array<stri
 }
 
 describe('run_board_tick.tick capacity', () => {
+	it('draws the local seat wait in the heading and queued row', async () => {
+		const plan = long_plan(1)
+		for (const child of plan.waves.waves.flat()) child.labels = [RUN_LANE_LABEL]
+		const local = {
+			...LOCAL,
+			lanes: [String(CHILD)],
+			events: [LAUNCH, { ...DRAIN, kind: 'setup', text: run_event_setup.STAGE.HANDING_OFF }],
+			occupied_count: 1,
+			lane_limit: 6,
+			free_lanes: 0,
+			lane_capacity: { free: 0, bound: 'seats', seated: 9 } as const,
+		}
+		const { ports, frames } = harness(local, [plan])
+
+		await tick(FRESH_STATE, ports)
+
+		const frame = stripVTControlCharacters(frames.at(-1) ?? '')
+
+		expect(frame).toContain('🧵 seats 9/9')
+		expect(frame).toContain('waiting for seats 9/9')
+		expect(frame).not.toContain(run_event_setup.STAGE.HANDING_OFF)
+		expect(frame.match(/seats 9\/9/gu), frame).toHaveLength(LANES_WITH_WAIT)
+	})
+
 	it('refreshes occupied slots and the live limit independently of visible running rows', async () => {
 		const local = { ...LOCAL, events: [LAUNCH], occupied_count: 2, lane_limit: 6 }
 		const { ports, frames, read_local, clock } = harness(local, [])
@@ -142,11 +169,11 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
 
-		expect(lines[0]).toMatch(/ {2}✅ {2}0\/- ─+ {2}🔄 1 {2}⏳ - {2}💤 0/u)
-		expect(lines[1]).toContain('🧠')
-		expect(lines[2]?.trimStart()).toMatch(/^\S {6}🔄 1 running$/u)
+		expect(lines[0]).toMatch(/^▶ josh-board {2}🎯 --:-- {2}- {2}--′--″ .*🧠/u)
+		expect(lines[1]).toMatch(/🕒 \d{2}:\d{2} {2}\+ +(?:\d+′)?\d+″/u)
+		expect(lines[2]).toMatch(/🚀 \d{2}:\d{2} {2}\S {10}🔄 1 running$/u)
 		expect(lines[3]).toBe('')
-		expect(lines[4]).toMatch(/^── 🧵 lanes ─+ ⏰ ─+$/u)
+		expect(lines[4]).toMatch(/^── 🧵 lanes ─+ ⏰ ─+ ✅ 0\/- {2}🔄 1 {2}💤 0$/u)
 		expect(lines[5]).toMatch(new RegExp(String.raw`^ {2}\S {2}🔍 .*${String(CHILD)}       …`, 'u'))
 	})
 
@@ -159,12 +186,14 @@ describe('run_board_tick.tick before the plan is read', () => {
 
 	// joshuafolkken/kit#3689: a waiting run's second line is a working run's — the heartbeat, then the
 	// machine. joshuafolkken/kit#3692: no plan is read yet, so no repository is named before them.
+	// joshuafolkken/kit#8475: the second line draws no heartbeat — its gap stands in the notice slot.
 	it('marks the run ⏸ and draws no wait on the second line when no child runs', async () => {
 		const lines = await loading([{ ...DRAIN, pos: 1 }])
 
-		expect(lines[0]).toMatch(/^⏸ josh-board {2}⏰ (?:\d+′)?\d+″ {2}✅/u)
-		expect(lines[1]).toMatch(/^ {2}- +💓 (?:\d+′)?\d+″ {2}🧠/u)
-		expect(lines[2]).toMatch(/^ +(?:\d+′)?\d+″ {2}🔭 watching/u)
+		expect(lines[0]).toMatch(/^⏸ josh-board {2}🎯 --:-- {2}- {2}--′--″ .*🧠/u)
+		expect(lines[1]).toMatch(/^ {2}- +🕒/u)
+		expect(lines[1]).not.toContain('💓')
+		expect(lines[2]).toMatch(/🚀 \d{2}:\d{2} +(?:\d+′)?\d+″ {2}🔭 watching/u)
 		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
 
@@ -205,8 +234,9 @@ describe('run_board_tick.tick lane totals', () => {
 			const { ports, frames } = harness(local, [long_plan(1)])
 
 			await tick(FRESH_STATE, ports)
+			const first = lines_of(frames.at(-1))[0] ?? ''
 
-			expect(lines_of(frames.at(-1))[0]?.includes('🎯')).toBe(is_drawn)
+			expect(/🎯 \d{2}:\d{2}/u.test(first)).toBe(is_drawn)
 		},
 	)
 })
@@ -224,8 +254,8 @@ describe('run_board_tick.tick with a session’s operation', () => {
 
 		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
 
-		expect(lines_of(frames[0])[2]?.trimStart().slice(1)).toBe(
-			`  0″  🔧 #${String(CHILD)} · Bash pnpm josh gate`,
+		expect(lines_of(frames[0])[2]).toMatch(
+			new RegExp(` 0″  🔧 #${String(CHILD)} · Bash pnpm josh gate$`, 'u'),
 		)
 	})
 })

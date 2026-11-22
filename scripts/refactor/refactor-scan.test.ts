@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { import_graph } from './import-graph'
 import type { CategoryResult, Priority } from './refactor-lint'
-import { refactor_scan } from './refactor-scan'
+import { refactor_scan, type ScopeCounts } from './refactor-scan'
 
 const HIGH: Priority = 'high'
 const LOW: Priority = 'low'
+const COUNTS: ScopeCounts = { seed_count: 4, scope_count: 12, stopped_at: undefined }
 const SCOPE_PREFIX = 'scope: 12 files (seed 4,'
 const CANDIDATES_VERDICT = 'verdict: candidates (1 high/medium)'
 const CLEAR_VERDICT = 'verdict: clear'
@@ -77,9 +79,23 @@ describe('refactor_scan.category_block', () => {
 	})
 })
 
+describe('refactor_scan.scope_line', () => {
+	it('names the stage cap when every stage fit', () => {
+		expect(refactor_scan.scope_line(COUNTS)).toBe(
+			`${SCOPE_PREFIX} expanded via import graph, max ${String(import_graph.MAX_STAGES)} stages)`,
+		)
+	})
+
+	it('names the stage the file cap stopped and the cap', () => {
+		expect(refactor_scan.scope_line({ ...COUNTS, stopped_at: 3 })).toBe(
+			`${SCOPE_PREFIX} expanded via import graph, stopped before stage 3: cap ${String(import_graph.MAX_SCOPE_FILES)} files)`,
+		)
+	})
+})
+
 describe('refactor_scan.render', () => {
 	it('opens with the scope line and ends with the verdict', () => {
-		const rendered = refactor_scan.render([category(1)], 4, 12)
+		const rendered = refactor_scan.render([category(1)], COUNTS)
 
 		expect(rendered.startsWith(SCOPE_PREFIX)).toBe(true)
 		expect(rendered.endsWith(CANDIDATES_VERDICT)).toBe(true)
@@ -88,7 +104,7 @@ describe('refactor_scan.render', () => {
 
 describe('refactor_scan.error_output', () => {
 	it('reports the error verdict rather than an empty (clear) result', () => {
-		const rendered = refactor_scan.error_output(4, 12)
+		const rendered = refactor_scan.error_output(COUNTS)
 
 		expect(rendered.startsWith(SCOPE_PREFIX)).toBe(true)
 		expect(rendered.endsWith(`verdict: ${refactor_scan.ERROR} (scan could not run)`)).toBe(true)
@@ -97,15 +113,17 @@ describe('refactor_scan.error_output', () => {
 
 describe('refactor_scan.render_result', () => {
 	it('renders the error output when the verdict is error', () => {
-		const result = { seed_count: 1, scope_count: 3, categories: [], verdict: refactor_scan.ERROR }
+		const result = { ...COUNTS, categories: [], verdict: refactor_scan.ERROR }
 
 		expect(refactor_scan.render_result(result)).toContain('scan could not run')
 	})
 
 	it('renders the categories when the verdict is not error', () => {
 		const categories = [category(1)]
-		const result = { seed_count: 1, scope_count: 3, categories, verdict: refactor_scan.CANDIDATES }
+		const result = { ...COUNTS, categories, verdict: refactor_scan.CANDIDATES }
+		const rendered = refactor_scan.render_result(result)
 
-		expect(refactor_scan.render_result(result)).toContain(CANDIDATES_VERDICT)
+		expect(rendered.startsWith(SCOPE_PREFIX)).toBe(true)
+		expect(rendered).toContain(CANDIDATES_VERDICT)
 	})
 })

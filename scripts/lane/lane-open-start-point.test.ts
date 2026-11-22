@@ -1,5 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_gh_pr_auto_merge } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { git_worktree } from '#scripts/git/git-worktree'
@@ -8,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_install } from './lane-install'
 import { lane_open } from './lane-open'
 import { lane_paths } from './lane-paths'
+import { lane_registry } from './lane-registry'
 import { lane_seat_ownership } from './lane-seat-ownership'
 import { lane_state } from './lane-state'
 
@@ -103,6 +105,7 @@ async function branch_config(branch_name: string, field: 'merge' | 'remote'): Pr
 // (joshuafolkken/kit#1554): this fixture commits text files and no `package.json`, so a real
 // `pnpm install` would fail on a manifest that was never the subject.
 function stub_what_the_fixture_cannot_do(): void {
+	vi.spyOn(git_gh_pr_auto_merge, 'pr_list_open_with_head_prefix').mockResolvedValue([])
 	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
 	vi.spyOn(git_worktree, 'ls_remote_branch').mockResolvedValue('')
 	vi.spyOn(lane_install, 'install_dependencies').mockResolvedValue({
@@ -189,10 +192,10 @@ const LANE_BRANCH = lane_paths.lane_branch(ISSUE)
 const MAIN = 'main'
 const PUSHED_FILE = 'work-the-child-already-pushed.txt'
 
-async function build_pushed_lane_branch(): Promise<void> {
+async function build_pushed_lane_branch(branch = LANE_BRANCH): Promise<void> {
 	const root = fixture.repository_root
 
-	await git(root, ['checkout', '-q', '--no-track', '-b', LANE_BRANCH, ORIGIN_MAIN_REF])
+	await git(root, ['checkout', '-q', '--no-track', '-b', branch, ORIGIN_MAIN_REF])
 	writeFileSync(path.join(root, PUSHED_FILE), 'pushed\n')
 	await commit_all('work the child already pushed')
 	await git(root, ['checkout', '-q', MAIN])
@@ -200,12 +203,12 @@ async function build_pushed_lane_branch(): Promise<void> {
 
 // What `lane:close` leaves: `remove_lane` runs `git branch -D`, and nothing deletes the
 // remote-tracking ref the push created.
-async function drop_local_lane_branch(): Promise<void> {
+async function drop_local_lane_branch(branch = LANE_BRANCH): Promise<void> {
 	const root = fixture.repository_root
-	const pushed = await git(root, ['rev-parse', LANE_BRANCH])
+	const pushed = await git(root, ['rev-parse', branch])
 
-	await git(root, [UPDATE_REF, `refs/remotes/origin/${LANE_BRANCH}`, pushed])
-	await git(root, ['branch', '-D', LANE_BRANCH])
+	await git(root, [UPDATE_REF, `refs/remotes/origin/${branch}`, pushed])
+	await git(root, ['branch', '-D', branch])
 }
 
 describe('reopening a lane whose branch already exists', () => {
@@ -267,7 +270,49 @@ describe('reopening a lane whose branch is only on the remote', () => {
 	)
 })
 
-// joshuafolkken/kit#4268: the lane's state record starts at the open.
+async function prepare_legacy_pull(remote_only: boolean, branch: string): Promise<string> {
+	await build_pushed_lane_branch(branch)
+	const head = await git(fixture.repository_root, ['rev-parse', branch])
+	if (remote_only) await drop_local_lane_branch(branch)
+	vi.mocked(git_gh_pr_auto_merge.pr_list_open_with_head_prefix).mockResolvedValue([
+		{ number: 7498, head_ref: branch, has_auto_merge: false },
+	])
+
+	return head
+}
+
+describe('resuming the existing pull request through lane open', () => {
+	it.each([false, true])(
+		'preserves a legacy PR and its work, remote-only: %s (ac-6810beb4)',
+		async (remote_only) => {
+			const branch = `${ISSUE}-legacy-implementation`
+
+			const head = await prepare_legacy_pull(remote_only, branch)
+
+			const outcome = await lane_open.open_lane(ISSUE)
+
+			expect(outcome.kind).toBe('opened')
+			expect(await git(lane_directory(), ['branch', '--show-current'])).toBe(branch)
+			expect(await git(lane_directory(), ['rev-parse', 'HEAD'])).toBe(head)
+			expect(lane_holds(PUSHED_FILE)).toBe(true)
+			expect(await git_command.branch_exists(LANE_BRANCH)).toBe(false)
+			expect(lane_registry.find_lane(await lane_registry.list_lanes(), ISSUE)?.branch).toBe(branch)
+			expect(await branch_config(branch, 'merge')).toBe(`refs/heads/${branch}`)
+		},
+		TIMEOUT_MS,
+	)
+
+	it('refuses an open PR whose head could not be fetched (ac-0009c1ae)', async () => {
+		vi.mocked(git_gh_pr_auto_merge.pr_list_open_with_head_prefix).mockResolvedValue([
+			{ number: 7498, head_ref: `${ISSUE}-missing`, has_auto_merge: false },
+		])
+		vi.mocked(git_command.fetch_branch).mockRejectedValue(new Error('offline'))
+
+		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow('could not be fetched')
+		expect(existsSync(lane_directory())).toBe(false)
+	})
+})
+
 describe('the state record an opened lane starts', () => {
 	it(
 		'records the lane as open by lane:open',

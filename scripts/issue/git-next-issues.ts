@@ -1,3 +1,4 @@
+import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
@@ -5,7 +6,7 @@ import { defect_rate } from './defect-rate'
 import { expected_effect_lint } from './expected-effect-lint'
 import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
 import { issue_priority } from './issue-priority'
-import { issue_rank, type DependencyRow, type RankRow } from './issue-rank'
+import { issue_rank, type DependencyRank, type DependencyRow, type RankRow } from './issue-rank'
 import { session_cite } from './session-cite'
 import { size_estimate } from './size-estimate'
 
@@ -43,20 +44,25 @@ function compare_oldest_first(first: OpenIssueData, second: OpenIssueData): numb
 	return first.createdAt < second.createdAt ? -1 : 1
 }
 
+function label_names(issue: OpenIssueData): Array<string> {
+	return (issue.labels ?? []).map((label) => label.name)
+}
+
 // A row's blockers by number. **Lossy across repositories**: a blocker elsewhere sharing a number
-// with a row here counts as one of its dependents, and so does every row upstream of it, since the
-// count is transitive. The listings this ranks are one repository's own, and `backlog:next` re-ranks
-// its offer from the qualified graph (`backlog-rank.ts`), so the cost is runnable rows reordered rather
-// than a run started early.
+// with a row here counts as one of its dependents and takes its priority class, and so does every row
+// upstream of it, since both are transitive. The listings this ranks are one repository's own, and
+// `backlog:next` re-ranks its offer from the qualified graph (`backlog-rank.ts`), so the cost is
+// runnable rows reordered rather than a blocked run started early.
 function dependency_row(issue: OpenIssueData): DependencyRow {
 	return {
 		key: String(issue.number),
+		labels: label_names(issue),
 		blockers: (issue.blockedBy?.nodes ?? []).map((blocker) => String(blocker.number)),
 	}
 }
 
-function rank_row(issue: OpenIssueData, dependents: ReadonlyMap<string, number>): RankRow {
-	const labels = (issue.labels ?? []).map((label) => label.name)
+function rank_row(issue: OpenIssueData, dependency: DependencyRank): RankRow {
+	const labels = label_names(issue)
 	const body = issue.body ?? ''
 
 	return {
@@ -65,7 +71,7 @@ function rank_row(issue: OpenIssueData, dependents: ReadonlyMap<string, number>)
 		labels,
 		lost_minutes: issue_priority.lost_minutes(issue.body),
 		gain_minutes: expected_effect_lint.weekly_minutes(issue.body),
-		dependents: dependents.get(String(issue.number)) ?? 0,
+		...dependency,
 		estimated_lines: size_estimate.declared_size(body)?.lines,
 	}
 }
@@ -79,9 +85,19 @@ function order(
 	const candidates = issues
 		.filter((issue) => is_candidate(issue, completed_issue_number))
 		.toSorted(compare_oldest_first)
-	const dependents = issue_rank.count_dependents(candidates.map((issue) => dependency_row(issue)))
+	const neighbors = backlog_overlap.overlap_neighbors(
+		candidates.map((issue) => ({
+			key: String(issue.number),
+			paths: backlog_overlap.declared_paths(issue.body ?? ''),
+		})),
+	)
+	const rows = candidates.map((issue) => ({
+		...dependency_row(issue),
+		overlaps: neighbors.get(String(issue.number)),
+	}))
+	const rank_of = issue_rank.dependency_ranks(rows)
 
-	return issue_rank.rank(candidates, (issue) => rank_row(issue, dependents))
+	return issue_rank.rank(candidates, (issue) => rank_row(issue, rank_of(String(issue.number))))
 }
 
 // **This display deliberately does not drop a blocked issue, and the `auto-ok` pickup deliberately

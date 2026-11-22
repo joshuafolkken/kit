@@ -71,8 +71,7 @@ function ended(result: string): Found {
 
 function board(
 	found: Found | undefined,
-	extra: Partial<BoardHeader> = {},
-	status: ItemStatus = MERGED,
+	{ extra = {}, status = MERGED }: { extra?: Partial<BoardHeader>; status?: ItemStatus } = {},
 ): BoardHeader {
 	return header({
 		layout: { ...EMPTY_LAYOUT, active: [row_of(status)] },
@@ -87,7 +86,7 @@ function row_line(board_header: BoardHeader): string {
 }
 
 function done_line(found: Found | undefined, extra: Partial<BoardHeader> = {}): string {
-	return row_line(board(found, extra))
+	return row_line(board(found, { extra }))
 }
 
 describe('run_board_render — a merged row’s net minutes', () => {
@@ -142,7 +141,7 @@ describe('run_board_render — a merged row while the investigation switch is of
 
 	it('ends on every filing and no 🔍 for a started investigation', () => {
 		const started = found_of(STARTED_NOTE, { filed: ['4768'], overrun_filed: ['4769'] })
-		const lines = lines_of(board(started, OFF))
+		const lines = lines_of(board(started, { extra: OFF }))
 
 		expect(lines.find((line) => line.includes(String(DONE)))).toMatch(/″ +4768, 4769$/u)
 		expect(lines.join('\n')).not.toContain(STILL)
@@ -338,7 +337,7 @@ describe('run_board_render — a done row’s filings', () => {
 	// joshuafolkken/kit#7095 (ac-932de729): a ⏩ already-done row counts what it found as 🏁 done does.
 	it.each(['done', 'already_done'] as const)('draws only them on a %s row', (state) => {
 		const status: ItemStatus = { ...MERGED, state }
-		const line = row_line(board(found_of(undefined, { filed: FILED }), {}, status))
+		const line = row_line(board(found_of(undefined, { filed: FILED }), { status }))
 
 		expect(line).toMatch(/″ +4768, 4769, 4770$/u)
 		expect(line).not.toContain('′ ')
@@ -347,7 +346,7 @@ describe('run_board_render — a done row’s filings', () => {
 	it('draws every filing as one list on a 🏁 done row, whatever its origin', () => {
 		const status: ItemStatus = { ...MERGED, state: 'done' }
 		const found = found_of(undefined, { filed: ['4768'], overrun_filed: ['4769', '4770'] })
-		const line = row_line(board(found, {}, status))
+		const line = row_line(board(found, { status }))
 
 		expect(line).toMatch(/″ +4768, 4769, 4770$/u)
 		expect(line).not.toContain(STILL)
@@ -356,7 +355,7 @@ describe('run_board_render — a done row’s filings', () => {
 	it('draws none on a row still running', () => {
 		const status: ItemStatus = { state: 'running', started_ms: STARTED }
 		const running = found_of(STARTED_NOTE, { filed: FILED, is_investigating: true })
-		const line = row_line(board(running, {}, status))
+		const line = row_line(board(running, { status }))
 
 		expect(line).not.toContain('4768')
 		expect(line).not.toContain(STILL)

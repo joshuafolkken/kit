@@ -103,8 +103,11 @@ function issue_column(lines: ReadonlyArray<string>, issue: number): number {
 	return width_of(lead)
 }
 
-function header(lines: ReadonlyArray<string>): Array<string> {
-	return lines.slice(0, lines.indexOf(''))
+// The run's tallies at the lanes rule's end (joshuafolkken/kit#8514).
+function tally_of(lines: ReadonlyArray<string>): string {
+	const rule = lines.find((line) => / lanes /u.test(line)) ?? ''
+
+	return rule.slice(rule.indexOf(STATE_ICONS.merged))
 }
 
 describe('run_board_tick.tick — what an earlier run’s lane is doing', () => {
@@ -168,7 +171,7 @@ describe('run_board_tick.tick — an earlier run’s lane its child cut and resu
 		const quiet = await frame_of(HELD, undefined, plans)
 
 		expect(row_of(lines, EARLIER)).toMatch(EARLIER_ROW)
-		expect(header(lines)[0]).toBe(header(quiet)[0])
+		expect(tally_of(lines)).toBe(tally_of(quiet))
 	})
 
 	it('keeps this run’s own child running across its cut and resume', async () => {
@@ -179,6 +182,6 @@ describe('run_board_tick.tick — an earlier run’s lane its child cut and resu
 		const lines = await frame_of({ ...HELD, lanes: [String(OWN), String(EARLIER)], events: own })
 
 		expect(row_of(lines, OWN)).not.toContain(EARLIER_ICON)
-		expect(header(lines)[0]).toContain('🔄 1')
+		expect(tally_of(lines)).toContain('🔄 1')
 	})
 })
