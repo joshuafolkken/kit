@@ -1,3 +1,5 @@
+import { run_board_fire_trail } from './run-board-fire-trail'
+
 // joshuafolkken/kit#8677: the bttf theme's time jump and arrival as timelines in ticks of
 // `TICK_MS`. A jump runs up over the merge notice's letters — one tick each, so it starts on the first
 // letter — and jumps on the tick after the last: the speed climbs to 88, the gauge steps up with the
@@ -33,6 +35,9 @@ const ARRIVE_FLASHES = ['4 2 0.35', '10 2 0.65', '16 3 1'].map((flash) => {
 })
 const THAW_AT = 19
 const ARRIVE_TICKS = THAW_AT + THAW_TICKS
+// joshuafolkken/kit#8675: the ticks a jump runs past its last letter — its wash, its thaw and its fire
+// trails burning out.
+const END_TICKS = Math.max(WASH_TICKS + THAW_TICKS, run_board_fire_trail.TRAIL_TICKS)
 
 // A jump: the moment the merge notice started typing, its letter count and the issue it merged.
 interface JumpRun {
@@ -55,8 +60,13 @@ function run_of(letters: number): number {
 	return Math.max(1, letters - lead_of(letters))
 }
 
-// Whether the jump is over at `ms`: its wash and its thaw done.
+// Whether the jump is over at `ms`: its wash, its thaw and its trails done.
 function is_over(run: JumpRun, ms: number): boolean {
+	return tick_of(run, ms) >= END_TICKS
+}
+
+// Whether the jump's wash and thaw are done at `ms`, leaving only its trails burning out.
+function is_thawed(run: JumpRun, ms: number): boolean {
 	return tick_of(run, ms) >= WASH_TICKS + THAW_TICKS
 }
 
@@ -125,6 +135,7 @@ function flash_of(tick: number): number {
 
 const run_board_jump = {
 	ARRIVE_TICKS,
+	END_TICKS,
 	THAW_AT,
 	THAW_TICKS,
 	TICK_MS,
@@ -138,6 +149,7 @@ const run_board_jump = {
 	is_orange,
 	is_over,
 	is_running,
+	is_thawed,
 	jump_speed,
 	lead_of,
 	stage_of,

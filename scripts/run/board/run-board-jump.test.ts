@@ -23,8 +23,10 @@ const {
 const RUN = { start_ms: 1000, letters: 10 }
 const LETTERS = 30
 const CRUISE = 40
-// The jump is over this many ticks after it: its wash and its thaw.
-const OVER_TICK = 58
+// The jump is over this many ticks after it: its fire trails burned out (58 ticks, crossing in 20).
+const OVER_TICK = 78
+// The thaw is over this many ticks after it: its wash and its thaw, when the speed is back at cruise.
+const THAWED_TICK = 58
 
 function ms_at(tick: number): number {
 	return RUN.start_ms + (tick + RUN.letters) * TICK_MS
@@ -39,7 +41,7 @@ describe('run_board_jump.tick_of', () => {
 })
 
 describe('run_board_jump.is_running / is_over', () => {
-	it('runs from the first letter until the wash and the thaw are done', () => {
+	it('runs from the first letter until the wash, the thaw and the fire trails are done', () => {
 		expect(is_running(RUN, RUN.start_ms - 1)).toBe(false)
 		expect(is_running(RUN, RUN.start_ms)).toBe(true)
 		expect(is_running(RUN, ms_at(OVER_TICK - 1))).toBe(true)
@@ -63,12 +65,12 @@ describe('run_board_jump.jump_speed', () => {
 	it('holds 88 through the wash and brakes towards the cruise through the thaw', () => {
 		expect(jump_speed(0, LETTERS, CRUISE)).toBe(TOP_SPEED)
 		expect(jump_speed(13, LETTERS, CRUISE)).toBe(TOP_SPEED)
-		expect(jump_speed(OVER_TICK - 1, LETTERS, CRUISE)).toBeCloseTo(41.07, 1)
+		expect(jump_speed(THAWED_TICK - 1, LETTERS, CRUISE)).toBeCloseTo(41.07, 1)
 	})
 
 	it('has no speed outside the jump', () => {
 		expect(jump_speed(-LETTERS - 1, LETTERS, CRUISE)).toBeUndefined()
-		expect(jump_speed(OVER_TICK, LETTERS, CRUISE)).toBeUndefined()
+		expect(jump_speed(THAWED_TICK, LETTERS, CRUISE)).toBeUndefined()
 	})
 })
 
