@@ -22,8 +22,9 @@ import {
 // cause-loss lines summed over its recurrences (joshuafolkken/kit#4928), else its causing-lane line,
 // so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
 // undeclared issue follows every declared one of its priority), then how many other open issues wait
-// on it, transitively (`count_dependents`: a chain's head runs ahead of an independent issue
-// (joshuafolkken/kit#5506)), then declared size-estimate lines, smallest first (undeclared last),
+// on it — transitively down blocked-by, plus those declaring a path it declares (`count_dependents`: a
+// chain's head and a run of same-file issues run ahead of an independent issue
+// (joshuafolkken/kit#5506, joshuafolkken/kit#8571)), then declared size-estimate lines, smallest first (undeclared last),
 // then the minutes a week its declared speed-up saves
 // (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared, so a measured
 // time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)). Below those, the caller's
@@ -52,11 +53,13 @@ interface RankRow {
 
 // One open issue as its key, its labels and the keys of the issues it is blocked by. The caller names
 // the key format, so a ranking over listing rows and one over graph children each count in their own
-// terms.
+// terms. `overlaps` names the rows whose declared paths meet this row's
+// (`backlog_overlap.overlap_neighbors`) — they queue behind it as surely as a blocked row does.
 interface DependencyRow {
 	key: string
 	labels: ReadonlyArray<string>
 	blockers: ReadonlyArray<string>
+	overlaps?: Iterable<string> | undefined
 }
 
 type DependencyRank = Pick<RankRow, 'blocked_priority' | 'dependents'>
@@ -142,16 +145,29 @@ function for_each_upstream(
 	}
 }
 
-// How many of the rows wait on each key, transitively: a chain's head counts every row behind it, so
-// the issue that unblocks the longest run of lanes is offered first (joshuafolkken/kit#5506).
-function count_dependents(rows: ReadonlyArray<DependencyRow>): ReadonlyMap<string, number> {
-	const counts = new Map<string, number>()
+function add_follower(followers: Map<string, Set<string>>, key: string, follower: string): void {
+	followers.set(key, (followers.get(key) ?? new Set()).add(follower))
+}
 
-	for_each_upstream(rows, (upstream) => {
-		counts.set(upstream, (counts.get(upstream) ?? NO_DEPENDENTS) + 1)
+// How many of the rows wait on each key: transitively down blocked-by, so a chain's head counts every
+// row behind it and the issue that unblocks the longest run of lanes is offered first
+// (joshuafolkken/kit#5506), and directly across a path overlap, so a run of issues declaring one file
+// goes ahead of an independent issue of its priority (joshuafolkken/kit#8571). A row behind on both
+// counts once.
+function count_dependents(rows: ReadonlyArray<DependencyRow>): ReadonlyMap<string, number> {
+	const followers = new Map<string, Set<string>>()
+
+	for_each_upstream(rows, (upstream, key) => {
+		add_follower(followers, upstream, key)
 	})
 
-	return counts
+	const overlap_pairs = rows.flatMap((row) =>
+		[...(row.overlaps ?? [])].map((neighbor) => [row.key, neighbor] as const),
+	)
+
+	for (const [key, neighbor] of overlap_pairs) add_follower(followers, key, neighbor)
+
+	return new Map([...followers].map(([key, keys]) => [key, keys.size]))
 }
 
 // The highest priority class among the rows waiting on each key, transitively (joshuafolkken/kit#8541).

@@ -1,3 +1,4 @@
+import { backlog_overlap, type OverlapCandidate } from '#scripts/backlog/backlog-overlap'
 import { defect_rate } from '#scripts/issue/defect-rate'
 import { expected_effect_lint } from '#scripts/issue/expected-effect-lint'
 import { issue_priority } from '#scripts/issue/issue-priority'
@@ -11,17 +12,41 @@ import { epic_graph, type EpicChild } from './epic-graph'
 
 const CLOSED = 'CLOSED'
 
-// The open issues of the pool as dependency rows, for how many wait on each child, directly or down a
-// chain, and the highest priority among them. Only the pool is counted: it is every issue the caller
-// may run, and an issue outside it is not one this ranking can start sooner.
-function dependency_rows(pool: ReadonlyArray<EpicChild>): Array<DependencyRow> {
-	return pool
-		.filter((child) => child.state !== CLOSED)
+function overlap_candidates(open: ReadonlyArray<EpicChild>, repo: string): Array<OverlapCandidate> {
+	return open
+		.filter((child) => child.repo === repo)
 		.map((child) => ({
 			key: epic_graph.key_of(child),
-			labels: child.labels,
-			blockers: child.blocked_by.map((blocker) => epic_graph.blocker_key(blocker)),
+			paths: backlog_overlap.declared_paths(child.body ?? ''),
 		}))
+}
+
+// The children whose declared paths meet each child's, weighed only within one repository: the same
+// path in two repositories is two files.
+function overlap_neighbors(
+	open: ReadonlyArray<EpicChild>,
+): ReadonlyMap<string, ReadonlySet<string>> {
+	const repos = [...new Set(open.map((child) => child.repo))]
+
+	return new Map(
+		repos.flatMap((repo) => [...backlog_overlap.overlap_neighbors(overlap_candidates(open, repo))]),
+	)
+}
+
+// The open issues of the pool as dependency rows, for how many wait on each child — directly, down a
+// chain, or across a declared path overlap — and the highest priority among them. Only the pool is
+// counted: it is every issue the caller may run, and an issue outside it is not one this ranking can
+// start sooner.
+function dependency_rows(pool: ReadonlyArray<EpicChild>): Array<DependencyRow> {
+	const open = pool.filter((child) => child.state !== CLOSED)
+	const neighbors = overlap_neighbors(open)
+
+	return open.map((child) => ({
+		key: epic_graph.key_of(child),
+		labels: child.labels,
+		blockers: child.blocked_by.map((blocker) => epic_graph.blocker_key(blocker)),
+		overlaps: neighbors.get(epic_graph.key_of(child)),
+	}))
 }
 
 function rank(
