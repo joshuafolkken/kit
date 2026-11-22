@@ -103,11 +103,13 @@ function spent_reason(
 		: undefined
 }
 
-// **While memory is pressured, a claim as large as the largest declared peak (ESLint's) never overflows**
-// (joshuafolkken/kit#8473). Compression and swap keep the free figure optimistic under pressure, so the
-// memory check passed a second ESLint claim on the CPU's overflow and the machine ran out of memory.
-// Smaller claims keep overflowing, so a saturated CPU still makes progress.
-const LARGE_CLAIM_MB = Math.max(...Object.values(core_weights.MEMORY_MB))
+// **While memory is pressured, a claim as large as ESLint's never overflows** (joshuafolkken/kit#8473).
+// Compression and swap keep the free figure optimistic under pressure, so the memory check passed a
+// second ESLint claim on the CPU's overflow and the machine ran out of memory. Smaller claims keep
+// overflowing, so a saturated CPU still makes progress. ESLint's claim, not the largest declared one:
+// the measured ESLint peak (joshuafolkken/kit#8587) sits under the type check's, so the type check
+// and a unit suite of enough workers to reach it are held under pressure too.
+const LARGE_CLAIM_MB = core_weights.MEMORY_MB.lint
 
 function is_large_under_pressure(context: WaitContext, budget: MachineBudget): boolean {
 	return budget.memory_pressured === true && (context.fields.memory_mb ?? 0) >= LARGE_CLAIM_MB

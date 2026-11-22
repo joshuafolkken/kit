@@ -11,8 +11,9 @@ const { LOCAL, harness, plan_titled } = run_board_fixture
 const { options_of } = run_board_frame_preview
 const ESCAPE = '\u{1B}['
 const NARROW = 60
+const ROWS = 30
 const NOTICE = ['--notice', 'running', '--issue', '8426']
-const NOTICE_TEXT = /🔊 \S+ #8426 \d{2}:\d{2}/u
+const NOTICE_TEXT = /🔊 \d{2}:\d{2} 🔄 launch · #8426 running/u
 
 async function framed(flags: ReadonlyArray<string>): Promise<{ text: string; code: number }> {
 	const { ports, frames } = harness(LOCAL, [plan_titled('a')])
@@ -33,7 +34,7 @@ describe('run_board_frame_preview — the notice', () => {
 	it('marks a repeat and a muted switch', async () => {
 		const { text } = await framed([...NOTICE, '--repeat', '--mute'])
 
-		expect(text).toMatch(/🔇 \S+ #8426 \d{2}:\d{2} ×2/u)
+		expect(text).toMatch(/🔇 \d{2}:\d{2} 🔄 launch · #8426 running ×2/u)
 	})
 
 	it('draws no notice when none is named', async () => {
@@ -54,12 +55,20 @@ describe('run_board_frame_preview — the icons', () => {
 	})
 })
 
-describe('run_board_frame_preview — the form', () => {
-	it('keeps every line within a narrow width', async () => {
-		const { text } = await framed([...NOTICE, '--columns', String(NARROW)])
-		const widths = text.split('\n').map((line) => run_board_fit.width_of(line))
+// The screen rows a frame takes in a narrow pane, each line wrapped as the board counts it.
+function narrow_height(text: string): number {
+	return text.split('\n').reduce((sum, line) => sum + run_board_fit.height_of(line, NARROW), 0)
+}
 
-		expect(Math.max(...widths)).toBeLessThanOrEqual(NARROW)
+describe('run_board_frame_preview — the form', () => {
+	// joshuafolkken/kit#8595: a narrow pane wraps the notice whole, and the frame counts the wrapped
+	// rows within its height.
+	it('keeps a narrow frame within its rows, the notice wrapped whole', async () => {
+		const size = ['--columns', String(NARROW), '--rows', String(ROWS)]
+		const { text } = await framed([...NOTICE, ...size])
+
+		expect(text).toMatch(NOTICE_TEXT)
+		expect(narrow_height(text)).toBeLessThanOrEqual(ROWS)
 	})
 
 	it('writes plain text unless --ansi keeps the escapes', async () => {

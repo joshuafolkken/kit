@@ -27,20 +27,39 @@ interface Row {
 	shown: string
 }
 
-// Each cue as its icon, then the issue or the run's words (joshuafolkken/kit#8475).
+// Each cue as its icon and name, then the issue and its words, or the run's words alone
+// (joshuafolkken/kit#8595).
 const ROWS: ReadonlyArray<Row> = [
-	{ scene: 'a launch', cue: 'launch', word: 'running', issue: 8090, shown: '🔄 #8090' },
-	{ scene: 'a lane end', cue: 'lane-end', word: 'merged', issue: 8096, shown: '✅ #8096' },
-	{ scene: 'a drain', cue: 'drain', word: 'run drained', shown: '🏁 run drained' },
+	{
+		scene: 'a launch',
+		cue: 'launch',
+		word: 'running',
+		issue: 8090,
+		shown: '🔄 launch · #8090 running',
+	},
+	{
+		scene: 'a lane end',
+		cue: 'lane-end',
+		word: 'merged',
+		issue: 8096,
+		shown: '✅ lane-end · #8096 merged',
+	},
+	{ scene: 'a drain', cue: 'drain', word: 'run drained', shown: '🏁 drain · run drained' },
 	{
 		scene: 'a wait on a person',
 		cue: 'human',
 		word: 'needs a person',
 		issue: 8026,
-		shown: '🙋 #8026',
+		shown: '🙋 human · #8026 needs a person',
 	},
-	{ scene: 'a stop', cue: ALERT, word: STOPPED, issue: STOPPED_ISSUE, shown: '🛑 #8103' },
-	{ scene: 'a usage hold', cue: ALERT, word: 'usage held', shown: '🛑 usage held' },
+	{
+		scene: 'a stop',
+		cue: ALERT,
+		word: STOPPED,
+		issue: STOPPED_ISSUE,
+		shown: '🛑 alert · #8103 stopped',
+	},
+	{ scene: 'a usage hold', cue: ALERT, word: 'usage held', shown: '🛑 alert · usage held' },
 ]
 const QUIET = { last_event_ms: undefined, outage: undefined, is_stopped: false }
 // A header with nothing standing: no outage, no failed read, no heartbeat read.
@@ -51,7 +70,7 @@ function notice_of({ cue, word, issue }: Omit<Row, 'scene' | 'shown'>, is_repeat
 }
 
 const STOP_NOTICE = notice_of({ cue: ALERT, word: STOPPED, issue: STOPPED_ISSUE })
-const STOP_WORDS = '🛑 #8103 10:42'
+const STOP_WORDS = '10:42 🛑 alert · #8103 stopped'
 
 function plain_link(reference: string): string {
 	return reference
@@ -66,8 +85,8 @@ function shown(notice: Notice | undefined, is_sound_on: boolean | undefined = tr
 }
 
 describe('run_board_header_notice.part_of', () => {
-	it.each(ROWS)('draws the cue’s icon, what sounded it and the minute for $scene', (entry) => {
-		expect(shown(notice_of(entry))).toBe(`🔊 ${entry.shown} 10:42`)
+	it.each(ROWS)('draws the minute, the cue and what sounded it for $scene', (entry) => {
+		expect(shown(notice_of(entry))).toBe(`🔊 10:42 ${entry.shown}`)
 	})
 
 	it('draws — after the speaker before any notice', () => {
@@ -77,7 +96,7 @@ describe('run_board_header_notice.part_of', () => {
 	it('marks a notice sounded again ten minutes on with ×2', () => {
 		const repeat = notice_of({ cue: ALERT, word: STOPPED, issue: STOPPED_ISSUE }, true)
 
-		expect(shown(repeat)).toBe('🔊 🛑 #8103 10:42 ×2')
+		expect(shown(repeat)).toBe(`🔊 ${STOP_WORDS} ×2`)
 	})
 
 	it('draws the notice behind 🔇 while the sound is off', () => {

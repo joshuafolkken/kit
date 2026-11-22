@@ -1,3 +1,4 @@
+import { run_board_escape } from './run-board-escape'
 import { run_board_fit } from './run-board-fit'
 import type { Icons } from './run-board-icons'
 import { run_board_labels, type Paint } from './run-board-labels'
@@ -144,17 +145,20 @@ function opened(open: Open, segment: string): Open {
 }
 
 // Share the escape walk with renderers that must restore the line's existing bold and dim.
+// joshuafolkken/kit#8591: a line splits at its escapes (`run-board-escape.ts`), so `draw` is given its
+// text only — a link's body or tmux's passthrough is kept as it came; a color escape updates `open`.
 function mapped(frame: string, draw: (text: string, open: Open) => string): string {
-	const [head = '', ...escaped] = frame.split(ESC)
-	const drawn = [draw(head, PLAIN)]
 	let open = PLAIN
 
-	for (const segment of escaped) {
-		open = opened(open, segment)
-		drawn.push(draw(segment, open))
-	}
+	return frame
+		.split(run_board_escape.LINE_ESCAPE)
+		.map((part) => {
+			if (!run_board_escape.is_escape(part)) return draw(part, open)
+			open = opened(open, part.slice(ESC.length))
 
-	return drawn.join(ESC)
+			return part
+		})
+		.join('')
 }
 
 // A board in no theme drawing `emoji` is the frame as its sources drew it.

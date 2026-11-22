@@ -116,6 +116,14 @@ describe('run_board_pause run:stalled next action and backfills', () => {
 	})
 })
 
+// joshuafolkken/kit#8592: with no reason anywhere the row still names what a person does next.
+describe('run_board_pause fallback', () => {
+	it('names the next action and what to decide', () => {
+		expect(run_board_pause.FALLBACK).toMatch(/^person: read the issue and decide\b/u)
+		expect(issue_outcome.summary_schema.safeParse(run_board_pause.FALLBACK).success).toBe(true)
+	})
+})
+
 describe('run_board_pause evidence validation', () => {
 	it('falls back for a missing URL or invalid summary', () => {
 		const missing = { ...note(APPROVAL_REASON), html_url: undefined }
