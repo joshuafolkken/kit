@@ -712,25 +712,25 @@ Create an epic issue from its child issue numbers.
 
 ```bash
 pnpm josh epic "Epic: split the parser work" 101 102 103
-pnpm josh epic "Epic: staged rollout" A B --ordered --order-reason "#A -> #B: B ships the flag A adds"
-pnpm josh epic "Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: …" --order-reason "#B -> #C: …"   # a join
-pnpm josh epic "Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: #B calls the parser #A adds"                           # why B waits on A
+pnpm josh epic "Epic: staged rollout" A B --ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"
+pnpm josh epic "Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"   # a join
+pnpm josh epic "Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"                # why B waits on A
 pnpm josh epic "Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md
-pnpm josh epic --promote 858 101 102 103                                                                                           # turn an existing issue into an epic
-pnpm josh epic --add 893 894                                                                                                       # track #894, declaring no order for it
-pnpm josh epic --add 893 894 --before 891 --order-reason "<chain>: <reason>"                                                       # #894 must finish before #891
-pnpm josh epic --add 893 894 --after 890 --order-reason "<chain>: <reason>"                                                        # #894 starts once #890 is done
-pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                      # …and record why, in one call
-pnpm josh epic --reconcile 2184                                                                                                    # rewrite the body to match the recorded blocked-by, and record any order the body declared
+pnpm josh epic --promote 858 101 102 103                                                                                                             # turn an existing issue into an epic
+pnpm josh epic --add 893 894                                                                                                                         # track #894, declaring no order for it
+pnpm josh epic --add 893 894 --before 891 --order-reason "<chain>: <reason>"                                                                         # #894 must finish before #891
+pnpm josh epic --add 893 894 --after 890 --order-reason "<chain>: <reason>"                                                                          # #894 starts once #890 is done
+pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                                        # …and record why, in one call
+pnpm josh epic --reconcile 2184                                                                                                                      # rewrite the body to match the recorded blocked-by, and record any order the body declared
 pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
-pnpm josh epic --untrack 893 894                                                                                                   # remove a child row and its connected orders
+pnpm josh epic --untrack 893 894                                                                                                                     # remove a child row and its connected orders
 ```
 
 **Options:**
 
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--chain "#A -> #B"` — repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.
-- `--order-reason "#A -> #B: <reason>"` — repeatable, on create, `--promote` and `--add`: what the later child of one declared chain (`--chain`, `--ordered`, `--before` or `--after`) takes from the earlier one. Required for every declared chain; written under its `### Declared order` entry. A missing, undeclared, repeated or reasonless one is refused before anything is written.
+- `--order-reason "#A -> #B: <reason>"` — repeatable, on create, `--promote` and `--add`: what the later child of one declared chain takes from the earlier one. Required per chain; written under its `### Declared order` entry. On create or `--promote` it opens with its kind (`unverifiable in one pass` / `waits on another`). A missing, undeclared, repeated, reasonless or kindless one is refused.
 - `--rationale-file <path|->` — split rationale prose, written under `.josh/tmp/` (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
 - `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.

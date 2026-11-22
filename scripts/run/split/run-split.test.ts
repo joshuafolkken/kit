@@ -89,11 +89,15 @@ const CHILDREN = ['11', '12']
 const ORDER_REASON = '--order-reason'
 const SPLIT = { issue: '10', children: CHILDREN, title: TITLE }
 const INDEPENDENT = { ...SPLIT, is_ordered: false, chains: [], order_reasons: [] }
-const ORDERED = { ...INDEPENDENT, is_ordered: true, order_reasons: ['#10 -> #11 -> #12: uses #10'] }
+const ORDERED = {
+	...INDEPENDENT,
+	is_ordered: true,
+	order_reasons: ['#10 -> #11 -> #12: 1 パスで検証できない — uses #10'],
+}
 const SECOND_INTO_LAST = '#11 -> #12'
 const OUTSIDER = '#11 -> #99'
 const JOIN = ['#10 -> #12', SECOND_INTO_LAST]
-const JOIN_REASONS = JOIN.map((chain) => `${chain}: #12 reads the earlier one`)
+const JOIN_REASONS = JOIN.map((chain) => `${chain}: 別の待ちがある — #12 reads the earlier one`)
 const JOINED = { ...INDEPENDENT, chains: JOIN, order_reasons: JOIN_REASONS }
 const JOIN_ARGV = [
 	...JOIN.flatMap((chain) => ['--chain', chain]),
@@ -195,7 +199,7 @@ describe('run_split.split — an ordered split into an existing epic records its
 		const decision = added_decision(epic_run.mock.calls[0]?.[0] ?? [])
 
 		expect(decision).toContain('- Order: `#10 -> #11 -> #12`, declared by `josh epic --add`')
-		expect(decision).toContain('- Reasoning: uses #10')
+		expect(decision).toContain('- Reasoning: 1 パスで検証できない — uses #10')
 	})
 })
 

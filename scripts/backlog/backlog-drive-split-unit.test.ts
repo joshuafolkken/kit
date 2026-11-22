@@ -130,9 +130,9 @@ async function brief_argv(): Promise<string> {
 // joshuafolkken/kit#7998: a declared order is refused without its reason, so the brief asks for both.
 // joshuafolkken/kit#7915: per-child chains are the default; --ordered is kept for a true series.
 describe('backlog_drive_split_unit.run — the order reason it asks for', () => {
-	it('asks for a reason beside any declared order', async () => {
+	it('asks for a kind and a reason beside any declared order', async () => {
 		expect(await brief_argv()).toContain(
-			'[--chain \\"#A -> #C\\" ... --order-reason \\"#A -> #C: <reason>\\"',
+			'[--chain \\"#A -> #C\\" ... --order-reason \\"#A -> #C: <kind> — <reason>\\"',
 		)
 	})
 
