@@ -19,8 +19,7 @@ import type { TypingSpan } from './run-board-type-rows'
 // changed since the last one.
 // joshuafolkken/kit#8369: while a row types the rain pours — `POUR_PER_STEP` drops enter on each step in
 // place of the second's one, each at its own pace in the pour's spread, and every drop falling speeds
-// up to at least the pour's pace (`run_board_idle_rain.POUR`). From the step the typing ends the second's
-// drop returns; a poured drop keeps its own pace until it falls off.
+// up to at least the pour's floor (`POUR_FLOOR`). From the step the typing ends the second's drop returns.
 // joshuafolkken/kit#8627: every drop's trail runs 40% to 100% of the screen's rows, `TRAIL`'s paint
 // stretched over it (`run_board_rain.paint_of`). The pour falls twice the panel's pour (`POUR_GAIN`), on
 // the drops only, and once the typing ends a poured drop gains its own pace again each second.

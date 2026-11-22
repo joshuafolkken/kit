@@ -128,6 +128,15 @@ describe('run_board_rain_drop — a trail 40% to 100% of the screen', () => {
 			expect(length).toBeLessThanOrEqual(ROWS)
 		}
 	})
+
+	it('keeps the slowest drop while its whole-screen trail still reaches the last row', () => {
+		// Twenty rows, the drop at 0 at 0.12 rows a step: at 15000 its head is on row 37, its 20-cell
+		// trail's end on row 17, past the 24 rows a four-cell trail would have kept it for.
+		const long = share_by(new Map([[SALT.trail, 1]]))
+		const born = falls_at(blank_screen(20), 15_000, long).map((fall) => fall.born_ms)
+
+		expect(born).toContain(0)
+	})
 })
 
 describe('run_board_rain_drop — the trail’s paint stretched over its length', () => {
