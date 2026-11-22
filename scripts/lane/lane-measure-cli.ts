@@ -13,6 +13,7 @@ import { lane_limit_history } from './lane-limit-history'
 import { lane_net_read } from './lane-net-read'
 import { lane_over_causes } from './lane-over-causes'
 import { lane_pairs } from './lane-pairs'
+import { lane_prefix_stats } from './lane-prefix-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_sinks } from './lane-sinks'
 import { lane_sinks_issues } from './lane-sinks-issues'
@@ -135,12 +136,14 @@ async function period_records(
 	const human_waits = is_human_read
 		? await lane_human_wait_read.read_for(context, events, window)
 		: []
+	const directories = transcript_directories(context)
 
 	return {
 		entries: await lane_ledger_archive.read_history(context),
 		events,
-		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
+		calls: lane_transcript_stats.read_calls(directories, window),
 		human_waits,
+		prefixes: lane_prefix_stats.read_prefixes(directories, window),
 	}
 }
 

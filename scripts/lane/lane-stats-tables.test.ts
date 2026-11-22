@@ -43,6 +43,7 @@ const FIRST_HEADER_CELLS = [
 	'test:related whole-suite trigger',
 	'lint:related stage',
 	'transcript metric',
+	'first request model',
 	'recording command',
 	'concurrent lanes',
 ]
