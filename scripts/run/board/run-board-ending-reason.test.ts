@@ -1,3 +1,4 @@
+import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
@@ -136,6 +137,22 @@ describe('run_board_ending_reason.row_reason — a waiting lane', () => {
 
 		expect(run_board_ending_reason.row_reason(13, status, read)).toStrictEqual({
 			reason: { tail: reason },
+		})
+	})
+})
+
+// joshuafolkken/kit#8665: the row's next free lane holds once a retry lifts the drive's yield cap.
+describe('run_board_ending_reason.row_reason — a retried yield-capped lane', () => {
+	it('names the next free lane for the issue the drive offers again', () => {
+		const events = [
+			{ ...event(KIND.PARK, '#13 parked (run:stalled: yield cap)'), pos: 1 },
+			{ ...event(KIND.ADD, 'retry #13'), pos: 2 },
+		]
+		const read = { titles: new Map(), labels: new Map() }
+
+		expect(backlog_drive_restore.without_readmitted(['13'], events)).toStrictEqual([])
+		expect(run_board_ending_reason.row_reason(13, { state: 'waiting' }, read)).toStrictEqual({
+			reason: { tail: run_board_ending_reason.WAITING_TAILS.free },
 		})
 	})
 })
