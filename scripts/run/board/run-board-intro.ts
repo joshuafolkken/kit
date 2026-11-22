@@ -187,11 +187,14 @@ async function lead_in(
 	if (is_played) await listen([{ text: line, ms: intro.hold_ms }].values(), ports, keys)
 }
 
-// The theme's letters, then its hold, silent, unless a key skipped the letters.
+// The theme's letters, then its typed-end sound once (joshuafolkken/kit#8697) and its hold, silent,
+// unless a key skipped the letters.
 async function type_in(ports: IntroPorts, keys: KeyReading, intro: IntroDefinition): Promise<void> {
 	const is_typed = await letters(letter_beats(intro), ports, keys)
 
-	if (is_typed) await listen([{ text: '', ms: intro.hold_ms }].values(), ports, keys)
+	if (!is_typed) return
+	ports.typing_sound?.typed?.()
+	await listen([{ text: '', ms: intro.hold_ms }].values(), ports, keys)
 }
 
 // The theme's lead lines where it has them (joshuafolkken/kit#8441), else its typed line.

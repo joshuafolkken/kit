@@ -5,6 +5,8 @@ import type { Paint } from './run-board-labels'
 import type { PanelPainter } from './run-board-panel-draw'
 import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_sound_click } from './run-board-sound-click'
+import { run_board_sound_enter } from './run-board-sound-enter'
+import { run_board_sound_keypad } from './run-board-sound-keypad'
 import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme_tones } from './run-board-theme-tones'
 
@@ -39,14 +41,15 @@ interface IntroDefinition {
 // whole board every second in place of the sweep (`run-board-rain-drop.ts`; joshuafolkken/kit#8367), and
 // whether a changed character lands white and cools (`run-board-change-flash.ts`; joshuafolkken/kit#8353),
 // and whether a new header notice traces in and blinks in a green bar (`run-board-notice-trace.ts`;
-// joshuafolkken/kit#8657).
+// joshuafolkken/kit#8657). The trill sounds over every typing row (`true`), or only over the header's
+// notice and now rows (`'header'`; joshuafolkken/kit#8697).
 interface LiveDefinition {
 	flash?: boolean
 	notice_trace?: boolean
 	sweep: boolean
 	drop: boolean
 	types_rows: boolean
-	trill: boolean
+	trill: boolean | 'header'
 	codes: boolean
 	strip: boolean
 	decode: boolean
@@ -96,6 +99,9 @@ interface ThemeDefinition {
 	// The WAV a live board loops while letters type at `intro.letter_ms`, `undefined` when it cannot
 	// be written (joshuafolkken/kit#8365).
 	typing: (letter_ms: number) => string | undefined
+	// joshuafolkken/kit#8697: the WAV a live board plays once a line types through — the opening's line,
+	// or the trill's rows once its loop runs out — `undefined` when it has none or cannot be written.
+	typed_end: () => string | undefined
 }
 
 const CYAN: Paint = { rgb: '62;236;225', named: 'cyan' }
@@ -128,7 +134,7 @@ function no_alert(): undefined {
 }
 
 function no_sound(): undefined {
-	// A theme with no typing sound writes no WAV.
+	// A theme with no typing or typed-end sound writes no WAV.
 }
 
 const THEME_DEFS = {
@@ -158,6 +164,7 @@ const THEME_DEFS = {
 			rain: false,
 		},
 		typing: run_board_sound_typing.teletype_wav,
+		typed_end: no_sound,
 	},
 	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening types three
 	// lines and shows the last at once (joshuafolkken/kit#8441); its new rows decode and the idle rain
@@ -200,9 +207,10 @@ const THEME_DEFS = {
 		},
 		// A key click every two letters while the intro types and new rows decode (joshuafolkken/kit#8365).
 		typing: run_board_sound_click.typing_wav,
+		typed_end: no_sound,
 	},
 	// joshuafolkken/kit#8673: the time machine's board — its header's clocks in the time circuits'
-	// red, green and amber, the rest a cool grey; no alert field, no sound.
+	// red, green and amber, the rest a cool grey; no alert field.
 	bttf: {
 		name: 'josh-flux',
 		capitals: false,
@@ -219,9 +227,12 @@ const THEME_DEFS = {
 		// The flux figure sits in the panel's area, which a lamped rule row would move.
 		rule_lamped: false,
 		spinner: '│╱─╲',
-		// joshuafolkken/kit#8683: its notices, operations and rows type as the other themes' do, silently.
-		live: { ...NO_LIVE, types_rows: true },
-		typing: no_sound,
+		// joshuafolkken/kit#8683: its notices, operations and rows type as the other themes' do; the
+		// time-circuit keypad sounds while the opening and the header's notice and now rows type, and the
+		// circuits' ENTER once each is typed through — the body's rows type silently (joshuafolkken/kit#8697).
+		live: { ...NO_LIVE, types_rows: true, trill: 'header' },
+		typing: run_board_sound_keypad.typing_wav,
+		typed_end: run_board_sound_enter.enter_wav,
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 

@@ -4,6 +4,8 @@ import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_sound_click } from './run-board-sound-click'
+import { run_board_sound_enter } from './run-board-sound-enter'
+import { run_board_sound_keypad } from './run-board-sound-keypad'
 import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme } from './run-board-theme'
 import {
@@ -54,6 +56,7 @@ const AMBER: ThemeDefinition = {
 	spinner: '|',
 	live: OFF_LIVE,
 	typing: run_board_sound_typing.teletype_wav,
+	typed_end: THEME_DEFS.wargames.typed_end,
 }
 const WIDER = { ...THEME_DEFS, amber: AMBER }
 
@@ -110,6 +113,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			spinner: '│╱─╲',
 			live: { ...OFF_LIVE, sweep: true, types_rows: true, trill: true, codes: true },
 			typing: run_board_sound_typing.teletype_wav,
+			typed_end: THEME_DEFS.wargames.typed_end,
 		})
 	})
 })
@@ -119,6 +123,18 @@ describe('run_board_theme_defs.THEME_DEFS typing', () => {
 	it('types wargames to the teletype trill and matrix to the key click', () => {
 		expect(THEME_DEFS.wargames.typing).toBe(run_board_sound_typing.teletype_wav)
 		expect(THEME_DEFS.matrix.typing).toBe(run_board_sound_click.typing_wav)
+	})
+
+	// joshuafolkken/kit#8697: bttf types to the keypad over the header and sounds ENTER after each line.
+	it('types bttf to the keypad over the header rows and ends each typed line with ENTER', () => {
+		expect(THEME_DEFS.bttf.typing).toBe(run_board_sound_keypad.typing_wav)
+		expect(THEME_DEFS.bttf.typed_end).toBe(run_board_sound_enter.enter_wav)
+		expect(THEME_DEFS.bttf.live.trill).toBe('header')
+	})
+
+	it('sounds no typed end in wargames or matrix', () => {
+		expect(THEME_DEFS.wargames.typed_end()).toBeUndefined()
+		expect(THEME_DEFS.matrix.typed_end()).toBeUndefined()
 	})
 })
 
@@ -151,6 +167,7 @@ describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 			spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 			live: MATRIX_LIVE,
 			typing: run_board_sound_click.typing_wav,
+			typed_end: THEME_DEFS.matrix.typed_end,
 		})
 	})
 })

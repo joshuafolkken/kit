@@ -52,10 +52,10 @@ describe('run_board_theme_defs bttf', () => {
 		expect(BTTF.capitals).toBe(false)
 	})
 
-	it('draws text icons, no alert field and no typing sound', () => {
+	// joshuafolkken/kit#8697: its typing sounds the keypad (`run-board-theme-defs.test.ts`).
+	it('draws text icons and no alert field', () => {
 		expect(run_board_icons.default_of('bttf')).toBe('shapes')
 		expect(BTTF.alert(1)).toBeUndefined()
-		expect(BTTF.typing(LETTER_MS)).toBeUndefined()
 		expect(BTTF.lamps).toBe(true)
 	})
 

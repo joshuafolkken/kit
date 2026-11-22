@@ -6,6 +6,8 @@ words:
   - magick
   # The WarGames computer the board's lamp panel is drawn after (#8236).
   - WOPR
+  # Dual-tone multi-frequency, the keypad tone the bttf board's typing sound is made from (#8697).
+  - dtmf
   # The launch-code alphabet a wargames board's rules run while a row types, `I` and `O` left out (#8375).
   - ABCDEFGHJKLMNPQRSTUVWXYZ
   # The macOS and Linux audio players the board's sound player starts (#7945).

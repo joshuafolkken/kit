@@ -105,8 +105,8 @@ function shut(write: Write, gate: Gate): Write {
 // The trill silenced once the wipe begins: the spinner's next turn sets it off, rows no longer drawn.
 function hushed(sound: TypingSound, gate: Gate): TypingSound {
 	return {
-		set: (is_on, left_ms) => {
-			sound.set(is_on && gate.is_open, left_ms)
+		set: (is_on, left_ms, ended) => {
+			sound.set(is_on && gate.is_open, left_ms, ended)
 		},
 		stop: sound.stop,
 	}

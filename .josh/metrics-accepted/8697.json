@@ -1,0 +1,7 @@
+{
+	"reason": "#8697 adds the bttf keypad/ENTER sound sockets: three new modules (dtmf, keypad, enter) and the header-only trill wiring the Issue asks for",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 175
+	}
+}

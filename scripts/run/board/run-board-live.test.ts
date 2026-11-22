@@ -82,7 +82,12 @@ describe('run_board_live.live_of', () => {
 // other live effect.
 describe('run_board_live.live_of bttf', () => {
 	it('reads only the rows typed from the bttf definition', () => {
-		expect(run_board_live.live_of('bttf')).toStrictEqual({ ...NO_LIVE, types_rows: true })
+		// joshuafolkken/kit#8697: its trill sounds over the header's rows alone.
+		expect(run_board_live.live_of('bttf')).toStrictEqual({
+			...NO_LIVE,
+			types_rows: true,
+			trill: 'header',
+		})
 	})
 })
 
