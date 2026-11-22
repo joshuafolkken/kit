@@ -1,0 +1,7 @@
+{
+	"reason": "#8632: reset_for helper so a colorless cut adds no escape",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

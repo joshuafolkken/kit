@@ -40,18 +40,25 @@ function link_close_of(kept: ReadonlyArray<Piece>): string {
 	return run_board_escape.link_close_for(last.text)
 }
 
+// joshuafolkken/kit#8632: the reset closing a cut of `pieces` — none for a line with no escape, so a
+// colorless board stays free of escapes.
+function reset_for(pieces: ReadonlyArray<Piece>): string {
+	return pieces.some((piece) => piece.width === 0) ? RESET : ''
+}
+
 // `line` cut to its first `columns` columns; a character two columns wide the cut would split is left
-// out whole. A link the cut leaves open is closed, and the colors reset.
+// out whole. A link the cut leaves open is closed, and the colors reset where the line has any escape.
 function cut_styled(line: string, columns: number): string {
 	let used = 0
-	const kept = pieces_of(line).filter((piece) => {
+	const pieces = pieces_of(line)
+	const kept = pieces.filter((piece) => {
 		used += piece.width
 
 		return used <= columns
 	})
 	const text = kept.map((piece) => piece.text).join('')
 
-	return `${text}${link_close_of(kept)}${RESET}`
+	return `${text}${link_close_of(kept)}${reset_for(pieces)}`
 }
 
 // One piece of a line's tail, `used` columns in once it is drawn: every escape, so the colors and links
@@ -64,16 +71,18 @@ function tail_piece(piece: Piece, used: number, columns: number): string {
 }
 
 // joshuafolkken/kit#8457: `line` past its first `columns` columns, its colors and links kept — the
-// saved line a typing row is written over, right of the block — and the colors reset.
+// saved line a typing row is written over, right of the block — and the colors reset where the line
+// has any escape.
 function tail_styled(line: string, columns: number): string {
 	let used = 0
-	const kept = pieces_of(line).map((piece) => {
+	const pieces = pieces_of(line)
+	const kept = pieces.map((piece) => {
 		used += piece.width
 
 		return tail_piece(piece, used, columns)
 	})
 
-	return `${kept.join('')}${RESET}`
+	return `${kept.join('')}${reset_for(pieces)}`
 }
 
 // A drawn line's character with the color escapes that hold at it (joshuafolkken/kit#8367) and the

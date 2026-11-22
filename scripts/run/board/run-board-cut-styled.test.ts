@@ -67,8 +67,13 @@ describe('run_board_cut_styled.styled_pieces', () => {
 })
 
 describe('run_board_cut_styled.cut_styled', () => {
-	it('cuts a plain line to its first columns and resets the colors after it', () => {
-		expect(cut_styled('abcdef', 3)).toBe(`abc${RESET}`)
+	// joshuafolkken/kit#8632: a line with no escape is cut with none added.
+	it('cuts a plain line to its first columns with no escape added', () => {
+		expect(cut_styled('abcdef', 3)).toBe('abc')
+	})
+
+	it('resets the colors after a cut of a colored line', () => {
+		expect(cut_styled(`${GREEN}abcdef`, 3)).toBe(`${GREEN}abc${RESET}`)
 	})
 
 	it('keeps the colors opened before the cut, counting no column for them', () => {
@@ -93,8 +98,8 @@ describe('run_board_cut_styled.cut_styled', () => {
 	})
 
 	it('leaves out a character two columns wide that the cut would split', () => {
-		expect(cut_styled('a✅b', 2)).toBe(`a${RESET}`)
-		expect(cut_styled('a✅b', 3)).toBe(`a✅${RESET}`)
+		expect(cut_styled('a✅b', 2)).toBe('a')
+		expect(cut_styled('a✅b', 3)).toBe('a✅')
 	})
 
 	it('cuts nothing off a line no wider than the columns', () => {
@@ -128,8 +133,12 @@ describe('run_board_cut_styled with a tmux-wrapped link', () => {
 describe('run_board_cut_styled.tail_styled', () => {
 	const { tail_styled } = run_board_cut_styled
 
-	it('drops a plain line’s first columns and resets the colors after it', () => {
-		expect(tail_styled('abcdef', 3)).toBe(`def${RESET}`)
+	it('drops a plain line’s first columns with no escape added', () => {
+		expect(tail_styled('abcdef', 3)).toBe('def')
+	})
+
+	it('resets the colors after the tail of a colored line', () => {
+		expect(tail_styled(`${GREEN}abcdef`, 3)).toBe(`${GREEN}def${RESET}`)
 	})
 
 	it('keeps the colors opened before the dropped columns, so the tail draws as the line did', () => {
@@ -137,8 +146,8 @@ describe('run_board_cut_styled.tail_styled', () => {
 	})
 
 	it('draws blanks for the part of a character two columns wide the cut splits', () => {
-		expect(tail_styled('a✅b', 2)).toBe(` b${RESET}`)
-		expect(tail_styled('a✅b', 3)).toBe(`b${RESET}`)
+		expect(tail_styled('a✅b', 2)).toBe(' b')
+		expect(tail_styled('a✅b', 3)).toBe('b')
 	})
 
 	it('keeps nothing of a line no wider than the columns but its escapes', () => {
