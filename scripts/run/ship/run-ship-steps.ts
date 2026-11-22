@@ -43,7 +43,7 @@ interface Step {
 const { STAGE } = run_ship_stage
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr)
+	return await josh_command.josh_run(argv, { should_forward_stderr })
 }
 
 // The pull request's preconditions and the scoped pair are asked first, so a stop they would cause
@@ -103,7 +103,7 @@ async function commit_stage(args: ShipArguments, state: ShipState): Promise<Step
 
 	return await run_ship_lap.timed(
 		STEP.COMMIT,
-		async () => await josh_command.josh_run(argv, should_forward_stderr, undefined, environment),
+		async () => await josh_command.josh_run(argv, { should_forward_stderr, environment }),
 	)
 }
 

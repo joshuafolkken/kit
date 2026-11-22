@@ -20,6 +20,7 @@ const SEATS = 9
 const RESUMED = 'lane resumed'
 const RESUME_COMMAND = 'lane:resume'
 const NO_CHILD = 'no child process running'
+const FORWARD_STDERR = { should_forward_stderr: true }
 
 const read_state = vi.spyOn(lane_state, 'read_state')
 const directory = vi.spyOn(run_carry, 'repository_directory')
@@ -113,7 +114,9 @@ describe('carrying paused lanes', () => {
 		is_same_process.mockReturnValue(live)
 
 		expect(await carry_and_resume([lane(CLAIMED, '/t/a.log')])).toStrictEqual([CLAIMED])
-		expect(josh_run.mock.calls).toStrictEqual(resumes ? [[[RESUME_COMMAND, CLAIMED], true]] : [])
+		expect(josh_run.mock.calls).toStrictEqual(
+			resumes ? [[[RESUME_COMMAND, CLAIMED], FORWARD_STDERR]] : [],
+		)
 	})
 
 	it('resumes all nine seats carried from a stopped run (ac-d42bf2fd)', async () => {
@@ -128,7 +131,7 @@ describe('carrying paused lanes', () => {
 
 		expect(await carry_and_resume(lanes)).toStrictEqual(lanes.map((item) => item.issue))
 		expect(josh_run.mock.calls).toStrictEqual(
-			lanes.map((item) => [[RESUME_COMMAND, item.issue], true]),
+			lanes.map((item) => [[RESUME_COMMAND, item.issue], FORWARD_STDERR]),
 		)
 	})
 })
@@ -149,7 +152,9 @@ describe('judging the owning run by the current carry', () => {
 
 			await carry_and_resume([lane(CLAIMED, '/t/a.log')])
 
-			expect(josh_run.mock.calls).toStrictEqual(resumes ? [[[RESUME_COMMAND, CLAIMED], true]] : [])
+			expect(josh_run.mock.calls).toStrictEqual(
+				resumes ? [[[RESUME_COMMAND, CLAIMED], FORWARD_STDERR]] : [],
+			)
 		},
 	)
 
@@ -163,7 +168,7 @@ describe('judging the owning run by the current carry', () => {
 
 		await carry_and_resume([lane(CLAIMED, '/t/a.log')])
 
-		expect(josh_run.mock.calls).toStrictEqual([[[RESUME_COMMAND, CLAIMED], true]])
+		expect(josh_run.mock.calls).toStrictEqual([[[RESUME_COMMAND, CLAIMED], FORWARD_STDERR]])
 	})
 })
 

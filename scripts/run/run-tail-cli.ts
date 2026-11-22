@@ -67,7 +67,7 @@ function parse_issues(argv: ReadonlyArray<string>): ReadonlyArray<string> | unde
 }
 
 async function run_step(step: Step, issues: ReadonlyArray<string>): Promise<TailSection> {
-	const result = await josh_command.josh_run(step.argv(issues), should_forward_stderr)
+	const result = await josh_command.josh_run(step.argv(issues), { should_forward_stderr })
 
 	return {
 		header: step.header,

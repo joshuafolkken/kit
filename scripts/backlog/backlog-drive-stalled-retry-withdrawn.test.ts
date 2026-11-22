@@ -67,7 +67,7 @@ describe('backlog_drive_stalled_retry.sweep — a park a person withdrew', () =>
 
 		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
 			['run:add', String(PARKED), '--retry'],
-			true,
+			{ should_forward_stderr: true },
 		)
 	})
 

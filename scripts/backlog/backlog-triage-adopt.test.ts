@@ -14,9 +14,7 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 		read_carry: vi.fn(() => carry),
 	},
 }))
-vi.mock('#scripts/issue/issue-state-cli', () => ({
-	issue_state_cli: { read_issue: vi.fn() },
-}))
+vi.mock('#scripts/issue/issue-state-cli')
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_list_comments: vi.fn(async () => '[]') },
 }))
@@ -123,7 +121,9 @@ describe('backlog:triage --apply --adopt', () => {
 			children: [Number(ISSUE)],
 			decision: `#${ISSUE}: adopted park option 1 (backlog:triage --adopt) — ${REASON}`,
 		})
-		expect(josh_command.josh_run).toHaveBeenCalledWith(['run:add', ISSUE, '--retry'], true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(['run:add', ISSUE, '--retry'], {
+			should_forward_stderr: true,
+		})
 	})
 
 	it.each([

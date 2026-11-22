@@ -221,7 +221,9 @@ async function approval_of(request: AdoptRequest, park: ParkFound): Promise<stri
 }
 
 async function requeue(issue: string): Promise<WriteResult> {
-	const result = await josh_command.josh_run(['run:add', issue, '--retry'], true)
+	const result = await josh_command.josh_run(['run:add', issue, '--retry'], {
+		should_forward_stderr: true,
+	})
 
 	if (result.code === SUCCESS_EXIT_CODE) return { next: 'requeued' }
 

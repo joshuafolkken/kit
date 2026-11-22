@@ -59,7 +59,7 @@ function verdict_of(result: JoshResult): string {
 }
 
 async function step(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr)
+	return await josh_command.josh_run(argv, { should_forward_stderr })
 }
 
 // **A primary checkout on the issue's own branch merges, too** (joshuafolkken/kit#7543): the hold was

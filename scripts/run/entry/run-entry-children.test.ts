@@ -33,12 +33,15 @@ describe('run_entry_children.claim_hold', () => {
 				}),
 		)
 
-		expect(josh_run).toHaveBeenCalledWith(['run:hold', ISSUE, '--fullrun'], true, undefined, {
-			JOSH_SHIP_LAP_SCOPE: JSON.stringify({
-				issue: Number(ISSUE),
-				stage: 'run:entry',
-				parent: 'run:entry › run:hold',
-			}),
+		expect(josh_run).toHaveBeenCalledWith(['run:hold', ISSUE, '--fullrun'], {
+			should_forward_stderr: true,
+			environment: {
+				JOSH_SHIP_LAP_SCOPE: JSON.stringify({
+					issue: Number(ISSUE),
+					stage: 'run:entry',
+					parent: 'run:entry › run:hold',
+				}),
+			},
 		})
 	})
 
@@ -70,7 +73,10 @@ describe('run_entry_children.claim_hold — the run mark', () => {
 				await run_entry_children.claim_hold({ issue_number: ISSUE, command, is_adopt: false }),
 		)
 
-		expect(josh_run).toHaveBeenCalledWith(argv, true, undefined, expect.any(Object))
+		expect(josh_run).toHaveBeenCalledWith(argv, {
+			should_forward_stderr: true,
+			environment: expect.any(Object),
+		})
 	})
 })
 

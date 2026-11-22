@@ -16,7 +16,7 @@ async function push(args: ShipArguments): Promise<void> {
 
 	const result = await josh_command.josh_run(
 		['git', '-y', '--skip-commit', ...args.body, args.title],
-		true,
+		{ should_forward_stderr: true },
 	)
 
 	await early_push_record.record('ship', result.code === 0 ? 'pushed' : 'push-failed')

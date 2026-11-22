@@ -71,7 +71,7 @@ function push_argv(title: string): ReadonlyArray<string> {
 }
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr)
+	return await josh_command.josh_run(argv, { should_forward_stderr })
 }
 
 // A merge that could not even be attempted — a fetch that failed — reads as a refusal: nothing was
@@ -117,12 +117,10 @@ async function commit_locally(title: string, is_dirty: boolean): Promise<JoshRes
 	const commit = await timed(
 		STEP.LOCAL_COMMIT,
 		async () =>
-			await josh_command.josh_run(
-				['git', '-y', '--skip-push', '--skip-pr', title],
+			await josh_command.josh_run(['git', '-y', '--skip-push', '--skip-pr', title], {
 				should_forward_stderr,
-				undefined,
-				{ [pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off' },
-			),
+				environment: { [pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off' },
+			}),
 	)
 
 	return commit.code === SUCCESS_EXIT_CODE ? undefined : commit
@@ -141,7 +139,7 @@ async function commit_locally(title: string, is_dirty: boolean): Promise<JoshRes
 async function push_ahead(title: string): Promise<string> {
 	const push = await timed(
 		STEP.PUSH,
-		async () => await josh_command.josh_run(push_argv(title), should_forward_stderr),
+		async () => await josh_command.josh_run(push_argv(title), { should_forward_stderr }),
 	)
 
 	return push.code === SUCCESS_EXIT_CODE ? PUSHED_NOTE : [PUSH_FAILED_NOTE, push.out].join('\n')
@@ -357,12 +355,10 @@ async function marked_followup(
 	mark(true)
 
 	try {
-		return await josh_command.josh_run(
-			['followup', title, ...notify],
+		return await josh_command.josh_run(['followup', title, ...notify], {
 			should_forward_stderr,
-			undefined,
-			followup_ship_environment.SHIPPED_ENVIRONMENT,
-		)
+			environment: followup_ship_environment.SHIPPED_ENVIRONMENT,
+		})
 	} finally {
 		mark(false)
 	}

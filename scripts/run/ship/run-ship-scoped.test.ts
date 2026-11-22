@@ -22,15 +22,11 @@ const unmoved_mock = vi.hoisted(() =>
 	vi.fn<(before: GateTree, after: GateTree) => boolean>(() => true),
 )
 const lap_mock = vi.hoisted(() =>
-	vi.fn<(lap: object) => Promise<void>>(async () => {
-		await Promise.resolve()
-	}),
+	vi.fn<(lap: object) => Promise<void>>().mockResolvedValue(undefined),
 )
 const LEDGER = vi.hoisted(() => 'lane-ledger.jsonl')
 const reused_ledger_mock = vi.hoisted(() =>
-	vi.fn(async () => {
-		await Promise.resolve()
-	}),
+	vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 )
 const read_tree_mock = vi.hoisted(() =>
 	vi.fn(async (): Promise<{ files: Record<string, string>; base: string }> => ({
@@ -342,7 +338,10 @@ describe('run_ship_scoped.scoped_gate', () => {
 
 		expect(await run_ship_scoped.scoped_gate()).toStrictEqual({ code: OK, out: '' })
 		expect(commands()).toStrictEqual([LINT, GATE])
-		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate', WHOLE_TREE_FLAG], true, undefined, {})
+		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate', WHOLE_TREE_FLAG], {
+			should_forward_stderr: true,
+			environment: {},
+		})
 	})
 
 	it('stops before josh gate when the scoped pair fails', async () => {

@@ -169,7 +169,7 @@ async function run(io: HandoffIo): Promise<number> {
 }
 
 async function josh_step(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, true)
+	return await josh_command.josh_run(argv, { should_forward_stderr: true })
 }
 
 async function read_lanes(): Promise<ReadonlyArray<LaneInfo>> {
