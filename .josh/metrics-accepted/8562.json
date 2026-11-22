@@ -1,0 +1,7 @@
+{
+	"reason": "#8562: newest_load reads the ledger backward from its end with a whole-scan fallback, replacing a whole read kept in cache; +5 code lines",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}
