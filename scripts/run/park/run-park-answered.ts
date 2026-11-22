@@ -69,7 +69,23 @@ function unavailable_note(cause: string): string {
 		: `The judgment hit a usage limit, so the existing-answer check was skipped. Cause: ${cause}`
 }
 
-function outcome(issue_number: string, verdict: AnswerVerdict): ParkCheck {
+function handoff_note(verdict: Answered): string {
+	const { lang } = session_language.resolve_session_lang()
+
+	return session_language.is_japanese(lang)
+		? `Issue はこの問いに答え済みです（${verdict.decision}）。推奨は親の操作なので、受け渡しとして park しました。採用前に推奨がこの決定に沿うか確かめてください。`
+		: `The Issue already answers this question (${verdict.decision}). The pick is the parent's action, so it parked as a hand-off; check the pick follows that decision before adopting it.`
+}
+
+// An answer the child cannot act on — its pick needs the parent (filing, closing, folding) — parks
+// as a hand-off carrying the Issue's decision, so the parent adopts it knowingly (joshuafolkken/kit#8726).
+function answered_check(issue_number: string, verdict: Answered, question: string): ParkCheck {
+	if (run_park_body.parent_pick(question)) return { note: handoff_note(verdict) }
+
+	return { exit_code: answered(issue_number, verdict) }
+}
+
+function outcome(issue_number: string, verdict: AnswerVerdict, question: string): ParkCheck {
 	if (verdict.kind === 'unanswered') return undefined
 	if (verdict.kind === 'unavailable') return { note: unavailable_note(verdict.cause) }
 
@@ -77,26 +93,22 @@ function outcome(issue_number: string, verdict: AnswerVerdict): ParkCheck {
 		return { exit_code: failed(issue_number, verdict.cause, verdict.retry) }
 	}
 
-	return { exit_code: answered(issue_number, verdict) }
+	return answered_check(issue_number, verdict, question)
 }
 
-// A note annotates a permitted park; an exit code stops it before any write. A recommendation only the
-// parent can carry out (filing, closing, folding) is a hand-off, not a question: an answer the Issue
-// already holds is still one the child cannot act on, so it parks without the judgment
-// (joshuafolkken/kit#8726).
+// A note annotates a permitted park; an exit code stops it before any write.
 async function refusal_of(
 	issue_number: string,
 	question: string,
 	directory: string,
 ): Promise<ParkCheck> {
-	if (run_park_body.parent_pick(question)) return undefined
 	const read = await issue_sources.read_sources(issue_number)
 
 	if (read.kind !== 'sources') return { exit_code: read_failure(issue_number, read) }
 
 	const verdict = await answer_judge.judge({ question, sources: read.sources, directory })
 
-	return outcome(issue_number, verdict)
+	return outcome(issue_number, verdict, question)
 }
 
 const run_park_answered = { refusal_of }

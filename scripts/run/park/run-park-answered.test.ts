@@ -108,15 +108,22 @@ function park_body(permission: string): string {
 }
 
 describe('run_park_answered.refusal_of a recommendation by permission', () => {
-	it("parks an answered question whose pick is the parent's filing, without judging (ac-ad90d0c5)", async () => {
-		judge_mock.mockResolvedValue(ANSWERED)
+	it.each([
+		['ja', 'Issue はこの問いに答え済みです（Reuse issue_sources）'],
+		['en', 'The Issue already answers this question (Reuse issue_sources)'],
+	])(
+		"parks an answered question whose pick is the parent's filing, noting the decision in %s (ac-ad90d0c5)",
+		async (lang, expected) => {
+			vi.stubEnv(session_language.ENV_KEY, lang)
+			judge_mock.mockResolvedValue(ANSWERED)
 
-		await expect(
-			run_park_answered.refusal_of(ISSUE, park_body('親（issue:file …）'), DIRECTORY),
-		).resolves.toBeUndefined()
-		expect(judge_mock).not.toHaveBeenCalled()
-		expect(console.error).not.toHaveBeenCalled()
-	})
+			await expect(
+				run_park_answered.refusal_of(ISSUE, park_body('親（issue:file …）'), DIRECTORY),
+			).resolves.toEqual({ note: expect.stringContaining(expected) })
+			expect(console.error).not.toHaveBeenCalled()
+			vi.unstubAllEnvs()
+		},
+	)
 
 	it('still refuses an answered question whose pick the child can run (ac-0a784e00)', async () => {
 		judge_mock.mockResolvedValue(ANSWERED)
