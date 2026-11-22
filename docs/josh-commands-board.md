@@ -136,7 +136,7 @@ The header is three lines in four columns, the time circuits — names, clocks, 
 
 ```
 ▶ josh-board    🎯 16:25  - 2°18′11″  💪  11% ■────  🧠  29% ■■───  💾 2.6M/s ■────
-  v1.3153.0+1   🕒 14:07  + 1°33′55″  🔊 10:42 alert · #<N> stopped
+  v1.3153.0+1   🕒 14:07  + 1°33′55″  🔊 10:42 🛑 alert · #<N> stopped
   kit           🚀 12:33  ⠦       4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
@@ -150,7 +150,7 @@ The tallies, counts, plan read in flight and saved plan's age are on the section
 
 The fourth column is the machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate, five-cell bars) over the notice slot over the third line's words.
 
-The notice slot holds a live board's sound switch (`🔊` on, `🔇` off) and the last notice, sounded or muted: `🔊 10:42 alert · #<N> stopped` — time, cue, cause; `(repeat)` on a replay, `🔊 —` before the first. `--once`, `--chat` and Telegram draw the slot without the switch.
+The notice slot holds a live board's sound switch (`🔊` on, `🔇` off) and the last notice, sounded or muted: `🔊 10:42 🛑 alert · #<N> stopped` — time, the cue's icon and name, then the issue and its words (the run's words alone where no issue sounded it); `×2` on a replay, `🔊 —` before the first. `--once`, `--chat` and Telegram draw the slot without the switch.
 
 While a running run's stream holds an outage with no `online` after it, last seen (`offline` or `offline-tick`) within two sampler ticks, `📴` (named in the legend) stands in the notice slot with the time since the network went down, in yellow. The connection events never count as the run's newest event.
 
@@ -201,8 +201,8 @@ The park comment of `run:stalled` (the `run:merge` park and `run:park --escalate
 The action is normally `pnpm josh ship --log <N>`, `pnpm josh run:cut --end` for a stale hand-off or handed-off cut, and a `parent:` sentence for an escalation.
 A trusted comment carrying a next-action marker that cites itself as evidence is read as a stop and becomes the reason in place of any older park. A backfill citing another comment, and an earlier `run:stalled` comment without a marker, are not read as stops.
 
-Even with no explanation, the row links to the latest stop comment. A failed fetch or a stop before launch shows `Reason unavailable: inspect issue` (linking to the Issue),
-and an adoption by `backlog:triage --adopt` after the stop shows `adopted option <n> · relaunching` (linking to the adoption comment). Without link support, or in chat/plain, check from the Issue number at the start of the row (on the CLI, `pnpm josh issue:read <N>`).
+With no explanation, the row links to the latest stop comment. A failed fetch or a stop before launch shows `person: read the issue and decide (no stop recorded)` (linking to the Issue; a 🙋 row's review stop action replaces it),
+and an adoption by `backlog:triage --adopt` after the stop shows `adopted option <n> · relaunching` (linking to the adoption). Without links, or in chat/plain, use the row's Issue number (`pnpm josh issue:read <N>`).
 
 A row waiting on a parent's action shows the park's action (linking to the park). The condition: the latest park recommends a parent's action (`必要な権限: 親…`), and the adoption after it took the recommendation without `parent action done:`.
 
