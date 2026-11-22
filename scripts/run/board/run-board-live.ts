@@ -6,12 +6,14 @@ import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_screen, type Screen } from './run-board-screen'
+import { run_board_sound_player } from './run-board-sound-player'
 import type { TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_theme_defs, type LiveDefinition } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
+import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // The live `josh run:board` loop: the alternate screen entered and left, the first frame drawn (or
 // revealed), and a frame redrawn on every second with its spinners turned between. `run-board-cli.ts`
@@ -21,7 +23,7 @@ const TRAILING_NEWLINE = /\n$/u
 const REDRAW_WORD = 'redraw'
 const { FRESH_STATE, tick } = run_board_tick
 const { WORDS } = run_board_labels
-const { live_of } = run_board_theme_defs
+const { live_of, THEME_DEFS } = run_board_theme_defs
 const { gated, quitter } = run_board_exit_rain
 const SCREEN = run_board_screen.screen_of('live')
 
@@ -42,11 +44,12 @@ type Step = (state: BoardState) => Promise<BoardState>
 type Failed = (cause: unknown) => void
 
 // What the redraws start from: the first frame's reveal, where the last frame drawn is kept for the
-// failure warning and the exit wipe, and who is told of a failed tick.
+// failure warning and the exit wipe, who is told of a failed tick, and the typing the rows start from.
 interface Start {
 	reveal: Reveal | undefined
 	last: LastFrame
 	failed?: Failed | undefined
+	typing: Typing
 }
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
@@ -93,22 +96,48 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 	}
 }
 
+// The theme's typed-end WAV played once (joshuafolkken/kit#8697); nothing in no theme or a theme with none.
+function typed_end_of(theme: Theme | undefined): () => void {
+	return () => {
+		const file = theme === undefined ? undefined : THEME_DEFS[theme].typed_end()
+
+		if (file !== undefined) run_board_sound_player.play(file)
+	}
+}
+
+// Whether the sound switch is on; on where the keys carry none.
+function is_sounding(keys: KeyReading): boolean {
+	return keys.sound?.() ?? true
+}
+
+// `typed_end` sounded only while the sound switch is on.
+function switched_end(keys: KeyReading, typed_end: (() => void) | undefined): () => void {
+	return () => {
+		if (is_sounding(keys)) typed_end?.()
+	}
+}
+
 // The trill reaches the draws only where the theme sounds it, and sounds only while the sound switch is
-// on (joshuafolkken/kit#8250); `stop` stays the board's, called as it leaves.
+// on (joshuafolkken/kit#8250); `stop` stays the board's, called as it leaves. `typed_end` sounds, under
+// the same switch, once the trill's letters type through (joshuafolkken/kit#8697).
 function trill_of(
-	ports: BoardPorts,
+	ports: Pick<BoardPorts, 'typing_sound'>,
 	keys: KeyReading,
 	live: LiveDefinition,
+	typed_end?: () => void,
 ): TypingSound | undefined {
 	const typing = ports.typing_sound
 
-	if (typing === undefined || !live.trill) return undefined
+	if (typing === undefined || live.trill === false) return undefined
+
+	const typed = switched_end(keys, typed_end)
 
 	return {
 		set: (is_on, left_ms) => {
-			typing.set(is_on && (keys.sound?.() ?? true), left_ms)
+			typing.set(is_on && is_sounding(keys), left_ms, typed)
 		},
 		stop: typing.stop,
+		typed,
 	}
 }
 
@@ -216,7 +245,7 @@ function ticker(ports: BoardPorts, screen: Screen, start: Start): Step {
 // so this thread only draws. Each stage is marked as it is entered, for `--timing`'s stalls.
 async function redraw_forever(ports: BoardPorts, screen: Screen, start: Start): Promise<void> {
 	const step = ticker(ports, screen, start)
-	let state = FRESH_STATE
+	let state: BoardState = { ...FRESH_STATE, typing: start.typing }
 
 	await poll.wait_for(
 		async () => {
@@ -237,7 +266,9 @@ async function redraw_forever(ports: BoardPorts, screen: Screen, start: Start): 
 // The ports the live board draws through: the folds, the sound switch and the cue it gates read off the
 // keys, and, where the theme's definition chooses them, the rows typed and the trill sounded while they
 // type.
-function live_ports(ports: BoardPorts, keys: KeyReading, live: LiveDefinition): BoardPorts {
+function live_ports(ports: BoardPorts, keys: KeyReading, theme: Theme | undefined): BoardPorts {
+	const live = live_of(theme)
+
 	return {
 		...ports,
 		folded: keys.folded,
@@ -245,7 +276,7 @@ function live_ports(ports: BoardPorts, keys: KeyReading, live: LiveDefinition): 
 		cue: keys.cue ?? ports.cue,
 		types_rows: live.types_rows,
 		is_live: true,
-		typing_sound: trill_of(ports, keys, live),
+		typing_sound: trill_of(ports, keys, live, typed_end_of(theme)),
 	}
 }
 
@@ -280,7 +311,7 @@ async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Faile
 	const ports = run_board_theme.themed(board, theme)
 	const { keys, drawn, last } = exiting(ports, theme)
 	const leave = leaver(ports, SCREEN, keys)
-	const live = live_ports(drawn, keys, live_of(theme))
+	const live = live_ports(drawn, keys, theme)
 
 	ports.write(SCREEN.enter)
 	ports.on_exit(leave)
@@ -291,12 +322,13 @@ async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Faile
 			reveal,
 			last,
 			failed,
+			typing: run_board_type_rows.typing_of_trill(live_of(theme).trill),
 		})
 	} finally {
 		leave()
 	}
 }
 
-const run_board_live = { live_of, trill_of, watch }
+const run_board_live = { live_of, trill_of, typed_end_of, watch }
 
 export { run_board_live }

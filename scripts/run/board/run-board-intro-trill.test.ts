@@ -33,6 +33,9 @@ function trilling(intro_sleep: ((ms: number) => Promise<void>) | undefined): {
 			stop: () => {
 				events.push('stop')
 			},
+			typed: () => {
+				events.push('typed')
+			},
 		},
 	}
 
@@ -56,8 +59,9 @@ function pending_sleep(): Promise<void> {
 	})
 }
 
-describe('run_board_intro.play trill', () => {
-	it('sounds through the letters and stops before the hold', async () => {
+// joshuafolkken/kit#8697: the typed end sounds once, as the letters type through.
+describe('run_board_intro.play typed end', () => {
+	it('sounds through the letters, stops and sounds the typed end before the hold', async () => {
 		const held: { events: Array<string> } = { events: [] }
 		const { events, ports } = trilling(async (ms) => {
 			await recorded_sleep(held.events, ms)
@@ -67,10 +71,17 @@ describe('run_board_intro.play trill', () => {
 		await play(ports, NO_KEYS, THEME)
 		const letters = Array.from(LINE, () => ['write', `sleep ${String(LETTER_MS)}`]).flat()
 
-		expect(events).toStrictEqual(['on', ...letters, 'off', 'write', `sleep ${String(HOLD_MS)}`])
+		expect(events).toStrictEqual([
+			'on',
+			...letters,
+			'off',
+			'typed',
+			'write',
+			`sleep ${String(HOLD_MS)}`,
+		])
 	})
 
-	it('stops when a key skips the letters', async () => {
+	it('stops, sounding no typed end, when a key skips the letters', async () => {
 		const taken: { on_key: (() => void) | undefined } = { on_key: undefined }
 		const keys: KeyReading = {
 			folded: undefined,
@@ -87,7 +98,9 @@ describe('run_board_intro.play trill', () => {
 		await pending
 		expect(events).toStrictEqual(['on', 'write', 'off'])
 	})
+})
 
+describe('run_board_intro.play trill', () => {
 	it('sounds nothing where the ports carry no pauses', async () => {
 		const { events, ports } = trilling(undefined)
 

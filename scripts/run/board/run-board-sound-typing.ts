@@ -20,10 +20,13 @@ const NOTES: ReadonlyArray<Note> = Array.from({ length: TRILL_PAIRS }, () => TEL
 
 // `left_ms`, given with `on`, is how long the letters still type: the trill stops itself then rather
 // than at the next `set(false)`, which a slow gather can hold up (joshuafolkken/kit#8523). Without it
-// (the intro) the trill sounds until `set(false)`.
+// (the intro) the trill sounds until `set(false)`. `ended`, given with `left_ms`, is called once the
+// trill stops itself that way — its letters typed through — and never on `set(false)` or `stop`; `typed`
+// sounds the theme's typed-end once (joshuafolkken/kit#8697).
 interface TypingSound {
-	set: (is_on: boolean, left_ms?: number) => void
+	set: (is_on: boolean, left_ms?: number, ended?: () => void) => void
 	stop: () => void
+	typed?: (() => void) | undefined
 }
 
 interface TypingPorts {
@@ -121,21 +124,30 @@ function disarm(held: Held): void {
 	held.disarm = undefined
 }
 
+// How a `set` switches the trill: on or off, how long its letters still type, and who is told once they
+// type through.
+interface Switch {
+	is_on: boolean
+	left_ms?: number | undefined
+	ended?: (() => void) | undefined
+}
+
 // Re-arms only the stop timer while the letters type: the player keeps sounding, never restarted
 // (see `hold`).
-function arm(held: Held, ports: TypingPorts, left_ms: number | undefined): void {
+function arm(held: Held, ports: TypingPorts, { left_ms, ended }: Switch): void {
 	disarm(held)
 	if (left_ms === undefined || !held.is_on) return
 	held.disarm = (ports.after ?? after)(left_ms, () => {
 		held.disarm = undefined
 		turn(held, ports, false)
+		ended?.()
 	})
 }
 
-function set(held: Held, ports: TypingPorts, is_on: boolean, left_ms: number | undefined): void {
+function set(held: Held, ports: TypingPorts, switched: Switch): void {
 	if (held.is_stopped) return
-	turn(held, ports, is_on)
-	arm(held, ports, left_ms)
+	turn(held, ports, switched.is_on)
+	arm(held, ports, switched)
 }
 
 // The board's trill, off until a line types; `stop` ends it for good as the board closes.
@@ -150,8 +162,8 @@ function typing_sound(ports: TypingPorts = DEFAULT_PORTS): TypingSound {
 	}
 
 	return {
-		set: (is_on, left_ms) => {
-			set(held, ports, is_on, left_ms)
+		set: (is_on, left_ms, ended) => {
+			set(held, ports, { is_on, left_ms, ended })
 		},
 		stop: () => {
 			held.is_stopped = true
