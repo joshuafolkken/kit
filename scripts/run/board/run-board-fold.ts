@@ -211,12 +211,29 @@ function rows_fit(usage: DetailPart, span: PanelSpan): RowsFit {
 	return is_clear(bare.lines, span) ? { usage: bare, rows: span } : { usage, rows: NO_PANEL }
 }
 
+// The usage rule's row started as a panel row where the panel rains and the rows under it run theirs
+// (joshuafolkken/kit#8647); a folded usage, or rows with no panel, keep the rule whole.
+function is_rule_rained(part: DetailPart, rows: PanelSpan): boolean {
+	return part.is_rule_lamped === true && part.is_folded !== true && rows !== NO_PANEL
+}
+
+function rule_lamped(part: DetailPart, rows: PanelSpan): DetailPart {
+	const rule = part.head.at(-1)
+	if (rule === undefined || !is_rule_rained(part, rows)) return part
+
+	return {
+		...part,
+		head: [...part.head.slice(0, -1), run_board_lamps.rule_started(rule, rows.start)],
+	}
+}
+
 function lamped(
-	part: DetailPart | undefined,
+	whole: DetailPart | undefined,
 	span: PanelSpan,
 	rows = span,
 ): DetailPart | undefined {
-	if (part === undefined) return undefined
+	if (whole === undefined) return undefined
+	const part = rule_lamped(whole, rows)
 	const head = part.head.map((line) => run_board_lamps.expanded(line, span))
 	const lines = part.lines.map((line) => ({
 		...line,

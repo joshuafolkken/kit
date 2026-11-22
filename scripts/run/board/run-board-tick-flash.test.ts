@@ -110,7 +110,7 @@ describe('run_board_tick_flash.flash_of over a lamp', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		vi.stubEnv('NO_COLOR', undefined)
 		const redraw = matrix_redraw()
-		const lamp = { row: 1, column: 2, panel_row: 0, group: 0, lamp: 0 }
+		const lamp = { row: 1, column: 2, panel_row: 0, panel_rows: 5, group: 0, lamp: 0 }
 		const drawn = { lines: ['12'], keyed: [], spots: [], lamps: [lamp] }
 		const base = run_board_tick_flash.flash_of(undefined, drawn, redraw, FRESH_STATE.typing)
 		const changed = { ...drawn, lines: ['34'] }

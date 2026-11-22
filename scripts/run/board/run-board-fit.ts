@@ -84,6 +84,8 @@ interface DetailPart extends Foldable {
 	lines: ReadonlyArray<{ text: string; is_detail: boolean; aside?: string | undefined }>
 	summary?: string | undefined
 	tail?: string | undefined
+	// Whether the rule's row runs the lamp panel too, ended short of it (joshuafolkken/kit#8647).
+	is_rule_lamped?: boolean | undefined
 }
 
 // A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around

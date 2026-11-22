@@ -26,7 +26,7 @@ const RULES = run_board_codes.rule_cells(LINES, STARTS, COLUMNS)
 function lamp_at(index: number): Lamp {
 	const column = FIRST_COLUMN + index * 2
 
-	return { row: 4, column, panel_row: 0, group: 0, lamp: index }
+	return { row: 4, column, panel_row: 0, panel_rows: 5, group: 0, lamp: index }
 }
 
 const LAMPS = Array.from({ length: LAMP_COUNT }, (_value, index) => lamp_at(index))
