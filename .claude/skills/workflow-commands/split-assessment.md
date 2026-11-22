@@ -53,6 +53,8 @@ spilled or stopped for size**, nor for review-finding work.
 **Trigger: `lane:plan` on the investigation's `### Files to edit` answers `split`** → separable part:
 `issue:file --route split --found-during <N>`; else `--single "<why>"`.
 
+**Trigger: what stays would wait on the carve-off** → no split (question 3); the child's own tier-A `--single`, never a park — `lane:plan` prints it, `--adopt` refuses the park (`scripts/run/park/run-park-serial.ts`).
+
 **Trigger: a later `lane:plan` is past its bar** → one `size warning`; go on.
 
 - An independent new requirement found in the lane → file it as an observation, without `--route split`.

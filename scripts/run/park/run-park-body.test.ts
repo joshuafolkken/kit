@@ -97,6 +97,8 @@ describe('run_park_body.adoptable_pick', () => {
 	})
 })
 
+const ORDER_REASON = '\n   - 順序の理由: 別の待ちがある — 上流の修正'
+
 function single_option(tier: string, permission: string): string {
 	return body_with(
 		PICK_ONE,
@@ -119,6 +121,7 @@ describe('run_park_body.parent_action', () => {
 // joshuafolkken/kit#7771: a child cannot file, so an option naming issue:file is the parent's filing.
 describe('run_park_body filing options', () => {
 	const FILING = '（`issue:file --route interrupt --blocks-finder`）'
+	const WAITED = `${FILING}${ORDER_REASON}`
 
 	it('refuses a filing option not written as the parent permission (ac-bd1ba775)', () => {
 		expect(run_park_body.problem_of(single_option('A', `なし${FILING}`))).toContain(
@@ -127,7 +130,7 @@ describe('run_park_body filing options', () => {
 	})
 
 	it.each([
-		[`親${FILING}`, true],
+		[`親${WAITED}`, true],
 		[PARENT_EDIT, false],
 		['なし', false],
 	])('accepts %j and answers filing_action %j', (permission, expected) => {
@@ -181,6 +184,30 @@ describe('run_park_body.adopt_problem', () => {
 		['a tier C option (ac-77bc914f)', PICK_TWO, 2, 'option 2 is tier C'],
 	])('refuses %s', (_case, pick, option, problem) => {
 		expect(run_park_body.adopt_problem(body_with(pick), option)).toContain(problem)
+	})
+})
+
+// joshuafolkken/kit#8661: #8657's park — file a prerequisite carved off its own scope, resume after it
+// merges — is a serial chain the parent does not adopt; a filing naming its order kind still is.
+describe('run_park_body.adopt_problem on a serial carve-off', () => {
+	const CARVE = single_option('A', '親（issue:file）')
+	const SERIAL = 'a serial carve-off'
+
+	it('refuses the carve-off and offers no --adopt line for it (ac-c3c5f477, ac-4789399d)', () => {
+		expect(run_park_body.adopt_problem(CARVE, 1)).toContain(SERIAL)
+		expect(run_park_body.adoptable_pick(CARVE)).toBeUndefined()
+	})
+
+	it('is refused by run:park while the child can still add the order reason', () => {
+		expect(run_park_body.problem_of(CARVE)).toContain(SERIAL)
+		expect(run_park_body.is_park(CARVE)).toBe(true)
+	})
+
+	it('adopts a filing whose order reason names a kind', () => {
+		const body = single_option('A', `親（issue:file）${ORDER_REASON}`)
+
+		expect(run_park_body.adopt_problem(body, 1)).toBeUndefined()
+		expect(run_park_body.adoptable_pick(body)).toBe(1)
 	})
 })
 

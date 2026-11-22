@@ -1,6 +1,8 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
+import { run_park_approval, type ApprovalRange, type ParkApproval } from './run-park-approval'
 import { run_park_fold } from './run-park-fold'
 import { run_park_permission } from './run-park-permission'
+import { run_park_serial } from './run-park-serial'
 
 // The `run:park` body schema (joshuafolkken/kit#6669): numbered options under the options heading,
 // each with its tier and the permission taking it needs, and one recommendation line naming the
@@ -10,27 +12,15 @@ import { run_park_permission } from './run-park-permission'
 // **The one parser of the schema**: `run:park` refuses a body `problem_of` names, and a reader of a
 // park comment summarizes it through `summary_of` — `run:board`'s park rows (joshuafolkken/kit#6688).
 //
-// An option that is a size approval carries its range in three more lines (joshuafolkken/kit#6776) —
-// the paths and both axes of `lane-plan-approval.ts`'s json, which `backlog:triage --adopt` writes.
-
-interface ParkBound {
-	declared: number
-	max: number
-}
-
-interface ParkApproval {
-	paths?: ReadonlyArray<string>
-	lines?: ParkBound
-	files?: ParkBound
-}
-
-type ApprovalRange = Required<ParkApproval>
+// An option that is a size approval carries its range in three more lines (`run-park-approval.ts`); a
+// filing option the parked Issue waits on carries its order reason (`run-park-serial.ts`).
 
 interface ParkOption {
 	number: number
 	tier?: string | undefined
 	permission?: string | undefined
 	approval?: ParkApproval | undefined
+	order_reason?: string | undefined
 }
 
 interface ParkPick {
@@ -50,15 +40,6 @@ const ANY_HEADING = /^#{1,6} /u
 const ITEM = /^(\d+)\. +\S/u
 const TIER = /^- 層: ?([ABC])$/u
 const PERMISSION = /^- 必要な権限: ?(\S.*)$/u
-const APPROVAL_PATHS = /^- 規模承認のパス: ?(\S.*)$/u
-const APPROVAL_LINES = /^- 規模承認の行数: ?([1-9]\d*) *\/ *([1-9]\d*)$/u
-const APPROVAL_FILES = /^- 規模承認のファイル数: ?([1-9]\d*) *\/ *([1-9]\d*)$/u
-const PATH_SEPARATOR = /[\s,、]+/u
-const APPROVAL_PARTS = [
-	['paths', '- 規模承認のパス: <path> …'],
-	['lines', '- 規模承認の行数: <declared> / <max>'],
-	['files', '- 規模承認のファイル数: <declared> / <max>'],
-] as const
 const PICK = /^(\d+)[\s:：.、]+\S/u
 const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
@@ -78,8 +59,9 @@ const FORMAT = [
 	'2. <option>',
 	TIER_LINE,
 	'   - 必要な権限: …',
+	run_park_serial.schema_line(),
 	'   (a size-approval option adds all three:)',
-	...APPROVAL_PARTS.map(([, line]) => `   ${line}`),
+	...run_park_approval.schema_lines(),
 	PICK_HEADING,
 	`<option number> <reason>   (or: ${NO_PICK_WORD} <reason>)`,
 ].join('\n')
@@ -102,43 +84,15 @@ function permission_of(option: ParkOption, line: string): string | undefined {
 	return option.permission ?? PERMISSION.exec(line)?.[1]?.trim()
 }
 
-function bound_of(pattern: RegExp, line: string): ParkBound | undefined {
-	const [, declared, max] = pattern.exec(line) ?? []
-
-	return max === undefined ? undefined : { declared: Number(declared), max: Number(max) }
-}
-
-function paths_of(line: string): ReadonlyArray<string> | undefined {
-	const text = APPROVAL_PATHS.exec(line)?.[1]
-	const paths = text
-		?.split(PATH_SEPARATOR)
-		.map((path) => path.replaceAll('`', ''))
-		.filter(Boolean)
-
-	return paths?.length === 0 ? undefined : paths
-}
-
-function approval_of(approval: ParkApproval | undefined, line: string): ParkApproval | undefined {
-	const paths = paths_of(line)
-
-	if (paths !== undefined) return { ...approval, paths }
-	const lines = bound_of(APPROVAL_LINES, line)
-
-	if (lines !== undefined) return { ...approval, lines }
-	const files = bound_of(APPROVAL_FILES, line)
-
-	return files === undefined ? approval : { ...approval, files }
-}
-
 function with_detail(option: ParkOption, raw_line: string): ParkOption {
 	const line = raw_line.trim()
-	const approval = approval_of(option.approval, line)
 
 	return {
 		...option,
 		tier: tier_of(option, line),
 		permission: permission_of(option, line),
-		approval,
+		approval: run_park_approval.with_line(option.approval, line),
+		order_reason: option.order_reason ?? run_park_serial.reason_of(line),
 	}
 }
 
@@ -182,14 +136,6 @@ function parse(body: string): ParkBody {
 	}
 }
 
-// A size-approval option missing one line of its range: the json it becomes needs every one.
-function approval_problem(approval: ParkApproval | undefined, name: string): string | undefined {
-	if (approval === undefined) return undefined
-	const missing = APPROVAL_PARTS.find(([key]) => approval[key] === undefined)
-
-	return missing === undefined ? undefined : `${name} has no "${missing[1]}" line`
-}
-
 function is_parent_action(option: ParkOption | undefined): boolean {
 	return option?.permission?.startsWith(PARENT_PERMISSION) === true
 }
@@ -215,7 +161,7 @@ function option_problem(option: ParkOption): string | undefined {
 	if (option.tier === undefined) return `${name} has no "- 層: A|B|C" line`
 	if (option.permission === undefined) return `${name} has no "- 必要な権限: …" line`
 
-	return command_problem(option, name) ?? approval_problem(option.approval, name)
+	return command_problem(option, name) ?? run_park_approval.problem_of(option.approval, name)
 }
 
 function is_listed(park: ParkBody, number: number | undefined): boolean {
@@ -239,6 +185,22 @@ function shape_problem(park: ParkBody): string | undefined {
 	return park.options.map((option) => option_problem(option)).find(Boolean) ?? pick_problem(park)
 }
 
+// Whether adopting `option` leaves the parked Issue waiting on the Issue it files: a filing that
+// neither closes nor folds it (`backlog-triage-adopt.ts` blocks it by the filed Issue).
+function waits_on(option: ParkOption | undefined): boolean {
+	if (!is_parent_action(option) || !names_command(option, FILING_COMMAND)) return false
+
+	return !names_command(option, CLOSE_COMMAND) && !names_command(option, FOLD_COMMAND)
+}
+
+// A filing the parked Issue waits on naming no order kind (joshuafolkken/kit#8661): `run:park` refuses
+// it while the child can still add the line, so an adopt never meets it.
+function serial_problem(park: ParkBody): string | undefined {
+	return park.options
+		.map((option) => run_park_serial.problem_of(option, waits_on(option)))
+		.find(Boolean)
+}
+
 function permission_problem(park: ParkBody): string | undefined {
 	return park.options
 		.map((option) =>
@@ -252,7 +214,7 @@ function permission_problem(park: ParkBody): string | undefined {
 function problem_of(body: string): string | undefined {
 	const park = parse(body)
 
-	return shape_problem(park) ?? permission_problem(park)
+	return shape_problem(park) ?? permission_problem(park) ?? serial_problem(park)
 }
 
 // Whether `body` meets the schema's structure — a park, even one whose permission `problem_of` names.
@@ -353,8 +315,9 @@ function auto_pick(body: string): number | undefined {
 }
 
 // Why a parent may not adopt option `number` of a schema-conforming park (joshuafolkken/kit#6670):
-// a park with no recommendation stays a person's, an unlisted option is no answer, and a tier C option
-// stays a person's. `undefined` when the parent may adopt it.
+// a park with no recommendation stays a person's, an unlisted option is no answer, a tier C option
+// stays a person's, and a filing naming no order kind is a serial carve-off (joshuafolkken/kit#8661).
+// `undefined` when the parent may adopt it.
 function adopt_problem(body: string, number: number): string | undefined {
 	const park = parse(body)
 
@@ -362,10 +325,9 @@ function adopt_problem(body: string, number: number): string | undefined {
 	const option = park.options.find((candidate) => candidate.number === number)
 
 	if (option === undefined) return `${OPTIONS_HEADING} lists no option ${String(number)}`
+	if (option.tier === PERSON_TIER) return `option ${String(number)} is tier C, a person's to take`
 
-	return option.tier === PERSON_TIER
-		? `option ${String(number)} is tier C, a person's to take`
-		: undefined
+	return run_park_serial.problem_of(option, waits_on(option))
 }
 
 // The recommended option a parent may adopt (`adopt_problem` passes it) — what `backlog:triage --pass`
@@ -406,15 +368,11 @@ function default_pick(body: string): DefaultPick | undefined {
 	return number === undefined ? undefined : { number, over }
 }
 
-function is_complete(approval: ParkApproval | undefined): approval is ApprovalRange {
-	return APPROVAL_PARTS.every(([key]) => approval?.[key] !== undefined)
-}
-
 // The size-approval range option `number` carries; `undefined` for an option that is no size approval.
 function approval_range(body: string, number: number): ApprovalRange | undefined {
 	const option = parse(body).options.find((candidate) => candidate.number === number)
 
-	return is_complete(option?.approval) ? option.approval : undefined
+	return run_park_approval.is_complete(option?.approval) ? option.approval : undefined
 }
 
 const run_park_body = {
@@ -438,5 +396,7 @@ const run_park_body = {
 	summary_of,
 }
 
-export type { ApprovalRange, DefaultPick }
+export type { DefaultPick }
 export { run_park_body }
+
+export { type ApprovalRange } from './run-park-approval'
