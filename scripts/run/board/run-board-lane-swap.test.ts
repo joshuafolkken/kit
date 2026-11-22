@@ -48,16 +48,25 @@ function others_at(t: number): Array<PaintCell> {
 }
 
 describe('run_board_lane_swap.remembered', () => {
-	it('ac-066a13f7 keeps the lane rows a frame dropped until another frame drops some', () => {
+	it('ac-066a13f7 keeps the row the noticed lane dropped while its merge notice shows', () => {
 		const merged = line(MERGED, 4)
 		const next = line(NEXT, 4)
-		const first = remembered(undefined, [merged, line(NEXT, 5)])
-		const dropped = remembered(first, [next])
+		const first = remembered(undefined, [merged, line(NEXT, 5)], 8711)
+		const dropped = remembered(first, [next], 8711)
 
 		expect(first.left).toStrictEqual([])
 		expect(dropped.left).toStrictEqual([merged])
-		expect(remembered(dropped, [next]).left).toStrictEqual([merged])
-		expect(remembered(dropped, []).left).toStrictEqual([next])
+		expect(remembered(dropped, [next], 8711).left).toStrictEqual([merged])
+		expect(remembered(dropped, [], 8711).left).toStrictEqual([merged])
+	})
+
+	it('remembers no row a fold, a resize or a fit cut drops of another lane or with no notice', () => {
+		const shown = [line(MERGED, 4), line(NEXT, 5)]
+		const first = remembered(undefined, shown, undefined)
+
+		expect(remembered(first, [], undefined).left).toStrictEqual([])
+		expect(remembered(first, [line(MERGED, 4)], 8711).left).toStrictEqual([])
+		expect(remembered(remembered(first, [], undefined), [], 8711).left).toStrictEqual([])
 	})
 })
 

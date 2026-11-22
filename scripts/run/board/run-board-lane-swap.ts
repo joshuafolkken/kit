@@ -34,10 +34,23 @@ interface LaneSwap {
 
 const NO_MEMORY: LaneMemory = { lines: [], left: [] }
 
-// The memory after a frame drawing `lines`: the lane rows it dropped, else those dropped before.
-function remembered(last: LaneMemory | undefined, lines: ReadonlyArray<KeyedLine>): LaneMemory {
+function is_lane_of(line: KeyedLine, issue: number): boolean {
+	return line.key.endsWith(`:${String(issue)}`)
+}
+
+// The memory after a frame drawing `lines` under a merge notice naming `issue`: the row it dropped of
+// that lane, else the one dropped before. Rows a fold, a resize or a fit cut drops are another lane's
+// or dropped with no merge notice, so the jump never draws a stale row back.
+function remembered(
+	last: LaneMemory | undefined,
+	lines: ReadonlyArray<KeyedLine>,
+	issue: number | undefined,
+): LaneMemory {
+	if (issue === undefined) return { lines, left: [] }
 	const { lines: before, left: earlier } = last ?? NO_MEMORY
-	const left = run_board_frame_diff.departures(before, lines)
+	const left = run_board_frame_diff
+		.departures(before, lines)
+		.filter((line) => is_lane_of(line, issue))
 
 	return { lines, left: left.length > 0 ? left : earlier }
 }
@@ -48,7 +61,7 @@ function left_lane(
 	issue: number | undefined,
 ): LeftLane | undefined {
 	if (issue === undefined) return undefined
-	const line = memory?.left.find((left) => left.key.endsWith(`:${String(issue)}`))
+	const line = memory?.left.find((left) => is_lane_of(left, issue))
 
 	return line === undefined ? undefined : { row: line.row - 1, text: line.source ?? line.text }
 }

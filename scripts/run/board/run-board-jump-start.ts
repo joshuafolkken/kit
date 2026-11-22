@@ -62,6 +62,11 @@ function first_letter(frame: JumpFrame): NoticePlace | undefined {
 	return turn.place
 }
 
+// The issue of the lane a shown merge notice names, none under any other notice or none.
+function merging_issue(notice: Notice | undefined): number | undefined {
+	return notice?.cause.cue === 'lane-end' ? notice.cause.issue : undefined
+}
+
 // The run a frame starts: on the first letter of a merge notice's trace, as long as the notice is.
 function started(frame: JumpFrame): JumpRun | undefined {
 	if (!is_jump_board(frame.ports)) return undefined
@@ -150,7 +155,11 @@ function arrive_of(last_ms: number | undefined, frame: JumpFrame): number | unde
 // What a frame leaves of the jump: the lane rows it dropped remembered, the jump it draws over them and
 // the arrival.
 function jump_state(last: JumpState, frame: JumpFrame): JumpState {
-	const lane_memory = run_board_lane_swap.remembered(last.lane_memory, frame.drawn.keyed ?? [])
+	const lane_memory = run_board_lane_swap.remembered(
+		last.lane_memory,
+		frame.drawn.keyed ?? [],
+		merging_issue(frame.notice),
+	)
 	const jump = jump_of(last.jump, { ...frame, lanes: lane_memory })
 
 	return { jump, arrive_ms: arrive_of(last.arrive_ms, frame), lane_memory }
