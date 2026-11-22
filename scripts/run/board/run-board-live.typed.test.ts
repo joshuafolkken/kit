@@ -86,23 +86,37 @@ describe('run_board_live.trill_of typed end', () => {
 
 describe('run_board_live.typed_end_of', () => {
 	it('plays the bttf ENTER WAV once', () => {
-		const play = vi.spyOn(run_board_sound_player, 'play').mockImplementation(() => undefined)
+		const start = vi.spyOn(run_board_sound_player, 'start').mockImplementation(() => undefined)
 		const write = vi.spyOn(run_board_sound_wav, 'cached_samples').mockReturnValue(ENTER_FILE)
 
 		run_board_live.typed_end_of('bttf')()
 
 		expect(write.mock.calls[0]?.[0]).toBe(run_board_sound_enter.NAME)
-		expect(play.mock.calls).toStrictEqual([[ENTER_FILE]])
-		play.mockRestore()
+		expect(start.mock.calls.map((call) => call[0])).toStrictEqual([ENTER_FILE])
+		start.mockRestore()
 		write.mockRestore()
 	})
 
+	// The typing voice falls silent where no player starts; the bell is a cue's fallback alone.
+	it('rings no bell where no player starts', () => {
+		const start = vi.spyOn(run_board_sound_player, 'start').mockImplementation(() => undefined)
+
+		vi.spyOn(run_board_sound_wav, 'cached_samples').mockReturnValue(ENTER_FILE)
+		const out = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		run_board_live.typed_end_of('bttf')()
+		start.mock.calls[0]?.[1].failed()
+
+		expect(out).not.toHaveBeenCalled()
+		vi.restoreAllMocks()
+	})
+
 	it.each(['wargames', 'matrix', undefined] as const)('plays nothing in %s', (theme) => {
-		const play = vi.spyOn(run_board_sound_player, 'play').mockImplementation(() => undefined)
+		const start = vi.spyOn(run_board_sound_player, 'start').mockImplementation(() => undefined)
 
 		run_board_live.typed_end_of(theme)()
 
-		expect(play).not.toHaveBeenCalled()
-		play.mockRestore()
+		expect(start).not.toHaveBeenCalled()
+		start.mockRestore()
 	})
 })

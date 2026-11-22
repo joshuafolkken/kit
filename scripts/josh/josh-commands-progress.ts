@@ -173,7 +173,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BTTF_THEME],
 					description:
-						'names the board `josh-flux` and types its opening line as written; no alert sound. The keypad sounds while the opening and the header’s notice and now rows type, and ENTER after each typed line (`run-board-sound-keypad.ts`, `run-board-sound-enter.ts`; both silent for now).',
+						'names the board `josh-flux` and types its opening line as written; no alert sound. The keypad sounds while the opening and the header’s notice and now rows type, and ENTER once they have typed through (`run-board-sound-keypad.ts`, `run-board-sound-enter.ts`; both silent for now).',
 				},
 				{
 					names: [BTTF_THEME],

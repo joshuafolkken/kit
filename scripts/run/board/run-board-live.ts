@@ -6,7 +6,7 @@ import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_screen, type Screen } from './run-board-screen'
-import { run_board_sound_player } from './run-board-sound-player'
+import { run_board_sound_player, type StartHandlers } from './run-board-sound-player'
 import type { TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
@@ -96,12 +96,23 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 	}
 }
 
+// A typed end is part of the typing voice, so where no player starts it falls silent as the trill does,
+// never ringing the bell a cue falls back to.
+const QUIET: StartHandlers = {
+	started: () => {
+		// a one-shot sound is let go, never ended
+	},
+	failed: () => {
+		// silent, as the trill is where no player starts
+	},
+}
+
 // The theme's typed-end WAV played once (joshuafolkken/kit#8697); nothing in no theme or a theme with none.
 function typed_end_of(theme: Theme | undefined): () => void {
 	return () => {
 		const file = theme === undefined ? undefined : THEME_DEFS[theme].typed_end()
 
-		if (file !== undefined) run_board_sound_player.play(file)
+		if (file !== undefined) run_board_sound_player.start(file, QUIET)
 	}
 }
 
