@@ -4,6 +4,8 @@ import { run_board_label_pair } from './run-board-label-pair'
 import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_processes } from './run-board-render-processes'
+import { run_board_row_key } from './run-board-row-key'
+import type { Theme } from './run-board-theme-defs'
 import type { UsageFigure } from './run-board-usage'
 
 // joshuafolkken/kit#4171: the 💻 section draws what is loading the machine by who started it — the
@@ -58,6 +60,29 @@ function part_of(groups: Partial<ProcessGroups>, spinner?: string): DetailPart |
 		lines: part.lines.map((line) => ({ ...line, text: bare(line.text) })),
 	}
 }
+
+// The supervisor row's key on a theme's board; the matrix keys its rows to flash them.
+function supervisor_key(supervisor_pid?: number, theme: Theme = 'matrix'): string | undefined {
+	const usages = board_usage(new Map(), { backlogrun: { ...BACKLOGRUN, supervisor_pid } })
+	const part = processes_part(header({ spinner: SPINNER, usages, theme }))
+	const keys = part?.lines.map((line) => run_board_row_key.split_key(line.text).key)
+
+	return keys?.find((key) => key?.includes('supervisor') === true)
+}
+
+describe('run_board_render_processes.processes_part supervisor key', () => {
+	it('ac-3a46d3cd keys the supervisor row by its pid where the theme flashes', () => {
+		expect(supervisor_key(123)).toMatch(/^flash:process:.*:supervisor:123$/u)
+		expect(supervisor_key()).toMatch(/:supervisor$/u)
+	})
+
+	it('ac-068e8fdc leaves the wargames rows without keys and as drawn before', () => {
+		const with_pid = part_of({ backlogrun: { ...BACKLOGRUN, supervisor_pid: 123 } }, SPINNER)
+
+		expect(supervisor_key(123, 'wargames')).toBeUndefined()
+		expect(with_pid).toStrictEqual(part_of({ backlogrun: BACKLOGRUN }, SPINNER))
+	})
+})
 
 function texts(part: DetailPart | undefined): Array<string> {
 	return part?.lines.map((line) => line.text.trimEnd()) ?? []

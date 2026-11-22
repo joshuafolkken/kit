@@ -50,6 +50,8 @@ interface ProcessGroups {
 	backlogrun: {
 		total: UsageFigure
 		supervisor: UsageFigure
+		// The running supervisor's pid, which tells one replacing it apart (joshuafolkken/kit#8470).
+		supervisor_pid?: number | undefined
 		parent: UsageFigure
 		lanes: { count: number; figure: UsageFigure }
 	}
@@ -162,6 +164,7 @@ function backlogrun_of(
 	return {
 		total: run_board_usage.sum_of([supervisor, parent, lane_figure]),
 		supervisor,
+		supervisor_pid: sources.roots.supervisor,
 		parent,
 		lanes: { count: lanes.size, figure: lane_figure },
 	}
