@@ -46,17 +46,31 @@ async function adoptable(in_flight: ReadonlyArray<string>): Promise<ReadonlyArra
 	return issues
 }
 
-// The state with every adoptable lane in flight, so its child is collected as soon as it ends. Asked on
-// an offered pass only, not every poll: the read walks the run's whole event stream. A stopping run
-// adopts nothing: the child whose unparked failure stopped it left the stream unsettled, so adopting
-// would collect — and count — it again.
-async function held(
-	state: DriveState,
-	should_offer: boolean,
-	ports: Pick<DrivePorts, 'adoptable'>,
-): Promise<DriveState> {
-	if (!should_offer || state.is_stopping) return state
+// The drive's in-memory exclusion, less the withdrawals a person put back with `run:add --retry` since
+// the drive collected them (`backlog_drive_restore.without_readmitted` in production,
+// joshuafolkken/kit#8599). Absent, the exclusion stands as held.
+interface ReadmitPorts {
+	readmit?: (exclude: ReadonlyArray<string>) => Promise<ReadonlyArray<string>>
+}
 
+async function readmitted(state: DriveState, ports: ReadmitPorts): Promise<DriveState> {
+	if (ports.readmit === undefined) return state
+
+	return { ...state, exclude: [...(await ports.readmit(state.exclude))] }
+}
+
+// The state with every adoptable lane in flight, so its child is collected as soon as it ends, and
+// every re-admitted withdrawal offerable again. Asked on an offered pass only, not every poll: the read
+// walks the run's whole event stream. A stopping run adopts nothing: the child whose unparked failure
+// stopped it left the stream unsettled, so adopting would collect — and count — it again.
+async function held(
+	before: DriveState,
+	should_offer: boolean,
+	ports: Pick<DrivePorts, 'adoptable' | 'readmit'>,
+): Promise<DriveState> {
+	if (!should_offer || before.is_stopping) return before
+
+	const state = await readmitted(before, ports)
 	const adopting = await ports.adoptable(state.in_flight)
 
 	return adopting.length === 0 ? state : { ...state, in_flight: [...state.in_flight, ...adopting] }
@@ -64,4 +78,5 @@ async function held(
 
 const backlog_drive_adopt = { active_lanes, adoptable, held }
 
+export type { ReadmitPorts }
 export { backlog_drive_adopt }

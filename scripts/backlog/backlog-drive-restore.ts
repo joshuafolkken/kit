@@ -72,10 +72,28 @@ function issues_of_kind(events: ReadonlyArray<RunEvent>, kind: string): Readonly
 // The issues a person withdrew from this run and nobody launched again: the withdrawal leaves the issue
 // open for the next run, so this one keeps it out of the offer (joshuafolkken/kit#4365). A lane that
 // yielded stays in the run: its retained plan holds it back until the holder ends (`lane-yield.ts`).
+// A person's `run:add --retry` after the withdrawal starts a new attempt, so the issue is offered
+// again (joshuafolkken/kit#8599).
 function withdrawn_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
-	const named = issues_of_kind(events, run_event_stream.EVENT_KIND.WITHDRAW)
+	const current = run_event_retry.current_attempts(events)
+	const named = issues_of_kind(current, run_event_stream.EVENT_KIND.WITHDRAW)
 
-	return named.filter((issue) => backlog_triage_withdrawn.is_withdrawn(events, issue))
+	return named.filter((issue) => backlog_triage_withdrawn.is_withdrawn(current, issue))
+}
+
+// The exclusion a live drive holds in memory, less the withdrawals a later `run:add --retry` put back
+// (joshuafolkken/kit#8599): the drive added them when it collected the withdrawn child.
+function without_readmitted(
+	exclude: ReadonlyArray<string>,
+	events: ReadonlyArray<RunEvent>,
+): ReadonlyArray<string> {
+	const current = run_event_retry.current_attempts(events)
+
+	return exclude.filter(
+		(issue) =>
+			!backlog_triage_withdrawn.is_withdrawn(events, issue) ||
+			backlog_triage_withdrawn.is_withdrawn(current, issue),
+	)
 }
 
 // The issues this run found waiting for their measurement sample (joshuafolkken/kit#6503): a drive
@@ -108,6 +126,14 @@ function parked_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
 			Number,
 		),
 	)
+}
+
+// The parks the drive may retry on its own. One a person withdrew is theirs to put back with
+// `run:add --retry`, which re-admits it, so no automatic retry takes it (joshuafolkken/kit#8599).
+function retryable_parks(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
+	const withdrawn = new Set(withdrawn_issues(events).map(Number))
+
+	return new Set([...parked_issues(events)].filter((issue) => !withdrawn.has(issue)))
 }
 
 // The issues this invocation launched or settled — any other dispatched lane was carried in from an
@@ -147,6 +173,8 @@ export const backlog_drive_restore = {
 	offer_exclude,
 	restore,
 	withdrawn_issues,
+	without_readmitted,
 	settled_issues,
 	parked_issues,
+	retryable_parks,
 }

@@ -19,7 +19,7 @@
 import { poll } from '#scripts/lib/poll'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
-import { backlog_drive_adopt } from './backlog-drive-adopt'
+import { backlog_drive_adopt, type ReadmitPorts } from './backlog-drive-adopt'
 import { backlog_drive_hold, type HeldWaiting } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_judge } from './backlog-drive-judge'
@@ -111,8 +111,8 @@ interface DriveEnd {
 
 type Collected = Pick<MergeResult, 'token' | 'outcome' | 'is_offer' | 'is_parked'>
 
-// The yield cap's ports (`backlog-yield-cap.ts`): the issue's yields, and its park.
-interface DrivePorts extends YieldCapPorts {
+// The yield cap's ports (`backlog-yield-cap.ts`): the issue's yields, and its park; and the re-admission.
+interface DrivePorts extends YieldCapPorts, ReadmitPorts {
 	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
 	is_finished: (issue: string) => boolean
 	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
