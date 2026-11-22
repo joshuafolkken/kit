@@ -17,6 +17,7 @@ const CALL_SUFFIX = /\(\)$/u
 const IDENTIFIER = /^[A-Za-z_]\w*$/u
 const COMPOUND = /[A-Z_]/u
 const DEFINITION_KEYWORDS = '(interface|type|function|class|const|let|enum)'
+// `-E` overrides the `-F` `git_grep_hits.search` sends first: git takes the last pattern-type flag.
 const DEFINITION_FLAGS = ['-E', '-w']
 
 function identifiers_of(plan: string): ReadonlyArray<string> {
