@@ -156,6 +156,15 @@ describe('run_board_tick.tick reads', () => {
 		expect(read_plan).not.toHaveBeenCalled()
 		expect(frames.at(-1)).toContain(`■ josh-board  ${WORDS.no_run}`)
 	})
+
+	// joshuafolkken/kit#8604: the no-run line names the board after the screen's theme.
+	it('names the board after the screen’s theme when no run has started', async () => {
+		const { ports, frames } = harness(undefined, [plan_titled('a')])
+
+		await tick(FRESH_STATE, { ...ports, theme: 'matrix' })
+
+		expect(stripVTControlCharacters(frames.at(-1) ?? '')).toMatch(/■ josh-trace/iu)
+	})
 })
 
 // joshuafolkken/kit#3439: an ended run stays on screen with its plan held, and the next run starts clean.

@@ -160,7 +160,9 @@ function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardL
 
 // The frame with no run, which keeps no spinner, sweep, lamp, TRACE field or clock colon to redraw over it.
 function draw_no_run(state: BoardState, ports: BoardPorts, now_ms: number): BoardState {
-	draw(ports, run_board_render.render_no_run(now_ms, { bounds: bounds_of(ports), failure: state }))
+	const options = { bounds: bounds_of(ports), failure: state, theme: ports.theme }
+
+	draw(ports, run_board_render.render_no_run(now_ms, options))
 	const still = { sweep: undefined, lamps: undefined, traces: undefined, colons: undefined }
 
 	return { ...state, spots: [], ...still }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_header_names } from './run-board-header-names'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
 
@@ -20,6 +21,16 @@ const BRAILLE = /[\u{2800}-\u{28FF}]/u
 
 function widths_of(frame: string): Array<number> {
 	return frame.split('\n').map((line) => run_board_fit.width_of(line))
+}
+
+// joshuafolkken/kit#8604: the plain frame's widths as wargames draws them — the header's name column,
+// its three lines, narrowed by how much shorter `josh-wopr` is than `josh-board`.
+const NAME_LINES = 3
+const NAME_SHIFT =
+	run_board_header_names.BOARD_NAME.length - run_board_theme_defs.THEME_DEFS.wargames.name.length
+
+function wargames_widths(plain: Array<number>): Array<number> {
+	return plain.map((width, at) => (at < NAME_LINES ? width - NAME_SHIFT : width))
 }
 
 async function frame_of(argv: Array<string>): Promise<string> {
@@ -51,7 +62,7 @@ describe('run_board_cli.run --theme', () => {
 
 		expect(plain).toContain(RULE)
 		expect(frame).not.toContain(RULE)
-		expect(widths_of(frame)).toStrictEqual(widths_of(plain))
+		expect(widths_of(frame)).toStrictEqual(wargames_widths(widths_of(plain)))
 	})
 })
 
@@ -312,7 +323,8 @@ async function alert_line(argv: Array<string>, alert: string): Promise<Array<str
 	const frame = await throughput_frame(argv)
 	const lines = frame.split('\n')
 
-	return [lines[0], lines.find((line) => line.includes(alert))]
+	// Past the header's first line, which names the matrix board `JOSH-TRACE` (joshuafolkken/kit#8604).
+	return [lines[0], lines.slice(1).find((line) => line.includes(alert))]
 }
 
 async function rule_of(argv: Array<string>, alert: string): Promise<string | undefined> {
@@ -339,7 +351,7 @@ describe('run_board_cli.run --theme alert level', () => {
 	// frame's does not.
 	it('keeps every line of the themed frame but the throughput rule as wide as the plain one', async () => {
 		vi.stubEnv('FORCE_COLOR', '0')
-		const plain = widths_of(await throughput_frame(['--once']))
+		const plain = wargames_widths(widths_of(await throughput_frame(['--once'])))
 		const themed = await throughput_frame([...THEMED, '--once'])
 		const index = themed.split('\n').findIndex((line) => line.includes('DEFCON'))
 		const kept = widths_of(themed).map((width, at) => (at === index ? plain[at] : width))
@@ -353,7 +365,8 @@ describe('run_board_cli.run --theme alert level', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 		const [first, rule] = await alert_line(['--theme', 'matrix', '--once'], 'TRACE')
 
-		expect(first).not.toContain('TRACE')
+		// The header names the board `JOSH-TRACE` (joshuafolkken/kit#8604) but draws no gauge.
+		expect(first).not.toMatch(/TRACE [■-]{5}/u)
 		expect(rule).toMatch(/THROUGHPUT.* TRACE [■-]{5}$/u)
 		vi.stubEnv('JOSH_BOARD_THEME', 'matrix')
 		expect(await rule_of(['--once'], 'TRACE')).toBeDefined()
