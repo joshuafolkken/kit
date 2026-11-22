@@ -44,17 +44,25 @@ function queue(...rows: ReadonlyArray<BoardRow>): Array<QueuedEntry> {
 	return rows.map((row) => ({ kind: 'row' as const, row }))
 }
 
-function left(layout: Partial<BoardLayout>): number | undefined {
+function read_of(layout: Partial<BoardLayout>): EstimateRead {
 	const board = { ...EMPTY_LAYOUT, ...layout }
-	const read: EstimateRead = {
-		now_ms: NOW,
-		ended_ms: undefined,
-		layout: board,
-		lane_totals: TOTALS,
-		lane_limit: 2,
-	}
 
-	return run_board_estimate.left_ms(read)
+	return { now_ms: NOW, ended_ms: undefined, layout: board, lane_totals: TOTALS, lane_limit: 2 }
+}
+
+function left(layout: Partial<BoardLayout>): number | undefined {
+	return run_board_estimate.left_ms(read_of(layout))
+}
+
+// When each issue finishes, from now.
+function finishes(layout: Partial<BoardLayout>, numbers: ReadonlyArray<number>): Array<unknown> {
+	const read = read_of(layout)
+
+	return numbers.map((number) => {
+		const finish_ms = run_board_estimate.queued_finish_ms(read, number)
+
+		return finish_ms === undefined ? undefined : finish_ms - NOW
+	})
 }
 
 describe('run_board_estimate.left_ms beside a running run:solo child', () => {
@@ -116,5 +124,37 @@ describe('run_board_estimate.left_ms for waits a child’s end lifts', () => {
 		const queued = queue(waiting(2, ['99']), waiting(3, ['owner/repo#1']))
 
 		expect(left({ active: [running(1)], queued })).toBe(RUNNING_LEFT)
+	})
+})
+
+describe('run_board_estimate.queued_finish_ms', () => {
+	it('stacks the queue in its order, each later child finishing no sooner', () => {
+		const layout = { queued: queue(waiting(2), waiting(3), waiting(4), waiting(5)) }
+
+		// Two lanes: 2 and 3 end at 30′, 4 and 5 at 60′.
+		expect(finishes(layout, [2, 3, 4, 5])).toStrictEqual([
+			PER_CHILD,
+			PER_CHILD,
+			2 * PER_CHILD,
+			2 * PER_CHILD,
+		])
+	})
+
+	it('finishes the last queued child when the run finishes', () => {
+		const layout = { active: [running(1)], queued: queue(waiting(2), waiting(3), waiting(4)) }
+
+		expect(finishes(layout, [4])).toStrictEqual([left(layout)])
+	})
+
+	it('follows a 🔗 chain the queue orders backwards', () => {
+		const layout = { queued: queue(waiting(4, ['3']), waiting(3, ['2']), waiting(2)) }
+
+		expect(finishes(layout, [2, 3, 4])).toStrictEqual([PER_CHILD, 2 * PER_CHILD, 3 * PER_CHILD])
+	})
+
+	it('leaves out a child waiting on an issue the board does not carry, and a running one', () => {
+		const layout = { active: [running(1)], queued: queue(waiting(2, ['99'])) }
+
+		expect(finishes(layout, [1, 2])).toStrictEqual([undefined, undefined])
 	})
 })
