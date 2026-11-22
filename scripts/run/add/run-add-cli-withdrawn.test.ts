@@ -19,7 +19,10 @@ const scratch = make_directory('run-add-cli-withdrawn-test-')
 const GIT_DIRECTORY = path.join(scratch, 'repository.git')
 const ISSUE = '8353'
 const INVOCATION = 'backlogrun #8353 --only'
-const RETRY_ARGS = [ISSUE, '--retry']
+const RETRY_FLAG = '--retry'
+const WITHDRAWN_FLAG = '--withdrawn'
+const RETRY_ARGS = [ISSUE, RETRY_FLAG]
+const REASON = 'on hold'
 const CARRY = run_carry.carry_path(GIT_DIRECTORY)
 const CHILD_LAUNCH = 'child-launch'
 
@@ -44,7 +47,7 @@ function withdrawn(...settled: ReadonlyArray<string>): void {
 
 	run_carry.begin_carry(CARRY, INVOCATION, run_carry.NO_OWNER, new Date())
 	run_event_stream.append(stream(), CHILD_LAUNCH, `#${ISSUE} dispatched`, at)
-	run_event_stream.append(stream(), 'withdraw', `#${ISSUE} withdrawn by a person`, at)
+	run_event_stream.append(stream(), 'withdraw', `#${ISSUE} withdrawn by a person: ${REASON}`, at)
 
 	for (const kind of settled) run_event_stream.append(stream(), kind, `#${ISSUE} settled`, at)
 
@@ -92,5 +95,56 @@ describe('run:add — an issue a person withdrew from the live run', () => {
 
 		expect(await run_add_cli.run(RETRY_ARGS, OPEN_PORTS)).toBe(1)
 		expect(console.info).toHaveBeenCalledWith(`refused #${ISSUE} · not a mechanical stop`)
+	})
+})
+
+// joshuafolkken/kit#8619: `--retry --withdrawn` stands for every such issue, each line with its reason.
+describe('run:add --retry --withdrawn', () => {
+	it('re-admits each withdrawn issue with its withdrawal reason', async () => {
+		withdrawn()
+
+		expect(await run_add_cli.run([RETRY_FLAG, WITHDRAWN_FLAG], OPEN_PORTS)).toBe(0)
+		expect(console.info).toHaveBeenCalledWith(
+			`queued #${ISSUE} · next free lane · withdrawn: ${REASON}`,
+		)
+		expect(is_offer_excluded()).toBe(false)
+	})
+
+	it('writes nothing and says so in one line when no issue is withdrawn', async () => {
+		run_carry.begin_carry(CARRY, INVOCATION, run_carry.NO_OWNER, new Date())
+		const apply_label = vi.fn(OPEN_PORTS.apply_label)
+
+		expect(
+			await run_add_cli.run([RETRY_FLAG, WITHDRAWN_FLAG], { ...OPEN_PORTS, apply_label }),
+		).toBe(0)
+		expect(console.info).toHaveBeenCalledExactlyOnceWith(
+			'No withdrawn issue in this backlogrun; nothing was added.',
+		)
+		expect(apply_label).not.toHaveBeenCalled()
+		expect(run_event_stream.read_events(stream())).toStrictEqual([])
+	})
+
+	it.each([[[WITHDRAWN_FLAG]], [[WITHDRAWN_FLAG, ISSUE, RETRY_FLAG]]])(
+		'prints the usage and exits 2 for %j',
+		async (argv) => {
+			vi.spyOn(console, 'error').mockImplementation(vi.fn())
+
+			expect(await run_add_cli.run(argv, OPEN_PORTS)).toBe(2)
+			expect(console.error).toHaveBeenCalledWith(run_add_cli.USAGE)
+			expect(run_add_cli.USAGE).toContain(`${RETRY_FLAG} ${WITHDRAWN_FLAG}`)
+		},
+	)
+})
+
+describe('run:add --retry --withdrawn — every withdrawn issue refused', () => {
+	it('keeps the withdrawal reason on the refusal line', async () => {
+		withdrawn()
+		const closed: AddPorts = {
+			...OPEN_PORTS,
+			read_issue: async () => ({ is_open: false, blockers: [] }),
+		}
+
+		expect(await run_add_cli.run([RETRY_FLAG, WITHDRAWN_FLAG], closed)).toBe(1)
+		expect(console.info).toHaveBeenCalledWith(expect.stringMatching(` · withdrawn: ${REASON}$`))
 	})
 })

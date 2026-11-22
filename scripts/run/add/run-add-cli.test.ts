@@ -66,6 +66,7 @@ describe('parse_request', () => {
 			issues: [3433, 3434],
 			is_priority: true,
 			is_retry: false,
+			is_withdrawn: false,
 		})
 	})
 
