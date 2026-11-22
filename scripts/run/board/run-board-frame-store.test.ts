@@ -11,6 +11,7 @@ const ROOT = `/run-board-frame-store-test-${randomUUID()}`
 
 afterEach(() => {
 	rmSync(path_of(CHAT_KEY, ROOT), { force: true })
+	vi.unstubAllEnvs()
 })
 
 describe('run_board_frame_store.file_store', () => {
@@ -111,14 +112,6 @@ describe('run_board_frame_store.fresh', () => {
 		expect(once_key('wargames', false)).not.toBe(once_key(undefined, false))
 	})
 
-	// joshuafolkken/kit#8505: the theme's own icons keep the key they had; others keep their own.
-	it('keeps a still frame in other icons apart, the default icons under the key they had', () => {
-		expect(once_key('wargames', false, 'shapes')).toBe('once-wargames-pipe')
-		expect(once_key(undefined, true, 'emoji')).toBe('once-tty')
-		expect(once_key('wargames', false, 'letters')).toBe('once-wargames-letters-pipe')
-		expect(once_key(undefined, false, 'shapes')).toBe('once-shapes-pipe')
-	})
-
 	it('save_only saves through to the store but loads nothing', () => {
 		const store = memory_store()
 		const only = run_board_frame_store.save_only(store)
@@ -138,8 +131,13 @@ describe('run_board_frame_store.fresh', () => {
 
 // joshuafolkken/kit#8616: a piped frame forced into color is recorded apart from an uncolored one.
 describe('run_board_frame_store.once_key — the colors stdout draws', () => {
-	afterEach(() => {
-		vi.unstubAllEnvs()
+	// joshuafolkken/kit#8505: the theme's own icons keep the key they had; others keep their own.
+	it('keeps a still frame in other icons apart, the default icons under the key they had', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		expect(once_key('wargames', false, 'shapes')).toBe('once-wargames-pipe')
+		expect(once_key(undefined, true, 'emoji')).toBe('once-tty')
+		expect(once_key('wargames', false, 'letters')).toBe('once-wargames-letters-pipe')
+		expect(once_key(undefined, false, 'shapes')).toBe('once-shapes-pipe')
 	})
 
 	it.each([undefined, 'wargames', 'matrix'] as const)(
