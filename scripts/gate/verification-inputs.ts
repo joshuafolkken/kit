@@ -187,7 +187,7 @@ const UNIT: InputDeclaration = {
 	reads: 'recorded',
 	is_config: configures_tests,
 	tools: ['vitest', 'typescript'],
-	env: [...COMMON_ENV, 'TZ'],
+	env: COMMON_ENV,
 }
 
 function compiled(is_input: FileTest): InputDeclaration {

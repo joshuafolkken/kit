@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 import { run_board_link } from './run-board-link'
@@ -83,13 +83,6 @@ describe('run_board_render — outcome evidence links', () => {
 })
 
 describe('run_board_render — finished reasons', () => {
-	beforeEach(() => {
-		vi.stubEnv('TZ', 'UTC')
-	})
-	afterEach(() => {
-		vi.unstubAllEnvs()
-	})
-
 	it.each(['withdrawn', 'done'] as const)('ends %s with its reason (ac-0dc7a1df)', (state) => {
 		expect(line_of(state, REASON)).toMatch(new RegExp(`${REASON}$`, 'u'))
 	})

@@ -6,9 +6,12 @@ import { PLANNED_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
 import { lane_plan } from '#scripts/lane/lane-plan'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_overlap } from './backlog-overlap'
+import type { PoolIssue } from './backlog-plan-comment'
+import { plan_definitions_fixture } from './plan-definitions-fixture'
 
 const list_comments_mock = vi.hoisted(() => vi.fn())
 const parse_comments_mock = vi.hoisted(() => vi.fn())
@@ -22,6 +25,7 @@ vi.mock('#scripts/issue/issue-read', () => ({
 }))
 
 const { backlog_plan_comment } = await import('./backlog-plan-comment')
+const { backlog_rank } = await import('./backlog-rank')
 
 // joshuafolkken/kit#4923: joshuafolkken/kit#4910's plan comment named files a running lane held, its
 // body named none, so dispatch let it run and the lane waited in `lane:plan`.
@@ -159,6 +163,62 @@ describe('backlog_plan_comment.declared_of — a bare file name', () => {
 
 		expect(declared.get(CANDIDATE)).toStrictEqual(new Set([SHARED]))
 		expect(listing).toHaveBeenCalledExactlyOnceWith(['ls-files'], NO_DIRECTORY)
+	})
+})
+
+// joshuafolkken/kit#8685: joshuafolkken/kit#8676's plan named `ThemeDefinition` but not the file
+// defining it, which its body named, and it launched beside joshuafolkken/kit#8673, which planned it.
+const { PANEL_DRAW, THEME_BODY, THEME_DEFS } = plan_definitions_fixture
+const CLOCKS_ISSUE = 8673
+const THEME_ISSUE = 8676
+const THEME_PLAN = `${plan_definitions_fixture.THEME_PLAN}\n${CONSUMERS}\n`
+const IDLE: BusyRead = { kind: 'busy', issues: [] }
+const make_directory = temporary_directory()
+
+function board_repo(): string {
+	return plan_definitions_fixture.board_repo(make_directory('plan-definitions-'))
+}
+
+function planned(number: number, body: string): PoolIssue {
+	return { number, body, labels: [{ name: PLANNED_LABEL }] }
+}
+
+function plans_by_issue(plans: ReadonlyMap<number, string>): void {
+	list_comments_mock.mockImplementation(async (issue: string) => await issue)
+	parse_comments_mock.mockImplementation(async (issue: string) => [
+		comment(plans.get(Number(issue)) ?? ''),
+	])
+}
+
+describe('backlog_plan_comment.declared_of — a name the plan defines in a body file', () => {
+	it('keeps the body file defining a name the plan carries, and no other body file', async () => {
+		plans_by_issue(new Map([[THEME_ISSUE, THEME_PLAN]]))
+		const issues = [planned(THEME_ISSUE, THEME_BODY)]
+		const declared = await backlog_plan_comment.declared_of(issues, board_repo())
+
+		expect(declared.get(THEME_ISSUE)).toStrictEqual(new Set([PANEL_DRAW, THEME_DEFS]))
+	})
+
+	it('holds the later of two issues back when one plans the file the other plans by a name', async () => {
+		plans_by_issue(
+			new Map([
+				[CLOCKS_ISSUE, plan(THEME_DEFS)],
+				[THEME_ISSUE, THEME_PLAN],
+			]),
+		)
+		const issues = [planned(CLOCKS_ISSUE, THEME_BODY), planned(THEME_ISSUE, THEME_BODY)]
+		const declared = await backlog_plan_comment.declared_of(issues, board_repo())
+		const candidates = [child(CLOCKS_ISSUE), child(THEME_ISSUE)]
+		const selection = backlog_rank.select({
+			candidates,
+			pool: candidates,
+			read: IDLE,
+			repo: REPO,
+			standalone: new Set(),
+			declared,
+		})
+
+		expect(selection.offered.map((entry) => entry.number)).toStrictEqual([CLOCKS_ISSUE])
 	})
 })
 
