@@ -173,7 +173,12 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BTTF_THEME],
 					description:
-						'names the board `josh-flux` and types its opening line as written; no alert, lamps or typing sound.',
+						'names the board `josh-flux` and types its opening line as written; no alert or typing sound.',
+				},
+				{
+					names: [BTTF_THEME],
+					description:
+						'a live board draws the flux capacitor in the lamp panel’s place: a lamp gauge right-aligned at the throughput rule’s end, the Y of lamps left of it with its red bar, and the speed readout `NN.N` in the throughput rule over the Y; the gauge moves only when the speed range changes (`run-board-flux-panel.ts`). None where the WOPR lamp panel would not show.',
 				},
 				{
 					names: [BTTF_THEME],
@@ -189,6 +194,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--frame'],
 					description:
 						'one live-form frame in a state its flags fix, for reading what only a live board draws; no frame record, cue or screen control (`run-board-frame-preview.ts`). `--notice <row state>` (`running`, `merged`, …) with `--issue <n>` and `--repeat` (`×2`) sets the notice; `--mute` draws `🔇`; `--columns` / `--rows` the size (120×40); `--ansi` keeps SGR.',
+				},
+				{
+					names: ['--frame'],
+					description:
+						'draws a theme’s animation area (the `bttf` flux capacitor) as a live board’s first turn does: over the plain text, or under `--ansi` as cursor writes after the frame.',
 				},
 				{
 					names: ['--timing'],

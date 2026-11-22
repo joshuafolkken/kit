@@ -69,6 +69,9 @@ interface BoardPorts {
 	is_tty: boolean
 	// Whether a live board types each issue row that appears, a letter at a time — only in a theme.
 	types_rows?: boolean | undefined
+	// Whether the frame is a live board's (or its `--frame` preview's), where a theme's lamp panel and
+	// animation area show though its rows do not type (joshuafolkken/kit#8674).
+	is_live?: boolean | undefined
 	// The theme the frame is drawn in (`run-board-theme.ts`), whose alert display the header adds.
 	theme?: Theme | undefined
 	// How the icons are drawn (`run-board-icons.ts`); unset, the theme's default.
