@@ -378,14 +378,23 @@ function guide_problem(
 	)
 }
 
-// The declared file count, or `undefined` when there is no estimate or it does not parse.
+// The declared estimate a tests-included count is compared with: `undefined` also for an estimate
+// filed excluding tests (joshuafolkken/kit#8589), which counts a different thing — the guide applies.
+function comparable_size(body: string): SizeMeasurement | undefined {
+	const excluding = issue_body_keys.excludes_tests(declared(body, PREFIX) ?? '')
+
+	return excluding ? undefined : parse(body)
+}
+
+// The comparable declared file count, or `undefined` when there is none (`comparable_size`).
 function declared_files(body: string): number | undefined {
-	return parse(body)?.files
+	return comparable_size(body)?.files
 }
 
 const size_estimate = {
 	budget_note,
 	capped,
+	comparable_size,
 	declared,
 	declared_files,
 	declared_lines_bar,

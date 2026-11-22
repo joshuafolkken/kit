@@ -307,7 +307,7 @@ runs with no `cpu_ms` left out. It only reports: a core weight is changed in its
 The `catch rate` table and `candidates:`: `lane-catch-rate-stats.ts`.
 
 Under the size table, the implement-rate table (`lane-implement-rate.ts`) prints the median `implement` minutes per 100
-actual non-test lines over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
+actual lines, tests included, over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
 issue to the last `size` measured before the merge, lanes with no size, no interval or zero lines left out.
 
 The row's last two columns, `estimate ratio first` and `estimate ratio median`, measure the run board's finish estimate

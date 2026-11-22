@@ -9,7 +9,7 @@ import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-siz
 // joshuafolkken/kit#5568: the probed hunks and the projected lines answer `split` too, with their reason.
 
 const ISSUE = 5533
-const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト除く）\n'
+const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト含む）\n'
 const PLANNED_AT = '2026-10-31T00:00:00.000Z'
 const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
 const UNPLANNED = 'scripts/lane/unplanned.ts'
@@ -33,7 +33,7 @@ function issue_with(body: string): Array<OpenIssueData> {
 
 function declared(file_count: number, line_count: number): Array<OpenIssueData> {
 	return issue_with(
-		`## 背景\n\n- 規模見積もり: 約 ${String(file_count)} ファイル / ${String(line_count)} 行（テスト除く）\n`,
+		`## 背景\n\n- 規模見積もり: 約 ${String(file_count)} ファイル / ${String(line_count)} 行（テスト含む）\n`,
 	)
 }
 
@@ -93,7 +93,6 @@ describe('lane_plan_size.oversize', () => {
 	it('counts test files toward the bar', () => {
 		expect(oversize_of([...files(8), TEST_FILE])).toMatchObject({ split_off: [TEST_FILE] })
 	})
-
 	it.each([
 		['an Issue with no declaration (an epic)', issue_with('## 背景\n\n- 種別: 非不具合\n')],
 		['an Issue missing from the listing', []],

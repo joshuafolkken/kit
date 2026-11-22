@@ -115,7 +115,7 @@ interface Declared {
 
 function declared_of(issue: number, issues: ReadonlyArray<OpenIssueData>): Declared | undefined {
 	const body = issues.find((candidate) => candidate.number === issue)?.body
-	const size = body === undefined ? undefined : size_estimate.declared_size(body)
+	const size = body === undefined ? undefined : size_estimate.comparable_size(body)
 
 	return size === undefined || size.files === 0 ? undefined : size
 }
@@ -186,8 +186,9 @@ function files_over(
 		return undefined
 	}
 
-	const kept = counted.filter((file) => units.slice(0, limit).flat().includes(file))
-	const split_off = counted.filter((file) => units.slice(limit).flat().includes(file))
+	const kept_files = new Set(split_assess.kept_units(units, limit).flat())
+	const kept = counted.filter((file) => kept_files.has(file))
+	const split_off = counted.filter((file) => !kept_files.has(file))
 
 	return { reason: 'files', declared, limit, kept, split_off }
 }

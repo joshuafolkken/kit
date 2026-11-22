@@ -92,11 +92,12 @@ const SIZE_VALUES = {
 } as const satisfies Row
 // Full- or half-width parentheses alike: the two read the same to the person typing the line. The
 // "excluding tests" spelling, in either column, is an Issue filed before tests counted
-// (joshuafolkken/kit#8589); its counts still parse, read against the guide as they stand.
+// (joshuafolkken/kit#8589); its counts still parse, and `counting` names the spelling.
 const SIZE_PATTERNS = [
-	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト(?:含む|除く)[）)]$/u,
-	/^about\s*(?<files>\d+)\s*files?\s*\/\s*(?<lines>\d+)\s*lines?\s*\((?:including|excluding) tests\)$/iu,
+	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト(?<counting>含む|除く)[）)]$/u,
+	/^about\s*(?<files>\d+)\s*files?\s*\/\s*(?<lines>\d+)\s*lines?\s*\((?<counting>including|excluding) tests\)$/iu,
 ]
+const EXCLUDING_TESTS: ReadonlySet<string> = new Set(['除く', 'excluding'])
 
 type IssueBodyKey = keyof typeof KEYS
 type IssueBodyValue = keyof typeof VALUES
@@ -170,6 +171,11 @@ function size_counts(text: string): Record<string, string> | undefined {
 	return SIZE_PATTERNS.map((pattern) => pattern.exec(text)?.groups).find(Boolean)
 }
 
+// Whether a size estimate's value is the "excluding tests" spelling an Issue filed before #8589 used.
+function excludes_tests(text: string): boolean {
+	return EXCLUDING_TESTS.has(size_counts(text)?.['counting']?.toLowerCase() ?? '')
+}
+
 // The row whose text in any column is `text`.
 function row_named(rows: Record<string, Row>, text: string): Row | undefined {
 	return Object.values(rows).find((row) => COLUMNS.some((at) => row[at] === text))
@@ -232,6 +238,7 @@ const issue_body_keys = {
 	prefix,
 	prefix_variants,
 	size_counts,
+	excludes_tests,
 	size_value,
 	TABLES,
 	value,

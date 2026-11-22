@@ -26,7 +26,7 @@ const SIGNALS: PlanSignals = {
 }
 
 function declared(file_count: number): Array<OpenIssueData> {
-	const body = `## 背景\n\n- 規模見積もり: 約 ${String(file_count)} ファイル / 20 行（テスト除く）\n`
+	const body = `## 背景\n\n- 規模見積もり: 約 ${String(file_count)} ファイル / 20 行（テスト含む）\n`
 
 	return [{ number: ISSUE, title: 'lane', createdAt: PLANNED_AT, labels: [], body }]
 }

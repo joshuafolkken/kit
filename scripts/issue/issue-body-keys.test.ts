@@ -109,11 +109,14 @@ describe('issue_body_keys in either language', () => {
 	})
 
 	it.each([
-		'約 2 ファイル / 30 行(テスト含む)',
-		'about 2 files / 30 lines (including tests)',
-		'約 2 ファイル / 30 行(テスト除く)',
-		'about 2 files / 30 lines (excluding tests)',
-	])('reads the size counts of %s', (text) => {
-		expect({ ...issue_body_keys.size_counts(text) }).toStrictEqual({ files: '2', lines: '30' })
+		['約 2 ファイル / 30 行(テスト含む)', false],
+		['about 2 files / 30 lines (including tests)', false],
+		['約 2 ファイル / 30 行(テスト除く)', true],
+		['about 2 files / 30 lines (excluding tests)', true],
+	])('reads the size counts of %s', (text, excluding) => {
+		const { files, lines } = issue_body_keys.size_counts(text) ?? {}
+
+		expect({ files, lines }).toStrictEqual({ files: '2', lines: '30' })
+		expect(issue_body_keys.excludes_tests(text)).toBe(excluding)
 	})
 })

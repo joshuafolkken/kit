@@ -19,6 +19,8 @@ import { split_cap } from './split-cap'
 // track its cut rate more closely than its other lines do (joshuafolkken/kit#8589).
 
 type SplitVerdict = 'split' | 'single'
+// The files that split as one (`units_of`).
+type Unit = ReadonlyArray<string>
 
 // One file's contribution to the change size: its path, and the lines it added plus the lines it
 // removed. A binary file, which `git diff --numstat` prints as `-`, contributes zero changed lines.
@@ -165,6 +167,39 @@ function units_of(files: ReadonlyArray<string>, added: ReadonlySet<string>): Arr
 			? []
 			: [[...unit, ...generated]]
 	})
+}
+
+const TEST_SUFFIX = /\.(?:test|e2e)\.ts$/u
+
+// The module a test file covers, or the path itself for any other file.
+function module_of(file: string): string {
+	return file.replace(TEST_SUFFIX, '.ts')
+}
+
+// The units a split-off cut keeps together: a unit led by a test joins its planned module's unit, so
+// a files refusal never splits a test off the module it covers (joshuafolkken/kit#8589).
+function test_groups(units: ReadonlyArray<Unit>): Array<Array<Unit>> {
+	const home = units.map((unit, index) => {
+		const at = units.findIndex((other) => other.includes(module_of(unit[0] ?? '')))
+
+		return at === -1 ? index : at
+	})
+
+	return units.flatMap((_, index) =>
+		home[index] === index ? [units.filter((__, other) => home[other] === index)] : [],
+	)
+}
+
+// The leading units that fit within `limit`, a test and its module never cut apart (`test_groups`).
+function kept_units(units: ReadonlyArray<Unit>, limit: number): Array<Unit> {
+	const kept: Array<Unit> = []
+
+	for (const group of test_groups(units)) {
+		if (kept.length + group.length > limit) break
+		kept.push(...group)
+	}
+
+	return kept
 }
 
 // `split` when **either** guide is exceeded — the AND form never fired, even on the lanes cut twice
@@ -329,6 +364,7 @@ const split_assess = {
 	policy_text,
 	reason,
 	units_of,
+	kept_units,
 	verdict_for,
 }
 
