@@ -113,8 +113,8 @@ describe('issue:fold — undetermined where the diff measures nothing', () => {
 		expect(output()).toContain(issue_fold.UNDETERMINED)
 	})
 
-	it('answers undetermined when only test files changed', async () => {
-		diff_numstat_since.mockResolvedValue('30\t2\tsrc/one.test.ts')
+	it('answers undetermined when only run records changed', async () => {
+		diff_numstat_since.mockResolvedValue('30\t2\t.josh/observations/1.md')
 
 		expect(await issue_fold_cli.run(TITLES)).toBe(0)
 		expect(output()).toContain(issue_fold.UNDETERMINED)

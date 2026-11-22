@@ -173,8 +173,14 @@ describe('run_board_header.alert_part', () => {
 		expect(header_line(1, WARGAMES)).not.toContain('DEFCON')
 	})
 
-	it('leaves the header of a themed screen as the plain one draws it', () => {
-		expect(header_line(0, WARGAMES)).toBe(header_line(0, {}))
+	// The theme's board name (joshuafolkken/kit#8604) is the one change.
+	it('leaves the header of a themed screen as the plain one draws it but the board name', () => {
+		expect(header_line(0, WARGAMES)).toBe(header_line(0, {}).replace('josh-board', 'josh-wopr'))
+	})
+
+	// A chat frame recorded off a themed live board keeps `josh-board`, as `--chat` draws no theme.
+	it('names the board josh-board in a chat frame that carries a theme', () => {
+		expect(header_line(0, { ...WARGAMES, form: 'chat' })).toBe(header_line(0, { form: 'chat' }))
 	})
 })
 

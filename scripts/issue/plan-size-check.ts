@@ -100,7 +100,7 @@ function next_steps(issue_number: string, repo?: string): string {
 
 function overrun_text(named: ReadonlyArray<string>, estimate: string): string {
 	return [
-		`plan not recorded — it names ${String(named.length)} file(s), tests excluded, past the estimate \`${estimate}\`:`,
+		`plan not recorded — it names ${String(named.length)} file(s), tests included, past the estimate \`${estimate}\`:`,
 		...named.map((path) => `  ${path}`),
 		`State the corrected estimate as a \`${SIZE_PREFIX}\` line in the plan, in the issue's format, and re-run \`issue:plan\`; recording the plan restates the issue's own. Work a review finding adds later is outside this check.`,
 	].join('\n')
@@ -111,11 +111,11 @@ function overrun_text(named: ReadonlyArray<string>, estimate: string): string {
 function overrun_of(plan: string, body: string): string | undefined {
 	const named = plan_named_files.named_files(plan)
 	const estimate = estimate_of(plan, body)
-	const declared = size_estimate.declared_files(judged_body(plan, body))
+	const declared = size_estimate.comparable_size(judged_body(plan, body))?.files
 
 	if (estimate === undefined || declared === undefined) {
 		console.info(
-			`plan names ${String(named.length)} file(s), tests excluded; no size estimate to compare`,
+			`plan names ${String(named.length)} file(s), tests included; no size estimate to compare`,
 		)
 
 		return undefined

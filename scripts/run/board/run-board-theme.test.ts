@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_header_names } from './run-board-header-names'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_render_throughput } from './run-board-render-throughput'
 import type { BoardPorts } from './run-board-state'
@@ -152,6 +153,17 @@ describe('run_board_theme.restyle as text', () => {
 
 		expect(stripVTControlCharacters(themed)).not.toMatch(PICTOGRAPHIC)
 		expect(widths_of(themed)).toStrictEqual(widths_of(frame))
+	})
+
+	// joshuafolkken/kit#8604: each theme's board name is drawn in the frame's capitals.
+	it.each([
+		['wargames', 'JOSH-WOPR'],
+		['matrix', 'JOSH-TRACE'],
+	] as const)('draws the %s board name as %s', (theme, drawn) => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const line = `■ ${run_board_header_names.board_name_of(theme)}`
+
+		expect(stripVTControlCharacters(run_board_theme.restyle(theme, line))).toContain(drawn)
 	})
 })
 

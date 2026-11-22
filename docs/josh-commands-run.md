@@ -256,10 +256,10 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 
 - An open epic becomes an unlabelled root of any run, recorded once.
 - Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`; an issue already labelled `priority:critical` or `priority:high` keeps that label alone, still ahead of the queue. Named runs also record additions beside their unchanged invocation.
-- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
+- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
-- `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
-- A reviewed PR may start a repair attempt through `--retry` after a trusted comment newer than its review stop, an open PR, and confirmed worker/ship exit. The retry boundary is recorded once and the previous cut is ended before a replacement worker starts. Merges, withdrawals, splits, protected labels, and active or unreadable owners remain refused.
+- `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed, stalled or withdrawn issues are refused.
+- A reviewed PR may start a repair attempt through `--retry` after a trusted comment newer than its review stop, an open PR, and confirmed worker/ship exit. The retry boundary is recorded once and the previous cut is ended before a replacement worker starts. Merges, splits, protected labels, and active or unreadable owners remain refused.
 - Only such a repair clears `needs-human-merge`, so the next offer dispatches it; its ship re-parks the PR while the diff still needs a person's merge.
 - A live `backlog:drive` runs `--retry` itself on the `run:stalled` causes it can re-offer, 2 times per issue ([labels and run states](./labels-and-run-states.md)); any other cause, or one at that cap, waits for this command.
 

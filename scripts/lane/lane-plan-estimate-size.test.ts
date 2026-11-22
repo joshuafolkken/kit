@@ -11,7 +11,7 @@ const ISSUES: Array<OpenIssueData> = [
 		title: 'scope',
 		createdAt: '',
 		labels: [],
-		body: '## 背景\n\n- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）\n',
+		body: '## 背景\n\n- 規模見積もり: 約 2 ファイル / 40 行（テスト含む）\n',
 	},
 ]
 const SIGNALS: PlanSignals = {

@@ -26,7 +26,7 @@ const LANE_PLAN = { issue: LANE, paths: [PLANNED], planned_at: '2026-11-02T00:00
 const HOLDER_RECORD = { issue: HOLDER, paths: [HELD], planned_at: '2026-11-01T00:00:00.000Z' }
 
 const EXTRA_FILE = 'scripts/lane/extra.ts'
-const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
+const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）\n'
 const QUIET = {
 	hunk_files: [],
 	committed_files: [],

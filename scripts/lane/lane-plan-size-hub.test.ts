@@ -9,7 +9,7 @@ import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-siz
 
 const ISSUE = 6543
 const PLANNED_AT = '2026-11-08T00:00:00.000Z'
-const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 80 行（テスト除く）\n'
+const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 80 行（テスト含む）\n'
 const HUB = 'scripts/split/split-assess.ts'
 const PLAIN = 'scripts/lane/plain.ts'
 const QUIET: PlanSignals = {

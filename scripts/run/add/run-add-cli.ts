@@ -178,6 +178,12 @@ async function clear_label(issue: number, label: string): Promise<boolean> {
 
 const GH_PORTS: AddPorts = { read_issue, apply_label, clear_label }
 
+// The settlements `--retry` lifts: a park, and a person's withdrawal (joshuafolkken/kit#8599).
+const RETRY_LIFTED_KINDS: ReadonlySet<string> = new Set([
+	run_event_stream.EVENT_KIND.PARK,
+	run_event_stream.EVENT_KIND.WITHDRAW,
+])
+
 async function context_of(
 	live: LiveRun,
 	is_retry: boolean,
@@ -186,13 +192,14 @@ async function context_of(
 	const lanes = await lane_spent.lanes_in_use()
 	const events = await run_event_stream_emit.current_events(is_retry)
 	const active = backlog_drive_restore.active_issues(events)
-	const terminal = events.filter((event) => event.kind !== run_event_stream.EVENT_KIND.PARK)
+	const terminal = events.filter((event) => !RETRY_LIFTED_KINDS.has(event.kind))
 
 	return {
 		is_retry,
 		repairs,
 		done: live.carry.done ?? [],
 		active: new Set([...active, ...lanes.working, ...lanes.unread]),
+		withdrawn: new Set(backlog_drive_restore.withdrawn_issues(events).map(Number)),
 		settled: new Set([
 			...(live.carry.merged_issues ?? []),
 			...backlog_drive_restore.settled_issues(terminal),

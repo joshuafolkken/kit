@@ -16,6 +16,16 @@ describe('run_board_render_none.render_no_run', () => {
 		expect(line).toContain(WORDS.no_run)
 	})
 
+	// joshuafolkken/kit#8604: the line names the board as the themed header does.
+	it.each([
+		['wargames', 'josh-wopr'],
+		['matrix', 'josh-trace'],
+	] as const)('names the board %s draws %s', (theme, name) => {
+		const [line = ''] = render_no_run(NOW, { theme })
+
+		expect(line.startsWith(`■ ${name}  `)).toBe(true)
+	})
+
 	it('says why the read failed in place of no run', () => {
 		const [line = ''] = render_no_run(NOW, { failure: { read_failed_ms: NOW, read_error: 'gone' } })
 

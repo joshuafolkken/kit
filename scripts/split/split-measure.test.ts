@@ -75,17 +75,17 @@ describe('read_branch on a new module and its importer', () => {
 	})
 })
 
-describe('read_branch excludes quoted tests', () => {
-	it('excludes an untracked C-quoted test file over the line guide', async () => {
+describe('read_branch counts quoted tests', () => {
+	it('counts an untracked C-quoted test file over the line guide', async () => {
 		const file = 'quote"name.test.ts'
 
 		await writeFile(path.join(fixture.root, file), lines_of(201))
 		vi.mocked(git_command.untracked_names).mockResolvedValue(JSON.stringify(file))
 
 		expect(await split_measure.read_branch()).toStrictEqual({
-			files: 0,
-			lines: 0,
-			verdict: 'single',
+			files: 1,
+			lines: 201,
+			verdict: 'split',
 			guide: LEGACY_GUIDE,
 		})
 	})
@@ -170,7 +170,7 @@ describe('read_branch excludes run records', () => {
 		await writeFile(path.join(fixture.root, record), lines_of(NEW_FILE_LINES))
 		vi.mocked(git_command.untracked_names).mockResolvedValue(record)
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(
-			'1\t0\tscripts/a.ts\n50\t0\tscripts/a.test.ts\n50\t0\t.josh/metrics-accepted/6391.json',
+			'1\t0\tscripts/a.ts\n50\t0\t.josh/metrics-accepted/6391.json',
 		)
 		const measurement = await split_measure.read_branch()
 

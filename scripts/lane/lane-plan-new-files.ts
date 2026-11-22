@@ -6,7 +6,7 @@ import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 // does not hold counts at least this many lines, the mean of those two; with no base listing none is new.
 const LINES_PER_NEW_FILE = 160
 
-// `counted` are the plan's counted files (tests excluded); a directory or glob claim is not one new file.
+// `counted` are the plan's counted files (tests included); a directory or glob claim is not one new file.
 function new_files_of(
 	counted: ReadonlyArray<string>,
 	base_files: ReadonlySet<string> | undefined,

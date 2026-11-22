@@ -46,6 +46,9 @@ interface LiveDefinition {
 }
 
 interface ThemeDefinition {
+	// The board's name the header and the no-run line draw in place of `josh-board`, in lower case: the
+	// frame's capitals pass raises it (joshuafolkken/kit#8604).
+	name: string
 	// The color the theme draws text no color is given in.
 	paint: Paint
 	// Section dashes and heading text, and the theme's idle glyphs (joshuafolkken/kit#8390).
@@ -71,6 +74,8 @@ const { IDLE_PAINT } = run_board_theme_tones
 
 const THEME_DEFS = {
 	wargames: {
+		// The film's war-planning computer, WOPR.
+		name: 'josh-wopr',
 		// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
 		paint: CYAN,
 		// The rules in the idle tone, behind the row typing (joshuafolkken/kit#8397).
@@ -96,6 +101,8 @@ const THEME_DEFS = {
 	// lines and shows the last at once (joshuafolkken/kit#8441); its new rows decode and the idle rain
 	// runs where the lamps sit (joshuafolkken/kit#8356).
 	matrix: {
+		// The film's opening terminal line, `Trace program: running`.
+		name: 'josh-trace',
 		paint: run_board_header_trace.SHADES.body,
 		rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
 		idle: run_board_header_trace.SHADES.mid,

@@ -32,17 +32,18 @@ describe('plan_named_files.named_files — the files a plan will edit', () => {
 		expect(plan_named_files.named_files(plan)).toEqual([EDITED])
 	})
 
-	it('leaves out tests, directories and a path named twice', () => {
+	it('counts tests and leaves out directories and a path named twice', () => {
+		const test_file = 'scripts/issue/issue-plan-cli.test.ts'
 		const plan = plan_of(
 			[
 				`- change \`${EDITED}\` and \`issue-plan-cli.ts\``,
-				'- test `scripts/issue/issue-plan-cli.test.ts`',
+				`- test \`${test_file}\``,
 				'- under `scripts/issue/`',
 			],
 			[`- \`record_plan\`: \`${EDITED}\` — 直す`],
 		)
 
-		expect(plan_named_files.named_files(plan)).toEqual([EDITED])
+		expect(plan_named_files.named_files(plan)).toEqual([EDITED, test_file])
 	})
 
 	it('keeps a bare name the repository root holds beside a nested one', () => {

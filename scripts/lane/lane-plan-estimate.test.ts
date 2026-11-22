@@ -34,7 +34,7 @@ describe('lane_plan_estimate', () => {
 		const plan = await lane_plan_estimate.attach(PLAN, input)
 
 		expect(plan.paths).toEqual(CHANGES.map((change) => change.path))
-		expect(plan.estimated_size).toEqual({ files: 4, lines: 40 })
+		expect(plan.estimated_size).toEqual({ files: 5, lines: 540 })
 		expect(split_assess.measure(CHANGES)).toMatchObject({ ...plan.estimated_size })
 	})
 

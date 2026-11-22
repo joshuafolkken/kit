@@ -282,14 +282,19 @@ function queued_tail(header: BoardHeader): string | undefined {
 	return parts.length === 0 ? undefined : parts.join(GAP)
 }
 
+// The theme a screen draws in; a chat frame takes none, even recorded off a themed board.
+function screen_theme(header: BoardHeader): BoardHeader['theme'] {
+	return header.form === 'screen' ? header.theme : undefined
+}
+
 // The alert level a themed screen draws at the right end of the throughput rule (joshuafolkken/kit#8513),
 // drawn as the theme's row says.
 function alert_part(header: BoardHeader): string | undefined {
-	if (header.theme === undefined || header.form !== 'screen') return undefined
+	const theme = screen_theme(header)
 
-	return run_board_theme_defs.THEME_DEFS[header.theme].alert(
-		run_board_header_defcon.level_of(header),
-	)
+	if (theme === undefined) return undefined
+
+	return run_board_theme_defs.THEME_DEFS[theme].alert(run_board_header_defcon.level_of(header))
 }
 
 // The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):
@@ -361,7 +366,7 @@ function header_lines(header: BoardHeader): Array<string> {
 	const left = left_of(header)
 	const finish = left === undefined ? undefined : header.now_ms + left
 	const columns = [
-		column_of(run_board_header_names.names_of(mark, header)),
+		column_of(run_board_header_names.names_of(mark, { ...header, theme: screen_theme(header) })),
 		column_of(planned_first(header, clocks_of(header, finish))),
 		planned_first(header, time_parts(header, mark, now, left)),
 		[machine_part(header), notice_of(header), now === undefined ? '' : now_text(now, header)],
