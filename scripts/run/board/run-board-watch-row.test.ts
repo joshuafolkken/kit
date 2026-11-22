@@ -1,9 +1,11 @@
+import { stripVTControlCharacters } from 'node:util'
 import { figure_format } from '#scripts/lib/figure-format'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_estimate } from './run-board-estimate'
 import { run_board_fit } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
+import { run_board_link } from './run-board-link'
 import type { PinnedIssue } from './run-board-pinned-graphql'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_theme } from './run-board-theme'
@@ -19,6 +21,7 @@ const DAY = 24 * 60 * MINUTE
 const PIN = 8591
 const TODAY = NOW + MINUTE
 const OTHER_DAY = NOW - 2 * DAY
+const REPO = 'joshuafolkken/kit'
 
 function open_pin(): PinnedIssue {
 	return { number: PIN, is_closed: false, closed_ms: undefined }
@@ -103,6 +106,31 @@ describe('watch_row icon set', () => {
 
 		expect(letters).not.toContain(STATE_ICONS.waiting)
 		expect(run_board_fit.width_of(letters)).toBe(run_board_fit.width_of(line))
+	})
+})
+
+function osc_link(text: string, url: string): string {
+	return `\u{1B}]8;;${url}\u{7}${text}\u{1B}]8;;\u{7}`
+}
+
+function linked_line(): string {
+	const board = header({ repo: REPO, link: run_board_link.linker(REPO, osc_link) })
+
+	return watch_row(board, open_pin())
+}
+
+describe('watch_row issue link', () => {
+	it("links the pin's number to its issue", () => {
+		const url = run_board_link.issue_url(String(PIN), REPO)
+
+		expect(linked_line()).toBe(`${STATE_ICONS.waiting} ${osc_link(String(PIN), url)} —`)
+	})
+
+	it('reads as the plain line once the link is stripped, at the same width', () => {
+		const plain = watch_row(header(), open_pin())
+
+		expect(stripVTControlCharacters(linked_line())).toBe(plain)
+		expect(run_board_fit.width_of(linked_line())).toBe(run_board_fit.width_of(plain))
 	})
 })
 

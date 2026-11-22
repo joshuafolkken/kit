@@ -10,6 +10,8 @@ import { run_board_render_icon } from './run-board-render-icon'
 // is the one its row in the run leads with (`run-board-render-icon.ts`), ✅ once GitHub reads it
 // closed, ⏳ while the run holds no row for it. The time is when it closed, else when it is foretold
 // to finish: a running row's own finish, a queued child's placement (`run-board-estimate.ts`).
+// joshuafolkken/kit#8625: the number is the board's own issue link (`header.link`), plain where
+// the terminal draws no links or the repository is unknown.
 
 const { STATE_ICONS } = run_board_labels
 const NO_TIME = '—'
@@ -57,7 +59,7 @@ function watch_row(header: BoardHeader, pin: PinnedIssue): string {
 	const row = row_of(header, pin.number)
 	const stamp = stamp_of(header.now_ms, moment_of(header, pin, row))
 
-	return `${icon_of(pin, row)} ${String(pin.number)} ${stamp}`
+	return `${icon_of(pin, row)} ${header.link(String(pin.number))} ${stamp}`
 }
 
 const run_board_watch_row = { NO_TIME, stamp_of, watch_row }
