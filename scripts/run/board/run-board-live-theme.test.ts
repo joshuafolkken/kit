@@ -2,11 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_live } from './run-board-live'
+import type { UsageMark } from './run-board-usage'
 
 // joshuafolkken/kit#8401: every live refresh keeps the wargames rules dimmed — the theme restyles the
 // board's own lines before the screen's control bytes are put in front of them.
 
-const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
+const { IDLE_ROW, LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const ESC = '\u{1B}'
 const SYNC_START = `${ESC}[?2026h`
 const SYNC_END = `${ESC}[?2026l`
@@ -15,6 +16,19 @@ const ERASE_LINE = `\n${ESC}[K`
 const DIM_RULE_TRUE_COLOR = `${ESC}[38;2;31;118;113m-`
 const DIM_RULE_NAMED = `${ESC}[2m-`
 const THEMED = ['--theme', 'wargames']
+// The bttf gauge's cell with all four lamps lit, as its idle green bars draw it.
+const GAUGE_FULL_CELL = '⣿'
+const USAGE: UsageMark = {
+	at_ms: 0,
+	processes: new Map(),
+	lanes: new Map(),
+	names: new Map(),
+	parents: new Map(),
+	unread: new Set(),
+	folded: new Set(),
+	cores: 1,
+	total_bytes: 1000,
+}
 // Enough board time for the opening, its reveal and a few redraws on the second to pass.
 const STOP_AFTER_MS = 5000
 
@@ -87,5 +101,24 @@ describe('run_board_live.watch wargames refresh', () => {
 			expect(frame).toContain(ERASE_LINE)
 			expect(frame.endsWith(SYNC_END)).toBe(true)
 		}
+	})
+})
+
+// joshuafolkken/kit#8674: a live bttf board draws its flux panel though its rows do not type.
+describe('run_board_live.watch bttf flux panel', () => {
+	it('draws the flux gauge on the live board', async () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const { ports, frames, clock, read_usage } = harness({ ...LOCAL, throughput: [IDLE_ROW] }, [
+			plan_titled('a'),
+		])
+
+		// The usage cells widen the rules to the pane, room for the flux figure beside the lamps.
+		read_usage.mockResolvedValue(USAGE)
+
+		await expect(
+			run_board_live.watch({ ...ports, sleep: clocked(clock), intro_sleep: instant }, 'bttf'),
+		).rejects.toBe(STOPPED)
+
+		expect(frames.join('')).toContain(GAUGE_FULL_CELL)
 	})
 })
