@@ -49,7 +49,7 @@ const { TITLE_LIMIT, WHOLE, title_of } = run_board_render_title
 const { width_for } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, kept_section, keyed, plan_section } = run_board_render_section
-const { GAP, row_line, shared_overrun } = run_board_render_row
+const { GAP, row_line, shared_overrun, title_width } = run_board_render_row
 const { tally_of } = run_board_priority
 const BRANCH = `${ROW_INDENT}   ├ `
 const LAST_BRANCH = `${ROW_INDENT}   └ `
@@ -148,6 +148,15 @@ function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 	return [kept_section(pair(STATE_ICONS.waiting, WORDS.queued), lines)]
 }
 
+// The decision rows' frame: what to decide matters more than the title, so their title column is as
+// wide as their widest title and, drawing no time (`run-board-render-row.ts` timed_parts), their
+// action starts right after the titles (joshuafolkken/kit#8590).
+function decision_frame(rows: ReadonlyArray<BoardRow>, frame: RowFrame): RowFrame {
+	const title_limit = Math.max(0, ...rows.map((row) => title_width(row, frame)))
+
+	return { ...frame, section: 'decision', title_limit }
+}
+
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
 // ones waiting on a person's decision — a child parked on one and an untouched plan row alike
 // (joshuafolkken/kit#4099).
@@ -165,7 +174,7 @@ function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 		frame.columns,
 	)
 
-	const decided = rows_section(decision, people, { ...frame, section: 'decision' })
+	const decided = rows_section(decision, people, decision_frame(people, frame))
 
 	return [...lanes, ...planned(frame.header, decided)]
 }
