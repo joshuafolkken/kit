@@ -150,7 +150,7 @@ function symbol_layers(seeded: Seeded, symbol: SymbolSelection): Layered {
 	const pins = seeded.code.flatMap((file) => pinned(file, []))
 
 	return {
-		layers: [[...seeded.seeds, ...pins, ...symbol.direct], symbol.tests],
+		layers: [[...seeded.seeds, ...pins, ...symbol.direct], ...symbol.rings],
 		reach: symbol.reach,
 		method: 'symbol',
 	}

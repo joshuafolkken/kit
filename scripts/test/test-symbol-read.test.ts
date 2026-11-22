@@ -58,6 +58,7 @@ describe('test_symbol_read.symbols', () => {
 			tests: [TWO_TEST],
 			reach: [{ file: LIB, count: 1 }],
 			direct: [TWO_TEST],
+			rings: [[TWO_TEST]],
 		})
 	})
 
@@ -69,6 +70,7 @@ describe('test_symbol_read.symbols', () => {
 			tests: [],
 			reach: [],
 			direct: [],
+			rings: [[]],
 		})
 	})
 

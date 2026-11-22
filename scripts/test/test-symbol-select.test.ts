@@ -12,6 +12,8 @@ const MOCKING_TEST = 'src/mocking.test.ts'
 const REGISTRY = 'scripts/josh/josh-commands-thing.ts'
 const SOLO = 'src/solo.ts'
 const FAR_TEST = 'src/far-0.test.ts'
+const RELAY = 'src/relay.ts'
+const RELAY_TEST = 'src/relay.test.ts'
 
 const LIB_SOURCE: Source = {
 	file: LIB,
@@ -56,6 +58,7 @@ describe('test_symbol_select.select_from', () => {
 			tests: [ONE_TEST],
 			reach: [{ file: LIB, count: 1 }],
 			direct: [ONE_TEST],
+			rings: [[ONE_TEST]],
 		})
 	})
 
@@ -74,14 +77,47 @@ describe('test_symbol_select.select_from', () => {
 		expect(tests.toSorted(by_name)).toEqual([FAR_TEST, ONE_TEST])
 	})
 
-	it('falls back to one file boundary where every user exceeds the cap', () => {
+	// joshuafolkken/kit#8570: the one-hop fallback dropped the far users unseen, never deferred.
+	it('follows every user past the cap, ring by ring, nearest first', () => {
 		const far = far_tests(test_pinned_logic.MAX_TEST_FILES)
 		const sources = [LIB_SOURCE, ONE_SOURCE, MID_SOURCE, ...far]
-		const selection = test_symbol_select.select_from(
+		const { tests, direct, rings } = test_symbol_select.select_from(
 			input_of(sources, [LIB], new Map([[LIB, [1]]])),
 		)
 
-		expect(selection).toMatchObject({ tests: [ONE_TEST], direct: [ONE_TEST] })
+		expect(tests).toHaveLength(test_pinned_logic.MAX_TEST_FILES + 1)
+		expect(direct).toEqual([ONE_TEST])
+		expect(rings.map((ring) => ring.toSorted(by_name))).toEqual([
+			[ONE_TEST],
+			far.map(({ file }) => file).toSorted(by_name),
+		])
+	})
+})
+
+// joshuafolkken/kit#8570: `const { one } = pack` read as a load-time statement stopped the chain there.
+describe('test_symbol_select.select_from — a destructured member', () => {
+	const pack: Source = {
+		file: 'src/pack.ts',
+		text: 'function one() { return 1 }\nconst pack = { one }\nexport { pack }\n',
+	}
+	const opened: Source = {
+		file: 'src/open.ts',
+		text: `import { pack } from './pack'\nconst { one } = pack\nfunction opened() { return one() }\nexport { opened }\n`,
+	}
+	const relay: Source = {
+		file: RELAY,
+		text: `import { opened } from './open'\nfunction relay() { return opened() }\nexport { relay }\n`,
+	}
+	const relay_test: Source = {
+		file: RELAY_TEST,
+		text: `import { relay } from './relay'\nit('r', relay)\n`,
+	}
+
+	it('follows the users of the destructured name past the file destructuring it', () => {
+		const sources = [pack, opened, relay, relay_test]
+		const input = input_of(sources, [pack.file], new Map([[pack.file, [1]]]))
+
+		expect(test_symbol_select.select_from(input).tests).toEqual([relay_test.file])
 	})
 })
 
@@ -139,21 +175,21 @@ describe('test_symbol_select.select_from — a command registry', () => {
 })
 
 describe('test_symbol_select.counts_from', () => {
-	it('counts each file as though it changed alone, unswayed by a wide neighbor', () => {
+	it('counts each file’s every user as though it changed alone, unswayed by a wide neighbor', () => {
 		const solo: Array<Source> = [
 			{ file: SOLO, text: 'function s() { return 1 }\nexport { s }\n' },
 			{
-				file: 'src/relay.ts',
+				file: RELAY,
 				text: `import { s } from './solo'\nexport function r() { return s() }\n`,
 			},
-			{ file: 'src/relay.test.ts', text: `import { r } from './relay'\nit('r', r)\n` },
+			{ file: RELAY_TEST, text: `import { r } from './relay'\nit('r', r)\n` },
 		]
 		const far = far_tests(test_pinned_logic.MAX_TEST_FILES)
 		const sources = [...LIB_SOURCES, MID_SOURCE, ...far, ...solo]
 		const input = input_of(sources, [LIB, SOLO])
 
 		expect(test_symbol_select.counts_from(input)).toEqual([
-			{ file: LIB, count: 2 },
+			{ file: LIB, count: 2 + test_pinned_logic.MAX_TEST_FILES },
 			{ file: SOLO, count: 1 },
 		])
 	})

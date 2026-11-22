@@ -121,10 +121,20 @@ function named_declaration(
 	return typescript.isEnumDeclaration(statement) ? statement.name : undefined
 }
 
+// **Every name a binding declares** (joshuafolkken/kit#8570): `const { a, b: [c] } = x` declares `a` and
+// `c`, so a function calling `a` uses `x` — read as one load-time statement, the chain stopped at it.
+function binding_names(typescript: TypeScript, name: ts.BindingName): Array<string> {
+	if (typescript.isIdentifier(name)) return [name.text]
+
+	return name.elements.flatMap((element) =>
+		typescript.isBindingElement(element) ? binding_names(typescript, element.name) : [],
+	)
+}
+
 function declared_names(typescript: TypeScript, statement: ts.Statement): Array<string> {
 	if (typescript.isVariableStatement(statement)) {
 		return statement.declarationList.declarations.flatMap((item) =>
-			typescript.isIdentifier(item.name) ? [item.name.text] : [],
+			binding_names(typescript, item.name),
 		)
 	}
 
