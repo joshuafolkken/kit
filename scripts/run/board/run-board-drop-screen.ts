@@ -57,13 +57,20 @@ function cells_of(piece: StyledPiece): Array<ScreenCell> {
 	]
 }
 
-// The line's cells cut into screen rows of `columns`; an empty line still takes its row.
-function rows_of(line: string, columns: number): Array<Array<ScreenCell>> {
-	const cells = run_board_cut_styled.styled_pieces(line).flatMap((piece) => cells_of(piece))
+// A line's cells cut into screen rows of `columns`, as the terminal wraps it; an empty line still
+// takes its row. The matrix rain wraps its grid with it too (`run-board-reveal-rain.ts`).
+function wrapped<Cell>(cells: ReadonlyArray<Cell>, columns: number): Array<Array<Cell>> {
 	const count = Math.max(1, Math.ceil(cells.length / columns))
 
 	return Array.from({ length: count }, (_row, index) =>
 		cells.slice(index * columns, (index + 1) * columns),
+	)
+}
+
+function rows_of(line: string, columns: number): Array<Array<ScreenCell>> {
+	return wrapped(
+		run_board_cut_styled.styled_pieces(line).flatMap((piece) => cells_of(piece)),
+		columns,
 	)
 }
 
@@ -111,7 +118,7 @@ function is_kept(screen: DropScreen, place: ScreenPlace): boolean {
 	return cell_at(screen, place).is_wide
 }
 
-const run_board_drop_screen = { cell_at, is_kept, key_of, screen_of }
+const run_board_drop_screen = { cell_at, is_kept, key_of, screen_of, wrapped }
 
 export { run_board_drop_screen }
 export type { DropScreen, FrameSpots, ScreenCell, ScreenPlace }

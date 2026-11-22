@@ -1,8 +1,11 @@
 import { run_board_cut_styled, type Piece } from './run-board-cut-styled'
+import { run_board_drop_screen } from './run-board-drop-screen'
+import type { TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels } from './run-board-labels'
 import { run_board_rain, type RainCell, type Random } from './run-board-rain'
 import type { Beat } from './run-board-reveal-blocks'
+import { run_board_screen } from './run-board-screen'
 
 // joshuafolkken/kit#8519: the matrix board's first frame revealed behind the code rain
 // (`run-board-rain.ts`). The frame, as the theme draws it, is cut into its terminal columns once, each
@@ -25,6 +28,12 @@ interface Escapes {
 	between: string
 }
 
+// How the rain reads its cells, and the terminal it fills; a frame's own size without one.
+interface Rendering {
+	read?: ((cell: RainCell) => RainCell) | undefined
+	size?: TerminalSize | undefined
+}
+
 interface Drawn {
 	text: string
 	// Whether the frame's colors are left on after the column.
@@ -33,11 +42,15 @@ interface Drawn {
 
 const ESC = '\u{1B}'
 const CURSOR_HOME = `${ESC}[H`
+// The cursor to the start of the next row: unlike a newline it never scrolls, and it ends a pending wrap.
+const NEXT_LINE = `${ESC}[E`
 // A cursor move or an erase: it takes no column and draws no color, so the columns leave it out.
 const CURSOR_ESCAPE = new RegExp(String.raw`${ESC}\[[\d;?]*[A-Za-ln-z]`, 'gu')
 const BLANK: Column = { text: ' ', width: 1, lead: '', between: '' }
 const BEHIND: RainCell = { kind: 'behind' }
 const { LINK_CLOSE, RESET, pieces_of } = run_board_cut_styled
+const { wrapped } = run_board_drop_screen
+const { synced } = run_board_screen
 const CLOSE = `${LINK_CLOSE}${RESET}`
 const PROBE = 'x'
 
@@ -73,12 +86,30 @@ function columns_of(line: string): Array<Column> {
 	})
 }
 
-// The frame's lines as columns, each padded with blanks to the widest line.
-function grid_of(frame: string): Array<Array<Column>> {
-	const rows = frame.split('\n').map((line) => columns_of(line))
-	const width = Math.max(0, ...rows.map((row) => row.length))
+function padded(row: ReadonlyArray<Column>, width: number): Array<Column> {
+	return [...row, ...Array.from({ length: width - row.length }, () => BLANK)]
+}
 
-	return rows.map((row) => [...row, ...Array.from({ length: width - row.length }, () => BLANK)])
+// The lines wrapped at the terminal's columns as a redraw wraps them, cut to its rows, and every
+// screen row and cell of the terminal filled, so the rain falls over the whole screen.
+function screen_grid(
+	lines: ReadonlyArray<Array<Column>>,
+	size: TerminalSize,
+): Array<Array<Column>> {
+	const columns = Math.max(1, size.columns)
+	const rows = lines.flatMap((line) => wrapped(line, columns)).slice(0, size.rows)
+	const blanks = Array.from({ length: size.rows - rows.length }, (): Array<Column> => [])
+
+	return [...rows, ...blanks].map((row) => padded(row, columns))
+}
+
+// The frame's lines as columns on the terminal's screen; without one, each padded to the widest line.
+function grid_of(frame: string, size?: TerminalSize): Array<Array<Column>> {
+	const lines = frame.split('\n').map((line) => columns_of(line))
+	if (size !== undefined) return screen_grid(lines, size)
+	const width = Math.max(0, ...lines.map((row) => row.length))
+
+	return lines.map((row) => padded(row, width))
 }
 
 function closed(is_shown: boolean): string {
@@ -141,28 +172,39 @@ function same(cell: RainCell): RainCell {
 	return cell
 }
 
+// The area the rain falls over: the grid's own.
+function area_of(grid: ReadonlyArray<ReadonlyArray<Column>>): { width: number; height: number } {
+	return { width: grid[0]?.length ?? 0, height: grid.length }
+}
+
+// One frame of the rain over the grid, its rows joined by a cursor move and written whole at once.
+function beat_of(
+	grid: ReadonlyArray<ReadonlyArray<Column>>,
+	cells: ReadonlyArray<ReadonlyArray<RainCell>>,
+	read: (cell: RainCell) => RainCell,
+): Beat {
+	const rows = grid.map((columns, y) =>
+		row_of(
+			columns,
+			(cells[y] ?? []).map((cell) => read(cell)),
+		),
+	)
+
+	return { text: synced(`${CURSOR_HOME}${rows.join(NEXT_LINE)}`), ms: run_board_rain.RAIN_MS }
+}
+
 // Every frame of one pass of the rain over the drawn frame, each a beat `RAIN_MS` long that rewrites
-// the screen from its top-left corner; made one at a time, so a skipped pass makes no more. `read`
-// turns each rain cell into what the frame shows under it: the frame behind the rain as it is, or
-// another reading of it (`run-board-exit-rain.ts`).
-function* beats_of(
-	frame: string,
-	random: Random,
-	read: (cell: RainCell) => RainCell = same,
-): Generator<Beat> {
-	const grid = grid_of(frame)
-	const size = { width: grid[0]?.length ?? 0, height: grid.length }
+// the screen from its top-left corner, written whole at once; made one at a time, so a skipped pass
+// makes no more. Rows are joined by a cursor move, not a newline, so a row as wide as the terminal or
+// the bottom row never scrolls it. `read` turns each rain cell into what the frame shows under it: the
+// frame behind the rain as it is, or another reading of it (`run-board-exit-rain.ts`); `size` is the
+// terminal the rain fills (joshuafolkken/kit#8614).
+function* beats_of(frame: string, random: Random, rendering: Rendering = {}): Generator<Beat> {
+	const { read = same, size } = rendering
+	const grid = grid_of(frame, size)
+	const passes = run_board_rain.passes(area_of(grid), random)
 
-	for (const cells of run_board_rain.passes(size, random)) {
-		const rows = grid.map((columns, y) =>
-			row_of(
-				columns,
-				(cells[y] ?? []).map((cell) => read(cell)),
-			),
-		)
-
-		yield { text: `${CURSOR_HOME}${rows.join('\n')}`, ms: run_board_rain.RAIN_MS }
-	}
+	for (const cells of passes) yield beat_of(grid, cells, read)
 }
 
 // Whether stdout draws the rain's colors; where it draws none (a pipe, `NO_COLOR`) no rain falls.
@@ -170,7 +212,15 @@ function is_colored(): boolean {
 	return run_board_labels.painted(run_board_header_trace.SHADES.head, PROBE) !== PROBE
 }
 
-const run_board_reveal_rain = { CLOSE, CURSOR_HOME, beats_of, grid_of, is_colored, row_of }
+const run_board_reveal_rain = {
+	CLOSE,
+	CURSOR_HOME,
+	NEXT_LINE,
+	beats_of,
+	grid_of,
+	is_colored,
+	row_of,
+}
 
 export { run_board_reveal_rain }
-export type { Column }
+export type { Column, Rendering }

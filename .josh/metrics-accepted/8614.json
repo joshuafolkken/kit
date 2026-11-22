@@ -1,0 +1,7 @@
+{
+	"reason": "Bug fix #8614: the matrix rain wraps at the terminal size (shared wrap, size plumbing, synced beats); the terminal-size cases get a new test file and a shared row reader",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 61
+	}
+}
