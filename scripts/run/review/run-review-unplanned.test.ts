@@ -216,6 +216,14 @@ describe('run_review_unplanned.refusal — narrowing the record to the actual ch
 		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED, BOARD, FREE_FILE])
 		expect(clash_on([NEW_FILE])?.claimed).toBe(BOARD)
 	})
+
+	it('keeps an untouched directory claim on the edit hook, which widens mid-lane', async () => {
+		record_board([PLANNED, FREE_FILE])
+
+		expect(await run_review_unplanned.refusal_to(directory, vi.fn())).toBeUndefined()
+		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED, BOARD, FREE_FILE])
+		expect(read_changed).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_review_unplanned.refusal — a widening past the declared size', () => {

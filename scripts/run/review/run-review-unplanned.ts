@@ -62,8 +62,13 @@ async function answer(
 // A directory or glob claim stays only while one of the lane's actual changes sits inside it
 // (joshuafolkken/kit#8662): a directory the plan comment's prose named but the lane never touched would
 // otherwise hold every new file under it against other Issues. A later edit there is unplanned again,
-// and the next widening restores the claim.
-function narrowed(paths: ReadonlyArray<string>, changed: ReadonlyArray<string>): Array<string> {
+// and the next widening restores the claim. `changed` undefined keeps every claim.
+function narrowed(
+	paths: ReadonlyArray<string>,
+	changed: ReadonlyArray<string> | undefined,
+): Array<string> {
+	if (changed === undefined) return [...paths]
+
 	return paths.filter(
 		(path) =>
 			backlog_overlap.is_file_claim(path) ||
@@ -73,24 +78,38 @@ function narrowed(paths: ReadonlyArray<string>, changed: ReadonlyArray<string>):
 
 function widened_of(
 	found: Unplanned,
-	changed: ReadonlyArray<string>,
+	changed: ReadonlyArray<string> | undefined,
 	directory: string,
 ): LanePlan | undefined {
 	const recorded = lane_plan.read(found.issue, directory)
-	const actual = [...changed, ...found.files]
 
 	return recorded === undefined
 		? undefined
 		: {
 				...recorded,
-				paths: [...narrowed(recorded.paths, actual), ...found.files],
+				paths: [...narrowed(recorded.paths, changed), ...found.files],
 				widened_paths: [...(recorded.widened_paths ?? []), ...found.files],
 			}
 }
 
-async function refusal_to(directory: string, inform: Inform): Promise<string | undefined> {
+// Only `run:review`'s open narrows: the lane's changes are complete by then. The edit hook's widening
+// runs mid-lane, before the lane reached every directory it planned, so it keeps them all.
+async function changes_of(
+	found: Unplanned | undefined,
+	is_narrowing: boolean,
+): Promise<ReadonlyArray<string> | undefined> {
+	if (found === undefined || !is_narrowing) return undefined
+
+	return [...(await changed_paths.read_changed_paths(false)), ...found.files]
+}
+
+async function refusal_to(
+	directory: string,
+	inform: Inform,
+	is_narrowing = false,
+): Promise<string | undefined> {
 	const found = await check_related_unplanned.read_unplanned()
-	const changed = found === undefined ? [] : await changed_paths.read_changed_paths(false)
+	const changed = await changes_of(found, is_narrowing)
 	const widened = found === undefined ? undefined : widened_of(found, changed, directory)
 
 	if (found === undefined || widened === undefined) return undefined
@@ -99,7 +118,7 @@ async function refusal_to(directory: string, inform: Inform): Promise<string | u
 }
 
 async function refusal(directory: string = process.cwd()): Promise<string | undefined> {
-	return await refusal_to(directory, console.info)
+	return await refusal_to(directory, console.info, true)
 }
 
 const run_review_unplanned = { refusal, refusal_to }
