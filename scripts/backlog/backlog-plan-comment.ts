@@ -7,13 +7,16 @@ import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { backlog_overlap, type Declared } from './backlog-overlap'
+import { plan_definitions } from './plan-definitions'
 
 // The paths a pool issue declares — the plan a running lane recorded with `lane:plan`, else the plan
 // `issue:plan` posted as a comment, else its body. A plan comment posted after the record wins
 // (joshuafolkken/kit#6798).
 //
 // **A plan replaces the body**: a body cites paths as evidence (joshuafolkken/kit#4937). A plan naming
-// no path leaves the body.
+// no path leaves the body. A body file defining an identifier the plan names stays, though: a plan
+// that says "extend `ThemeDefinition`" edits the file that defines it (joshuafolkken/kit#8685,
+// `plan-definitions.ts`).
 //
 // **A plan posted as a comment declares paths too.** joshuafolkken/kit#4910's body named none of the
 // files its plan comment did, so dispatch saw no overlap with joshuafolkken/kit#4911 and
@@ -73,15 +76,16 @@ async function plan_paths(issue: number): Promise<ReadonlyArray<string>> {
 	return [...backlog_overlap.declared_paths((await read_plan(issue)) ?? '')]
 }
 
-async function with_plan(issue: PoolIssue): Promise<PlannedIssue> {
+async function with_plan(issue: PoolIssue, directory: string): Promise<PlannedIssue> {
 	if (!has_any_label(issue.labels, PLANNED)) return issue
 
 	const comment = await read_plan_comment(issue.number)
 	const plan = plan_body(comment)
 
 	if (plan === undefined || backlog_overlap.declared_paths(plan).size === 0) return issue
+	const body = await plan_definitions.with_definitions(plan, issue.body, directory)
 
-	return { ...issue, body: plan, commented_at: comment?.created_at }
+	return { ...issue, body, commented_at: comment?.created_at }
 }
 
 function commented_of(planned: ReadonlyArray<PlannedIssue>): ReadonlyMap<number, string> {
@@ -95,7 +99,11 @@ function commented_of(planned: ReadonlyArray<PlannedIssue>): ReadonlyMap<number,
 // this scope — the gate, the paused-holder check, the named offer, `lane:plan`'s entry — weighs the
 // same paths (joshuafolkken/kit#8273).
 async function declared_of(issues: ReadonlyArray<PoolIssue>, directory: string): Promise<Declared> {
-	const planned = await bounded_pool.bounded_map(issues, READ_CONCURRENCY, with_plan)
+	const planned = await bounded_pool.bounded_map(
+		issues,
+		READ_CONCURRENCY,
+		async (issue) => await with_plan(issue, directory),
+	)
 	const declared = backlog_overlap.declared_of(planned)
 	const resolved = backlog_overlap.with_resolved_names(
 		declared,
