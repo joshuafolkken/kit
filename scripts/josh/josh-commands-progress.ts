@@ -141,7 +141,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME, MATRIX_THEME],
 					description:
-						'names the board `JOSH-WOPR` / `JOSH-TRACE` in place of `josh-board`, in the header and the no-run line (`run-board-theme-defs.ts` → `name`).',
+						'names the board `JOSH-WOPR` / `josh-trace` in place of `josh-board`, in the header and the no-run line (`run-board-theme-defs.ts` → `name`).',
 				},
 				{
 					names: [BOARD_THEME],
@@ -156,12 +156,12 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [MATRIX_THEME],
 					description:
-						'draws as `--theme wargames` does, red and amber kept, with uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No lamps or typed rows.',
+						'draws as `--theme wargames` does, red and amber kept, with the text as written (only `wargames` draws capitals; `run-board-theme-defs.ts` → `capitals`), uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No lamps or typed rows.',
 				},
 				{
 					names: [MATRIX_THEME],
 					description:
-						'a live board types three lead lines in bright green, erasing each, then shows `KNOCK, KNOCK, JOSH.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.',
+						'a live board types three lead lines in bright green, erasing each, then shows `Knock, knock, Josh.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.',
 				},
 				{
 					names: ['--frame'],

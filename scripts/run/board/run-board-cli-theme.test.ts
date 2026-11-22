@@ -323,7 +323,7 @@ async function alert_line(argv: Array<string>, alert: string): Promise<Array<str
 	const frame = await throughput_frame(argv)
 	const lines = frame.split('\n')
 
-	// Past the header's first line, which names the matrix board `JOSH-TRACE` (joshuafolkken/kit#8604).
+	// Past the header's first line, which names the matrix board `josh-trace` (joshuafolkken/kit#8604).
 	return [lines[0], lines.slice(1).find((line) => line.includes(alert))]
 }
 
@@ -365,9 +365,10 @@ describe('run_board_cli.run --theme alert level', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 		const [first, rule] = await alert_line(['--theme', 'matrix', '--once'], 'TRACE')
 
-		// The header names the board `JOSH-TRACE` (joshuafolkken/kit#8604) but draws no gauge.
+		// The header names the board `josh-trace` (joshuafolkken/kit#8604) but draws no gauge; the rule's
+		// heading is drawn as written (joshuafolkken/kit#8609).
 		expect(first).not.toMatch(/TRACE [■-]{5}/u)
-		expect(rule).toMatch(/THROUGHPUT.* TRACE [■-]{5}$/u)
+		expect(rule).toMatch(/throughput.* TRACE [■-]{5}$/u)
 		vi.stubEnv('JOSH_BOARD_THEME', 'matrix')
 		expect(await rule_of(['--once'], 'TRACE')).toBeDefined()
 		expect(await rule_of([...THEMED, '--once'], 'DEFCON')).toBeDefined()
