@@ -2,7 +2,9 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_idle_rain, type RainMoment } from './run-board-idle-rain'
-import { run_board_lamp_spots, type LampMoment } from './run-board-lamp-spots'
+import { run_board_lamp_spots } from './run-board-lamp-spots'
+import { run_board_panel_draw } from './run-board-panel-draw'
+import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_spot } from './run-board-spot'
 import { run_board_sweep } from './run-board-sweep'
 
@@ -12,7 +14,8 @@ import { run_board_sweep } from './run-board-sweep'
 
 const { POUR, SPEED, cell_text, row_at, speed_of } = run_board_idle_rain
 const PRECISION = 9
-const { lamps_in, write_lamps } = run_board_lamp_spots
+const { lamps_in } = run_board_lamp_spots
+const { area_of, write_panel } = run_board_panel_draw
 const { LAMP } = run_board_spot
 const START = Date.parse('2026-11-22T09:00:00.000Z')
 const FRAME_MS = 70
@@ -30,6 +33,8 @@ const CELL = /\u{1B}\[(\d+;\d+)H/gu
 const SCREEN_COLUMNS = 80
 const LAMPS = lamps_in(LINES, [1, 2, 3], SCREEN_COLUMNS)
 const LAMP_PLACES = LAMPS.map((lamp) => `${String(lamp.row)};${String(lamp.column)}`)
+const AREA = area_of(LINES, [1, 2, 3], LAMPS)
+const RAINING = AREA && { painter: run_board_panel_painters.RAIN_PAINTER, area: AREA }
 
 interface Written {
 	places: Array<string>
@@ -96,7 +101,7 @@ describe('run_board_idle_rain.speed_of', () => {
 
 // The screen places, `row;column`, the rain wrote at `at` after `since`, past the theme, and whether it
 // wrote any through the theme.
-function written_at(at: LampMoment, since: LampMoment | undefined): Written {
+function written_at(at: RainMoment, since: RainMoment | undefined): Written {
 	const drawn: Array<string> = []
 	const themed: Array<string> = []
 	const ports = {
@@ -108,17 +113,17 @@ function written_at(at: LampMoment, since: LampMoment | undefined): Written {
 		},
 	}
 
-	write_lamps(LAMPS, ports, at, since)
+	write_panel(RAINING, ports, at, since)
 	const places = [...drawn.join('').matchAll(CELL)].map((match) => match[1] ?? '')
 
 	return { places, is_themed: themed.length > 0 }
 }
 
-describe('run_board_lamp_spots.write_lamps with the idle rain', () => {
+describe('run_board_panel_draw.write_panel with the idle rain', () => {
 	it('writes every lamp’s own cell and no other, past the theme', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
-		expect(written_at({ ...IDLE, is_rain: true }, undefined)).toStrictEqual({
+		expect(written_at(IDLE, undefined)).toStrictEqual({
 			places: LAMP_PLACES,
 			is_themed: false,
 		})
@@ -126,7 +131,7 @@ describe('run_board_lamp_spots.write_lamps with the idle rain', () => {
 
 	it('writes later only lamp cells, those whose rain changed', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
-		const since = { ...IDLE, is_rain: true }
+		const since = IDLE
 		const { places } = written_at({ ...since, ms: START + 10 * FRAME_MS }, since)
 
 		expect(places.length).toBeGreaterThan(0)

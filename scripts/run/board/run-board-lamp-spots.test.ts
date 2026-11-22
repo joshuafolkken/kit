@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
 import { run_board_lamps } from './run-board-lamps'
+import { run_board_panel_draw, type PanelPainter } from './run-board-panel-draw'
+import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_spin, type Turning } from './run-board-spin'
 import { run_board_spot } from './run-board-spot'
 import { run_board_theme } from './run-board-theme'
@@ -11,6 +13,7 @@ const { LAMP_TICK_MS, is_lit } = run_board_lamps
 const { REDRAW_MS, spin_to_second, spun } = run_board_spin
 const { is_typing } = run_board_type_rows
 const { LAMP, LAMP_MARK } = run_board_spot
+const { LAMP_PAINTER, RAIN_PAINTER } = run_board_panel_painters
 const START = Date.parse('2026-11-20T09:00:00.000Z')
 const WIDE = { rows: 24, columns: 80 }
 const BLINK = '\u{1B}[5m'
@@ -56,8 +59,17 @@ function lamp_ports(now_ms: number): LampPorts {
 	return { ports, themed, drawn }
 }
 
-function turning_of(lamps: ReadonlyArray<Lamp>, typing = SEEN): Turning {
-	return { spots: [], typing, lamps }
+// joshuafolkken/kit#8676: the lamps' turn, drawn by the theme's painter in the area they place.
+function turning_of(
+	lamps: ReadonlyArray<Lamp>,
+	{
+		typing = SEEN,
+		painter = LAMP_PAINTER,
+	}: { typing?: Turning['typing']; painter?: PanelPainter } = {},
+): Turning {
+	const area = run_board_panel_draw.area_of(LINES, [1, 2, 3], lamps)
+
+	return { spots: [], typing, lamps, panel: area && { painter, area } }
 }
 
 describe('run_board_lamp_spots.lamps_in', () => {
@@ -98,7 +110,10 @@ describe('run_board_spin.spin_to_second with lamps', () => {
 		const { ports, drawn } = lamp_ports(START)
 		const unseen = { seen: undefined, lines: [] }
 
-		await spin_to_second(turning_of(spun(LINES, '⠋', { size: WIDE }).lamps, unseen), ports)
+		await spin_to_second(
+			turning_of(spun(LINES, '⠋', { size: WIDE }).lamps, { typing: unseen }),
+			ports,
+		)
 
 		expect(drawn).toStrictEqual([])
 	})
@@ -123,7 +138,10 @@ describe('run_board_spin.spin_to_second with the idle rain', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const { ports, drawn } = lamp_ports(START)
 		const unseen = { seen: undefined, lines: [] }
-		const raining = { ...turning_of(spun(LINES, '⠋', { size: WIDE }).lamps, unseen), is_rain: true }
+		const raining = turning_of(spun(LINES, '⠋', { size: WIDE }).lamps, {
+			typing: unseen,
+			painter: RAIN_PAINTER,
+		})
 
 		await spin_to_second(raining, ports)
 
@@ -154,7 +172,7 @@ async function cells_by_moment(typing: Turning['typing']): Promise<Map<number, n
 		},
 	}
 
-	await spin_to_second(turning_of(TYPED_LAMPS, typing), timed)
+	await spin_to_second(turning_of(TYPED_LAMPS, { typing }), timed)
 	cells.delete(START)
 
 	return cells

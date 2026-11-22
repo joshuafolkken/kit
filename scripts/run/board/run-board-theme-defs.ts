@@ -1,6 +1,8 @@
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
+import type { PanelPainter } from './run-board-panel-draw'
+import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_sound_click } from './run-board-sound-click'
 import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme_tones } from './run-board-theme-tones'
@@ -81,6 +83,9 @@ interface ThemeDefinition {
 	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
 	// joshuafolkken/kit#8359).
 	lamps: boolean
+	// joshuafolkken/kit#8676: the painter that draws the animation area where the lamp panel shows
+	// (`run-board-panel-draw.ts`); a theme with none draws nothing there between redraws.
+	panel?: PanelPainter
 	// Glyphs spread over the board spinner's cycle, in order (joshuafolkken/kit#8366).
 	spinner: string
 	live: LiveDefinition
@@ -135,6 +140,7 @@ const THEME_DEFS = {
 		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
+		panel: run_board_panel_painters.LAMP_PAINTER,
 		spinner: '│╱─╲',
 		live: {
 			sweep: true,
@@ -172,6 +178,7 @@ const THEME_DEFS = {
 		},
 		alert: run_board_header_trace.field_of,
 		lamps: true,
+		panel: run_board_panel_painters.RAIN_PAINTER,
 		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 		live: {
 			sweep: false,
@@ -233,11 +240,20 @@ function live_of(theme: Theme | undefined, defs: LiveDefs = THEME_DEFS): LiveDef
 	return defs[theme]?.live ?? NO_LIVE
 }
 
+// The painter a theme's definition hands the animation area (joshuafolkken/kit#8676); none in no theme.
+function panel_of(theme: Theme | undefined): PanelPainter | undefined {
+	if (theme === undefined) return undefined
+	const definition: ThemeDefinition = THEME_DEFS[theme]
+
+	return definition.panel
+}
+
 const run_board_theme_defs = {
 	THEMES,
 	THEME_DEFS,
 	live_of,
 	names_of,
+	panel_of,
 }
 
 export { run_board_theme_defs }

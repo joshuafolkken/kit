@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DropScreen } from './run-board-drop-screen'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import type { BoardState } from './run-board-state'
 import type { Theme } from './run-board-theme-defs'
@@ -11,7 +12,7 @@ import type { TypingSpan } from './run-board-type-rows'
 // joshuafolkken/kit#8356: the matrix board draws its lamp panel as the idle rain, and its new rows decode
 // on a terminal drawing color; elsewhere they type or show at once.
 
-const { entry_of, has_drop, has_lamps, has_rain } = run_board_tick_draw
+const { entry_of, has_drop, has_lamps, has_rain, panel_of } = run_board_tick_draw
 const MATRIX = { types_rows: true, theme: 'matrix', is_tty: true } as const
 const WARGAMES = { ...MATRIX, theme: 'wargames' } as const
 const ONCE = '--once, --chat and a pipe'
@@ -51,6 +52,38 @@ describe('run_board_tick_draw.has_rain', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(has_rain(MATRIX)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8676: the theme's painter the turns carry, with the frame's animation area.
+describe('run_board_tick_draw.panel_of', () => {
+	const area = { top: 1, end: 80, rows: 7, lamps: [] }
+	const { LAMP_PAINTER, RAIN_PAINTER } = run_board_panel_painters
+
+	it('hands the matrix rain and the wargames lamps on a terminal drawing color', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(panel_of(MATRIX, { area })).toStrictEqual({ painter: RAIN_PAINTER, area })
+		expect(panel_of(WARGAMES, { area })).toStrictEqual({ painter: LAMP_PAINTER, area })
+	})
+
+	it.each([
+		['no theme', { ...MATRIX, theme: undefined }],
+		['the bttf theme, with no painter yet', { ...MATRIX, theme: 'bttf' as const }],
+		[ONCE, { ...MATRIX, is_tty: false }],
+	])('hands none with %s', (_, ports) => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(panel_of(ports, { area })).toBeUndefined()
+	})
+
+	it('hands none on a terminal drawing no color, or with no area out', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+
+		expect(panel_of(MATRIX, { area })).toBeUndefined()
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(panel_of(MATRIX, { area: undefined })).toBeUndefined()
 	})
 })
 
@@ -133,11 +166,11 @@ function redrawn_state(
 	return drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
 }
 
-// Whether the rain runs and rows decode on the redraw's turns.
-function redrawn(theme: Theme): { is_rain: boolean; is_decoding: boolean } {
+// Whether rows decode on the redraw's turns.
+function redrawn(theme: Theme): { is_decoding: boolean } {
 	const drawn = redrawn_state(theme)
 
-	return { is_rain: drawn.is_rain === true, is_decoding: drawn.typing?.is_decoding === true }
+	return { is_decoding: drawn.typing?.is_decoding === true }
 }
 
 function screen_texts(drop: DropScreen | undefined): Array<string> {
@@ -145,12 +178,12 @@ function screen_texts(drop: DropScreen | undefined): Array<string> {
 }
 
 describe('run_board_tick_draw.draw_display with the entry', () => {
-	it('keeps the rain and the decoding for the matrix board’s turns', () => {
-		expect(redrawn('matrix')).toStrictEqual({ is_rain: true, is_decoding: true })
+	it('keeps the decoding for the matrix board’s turns', () => {
+		expect(redrawn('matrix')).toStrictEqual({ is_decoding: true })
 	})
 
-	it('keeps neither for the wargames board’s turns', () => {
-		expect(redrawn('wargames')).toStrictEqual({ is_rain: false, is_decoding: false })
+	it('keeps none for the wargames board’s turns', () => {
+		expect(redrawn('wargames')).toStrictEqual({ is_decoding: false })
 	})
 })
 

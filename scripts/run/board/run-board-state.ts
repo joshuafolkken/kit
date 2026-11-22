@@ -19,6 +19,7 @@ import type { Lamp } from './run-board-lamp-spots'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { NoticeTurn } from './run-board-notice-turn'
+import type { PanelDraw } from './run-board-panel-draw'
 import type { PinnedIssue } from './run-board-pinned-graphql'
 import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
@@ -177,8 +178,8 @@ interface BoardView {
 	sweep?: Sweep | undefined
 	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
-	// Whether those cells run the idle rain in place of the lamps (`run-board-idle-rain.ts`).
-	is_rain?: boolean | undefined
+	// The theme's painter of the animation area those lamps place, and the area (`run-board-panel-draw.ts`).
+	panel?: PanelDraw | undefined
 	// The last frame's cells on screen where a drop falls down it between redraws (`run-board-rain-drop.ts`).
 	drop?: DropScreen | undefined
 	// Where the last frame drew its worst-level TRACE field, blinked between redraws (`run-board-trace-spot.ts`).
