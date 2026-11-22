@@ -175,6 +175,23 @@ describe('run_board_notice_trace.is_tracing', () => {
 	})
 })
 
+// joshuafolkken/kit#8657: the spin wakes when the trace next changes its look.
+describe('run_board_notice_trace.change_after', () => {
+	it.each([
+		[0, LETTER_MS],
+		[LETTER_MS + 1, LETTER_MS * 2],
+		[LOCKED_MS - 1, LOCKED_MS],
+		[LOCKED_MS, LOCKED_MS + 1000],
+		[LOCKED_MS + 999, LOCKED_MS + 1000],
+		[LOCKED_MS + 1000, LOCKED_MS + 2000],
+		[LOCKED_MS + 2000, LOCKED_MS + 3000],
+		[LOCKED_MS + 3000, LOCKED_MS + 4000],
+		[LOCKED_MS + 4000, Infinity],
+	])('changes after %d ms at %d ms', (since_ms, next_ms) => {
+		expect(run_board_notice_trace.change_after(since_ms, PLAIN_LENGTH)).toBe(next_ms)
+	})
+})
+
 describe('run_board_notice_trace.trace_of — when a trace starts', () => {
 	const notice = { key: KEY, is_standing: false }
 	const running: NoticeTrace = { key: KEY, start_ms: 0 }

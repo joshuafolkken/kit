@@ -8,6 +8,7 @@ import type { TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamp_spots, type Lamp, type LampMoment } from './run-board-lamp-spots'
+import { run_board_notice_turn, type NoticeTurn } from './run-board-notice-turn'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spin_place } from './run-board-spin-place'
@@ -69,6 +70,8 @@ interface Turning {
 	drop?: DropScreen | undefined
 	// The header clocks' colons, blinked every half second (`run-board-colon.ts`).
 	colons?: ReadonlyArray<Spot> | undefined
+	// The header notice traced in (`run-board-notice-turn.ts`).
+	notice_trace?: NoticeTurn | undefined
 }
 
 // What changed since the last turn was written: the spinner's frame, the sweep's cell, the colons'
@@ -170,8 +173,9 @@ function colons_of(turning: Turning): ReadonlyArray<Spot> {
 
 function has_effects(turning: Turning): boolean {
 	const is_falling = turning.sweep !== undefined || turning.drop !== undefined
+	const is_blinking = blinking(turning).length > 0 || traces_of(turning).length > 0
 
-	return is_falling || blinking(turning).length > 0 || traces_of(turning).length > 0
+	return is_falling || is_blinking || run_board_notice_turn.is_placed(turning.notice_trace)
 }
 
 // The next step the sweep moves or the drops fall on.
@@ -181,12 +185,13 @@ function sweep_boundary(turning: Turning, now_ms: number): number {
 	return is_moving ? boundary_after(now_ms, SWEEP_MS) : Infinity
 }
 
-// The next step the TRACE field blinks or the colons turn on.
+// The next step the TRACE field blinks, the colons turn or the notice's trace changes on.
 function blink_boundary(turning: Turning, now_ms: number): number {
 	const trace_ms =
 		traces_of(turning).length > 0 ? run_board_header_trace.boundary_after(now_ms) : Infinity
+	const notice_ms = run_board_notice_turn.wake_after(turning.notice_trace, now_ms)
 
-	return Math.min(trace_ms, run_board_colon.colon_boundary(colons_of(turning), now_ms))
+	return Math.min(trace_ms, notice_ms, run_board_colon.colon_boundary(colons_of(turning), now_ms))
 }
 
 // The rules run code only where the lamp panel blinks, so its gate is theirs (joshuafolkken/kit#8375).
@@ -235,6 +240,14 @@ function write_drop(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 	write(run_board_screen.synced(bytes))
 }
 
+// joshuafolkken/kit#8657: the header notice traced over the drops and the flash, past the theme like
+// the flash — at every turn, so a drop that crossed it is written over.
+function write_notice(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
+	const bytes = run_board_notice_turn.notice_bytes(turning.notice_trace, at_ms, turned.since?.ms)
+
+	if (bytes !== '') ports.write_drawn?.(run_board_screen.synced(bytes))
+}
+
 // The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
 // header's now line or a section's new row — and blink apart from the step after the last is typed
 // through, so they change only on the spinner's step (joshuafolkken/kit#8237); where the frame runs the
@@ -258,6 +271,7 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 		write_drop(turning, ports, at_ms, turned)
 		ports.write(turn_bytes(turning, at_ms, turned))
 		run_board_change_flash.write(ports, turning.flash, at_ms, turned.since)
+		write_notice(turning, ports, at_ms, turned)
 		run_board_lamp_spots.write_lamps(
 			blinking(turning),
 			ports,
