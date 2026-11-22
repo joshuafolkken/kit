@@ -19,13 +19,47 @@ function lamp_key(lamp: { row: number; column: number; step: number }): string {
 }
 
 describe('run_board_flux.FLUX_LAMPS', () => {
-	it('places each lamp at its step on the Y over six rows and thirteen columns', () => {
-		expect(FLUX_ROWS).toBe(6)
+	it('places each lamp at its step on the Y over seven rows and thirteen columns', () => {
+		expect(FLUX_ROWS).toBe(7)
 		expect(FLUX_WIDTH).toBe(13)
-		expect(FLUX_LAMPS).toHaveLength(9)
+		expect(FLUX_LAMPS).toHaveLength(10)
 		expect(new Set(FLUX_LAMPS.map((lamp) => lamp_key(lamp)))).toStrictEqual(
-			new Set(['0 0 0', '0 0 12', '0 5 6', '1 1 2', '1 1 10', '1 4 6', '2 2 4', '2 2 8', '3 3 6']),
+			new Set([
+				'0 0 0',
+				'0 0 12',
+				'0 6 6',
+				'1 1 2',
+				'1 1 10',
+				'1 5 6',
+				'2 2 4',
+				'2 2 8',
+				'2 4 6',
+				'3 3 6',
+			]),
 		)
+	})
+})
+
+// joshuafolkken/kit#8712: the stem's three lamps lit one at a time from its bottom in to the middle.
+function stem_at(tick: number): Array<string> {
+	const cells = flux_cells(ORIGIN, tick, 0)
+
+	return [14, 15, 16].map(
+		(row) => cells.findLast((cell) => cell.row === row && cell.column === 26)?.text ?? '',
+	)
+}
+
+describe('run_board_flux.flux_cells on the stem', () => {
+	it('lights the bottom lamp, then the one above it, then the one under the middle', () => {
+		expect(stem_at(0)).toStrictEqual([DIM, DIM, LIT])
+		expect(stem_at(4)).toStrictEqual([DIM, LIT, DIM])
+		expect(stem_at(8)).toStrictEqual([LIT, DIM, DIM])
+	})
+
+	it('lights the lamp under the middle at 60%, as each arm’s third step', () => {
+		const top = flux_cells(ORIGIN, 8, 0).find((cell) => cell.row === 14 && cell.column === 26)
+
+		expect(top?.fg).toStrictEqual({ rgb: '69;66;54', named: 'white' })
 	})
 })
 
@@ -58,17 +92,17 @@ describe('run_board_flux.lamp_look', () => {
 })
 
 describe('run_board_flux.flux_cells', () => {
-	it('draws the red bar on the fifth row, four columns either side of the stem', () => {
+	it('draws the red bar on the sixth row, the stem’s middle, four columns either side of it', () => {
 		const bar = flux_cells(ORIGIN, 0, 0).filter((cell) => cell.text === '━')
 
 		expect(bar.map((cell) => cell.column)).toStrictEqual([22, 23, 24, 25, 26, 27, 28, 29, 30])
-		expect(new Set(bar.map((cell) => cell.row))).toStrictEqual(new Set([14]))
+		expect(new Set(bar.map((cell) => cell.row))).toStrictEqual(new Set([15]))
 		expect(bar[0]?.fg).toStrictEqual({ rgb: '70;16;24', named: 'red' })
 	})
 
 	it('draws the lamps after the bar, so the stem lamp stands over it', () => {
 		const cells = flux_cells(ORIGIN, 0, 0)
-		const on_stem = cells.filter((cell) => cell.row === 14 && cell.column === 26)
+		const on_stem = cells.filter((cell) => cell.row === 15 && cell.column === 26)
 
 		expect(on_stem.map((cell) => cell.text)).toStrictEqual(['━', DIM])
 		expect(cells.find((cell) => cell.row === 10 && cell.column === 20)).toStrictEqual({
@@ -85,7 +119,7 @@ describe('run_board_flux.flux_cells', () => {
 
 const WHITE = '255;255;255'
 const DIM_TICK = 20
-const STEM = { row: 14, column: 26 }
+const STEM = { row: 15, column: 26 }
 // The box reaches a column past either side of the picture; the bar is nine cells long.
 const SIDES = 2
 const BAR_LENGTH = 9
@@ -115,6 +149,11 @@ describe('run_board_flux.flux_cells through a jump', () => {
 		expect(new Set(cells.map((cell) => cell.bg))).toStrictEqual(new Set([WHITE]))
 		expect(cells.some((cell) => cell.text === LIT)).toBe(false)
 		expect(cells).toHaveLength(FLUX_ROWS * (FLUX_WIDTH + SIDES) + BAR_LENGTH + FLUX_LAMPS.length)
+		// The box: seven rows of fifteen columns.
+		expect(new Set(cells.map((cell) => cell.row))).toStrictEqual(
+			new Set([10, 11, 12, 13, 14, 15, 16]),
+		)
+		expect(new Set(cells.map((cell) => cell.column)).size).toBe(15)
 	})
 
 	it('then stands white dots and a red bar on the darkening gray', () => {

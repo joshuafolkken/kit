@@ -7,7 +7,8 @@ import { run_board_screen } from './run-board-screen'
 import type { BoardPorts } from './run-board-state'
 
 // joshuafolkken/kit#8676: the animation area a theme draws its own cells in — the throughput rule's row and
-// the six under it (the `24h` and `7d` rows, the blank line, the usage rule and its first two rows), up to
+// the seven under it (the `24h` and `7d` rows, the blank line, the usage rule and its first three rows —
+// through GitHub's, joshuafolkken/kit#8712), up to
 // the rule's end. The theme hands a painter (`ThemeDefinition.panel`); this module places the area, wakes
 // the turn every `PANEL_TICK_MS` where the painter ticks and writes only the cells that changed, past the
 // theme (`write_drawn`).
@@ -16,8 +17,8 @@ import type { BoardPorts } from './run-board-state'
 
 const CSI = '\u{1B}['
 const PANEL_TICK_MS = 50
-// The throughput rule's row and the six under it.
-const AREA_ROWS = 7
+// The throughput rule's row and the seven under it.
+const AREA_ROWS = 8
 const FOREGROUND_RGB = `${CSI}38;2;`
 const BACKGROUND_RGB = `${CSI}48;2;`
 const DEFAULT_FOREGROUND = `${CSI}39m`
@@ -68,6 +69,15 @@ interface PanelDraw {
 
 type PanelPorts = Pick<BoardPorts, 'write' | 'write_drawn'>
 
+// The area's rows from the rule's line: `AREA_ROWS`, fewer where the frame ends first or the usage
+// section does — at the second blank line under the rule, as before the GitHub row is read.
+function rows_from(lines: ReadonlyArray<string>, rule_index: number): number {
+	const under = lines.slice(rule_index, rule_index + AREA_ROWS)
+	const blanks = [...under.keys()].filter((at) => run_board_fit.width_of(under[at] ?? '') === 0)
+
+	return blanks[1] ?? under.length
+}
+
 // The frame's area found from its lamps on screen: the rule's row above the first lamp's, ended where that
 // rule ends; none with no lamp on screen.
 function area_of(
@@ -78,9 +88,15 @@ function area_of(
 	const [first] = lamps
 
 	if (first === undefined) return undefined
-	const rule = lines[starts.indexOf(first.row) - 1] ?? ''
+	const rule_index = starts.indexOf(first.row) - 1
+	const rule = lines[rule_index] ?? ''
 
-	return { top: first.row - 1, end: run_board_fit.width_of(rule), rows: AREA_ROWS, lamps }
+	return {
+		top: first.row - 1,
+		end: run_board_fit.width_of(rule),
+		rows: rows_from(lines, rule_index),
+		lamps,
+	}
 }
 
 // `text` on `bg`: a style name (`bgYellow`) as it is; a shade as a 24-bit background where the terminal

@@ -76,6 +76,25 @@ describe('run_board_panel_painters.RAIN_PAINTER', () => {
 	})
 })
 
+// joshuafolkken/kit#8712: the bttf area reaching a row lower leaves the other themes' cells as they were.
+describe('run_board_panel_painters on the taller area', () => {
+	it.each([LAMP_PAINTER, RAIN_PAINTER])(
+		'draws the same cells over seven rows as over eight',
+		(painter) => {
+			vi.stubEnv('FORCE_COLOR', '3')
+			const area = area_of(LINES, [1, 2, 3], LAMPS)
+
+			if (area === undefined) throw new Error('no area')
+
+			const at = { ms: START, is_burst: false }
+
+			expect(painter.cells({ ...area, rows: 8 }, at)).toStrictEqual(
+				painter.cells({ ...area, rows: 7 }, at),
+			)
+		},
+	)
+})
+
 describe('run_board_theme_defs.panel_of', () => {
 	it('hands the wargames lamps, the matrix rain and the bttf flux, and nothing in no theme', () => {
 		const { panel_of } = run_board_theme_defs

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_live } from './run-board-live'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 import type { UsageMark } from './run-board-usage'
 
 // joshuafolkken/kit#8401: every live refresh keeps the wargames rules dimmed — the theme restyles the
@@ -28,6 +29,10 @@ const USAGE: UsageMark = {
 	folded: new Set(),
 	cores: 1,
 	total_bytes: 1000,
+}
+const RATE_LIMIT: GithubRateLimit = {
+	core: { remaining: 4321, limit: 5000, reset_ms: 0 },
+	graphql: undefined,
 }
 // Enough board time for the opening, its reveal and a few redraws on the second to pass.
 const STOP_AFTER_MS = 5000
@@ -115,10 +120,17 @@ describe('run_board_live.watch bttf flux panel', () => {
 		// The usage cells widen the rules to the pane, room for the flux figure beside the lamps.
 		read_usage.mockResolvedValue(USAGE)
 
+		// joshuafolkken/kit#8712: the rate limit read draws the GitHub row the figure's last row sits on.
+		const read_rate_limit = vi.fn(async () => RATE_LIMIT)
+
 		await expect(
-			run_board_live.watch({ ...ports, sleep: clocked(clock), intro_sleep: instant }, 'bttf'),
+			run_board_live.watch(
+				{ ...ports, read_rate_limit, sleep: clocked(clock), intro_sleep: instant },
+				'bttf',
+			),
 		).rejects.toBe(STOPPED)
 
+		expect(read_rate_limit).toHaveBeenCalled()
 		expect(frames.join('')).toContain(GAUGE_FULL_CELL)
 	})
 })

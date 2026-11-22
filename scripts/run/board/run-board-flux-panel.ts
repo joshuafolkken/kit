@@ -11,7 +11,7 @@ import {
 import { run_board_rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8674: the bttf theme's painter of the animation area at idle — the lamp gauge right
-// at the throughput rule's end, the flux capacitor two columns left of it, both over the six rows under
+// at the throughput rule's end, the flux capacitor two columns left of it, both over the seven rows under
 // the rule, and the speed readout in the rule over the capacitor. The frame's lamp places and the usage
 // rule are blanked across the area; where the throughput rows leave too little room, only the lamp
 // places are blanked.
@@ -126,8 +126,14 @@ function left_of(area: PanelArea): number | undefined {
 	return left >= start ? left : undefined
 }
 
+// The figure's rows the area holds: all of them under the GitHub row, its top ones where the area ends
+// first — the rate limit not read, joshuafolkken/kit#8712.
+function rows_shown(area: PanelArea): number {
+	return Math.min(FIGURE_ROWS, area.rows - 1)
+}
+
 function blanks_of(area: PanelArea, left: number): Array<PanelCell> {
-	return Array.from({ length: FIGURE_ROWS * FIGURE_WIDTH }, (_, index) => ({
+	return Array.from({ length: rows_shown(area) * FIGURE_WIDTH }, (_, index) => ({
 		row: area.top + 1 + Math.floor(index / FIGURE_WIDTH),
 		column: left + (index % FIGURE_WIDTH),
 		text: BLANK,
@@ -141,10 +147,15 @@ function figure_cells(area: PanelArea, left: number, at: PanelMoment): Array<Pan
 	const gauge = { row: top, column: left + FLUX_WIDTH + GAP }
 	const flux = { row: top, column: left }
 
-	return [
-		...blanks_of(area, left),
+	const bottom = top + rows_shown(area)
+	const figure = [
 		...flux_cells(flux, tick, motion.range_at(tick), motion.flux),
 		...gauge_cells(gauge, tick, motion.range_at, motion.gauge),
+	]
+
+	return [
+		...blanks_of(area, left),
+		...figure.filter((cell) => cell.row < bottom),
 		speed_cell(area, left, tick, motion),
 	]
 }
