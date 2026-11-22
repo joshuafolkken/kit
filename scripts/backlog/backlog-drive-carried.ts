@@ -45,7 +45,9 @@ function is_ended(run: LaneRun, directory: string): boolean {
 }
 
 async function resume(issue: string): Promise<void> {
-	const result = await josh_command.josh_run([RESUME_COMMAND, issue], true)
+	const result = await josh_command.josh_run([RESUME_COMMAND, issue], {
+		should_forward_stderr: true,
+	})
 
 	console.error(result.out)
 	josh_command.require_success(result, RESUME_COMMAND)
