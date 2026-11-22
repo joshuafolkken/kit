@@ -3,7 +3,7 @@ import { run_board_drop_screen } from './run-board-drop-screen'
 import type { TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels } from './run-board-labels'
-import { run_board_rain, type RainCell, type Random } from './run-board-rain'
+import { run_board_rain, type RainCell, type Random, type Scene } from './run-board-rain'
 import type { Beat } from './run-board-reveal-blocks'
 import { run_board_screen } from './run-board-screen'
 
@@ -28,10 +28,12 @@ interface Escapes {
 	between: string
 }
 
-// How the rain reads its cells, and the terminal it fills; a frame's own size without one.
+// How the rain reads its cells, the terminal it fills (a frame's own size without one), and its scene
+// (the reveal's without one).
 interface Rendering {
 	read?: ((cell: RainCell) => RainCell) | undefined
 	size?: TerminalSize | undefined
+	scene?: Scene | undefined
 }
 
 interface Drawn {
@@ -205,9 +207,9 @@ function beat_of(
 // frame behind the rain as it is, or another reading of it (`run-board-exit-rain.ts`); `size` is the
 // terminal the rain fills (joshuafolkken/kit#8614).
 function* beats_of(frame: string, random: Random, rendering: Rendering = {}): Generator<Beat> {
-	const { read = same, size } = rendering
+	const { read = same, size, scene } = rendering
 	const grid = grid_of(frame, size)
-	const passes = run_board_rain.passes(area_of(grid), random)
+	const passes = run_board_rain.passes(area_of(grid), random, scene)
 
 	for (const cells of passes) yield beat_of(grid, cells, read)
 }

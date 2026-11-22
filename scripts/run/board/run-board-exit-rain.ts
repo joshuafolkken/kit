@@ -46,9 +46,13 @@ function wiping(cell: RainCell): RainCell {
 	return cell
 }
 
-// Every frame of the wipe over the terminal, the last the screen erased whole.
+// Every frame of the wipe over the terminal, in the wipe's own scene, the last the screen erased whole.
 function* beats_of(frame: string, random: Random, size?: TerminalSize): Generator<Beat> {
-	yield* run_board_reveal_rain.beats_of(frame, random, { read: wiping, size })
+	yield* run_board_reveal_rain.beats_of(frame, random, {
+		read: wiping,
+		size,
+		scene: run_board_rain.WIPE,
+	})
 	yield CLEARED
 }
 
