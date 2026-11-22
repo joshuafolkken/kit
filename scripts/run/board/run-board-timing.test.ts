@@ -86,7 +86,7 @@ describe('run_board_timing.timed draws', () => {
 	it('says the max and median of each kind it timed as the board leaves', () => {
 		const { ports, frames, leaves } = harness(undefined, [])
 		const clock = [0, 4, 10, 11, 20, 22]
-		const board = run_board_timing.timed(ports, true, () => clock.shift() ?? 0)
+		const board = run_board_timing.timed(ports, true, { now: () => clock.shift() ?? 0 })
 
 		expect(board.time_draw?.('tick', () => 'drawn')).toBe('drawn')
 		board.time_draw?.('tick', () => 0)
@@ -146,7 +146,10 @@ describe('run_board_timing.timed heaps', () => {
 	it('says the main and the worker heap, latest and peak, as a live board leaves', async () => {
 		const { ports, frames, leaves } = harness(undefined, [])
 		const worker_heap = vi.fn(async () => await HEAP)
-		const board = run_board_timing.timed({ ...ports, worker_heap }, true, () => 0, heap_probes())
+		const board = run_board_timing.timed({ ...ports, worker_heap }, true, {
+			now: () => 0,
+			probes: heap_probes(),
+		})
 
 		board.on_exit(() => 0)
 		await settled()
@@ -160,7 +163,10 @@ describe('run_board_timing.timed heaps', () => {
 		const { ports, leaves } = harness(undefined, [])
 		const worker_heap = vi.fn(async () => await HEAP)
 		const probes = heap_probes()
-		const board = run_board_timing.timed({ ...ports, worker_heap }, false, () => 0, probes)
+		const board = run_board_timing.timed({ ...ports, worker_heap }, false, {
+			now: () => 0,
+			probes,
+		})
 
 		board.on_exit(() => 0)
 		leaves.at(-1)?.()

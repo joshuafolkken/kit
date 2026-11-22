@@ -176,9 +176,14 @@ function sound_rig(is_on: boolean): SoundRig {
 			saved.push(next)
 		},
 	}
-	const reading = read_keys({ ...keys.input, store }, (name) => {
-		played.push(name)
-	})
+	const reading = read_keys(
+		{ ...keys.input, store },
+		{
+			cue: (name) => {
+				played.push(name)
+			},
+		},
+	)
 
 	return { keys, saved, played, reading }
 }
@@ -222,11 +227,16 @@ describe('run_board_keys.read_keys trill', () => {
 		const switched: Array<boolean> = []
 		const store = { load: (): ReadonlySet<never> => new Set(), save: () => undefined }
 
-		read_keys({ ...keys.input, store }, undefined, {
-			set: (is_on) => {
-				switched.push(is_on)
+		read_keys(
+			{ ...keys.input, store },
+			{
+				trill: {
+					set: (is_on) => {
+						switched.push(is_on)
+					},
+				},
 			},
-		})
+		)
 		keys.type('s')
 		keys.type('s')
 		expect(switched).toStrictEqual([false])

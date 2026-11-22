@@ -117,7 +117,10 @@ function size(): { rows: number; columns: number } {
 
 // A live redraw of a frame in `theme`, on a terminal drawing color and opened at the redraw: the state
 // its turns carry.
-function redrawn_state(theme: Theme, drop?: DropScreen, flash?: BoardState['flash']): BoardState {
+function redrawn_state(
+	theme: Theme,
+	{ drop, flash }: { drop?: DropScreen; flash?: BoardState['flash'] } = {},
+): BoardState {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 	const { FRESH_STATE, layout_for } = run_board_tick
@@ -182,7 +185,7 @@ function last_drop(): DropScreen {
 }
 
 function carried(span: TypingSpan): ReadonlyArray<TypingSpan> {
-	return redrawn_state('matrix', { ...last_drop(), pours: [span] }).drop?.pours ?? []
+	return redrawn_state('matrix', { drop: { ...last_drop(), pours: [span] } }).drop?.pours ?? []
 }
 
 describe('run_board_tick_draw.draw_display with the last frame’s pours', () => {
@@ -201,7 +204,9 @@ describe('run_board_tick_draw.draw_display with the last frame’s pours', () =>
 
 // joshuafolkken/kit#8629: a redraw carries the last frame's deja vu rains on the same way.
 function carried_deja(span: TypingSpan): ReadonlyArray<TypingSpan> {
-	return redrawn_state('matrix', { ...last_drop(), deja_spans: [span] }).drop?.deja_spans ?? []
+	return (
+		redrawn_state('matrix', { drop: { ...last_drop(), deja_spans: [span] } }).drop?.deja_spans ?? []
+	)
 }
 
 // The matrix board's flash, replaying its first row from the fixture's start.
@@ -234,7 +239,9 @@ describe('run_board_tick_draw.draw_display with the last frame’s deja vu rains
 	})
 
 	it('starts a rain from the first frame of a row the flash replays', () => {
-		expect(redrawn_state('matrix', last_drop(), replaying_flash()).drop?.deja_spans).toStrictEqual([
+		const flash = replaying_flash()
+
+		expect(redrawn_state('matrix', { drop: last_drop(), flash }).drop?.deja_spans).toStrictEqual([
 			{
 				from_ms: START,
 				to_ms: START + run_board_rain_drop.DEJA_STEPS * run_board_rain_drop.DROP_MS,

@@ -257,7 +257,7 @@ describe('run_board_decision_read row integration', () => {
 			is_stopped: false,
 			now_ms: 0,
 		})
-		const layout = run_board_layout.layout_of(plan, new Map(), reader)
+		const layout = run_board_layout.layout_of(plan, new Map(), { reason_of: reader })
 
 		expect(layout.unreached[0]?.reason).toStrictEqual({ icon: '🔗', issues: [String(PERSON)] })
 		expect(run_board_layout.people_of(layout)).toMatchObject([

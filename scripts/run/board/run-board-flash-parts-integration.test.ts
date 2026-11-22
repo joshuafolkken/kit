@@ -40,7 +40,7 @@ function rendered(extra: Partial<BoardView>, board: Partial<BoardHeader>): Spun 
 		...extra,
 	})
 
-	return run_board_spin.spun(lines, '⠋', SIZE)
+	return run_board_spin.spun(lines, '⠋', { size: SIZE })
 }
 
 // The same theme rendered with its change flash turned off, so only the flash keying differs.
@@ -57,7 +57,7 @@ function without_flash(render: () => Spun): Spun {
 	}
 }
 
-function frame(extra: Partial<BoardView> = {}, board: Partial<BoardHeader> = {}): Array<KeyedLine> {
+function frame(board: Partial<BoardHeader>, extra: Partial<BoardView> = {}): Array<KeyedLine> {
 	return rendered(extra, board).keyed
 }
 
@@ -88,9 +88,9 @@ function app(name: string, instances = 1): NamedFigure {
 
 describe('run_board_flash_parts matrix producer identity', () => {
 	it('ac-713cb5e6 establishes a new base for reordered and inserted issue rows', () => {
-		const base = frame({}, lanes([1, NEXT_COUNT]))
-		const moved = frame({}, lanes([NEXT_COUNT, 1]))
-		const inserted = frame({}, lanes([NEXT_COUNT, 1, 3]))
+		const base = frame(lanes([1, NEXT_COUNT]))
+		const moved = frame(lanes([NEXT_COUNT, 1]))
+		const inserted = frame(lanes([NEXT_COUNT, 1, 3]))
 
 		expect(run_board_frame_diff.changed(base, moved)).toStrictEqual([])
 		expect(
@@ -100,16 +100,16 @@ describe('run_board_flash_parts matrix producer identity', () => {
 
 	it('ac-713cb5e6 ignores provider reordering when the scheduler changes', () => {
 		const quotas = { claude: READING, codex: READING }
-		const base = frame({}, { quotas, scheduler_provider: 'claude' })
-		const moved = frame({}, { quotas, scheduler_provider: 'codex' })
+		const base = frame({ quotas, scheduler_provider: 'claude' })
+		const moved = frame({ quotas, scheduler_provider: 'codex' })
 
 		expect(run_board_frame_diff.changed(base, moved)).toStrictEqual([])
 	})
 
 	it('ac-713cb5e6 ignores lower rows moved by an optional throughput section', () => {
 		const board = apps([app('editor')])
-		const base = frame({}, board)
-		const shown = frame({ throughput: [THROUGHPUT] }, board)
+		const base = frame(board)
+		const shown = frame(board, { throughput: [THROUGHPUT] })
 
 		expect(run_board_frame_diff.changed(base, shown)).toStrictEqual([])
 		expect(run_board_frame_diff.changed(shown, base)).toStrictEqual([])
@@ -120,17 +120,17 @@ describe('run_board process identity', () => {
 	it('uses original names for reordered and replaced rows with identical truncated labels', () => {
 		const first = app(`${LONG_NAME}a`)
 		const second = app(`${LONG_NAME}b`)
-		const base = frame({}, apps([first, second]))
-		const moved = frame({}, apps([second, first]))
-		const replaced = frame({}, apps([app(`${LONG_NAME}c`), first]))
+		const base = frame(apps([first, second]))
+		const moved = frame(apps([second, first]))
+		const replaced = frame(apps([app(`${LONG_NAME}c`), first]))
 
 		expect(run_board_frame_diff.changed(base, moved)).toStrictEqual([])
 		expect(run_board_frame_diff.changed(moved, replaced)).toStrictEqual([])
 	})
 
 	it('retains identity when an application instance count changes', () => {
-		const base = frame({}, apps([app('editor')]))
-		const changed = frame({}, apps([app('editor', NEXT_COUNT)]))
+		const base = frame(apps([app('editor')]))
+		const changed = frame(apps([app('editor', NEXT_COUNT)]))
 		const cells = run_board_frame_diff.changed(base, changed)
 
 		expect(cells.length).toBeGreaterThan(0)
@@ -139,8 +139,8 @@ describe('run_board process identity', () => {
 
 	it('keys folded summaries and changing lane counts independently of displayed labels', () => {
 		const extra = { folded: new Set<'lanes'>(['lanes']) }
-		const base = frame(extra, lanes([1]))
-		const changed = frame(extra, lanes([1, NEXT_COUNT]))
+		const base = frame(lanes([1]), extra)
+		const changed = frame(lanes([1, NEXT_COUNT]), extra)
 		const cells = run_board_frame_diff.changed(base, changed)
 
 		expect(cells.length).toBeGreaterThan(0)
@@ -169,7 +169,7 @@ describe('run_board_flash_parts metadata', () => {
 		const size = { rows: 4, columns: 80 }
 		const plain = run_board_fit.fit(parts, size)
 		const flashed = run_board_fit.fit(run_board_flash_parts.keyed(parts, true), size)
-		const spun = run_board_spin.spun(flashed, '', size)
+		const spun = run_board_spin.spun(flashed, '', { size })
 
 		expect(spun.lines).toStrictEqual(plain)
 		expect(spun.keyed.at(-1)?.key).toBe('flash:more:plan')
@@ -179,7 +179,7 @@ describe('run_board_flash_parts metadata', () => {
 describe('run_board_flash_parts typing', () => {
 	it('never types or emits typing bytes for newly visible flash metadata', () => {
 		const quotas = { claude: READING, codex: undefined }
-		const keyed = frame({ has_lamps: true }, { quotas }).filter((line) =>
+		const keyed = frame({ quotas }, { has_lamps: true }).filter((line) =>
 			line.key.startsWith('flash:'),
 		)
 		const typing = run_board_type_rows.next(

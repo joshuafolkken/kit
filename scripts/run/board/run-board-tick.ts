@@ -140,7 +140,10 @@ function planned_layout(
 		now_ms,
 	})
 
-	return run_board_layout.layout_of({ ...plan, now_ms }, statuses, reason_of, earlier_here(local))
+	return run_board_layout.layout_of({ ...plan, now_ms }, statuses, {
+		reason_of,
+		earlier: earlier_here(local),
+	})
 }
 
 // The statuses scoped to the run's plan, a running child GitHub read closed settled.

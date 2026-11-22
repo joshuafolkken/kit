@@ -80,7 +80,7 @@ const UNMARKED = {
 describe('run_board_spin.spun', () => {
 	it('records the title’s, a running row’s and a loading spinner’s spots by display width', () => {
 		const lines = [`${SPOT} backlogrun  ✅ 0/1  ⏳ ${SPOT}`, '', `${SPOT} 🔍 1  a`]
-		const { spots } = spun(lines, '⠋', WIDE)
+		const { spots } = spun(lines, '⠋', { size: WIDE })
 
 		// `⠋ backlogrun  ` is 14 columns, `✅ 0/1  ` 8 with its two-column ✅, `⏳ ` 3 with its ⏳.
 		expect(places(spots)).toStrictEqual([
@@ -93,13 +93,13 @@ describe('run_board_spin.spun', () => {
 	it('draws every placeholder as the frame and leaves a frame with none as it was', () => {
 		const lines = [`${SPOT} run`, 'still']
 
-		expect(spun(lines, '⠙', WIDE).lines).toStrictEqual(['⠙ run', 'still'])
-		expect(spun(['▶ run'], '⠙', WIDE)).toStrictEqual(UNMARKED)
+		expect(spun(lines, '⠙', { size: WIDE }).lines).toStrictEqual(['⠙ run', 'still'])
+		expect(spun(['▶ run'], '⠙', { size: WIDE })).toStrictEqual(UNMARKED)
 	})
 
 	it('counts the rows a wrapped line takes and keeps the colors in effect at the spot', () => {
 		const lines = ['x'.repeat(25), `${GREEN}ab${SPOT}${ESCAPE}[39m`, `${'y'.repeat(12)}${SPOT}`]
-		const { spots } = spun(lines, '⠋', { rows: 24, columns: 10 })
+		const { spots } = spun(lines, '⠋', { size: { rows: 24, columns: 10 } })
 
 		expect(spots).toStrictEqual([
 			{ row: 4, column: 3, style: GREEN },
@@ -110,7 +110,9 @@ describe('run_board_spin.spun', () => {
 	it('records no spot below the rows the frame is kept within', () => {
 		const lines = [`${SPOT} run`, 'a', `${SPOT} row`]
 
-		expect(places(spun(lines, '⠋', { rows: 2, columns: 80 }).spots)).toStrictEqual([[1, 1]])
+		expect(places(spun(lines, '⠋', { size: { rows: 2, columns: 80 } }).spots)).toStrictEqual([
+			[1, 1],
+		])
 		expect(places(spun(lines, '⠋').spots)).toStrictEqual([
 			[1, 1],
 			[3, 1],
@@ -200,7 +202,7 @@ const STRIP_FRAME = [
 ]
 
 describe('run_board_spin — the lamp strips (joshuafolkken/kit#8376)', () => {
-	const drawn = spun(STRIP_FRAME, '⠋', WIDE)
+	const drawn = spun(STRIP_FRAME, '⠋', { size: WIDE })
 
 	it('records a strip above the throughput rule only, in the panel’s first row’s columns', () => {
 		const panel = drawn.lamps.filter((lamp) => lamp.panel_row === 0).map((lamp) => lamp.column)
@@ -224,7 +226,7 @@ describe('run_board_spin — the lamp strips (joshuafolkken/kit#8376)', () => {
 describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', () => {
 	it('takes each row’s key out of the frame and records the row it starts on, its spinner kept a placeholder', () => {
 		const lines = ['x'.repeat(25), keyed('done', 7, `${SPOT} ✅ 7`), keyed('lanes', 8, 'off')]
-		const { lines: written, keyed: rows } = spun(lines, '⠋', { rows: 4, columns: 10 })
+		const { lines: written, keyed: rows } = spun(lines, '⠋', { size: { rows: 4, columns: 10 } })
 
 		expect(written).toStrictEqual(['x'.repeat(25), '⠋ ✅ 7', 'off'])
 		expect(rows).toStrictEqual([
@@ -234,7 +236,7 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 
 	it('records no keyed row that wraps, so a row typed shorter never moves the lines below it', () => {
 		const lines = [keyed('done', 7, 'x'.repeat(25)), keyed('lanes', 8, 'short')]
-		const { keyed: rows } = spun(lines, '⠋', { rows: 24, columns: 10 })
+		const { keyed: rows } = spun(lines, '⠋', { size: { rows: 24, columns: 10 } })
 
 		expect(rows).toStrictEqual([
 			{ key: 'lanes:8', index: 1, row: 4, text: 'short', prefix_columns: 0 },
@@ -323,7 +325,7 @@ describe('run_board_spin — the header’s now line (joshuafolkken/kit#8103)', 
 	const THIRD_ROW = `${ESCAPE}[3;1H`
 
 	it('records the columns before the key, its spinner a spot that still turns', () => {
-		const { spots, keyed: rows } = spun(['a', 'b', NOW], '⠋', WIDE)
+		const { spots, keyed: rows } = spun(['a', 'b', NOW], '⠋', { size: WIDE })
 
 		expect(places(spots)).toStrictEqual([[3, 6]])
 		expect(rows).toStrictEqual([
@@ -338,7 +340,7 @@ describe('run_board_spin — the header’s now line (joshuafolkken/kit#8103)', 
 	})
 
 	it('writes the spinner’s turn and the typed words together, the spinner redrawn in the prefix', () => {
-		const [row] = spun(['a', 'b', NOW], '⠋', WIDE).keyed
+		const [row] = spun(['a', 'b', NOW], '⠋', { size: WIDE }).keyed
 		const typing = { seen: new Set<string>(), lines: row ? [{ ...row, start_ms: START }] : [] }
 		const at_ms = START + LETTER_MS
 		const bytes = type_bytes(typing, at_ms)
@@ -347,6 +349,6 @@ describe('run_board_spin — the header’s now line (joshuafolkken/kit#8103)', 
 	})
 
 	it('records no now line that wraps', () => {
-		expect(spun(['a', 'b', NOW], '⠋', { rows: 24, columns: 20 }).keyed).toStrictEqual([])
+		expect(spun(['a', 'b', NOW], '⠋', { size: { rows: 24, columns: 20 } }).keyed).toStrictEqual([])
 	})
 })

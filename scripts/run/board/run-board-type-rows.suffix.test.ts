@@ -38,7 +38,7 @@ function now_line(words: string): string {
 }
 
 function spun_of(line: string): Pick<ReturnType<typeof run_board_spin.spun>, 'lines' | 'keyed'> {
-	return run_board_spin.spun([line], '⠋', { rows: 2, columns: RULE_WIDTH })
+	return run_board_spin.spun([line], '⠋', { size: { rows: 2, columns: RULE_WIDTH } })
 }
 
 function frame_of(keyed: ReadonlyArray<KeyedLine>): TypingFrame {

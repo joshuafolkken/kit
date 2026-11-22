@@ -256,7 +256,10 @@ function exiting(
 ): { keys: KeyReading; drawn: BoardPorts; last: LastFrame } {
 	const last: LastFrame = { text: undefined }
 	const exit = run_board_exit_rain.exit_of()
-	const keys = run_board_keys.read_keys(quitter(ports.keys, exit), ports.cue, ports.typing_sound)
+	const keys = run_board_keys.read_keys(quitter(ports.keys, exit), {
+		cue: ports.cue,
+		trill: ports.typing_sound,
+	})
 
 	exit.wipe = async () => {
 		await run_board_exit_rain.wipe(last.text, ports, keys, theme)

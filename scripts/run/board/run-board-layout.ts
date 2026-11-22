@@ -230,11 +230,16 @@ function row_read(overlay: Drawn): RowRead {
 	return { ...plan, titles: plan.context.titles, waits, held_of: held }
 }
 
+// What the layout reads beyond the plan and the statuses: each row's reason, and the earlier run's lanes.
+interface LayoutReads {
+	reason_of?: ReasonOf | undefined
+	earlier?: EarlierLanes | undefined
+}
+
 function layout_of(
 	input_plan: BoardPlan,
 	input_statuses: ReadonlyMap<number, ItemStatus>,
-	reason_of?: ReasonOf,
-	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
+	{ reason_of, earlier = run_board_earlier.NO_EARLIER }: LayoutReads = {},
 ): BoardLayout {
 	const current = run_board_retry_wait.overlay_of(input_plan, input_statuses)
 	const { plan, statuses } = current

@@ -15,6 +15,12 @@ const SWITCHED_ON_CUE: CueName = 'launch'
 type Cue = (name: CueName) => void
 type Trill = Pick<TypingSound, 'set'>
 
+// The board's cue and the typing trill the sound switch gates; none plays without them.
+interface KeySounds {
+	cue?: Cue | undefined
+	trill?: Trill | undefined
+}
+
 // The keyboard as the board uses it; `interrupt` is what Ctrl-C does once raw mode reads it as a key,
 // and `store` where the folds and the sound switch are kept across launches — none keeps them until
 // the board closes.
@@ -121,7 +127,7 @@ function pressing(
 	}
 }
 
-function read_keys(input: KeyInput | undefined, cue?: Cue, trill?: Trill): KeyReading {
+function read_keys(input: KeyInput | undefined, { cue, trill }: KeySounds = {}): KeyReading {
 	if (input?.is_tty !== true) return { folded: undefined }
 
 	const { press, ...reading } = pressing(input, cue, trill)

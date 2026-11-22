@@ -31,6 +31,12 @@ type HeapTimer = Omit<HeapProbes, 'worker'>
 // The stall probes with the heap's; where none are handed, the process's heap on the stall probes' timer.
 type TimingProbes = StallProbes & { heap?: HeapTimer }
 
+// The clock the marks are read on and the probes the draws are watched with.
+interface TimingReads {
+	now?: (() => number) | undefined
+	probes?: TimingProbes | undefined
+}
+
 interface Watching {
 	stalls: StallWatch
 	heap: HeapWatch
@@ -186,12 +192,15 @@ function marked_write(
 }
 
 // The ports with the code load, the screen entered, the first read and the first frame marked, and the
-// report said after the screen is left. Without `--timing` they are the ports as they came.
+// report said after the screen is left. Without `--timing` they are the ports as they came; `now` and
+// `probes` default to the process's clock and probes.
 function timed(
 	ports: BoardPorts,
 	is_timing: boolean,
-	now: () => number = performance.now.bind(performance),
-	probes: TimingProbes = run_board_stall.PROCESS_PROBES,
+	{
+		now = performance.now.bind(performance),
+		probes = run_board_stall.PROCESS_PROBES,
+	}: TimingReads = {},
 ): BoardPorts {
 	if (!is_timing) return ports
 	let has_read = false

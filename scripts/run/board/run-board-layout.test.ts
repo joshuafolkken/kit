@@ -179,7 +179,7 @@ describe('run_board_layout.layout_of waiting reasons', () => {
 	// joshuafolkken/kit#4288: the reader leads a blocked row with its blockers, so it is handed them.
 	it('hands the reader the blockers still standing for the row', () => {
 		const plan = plan_of([[child(1, [OPEN_BLOCKER])]])
-		const layout = run_board_layout.layout_of(plan, NO_STATUSES, issues_of)
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES, { reason_of: issues_of })
 
 		expect(run_board_layout.rows_of(layout)[0]?.reason).toStrictEqual({
 			issues: [String(OPEN_BLOCKER)],
@@ -188,7 +188,7 @@ describe('run_board_layout.layout_of waiting reasons', () => {
 
 	it('gives every waiting row what the reader says of it, in the waves and outside them', () => {
 		const plan = plan_of([[child(1)]], [child(2)])
-		const layout = run_board_layout.layout_of(plan, NO_STATUSES, reason_of)
+		const layout = run_board_layout.layout_of(plan, NO_STATUSES, { reason_of })
 
 		expect(run_board_layout.rows_of(layout).map((row) => row.reason)).toStrictEqual([
 			REASON,
@@ -199,14 +199,14 @@ describe('run_board_layout.layout_of waiting reasons', () => {
 	it('asks nothing of a row waiting on a person, or of one the run has touched', () => {
 		const statuses = new Map<number, ItemStatus>([[1, { state: 'running', started_ms: 100 }]])
 		const plan = plan_of([[child(1), child(2, [], [NEEDS_DECISION_LABEL])]])
-		const layout = run_board_layout.layout_of(plan, statuses, reason_of)
+		const layout = run_board_layout.layout_of(plan, statuses, { reason_of })
 
 		expect(run_board_layout.rows_of(layout).filter((row) => 'reason' in row)).toStrictEqual([])
 	})
 
 	it('leaves the key off a row the reader says nothing of, and off every row read without one', () => {
 		const plan = plan_of([[child(1)]])
-		const silent = run_board_layout.layout_of(plan, NO_STATUSES, () => undefined)
+		const silent = run_board_layout.layout_of(plan, NO_STATUSES, { reason_of: () => undefined })
 		const unread = run_board_layout.layout_of(plan, NO_STATUSES)
 
 		expect(run_board_layout.rows_of(silent)[0]).not.toHaveProperty('reason')
@@ -316,7 +316,9 @@ function start_reason(item: EpicChild): RowReason {
 describe('run_board_layout.layout_of unreached order', () => {
 	it('draws the waiting rows first, then the rows waiting on a start time from the earliest', () => {
 		const unreached = [41, 42, 43, 44, 45].map((number) => child(number))
-		const layout = run_board_layout.layout_of(plan_of([], unreached), NO_STATUSES, start_reason)
+		const layout = run_board_layout.layout_of(plan_of([], unreached), NO_STATUSES, {
+			reason_of: start_reason,
+		})
 
 		expect(layout.unreached.map((row) => row.number)).toStrictEqual([42, 45, 44, 43, 41])
 	})

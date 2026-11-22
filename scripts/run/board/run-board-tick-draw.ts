@@ -215,7 +215,7 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		...bounds,
 	})
 	const spinner = run_board_labels.spinner_of(redraw.now_ms)
-	const spun = run_board_spin.spun(lines, spinner, bounds.size, rain_of(redraw))
+	const spun = run_board_spin.spun(lines, spinner, { size: bounds.size, rain: rain_of(redraw) })
 	// joshuafolkken/kit#8476: the clocks' colons found as the theme draws them, in its colors and in the
 	// icons every write draws (joshuafolkken/kit#8505), so the restyle reuses those writes' cache.
 	const { theme, icons } = redraw.ports

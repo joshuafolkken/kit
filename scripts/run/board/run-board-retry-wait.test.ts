@@ -48,11 +48,9 @@ function layout_of(plan: BoardPlan, status: ItemStatus, issue = WAITS): BoardLay
 	const statuses = new Map([[issue, status]])
 	const read = { plan, statuses, events: [], free_lanes: 1, is_stopped: false, now_ms: NOW_MS }
 
-	return run_board_layout.layout_of(
-		{ ...plan, now_ms: NOW_MS },
-		statuses,
-		run_board_reason.reader(read),
-	)
+	return run_board_layout.layout_of({ ...plan, now_ms: NOW_MS }, statuses, {
+		reason_of: run_board_reason.reader(read),
+	})
 }
 
 function markdown_link(text: string, url: string): string {
@@ -211,7 +209,9 @@ describe('run_board_layout.layout_of — a relaunched retry a running lane holds
 		])
 		const read = { plan, statuses, events: [], free_lanes: 1, is_stopped: false, now_ms: NOW_MS }
 
-		return run_board_layout.layout_of(plan, statuses, run_board_reason.reader(read))
+		return run_board_layout.layout_of(plan, statuses, {
+			reason_of: run_board_reason.reader(read),
+		})
 	}
 
 	it('draws the 📂 holder and path the plan row draws', () => {
