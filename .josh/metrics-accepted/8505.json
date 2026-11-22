@@ -2,6 +2,6 @@
 	"reason": "New JOSH_BOARD_ICONS / --icons switch: icons reader, shared flag-else-env option reader and threading icons beside theme through every board frame path (#8505)",
 	"date": "2026-11-22",
 	"growth": {
-		"scripts.code_lines": 139
+		"scripts.code_lines": 168
 	}
 }

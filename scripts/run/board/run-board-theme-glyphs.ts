@@ -2,142 +2,15 @@ import { run_board_fit } from './run-board-fit'
 import type { Icons } from './run-board-icons'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
+import { run_board_theme_glyph_table, type Glyph } from './run-board-theme-glyph-table'
 import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
 // joshuafolkken/kit#7988: the WarGames theme draws the board as a text terminal would, so every icon is
 // drawn as ASCII text of the width the icon took — the columns line up as they do without the theme.
-// The one table of what each icon reads as; the render modules keep their own icons and never see it.
-// joshuafolkken/kit#8150: each text in the color of the tone of the state its icon marks.
-// joshuafolkken/kit#8505: each row holds the icon's letters (capitals, so a board in no theme draws them
-// as one in a theme does) and, for one read faster as a shape (`>>` running, `||` paused, `<-` waiting
-// on an Issue), that shape of the same width; `shapes` draws the shape where a row has one, else its
-// letters. Both share the row's tone, and stay as they are when the theme capitalizes the frame; `⏸`
-// takes the one-column rule `║`.
+// joshuafolkken/kit#8505: `shapes` draws a row's shape where it has one, else its letters; both stay as
+// they are when the theme capitalizes the frame. The rows: `run-board-theme-glyph-table.ts`.
 
-type Glyph = readonly [letters: string, tone: Tone, shape?: string]
-type Glyphs = ReadonlyMap<string, Glyph>
-
-// Each emoji the board's sources draw, by what it marks; a text-presentation symbol one column wide
-// gets one character. A section heading's icon reads as its rule, so every heading reads
-// `V -- NAME` as one whose icon is dropped beside its label does (joshuafolkken/kit#8154).
-const EMOJI: Glyphs = new Map<string, Glyph>([
-	['💻', ['--', 'info']],
-	['📈', ['--', 'info']],
-	['⛽', ['--', 'info']],
-	['🧵', ['--', 'info']],
-	['📌', ['--', 'info']],
-	['🚨', ['P1', 'alert']],
-	['🔺', ['P2', 'caution']],
-	['✨', ['FT', 'info', '**']],
-	['🐛', ['BG', 'info']],
-	['🔍', ['IV', 'running']],
-	['📝', ['PL', 'running']],
-	['🔨', ['BD', 'running']],
-	['👀', ['RV', 'running']],
-	['🔀', ['MG', 'done']],
-	['📦', ['CM', 'running']],
-	['🔂', ['R2', 'running']],
-	['🚢', ['SH', 'done']],
-	['📣', ['RP', 'running']],
-	['💥', ['FL', 'alert']],
-	['⏳', ['HD', 'idle', '..']],
-	['💤', ['ZZ', 'idle']],
-	['✅', ['OK', 'done']],
-	['🚫', ['XX', 'alert']],
-	['🔄', ['RN', 'running', '>>']],
-	['🏁', ['FN', 'done', '|>']],
-	['⏩', ['AD', 'idle', '>|']],
-	['🧊', ['PS', 'idle', '||']],
-	['❔', ['??', 'caution']],
-	['❓', ['Q?', 'human']],
-	['❗', ['!!', 'alert']],
-	['🔧', ['> ', 'info']],
-	['💬', [': ', 'info']],
-	['🔭', ['WT', 'idle', 'OO']],
-	['🔚', ['EN', 'info', '-|']],
-	['⏰', ['T+', 'caution']],
-	['🕘', ['AG', 'idle']],
-	['🎯', ['ET', 'info', '->']],
-	['💓', ['HB', 'info', '<3']],
-	['🧠', ['MM', 'info']],
-	['💾', ['DK', 'info']],
-	['💪', ['CP', 'info']],
-	['⚡', ['PW', 'info']],
-	['🔥', ['HT', 'alert']],
-	['📴', ['OF', 'idle']],
-	['🔊', ['SN', 'info', '<)']],
-	['🔇', ['MU', 'idle', '<X']],
-	['✋', ['HU', 'human']],
-	['🙋', ['DC', 'human', String.raw`\O`]],
-	['🛑', ['ST', 'alert', '[]']],
-	['🧳', ['ER', 'info']],
-	['🔗', ['LK', 'idle', '<-']],
-	['📂', ['FD', 'info', '//']],
-	['🧍', ['SO', 'info']],
-	['🙅', ['NO', 'alert']],
-	['📋', ['OR', 'info', '1.']],
-	['🚦', ['SG', 'info']],
-	['🛫', ['TO', 'info']],
-	['📮', ['IS', 'info']],
-	['📅', ['NB', 'idle', '>=']],
-	['⚓', ['AN', 'info']],
-	['🔁', ['RT', 'caution', '<<']],
-	['🆕', ['NW', 'info']],
-	['🕒', ['NW', 'info', '()']],
-	['🧨', ['XP', 'alert']],
-	['🚪', ['DR', 'info']],
-	['📥', ['IN', 'info', String.raw`\/`]],
-	['📤', ['DS', 'info', '/\\']],
-	['🚀', ['T0', 'done', '^^']],
-	['🤝', ['HO', 'info', '><']],
-	['🤔', ['JG', 'caution']],
-	['💭', ['SS', 'info']],
-	['🚧', ['BL', 'alert', '##']],
-	['🔒', ['LC', 'caution']],
-	['🪫', ['LO', 'caution', '[_']],
-	['📰', ['NS', 'info']],
-	['🔏', ['HM', 'info']],
-	['🔑', ['AU', 'info', 'O-']],
-	['🐰', ['CR', 'info']],
-	['⛔', ['RL', 'alert']],
-	['🤏', ['CX', 'info']],
-	['💺', ['SE', 'info', '__']],
-	['🏠', ['HQ', 'info']],
-	['🌐', ['WB', 'info']],
-	['👻', ['GH', 'info']],
-	['🧭', ['SV', 'info']],
-	['🎬', ['PA', 'info']],
-	['🤖', ['AI', 'info']],
-	['🙏', ['TY', 'info']],
-	['🟢', ['AC', 'done']],
-	['📁', ['EP', 'info', '[+']],
-	['▶', ['>', 'info']],
-	['⏸', ['=', 'idle', '║']],
-	['⏭', ['>', 'info']],
-	['⏱', ['T', 'info']],
-	['↪', ['^', 'info']],
-	['🅿', ['P', 'info']],
-	['☑', ['V', 'done']],
-	['⛓', ['#', 'info']],
-	['🗓', ['D', 'info']],
-	['⚠', ['!', 'caution']],
-	['🛤', ['=', 'info']],
-	['🗜', ['C', 'info']],
-	['🖥', ['M', 'info']],
-	['🎛', ['K', 'info']],
-	['🏔', ['^', 'info']],
-])
-
-// The one-column symbols drawn as one ASCII character. The rules and gauges (`■ █ ▁…▇ ┊ ├ └`) stay.
-const SYMBOLS: Glyphs = new Map<string, Glyph>([
-	['→', ['>', 'info']],
-	['↻', ['@', 'info']],
-	['▸', ['>', 'info']],
-	['▾', ['V', 'info']],
-	['✚', ['+', 'done']],
-	['✓', ['+', 'done']],
-	['✗', ['X', 'alert']],
-])
+const { EMOJI, SYMBOLS } = run_board_theme_glyph_table
 
 // The spinner steps through its theme's glyphs (`spinner` in the theme table: wargames' `│ ╱ ─ ╲`,
 // matrix's kana) instead of the braille dots, each frame the glyph its place in the dots' cycle
