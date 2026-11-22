@@ -2,6 +2,7 @@ import { availableParallelism, cpus } from 'node:os'
 import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_admission, type LedgerEntry } from './core-admission'
+import { core_weights } from './core-weights'
 import { machine_capacity, type MachineReading, type MemoryReading } from './machine-capacity'
 
 vi.mock('execa', async () => {
@@ -80,7 +81,10 @@ describe('machine_capacity.machine_budget — claims under their declared memory
 	const reading = { busy_cores: 0, available_mb, total_mb }
 
 	it('adds back no more than the memory in use, and never past the machine', () => {
-		const ledger = { cores: 0, memory_mb: 8590 + 2900 }
+		const ledger = {
+			cores: 0,
+			memory_mb: core_weights.MEMORY_MB.lint + core_weights.MEMORY_MB.type_check,
+		}
 		const { memory_mb } = machine_capacity.machine_budget(CORES, reading, ledger)
 
 		expect(memory_mb).toBeLessThanOrEqual(total_mb)
