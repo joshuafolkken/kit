@@ -292,8 +292,8 @@ const FILING_PARK = [
 	'1. 親が割り込み Issue を起票して直す（premise の読み取りを `lane:stats` の表の形に合わせる）。',
 	'   - 層: A',
 	'   - 必要な権限: 親（`issue:file --route interrupt --label priority:high --blocks-finder`）',
-	'### 推奨',
-	'1 the premise reader is the defect',
+	'   - 順序の理由: 別の待ちがある — premise の読み取りの不具合',
+	'### 推奨\n1 the premise reader is the defect',
 ].join('\n')
 
 function adopt_filing(done: string): Promise<number> {

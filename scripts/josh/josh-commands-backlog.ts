@@ -142,7 +142,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--done "filed #<M>"'],
 					description:
-						"for a `親` option naming `issue:file`: the open Issue it filed (else refused with the `issue:file … --route interrupt --found-during <N> --blocks-finder` line). The child is blocked by `#M`, not requeued; `#M`'s merge re-dispatches it.",
+						"for a `親` option naming `issue:file`: the open Issue it filed (else refused with the `issue:file … --route interrupt --found-during <N> --blocks-finder` line). The child is blocked by `#M`, not requeued; `#M`'s merge re-dispatches it. An option with no `- 順序の理由: <kind> — <理由>` line is refused as a serial carve-off.",
 				},
 			],
 		},

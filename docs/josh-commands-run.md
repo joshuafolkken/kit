@@ -412,6 +412,8 @@ pnpm josh run:park 1839 --escalate "needs a stronger model"                     
 
 The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered options under `### 選択肢`, each with `- 層: A|B|C` and `- 必要な権限:` (a `run-park-permission.ts` word, e.g. `親（issue:close）`, `親（lane:fold <N> --into #<M>）`), then one `### 推奨` line — `<option number> <reason>`, or `推奨なし <reason>`.
 
+A filing option the parked Issue then waits on (no close, no fold) adds `- 順序の理由: <kind> — <理由>`, `<kind>` one of `epic-chain-kind.ts`'s. Without it the park is refused as a serial carve-off: the child's own `lane:plan --single` (`split-assessment.md` → "Over the guide before the gate").
+
 A body off the schema is refused before any write, naming the missing piece, printing the schema as the usage does.
 
 A body on the schema is then judged against the Issue's trusted sources before any write (`scripts/run/park/run-park-answered.ts`); `--clear` is not judged, and the `backlog:drive` yield-cap park is a `run:stalled` stop, not a `run:park`.
