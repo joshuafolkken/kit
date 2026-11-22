@@ -205,6 +205,24 @@ describe('run_board_estimate.left_ms with nothing to estimate', () => {
 	})
 })
 
+describe('run_board_estimate.queued_finish_ms with nothing to estimate', () => {
+	it('leaves an unreached, a human and an unqueued child out', () => {
+		const queued = queue(row(2, 'waiting'), row(3, 'human'))
+		const board = read({ queued, unreached: [row(4, 'waiting')] })
+
+		expect(run_board_estimate.queued_finish_ms(board, 2)).toBe(NOW + PER_CHILD)
+		expect(
+			[3, 4, 5].map((number) => run_board_estimate.queued_finish_ms(board, number)),
+		).toStrictEqual([undefined, undefined, undefined])
+	})
+
+	it('finishes no queued child without a lane total', () => {
+		const board = read({ queued: queue(row(2, 'waiting')) }, { lane_totals: [] })
+
+		expect(run_board_estimate.queued_finish_ms(board, 2)).toBeUndefined()
+	})
+})
+
 describe('run_board_estimate.row_finish', () => {
 	it('finishes a running child when the header reads it as finishing', () => {
 		const child = running(1, 'implement', 5)

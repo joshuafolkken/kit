@@ -1,5 +1,9 @@
 import { lane_host_gaps } from '#scripts/lane/lane-host-gaps'
-import { run_board_estimate_schedule, type Lanes } from './run-board-estimate-schedule'
+import {
+	run_board_estimate_schedule,
+	type Lanes,
+	type Placement,
+} from './run-board-estimate-schedule'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
@@ -129,8 +133,9 @@ function is_foretold(row: BoardRow): boolean {
 	return row.is_earlier !== true && row.status?.is_adopted !== true
 }
 
-// How long the run has left, `undefined` where nothing is left to run or no lane total is measured.
-function left_ms(read: EstimateRead): number | undefined {
+// The waiting children placed on the lanes the running ones leave, `undefined` where nothing is left to
+// run or no lane total is measured.
+function placement_of(read: EstimateRead): Placement | undefined {
 	const { layout } = read
 	const totals = read.lane_totals ?? []
 
@@ -141,7 +146,21 @@ function left_ms(read: EstimateRead): number | undefined {
 
 	if (running.length + waiting.length === 0) return undefined
 
-	return run_board_estimate_schedule.end_of(waiting, lanes_of(running, read, totals))
+	return run_board_estimate_schedule.placed_of(waiting, lanes_of(running, read, totals))
+}
+
+// How long the run has left, `undefined` where nothing is left to run or no lane total is measured.
+function left_ms(read: EstimateRead): number | undefined {
+	return placement_of(read)?.end
+}
+
+// When a queued child should finish (epoch ms), from the same placement the run's finish reads;
+// `undefined` for a child the lanes do not take — a blocker or start date ahead of it, a decision a
+// person owes, one not queued — or where no lane total is measured.
+function queued_finish_ms(read: EstimateRead, number: number): number | undefined {
+	const end = placement_of(read)?.ends.get(number)
+
+	return end === undefined ? undefined : read.now_ms + end
 }
 
 // When one running child should finish, from the same lane totals the run's finish reads
@@ -187,6 +206,7 @@ const run_board_estimate = {
 	is_finish_drawn,
 	left_ms,
 	phase_spent,
+	queued_finish_ms,
 	row_finish,
 	stamp_of,
 }
