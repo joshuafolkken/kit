@@ -12,6 +12,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 <`- Type: defect` for a defect, else `- Type: non-defect`>
 <for a defect `- Cause: #<PR>`, or `- Cause: unknown（<reason>）` when it cannot be traced>
 <`- Human judgement: not needed` or `- Human judgement: needed（<policy decision / external account / visual check before merge>）`; the criterion is the "人の判断" line under `issue-template.md`'s declaration table>
+<for a display change looked at after the merge, with `Human judgement: not needed`: `- Post-merge check: <where to look>`; the completion gate's handling → `.claude/skills/verify-ui/SKILL.md` → "When there is no screenshot command">
 <when a measurement picks: `- Decision rule: <condition> then <A>, else <B>（#<measurement Issue>）`, with `Human judgement: not needed`>
 <for a cause that lengthened a lane: `- Cause lane: <minutes> 分（#<N>）`; the minutes from `pnpm josh lane:net <N>`>
 <the minutes this Issue's cause could save: `- Cause loss: <minutes> 分`, one line per recurrence>
@@ -82,6 +83,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 | key     | 互換性           | Compatibility                  |
 | key     | リリース分類     | Release classification         |
 | key     | 人の判断         | Human judgement                |
+| key     | マージ後の確認   | Post-merge check               |
 | key     | 判定規則         | Decision rule                  |
 | key     | 中止条件         | Close condition                |
 | key     | 優先度           | Priority                       |

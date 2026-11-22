@@ -88,10 +88,16 @@ function placeholder_repositories(
 		: [selector_repository(gh_repo)]
 }
 
-function placeholder_owners(
-	repository_path: string = process.cwd(),
-	environment: NodeJS.ProcessEnv = process.env,
-): Array<string | undefined> {
+// The checkout a placeholder expands under: its path and the environment `gh` reads.
+interface CheckoutScope {
+	repository_path?: string | undefined
+	environment?: NodeJS.ProcessEnv | undefined
+}
+
+function placeholder_owners({
+	repository_path = process.cwd(),
+	environment = process.env,
+}: CheckoutScope = {}): Array<string | undefined> {
 	return placeholder_repositories(repository_path, environment).map((identity) => identity?.owner)
 }
 
@@ -117,10 +123,10 @@ function sole_repository(
 // posts. Nothing unless that is one repository whichever candidate `gh` picks, so a spelled-out
 // repository is never read as the one `issue:comment` reaches when it might not be
 // (joshuafolkken/kit#4737).
-function current_repository(
-	repository_path: string = process.cwd(),
-	environment: NodeJS.ProcessEnv = process.env,
-): RepoIdentity | undefined {
+function current_repository({
+	repository_path = process.cwd(),
+	environment = process.env,
+}: CheckoutScope = {}): RepoIdentity | undefined {
 	return sole_repository(placeholder_repositories(repository_path, environment))
 }
 

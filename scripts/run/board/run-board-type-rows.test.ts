@@ -1,4 +1,6 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin } from './run-board-spin'
 import { run_board_theme_defs } from './run-board-theme-defs'
@@ -116,6 +118,22 @@ describe('run_board_type_rows.is_typing', () => {
 	})
 })
 
+// joshuafolkken/kit#8523: the trill stops itself as the last row types through.
+describe('run_board_type_rows.left_ms', () => {
+	it('runs out at the first moment no row types', () => {
+		const typing = after_base(frame_of([line_of('#1', 0)]), [line_of('#1', 0), line_of('#2', 1)])
+		const done_ms = START + SECOND + run_board_type_rows.left_ms(typing, START + SECOND)
+
+		expect(run_board_type_rows.is_typing(typing, done_ms - 1)).toBe(true)
+		expect(run_board_type_rows.is_typing(typing, done_ms)).toBe(false)
+		expect(run_board_type_rows.left_ms(typing, done_ms + SECOND)).toBe(0)
+	})
+
+	it('is 0 with no row typing', () => {
+		expect(run_board_type_rows.left_ms(NO_TYPING, START)).toBe(0)
+	})
+})
+
 // joshuafolkken/kit#8375: the rules' lock starts once the row that types through last is done.
 describe('run_board_type_rows.done_ms', () => {
 	it('is the moment the row typing through last is done, with rows typing together', () => {
@@ -196,6 +214,33 @@ describe('run_board_type_rows — what is written', () => {
 
 		expect(typing.lines).toStrictEqual([])
 		expect(type_bytes(typing, START + SECOND + LETTER_MS)).toBe('')
+	})
+})
+
+// joshuafolkken/kit#8356: where the rows decode, a row resolves out of code with no block, as wide as
+// the row it becomes.
+describe('run_board_type_rows — a decoding row', () => {
+	it('writes the row with no block, as wide as the row', () => {
+		const typing = after_base(frame_of([]), [line_of('done:7', 0)])
+		const decoding = { ...typing, is_decoding: true }
+		const [line = ''] = typed_lines([ROW], decoding, START + SECOND + 10 * LETTER_MS)
+
+		expect(line).not.toContain(CURSOR)
+		expect(run_board_fit.width_of(stripVTControlCharacters(line))).toBe(ROW.length)
+		expect(type_bytes(decoding, START + SECOND + 10 * LETTER_MS)).not.toContain(CURSOR)
+	})
+
+	it('carries the frame’s decoding into the typing', () => {
+		const frame = { ...frame_of([]), is_decoding: true }
+
+		expect(next(NO_TYPING, frame, START, true).is_decoding).toBe(true)
+	})
+
+	it('keeps the frame’s decoding past the base', () => {
+		const base = next(NO_TYPING, frame_of([]), START, true)
+		const frame = { ...frame_of([line_of('done:7', 0)]), is_decoding: true }
+
+		expect(next(base, frame, START + SECOND, true).is_decoding).toBe(true)
 	})
 })
 

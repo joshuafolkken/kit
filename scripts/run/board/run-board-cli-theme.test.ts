@@ -10,12 +10,11 @@ const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
 // joshuafolkken/kit#7934: a board a person watches takes the theme; the chat's frame never does. How
 // the theme draws a frame is `run-board-theme.test.ts`'s.
 
-const { LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
+const { IDLE_ROW, LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 const THEMED = ['--theme', 'wargames']
 const RULE = '─'
 const NAMED_CYAN = '\u{1B}[36m'
-const DEFCON_FIELD = / {2}DEFCON [\d [\]]+/u
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u
 const BRAILLE = /[\u{2800}-\u{28FF}]/u
 
@@ -52,7 +51,7 @@ describe('run_board_cli.run --theme', () => {
 
 		expect(plain).toContain(RULE)
 		expect(frame).not.toContain(RULE)
-		expect(widths_of(frame.replace(DEFCON_FIELD, ''))).toStrictEqual(widths_of(plain))
+		expect(widths_of(frame)).toStrictEqual(widths_of(plain))
 	})
 })
 
@@ -266,28 +265,99 @@ describe('run_board_cli.run --theme refused', () => {
 	})
 })
 
-// joshuafolkken/kit#7989, #8107: the themed header's first line ends on the alert level; no other frame has it.
-describe('run_board_cli.run --theme alert level', () => {
-	it('ends the --once header first line on DEFCON in the theme alone', async () => {
-		vi.stubEnv('FORCE_COLOR', '0')
-		const frame = await frame_of([...THEMED, '--once'])
-		const [first] = frame.split('\n', 1)
+// joshuafolkken/kit#8505: the icons a board draws, refused as the theme is.
+describe('run_board_cli.run --icons', () => {
+	it('names the icons in the usage', () => {
+		expect(run_board_cli.USAGE).toContain('[--icons emoji|letters|shapes]')
+	})
 
-		expect(first).toMatch(/ {2}DEFCON(?: \d){0,4} \[\d\](?: \d){0,4}$/u)
-		expect(await frame_of(['--once'])).not.toContain('DEFCON')
-		expect(await frame_of([...THEMED, '--chat'])).not.toContain('DEFCON')
+	it('draws a board in no theme in letters where --icons asks', async () => {
+		const pictographic = /\p{Extended_Pictographic}/u
+
+		expect(await frame_of(['--once'])).toMatch(pictographic)
+		expect(await frame_of(['--once', '--icons', 'letters'])).not.toMatch(pictographic)
+	})
+
+	it('names JOSH_BOARD_ICONS when it, not --icons, names no icons', async () => {
+		vi.stubEnv('JOSH_BOARD_ICONS', 'nope')
+		const { ports } = harness(LOCAL, [])
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		await expect(run_board_cli.run(['--once'], ports)).resolves.toBe(1)
+		expect(stderr).toHaveBeenCalledWith(
+			`JOSH_BOARD_ICONS=nope names no icons (emoji, letters, shapes)\n${run_board_cli.USAGE}\n`,
+		)
+		stderr.mockRestore()
+	})
+
+	it('draws --chat whatever JOSH_BOARD_ICONS holds', async () => {
+		vi.stubEnv('JOSH_BOARD_ICONS', 'nope')
+
+		expect(await frame_of(['--chat'])).toContain('a')
+	})
+})
+
+// The frame of a read carrying the throughput rows.
+async function throughput_frame(argv: Array<string>): Promise<string> {
+	const local = { ...LOCAL, events: [LAUNCH], throughput: [IDLE_ROW] }
+	const { ports, frames } = harness(local, [plan_titled('a')])
+
+	await expect(run_board_cli.run(argv, ports)).resolves.toBe(0)
+
+	return frames.join('')
+}
+
+// The frame's first line, and the first line holding `alert`.
+async function alert_line(argv: Array<string>, alert: string): Promise<Array<string | undefined>> {
+	const frame = await throughput_frame(argv)
+	const lines = frame.split('\n')
+
+	return [lines[0], lines.find((line) => line.includes(alert))]
+}
+
+async function rule_of(argv: Array<string>, alert: string): Promise<string | undefined> {
+	const [, rule] = await alert_line(argv, alert)
+
+	return rule
+}
+
+// joshuafolkken/kit#7989, #8107, #8513: the themed throughput rule ends on the alert level, the header's
+// first line no longer; no other frame has it.
+describe('run_board_cli.run --theme alert level', () => {
+	it('ends the --once throughput rule on DEFCON in the theme alone', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const [first, rule] = await alert_line([...THEMED, '--once'], 'DEFCON')
+
+		expect(first).not.toContain('DEFCON')
+		expect(rule).toMatch(/THROUGHPUT.* DEFCON(?: \d){0,4} \[\d\](?: \d){0,4}$/u)
+		expect(await rule_of(['--once'], 'DEFCON')).toBeUndefined()
+		expect(await rule_of([...THEMED, '--chat'], 'DEFCON')).toBeUndefined()
+	})
+
+	// The header gives up the alert and nothing else moves: every line but the throughput rule keeps its
+	// width. The rule keeps its own where its rule run holds the alert (`tailed`), which this narrow
+	// frame's does not.
+	it('keeps every line of the themed frame but the throughput rule as wide as the plain one', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const plain = widths_of(await throughput_frame(['--once']))
+		const themed = await throughput_frame([...THEMED, '--once'])
+		const index = themed.split('\n').findIndex((line) => line.includes('DEFCON'))
+		const kept = widths_of(themed).map((width, at) => (at === index ? plain[at] : width))
+
+		expect(index).toBeGreaterThan(0)
+		expect(kept).toStrictEqual(plain)
 	})
 
 	// joshuafolkken/kit#8354: `matrix` ends it on TRACE, from --theme or JOSH_BOARD_THEME, --theme winning.
-	it('ends the matrix header first line on TRACE, never in --chat', async () => {
+	it('ends the matrix throughput rule on TRACE, never in --chat', async () => {
 		vi.stubEnv('FORCE_COLOR', '0')
-		const frame = await frame_of(['--theme', 'matrix', '--once'])
-		const [first] = frame.split('\n', 1)
+		const [first, rule] = await alert_line(['--theme', 'matrix', '--once'], 'TRACE')
 
-		expect(first).toMatch(/ {2}TRACE [■-]{5}$/u)
+		expect(first).not.toContain('TRACE')
+		expect(rule).toMatch(/THROUGHPUT.* TRACE [■-]{5}$/u)
 		vi.stubEnv('JOSH_BOARD_THEME', 'matrix')
-		expect(await frame_of(['--once'])).toContain('TRACE')
-		expect(await frame_of([...THEMED, '--once'])).toContain('DEFCON')
-		expect(await frame_of(['--chat'])).not.toContain('TRACE')
+		expect(await rule_of(['--once'], 'TRACE')).toBeDefined()
+		expect(await rule_of([...THEMED, '--once'], 'DEFCON')).toBeDefined()
+		expect(await rule_of(['--chat'], 'TRACE')).toBeUndefined()
 	})
 })

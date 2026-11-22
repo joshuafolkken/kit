@@ -1,0 +1,7 @@
+{
+	"reason": "New parked-decision predicate module reads the issue's labels so a bare run:park park draws as a 🙋 row (#8525)",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}

@@ -55,3 +55,12 @@ describe('plan_named_files.named_files — the files a plan will edit', () => {
 		expect(plan_named_files.named_files(plan_of(['- step'], NO_CONSUMERS))).toEqual([])
 	})
 })
+
+// joshuafolkken/kit#8529: a glob keeps its pattern, and its extension must not count it as a file.
+describe('plan_named_files.named_files — a glob the plan names', () => {
+	it('leaves out a glob whose pattern ends in a file extension', () => {
+		const plan = plan_of([`- change \`${EDITED}\` and \`scripts/lines/*-limit.ts\``], NO_CONSUMERS)
+
+		expect(plan_named_files.named_files(plan)).toEqual([EDITED])
+	})
+})

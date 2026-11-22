@@ -1,6 +1,8 @@
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
+import { run_board_sound_click } from './run-board-sound-click'
+import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme_tones } from './run-board-theme-tones'
 
 // joshuafolkken/kit#8349: what each theme draws, one row per theme — a theme is added by adding its
@@ -28,13 +30,19 @@ interface IntroDefinition {
 // the trill sounds while it types, and whether the section rules run launch codes while it types where
 // the lamp panel shows (`run-board-codes.ts`; joshuafolkken/kit#8375), and whether a lamp strip fills
 // above each rule by typing progress where the rules run code (`run-board-strip.ts`; joshuafolkken/kit#8376)
-// — off in every theme for now, kept to switch back on (joshuafolkken/kit#8398).
+// — off in every theme for now, kept to switch back on (joshuafolkken/kit#8398) — and whether each row
+// decodes from code rather than types (`run-board-decode.ts`) and the lamp panel's cells run the idle rain
+// rather than blink (`run-board-idle-rain.ts`; joshuafolkken/kit#8356), and whether a drop falls down the
+// whole board every second in place of the sweep (`run-board-rain-drop.ts`; joshuafolkken/kit#8367).
 interface LiveDefinition {
 	sweep: boolean
+	drop: boolean
 	types_rows: boolean
 	trill: boolean
 	codes: boolean
 	strip: boolean
+	decode: boolean
+	rain: boolean
 }
 
 interface ThemeDefinition {
@@ -44,7 +52,7 @@ interface ThemeDefinition {
 	rule: { dash: Paint; text: Paint }
 	idle: Paint
 	intro: IntroDefinition
-	// The alert field a screen's first line ends on, drawn from the level every theme shares
+	// The alert field a screen's throughput rule ends on, drawn from the level every theme shares
 	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
 	alert: (level: number) => string
 	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
@@ -53,6 +61,9 @@ interface ThemeDefinition {
 	// Glyphs spread over the board spinner's cycle, in order (joshuafolkken/kit#8366).
 	spinner: string
 	live: LiveDefinition
+	// The WAV a live board loops while letters type at `intro.letter_ms`, `undefined` when it cannot
+	// be written (joshuafolkken/kit#8365).
+	typing: (letter_ms: number) => string | undefined
 }
 
 const CYAN: Paint = { rgb: '62;236;225', named: 'cyan' }
@@ -69,11 +80,21 @@ const THEME_DEFS = {
 		alert: run_board_header_defcon.field_of,
 		lamps: true,
 		spinner: '│╱─╲',
-		live: { sweep: true, types_rows: true, trill: true, codes: true, strip: false },
+		live: {
+			sweep: true,
+			drop: false,
+			types_rows: true,
+			trill: true,
+			codes: true,
+			strip: false,
+			decode: false,
+			rain: false,
+		},
+		typing: run_board_sound_typing.teletype_wav,
 	},
 	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening types three
-	// lines and shows the last at once (joshuafolkken/kit#8441), and its live effects come with the
-	// epic's later children.
+	// lines and shows the last at once (joshuafolkken/kit#8441); its new rows decode and the idle rain
+	// runs where the lamps sit (joshuafolkken/kit#8356).
 	matrix: {
 		paint: run_board_header_trace.SHADES.body,
 		rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
@@ -90,9 +111,20 @@ const THEME_DEFS = {
 			},
 		},
 		alert: run_board_header_trace.field_of,
-		lamps: false,
+		lamps: true,
 		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
-		live: { sweep: false, types_rows: false, trill: false, codes: false, strip: false },
+		live: {
+			sweep: false,
+			drop: true,
+			types_rows: true,
+			trill: true,
+			codes: false,
+			strip: false,
+			decode: true,
+			rain: true,
+		},
+		// A key click every two letters while the intro types and new rows decode (joshuafolkken/kit#8365).
+		typing: run_board_sound_click.typing_wav,
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 
@@ -117,10 +149,13 @@ type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
 
 const NO_LIVE: LiveDefinition = {
 	sweep: false,
+	drop: false,
 	types_rows: false,
 	trill: false,
 	codes: false,
 	strip: false,
+	decode: false,
+	rain: false,
 }
 
 // The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.

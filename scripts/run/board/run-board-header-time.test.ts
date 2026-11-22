@@ -75,6 +75,7 @@ function third(
 			{ ...header_of(undefined, spinner), theme: 'wargames', ...overrides },
 			mark,
 			THIRD_NOW,
+			undefined,
 		)[2] ?? ''
 	)
 }
@@ -104,13 +105,66 @@ describe('run_board_header_time.time_parts — the sweep’s placeholder', () =>
 		expect(third(SPOT, 'idle', { activity })).toContain(TICK)
 	})
 
-	it('leaves the `″` as it is with no spinner, or for a run that has stopped or ended', () => {
+	it('leaves the `″` as it is with no spinner, or for a run that has stopped', () => {
 		expect(third(undefined, 'running')).not.toContain(TICK)
 		expect(third(undefined, 'idle')).not.toContain(TICK)
 		expect(third(undefined, 'running')).toContain(SECONDS_MARK)
 		expect(third(SPOT, 'stopped')).not.toContain(TICK)
-		expect(third(SPOT, 'idle', { ended_ms: NOW_MS })).not.toContain(TICK)
-		expect(third(SPOT, 'idle', { ended_ms: NOW_MS })).toContain(SECONDS_MARK)
+		expect(third(SPOT, 'stopped')).toContain(SECONDS_MARK)
+	})
+
+	// joshuafolkken/kit#8478: an ended run draws `—` in the third cell, so no `″` is left to sweep.
+	it('draws an ended run’s third cell as `—`, no placeholder', () => {
+		expect(third(SPOT, 'idle', { ended_ms: NOW_MS }).trim()).toBe('—')
+	})
+})
+
+const SECOND = 1000
+const HOUR_MS = 60 * MS_PER_MINUTE
+const LEFT_MS = 35 * MS_PER_MINUTE
+// One sign — or the spinner — then the eight-column span.
+const CELL_WIDTH = 9
+
+// The three time cells of a running run started `age_ms` ago, `left_ms` left.
+function cells_of(age_ms: number, left_ms: number | undefined): Array<string> {
+	const header = { ...header_of(undefined, SPOT), started_ms: NOW_MS - age_ms }
+
+	return time_parts(header, 'running', THIRD_NOW, left_ms)
+}
+
+// joshuafolkken/kit#8478: what is left after `-` over the age after `+` over the spinner and the third
+// line's age, one fixed width so the column never moves as a time grows.
+describe('run_board_header_time.time_parts — the signed column', () => {
+	it('draws what is left, the age, then the spinner and the third line’s age', () => {
+		const [left, age, now] = cells_of(5 * MS_PER_MINUTE, LEFT_MS)
+
+		expect(left).toBe('-  35′00″')
+		expect(age).toBe('+   5′00″')
+		expect(now).toBe(`${SPOT}     16″`)
+	})
+
+	it('keeps every cell one width, the spinner its own cell, past an hour', () => {
+		for (const age_ms of [SECOND, HOUR_MS + SECOND, 2 * HOUR_MS]) {
+			const cells = cells_of(age_ms, LEFT_MS)
+
+			expect(cells.map((cell) => cell.length)).toStrictEqual([CELL_WIDTH, CELL_WIDTH, CELL_WIDTH])
+			expect(cells[2]?.startsWith(SPOT)).toBe(true)
+		}
+	})
+
+	it('draws what is left unknown where no finish is estimated', () => {
+		expect(cells_of(SECOND, undefined)[0]).toBe('-  --′--″')
+	})
+
+	it('draws an ended run with none left, its age stopped at its end, and `—` under them', () => {
+		const header = { ...header_of(undefined, SPOT), started_ms: NOW_MS - HOUR_MS, ended_ms: NOW_MS }
+		const later = { ...header, now_ms: NOW_MS + HOUR_MS }
+
+		expect(time_parts(later, 'idle', THIRD_NOW, LEFT_MS)).toStrictEqual([
+			'-      0″',
+			'+1°00′00″',
+			'        —',
+		])
 	})
 })
 

@@ -70,6 +70,11 @@ function row_of(lines: ReadonlyArray<string>): string | undefined {
 	return lines.find((line) => line.includes(String(ISSUE)))
 }
 
+// The lanes rule, whose end draws the tallies (joshuafolkken/kit#8514).
+function lanes_rule(lines: ReadonlyArray<string>): string | undefined {
+	return lines.find((line) => line.includes('🧵'))
+}
+
 describe('run_board_tick.tick — a parked child a person released', () => {
 	it('draws it waiting on its start time and leaves it out of the parked count', async () => {
 		const lines = await frame_with(RELEASED_LABELS)
@@ -81,7 +86,7 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 		expect(lines.indexOf(row ?? '')).toBeGreaterThan(
 			lines.findIndex((line) => line.includes(`🔗 ${WORDS.waiting}`)),
 		)
-		expect(lines[0]).toContain('💤 0')
+		expect(lanes_rule(lines)).toContain('💤 0')
 	})
 
 	// joshuafolkken/kit#4848: the start time is weighed against the board's clock, not the wall clock.
@@ -108,7 +113,7 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 		const lines = await frame_with([...RELEASED_LABELS, 'needs-decision'])
 
 		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
-		expect(lines[0]).toContain('⏳ 1  💤 0')
+		expect(lanes_rule(lines)).toContain('✅ 0/1')
 	})
 
 	// joshuafolkken/kit#4127: the findings section read the park off the stream and kept saying it.
@@ -116,6 +121,6 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 		const lines = await frame_with(RELEASED_LABELS, local_parked('waiting on #4065'))
 
 		expect(lines.join('\n')).not.toContain('(waiting on #4065)')
-		expect(lines.filter((line) => line.includes('💤'))).toStrictEqual([lines[0]])
+		expect(lines.filter((line) => line.includes('💤'))).toStrictEqual([lanes_rule(lines)])
 	})
 })

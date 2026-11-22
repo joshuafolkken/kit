@@ -2,7 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_display } from './run-board-display'
 import { run_board_fixture } from './run-board-fixture'
-import { run_board_header } from './run-board-header'
+import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { CueName } from './run-board-sound-cues'
 import type { BoardState } from './run-board-state'
@@ -12,9 +12,9 @@ import { run_board_tick_draw } from './run-board-tick-draw'
 const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const { bounds_of } = run_board_tick_draw
+const { minute_of } = run_board_labels
 const SIZE = { rows: 15, columns: 80 }
 const FOOTER = ['footer']
-const BASELINE = 7
 const HEADER_LINES = 3
 const SECOND = 1000
 // Past the time the header's now line takes to type through.
@@ -26,31 +26,14 @@ function planned(): BoardState {
 }
 
 describe('run_board_tick_draw.draw_display', () => {
-	it('pins the baseline total to the first count the plan gives and writes one frame', () => {
+	it('writes one frame', () => {
 		const { ports, frames } = harness(LOCAL, [])
 		const state = planned()
 		const run_layout = layout_for(state, LOCAL, START)
-		const drawn = drawn_from(state, LOCAL, { ports, now_ms: START }, run_layout)
 
-		expect(drawn.baseline_total).toBe(run_board_header.counts_of(run_layout).total)
+		drawn_from(state, LOCAL, { ports, now_ms: START }, run_layout)
+
 		expect(frames).toHaveLength(1)
-	})
-
-	it('keeps a baseline already pinned', () => {
-		const { ports } = harness(LOCAL, [])
-		const state = { ...planned(), baseline_total: BASELINE }
-		const run_layout = layout_for(state, LOCAL, START)
-		const drawn = drawn_from(state, LOCAL, { ports, now_ms: START }, run_layout)
-
-		expect(drawn.baseline_total).toBe(BASELINE)
-	})
-
-	it('pins no baseline before the plan is read', () => {
-		const { ports } = harness(LOCAL, [])
-		const run_layout = layout_for(FRESH_STATE, LOCAL, START)
-		const drawn = drawn_from(FRESH_STATE, LOCAL, { ports, now_ms: START }, run_layout)
-
-		expect(drawn.baseline_total).toBeUndefined()
 	})
 })
 
@@ -133,13 +116,15 @@ function header_drawn({ is_on, state = planned(), rows }: SoundDraw): SoundDrawn
 }
 
 // joshuafolkken/kit#7952, #8107: the live header ends its second line on the sound switch and the
-// last notice.
+// last notice. joshuafolkken/kit#8478: the machine sits on the first line, the time circuits before it.
 describe('run_board_tick_draw.draw_display sound mark', () => {
 	it('draws 🔊 and — at the end of the second line while the sound is on, none on the first', () => {
+		const clock = minute_of(START)
+
 		expect(header_drawn({ is_on: true }).lines).toStrictEqual([
-			'⏸ josh-board  ⏰ 0″  ✅  0/- ──────────  🔄 0  ⏳ -  💤 0',
-			'  -                  💪 -  🧠 -  💾 -  🔊 —',
-			'  kit',
+			'⏸ josh-board  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -',
+			`  -           🕒 ${clock}  +      0″  🔊 —`,
+			`  kit         🚀 ${clock}`,
 		])
 	})
 
@@ -177,7 +162,7 @@ describe('run_board_tick_draw.draw_display machine samples', () => {
 		const lines = stripVTControlCharacters(frames.join('')).split('\n')
 
 		expect(display.header.machine).toBeUndefined()
-		expect(lines[1]).toContain(`${String(CPU_PERCENT)}%`)
+		expect(lines[0]).toContain(`${String(CPU_PERCENT)}%`)
 	})
 })
 

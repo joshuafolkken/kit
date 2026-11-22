@@ -1,6 +1,7 @@
 import { backlog_drive_memory } from '#scripts/backlog/backlog-drive-memory'
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
+import { lane_capacity, type LaneAnswer } from '#scripts/lane/lane-capacity'
 import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
@@ -18,12 +19,14 @@ import type { FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
+import type { ReviewStop } from './run-board-layout-types'
 import { run_board_ledger_window } from './run-board-ledger-window'
 import type { SessionOperations } from './run-board-operation-read'
 import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
 import { run_board_read_local } from './run-board-read-local'
 import { run_board_records } from './run-board-records'
+import { run_board_review_stop } from './run-board-review-stop'
 import { run_board_run_fields, type RunSpan } from './run-board-run-fields'
 import type { EndedRoot, RootRun } from './run-board-single'
 import { run_board_span_read } from './run-board-span-read'
@@ -58,6 +61,9 @@ interface LocalRead {
 	// The open lanes as their lane state records sort them — this run's, an earlier run's and the ones
 	// with no record — with what each is doing (`run-board-lane-state.ts`).
 	lane_states: BoardLanes
+	// Each review-stopped lane, by issue: when it stopped and its directory
+	// (`run-board-review-stop.ts`).
+	review_stops?: ReadonlyMap<number, ReviewStop> | undefined
 	// The session a stopped run is resumed from; `undefined` otherwise.
 	resume: string | undefined
 	// The run is carried but nothing drives it — its owner and its supervisor are both gone
@@ -81,6 +87,7 @@ interface LocalRead {
 	// How many lanes hold a place under the limit (`backlog-occupied.ts`), counted beside a row that
 	// waits for a free lane.
 	occupied_count?: number | undefined
+	lane_capacity?: LaneAnswer | undefined
 	// The same snapshot's occupied identities, so row selection can use the heading's exact lanes.
 	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
@@ -164,17 +171,25 @@ function unfinished_here(
 	}
 }
 
+// Where a run's local records are: `repository` the common git directory its records are keyed on,
+// `main` the main work tree the lane root sits beside (`lane_paths.lane_root`).
+interface RepositoryRoots {
+	repository: string
+	main: string
+}
+
 // Every lane record, read once for the lanes' states and the closes still unfinished.
 function lanes_here(
 	lanes: ReadonlyArray<LaneInfo>,
-	repository: string,
+	roots: RepositoryRoots,
 	events: ReadonlyArray<RunEvent>,
 	started_ms: number,
-): Pick<LocalRead, 'lane_states' | 'closing' | 'stuck'> {
-	const records = run_board_records.read_records(repository)
+): Pick<LocalRead, 'lane_states' | 'review_stops' | 'closing' | 'stuck'> {
+	const records = run_board_records.read_records(roots.repository)
 
 	return {
 		lane_states: sorted_here(lanes, records, events, started_ms),
+		review_stops: run_board_review_stop.stops_here(records, roots.main),
 		...unfinished_here(records),
 	}
 }
@@ -184,6 +199,7 @@ type LaneRoomRead = Pick<
 	| 'free_lanes'
 	| 'lane_limit'
 	| 'occupied_count'
+	| 'lane_capacity'
 	| 'occupied_lanes'
 	| 'earlier_occupied'
 	| 'idle_lanes'
@@ -204,6 +220,10 @@ async function lane_room_of(
 		free_lanes: count?.free,
 		lane_limit: count?.limit,
 		occupied_count: occupied.length,
+		lane_capacity:
+			count === undefined
+				? undefined
+				: lane_capacity.lane_answer(count.limit, occupied.length, room.use.seated),
 		occupied_lanes: occupied,
 		earlier_occupied: run_board_lane_state.earlier_occupied(occupied, sorted),
 		idle_lanes: room.idle,
@@ -274,18 +294,18 @@ async function run_read(
 ): Promise<LocalRead> {
 	const { span, root, carry } = read
 	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
-	const lane_read = lanes_here(lanes, repository, events, span.started_ms)
+	const roots = { repository, main: await main_root() }
+	const lane_read = lanes_here(lanes, roots, events, span.started_ms)
 	const [root_fields, span_events, room, records] = await Promise.all([
 		read_roots(span, root, events),
 		read_span_events(events, span, table, carry),
 		read_room(lanes, lane_read.lane_states, table),
 		read_records(repository, events),
 	])
-	const fields = run_board_run_fields.fields_of(repository, read, lanes, events)
 
 	return {
 		...span_fields(span, root_fields),
-		...fields,
+		...run_board_run_fields.fields_of(repository, read, lanes, events),
 		...span_events,
 		...lane_read,
 		...room,

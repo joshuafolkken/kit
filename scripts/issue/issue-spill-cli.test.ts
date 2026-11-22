@@ -206,7 +206,7 @@ describe('issue_spill_cli.run placement', () => {
 })
 
 describe('issue_spill_cli.run failures after the filing', () => {
-	const PLACE_HINT = `epic --add <E> ${String(FOLLOW_UP)} --after ${String(ISSUE)}`
+	const PLACE_HINT = `epic --add <E> ${String(FOLLOW_UP)} --after ${String(ISSUE)} --order-reason "#${String(ISSUE)} -> #${String(FOLLOW_UP)}: <reason>"`
 
 	it('names the placing command when the epic refuses the follow-up', async () => {
 		listing('none', new Map([[ISSUE, EPIC]]))

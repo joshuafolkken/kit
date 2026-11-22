@@ -51,7 +51,9 @@ interface BlockTrust {
 	has_trusted_comment: boolean | undefined
 }
 
-type BlockRead = { kind: 'ok'; block: string; trust: BlockTrust } | { kind: ReadFailureKind }
+// `body` is the issue body alone, for a reader that must not take a comment's text for the body's.
+type BlockRead =
+	{ kind: 'ok'; block: string; body: string; trust: BlockTrust } | { kind: ReadFailureKind }
 
 interface IssueReport {
 	issue_number: string
@@ -147,7 +149,12 @@ async function read_block(issue_number: string): Promise<BlockRead> {
 		has_trusted_comment: has_trusted_comment(comments),
 	}
 
-	return { kind: 'ok', block: issue_read.format_issue(issue_number, fields, comments), trust }
+	return {
+		kind: 'ok',
+		block: issue_read.format_issue(issue_number, fields, comments),
+		body: fields.body,
+		trust,
+	}
 }
 
 // Every read requested at once: each is a `gh` process, and the `gh` layer's shared spawn limit

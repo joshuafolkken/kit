@@ -46,6 +46,7 @@ const LANE_ROOM = {
 	free_lanes: FREE_LANES,
 	lane_limit: run_board_read_fixture.LANE_LIMIT,
 	occupied_count: 1,
+	lane_capacity: { free: FREE_LANES, bound: 'none', seated: 1 },
 	occupied_lanes: ['3432'],
 	earlier_occupied: [],
 }
@@ -55,6 +56,7 @@ const UNRECORDED = {
 	roots: { supervisor: undefined, parent: undefined },
 	stuck: new Map(),
 	closing: new Set(),
+	review_stops: new Map(),
 	carry: undefined,
 	is_session_active: false,
 	kit_version: undefined,

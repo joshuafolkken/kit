@@ -12,6 +12,7 @@ import {
 } from './run-board-layout'
 import type { Link } from './run-board-link'
 import { run_board_notes, type BoardNote } from './run-board-notes'
+import { run_board_priority } from './run-board-priority'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
 import { run_board_render_lanes } from './run-board-render-lanes'
@@ -49,6 +50,7 @@ const { width_for } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, kept_section, keyed, plan_section } = run_board_render_section
 const { GAP, row_line, shared_overrun } = run_board_render_row
+const { tally_of } = run_board_priority
 const BRANCH = `${ROW_INDENT}   ├ `
 const LAST_BRANCH = `${ROW_INDENT}   └ `
 const { bounded } = run_board_fold
@@ -175,33 +177,37 @@ function waiting_section(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 	return rows_section(waiting, layout.unreached, { ...frame, section: 'waiting' }, 'waiting')
 }
 
+// The queued, waiting and done sections, the first two counting their priorities beside their rows
+// (joshuafolkken/kit#8511), the plan read in flight and the saved plan's age at the queued rule's end
+// (joshuafolkken/kit#8512).
+function below_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+	const { header } = frame
+	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
+	const done = run_board_row_sections.done_rows(layout)
+	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
+	const waiting = waiting_section(layout, conditioned)
+	const queued_tally = tally_of(run_board_layout.queued_rows(layout))
+
+	return [
+		...keyed('queued', planned(header, queued), queued_tally, run_board_header.queued_tail(header)),
+		...keyed('waiting', planned(header, waiting), tally_of(layout.unreached)),
+		...done_section(done, (row) => row_line(ROW_INDENT, row, { ...conditioned, section: 'done' })),
+	]
+}
+
 // The plan's rest under the findings, the 🔗 waiting rows giving way before them.
 function plan_parts(
 	header: BoardHeader,
 	notes: ReadonlyArray<BoardNote>,
 	size: TerminalSize | undefined,
-): Pick<FrameParts, 'below' | 'plan' | 'rule_width'> {
+): Pick<FrameParts, 'below' | 'columns' | 'plan' | 'rule_width'> {
 	const { layout } = header
 	const frame = frame_of(header, notes, size)
-	const rule_width = run_board_rule_width.rule_width(frame)
+	const widths = { rule_width: run_board_rule_width.rule_width(frame), columns: size?.columns }
 
-	if (layout === undefined) return { plan: [], rule_width }
+	if (layout === undefined) return { plan: [], ...widths }
 
-	const conditioned = { ...frame, condition_width: width_for(layout.unreached) }
-	const done = run_board_row_sections.done_rows(layout)
-	const queued = queued_section(layout, { ...conditioned, section: 'queued' })
-
-	return {
-		plan: active_sections(layout, frame),
-		rule_width,
-		below: [
-			...keyed('queued', planned(header, queued)),
-			...keyed('waiting', planned(header, waiting_section(layout, conditioned))),
-			...done_section(done, (row) =>
-				row_line(ROW_INDENT, row, { ...conditioned, section: 'done' }),
-			),
-		],
-	}
+	return { plan: active_sections(layout, frame), ...widths, below: below_sections(layout, frame) }
 }
 
 function render(view: BoardView): Array<string> {
@@ -209,7 +215,11 @@ function render(view: BoardView): Array<string> {
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
-		throughput: run_board_render_throughput.throughput_part(view.throughput, view.has_lamps),
+		throughput: run_board_render_throughput.throughput_part(
+			view.throughput,
+			view.has_lamps,
+			run_board_header.alert_part(header),
+		),
 		usage: run_board_render_quota.usage_part({
 			...header,
 			hold: header.quota_hold,

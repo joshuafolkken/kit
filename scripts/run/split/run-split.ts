@@ -82,12 +82,12 @@ function chain_argv(request: SplitRequest): Array<string> {
 	]
 }
 
-// `--after <N>` makes `#N` the head of an ordered split's chain inside an existing epic too. That
-// placement declares no chain, so `--ordered`'s reason, already read by `create_refusal`, is not passed.
+// `--after <N>` makes `#N` the head of an ordered split's chain inside an existing epic too. It writes
+// `#N -> #c1 -> … -> #cn`, the very chain `--ordered` declares, so `--ordered`'s reason goes with it.
 function add_argv(request: SplitRequest, epic: number): Array<string> {
-	const order = request.is_ordered ? ['--after', request.issue] : chain_argv(request)
+	const order = request.is_ordered ? ['--after', request.issue] : []
 
-	return ['--add', String(epic), ...request.children, ...order]
+	return ['--add', String(epic), ...request.children, ...order, ...chain_argv(request)]
 }
 
 function create_argv(request: SplitRequest, title: string): Array<string> {

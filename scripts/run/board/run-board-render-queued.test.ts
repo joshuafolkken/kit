@@ -7,6 +7,7 @@ import { run_board_layout, type BoardPlan } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_row_key } from './run-board-row-key'
+import { run_board_theme } from './run-board-theme'
 
 // joshuafolkken/kit#4137: a running batch starts each row once a lane and its paths are free, never
 // wave by wave, so the rows not yet started are one `⏳ queued` section in the plan's order.
@@ -174,5 +175,36 @@ describe('run_board_render.render a title mark', () => {
 			plain.map((line) => run_board_fit.width_of(line)),
 		)
 		expect(themed.map((line) => bare(untitled(line)))).toStrictEqual(plain)
+	})
+})
+
+// joshuafolkken/kit#8512: on the WarGames screen the queued rule's tail reads as text, and drawing it
+// there moves nothing else.
+function wargames_lines(overrides: Parameters<typeof header>[0]): Array<string> {
+	const view = { header: header({ layout: EMPTY_LAYOUT, theme: 'wargames', ...overrides }) }
+	const drawn = run_board_render.render({ ...view, notes: [] }).join('\n')
+
+	return stripVTControlCharacters(
+		untitled(run_board_theme.marked('wargames', drawn, 'letters')),
+	).split('\n')
+}
+
+describe('run_board_render.render queued rule tail on a themed screen', () => {
+	const loading = { is_plan_loading: true, spinner: '⠋' }
+
+	it('draws HD for the spinner’s ⏳ and AG for the saved plan’s 🕘', () => {
+		const lines = wargames_lines({ ...loading, plan_saved_ms: header().now_ms })
+
+		expect(lines.filter((line) => /^-- -- QUEUED .* HD \S {2}AG \S+$/u.test(line))).toHaveLength(1)
+	})
+
+	it('changes the queued rule alone', () => {
+		const plain = wargames_lines({})
+		const tailed = wargames_lines(loading)
+		const changed = tailed.filter((line, index) => line !== plain[index])
+
+		expect(tailed).toHaveLength(plain.length)
+		expect(changed).toHaveLength(1)
+		expect(changed[0]).toMatch(/^-- -- QUEUED 0 -+ HD \S$/u)
 	})
 })

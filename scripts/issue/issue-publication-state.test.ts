@@ -175,3 +175,30 @@ describe('issue_publication_state.missing_steps', () => {
 		).toStrictEqual([EPIC_STEP, 'publish'])
 	})
 })
+
+// joshuafolkken/kit#8542: a lane child's prepared child records the run Issue it was filed from.
+describe('issue_publication_state.origin_of', () => {
+	const LANE = 8474
+
+	it('reads the origin a lane filing records, keeping the labels', () => {
+		const created = issue_publication_state.creation(BODY, LABELS, true, LANE)
+
+		expect(issue_publication_state.origin_of(created.body)).toBe(LANE)
+		expect(issue_publication_state.labels_of(created.body, [PLANNED])).toEqual([PLANNED, 'auto-ok'])
+	})
+
+	it('records no origin for a filing outside a lane, as the record read before', () => {
+		const body = issue_publication_state.prepare(BODY, LABELS)
+
+		expect(body).toContain('<!-- josh:publication {"labels":["auto-ok","run:lane"]} -->')
+		expect(issue_publication_state.origin_of(body)).toBeUndefined()
+	})
+
+	it('reads no origin once the issue is published', () => {
+		const body = issue_publication_state.prepare(BODY, LABELS, LANE)
+
+		expect(
+			issue_publication_state.origin_of(issue_publication_state.public_body(body)),
+		).toBeUndefined()
+	})
+})

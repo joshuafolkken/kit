@@ -11,7 +11,16 @@ import type { TypingSound } from './run-board-sound-typing'
 
 const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const SCREEN = run_board_screen.screen_of('live')
-const NO_LIVE = { sweep: false, types_rows: false, trill: false, codes: false, strip: false }
+const NO_LIVE = {
+	sweep: false,
+	types_rows: false,
+	trill: false,
+	codes: false,
+	strip: false,
+	decode: false,
+	rain: false,
+	drop: false,
+}
 const ESCAPE = '\u{1B}'
 const DIM_RULE = new RegExp(`${ESCAPE}\\[2m─+${ESCAPE}\\[22m`, 'u')
 const REFRESH_START = `${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`
@@ -19,6 +28,7 @@ const DIM_HEADING_START = `\n${ESCAPE}[K${ESCAPE}[2m──${ESCAPE}[22m `
 const { WORDS } = run_board_labels
 // The keeps-running line and the line after it or before it (the keys, or the blank) end every frame.
 const FOOTER_LINES = 2
+const LEFT_MS = 300
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -28,17 +38,29 @@ afterEach(() => {
 describe('run_board_live.live_of', () => {
 	it('reads the rows typed, the trill and the rules code from the wargames definition', () => {
 		expect(run_board_live.live_of('wargames')).toStrictEqual({
+			...NO_LIVE,
 			sweep: true,
 			types_rows: true,
 			trill: true,
 			codes: true,
-			strip: false,
+		})
+	})
+
+	// joshuafolkken/kit#8356: the matrix board's rows decode and its lamp panel runs the idle rain.
+	// joshuafolkken/kit#8367: a raindrop falls down the whole matrix board in place of the sweep.
+	it('reads the decoded rows, the idle rain and the board drop from the matrix definition', () => {
+		expect(run_board_live.live_of('matrix')).toStrictEqual({
+			...NO_LIVE,
+			types_rows: true,
+			trill: true,
+			decode: true,
+			rain: true,
+			drop: true,
 		})
 	})
 
 	it('chooses no live effect with no theme', () => {
 		expect(run_board_live.live_of(undefined)).toStrictEqual(NO_LIVE)
-		expect(run_board_live.live_of('matrix')).toStrictEqual(NO_LIVE)
 	})
 
 	it('chooses no live effect for a theme the table has no row for', () => {
@@ -164,14 +186,22 @@ describe('run_board_live.watch failed tick', () => {
 
 // joshuafolkken/kit#8250: the trill reaches the draws only in a theme, and the board stops it as it
 // leaves.
-function trill_heard(): { switched: Array<string>; typing_sound: TypingSound } {
+// The trill's switches, and the letters' ends each `on` was handed (joshuafolkken/kit#8523).
+function trill_heard(): {
+	switched: Array<string>
+	ends: Array<number | undefined>
+	typing_sound: TypingSound
+} {
 	const switched: Array<string> = []
+	const ends: Array<number | undefined> = []
 
 	return {
 		switched,
+		ends,
 		typing_sound: {
-			set: (is_on) => {
+			set: (is_on, left_ms) => {
 				switched.push(is_on ? 'on' : 'off')
+				if (is_on) ends.push(left_ms)
 			},
 			stop: () => {
 				switched.push('stop')
@@ -224,6 +254,16 @@ describe('run_board_live.watch trill', () => {
 		expect(switched.at(-1)).toBe('stop')
 	})
 
+	it('hands the draws’ letters end through to the trill', () => {
+		const { ports } = harness(LOCAL, [])
+		const { ends, typing_sound } = trill_heard()
+		const live = run_board_live.live_of('wargames')
+		const trill = run_board_live.trill_of({ ...ports, typing_sound }, { folded: undefined }, live)
+
+		trill?.set(true, LEFT_MS)
+		expect(ends).toStrictEqual([LEFT_MS])
+	})
+
 	it('stops the trill once however many paths reach the leave', async () => {
 		const { ports, leaves } = harness(undefined, [])
 		const { switched, typing_sound } = trill_heard()
@@ -231,6 +271,19 @@ describe('run_board_live.watch trill', () => {
 		await expect(run_board_live.watch({ ...ports, typing_sound }, undefined)).rejects.toBe(STOPPED)
 		leaves[0]?.()
 		expect(switched.filter((event) => event === 'stop')).toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#8365: the matrix key click sounds through its intro and its decoding rows.
+describe('run_board_live.watch matrix trill', () => {
+	it('hands the matrix draws’ letters end through to the trill (ac-57e6668c)', () => {
+		const { ports } = harness(LOCAL, [])
+		const { ends, typing_sound } = trill_heard()
+		const live = run_board_live.live_of('matrix')
+		const trill = run_board_live.trill_of({ ...ports, typing_sound }, { folded: undefined }, live)
+
+		trill?.set(true, LEFT_MS)
+		expect(ends).toStrictEqual([LEFT_MS])
 	})
 })
 
@@ -246,14 +299,29 @@ describe('run_board_live.watch trill and the sound switch', () => {
 		expect(switched).toStrictEqual(['off', 'stop'])
 	})
 
-	it('sounds no trill in the intro or the draws while the sound is off', async () => {
+	it('switches the matrix trill off as s switches the sound off (ac-57e6668c)', async () => {
 		const { ports } = harness(LOCAL, [plan_titled('a')])
 		const { switched, typing_sound } = trill_heard()
-		const { input } = sound_keys(false)
-		const sounding = { ...ports, typing_sound, keys: input, intro_sleep: instant }
+		const { input, type } = sound_keys(true)
+		const watching = run_board_live.watch({ ...ports, typing_sound, keys: input }, 'matrix')
 
-		await expect(run_board_live.watch(sounding, 'wargames')).rejects.toBe(STOPPED)
+		type('s')
+		await expect(watching).rejects.toBe(STOPPED)
+		expect(switched[0]).toBe('off')
 		expect(switched).not.toContain('on')
-		expect(switched.at(-1)).toBe('stop')
 	})
+
+	it.each(['wargames', 'matrix'] as const)(
+		'sounds no %s trill while the sound is off',
+		async (theme) => {
+			const { ports } = harness(LOCAL, [plan_titled('a')])
+			const { switched, typing_sound } = trill_heard()
+			const { input } = sound_keys(false)
+			const sounding = { ...ports, typing_sound, keys: input, intro_sleep: instant }
+
+			await expect(run_board_live.watch(sounding, theme)).rejects.toBe(STOPPED)
+			expect(switched).not.toContain('on')
+			expect(switched.at(-1)).toBe('stop')
+		},
+	)
 })

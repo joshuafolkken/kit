@@ -211,7 +211,7 @@ async function prepare(
 async function migrate(
 	root: string,
 	version: string,
-	is_dry_run = false,
+	is_dry_run: boolean,
 	dependencies: MigrationDependencies = defaults,
 ): Promise<Array<string>> {
 	validate(root, version, dependencies)

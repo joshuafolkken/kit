@@ -22,7 +22,9 @@ const {
 	print_once_mock,
 	refusal_mock,
 	actual_refusal,
+	post_merge_mock,
 } = vi.hoisted(() => ({
+	post_merge_mock: vi.fn(async (): Promise<boolean> => false),
 	actual_refusal: vi.fn<typeof run_park_answered.refusal_of>(),
 	refusal_mock: vi.fn<(issue: string, question: string, directory: string) => Promise<ParkCheck>>(),
 	print_once_mock: vi.fn<(key: string, root?: string) => number>(),
@@ -48,6 +50,7 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 vi.mock('./run-park', () => ({ run_park: { record: record_mock, clear: clear_record_mock } }))
 vi.mock('./run-park-release', () => ({ run_park_release: { release: release_mock } }))
 vi.mock('./run-park-lane', () => ({ run_park_lane: { with_lane_note: lane_note_mock } }))
+vi.mock('./run-park-post-merge', () => ({ run_park_post_merge: { is_refused: post_merge_mock } }))
 vi.mock('./run-park-answered', async (import_original) => {
 	const original = await import_original<{ run_park_answered: typeof run_park_answered }>()
 
@@ -216,6 +219,14 @@ describe('run:park answered question', () => {
 		expect(apply_mock).not.toHaveBeenCalled()
 		expect(record_mock).not.toHaveBeenCalled()
 		expect(release_mock).not.toHaveBeenCalled()
+	})
+
+	it('writes nothing and fails when a visual-check park meets a post-merge check', async () => {
+		post_merge_mock.mockResolvedValueOnce(true)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(post_merge_mock).toHaveBeenCalledWith(ISSUE, MARKED_BODY)
+		expect(apply_mock).not.toHaveBeenCalled()
 	})
 
 	it('does not judge a body off the schema', async () => {

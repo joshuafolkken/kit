@@ -2,6 +2,7 @@ import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { RuleCell } from './run-board-codes'
 import type { BoardDisplay } from './run-board-display'
+import type { DropScreen } from './run-board-drop-screen'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameStore } from './run-board-frame-store'
@@ -9,6 +10,7 @@ import type { GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
 import type { Notice } from './run-board-header-notice'
 import type { WorkerHeap } from './run-board-heap'
+import type { Icons } from './run-board-icons'
 import { run_board_idle } from './run-board-idle'
 import type { IssueCount } from './run-board-issue-count'
 import type { KeyInput } from './run-board-keys'
@@ -65,6 +67,8 @@ interface BoardPorts {
 	types_rows?: boolean | undefined
 	// The theme the frame is drawn in (`run-board-theme.ts`), whose alert display the header adds.
 	theme?: Theme | undefined
+	// How the icons are drawn (`run-board-icons.ts`); unset, the theme's default.
+	icons?: Icons | undefined
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
 	// next one; none where the frame is drawn whole — one frame, a pipe, a chat.
 	size?: (() => TerminalSize) | undefined
@@ -162,6 +166,10 @@ interface BoardView {
 	sweep?: Sweep | undefined
 	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
+	// Whether those cells run the idle rain in place of the lamps (`run-board-idle-rain.ts`).
+	is_rain?: boolean | undefined
+	// The last frame's cells on screen where a drop falls down it between redraws (`run-board-rain-drop.ts`).
+	drop?: DropScreen | undefined
 	// Where the last frame drew its worst-level TRACE field, blinked between redraws (`run-board-trace-spot.ts`).
 	traces?: ReadonlyArray<Spot> | undefined
 	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).

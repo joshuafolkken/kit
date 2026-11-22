@@ -10,7 +10,9 @@ const PREFIX = '<!-- josh:publication '
 const RECORDS = /^<!-- josh:publication (?<record>[^\n]*?) -->/gmu
 const RECORD_LINE = /^<!-- josh:publication /mu
 const FENCE_LINE = /^ {0,3}(?<marker>`{3,}|~{3,})/u
-const schema = z.object({ labels: z.array(z.string()) })
+// `origin` is the run Issue a lane child filed the issue from, so its ship publishes or refuses the
+// children it left prepared (joshuafolkken/kit#8542); a record written outside a lane has none.
+const schema = z.object({ labels: z.array(z.string()), origin: z.number().optional() })
 
 interface Fence {
 	marker: string
@@ -68,10 +70,10 @@ function last_record(body: string): RegExpExecArray | undefined {
 	return [...unfenced(body).matchAll(RECORDS)].at(-1)
 }
 
-function prepare(body: string, labels: ReadonlyArray<string>): string {
+function prepare(body: string, labels: ReadonlyArray<string>, origin?: number): string {
 	if (is_pending(body)) throw new Error('Issue already contains a publication record')
 
-	return `${body}\n\n${PREFIX}${JSON.stringify({ labels })} -->\n`
+	return `${body}\n\n${PREFIX}${JSON.stringify({ labels, origin })} -->\n`
 }
 
 // A body rewrite keeps a pending child's record unless the new body brings its own: without it,
@@ -90,10 +92,19 @@ function public_body(body: string): string {
 	return `${body.slice(0, at)}${body.slice(at + record.length)}`.trimEnd()
 }
 
-function intended_labels(body = ''): ReadonlyArray<string> {
+function record_of(body: string): z.infer<typeof schema> {
 	const record = last_record(body)?.groups?.['record']
 
-	return schema.parse(JSON.parse(record ?? 'null')).labels
+	return schema.parse(JSON.parse(record ?? 'null'))
+}
+
+function intended_labels(body = ''): ReadonlyArray<string> {
+	return record_of(body).labels
+}
+
+// The run Issue a pending issue was filed from, or `undefined` when it is published or has none.
+function origin_of(body = ''): number | undefined {
+	return is_pending(body) ? record_of(body).origin : undefined
 }
 
 function labels_of(
@@ -116,11 +127,12 @@ function creation(
 	body: string,
 	labels: ReadonlyArray<string>,
 	is_prepared: boolean,
+	origin?: number,
 ): { body: string; labels: ReadonlyArray<string> } {
 	if (!is_prepared) return { body, labels }
 
 	return {
-		body: prepare(body, labels),
+		body: prepare(body, labels, origin),
 		labels: labels.filter((label) => !has_label_name([label], AUTO_OK_LABEL)),
 	}
 }
@@ -166,6 +178,7 @@ const issue_publication_state = {
 	carried,
 	public_body,
 	labels_of,
+	origin_of,
 	creation,
 }
 

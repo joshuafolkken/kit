@@ -59,7 +59,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--icons emoji|letters|shapes] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -78,6 +78,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{ arguments: BOARD_THEME, note: 'cyan phosphor text and dashed rules' },
 				{ arguments: MATRIX_THEME, note: 'green phosphor text and the TRACE gauge' },
+				{ arguments: '--icons letters', note: 'every icon as two-letter capitals' },
 				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
 			],
 			flags: [
@@ -109,7 +110,12 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'draws the board as a text terminal does: every icon as ASCII text of its width (`🚨` → `P1`, `🔨` → `BD`; one table, `run-board-theme-glyphs.ts`), a state read faster as a shape drawn as one (`🔄` → `>>`, `🧊` → `||`, `🔗` → `<-`, `⏸` → `║`), the text in capitals (escapes and link URLs as written), and the spinner as `│ ╱ ─ ╲`; the columns line up as without it.',
+						'draws the board as a text terminal does: the text in capitals (escapes and link URLs as written) and the spinner as `│ ╱ ─ ╲`; each icon as `--icons` draws it, `shapes` unless set; the columns line up as without it.',
+				},
+				{
+					names: ['--icons <emoji|letters|shapes>'],
+					description:
+						'`emoji` as drawn; `letters` as ASCII of their width (`🚨` → `P1`; `run-board-theme-glyphs.ts`); `shapes` a state as a shape where it has one (`🔄` → `>>`, `🔗` → `<-`, `⏸` → `║`). Unset: `emoji` with no theme, else `shapes`. No theme: tone color only. `JOSH_BOARD_ICONS` sets it, `--icons` wins; unknown names refused; not for `--chat` / `--every`.',
 				},
 				{
 					names: [BOARD_THEME],
@@ -124,7 +130,12 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BOARD_THEME],
 					description:
-						'ends the header’s first line on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.',
+						'ends the `📈 throughput` rule on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.',
+				},
+				{
+					names: [BOARD_THEME],
+					description:
+						'no alert while throughput is unread or cut for height: only that rule carries it.',
 				},
 				{
 					names: [BOARD_THEME],

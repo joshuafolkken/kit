@@ -14,6 +14,22 @@ const REMAINING_LANES = DEFAULT_LIMIT - OCCUPIED_LANES
 const LANE_SEATS = 9
 const LIMIT_ABOVE_SEATS = 12
 
+it.each([
+	{ occupied: OCCUPIED_LANES, seated: OCCUPIED_LANES, free: REMAINING_LANES, bound: 'none' },
+	{ occupied: DEFAULT_LIMIT, seated: DEFAULT_LIMIT, free: NO_LANES, bound: 'limit' },
+	{ occupied: 1, seated: LANE_SEATS, free: NO_LANES, bound: 'seats' },
+	{ occupied: DEFAULT_LIMIT, seated: LANE_SEATS, free: NO_LANES, bound: 'limit' },
+])(
+	'answers the exhausted bound with $occupied occupied and $seated seated (ac-41575328)',
+	({ occupied, seated, free, bound }) => {
+		const answer = lane_capacity.lane_answer(DEFAULT_LIMIT, occupied, seated)
+
+		expect(answer).toEqual({ free, bound, seated })
+		expect(lane_capacity.free_lanes(DEFAULT_LIMIT, occupied, seated)).toBe(free)
+		expect(lane_capacity.seat_text(answer)).toBe(bound === 'seats' ? 'seats 9/9' : undefined)
+	},
+)
+
 function environment(value: string | undefined): Record<string, string | undefined> {
 	return { [LANE_LIMIT_KEY]: value }
 }

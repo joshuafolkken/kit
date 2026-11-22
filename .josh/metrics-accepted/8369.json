@@ -1,0 +1,7 @@
+{
+	"reason": "the matrix downpour adds a pour module (typing spans, merged steps, poured drops) for #8369",
+	"date": "2026-11-21",
+	"growth": {
+		"scripts.code_lines": 100
+	}
+}

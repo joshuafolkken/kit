@@ -63,6 +63,7 @@ describe('lane_plan_moves.sources_of', () => {
 	it.each([
 		['no unlisted namesake', BASE, new Set(BASE)],
 		['a directory claim', [SOURCE, 'scripts/test/'], new Set(BASE)],
+		['a glob claim', [SOURCE, 'scripts/test/test-symbol-users*.ts'], new Set(BASE)],
 		['no base listing', MOVE_PLAN, undefined],
 		[
 			'an edited SKILL.md beside an added one',

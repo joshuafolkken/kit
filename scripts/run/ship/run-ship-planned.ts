@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_issue } from '#scripts/git/git-issue'
@@ -13,15 +14,13 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 
 // The precondition's name in the preflight's answer and in a `stop` record's `preconditions`.
 const PRECONDITION = 'unplanned'
-const SEPARATOR = '/'
 const NON_CODE_PREFIXES = ['docs/', '.josh/']
 const CODE_EXTENSIONS = new Set(['.cjs', '.js', '.mjs', '.sh', '.svelte', '.ts'])
 
-// A claim ending in `/` is a directory and holds every path under it — `backlog_overlap`'s reading.
+// A claim holds the file it names, every path under a directory and every path its glob matches —
+// `backlog_overlap`'s reading (joshuafolkken/kit#8529).
 function is_planned(claims: ReadonlyArray<string>, file: string): boolean {
-	return claims.some((claim) =>
-		claim.endsWith(SEPARATOR) ? file.startsWith(claim) : claim === file,
-	)
+	return claims.some((claim) => backlog_overlap.claims_meet(claim, file))
 }
 
 function is_code(file: string): boolean {

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_icons } from './run-board-icons'
 import { run_board_labels } from './run-board-labels'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
@@ -64,6 +65,15 @@ const SHAPES: ReadonlyArray<readonly [string, string]> = [
 	['🚀', '^^'],
 	['🔑', 'O-'],
 ]
+// The letters main drew for icons #8505 gave a shape or a new row.
+const LETTERS: ReadonlyArray<readonly [string, string]> = [
+	['🔄', 'RN'],
+	['🔗', 'LK'],
+	['⏸', '='],
+	['🎯', 'ET'],
+	['🕒', 'NW'],
+	['🚀', 'T0'],
+]
 const DISCLOSURE = '▾'
 const KANA = 'ｦｱｳｴｵｶｷｹｺｻ'
 const TEXTUAL = 'run_board_theme_glyphs.textual'
@@ -83,10 +93,17 @@ function table_rows(): Array<[string, Tone]> {
 	)
 }
 
-function tones_of(text: string): Array<Tone> {
-	const entries = [...EMOJI, ...SYMBOLS].filter(([glyph]) => glyph !== DISCLOSURE)
+// Every text a row draws — its letters, and its shape where it has one — by the glyph it draws.
+function texts_of(): Array<readonly [string, string, Tone]> {
+	return [...EMOJI, ...SYMBOLS].flatMap(([glyph, [letters, tone, shape]]) =>
+		[letters, shape].flatMap((text) => (text === undefined ? [] : [[glyph, text, tone] as const])),
+	)
+}
 
-	return entries.filter(([, [drawn]]) => drawn === text).map(([, [, tone]]) => tone)
+function tones_of(text: string): Array<Tone> {
+	const entries = texts_of().filter(([glyph]) => glyph !== DISCLOSURE)
+
+	return entries.filter(([, drawn]) => drawn === text).map((entry) => entry[2])
 }
 
 afterEach(() => {
@@ -100,9 +117,9 @@ describe('run_board_theme_glyphs table', () => {
 		expect(missing).toStrictEqual([])
 	})
 
-	it.each([...EMOJI, ...SYMBOLS])(
-		'draws %s as ASCII or a rule of its width in a tone, unchanged by capitals',
-		(glyph, [text, tone]) => {
+	it.each(texts_of())(
+		'draws %s as %s, ASCII or a rule of its width in a tone, unchanged by capitals',
+		(glyph, text, tone) => {
 			expect(text).toMatch(TEXT_GLYPH)
 			expect(text.toUpperCase()).toBe(text)
 			expect(run_board_fit.width_of(text)).toBe(run_board_fit.width_of(glyph))
@@ -111,7 +128,17 @@ describe('run_board_theme_glyphs table', () => {
 	)
 
 	it.each(SHAPES)('draws %s as the shape %s (#8505)', (glyph, shape) => {
-		expect(EMOJI.get(glyph)?.[0]).toBe(shape)
+		expect(EMOJI.get(glyph)?.[2]).toBe(shape)
+	})
+
+	it.each(LETTERS)('keeps the letters %s for %s (#8505)', (glyph, letters) => {
+		expect(EMOJI.get(glyph)?.[0]).toBe(letters)
+	})
+
+	it.each(['🎯', '🕒', '🚀'])('never draws %s as `?` in any icons (#8505)', (glyph) => {
+		for (const icons of run_board_icons.ICONS) {
+			expect(textual(glyph, { theme: 'wargames', icons }).trim()).not.toBe('?')
+		}
 	})
 
 	it.each(table_rows())('gives %s the %s tone', (text, tone) => {
@@ -137,6 +164,16 @@ describe(TEXTUAL, () => {
 		expect(textual('🔄|🔗|⏸|')).toBe('>>|<-|║|')
 	})
 
+	it('draws the same icons as their letters where the icons are `letters` (#8505)', () => {
+		expect(textual('🔄|🔗|⏸|', { theme: 'wargames', icons: 'letters' })).toBe('RN|LK|=|')
+	})
+
+	it('keeps every icon and the spinner with no theme and `emoji` (#8505)', () => {
+		const frame = `🔄|${run_board_labels.SPINNER_FRAMES.join('')}`
+
+		expect(textual(frame, { theme: undefined, icons: 'emoji' })).toBe(frame)
+	})
+
 	it('draws an emoji the table misses as `?` of its width', () => {
 		expect(textual('🦄|')).toBe('? |')
 	})
@@ -156,7 +193,9 @@ describe('run_board_theme_glyphs themed spinners', () => {
 	})
 
 	it('maps all matrix spinner frames to one-column kana in order (ac-6bea4c04)', () => {
-		const turns = run_board_labels.SPINNER_FRAMES.map((frame) => textual(frame, 'matrix'))
+		const turns = run_board_labels.SPINNER_FRAMES.map((frame) =>
+			textual(frame, { theme: 'matrix', icons: 'shapes' }),
+		)
 
 		expect(turns.join('')).toBe(KANA)
 		expect(turns.map((glyph) => run_board_fit.width_of(glyph))).toStrictEqual(turns.map(() => 1))

@@ -125,8 +125,13 @@ function summary_of(rows: ReadonlyArray<ThroughputRow>): string {
 	return rows.map((row) => `${row.label} ${rate_of(row.per_hour)}/h`).join(' · ')
 }
 
-// Where the frame `has_lamps`, each row ends on where its lamp panel starts (`run-board-lamps.ts`).
-function rows_part(rows: ReadonlyArray<ThroughputRow>, has_lamps = false): DetailPart {
+// Where the frame `has_lamps`, each row ends on where its lamp panel starts (`run-board-lamps.ts`);
+// `tail` is drawn at the right end of the rule — a themed screen's alert level (joshuafolkken/kit#8513).
+function rows_part(
+	rows: ReadonlyArray<ThroughputRow>,
+	has_lamps = false,
+	tail?: string,
+): DetailPart {
 	const widths = widths_of(rows)
 	const lines = rows.map((row, index) => ({
 		text: line_of(row, widths, has_lamps ? run_board_lamps.start_of(index) : undefined),
@@ -134,15 +139,16 @@ function rows_part(rows: ReadonlyArray<ThroughputRow>, has_lamps = false): Detai
 	}))
 	const rule = run_board_render_section.tight_columns_rule(LABEL, rule_columns(widths))
 
-	return { head: ['', rule], lines, label: LABEL, summary: summary_of(rows) }
+	return { head: ['', rule], lines, label: LABEL, summary: summary_of(rows), tail }
 }
 
 // None where no rows were read — a frame drawn with no throughput.
 function throughput_part(
 	rows: ReadonlyArray<ThroughputRow> | undefined,
 	has_lamps = false,
+	tail?: string,
 ): DetailPart | undefined {
-	return rows === undefined ? undefined : rows_part(rows, has_lamps)
+	return rows === undefined ? undefined : rows_part(rows, has_lamps, tail)
 }
 
 const run_board_render_throughput = { rows_part, throughput_part }

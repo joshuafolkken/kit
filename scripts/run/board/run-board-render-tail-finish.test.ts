@@ -6,7 +6,8 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_tail } from './run-board-render-tail'
 import type { ItemState } from './run-board-status'
 
-// joshuafolkken/kit#7920: a running row's tail leads with its finish (#7994), `🎯 ~HH:MM`, read from the
+// joshuafolkken/kit#7920: a running row's tail leads with its finish (#7994), `🎯 HH:MM` (no `~` since
+// joshuafolkken/kit#8478), read from the
 // lane totals the header's 🎯 reads, with `+N′` / `−N′` where it moved past a minute from its launch's;
 // `🎯 —` where no lane total is measured, and after the reason of a parked row; a row waiting on a person
 // ends on its reason alone (#8166).
@@ -50,18 +51,18 @@ function held(state: ItemState, tail?: string): BoardRow {
 describe('run_board_render_tail.tail_of finish', () => {
 	it('ends a running row on its finish time, with no drift on the usual pace', () => {
 		// 15′, 25′ and 35′ beyond 5′: the median 25′ is what its launch foretold.
-		expect(finish_of(launched(5))).toBe(`🎯 ~${run_board_labels.minute_of(NOW + 25 * MINUTE)}`)
+		expect(finish_of(launched(5))).toBe(`🎯 ${run_board_labels.minute_of(NOW + 25 * MINUTE)}`)
 	})
 
 	it('draws how much later than its launch foretold a long lane finishes', () => {
 		// 5′ and 15′ beyond 25′ end it in 10′, 5′ past the 30′ median from its launch.
-		expect(finish_of(launched(25))).toBe(`🎯 ~${run_board_labels.minute_of(NOW + 10 * MINUTE)} +5′`)
+		expect(finish_of(launched(25))).toBe(`🎯 ${run_board_labels.minute_of(NOW + 10 * MINUTE)} +5′`)
 	})
 
 	it('draws the day too for a finish on another day', () => {
 		const finish = run_board_labels.day_minute_of(NOW + 30 * HOUR)
 
-		expect(finish_of(launched(0), [30 * HOUR])).toBe(`🎯 ~${finish}`)
+		expect(finish_of(launched(0), [30 * HOUR])).toBe(`🎯 ${finish}`)
 	})
 
 	it('draws 🎯 — where no lane total is measured', () => {

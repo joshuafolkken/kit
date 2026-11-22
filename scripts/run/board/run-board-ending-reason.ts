@@ -165,8 +165,16 @@ function blocked_tail(waits: ReadonlyArray<string>): string {
 	return upstream_count === waits.length ? WAITING_TAILS.upstream : WAITING_TAILS.both
 }
 
-function waiting_reason(waits: ReadonlyArray<string> = []): RowReason {
-	return { tail: waits.length === 0 ? WAITING_TAILS.free : blocked_tail(waits) }
+// With no blocker, what the plan row would say holds it (a running lane's path, the solo gate, …)
+// before the free lane a retry starts in (joshuafolkken/kit#8497).
+function waiting_reason(
+	number: number,
+	read: RowRead,
+	waits: ReadonlyArray<string> = [],
+): RowReason {
+	if (waits.length > 0) return { tail: blocked_tail(waits) }
+
+	return read.held_of?.(number) ?? { tail: WAITING_TAILS.free }
 }
 
 // A row no reason was recorded for: a ⏳ wait's next move, a stall's resume, else what stopped it.
@@ -176,7 +184,7 @@ function unrecorded_reason(
 	read: RowRead,
 	waits: ReadonlyArray<string> | undefined,
 ): Pick<BoardRow, 'reason'> {
-	if (status.state === 'waiting') return { reason: waiting_reason(waits) }
+	if (status.state === 'waiting') return { reason: waiting_reason(number, read, waits) }
 
 	return is_stalled(status, read.labels.get(number))
 		? { reason: stalled_reason(number, read, waits) }

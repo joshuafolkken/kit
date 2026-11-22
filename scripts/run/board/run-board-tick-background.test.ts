@@ -79,7 +79,9 @@ describe('run_board_tick.tick in the background', () => {
 		await tick(FRESH_STATE, { ...ports, read_plan: never }, 'background')
 
 		expect(frames).toHaveLength(1)
-		expect(title_of(frames[0])).toContain(`${LOADING} ${spinner_of(START)}`)
+		// joshuafolkken/kit#8512: at the queued rule's right end, not on the first line.
+		expect(frames[0]).toContain(`─ ${LOADING} ${spinner_of(START)}\n`)
+		expect(title_of(frames[0])).not.toContain(LOADING)
 		expect(frames[0]).not.toMatch(PROGRESS)
 	})
 
@@ -92,8 +94,9 @@ describe('run_board_tick.tick in the background', () => {
 		clock.now_ms += MACHINE_SAMPLE_MS
 		await tick(first, live, 'background')
 
-		expect(frames[0]).toContain('⏰ 0″')
-		expect(frames[1]).toContain('⏰ 1″')
+		// joshuafolkken/kit#8478: the run's age after `+`, padded to its column.
+		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/\+ +0″/u)
+		expect(stripVTControlCharacters(frames[1] ?? '')).toMatch(/\+ +1″/u)
 		expect(read_plan).toHaveBeenCalledOnce()
 	})
 })
@@ -103,8 +106,9 @@ describe('run_board_tick.tick in the background, once the read lands', () => {
 		const [loading, landed] = await across_landing(answering)
 
 		expect(loading).not.toMatch(PROGRESS)
+		expect(loading).toMatch(SPINNING)
 		expect(landed).toMatch(PROGRESS)
-		expect(title_of(landed)).not.toMatch(SPINNING)
+		expect(landed).not.toMatch(SPINNING)
 	})
 
 	it('warns as for a failed read when the read rejects', async () => {
@@ -113,7 +117,7 @@ describe('run_board_tick.tick in the background, once the read lands', () => {
 		// joshuafolkken/kit#8475: the failed plan read is said in the notice slot on the second line.
 		expect(stripVTControlCharacters(landed ?? '').split('\n', 2)[1]).toContain('❗ stale')
 		expect(title_of(landed)).not.toContain('❗')
-		expect(title_of(landed)).not.toMatch(SPINNING)
+		expect(landed).not.toMatch(SPINNING)
 	})
 })
 
@@ -138,6 +142,6 @@ describe('run_board_tick.tick settled', () => {
 		await tick(FRESH_STATE, ports)
 
 		expect(frames[0]).toMatch(PROGRESS)
-		expect(title_of(frames[0])).not.toMatch(SPINNING)
+		expect(frames[0]).not.toMatch(SPINNING)
 	})
 })

@@ -12,12 +12,15 @@ const FOLLOWUP = 'followup'
 const UNRESOLVED_MESSAGE = 'The section that governs `josh followup` could not be printed.'
 const { SHIPPED_ENVIRONMENT, is_ship_run } = followup_ship_environment
 
+interface SectionScope {
+	root?: string | undefined
+	source?: NodeJS.ProcessEnv | undefined
+}
+
 // An unresolved heading fails the command, exactly as `run:review` and `ship` refuse it, so a renamed
 // section is never acted on unread.
-function print_section(
-	root: string = process.cwd(),
-	source: NodeJS.ProcessEnv = process.env,
-): void {
+// `root` stays undefined here so `print_once` owns its default.
+function print_section({ root, source = process.env }: SectionScope = {}): void {
 	if (is_ship_run(source)) return
 
 	if (run_step_section.print_once(FOLLOWUP, root) !== SUCCESS_EXIT_CODE) {

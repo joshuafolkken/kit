@@ -13,13 +13,15 @@ import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_record } from './run-board-gather-record'
 import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_heap } from './run-board-heap'
+import { run_board_icons, type Icons } from './run-board-icons'
 import { run_board_live } from './run-board-live'
 import { run_board_saved_state } from './run-board-saved-state'
 import { run_board_screen } from './run-board-screen'
 import { run_board_sound_player } from './run-board-sound-player'
-import { run_board_sound_typing } from './run-board-sound-typing'
+import { run_board_sound_typing, type TypingSound } from './run-board-sound-typing'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
 
@@ -28,6 +30,22 @@ import { run_board_timing } from './run-board-timing'
 // and how often each read is taken, is `run-board-tick.ts`'s; this file wires the live reads and the
 // terminal around it. A run that ended stays on screen until the next one starts; with no run in this
 // checkout it reads nothing from GitHub and waits.
+
+// What a board a person sees is drawn with: its theme and its icons (`run-board-icons.ts`).
+interface BoardLook {
+	theme: Theme | undefined
+	icons: Icons
+}
+
+interface LookChoice {
+	look: BoardLook
+	argv: Array<string>
+}
+
+// The line said before the usage where the theme or the icons name none.
+interface Refused {
+	refusal: string
+}
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -39,7 +57,7 @@ const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const { SIGINT_EXIT_CODE, SIGTERM_EXIT_CODE } = run_board_exit_record
 const USAGE =
-	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--timing]'
+	'Usage: josh run:board [--once | --chat [--fresh] | --every <minutes>] [--theme wargames|matrix] [--icons emoji|letters|shapes] [--timing]'
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const { FRESH_STATE, tick } = run_board_tick
 const { CHAT_KEY, fresh } = run_board_frame_store
@@ -94,13 +112,16 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 
 // A live board's worker gathers, its heap readable for `--timing` (`run-board-heap.ts`); a single
 // frame gathers where it draws.
-function gather_ports(is_live: boolean, theme?: Theme): Pick<BoardPorts, 'gather' | 'worker_heap'> {
+function gather_ports(
+	is_live: boolean,
+	look?: BoardLook,
+): Pick<BoardPorts, 'gather' | 'worker_heap'> {
 	if (!is_live) {
 		return { gather: run_board_gather.frame_gatherer(run_board_gather_live.ports_of(false)) }
 	}
 
 	const { spawn, heap } = run_board_heap.tracked(
-		run_board_gather_thread.spawner(run_board_gather_record.setup_of(theme)),
+		run_board_gather_thread.spawner(run_board_gather_record.setup_of(look?.theme, look?.icons)),
 	)
 	const gather = run_board_gather_thread.worker_gatherer(
 		spawn,
@@ -111,17 +132,28 @@ function gather_ports(is_live: boolean, theme?: Theme): Pick<BoardPorts, 'gather
 	return { gather, worker_heap: heap }
 }
 
+// The trill in the theme row's voice at its letter pace (joshuafolkken/kit#8365); a board in no theme
+// keeps the default, which no draw sounds (`run-board-live.ts` → `trill_of`).
+function typing_sound_of(theme: Theme | undefined): TypingSound {
+	if (theme === undefined) return run_board_sound_typing.typing_sound()
+	const { typing, intro } = run_board_theme_defs.THEME_DEFS[theme]
+
+	return run_board_sound_typing.typing_sound(
+		run_board_sound_typing.voiced(() => typing(intro.letter_ms)),
+	)
+}
+
 // A live board reads and records its frames on its worker thread, so neither stops its spinner, and
 // sounds its cues and the trill (joshuafolkken/kit#8250); a single frame has no spinner to stop, reads
 // where it draws, and stays silent.
-function live_ports(is_live: boolean, theme?: Theme): BoardPorts {
+function live_ports(is_live: boolean, look?: BoardLook): BoardPorts {
 	const cue = is_live ? run_board_sound_player.play_cue : undefined
-	const typing_sound = is_live ? run_board_sound_typing.typing_sound() : undefined
+	const typing_sound = is_live ? typing_sound_of(look?.theme) : undefined
 
 	// Kept off `LIVE_PORTS`, so the profile that spreads them always reads from scratch.
 	return {
 		...LIVE_PORTS,
-		...gather_ports(is_live, theme),
+		...gather_ports(is_live, look),
 		cue,
 		typing_sound,
 		frames: run_board_frame_store.file_store(),
@@ -152,7 +184,7 @@ async function answer(ports: BoardPorts): Promise<void> {
 // One plain frame stays on the terminal after the command, so it draws the still icons rather than a
 // spinner frame frozen mid-turn; a frame recorded within the minute is the answer, read nothing.
 async function still(ports: BoardPorts, theme: Theme | undefined): Promise<void> {
-	const key = run_board_frame_store.once_key(theme, ports.is_tty)
+	const key = run_board_frame_store.once_key(theme, ports.is_tty, ports.icons)
 	const now_ms = ports.now()
 	const recorded = fresh(ports.frames, key, now_ms)
 
@@ -193,8 +225,13 @@ async function push_every(minutes: string | undefined, ports: BoardPorts): Promi
 }
 
 // The ports a test hands in, else the live ones.
-function ports_for(ports: BoardPorts | undefined, is_live: boolean, theme?: Theme): BoardPorts {
-	return ports ?? live_ports(is_live, theme)
+function ports_for(ports: BoardPorts | undefined, is_live: boolean, look?: BoardLook): BoardPorts {
+	return ports ?? live_ports(is_live, look)
+}
+
+// The ports a board a person sees is drawn through, carrying its icons.
+function drawn_ports(ports: BoardPorts | undefined, is_live: boolean, look: BoardLook): BoardPorts {
+	return { ...ports_for(ports, is_live, look), icons: look.icons }
 }
 
 // A live board on the process's own ports records why it ends (`run-board-exit-record.ts`); one on a
@@ -202,27 +239,27 @@ function ports_for(ports: BoardPorts | undefined, is_live: boolean, theme?: Them
 // returns by throwing.
 async function watch(
 	ports: BoardPorts | undefined,
-	theme: Theme | undefined,
+	look: BoardLook,
 	is_timing: boolean,
 ): Promise<void> {
 	const exits = ports === undefined ? run_board_exit_record.start() : undefined
-	const live = ports_for(ports, true, theme)
+	const live = drawn_ports(ports, true, look)
 	const leaving = exits?.on_exit ?? live.on_exit
 	const board = run_board_timing.timed({ ...live, on_exit: leaving }, is_timing)
 
 	await run_board_exit_record.guarded(exits, async () => {
-		await run_board_live.watch(board, theme, exits?.failed)
+		await run_board_live.watch(board, look.theme, exits?.failed)
 	})
 }
 
 async function draw_still(
 	ports: BoardPorts | undefined,
-	theme: Theme | undefined,
+	look: BoardLook,
 	is_timing: boolean,
 ): Promise<void> {
-	const board = run_board_timing.timed(ports_for(ports, false, theme), is_timing)
+	const board = run_board_timing.timed(drawn_ports(ports, false, look), is_timing)
 
-	await still(board, theme)
+	await still(board, look.theme)
 	run_board_timing.say(board, is_timing)
 }
 
@@ -232,7 +269,7 @@ async function draw_still(
 async function draw(
 	flag: string,
 	ports: BoardPorts | undefined,
-	theme: Theme | undefined,
+	look: BoardLook,
 	is_timing: boolean,
 ): Promise<void> {
 	if (flag === CHAT_FLAG) {
@@ -244,8 +281,8 @@ async function draw(
 	const { is_tty } = ports ?? LIVE_PORTS
 	const mode = run_board_screen.mode_of({ is_tty, is_once: flag === ONCE_FLAG })
 
-	if (mode === 'live') await watch(ports, theme, is_timing)
-	else await draw_still(ports, theme, is_timing)
+	if (mode === 'live') await watch(ports, look, is_timing)
+	else await draw_still(ports, look, is_timing)
 }
 
 function is_every(flag: string, rest: ReadonlyArray<string>): boolean {
@@ -273,23 +310,39 @@ function is_refused(flag: string, rest: ReadonlyArray<string>): boolean {
 	return (rest.length > 0 && !is_fresh_chat(flag, rest)) || !FLAGS.has(flag)
 }
 
-// `--chat` and `--every` never take the theme, so a `JOSH_BOARD_THEME` naming none never refuses them.
+// `--chat` and `--every` never take the theme or the icons, so a `JOSH_BOARD_THEME` or a
+// `JOSH_BOARD_ICONS` naming none never refuses them.
 function theme_environment(argv: ReadonlyArray<string>): NodeJS.ProcessEnv {
 	return argv.some((argument) => PASSED_ON_FLAGS.has(argument)) ? {} : process.env
 }
 
+// The theme and the icons the arguments, else the environment, name, with the arguments left; the
+// refusal line where either names none.
+function look_of(
+	argv: ReadonlyArray<string>,
+	environment: NodeJS.ProcessEnv,
+): LookChoice | Refused {
+	const themed = run_board_theme.choose(argv, environment)
+
+	if (themed === undefined) return { refusal: run_board_theme.refusal(argv, environment) }
+	const drawn = run_board_icons.choose(themed.argv, environment, themed.theme)
+
+	if (drawn === undefined) return { refusal: run_board_icons.refusal(themed.argv, environment) }
+
+	return { look: { theme: themed.theme, icons: drawn.icons }, argv: drawn.argv }
+}
+
 async function run(given: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {
 	const { argv, is_timing } = run_board_timing.split(given)
-	const environment = theme_environment(argv)
-	const choice = run_board_theme.choose(argv, environment)
+	const choice = look_of(argv, theme_environment(argv))
 
-	if (choice === undefined) return refuse(run_board_theme.refusal(argv, environment))
+	if ('refusal' in choice) return refuse(choice.refusal)
 	const [flag = '', ...rest] = choice.argv
 
 	if (is_every(flag, rest)) return await push_every(rest[0], ports_for(ports, false))
 	if (is_refused(flag, rest)) return refuse()
 
-	await draw(flag, chat_ports(flag, rest, ports), choice.theme, is_timing)
+	await draw(flag, chat_ports(flag, rest, ports), choice.look, is_timing)
 
 	return SUCCESS_EXIT_CODE
 }

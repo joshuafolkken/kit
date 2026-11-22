@@ -8,7 +8,7 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 
 // Synthesized PCM is saved once under a digest of its definition and implementation.
 
-const { SAMPLE_RATE, HEADER_BYTES, cached_wav, wav_of } = run_board_sound_wav
+const { SAMPLE_RATE, HEADER_BYTES, cached_samples, cached_wav, wav_of } = run_board_sound_wav
 
 const SAMPLES: Int16Array = Int16Array.from([0, 1000, -1000, 32_767])
 const DATA_BYTES = 8
@@ -107,6 +107,60 @@ describe('run_board_sound_wav.cached_wav', () => {
 
 		expect(changed).toBeDefined()
 		expect(changed).not.toBe(original)
+	})
+})
+
+// joshuafolkken/kit#8365: rendered samples at their own rate, named after the WAV's bytes.
+describe('run_board_sound_wav.cached_samples', () => {
+	const RATE = 48_000
+	let directory = ''
+
+	beforeEach(() => {
+		directory = create_directory(DIRECTORY_PREFIX)
+	})
+
+	it('writes the samples at their rate', () => {
+		const bytes = readFileSync(cached_samples('click', SAMPLES, RATE, directory) ?? '')
+
+		expect(bytes.readUInt32LE(OFFSETS.sample_rate)).toBe(RATE)
+		expect(bytes).toStrictEqual(wav_of(SAMPLES, RATE))
+	})
+
+	it('names the same samples alike and reuses the file (ac-089f34f5)', () => {
+		const write = vi.spyOn(atomic_write, 'replace_file')
+		const first = cached_samples('click', SAMPLES, RATE, directory)
+
+		expect(cached_samples('click', Int16Array.from(SAMPLES), RATE, directory)).toBe(first)
+		expect(write).toHaveBeenCalledOnce()
+	})
+
+	it('names other samples or another rate differently', () => {
+		const first = cached_samples('click', SAMPLES, RATE, directory)
+
+		expect(cached_samples('click', SAMPLES.subarray(1), RATE, directory)).not.toBe(first)
+		expect(cached_samples('click', SAMPLES, SAMPLE_RATE, directory)).not.toBe(first)
+	})
+
+	it('returns undefined instead of throwing when the write fails', () => {
+		vi.spyOn(atomic_write, 'replace_file').mockImplementation(() => {
+			throw new Error('disk full')
+		})
+
+		expect(cached_samples('click', SAMPLES, RATE, directory)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8365: a raw-PCM player plays each WAV at the rate its header records.
+describe('run_board_sound_wav.rate_of', () => {
+	it('reads each file’s rate back from its header', () => {
+		const RATE = 48_000
+		const directory = create_directory(DIRECTORY_PREFIX)
+		const click = cached_samples('click', SAMPLES, RATE, directory) ?? ''
+		const cue = cached_wav('cue', NOTES, directory) ?? ''
+
+		expect(run_board_sound_wav.rate_of(click)).toBe(RATE)
+		expect(run_board_sound_wav.rate_of(cue)).toBe(SAMPLE_RATE)
+		expect(() => run_board_sound_wav.rate_of(path.join(directory, 'missing.wav'))).toThrow()
 	})
 })
 

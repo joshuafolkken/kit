@@ -1,10 +1,12 @@
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_codes, type RuleCell } from './run-board-codes'
+import type { DropScreen } from './run-board-drop-screen'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamp_spots, type Lamp, type LampMoment } from './run-board-lamp-spots'
+import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spot, type Spot } from './run-board-spot'
@@ -54,9 +56,12 @@ interface Turning {
 	typing: Typing
 	sweep?: Sweep | undefined
 	lamps?: ReadonlyArray<Lamp> | undefined
+	is_rain?: boolean | undefined
 	traces?: ReadonlyArray<Spot> | undefined
 	rules?: ReadonlyArray<RuleCell> | undefined
 	strips?: ReadonlyArray<StripCell> | undefined
+	// The frame's cells a drop falls down in place of the sweep (`run-board-rain-drop.ts`).
+	drop?: DropScreen | undefined
 }
 
 // What changed since the last turn was written: the spinner's frame, the sweep's cell, and the moment
@@ -184,9 +189,12 @@ function boundary_after(now_ms: number, interval_ms: number): number {
 	return now_ms - (now_ms % interval_ms) + interval_ms
 }
 
-// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236).
+// The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236);
+// the idle rain runs from the first frame (joshuafolkken/kit#8356).
 function blinking(turning: Turning): ReadonlyArray<Lamp> {
-	return turning.typing.seen === undefined ? [] : (turning.lamps ?? [])
+	const is_ready = turning.is_rain === true || turning.typing.seen !== undefined
+
+	return is_ready ? (turning.lamps ?? []) : []
 }
 
 function traces_of(turning: Turning): ReadonlyArray<Spot> {
@@ -194,9 +202,16 @@ function traces_of(turning: Turning): ReadonlyArray<Spot> {
 }
 
 function has_effects(turning: Turning): boolean {
-	return (
-		turning.sweep !== undefined || blinking(turning).length > 0 || traces_of(turning).length > 0
-	)
+	const is_falling = turning.sweep !== undefined || turning.drop !== undefined
+
+	return is_falling || blinking(turning).length > 0 || traces_of(turning).length > 0
+}
+
+// The next step the sweep moves or the drops fall on.
+function sweep_boundary(turning: Turning, now_ms: number): number {
+	const is_moving = turning.sweep !== undefined || turning.drop !== undefined
+
+	return is_moving ? boundary_after(now_ms, SWEEP_MS) : Infinity
 }
 
 function trace_boundary(turning: Turning, now_ms: number): number {
@@ -216,12 +231,12 @@ function coded(turning: Turning): { typing: Typing; cells: ReadonlyArray<RuleCel
 function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	const turn_ms = boundary_after(now_ms, SPINNER_INTERVAL_MS)
 	const letter_ms = turning.typing.lines.length > 0 ? boundary_after(now_ms, LETTER_MS) : Infinity
-	const sweep_ms = turning.sweep === undefined ? Infinity : boundary_after(now_ms, SWEEP_MS)
 	const { typing, cells } = coded(turning)
 	const is_coding = run_board_codes.is_coding(typing, cells, now_ms)
 	const code_ms = is_coding ? boundary_after(now_ms, run_board_codes.CODE_MS) : Infinity
+	const effect_ms = Math.min(sweep_boundary(turning, now_ms), trace_boundary(turning, now_ms))
 
-	return Math.min(turn_ms, letter_ms, sweep_ms, code_ms, trace_boundary(turning, now_ms), until_ms)
+	return Math.min(turn_ms, letter_ms, code_ms, effect_ms, until_ms)
 }
 
 // The spinners turned when their frame changed, the sweep when its cell did, then the rows typing
@@ -236,13 +251,30 @@ function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
 	)
 }
 
+// The drops' cells that changed since the last turn, written past the theme like the lamps: the
+// screen holds each cell as the theme drew it, so a cell put back keeps a rule's own paint
+// (joshuafolkken/kit#8367).
+function write_drop(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
+	const bytes = run_board_rain_drop.drop_bytes(turning.drop, at_ms, turned.since?.ms)
+
+	if (bytes === '') return
+	const write = ports.write_drawn ?? ports.write
+
+	write(run_board_screen.synced(bytes))
+}
+
 // The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
 // header's now line or a section's new row — and blink apart from the step after the last is typed
-// through, so they change only on the spinner's step (joshuafolkken/kit#8237).
+// through, so they change only on the spinner's step (joshuafolkken/kit#8237); where the frame runs the
+// idle rain in their cells, it pours instead (joshuafolkken/kit#8356).
 function lamp_moment(turning: Turning, at_ms: number): LampMoment {
 	const step_ms = at_ms - (at_ms % SPINNER_INTERVAL_MS)
 
-	return { ms: at_ms, is_burst: run_board_type_rows.is_typing(turning.typing, step_ms) }
+	return {
+		ms: at_ms,
+		is_burst: run_board_type_rows.is_typing(turning.typing, step_ms),
+		is_rain: turning.is_rain === true,
+	}
 }
 
 // The turn built and written, timed as a turn where `--timing` times draws, then the lamps that changed;
@@ -251,6 +283,7 @@ function lamp_moment(turning: Turning, at_ms: number): LampMoment {
 function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
 	run_board_timing.drawn(ports, 'turn', () => {
 		ports.write(turn_bytes(turning, at_ms, turned))
+		write_drop(turning, ports, at_ms, turned)
 		run_board_lamp_spots.write_lamps(
 			blinking(turning),
 			ports,
@@ -263,7 +296,10 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 		run_board_strip.write_strips(striped, ports, at_ms, turned.since?.ms)
 		run_board_trace_spot.write_traces(traces_of(turning), ports, at_ms, turned.since?.ms)
 	})
-	ports.typing_sound?.set(run_board_type_rows.is_typing(turning.typing, at_ms))
+	ports.typing_sound?.set(
+		run_board_type_rows.is_typing(turning.typing, at_ms),
+		run_board_type_rows.left_ms(turning.typing, at_ms),
+	)
 }
 
 function moment_of(turning: Turning, at_ms: number): Moment {

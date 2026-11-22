@@ -65,10 +65,13 @@ function is_origin_on_github(repository_path: string = process.cwd()): boolean {
 	return url !== undefined && repo_origin.parse_origin_url(url) !== undefined
 }
 
-function is_linked(
-	repository_path: string = process.cwd(),
-	environment: Environment = process.env,
-): boolean {
+interface LinkScope {
+	repository_path?: string | undefined
+	environment?: Environment | undefined
+}
+
+// `repository_path` stays undefined here so `is_origin_on_github` owns its default.
+function is_linked({ repository_path, environment = process.env }: LinkScope = {}): boolean {
 	return has_gh(environment) && is_signed_in(environment) && is_origin_on_github(repository_path)
 }
 

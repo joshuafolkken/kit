@@ -7,7 +7,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_body } from './epic-body'
 import { epic_cli, epic_cli_untrack, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
-import type { ChainRead } from './epic-cli-chain'
+import { epic_cli_chain, type ChainRead } from './epic-cli-chain'
 import { epic_decide } from './epic-decide'
 import { epic_notify } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
@@ -21,7 +21,8 @@ const FLAGS =
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
-	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M> | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...] [--decision-file <path|->]',
+	'       josh epic --add <E> <N1> <N2> ... --before <M> | --after <M> --order-reason "<chain>: <reason>" [--decision-file <path|->]',
+	'       josh epic --add <E> <N1> <N2> ... [--chain "#A -> #B" ...] [--order-reason "#A -> #B: <reason>" ...] [--decision-file <path|->]',
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
 	'       josh epic --untrack <E> <N1> <N2> ...',
@@ -78,12 +79,13 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	return exit_code
 }
 
-// The decision file's text, then the `--chain` orders with their `--order-reason`s — the one record an
-// insertion writes, so an added order's reason lands in `## Decisions` and on its children.
+// The decision file's text, then the `--chain` / `--before` / `--after` orders with their
+// `--order-reason`s — the one record an insertion writes, so an added order's reason lands in
+// `## Decisions` and on its children.
 function to_add_decision(parsed: AddArguments): string | undefined {
 	const parts = [
 		epic_cli.read_decision(parsed.decision_path),
-		epic_body.format_added_order(parsed.chains, parsed.order_reasons ?? []),
+		epic_body.format_added_order(epic_cli_chain.declared_of(parsed), parsed.order_reasons ?? []),
 	].filter((part) => part !== undefined)
 
 	return parts.length === 0 ? undefined : parts.join('\n\n')

@@ -16,6 +16,36 @@ function linked(text: string): string {
 	return `${ESC}]8;;https://example.com/7${BEL}${text}${LINK_CLOSE}`
 }
 
+// joshuafolkken/kit#8367: each character with the colors holding at it, for the drop to put a cell back.
+describe('run_board_cut_styled.styled_pieces', () => {
+	const { styled_pieces } = run_board_cut_styled
+
+	it('gives each character the color escapes written since the last reset before it', () => {
+		const line = `a${GREEN}b${RESET}c`
+
+		expect(styled_pieces(line)).toEqual([
+			{ text: 'a', width: 1, style: '' },
+			{ text: 'b', width: 1, style: GREEN },
+			{ text: 'c', width: 1, style: '' },
+		])
+	})
+
+	it('stacks escapes until a reset and counts a wide character as two columns', () => {
+		const pieces = styled_pieces(`${GREEN}${DEFAULT}日${ESC}[mx`)
+
+		expect(pieces).toEqual([
+			{ text: '日', width: 2, style: `${GREEN}${DEFAULT}` },
+			{ text: 'x', width: 1, style: '' },
+		])
+	})
+
+	it('leaves the colors holding across a link’s escapes', () => {
+		const pieces = styled_pieces(`${GREEN}${linked('7')}`)
+
+		expect(pieces.map((piece) => piece.style)).toEqual([GREEN])
+	})
+})
+
 describe('run_board_cut_styled.cut_styled', () => {
 	it('cuts a plain line to its first columns and resets the colors after it', () => {
 		expect(cut_styled('abcdef', 3)).toBe(`abc${RESET}`)

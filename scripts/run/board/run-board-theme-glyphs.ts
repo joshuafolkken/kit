@@ -1,4 +1,5 @@
 import { run_board_fit } from './run-board-fit'
+import type { Icons } from './run-board-icons'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
@@ -7,11 +8,13 @@ import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 // drawn as ASCII text of the width the icon took — the columns line up as they do without the theme.
 // The one table of what each icon reads as; the render modules keep their own icons and never see it.
 // joshuafolkken/kit#8150: each text in the color of the tone of the state its icon marks.
-// joshuafolkken/kit#8505: an icon read faster as a shape (`>>` running, `||` paused, `<-` waiting on an
-// Issue) is drawn as one of the same width; a phase or priority keeps its code. A text stays as it is
-// when the theme capitalizes the frame, and `⏸` takes the one-column rule `║`.
+// joshuafolkken/kit#8505: each row holds the icon's letters (capitals, so a board in no theme draws them
+// as one in a theme does) and, for one read faster as a shape (`>>` running, `||` paused, `<-` waiting
+// on an Issue), that shape of the same width; `shapes` draws the shape where a row has one, else its
+// letters. Both share the row's tone, and stay as they are when the theme capitalizes the frame; `⏸`
+// takes the one-column rule `║`.
 
-type Glyph = readonly [text: string, tone: Tone]
+type Glyph = readonly [letters: string, tone: Tone, shape?: string]
 type Glyphs = ReadonlyMap<string, Glyph>
 
 // Each emoji the board's sources draw, by what it marks; a text-presentation symbol one column wide
@@ -25,7 +28,7 @@ const EMOJI: Glyphs = new Map<string, Glyph>([
 	['📌', ['--', 'info']],
 	['🚨', ['P1', 'alert']],
 	['🔺', ['P2', 'caution']],
-	['✨', ['**', 'info']],
+	['✨', ['FT', 'info', '**']],
 	['🐛', ['BG', 'info']],
 	['🔍', ['IV', 'running']],
 	['📝', ['PL', 'running']],
@@ -37,67 +40,68 @@ const EMOJI: Glyphs = new Map<string, Glyph>([
 	['🚢', ['SH', 'done']],
 	['📣', ['RP', 'running']],
 	['💥', ['FL', 'alert']],
-	['⏳', ['..', 'idle']],
+	['⏳', ['HD', 'idle', '..']],
 	['💤', ['ZZ', 'idle']],
 	['✅', ['OK', 'done']],
 	['🚫', ['XX', 'alert']],
-	['🔄', ['>>', 'running']],
-	['🏁', ['|>', 'done']],
-	['⏩', ['>|', 'idle']],
-	['🧊', ['||', 'idle']],
+	['🔄', ['RN', 'running', '>>']],
+	['🏁', ['FN', 'done', '|>']],
+	['⏩', ['AD', 'idle', '>|']],
+	['🧊', ['PS', 'idle', '||']],
 	['❔', ['??', 'caution']],
 	['❓', ['Q?', 'human']],
 	['❗', ['!!', 'alert']],
 	['🔧', ['> ', 'info']],
 	['💬', [': ', 'info']],
-	['🔭', ['OO', 'idle']],
-	['🔚', ['-|', 'info']],
+	['🔭', ['WT', 'idle', 'OO']],
+	['🔚', ['EN', 'info', '-|']],
 	['⏰', ['T+', 'caution']],
 	['🕘', ['AG', 'idle']],
-	['🎯', ['->', 'info']],
-	['💓', ['<3', 'info']],
+	['🎯', ['ET', 'info', '->']],
+	['💓', ['HB', 'info', '<3']],
 	['🧠', ['MM', 'info']],
 	['💾', ['DK', 'info']],
 	['💪', ['CP', 'info']],
 	['⚡', ['PW', 'info']],
 	['🔥', ['HT', 'alert']],
 	['📴', ['OF', 'idle']],
-	['🔊', ['<)', 'info']],
-	['🔇', ['<X', 'idle']],
+	['🔊', ['SN', 'info', '<)']],
+	['🔇', ['MU', 'idle', '<X']],
 	['✋', ['HU', 'human']],
-	['🙋', [String.raw`\O`, 'human']],
-	['🛑', ['[]', 'alert']],
+	['🙋', ['DC', 'human', String.raw`\O`]],
+	['🛑', ['ST', 'alert', '[]']],
 	['🧳', ['ER', 'info']],
-	['🔗', ['<-', 'idle']],
-	['📂', ['//', 'info']],
+	['🔗', ['LK', 'idle', '<-']],
+	['📂', ['FD', 'info', '//']],
 	['🧍', ['SO', 'info']],
 	['🙅', ['NO', 'alert']],
-	['📋', ['1.', 'info']],
+	['📋', ['OR', 'info', '1.']],
 	['🚦', ['SG', 'info']],
 	['🛫', ['TO', 'info']],
 	['📮', ['IS', 'info']],
-	['📅', ['>=', 'idle']],
+	['📅', ['NB', 'idle', '>=']],
 	['⚓', ['AN', 'info']],
-	['🔁', ['<<', 'caution']],
+	['🔁', ['RT', 'caution', '<<']],
 	['🆕', ['NW', 'info']],
+	['🕒', ['NW', 'info', '()']],
 	['🧨', ['XP', 'alert']],
 	['🚪', ['DR', 'info']],
-	['📥', [String.raw`\/`, 'info']],
-	['📤', ['/\\', 'info']],
-	['🚀', ['^^', 'done']],
-	['🤝', ['><', 'info']],
+	['📥', ['IN', 'info', String.raw`\/`]],
+	['📤', ['DS', 'info', '/\\']],
+	['🚀', ['T0', 'done', '^^']],
+	['🤝', ['HO', 'info', '><']],
 	['🤔', ['JG', 'caution']],
 	['💭', ['SS', 'info']],
-	['🚧', ['##', 'alert']],
+	['🚧', ['BL', 'alert', '##']],
 	['🔒', ['LC', 'caution']],
-	['🪫', ['[_', 'caution']],
+	['🪫', ['LO', 'caution', '[_']],
 	['📰', ['NS', 'info']],
 	['🔏', ['HM', 'info']],
-	['🔑', ['O-', 'info']],
+	['🔑', ['AU', 'info', 'O-']],
 	['🐰', ['CR', 'info']],
 	['⛔', ['RL', 'alert']],
 	['🤏', ['CX', 'info']],
-	['💺', ['__', 'info']],
+	['💺', ['SE', 'info', '__']],
 	['🏠', ['HQ', 'info']],
 	['🌐', ['WB', 'info']],
 	['👻', ['GH', 'info']],
@@ -106,9 +110,9 @@ const EMOJI: Glyphs = new Map<string, Glyph>([
 	['🤖', ['AI', 'info']],
 	['🙏', ['TY', 'info']],
 	['🟢', ['AC', 'done']],
-	['📁', ['[+', 'info']],
+	['📁', ['EP', 'info', '[+']],
 	['▶', ['>', 'info']],
-	['⏸', ['║', 'idle']],
+	['⏸', ['=', 'idle', '║']],
 	['⏭', ['>', 'info']],
 	['⏱', ['T', 'info']],
 	['↪', ['^', 'info']],
@@ -162,17 +166,44 @@ function spinner_turns(theme: Theme): Array<[string, Glyph]> {
 	return frames.map((frame, index) => [frame, [turn_of(turn, index, frames.length), 'info']])
 }
 
-const SINGLES = new Map(
-	THEMES.map((theme) => [theme, new Map([...SYMBOLS, ...spinner_turns(theme)])]),
-)
+const TURNS = new Map(THEMES.map((theme) => [theme, new Map(spinner_turns(theme))]))
+const SPINNER: ReadonlySet<string> = new Set(run_board_labels.SPINNER_FRAMES)
 const SINGLE_CLASS = [...SYMBOLS.keys(), ...run_board_labels.SPINNER_FRAMES].join('')
 const PICTOGRAPHIC = String.raw`\p{Extended_Pictographic}`
 const GLYPH = new RegExp(`${PICTOGRAPHIC}${VARIATION_SELECTOR}?|[${SINGLE_CLASS}]`, 'gu')
 
-function entry_of(glyph: string, theme: Theme): Glyph {
-	return (
-		SINGLES.get(theme)?.get(glyph) ?? EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
-	)
+// What a line's glyphs are drawn with: its theme, none for a board in no theme, and its icons.
+interface GlyphLook {
+	theme: Theme | undefined
+	icons: Icons
+}
+
+const DEFAULT_LOOK: GlyphLook = { theme: 'wargames', icons: 'shapes' }
+
+// A spinner dot takes its theme's glyph; a board in no theme keeps the dots.
+function turn_entry(glyph: string, theme: Theme | undefined): Glyph | undefined {
+	return theme === undefined ? undefined : TURNS.get(theme)?.get(glyph)
+}
+
+function icon_entry(glyph: string): Glyph {
+	return SYMBOLS.get(glyph) ?? EMOJI.get(glyph.replace(VARIATION_SELECTOR, '')) ?? UNKNOWN
+}
+
+// The row a glyph is drawn by; `undefined` where it is drawn as it is — every icon as `emoji`.
+function entry_of(glyph: string, look: GlyphLook): Glyph | undefined {
+	if (SPINNER.has(glyph)) return turn_entry(glyph, look.theme)
+
+	return look.icons === 'emoji' ? undefined : icon_entry(glyph)
+}
+
+// A row's text: its shape as `shapes` where it has one, else its letters.
+function drawn_text([letters, , shape = letters]: Glyph, icons: Icons): string {
+	return icons === 'shapes' ? shape : letters
+}
+
+// The idle tone's paint: the theme's, else the tones' own dim.
+function idle_of(theme: Theme | undefined): Paint | undefined {
+	return theme === undefined ? undefined : THEME_DEFS[theme].idle
 }
 
 // What a render module left open where a glyph is drawn: a foreground color, and the escapes of the
@@ -186,7 +217,7 @@ const PLAIN: Open = { is_colored: false, intensity: '' }
 
 // Inside a color a render module gave, the text is left uncolored, so that color is not cut; a tone
 // that ends bold or dim (`ESC[22m`) is followed by the bold or dim the line had on.
-function toned_text(text: string, tone: Tone, open: Open, idle: Paint): string {
+function toned_text(text: string, tone: Tone, open: Open, idle: Paint | undefined): string {
 	if (open.is_colored) return text
 	const toned = run_board_theme_tones.toned(tone, text, idle)
 
@@ -194,16 +225,19 @@ function toned_text(text: string, tone: Tone, open: Open, idle: Paint): string {
 }
 
 // An emoji, with its variation selector, as its text in its tone's color padded to the width it took;
-// one the table misses as `?`, so no emoji is ever drawn.
-function text_of(glyph: string, open: Open, theme: Theme): string {
-	const [text, tone] = entry_of(glyph, theme)
+// one the table misses as `?`, so no emoji is drawn but as `emoji`.
+function text_of(glyph: string, open: Open, look: GlyphLook): string {
+	const entry = entry_of(glyph, look)
+
+	if (entry === undefined) return glyph
+	const text = drawn_text(entry, look.icons)
 	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
 
-	return toned_text(text, tone, open, THEME_DEFS[theme].idle) + padding
+	return toned_text(text, entry[1], open, idle_of(look.theme)) + padding
 }
 
-function glyphs_as_text(text: string, open: Open, theme: Theme): string {
-	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open, theme))
+function glyphs_as_text(text: string, open: Open, look: GlyphLook): string {
+	return text.replaceAll(GLYPH, (glyph: string) => text_of(glyph, open, look))
 }
 
 // The first code of the color escape a segment starts with; `undefined` for any other segment.
@@ -250,8 +284,11 @@ function mapped(frame: string, draw: (text: string, open: Open) => string): stri
 	return drawn.join(ESC)
 }
 
-function textual(frame: string, theme: Theme = 'wargames'): string {
-	return mapped(frame, (text, open) => glyphs_as_text(text, open, theme))
+// A board in no theme drawing `emoji` is the frame as its sources drew it.
+function textual(frame: string, look: GlyphLook = DEFAULT_LOOK): string {
+	if (look.theme === undefined && look.icons === 'emoji') return frame
+
+	return mapped(frame, (text, open) => glyphs_as_text(text, open, look))
 }
 
 const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, mapped, textual }

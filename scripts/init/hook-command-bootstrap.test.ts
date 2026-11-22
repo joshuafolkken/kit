@@ -49,7 +49,7 @@ describe('bootstrap without installed dependencies', () => {
 			const { command } = JSON.parse(transform_copied_content(destination, PRETOOL_SOURCE)) as {
 				command: string
 			}
-			const result = run_in_temporary_checkout(command, false, false, {
+			const result = run_in_temporary_checkout(command, {
 				is_project_directory_named: destination === SETTINGS_DESTINATION,
 			})
 
@@ -61,7 +61,8 @@ describe('bootstrap without installed dependencies', () => {
 
 	it('runs a present hook bundle even if the dispatcher is missing', () => {
 		expect_guard_ran(
-			run_in_temporary_checkout(consumer_command(KIT_LAUNCHER_COMMAND), true, false, {
+			run_in_temporary_checkout(consumer_command(KIT_LAUNCHER_COMMAND), {
+				is_partial_install: true,
 				is_project_directory_named: true,
 			}),
 		)
@@ -76,7 +77,11 @@ describe('installed hook from a project subdirectory', () => {
 		'runs the hook bundle under %s instead of reporting an inactive installation',
 		(_agent, command, is_project_directory_named) => {
 			expect_guard_ran(
-				run_in_temporary_checkout(command, true, true, { is_project_directory_named }),
+				run_in_temporary_checkout(command, {
+					is_partial_install: true,
+					is_nested: true,
+					is_project_directory_named,
+				}),
 			)
 		},
 	)
@@ -88,7 +93,9 @@ describe('installed hook with Git located elsewhere', () => {
 		const foreign_root = make_directory(FOREIGN_DIRECTORY_PREFIX)
 
 		expect_guard_ran(
-			run_in_temporary_checkout(consumer_command(KIT_LAUNCHER_COMMAND), true, true, {
+			run_in_temporary_checkout(consumer_command(KIT_LAUNCHER_COMMAND), {
+				is_partial_install: true,
+				is_nested: true,
 				git_overrides: { GIT_WORK_TREE: foreign_root },
 				is_project_directory_named: true,
 			}),
@@ -97,7 +104,9 @@ describe('installed hook with Git located elsewhere', () => {
 
 	it('runs the hook bundle under Codex when Git metadata is outside the work tree', () => {
 		expect_guard_ran(
-			run_in_temporary_checkout(consumer_command(CODEX_LAUNCHER_COMMAND, true), true, true, {
+			run_in_temporary_checkout(consumer_command(CODEX_LAUNCHER_COMMAND, true), {
+				is_partial_install: true,
+				is_nested: true,
 				is_external_git: true,
 			}),
 		)

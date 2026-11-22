@@ -1,4 +1,8 @@
-import { NEEDS_HUMAN_MERGE_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import {
+	NEEDS_HUMAN_MERGE_LABEL,
+	NEEDS_HUMAN_REVIEW_LABEL,
+	RUN_LANE_LABEL,
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { run_board_decision_rows } from './run-board-decision-rows'
 import type { BoardPlan, BoardRow, DecisionBlocker } from './run-board-layout-types'
@@ -14,6 +18,9 @@ const PREPARED = 8031
 const PREPARED_HELD = 8030
 const TITLE = 'Blocker title'
 const DECIDE_TAIL = '→ decide: why'
+const TAKE_TAIL = '→ take into a run (blocks #8030)'
+const LANE = '/work/.kit-lanes/8031'
+const STOPPED_MS = Date.parse('2026-11-21T09:00:00Z')
 
 function blocker(
 	number: number,
@@ -85,7 +92,7 @@ describe('run_board_decision_rows.rows_of (joshuafolkken/kit#8026)', () => {
 
 	it.each([
 		['publish', '→ publish (blocks #8030)'],
-		['take', '→ take into a run (blocks #8030)'],
+		['take', TAKE_TAIL],
 		['decide', '→ decide (blocks #8030)'],
 	] as const)('says what a person does for a %s blocker with no pull request', (need, tail) => {
 		expect(prepared_tail(need)).toStrictEqual([tail])
@@ -95,6 +102,34 @@ describe('run_board_decision_rows.rows_of (joshuafolkken/kit#8026)', () => {
 		const plan = plan_of([blocker(PREPARED, 'decide', [PREPARED_HELD])], new Map())
 
 		expect(tail_of(plan, new Set([PREPARED]))).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#8527: a blocker held at a review stop — labelled, its lane stopped — says to review
+// its lane's changes; the label alone, which stands before the run, leaves it a blocker to take.
+describe('run_board_decision_rows.rows_of — a review stop', () => {
+	const labelled = {
+		...blocker(PREPARED, 'take', [PREPARED_HELD]),
+		labels: [NEEDS_HUMAN_REVIEW_LABEL],
+	}
+
+	it('says to review the changes in the stopped lane', () => {
+		const stop = { stopped_ms: STOPPED_MS, directory: LANE }
+		const plan = {
+			...plan_of([labelled], new Map()),
+			review_stops: new Map([[PREPARED, stop]]),
+			now_ms: STOPPED_MS,
+		}
+
+		expect(tail_of(plan)).toStrictEqual([
+			`→ review the uncommitted changes in ${LANE} (stopped 0″ ago) (blocks #8030)`,
+		])
+	})
+
+	it('says to take the blocker into a run when its lane has not stopped', () => {
+		const plan = plan_of([labelled], new Map())
+
+		expect(tail_of(plan)).toStrictEqual([TAKE_TAIL])
 	})
 })
 
