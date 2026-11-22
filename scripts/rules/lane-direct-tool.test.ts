@@ -205,10 +205,11 @@ describe('delivered_rules.delivery — outside a lane checkout', () => {
 describe('LANE_DIRECT_TOOL_REASON', () => {
 	it.each([
 		[LINT_RELATED],
-		['pnpm josh test:related'],
 		['pnpm josh cspell:dot'],
 		['pnpm josh reserved-run <weight> -- <command>'],
-		['wrapped for you'],
+		['pnpm josh test:related <file>… [-u]'],
+		['snapshot updates'],
+		['rewritten for you'],
 		['every occurrence'],
 	])('carries %j', (marker) => {
 		expect(REASON).toContain(marker)
@@ -221,8 +222,6 @@ describe('reserved_command', () => {
 		['pnpm exec eslint scripts/a.ts', core_weights.CORE_WEIGHTS.lint],
 		['pnpm tsc -p .', core_weights.CORE_WEIGHTS.type_check],
 		['npx cspell scripts/a.ts', core_weights.CORE_WEIGHTS.spell_check],
-		['pnpm exec vitest run --maxWorkers 3 scripts/a.test.ts', 3],
-		['vitest run scripts/a.test.ts', CORES - 1],
 		["sh -c 'eslint . --concurrency off'", core_weights.CORE_WEIGHTS.lint],
 		['pnpm exec eslint "a b.ts" 2>&1', core_weights.CORE_WEIGHTS.lint],
 		['pnpm exec eslint "a;b.ts"', core_weights.CORE_WEIGHTS.lint],
@@ -249,6 +248,48 @@ describe('reserved_command', () => {
 		['git commit -m "run eslint"'],
 	])('leaves %j unwrapped', (command) => {
 		expect(lane_direct_tool.reserved_command(command, CORES)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8686: `-u [type]` takes an optional value, so `vitest run -u <file>` behind
+// `reserved-run` read the file as that value and ran the whole suite.
+const VITEST_UPDATE = 'vitest run -u scripts/a.test.ts'
+const RELATED_UPDATE = 'pnpm josh test:related -u scripts/a.test.ts'
+
+describe('reserved_command — vitest runs test:related can carry', () => {
+	it.each([
+		[VITEST_UPDATE, RELATED_UPDATE],
+		[`pnpm exec ${VITEST_UPDATE}`, RELATED_UPDATE],
+		['npx vitest run scripts/a.test.ts -u', 'pnpm josh test:related scripts/a.test.ts -u'],
+		['pnpm vitest --update scripts/a.test.ts', 'pnpm josh test:related --update scripts/a.test.ts'],
+		['vitest', 'pnpm josh test:related'],
+		['pnpm exec vitest --reporter=dot', 'pnpm josh test:related --reporter=dot'],
+	])('rewrites %j to %j', (command, expected) => {
+		expect(lane_direct_tool.reserved_command(command, CORES)).toBe(expected)
+	})
+
+	it.each([
+		['pnpm exec vitest run --maxWorkers 3 scripts/a.test.ts', 3],
+		['vitest run --project unit scripts/a.test.ts', CORES - 1],
+		['npx vitest run --config=vitest.config.ts scripts/a.test.ts', CORES - 1],
+		['vitest list scripts/a.test.ts', CORES - 1],
+		['vitest run -t name', CORES - 1],
+		['vitest run --outputFile report.json scripts/a.test.ts', CORES - 1],
+		['vitest run --dir src/x', CORES - 1],
+	])('keeps %j behind reserved-run at its gate weight', (command, weight) => {
+		expect(lane_direct_tool.reserved_command(command, CORES)).toBe(
+			`pnpm josh reserved-run ${String(weight)} -- ${command}`,
+		)
+	})
+
+	it('names both rewrite targets in the rewrite note', () => {
+		expect(lane_direct_tool.RESERVED_NOTE).toContain('vitest to `pnpm josh test:related`')
+	})
+
+	it('hands the rewritten line through the refusal', () => {
+		const rewritten = lane_direct_tool.reserved_command(VITEST_UPDATE, CORES)
+
+		expect(lane_direct_tool.is_lane_direct_tool(String(rewritten), true)).toBe(false)
 	})
 })
 
