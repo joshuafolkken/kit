@@ -1,0 +1,8 @@
+{
+	"reason": "New on-demand board-theme/theme-split.md holds the demo-backed theme split procedure, read only when filing a theme; one budget row registers it",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 1,
+		"ai_cost.on_demand_bytes": 2064
+	}
+}
