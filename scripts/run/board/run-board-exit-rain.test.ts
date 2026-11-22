@@ -5,6 +5,7 @@ import { run_board_fixture } from './run-board-fixture'
 import type { IntroPorts } from './run-board-intro'
 import type { KeyInput, KeyReading } from './run-board-keys'
 import { run_board_live } from './run-board-live'
+import { run_board_rain, type Scene } from './run-board-rain'
 import { run_board_reveal_rain_fixture } from './run-board-reveal-rain-fixture'
 import { run_board_screen } from './run-board-screen'
 import type { Theme } from './run-board-theme'
@@ -16,6 +17,7 @@ import type { Theme } from './run-board-theme'
 const { beats_of, gated, wipe } = run_board_exit_rain
 const { harness, plan_titled } = run_board_fixture
 const { drawn_rows } = run_board_reveal_rain_fixture
+const { REVEAL, WIPE, passes } = run_board_rain
 const SCREEN = run_board_screen.screen_of('live')
 const ESC = '\u{1B}'
 const CLEARED = `${ESC}[H${ESC}[J`
@@ -28,6 +30,11 @@ const FULL_COLOR = '3'
 const KEYS_LINE = /ctrl-c: quit$/iu
 
 type Sleep = (ms: number) => Promise<void>
+
+// How many frames one pass of `scene` falls over `FRAME`.
+function frames_in(scene: Scene): number {
+	return [...passes({ width: 3, height: 2 }, RAIN.random, scene)].length
+}
 
 async function instant(): Promise<void> {
 	await Promise.resolve()
@@ -140,6 +147,13 @@ describe('run_board_exit_rain.beats_of — the rain takes the frame away', () =>
 		const [first = { text: '' }] = beats_of(FRAME, RAIN.random)
 
 		expect(drawn_rows(first.text)).toEqual(['ONE', 'TWO'])
+	})
+
+	it('falls in the wipe scene, not the reveal one', () => {
+		const wiped = [...beats_of(FRAME, RAIN.random)].length - 1
+
+		expect(wiped).toBe(frames_in(WIPE))
+		expect(wiped).not.toBe(frames_in(REVEAL))
 	})
 
 	it('blanks the cells the rain has passed and erases the screen last', () => {

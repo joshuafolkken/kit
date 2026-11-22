@@ -1,0 +1,7 @@
+{
+	"reason": "#8626 adds per-scene rain settings (tail span, ramp, speed, hold) and the shared tail paint stretch reused by #8627",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 69
+	}
+}
