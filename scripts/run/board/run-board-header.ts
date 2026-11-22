@@ -28,7 +28,8 @@ import { run_board_render_title } from './run-board-render-title'
 import { run_board_row_key } from './run-board-row-key'
 import type { SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
-import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
+import { run_board_theme_defs, type Theme, type ThemeDefinition } from './run-board-theme-defs'
+import { run_board_tint } from './run-board-tint'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
 
@@ -52,6 +53,7 @@ const { cell_of } = run_board_render_slot
 const { title_of } = run_board_render_title
 const { now_text, time_parts } = run_board_header_time
 const { clocks_of } = run_board_clocks
+const { circuit_cells } = run_board_tint
 const notice_of = run_board_header_notice.part_of
 // The columns a failed read's reason is cut to, so the header keeps its line.
 const REASON_LIMIT = 40
@@ -294,7 +296,9 @@ function alert_part(header: BoardHeader): string | undefined {
 
 	if (theme === undefined) return undefined
 
-	return run_board_theme_defs.THEME_DEFS[theme].alert(run_board_header_defcon.level_of(header))
+	const definition: ThemeDefinition = run_board_theme_defs.THEME_DEFS[theme]
+
+	return definition.alert(run_board_header_defcon.level_of(header))
 }
 
 // The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):
@@ -358,19 +362,26 @@ function lines_of(columns: ReadonlyArray<ReadonlyArray<string>>): Array<string> 
 
 // The time circuits (joshuafolkken/kit#8478): the names, the clocks, the signed times, then the machine
 // over the notice slot over what the run is doing now — in every state the board can be in. The finish
-// and what is left are faint while the plan is a saved one.
+// and what is left are faint while the plan is a saved one; the names, clocks and times take their row's
+// circuit where the theme has them (joshuafolkken/kit#8673).
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))
 	const mark = mark_of(header, counts.running)
 	const now = now_line(counts, header)
 	const left = left_of(header)
 	const finish = left === undefined ? undefined : header.now_ms + left
+	const theme = screen_theme(header)
 	const columns = [
-		column_of(run_board_header_names.names_of(mark, { ...header, theme: screen_theme(header) })),
+		column_of(run_board_header_names.names_of(mark, { ...header, theme })),
 		column_of(planned_first(header, clocks_of(header, finish))),
 		planned_first(header, time_parts(header, mark, now, left)),
-		[machine_part(header), notice_of(header), now === undefined ? '' : now_text(now, header)],
-	]
+	].map((cells) => circuit_cells(theme, cells))
+
+	columns.push([
+		machine_part(header),
+		notice_of(header),
+		now === undefined ? '' : now_text(now, header),
+	])
 
 	return lines_of(columns)
 }
@@ -412,6 +423,7 @@ const run_board_header = {
 	now_legend,
 	queued_tail,
 	run_mark_of,
+	screen_theme,
 	warning_of,
 }
 

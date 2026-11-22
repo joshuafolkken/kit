@@ -58,7 +58,7 @@ const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const { SIGINT_EXIT_CODE, SIGTERM_EXIT_CODE } = run_board_exit_record
 const { FRAME_FLAG, FRAME_USAGE } = run_board_frame_preview
-const USAGE = `Usage: josh run:board [--once | --chat [--fresh] | --every <minutes> | ${FRAME_USAGE}] [--theme wargames|matrix] [--icons emoji|letters|shapes] [--timing]`
+const USAGE = `Usage: josh run:board [--once | --chat [--fresh] | --every <minutes> | ${FRAME_USAGE}] [--theme ${run_board_theme.THEMES.join('|')}] [--icons emoji|letters|shapes] [--timing]`
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const { FRESH_STATE, tick } = run_board_tick
 const { CHAT_KEY, fresh } = run_board_frame_store

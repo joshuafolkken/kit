@@ -59,7 +59,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wargames|matrix] [--icons emoji|letters|shapes] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wargames|matrix|bttf] [--icons emoji|letters|shapes] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],

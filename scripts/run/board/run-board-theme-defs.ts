@@ -50,6 +50,12 @@ interface LiveDefinition {
 	rain: boolean
 }
 
+// joshuafolkken/kit#8673: a rule's `─` kept on every line in the rule's dash paint, and dim text no
+// color is given in drawn in `dim` in place of the dim attribute.
+interface PlainLook {
+	dim: Paint
+}
+
 interface ThemeDefinition {
 	// The board's name the header and the no-run line draw in place of `josh-board`, in lower case: a
 	// theme that draws in `capitals` raises it (joshuafolkken/kit#8604).
@@ -62,10 +68,16 @@ interface ThemeDefinition {
 	// Section dashes and heading text, and the theme's idle glyphs (joshuafolkken/kit#8390).
 	rule: { dash: Paint; text: Paint }
 	idle: Paint
+	// Where the theme has one, how it draws text no color is given in beyond `paint`; without one, a
+	// rule's `─` is drawn as `-` (`run-board-tint.ts` → `plain_drawn`).
+	plain?: PlainLook
+	// joshuafolkken/kit#8673: the header's three clock rows — the finish, now, the start — each in its
+	// own color where the theme gives them (`run-board-tint.ts`).
+	circuits?: readonly [Paint, Paint, Paint]
 	intro: IntroDefinition
 	// The alert field a screen's throughput rule ends on, drawn from the level every theme shares
 	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
-	alert: (level: number) => string
+	alert: (level: number) => string | undefined
 	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
 	// joshuafolkken/kit#8359).
 	lamps: boolean
@@ -79,6 +91,36 @@ interface ThemeDefinition {
 
 const CYAN: Paint = { rgb: '62;236;225', named: 'cyan' }
 const { IDLE_PAINT } = run_board_theme_tones
+
+const NO_LIVE: LiveDefinition = {
+	sweep: false,
+	drop: false,
+	types_rows: false,
+	trill: false,
+	codes: false,
+	strip: false,
+	decode: false,
+	rain: false,
+}
+
+// joshuafolkken/kit#8673: the time circuits' destination (the estimated finish), present and last
+// departed (the run's start), the body's grey, its dim at 55% and the rules' slate.
+const BTTF = {
+	destination: { rgb: '255;70;50', named: 'red' },
+	present: { rgb: '70;255;110', named: 'green' },
+	departed: { rgb: '255;190;40', named: 'yellow' },
+	body: { rgb: '190;198;206', named: 'white' },
+	dim: { rgb: '105;109;113', named: 'gray' },
+	rule: { rgb: '80;88;98', named: 'gray' },
+} as const satisfies Readonly<Record<string, Paint>>
+
+function no_alert(): undefined {
+	// A theme with no alert field draws none on the throughput rule.
+}
+
+function no_sound(): undefined {
+	// A theme with no typing sound writes no WAV.
+}
 
 const THEME_DEFS = {
 	wargames: {
@@ -146,6 +188,23 @@ const THEME_DEFS = {
 		// A key click every two letters while the intro types and new rows decode (joshuafolkken/kit#8365).
 		typing: run_board_sound_click.typing_wav,
 	},
+	// joshuafolkken/kit#8673: the time machine's board — its header's clocks in the time circuits'
+	// red, green and amber, the rest a cool grey; no alert field, no sound.
+	bttf: {
+		name: 'josh-flux',
+		capitals: false,
+		paint: BTTF.body,
+		rule: { dash: BTTF.rule, text: BTTF.body },
+		idle: BTTF.dim,
+		plain: { dim: BTTF.dim },
+		circuits: [BTTF.destination, BTTF.present, BTTF.departed],
+		intro: { line: "Roads? Where we're going, we don't need roads.", letter_ms: 50, hold_ms: 2000 },
+		alert: no_alert,
+		lamps: false,
+		spinner: '│╱─╲',
+		live: NO_LIVE,
+		typing: no_sound,
+	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 
 // A table's theme names, in its row order, as the non-empty list `z.enum` takes.
@@ -167,17 +226,6 @@ type Theme = keyof typeof THEME_DEFS
 // The theme rows whose live effects a reader reads.
 type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
 
-const NO_LIVE: LiveDefinition = {
-	sweep: false,
-	drop: false,
-	types_rows: false,
-	trill: false,
-	codes: false,
-	strip: false,
-	decode: false,
-	rain: false,
-}
-
 // The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.
 function live_of(theme: Theme | undefined, defs: LiveDefs = THEME_DEFS): LiveDefinition {
 	if (theme === undefined) return NO_LIVE
@@ -193,4 +241,12 @@ const run_board_theme_defs = {
 }
 
 export { run_board_theme_defs }
-export type { IntroDefinition, IntroLeads, LiveDefinition, LiveDefs, Theme, ThemeDefinition }
+export type {
+	IntroDefinition,
+	IntroLeads,
+	LiveDefinition,
+	LiveDefs,
+	PlainLook,
+	Theme,
+	ThemeDefinition,
+}

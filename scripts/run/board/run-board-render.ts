@@ -33,6 +33,7 @@ import { run_board_rule_width } from './run-board-rule-width'
 import type { Thanks } from './run-board-thanks-csv'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
+import { run_board_tint } from './run-board-tint'
 import { run_board_watch_panel } from './run-board-watch-panel'
 import { run_board_watch_row } from './run-board-watch-row'
 
@@ -227,10 +228,12 @@ function plan_parts(
 	return { plan: active_sections(layout, frame), ...widths, below: below_sections(layout, frame) }
 }
 
-// The header with the pinned issues' watch panel at its right (joshuafolkken/kit#8607), then the
-// session a stopped run resumes from.
+// The header with the pinned issues' watch panel at its right (joshuafolkken/kit#8607), each pin in its
+// header row's circuit where the theme has them (joshuafolkken/kit#8673), then the session a stopped
+// run resumes from.
 function above_of(view: BoardView, rule_width: number): Array<string> {
-	const rows = (view.pinned ?? []).map((pin) => run_board_watch_row.watch_row(view.header, pin))
+	const pins = (view.pinned ?? []).map((pin) => run_board_watch_row.watch_row(view.header, pin))
+	const rows = run_board_tint.circuit_cells(run_board_header.screen_theme(view.header), pins)
 	const header = run_board_header.header_lines(view.header)
 
 	return [...run_board_watch_panel.composed(header, rows, rule_width), ...resume_lines(view.resume)]
