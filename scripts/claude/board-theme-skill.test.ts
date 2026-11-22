@@ -36,16 +36,31 @@ describe('board-theme demo template', () => {
 	it('passes node --check', () => {
 		expect(node_check(blocks[0] ?? '')).toBe(0)
 	})
+
+	it('reads a real colored frame, never a colorless one', () => {
+		expect(blocks[0]).toMatch(/readFileSync\(new URL\(.*-frame\.ans/u)
+		expect(read_skill_file(TEMPLATE_FILE)).not.toContain('NO_COLOR')
+	})
 })
 
 describe('board-theme skill', () => {
 	const skill = read_skill_file('SKILL.md')
 
-	it('is read when a theme or a theme effect is asked for', () => {
-		expect(skill).toMatch(/^description: .*`run:board` theme.*effect/mu)
+	it('is read unasked before any board look change is proposed or filed', () => {
+		expect(skill).toMatch(
+			/^description: .*`run:board` look change.*unasked before proposing or filing/mu,
+		)
+	})
+
+	it('bases a demo or a printf on a real colored frame, never a colorless one', () => {
+		expect(skill).toContain('FORCE_COLOR=3 pnpm josh run:board --once --theme <theme>')
+		expect(skill).not.toContain('NO_COLOR')
 	})
 
 	it.each([
+		'It moves → a JS demo',
+		'It does not move → a `printf` command',
+		'Skip it for a fix that only restores the existing look',
 		'Measure the original',
 		'matches the original item by item',
 		'items changed on purpose',

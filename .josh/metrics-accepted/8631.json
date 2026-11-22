@@ -1,0 +1,7 @@
+{
+	"reason": "The watch panel gains its priority rows (#8631): a new rank module composing pinned, critical and high through the existing ranking",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 86
+	}
+}
