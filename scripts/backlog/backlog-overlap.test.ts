@@ -322,3 +322,23 @@ describe('backlog_overlap.running_clash', () => {
 		expect(backlog_overlap.running_clash(elsewhere, DECLARED, HOLDING)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#8571: the overlap pairs the ranking counts as dependents.
+describe('backlog_overlap.overlap_neighbors', () => {
+	const NEIGHBORS = backlog_overlap.overlap_neighbors([
+		{ key: 'lint', paths: backlog_overlap.declared_paths(LINT_BODY) },
+		{ key: 'limits', paths: backlog_overlap.declared_paths(LIMITS_BODY) },
+		{ key: 'run', paths: backlog_overlap.declared_paths(RUN_BODY) },
+		{ key: 'none', paths: new Set() },
+	])
+
+	it('answers an overlapping pair on both sides', () => {
+		expect([...(NEIGHBORS.get('lint') ?? [])]).toStrictEqual(['limits'])
+		expect([...(NEIGHBORS.get('limits') ?? [])]).toStrictEqual(['lint'])
+	})
+
+	it('answers none for a candidate on its own paths or with nothing declared', () => {
+		expect(NEIGHBORS.get('run')?.size).toBe(0)
+		expect(NEIGHBORS.get('none')?.size).toBe(0)
+	})
+})
