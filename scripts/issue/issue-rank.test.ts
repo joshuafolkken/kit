@@ -328,6 +328,33 @@ describe('issue_rank.count_dependents', () => {
 	})
 })
 
+// joshuafolkken/kit#8571: a row whose declared paths overlap another's queues behind it.
+describe('issue_rank.count_dependents path overlap', () => {
+	it('counts each overlapping row as a dependent', () => {
+		const counts = issue_rank.count_dependents([
+			{ ...dependency('a', []), overlaps: ['b', 'c'] },
+			{ ...dependency('b', []), overlaps: ['a'] },
+			{ ...dependency('c', []), overlaps: ['a'] },
+			dependency('d', []),
+		])
+
+		expect(counts.get('a')).toBe(2)
+		expect(counts.get('b')).toBe(1)
+		expect(counts.get('d')).toBeUndefined()
+	})
+
+	it('counts a row behind on both blocked-by and overlap once', () => {
+		const counts = issue_rank.count_dependents([
+			{ ...dependency('a', []), overlaps: ['b'] },
+			{ ...dependency('b', ['a']), overlaps: ['a'] },
+			dependency('c', ['b']),
+		])
+
+		expect(counts.get('a')).toBe(2)
+		expect(counts.get('b')).toBe(2)
+	})
+})
+
 // joshuafolkken/kit#5506: the head of a chain of three runs ahead of an independent issue of its
 // priority that declares a weekly gain.
 describe('issue_rank.rank chain head', () => {

@@ -151,6 +151,34 @@ function overlaps(left: string, right: string): boolean {
 	return claims_meet(left, right)
 }
 
+// One candidate as its key and the paths its body declares.
+interface OverlapCandidate {
+	key: string
+	paths: ReadonlySet<string>
+}
+
+function paths_meet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+	return [...left].some((path) => [...right].some((other) => overlaps(path, other)))
+}
+
+// Each candidate's key mapped to the keys of the other candidates whose declared paths overlap its
+// own, by the comparison `separate` holds candidates apart on — over the paths as given, so a bare
+// file name `separate` would first resolve (`with_resolved_names`) meets only its own spelling here.
+// Symmetric, and not transitive: A meeting B and B meeting C leaves A and C free to run together
+// (joshuafolkken/kit#8571).
+function overlap_neighbors(
+	candidates: ReadonlyArray<OverlapCandidate>,
+): ReadonlyMap<string, ReadonlySet<string>> {
+	return new Map(
+		candidates.map((candidate) => {
+			const others = candidates.filter((other) => other.key !== candidate.key)
+			const met = others.filter((other) => paths_meet(candidate.paths, other.paths))
+
+			return [candidate.key, new Set(met.map((other) => other.key))]
+		}),
+	)
+}
+
 interface SeparateContext {
 	read: BusyRead
 	repo: string
@@ -302,6 +330,7 @@ const backlog_overlap = {
 	declared_paths,
 	holds,
 	is_file_claim,
+	overlap_neighbors,
 	path_claims,
 	path_clash,
 	running_clash,
@@ -311,4 +340,4 @@ const backlog_overlap = {
 }
 
 export { backlog_overlap }
-export type { Clash, Declared }
+export type { Clash, Declared, OverlapCandidate }
