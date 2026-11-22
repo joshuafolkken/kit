@@ -5,6 +5,7 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import string_width from 'string-width'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { run_board_drop_screen } from './run-board-drop-screen'
+import { run_board_exit_rain } from './run-board-exit-rain'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type Gatherer, type GatherState } from './run-board-gather'
 import {
@@ -14,9 +15,12 @@ import {
 } from './run-board-gather-thread'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
+import { run_board_rain, type Random } from './run-board-rain'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import type { LocalRead } from './run-board-read'
 import { run_board_render_stress_fixture } from './run-board-render-stress-fixture'
+import type { Beat } from './run-board-reveal-blocks'
+import { run_board_reveal_rain } from './run-board-reveal-rain'
 import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
@@ -50,6 +54,7 @@ const STAGES = ['preflight', 'sync', 'gate', 'commit', 'push', 'checks', 'review
 const ROUNDS = 3
 // The pane the live board was profiled in (joshuafolkken/kit#5185).
 const PANE = { rows: 50, columns: 160 }
+const HALF = 0.5
 const ISSUES = EVENTS / EVENTS_PER_ISSUE
 const LIVE = Array.from({ length: LANES }, (_, index) => FIRST_ISSUE + ISSUES - LANES + index)
 
@@ -305,5 +310,26 @@ describe('run_board_rain_drop draw budget', () => {
 		})
 
 		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
+})
+
+// joshuafolkken/kit#8626: the reveal's and the wipe's tails run one to two screens long, so a whole pass
+// over the stress frame is held to one `RAIN_MS` a frame on average.
+type Pass = (frame: string, random: Random) => Iterable<Beat>
+
+function beat_ms(pass: Pass): number {
+	const frame = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows).join('\n')
+	const started = performance.now()
+	const beats = [...pass(frame, () => HALF)]
+
+	return (performance.now() - started) / beats.length
+}
+
+describe('run_board_rain draw budget', () => {
+	it.each<[string, Pass]>([
+		['reveal', (frame, random) => run_board_reveal_rain.beats_of(frame, random, { size: PANE })],
+		['wipe', (frame, random) => run_board_exit_rain.beats_of(frame, random, PANE)],
+	])('draws each %s frame over the stress frame within one rain frame', (_name, pass) => {
+		expect(beat_ms(pass)).toBeLessThan(run_board_rain.RAIN_MS)
 	})
 })
