@@ -15,6 +15,22 @@ function body_with(...lines: ReadonlyArray<string>): string {
 	return ['## 背景', '', '- 種別: 非不具合', ...lines, '', '## 現象', '', 'x'].join('\n')
 }
 
+describe('size_estimate_target.kind_among', () => {
+	it('passes only the kinds in the list it is given', () => {
+		expect(size_estimate_target.kind_among('別の待ちがある — 理由', ['other_wait'])).toBe(
+			'別の待ちがある',
+		)
+		expect(size_estimate_target.kind_among('全体が遅くなる — 理由', ['other_wait'])).toBeUndefined()
+	})
+
+	it('reads the English column and refuses a kind with no reason after it', () => {
+		expect(size_estimate_target.kind_among('waits on another: x', ['other_wait'])).toBe(
+			'waits on another',
+		)
+		expect(size_estimate_target.kind_among('waits on another —', ['other_wait'])).toBeUndefined()
+	})
+})
+
 describe('size_estimate_target.problem', () => {
 	it('does not judge a projection within the target', () => {
 		expect(size_estimate_target.problem(WITHIN)).toBeUndefined()

@@ -7,7 +7,7 @@ import { run_split, type SplitRequest, type SplitResult } from './run-split'
 import { run_split_prerequisite, type PrerequisiteRequest } from './run-split-prerequisite'
 
 // `josh run:split <N> --children <N1,N2,...> [--ordered | --chain <chain>...] [--order-reason
-// "<chain>: <reason>"...] [--title <title>]` and
+// "<chain>: <kind> — <reason>"...] [--title <title>]` and
 // `josh run:split <N> --prerequisite <P> [--title <title>]` — the argument parsing and the report
 // around `run-split.ts` and `run-split-prerequisite.ts`. One line per step that landed, then the
 // verdict line a run branches on: `epic #E` to continue against, or `needs-decision` to report. A
@@ -17,7 +17,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = [
-	'Usage: josh run:split <issue> --children <N1,N2,...> [--ordered | --chain "<chain>"...] [--order-reason "<chain>: <reason>"...] [--title <title>]',
+	'Usage: josh run:split <issue> --children <N1,N2,...> [--ordered | --chain "<chain>"...] [--order-reason "<chain>: <kind> — <reason>"...] [--title <title>]',
 	'       josh run:split <issue> --prerequisite <P> [--title <title>]',
 ].join('\n')
 const OPTIONS = {

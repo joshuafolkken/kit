@@ -120,7 +120,7 @@ describe('run_split_prerequisite.prerequisite — no epic tracks the issue', () 
 			'10',
 			'--ordered',
 			'--order-reason',
-			'#11 -> #10: #10 needs #11 first, named by `run:split --prerequisite`.',
+			'#11 -> #10: 別の待ちがある — #10 needs #11 first, named by `run:split --prerequisite`.',
 		])
 		expect(record).toHaveBeenCalledWith(REQUEST)
 		expect(audit_run).toHaveBeenCalledWith(['30'])

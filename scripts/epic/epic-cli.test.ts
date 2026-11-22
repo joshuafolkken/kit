@@ -126,7 +126,7 @@ describe('epic_cli — --chain', () => {
 	const JOIN_LINES = ['#101 -> #103', '#102 -> #103']
 	const JOIN_ARGS = [
 		...JOIN_LINES.flatMap((line) => ['--chain', line]),
-		...JOIN_LINES.flatMap((line) => ['--order-reason', `${line}: a reason`]),
+		...JOIN_LINES.flatMap((line) => ['--order-reason', `${line}: 別の待ちがある — a reason`]),
 	]
 	const JOIN = [
 		[101, 103],
