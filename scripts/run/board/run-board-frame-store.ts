@@ -16,6 +16,20 @@ const FRESH_MS = MS_PER_MINUTE
 const CHAT_KEY = 'chat'
 const ONCE_KEY = 'once'
 const COLOR_PROBE = 'x'
+const COLOR_LEVELS = ['0', '1', '2', '3'] as const
+const NO_COLOR_LEVEL = '0'
+// The depths `getColorDepth` answers past 2 colors, in bits: 16, 256 and 16 million colors.
+const DEPTH_16 = 4
+const DEPTH_256 = 8
+const DEPTH_TRUE = 24
+// `FORCE_COLOR`'s level for each of them.
+const LEVEL_OF_DEPTH = new Map<number, ColorLevel>([
+	[DEPTH_16, '1'],
+	[DEPTH_256, '2'],
+	[DEPTH_TRUE, '3'],
+])
+
+type ColorLevel = (typeof COLOR_LEVELS)[number]
 
 interface RecordedFrame {
 	text: string
@@ -156,13 +170,19 @@ function save_only(store: FrameStore | undefined): FrameStore | undefined {
 	return { load: no_record, save: store.save }
 }
 
-// joshuafolkken/kit#8616: the colors this process's stdout draws in — none, or the color depth — so a
-// frame forced into color (`FORCE_COLOR`) is never answered by one recorded without, nor the reverse.
-// `styleText` decides from stdout and the color variables, as every color on the frame does.
-function colors_drawn(): string | undefined {
-	if (styleText('red', COLOR_PROBE) === COLOR_PROBE) return undefined
+// joshuafolkken/kit#8616: the `FORCE_COLOR` level this process's stdout draws at — `0` for none — as
+// `styleText` decides it from stdout and the color variables, as every color on the frame does.
+function color_level(): ColorLevel {
+	if (styleText('red', COLOR_PROBE) === COLOR_PROBE) return NO_COLOR_LEVEL
 
-	return `color${String(WriteStream.prototype.getColorDepth())}`
+	return LEVEL_OF_DEPTH.get(WriteStream.prototype.getColorDepth()) ?? NO_COLOR_LEVEL
+}
+
+// So a frame forced into color is never answered by one recorded without, nor the reverse.
+function colors_drawn(): string | undefined {
+	const level = color_level()
+
+	return level === NO_COLOR_LEVEL ? undefined : `color${level}`
 }
 
 // A still frame in a theme is drawn in its own colors, and one on a terminal carries its links, so each
@@ -206,7 +226,9 @@ function recording(
 
 const run_board_frame_store = {
 	CHAT_KEY,
+	COLOR_LEVELS,
 	FRESH_MS,
+	color_level,
 	file_store,
 	fresh,
 	latest_writer,
@@ -218,4 +240,4 @@ const run_board_frame_store = {
 }
 
 export { run_board_frame_store }
-export type { FileFrameStore, FrameStore, RecordedFrame }
+export type { ColorLevel, FileFrameStore, FrameStore, RecordedFrame }

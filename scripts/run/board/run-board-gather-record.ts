@@ -2,7 +2,7 @@ import terminalLink from 'terminal-link'
 import { z } from 'zod'
 import { run_board_data } from './run-board-data'
 import { run_board_every, type RecordPorts } from './run-board-every'
-import { run_board_frame_store } from './run-board-frame-store'
+import { run_board_frame_store, type ColorLevel } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
 import type { RoundState } from './run-board-gather-thread'
 import { run_board_icons, type Icons } from './run-board-icons'
@@ -16,6 +16,8 @@ import { run_board_theme, type Theme } from './run-board-theme'
 // whether it opens links — is handed to the worker as it starts, since the worker writes to no terminal.
 
 const FORCE_HYPERLINK = 'FORCE_HYPERLINK'
+const FORCE_COLOR = 'FORCE_COLOR'
+const COLOR_OFF = new Set(['NO_COLOR', 'NODE_DISABLE_COLORS'])
 
 // What the worker records with, read off the board's terminal.
 interface RecordSetup {
@@ -23,6 +25,7 @@ interface RecordSetup {
 	icons: Icons | undefined
 	is_tty: boolean
 	is_linked: boolean
+	color_level: ColorLevel
 }
 
 const setup_schema = z.object({
@@ -30,6 +33,7 @@ const setup_schema = z.object({
 	icons: z.enum(run_board_icons.ICONS).optional(),
 	is_tty: z.boolean(),
 	is_linked: z.boolean(),
+	color_level: z.enum(run_board_frame_store.COLOR_LEVELS),
 })
 
 // joshuafolkken/kit#8242: every link opens with the same `id=`. A terminal keying links by id and URL
@@ -48,7 +52,13 @@ function link(text: string, url: string): string {
 }
 
 function setup_of(theme: Theme | undefined, icons?: Icons): RecordSetup {
-	return { theme, icons, is_tty: process.stdout.isTTY, is_linked: terminalLink.isSupported }
+	return {
+		theme,
+		icons,
+		is_tty: process.stdout.isTTY,
+		is_linked: terminalLink.isSupported,
+		color_level: run_board_frame_store.color_level(),
+	}
 }
 
 // What a worker is started with (`run-board-gather-thread.ts` → `WorkerSeed`).
@@ -61,10 +71,20 @@ interface WorkerStart {
 	record: ((round: RoundState) => void) | undefined
 }
 
-// The worker's environment: `link` there reads the worker's own output, never a terminal, so whether
-// the board's terminal opens links is forced to its answer.
+// The worker's environment: `link` and `styleText` there read the worker's own output, never a
+// terminal, so whether the board's terminal opens links, and the colors it draws (joshuafolkken/kit#8616),
+// are forced to its answers — the recorded `--once` frame, and its key, are then the terminal's. The
+// variables that turn color off go: `FORCE_COLOR` already carries their answer.
 function worker_environment(setup: RecordSetup): NodeJS.ProcessEnv {
-	return { ...process.env, [FORCE_HYPERLINK]: setup.is_linked ? '1' : '0' }
+	const inherited = Object.fromEntries(
+		Object.entries(process.env).filter(([name]) => !COLOR_OFF.has(name)),
+	)
+
+	return {
+		...inherited,
+		[FORCE_HYPERLINK]: setup.is_linked ? '1' : '0',
+		[FORCE_COLOR]: setup.color_level,
+	}
 }
 
 // The board's state over a round, as the board receives it (`run-board-gather-thread.ts`), with no view

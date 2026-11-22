@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync, writeFileSync } from 'node:fs'
+import { WriteStream } from 'node:tty'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_frame_store } from './run-board-frame-store'
 
@@ -8,10 +9,13 @@ const { CHAT_KEY, FRESH_MS, file_store, fresh, latest_writer, memory_store, once
 const SAVED_MS = Date.parse('2026-11-18T09:00:00.000Z')
 const FRAME = { text: 'board\n', saved_ms: SAVED_MS }
 const ROOT = `/run-board-frame-store-test-${randomUUID()}`
+// A color depth `getColorDepth` never answers, so it has no `FORCE_COLOR` level.
+const UNKNOWN_DEPTH = 2
 
 afterEach(() => {
 	rmSync(path_of(CHAT_KEY, ROOT), { force: true })
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('run_board_frame_store.file_store', () => {
@@ -148,7 +152,7 @@ describe('run_board_frame_store.once_key — the colors stdout draws', () => {
 
 			vi.stubEnv('FORCE_COLOR', '1')
 
-			expect(once_key(theme, false)).toBe(`${plain}-color4`)
+			expect(once_key(theme, false)).toBe(`${plain}-color1`)
 		},
 	)
 
@@ -157,6 +161,12 @@ describe('run_board_frame_store.once_key — the colors stdout draws', () => {
 		vi.stubEnv('NO_COLOR', no)
 		expect(once_key(undefined, false)).toBe('once-pipe')
 		vi.stubEnv('FORCE_COLOR', '3')
-		expect(once_key(undefined, false)).toBe('once-pipe-color24')
+		expect(once_key(undefined, false)).toBe('once-pipe-color3')
+	})
+
+	it('keys a depth with no FORCE_COLOR level as uncolored', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		vi.spyOn(WriteStream.prototype, 'getColorDepth').mockReturnValue(UNKNOWN_DEPTH)
+		expect(once_key(undefined, false)).toBe('once-pipe')
 	})
 })
