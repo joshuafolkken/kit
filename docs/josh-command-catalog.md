@@ -272,4 +272,4 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh time:density` · `josh tmd` · **kit only** | `[--lanes <n>] [--path <dir>]` | maintainer | none | Report tool calls per round trip across the recent lane sessions |
 | `josh tree:status` | — | automation | git, files | Bundle the working tree’s read-only pre-check: branch, status, stash list, run hold |
 | `josh upstream:interrupt` | `<finder> <title> --repo <owner/repo> --body-file <path> [--blocks-finder]` | automation | git, network, notifications | Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation |
-| `josh wait` | `[--pid <pid> \| --process <pattern> \| --file <path>]` | automation | processes, files | Wait until a pid or process ends or a file exists, or one ship:wait chunk (done \| pending) |
+| `josh wait` | `[--pid <pid> \| --process <pattern> \| --file <path> \| --result <dir>]` | automation | processes, files | Wait until a pid or process ends or a file exists, or one ship:wait chunk (done \| pending) |
