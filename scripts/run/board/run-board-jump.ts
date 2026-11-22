@@ -65,6 +65,11 @@ function is_over(run: JumpRun, ms: number): boolean {
 	return tick_of(run, ms) >= END_TICKS
 }
 
+// Whether the jump's wash and thaw are done at `ms`, leaving only its trails burning out.
+function is_thawed(run: JumpRun, ms: number): boolean {
+	return tick_of(run, ms) >= WASH_TICKS + THAW_TICKS
+}
+
 // Whether `ms` is in the run up or later, before the jump is over.
 function is_running(run: JumpRun, ms: number): boolean {
 	return tick_of(run, ms) >= -run.letters && !is_over(run, ms)
@@ -144,6 +149,7 @@ const run_board_jump = {
 	is_orange,
 	is_over,
 	is_running,
+	is_thawed,
 	jump_speed,
 	lead_of,
 	stage_of,

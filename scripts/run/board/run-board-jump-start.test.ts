@@ -7,7 +7,7 @@ import type { CueName } from './run-board-sound-cues'
 import { run_board_type_rows } from './run-board-type-rows'
 
 const { arrive_of, jump_of } = run_board_jump_start
-const { END_TICKS, TICK_MS, THAW_AT } = run_board_jump
+const { END_TICKS, THAW_AT, THAW_TICKS, TICK_MS, WASH_TICKS } = run_board_jump
 
 const ISSUE = 8677
 const NOW = 1000
@@ -100,6 +100,19 @@ describe('run_board_jump_start.jump_of once running', () => {
 		})
 
 		expect(jump_of(first, next)?.run.start_ms).toBe(NOW)
+	})
+
+	it('yields to the next merge notice once thawed, with only its fire trails burning', () => {
+		const first = jump_of(undefined, frame_of())
+		const thawed = NOW + ((first?.run.letters ?? 0) + WASH_TICKS + THAW_TICKS) * TICK_MS
+		const trace = { key: 'k2', start_ms: thawed }
+		const next = frame_of({
+			now_ms: thawed,
+			turn: { trace, place: { row: 1, column: 1, text: NOTICE_TEXT } },
+		})
+
+		expect(jump_of(first, next)?.run.start_ms).toBe(thawed)
+		expect(jump_of(first, frame_of({ now_ms: thawed }))?.run.start_ms).toBe(NOW)
 	})
 
 	it('draws nothing once the jump is over', () => {

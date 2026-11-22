@@ -88,10 +88,21 @@ function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 	return { run, screen, scene, place: frame.turn?.place, panel: area }
 }
 
-// The jump a frame draws: the last one carried on while it runs, else one the frame starts.
+// The last run carried on while it runs — joshuafolkken/kit#8675: once thawed, with only its trails
+// burning out, it yields to a merge notice that starts a jump.
+function carried(last: JumpDraw | undefined, frame: JumpFrame): JumpRun | undefined {
+	if (last === undefined || !run_board_jump.is_running(last.run, frame.now_ms)) return undefined
+
+	if (run_board_jump.is_thawed(last.run, frame.now_ms) && started(frame) !== undefined) {
+		return undefined
+	}
+
+	return last.run
+}
+
+// The jump a frame draws: the last one carried on, else one the frame starts.
 function jump_of(last: JumpDraw | undefined, frame: JumpFrame): JumpDraw | undefined {
-	const is_carried = last !== undefined && run_board_jump.is_running(last.run, frame.now_ms)
-	const run = is_carried ? last.run : started(frame)
+	const run = carried(last, frame) ?? started(frame)
 
 	return run === undefined ? undefined : draw_of(run, frame)
 }
