@@ -20,6 +20,7 @@ import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive_escalate } from './backlog-drive-escalate'
+import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retry } from './backlog-drive-retry'
 import { backlog_yield_cap } from './backlog-yield-cap'
 
@@ -89,7 +90,7 @@ const CAUSE_CHECKS: ReadonlyMap<string, CauseCheck> = new Map([
 ])
 
 // Each issue's newest park within its current attempt.
-function latest_parks(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, RunEvent> {
+function latest_parks(events: ReadonlyArray<RunEvent>): Map<number, RunEvent> {
 	const parks = new Map<number, RunEvent>()
 
 	for (const event of run_event_retry.current_attempts(events)) {
@@ -97,6 +98,16 @@ function latest_parks(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, RunE
 
 		if (issue !== undefined && event.kind === PARK) parks.set(Number(issue), event)
 	}
+
+	return parks
+}
+
+// The parks the sweep may re-offer. An issue a person withdrew is theirs to put back with
+// `run:add --retry`, which now re-admits it, so the sweep leaves it (joshuafolkken/kit#8599).
+function offerable_parks(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, RunEvent> {
+	const parks = latest_parks(events)
+
+	for (const issue of backlog_drive_restore.withdrawn_issues(events)) parks.delete(Number(issue))
 
 	return parks
 }
@@ -151,7 +162,7 @@ async function note_cap(issue: number, park: RunEvent): Promise<void> {
 	await restate(park, run_stalled.park_event(issue, cap_cause(park)))
 }
 
-// A refused `run:add` (a settled or withdrawn issue, an unreadable lane, a failed label write) leaves the
+// A refused `run:add` (a settled issue, an unreadable lane, a failed label write) leaves the
 // park for a person instead of ending the drive.
 async function retry_cleared(issue: number): Promise<boolean> {
 	try {
@@ -253,7 +264,7 @@ async function retry_all(
 async function sweep(now = Date.now()): Promise<void> {
 	if (now - last_sweep.at < backlog_budget.OFFER_INTERVAL_MS) return
 	last_sweep.at = now
-	const parks = latest_parks(await run_event_stream_emit.current_events())
+	const parks = offerable_parks(await run_event_stream_emit.current_events())
 
 	if (parks.size === 0) return
 	await retry_all([...parks], { history: await run_event_stream_emit.all_events(), now })

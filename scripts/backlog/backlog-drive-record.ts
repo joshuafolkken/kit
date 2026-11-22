@@ -41,13 +41,12 @@ async function stall(issue: string, outcome: DriveLaunch): Promise<void> {
 	await run_stalled_park.apply(issue, comment, `launch ${outcome}`)
 }
 
-// A stream that cannot be read re-admits nothing: the exclusion stands as held (joshuafolkken/kit#8599).
+// With no tick read given, the stream is read as the sibling questions read it. A stream that cannot be
+// read re-admits nothing: the exclusion stands as held (joshuafolkken/kit#8599).
 async function readmit(
 	exclude: ReadonlyArray<string>,
-	read: EventReader | undefined,
+	read: EventReader = backlog_arrival_added.tick_reader().read,
 ): Promise<ReadonlyArray<string>> {
-	if (read === undefined) return exclude
-
 	try {
 		return backlog_drive_restore.without_readmitted(exclude, await read())
 	} catch {

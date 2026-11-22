@@ -1,5 +1,6 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { describe, expect, it, vi } from 'vitest'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DrivePorts, DriveState } from './backlog-drive'
 import { backlog_drive_adopt } from './backlog-drive-adopt'
 import { backlog_drive_record } from './backlog-drive-record'
@@ -91,11 +92,25 @@ describe('backlog_drive_adopt.held — the live drive re-admits', () => {
 	})
 })
 
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
 describe('backlog_drive_record — the production re-admission port', () => {
 	it('reads the tick stream for re-admitted withdrawals', async () => {
 		const { readmit } = backlog_drive_record.record_ports(async () => await READMITTED)
 
 		expect(await readmit([MERGED, CHILD])).toStrictEqual([MERGED])
+	})
+
+	it('reads the run stream itself when no tick read is given', async () => {
+		const stream_target = vi
+			.spyOn(run_event_stream_emit, 'stream_target')
+			.mockResolvedValue(undefined)
+		const { readmit } = backlog_drive_record.record_ports()
+
+		expect(await readmit([CHILD])).toStrictEqual([CHILD])
+		expect(stream_target).toHaveBeenCalledOnce()
 	})
 
 	it('keeps the exclusion when the stream cannot be read', async () => {
