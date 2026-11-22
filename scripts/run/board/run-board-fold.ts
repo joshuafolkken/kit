@@ -171,12 +171,44 @@ function panel_span(throughput: DetailPart | undefined): PanelSpan {
 	return start === undefined ? NO_PANEL : { start, end }
 }
 
-// The usage rows run their panels both or neither: none where one's text reaches the panel's start.
-function rows_span(usage: DetailPart, span: PanelSpan): PanelSpan {
-	const starts = usage.lines.map((line) => run_board_lamps.start_column(line.text))
-	const is_clear = starts.every((column) => column === undefined || column < span.start)
+type DetailLine = DetailPart['lines'][number]
 
-	return is_clear ? span : NO_PANEL
+// The usage part as its panels are run, and the span its rows run them to.
+interface RowsFit {
+	usage: DetailPart
+	rows: PanelSpan
+}
+
+function is_line_clear(line: DetailLine, span: PanelSpan): boolean {
+	const column = run_board_lamps.start_column(line.text)
+
+	return column === undefined || column < span.start
+}
+
+function is_clear(lines: ReadonlyArray<DetailLine>, span: PanelSpan): boolean {
+	return lines.every((line) => is_line_clear(line, span))
+}
+
+// A line reaching the panel's start with the trailing note its text ends on left off; one clear of it
+// keeps its note.
+function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
+	const { text, aside } = line
+	const index = aside === undefined ? -1 : text.lastIndexOf(aside)
+	if (aside === undefined || index === -1 || is_line_clear(line, span)) return line
+
+	return { ...line, text: `${text.slice(0, index)}${text.slice(index + aside.length)}` }
+}
+
+// The usage rows run their panels both or neither: where one's text reaches the panel's start, the
+// reaching rows' asides — a stale reading's age — are left off so both run them
+// (joshuafolkken/kit#8644); none where one reaches it still, or where the span has no room for a panel.
+function rows_fit(usage: DetailPart, span: PanelSpan): RowsFit {
+	if (run_board_lamps.count_of(span.end - span.start) === 0) return { usage, rows: NO_PANEL }
+	if (is_clear(usage.lines, span)) return { usage, rows: span }
+
+	const bare = { ...usage, lines: usage.lines.map((line) => without_aside(line, span)) }
+
+	return is_clear(bare.lines, span) ? { usage: bare, rows: span } : { usage, rows: NO_PANEL }
 }
 
 function lamped(
@@ -197,12 +229,12 @@ function lamped(
 function lamped_parts(parts: FrameParts): FrameParts {
 	const { throughput, usage } = parts
 	const span = panel_span(throughput)
-	const rows = usage === undefined ? span : rows_span(usage, span)
+	const fit = usage === undefined ? undefined : rows_fit(usage, span)
 
 	return {
 		...parts,
 		throughput: lamped(throughput, span),
-		usage: lamped(usage, span, rows),
+		usage: lamped(fit?.usage, span, fit?.rows),
 		usage_alone: lamped(usage, NO_PANEL),
 	}
 }
