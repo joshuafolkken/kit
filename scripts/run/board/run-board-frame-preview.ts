@@ -115,8 +115,8 @@ function notice_of(options: FrameOptions, now_ms: number): Notice | undefined {
 }
 
 // The live ports in the live screen form, with the size and sound switch fixed, the rows typing where
-// the theme's live board types them (so its lamp panel shows), no cue sounded and no frame store; the
-// frame is collected so its escapes can be left off.
+// the theme's live board types them, marked live (so its lamp panel shows though its rows do not
+// type), no cue sounded and no frame store; the frame is collected so its escapes can be left off.
 function fixed_ports(
 	ports: BoardPorts,
 	options: FrameOptions,
