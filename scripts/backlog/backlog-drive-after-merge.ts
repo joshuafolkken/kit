@@ -98,7 +98,7 @@ async function trusted_bodies(issue: string): Promise<ReadonlyArray<string>> {
 }
 
 async function run_josh(argv: ReadonlyArray<string>): Promise<number> {
-	const result = await josh_command.josh_run(argv, true)
+	const result = await josh_command.josh_run(argv, { should_forward_stderr: true })
 
 	return result.code
 }

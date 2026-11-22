@@ -157,7 +157,7 @@ describe('backlog_drive_rate.offer_run', () => {
 		const emit = stub_emit()
 
 		await expect(backlog_drive_rate.offer_run(OFFER_ARGV)).resolves.toBe(result)
-		expect(run).toHaveBeenCalledWith(OFFER_ARGV, true)
+		expect(run).toHaveBeenCalledWith(OFFER_ARGV, { should_forward_stderr: true })
 		expect(emit).toHaveBeenCalledTimes(1)
 	})
 })
@@ -171,8 +171,8 @@ describe('backlog_drive_rate.offer_run lane:prune', () => {
 
 		await backlog_drive_rate.offer_run(OFFER_ARGV)
 		expect(run.mock.calls).toEqual([
-			[['lane:prune'], true],
-			[OFFER_ARGV, true],
+			[['lane:prune'], { should_forward_stderr: true }],
+			[OFFER_ARGV, { should_forward_stderr: true }],
 		])
 	})
 

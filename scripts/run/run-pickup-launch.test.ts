@@ -35,9 +35,9 @@ describe('run:pickup launching the offered children', () => {
 		const result = await run_pickup_launch.launch(['20', '30'])
 
 		expect(josh_run_mock.mock.calls).toStrictEqual([
-			[['epic:next', '20', '30', '--repo', REPO, '--lanes'], true],
-			[[LANE_LAUNCH, '21'], true],
-			[[LANE_LAUNCH, '22'], true],
+			[['epic:next', '20', '30', '--repo', REPO, '--lanes'], { should_forward_stderr: true }],
+			[[LANE_LAUNCH, '21'], { should_forward_stderr: true }],
+			[[LANE_LAUNCH, '22'], { should_forward_stderr: true }],
 		])
 		expect(result).toStrictEqual({
 			lines: [

@@ -242,12 +242,13 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:carry` 
 
 <!-- usage: run:add -->
 
-Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots.
+Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots; --withdrawn re-admits every issue a person withdrew.
 
 ```bash
-pnpm josh run:add 101 102             # ahead of the rest of the queue (`#N` works too)
-pnpm josh run:add 101 --no-priority   # at the end of the queue
-pnpm josh run:add 101 --retry         # retry a mechanically stopped issue in this run
+pnpm josh run:add 101 102               # ahead of the rest of the queue (`#N` works too)
+pnpm josh run:add 101 --no-priority     # at the end of the queue
+pnpm josh run:add 101 --retry           # retry a mechanically stopped issue in this run
+pnpm josh run:add --retry --withdrawn   # re-admit every issue a person withdrew from this run
 ```
 
 <!-- /usage -->
@@ -262,6 +263,7 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 - A reviewed PR may start a repair attempt through `--retry` after a trusted comment newer than its review stop, an open PR, and confirmed worker/ship exit. The retry boundary is recorded once and the previous cut is ended before a replacement worker starts. Merges, splits, protected labels, and active or unreadable owners remain refused.
 - Only such a repair clears `needs-human-merge`, so the next offer dispatches it; its ship re-parks the PR while the diff still needs a person's merge.
 - A live `backlog:drive` runs `--retry` itself on the `run:stalled` causes it can re-offer, 2 times per issue ([labels and run states](./labels-and-run-states.md)); any other cause, or one at that cap, waits for this command.
+- `--retry --withdrawn` (no number) stands for every issue a person withdrew (`lane:withdraw`, not a yield) and nobody relaunched; lines end ` · withdrawn: <reason>`; none → one line, exit 0.
 
 **Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, `tracking #E · <where>`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
 

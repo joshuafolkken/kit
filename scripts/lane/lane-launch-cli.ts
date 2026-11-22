@@ -107,10 +107,9 @@ async function prepare(context: LaunchContext, directory: string): Promise<JoshR
 
 	if (stash === undefined) return PREPARED
 
-	const popped = await josh_command.josh_run(
-		['stash:pop', stash, '--dir', directory],
+	const popped = await josh_command.josh_run(['stash:pop', stash, '--dir', directory], {
 		should_forward_stderr,
-	)
+	})
 
 	if (popped.code !== SUCCESS_EXIT_CODE) return popped
 
@@ -124,7 +123,7 @@ async function prepare(context: LaunchContext, directory: string): Promise<JoshR
 async function close_if_vacant(lane: LaneInfo | undefined): Promise<void> {
 	if (lane === undefined || !(await lane_vacant.is_vacant(lane))) return
 
-	await josh_command.josh_run(['lane:close', lane.issue], should_forward_stderr)
+	await josh_command.josh_run(['lane:close', lane.issue], { should_forward_stderr })
 }
 
 // **A lane a park kept open is resumed, not reopened**. A child parked before
@@ -145,7 +144,7 @@ async function lane_directory(issue: string): Promise<JoshResult> {
 
 	await close_if_vacant(kept)
 
-	return await josh_command.josh_run(['lane:open', issue], should_forward_stderr)
+	return await josh_command.josh_run(['lane:open', issue], { should_forward_stderr })
 }
 
 // The wait code is a dependency wait or a cut-session refusal: neither is a failed launch.
@@ -161,7 +160,7 @@ async function dispatch(context: LaunchContext): Promise<LaunchOutcome> {
 	const dispatched = await run_startup.phase(
 		'worker dispatch',
 		async () =>
-			await josh_command.josh_run(['lane:dispatch', context.issue], should_forward_stderr),
+			await josh_command.josh_run(['lane:dispatch', context.issue], { should_forward_stderr }),
 		{ edge_of: wait_edge },
 	)
 

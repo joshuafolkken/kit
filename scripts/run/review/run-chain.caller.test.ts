@@ -24,8 +24,11 @@ describe('run_chain — the caller a stage names', () => {
 
 		await run_chain.run_stages([stage_named(CHECK_RELATED)], ISSUE, vi.fn())
 
-		expect(josh_run).toHaveBeenCalledWith([CHECK_RELATED], true, undefined, {
-			[test_related_caller.CALLER_ENVIRONMENT]: `run:chain ${CHECK_RELATED}`,
+		expect(josh_run).toHaveBeenCalledWith([CHECK_RELATED], {
+			should_forward_stderr: true,
+			environment: {
+				[test_related_caller.CALLER_ENVIRONMENT]: `run:chain ${CHECK_RELATED}`,
+			},
 		})
 		josh_run.mockRestore()
 	})
@@ -36,8 +39,11 @@ describe('run_chain — the caller a stage names', () => {
 
 		await run_chain.run_stages([review], ISSUE, vi.fn())
 
-		expect(josh_run).toHaveBeenCalledWith(review.argv, true, undefined, {
-			[test_related_caller.CALLER_ENVIRONMENT]: `run:chain ${RUN_REVIEW}`,
+		expect(josh_run).toHaveBeenCalledWith(review.argv, {
+			should_forward_stderr: true,
+			environment: {
+				[test_related_caller.CALLER_ENVIRONMENT]: `run:chain ${RUN_REVIEW}`,
+			},
 		})
 		josh_run.mockRestore()
 	})

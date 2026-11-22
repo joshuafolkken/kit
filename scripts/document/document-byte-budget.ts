@@ -85,7 +85,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// into pages of their own, each at its smallest block.
 	// The drive's own `run:stalled` retry under `run:add --retry` (joshuafolkken/kit#7076) crossed the 53248 block.
 	// `run:park`'s required `--outcome` in its example (joshuafolkken/kit#7850) crossed the 57344 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 61_440 },
+	// `run:add --retry --withdrawn` (joshuafolkken/kit#8619) crossed the 61440 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 65_536 },
 	// The finished rows' icons, `⏩` already done among them (joshuafolkken/kit#7095), crossed the 20480 block.
 	// The parked row's next action from `run:park --outcome` (joshuafolkken/kit#7850) crossed the 24576 block.
 	// `run:board --timing` (joshuafolkken/kit#7929) crossed the 28672 block.

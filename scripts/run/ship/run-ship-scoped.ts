@@ -94,12 +94,10 @@ async function bare_pair(scripts: ReadonlyArray<string>): Promise<PairResult> {
 		scripts.map((script) => ({
 			script,
 			run: async () => {
-				const ran = await josh_command.josh_run(
-					[script],
+				const ran = await josh_command.josh_run([script], {
 					should_forward_stderr,
-					undefined,
-					run_ship_lap.caller_environment(),
-				)
+					environment: run_ship_lap.caller_environment(),
+				})
 
 				outs.push(ran.out)
 
@@ -341,12 +339,10 @@ async function ran_gate(tree: GateTree): Promise<JoshResult> {
 	const result = await run_ship_lap.timed(
 		run_ship_lap.STEP.GATE,
 		async () =>
-			await josh_command.josh_run(
-				GATE_ARGUMENTS,
+			await josh_command.josh_run(GATE_ARGUMENTS, {
 				should_forward_stderr,
-				undefined,
-				run_ship_lap.caller_environment(),
-			),
+				environment: run_ship_lap.caller_environment(),
+			}),
 		{ note_of: () => ({ rerun: reason }) },
 	)
 

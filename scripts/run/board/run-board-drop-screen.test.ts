@@ -52,6 +52,16 @@ describe('run_board_drop_screen.screen_of', () => {
 	})
 })
 
+describe('run_board_drop_screen.screen_of — a wide character at a row’s end', () => {
+	it('starts a wide character landing on a row’s last column on the next row', () => {
+		const screen = screen_of(frame(['abc日d']), IDLE, { rows: 3, columns: 4 })
+
+		expect(cell_at(screen, { row: 1, column: 4 }).text).toBe(' ')
+		expect(cell_at(screen, { row: 2, column: 1 }).text).toBe('日')
+		expect(cell_at(screen, { row: 2, column: 3 }).text).toBe('d')
+	})
+})
+
 describe('run_board_drop_screen.is_kept', () => {
 	it('keeps both halves of a character two columns wide', () => {
 		const screen = screen_of(frame(['a日b']), IDLE, { rows: 2, columns: 8 })

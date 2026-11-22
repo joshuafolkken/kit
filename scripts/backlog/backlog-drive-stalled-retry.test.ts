@@ -119,7 +119,9 @@ describe('backlog_drive_stalled_retry.sweep — an adopted PR', () => {
 		await next_sweep()
 
 		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(branch)
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('checks the registered slug PR before retrying (ac-8429)', async () => {
@@ -135,7 +137,9 @@ describe('backlog_drive_stalled_retry.sweep — an adopted PR', () => {
 		await next_sweep()
 
 		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(branch)
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 })
 
@@ -144,14 +148,18 @@ describe('backlog_drive_stalled_retry.sweep — the cause cleared', () => {
 		await next_sweep()
 
 		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).toHaveBeenCalledWith(`${String(PARKED)}-lane`)
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('retries below the cap, counting earlier retries (ac-765f9d97)', async () => {
 		mock_stream([park()], [retry_event(0), park()])
 		await next_sweep()
 
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('leaves a park run:add refuses for a person, without ending the drive', async () => {
@@ -278,7 +286,9 @@ describe('backlog_drive_stalled_retry.sweep — a park with no stop (ac-a7d6e211
 		await next_sweep()
 
 		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).not.toHaveBeenCalled()
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 })
 
@@ -304,7 +314,9 @@ describe('backlog_drive_stalled_retry.sweep — a yield-cap park (ac-1737b91a)',
 		mock_stream([yield_park(due_at())])
 		await next_sweep()
 
-		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, {
+			should_forward_stderr: true,
+		})
 	})
 
 	it('reaches the cap on the third trip, naming the cause', async () => {
