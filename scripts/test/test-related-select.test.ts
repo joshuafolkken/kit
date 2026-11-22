@@ -209,7 +209,7 @@ describe('test_related_select.select by declaration users', () => {
 	it('runs the users of the changed declarations in place of the import layers', async () => {
 		const root = fixture.workspace
 		const tests = [OUTER_TESTS[1] ?? '']
-		const symbol = { tests, reach: [{ file: CODE, count: 1 }], direct: tests }
+		const symbol = { tests, reach: [{ file: CODE, count: 1 }], direct: tests, rings: [tests] }
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
 		expect(selection).toEqual({ tests, reach: symbol.reach, deferred: 0, method: 'symbol' })
@@ -218,7 +218,7 @@ describe('test_related_select.select by declaration users', () => {
 	it('still defers what the users select past the cap', async () => {
 		const root = fixture.workspace
 		const reach = [{ file: CODE, count: ALL_TESTS.length }]
-		const symbol = { tests: ALL_TESTS, reach, direct: [] }
+		const symbol = { tests: ALL_TESTS, reach, direct: [], rings: [ALL_TESTS] }
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
 		expect(selection).toMatchObject({ deferred: DEFERRED, method: 'symbol' })
@@ -226,7 +226,7 @@ describe('test_related_select.select by declaration users', () => {
 
 	it('reads the import layers for a scope fallen to the whole suite', async () => {
 		const scope: RelatedScope = { mode: 'all', files: [], reason: '' }
-		const symbol = { tests: [], reach: [], direct: [] }
+		const symbol = { tests: [], reach: [], direct: [], rings: [] }
 		const selection = await select_by_users(fixture.workspace, scope, symbol)
 
 		expect(selection.method).toBe('import')
@@ -241,7 +241,7 @@ async function symbol_input(
 	changed: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<string>> {
 	const read: Array<string> = []
-	const symbol = { tests: [], reach: [], direct: [] }
+	const symbol = { tests: [], reach: [], direct: [], rings: [] }
 	const readers: SelectReaders = {
 		...readers_of(root, ALL_TESTS, symbol),
 		symbols: async (_root, code) => {
@@ -292,7 +292,7 @@ describe('test_related_select.select by declaration users, cut by rank', () => {
 
 	it('keeps a direct user sorting last past the cap, the farther users cut first', async () => {
 		const root = fixture.workspace
-		const symbol = { tests: ALL_TESTS, reach, direct: [DIRECT_TEST] }
+		const symbol = { tests: ALL_TESTS, reach, direct: [DIRECT_TEST], rings: [ALL_TESTS] }
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
 		expect(selection.tests[0]).toBe(DIRECT_TEST)
@@ -304,12 +304,37 @@ describe('test_related_select.select by declaration users, cut by rank', () => {
 		const root = fixture.workspace
 		const scope = related_of(root, [CODE])
 		const direct = [DIRECT_TEST, OUTER_TESTS[2] ?? '', OUTER_TESTS[1] ?? '']
-		const first = await select_by_users(root, scope, { tests: ALL_TESTS, reach, direct })
-		const reversed = { tests: ALL_TESTS.toReversed(), reach, direct: direct.toReversed() }
+		const symbol = { tests: ALL_TESTS, reach, direct, rings: [ALL_TESTS] }
+		const first = await select_by_users(root, scope, symbol)
+		const tests = ALL_TESTS.toReversed()
+		const reversed = { tests, reach, direct: direct.toReversed(), rings: [tests] }
 		const second = await select_by_users(root, scope, reversed)
 
 		expect(first.tests.slice(0, direct.length)).toEqual(direct.toReversed())
 		expect(second.tests).toEqual(first.tests)
+	})
+})
+
+// joshuafolkken/kit#8570: past the cap the farthest ring of users is what the cut defers.
+describe('test_related_select.select by declaration users, cut by ring', () => {
+	let fixture: FixtureWorkspace
+
+	beforeEach(() => {
+		fixture = open_fixture()
+	})
+
+	afterEach(async () => {
+		await git_fixture_workspace.close_workspace(fixture)
+	})
+
+	it('keeps a nearer ring sorting last past the cap, the farther ring cut first', async () => {
+		const root = fixture.workspace
+		const reach = [{ file: CODE, count: ALL_TESTS.length }]
+		const symbol = { tests: ALL_TESTS, reach, direct: [], rings: [[DIRECT_TEST], ALL_TESTS] }
+		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
+
+		expect(selection.tests[0]).toBe(DIRECT_TEST)
+		expect(selection.deferred).toBe(DEFERRED)
 	})
 })
 
