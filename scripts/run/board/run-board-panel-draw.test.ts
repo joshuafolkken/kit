@@ -24,6 +24,9 @@ const RULE = `── throughput ${'─'.repeat(40)}`
 const PANEL = Array.from({ length: 8 }, () => LAMP).join(' ')
 const LINES = [RULE, `  24h  5  ${PANEL}`, `   7d     ${PANEL}`]
 const STARTS = [1, 2, 3]
+// The rows under the throughput ones down to the lanes rule.
+const USAGE = ['', '── usage ──', '  Claude', '  Codex', '  GitHub']
+const LANES = '── lanes ──'
 const LAMPS = run_board_lamp_spots.lamps_in(LINES, STARTS, 80)
 const AT = { ms: START, is_burst: false }
 const SHADE = { rgb: '255;70;50', named: 'red' } as const
@@ -75,14 +78,22 @@ function written(draw: PanelDraw | undefined): { drawn: Array<string>; themed: A
 }
 
 describe('run_board_panel_draw.area_of', () => {
-	it('places the area on the throughput rule’s row and the six under it, ended at the rule’s end', () => {
-		expect(area_of(LINES, STARTS, LAMPS)).toStrictEqual({
+	it('places the area on the throughput rule’s row and the seven under it, ended at the rule’s end', () => {
+		expect(area_of([...LINES, ...USAGE, '', LANES], STARTS, LAMPS)).toStrictEqual({
 			top: 1,
 			end: RULE.length,
 			rows: AREA_ROWS,
 			lamps: LAMPS,
 		})
-		expect(AREA_ROWS).toBe(7)
+		expect(AREA_ROWS).toBe(8)
+	})
+
+	// joshuafolkken/kit#8712: the GitHub row is drawn once the rate limit is read.
+	it('ends the area at the usage section’s end, before the GitHub row is drawn or the frame ends', () => {
+		const no_github = [...LINES, ...USAGE.slice(0, -1), '', LANES]
+
+		expect(area_of(no_github, STARTS, LAMPS)?.rows).toBe(AREA_ROWS - 1)
+		expect(area_of(LINES, STARTS, LAMPS)?.rows).toBe(LINES.length)
 	})
 
 	it('places none where the frame draws no lamp — a narrow or colorless terminal', () => {
