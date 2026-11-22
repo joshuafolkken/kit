@@ -4,13 +4,13 @@ import { run_board_change_flash, type Flash } from './run-board-change-flash'
 import { run_board_codes, type RuleCell } from './run-board-codes'
 import { run_board_colon } from './run-board-colon'
 import type { DropScreen } from './run-board-drop-screen'
-import { run_board_fit, type TerminalSize } from './run-board-fit'
+import type { TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamp_spots, type Lamp, type LampMoment } from './run-board-lamp-spots'
 import { run_board_rain_drop } from './run-board-rain-drop'
-import { run_board_row_key } from './run-board-row-key'
 import { run_board_screen } from './run-board-screen'
+import { run_board_spin_place } from './run-board-spin-place'
 import { run_board_spot, type Spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
 import { run_board_strip, type StripCell } from './run-board-strip'
@@ -28,7 +28,8 @@ import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-ty
 // row the frame was cut to the terminal's rows without is not on screen, so it records nothing. The
 // sweep under the third line's age (`run-board-sweep.ts`) is placed the same way, by its own placeholder.
 
-const { COLON, SPOT, TICK, spot_at } = run_board_spot
+const { COLON, SPOT } = run_board_spot
+const { can_type, keyed_of, marks_in, starts_of, sweep_in } = run_board_spin_place
 const { SWEEP_MS, sweep_bytes, sweep_index } = run_board_sweep
 const { colon_bytes } = run_board_colon
 const REDRAW_MS = MS_PER_SECOND
@@ -92,89 +93,6 @@ type SpinPorts = Pick<
 	BoardPorts,
 	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'typing_sound'
 >
-
-// Each `mark` placeholder's spot in `lines`, on screen.
-function marks_in(
-	lines: ReadonlyArray<string>,
-	mark: string,
-	starts: ReadonlyArray<number>,
-	size: { rows: number; columns: number },
-): Array<Spot> {
-	return lines
-		.flatMap((line, index) =>
-			[...line.matchAll(new RegExp(mark, 'gu'))].map((match) =>
-				spot_at(line, match.index, starts[index] ?? 1, size.columns),
-			),
-		)
-		.filter((spot) => spot.row <= size.rows)
-}
-
-// The row on screen each line starts on, after the lines above it wrap.
-function starts_of(lines: ReadonlyArray<string>, columns: number): Array<number> {
-	let row = 1
-
-	return lines.map((line) => {
-		const start = row
-
-		row += run_board_fit.height_of(line, columns)
-
-		return start
-	})
-}
-
-// The keyed row of a split line at `index`, on screen `row`; none for a line with no key. What follows
-// its end mark (joshuafolkken/kit#8607) rides along, drawn whole after the typed text.
-function keyed_line(
-	{ key, text, prefix, suffix }: ReturnType<typeof run_board_row_key.split_key>,
-	index: number,
-	row: number,
-): Array<KeyedLine> {
-	if (key === undefined) return []
-
-	const line = { key, index, row, text, prefix_columns: run_board_fit.width_of(prefix) }
-
-	return [suffix === '' ? line : { ...line, suffix }]
-}
-
-// Each line with its placeholders drawn as `frame` and its key taken out, and the keyed ones — their
-// placeholders kept, so a typing row draws the spinner's frame of the moment it is written.
-function keyed_of(
-	lines: ReadonlyArray<string>,
-	frame: string,
-	starts: ReadonlyArray<number>,
-): Pick<Spun, 'lines' | 'keyed'> {
-	const split = lines.map((line) => run_board_row_key.split_key(line))
-	const keyed = split.flatMap((line, index) => keyed_line(line, index, starts[index] ?? 1))
-
-	return {
-		lines: split.map((line) => run_board_spot.drawn(`${line.text}${line.suffix}`, frame)),
-		keyed,
-	}
-}
-
-// A keyed row types only on screen and within one screen row: a row typed shorter than it wraps would
-// take fewer rows and move every line below it off the spots recorded for them.
-function can_type(line: KeyedLine, rows: number, columns: number): boolean {
-	return (
-		line.row <= rows && run_board_fit.height_of(`${line.text}${line.suffix ?? ''}`, columns) === 1
-	)
-}
-
-// The sweep under the line the `″` placeholder is drawn in, where the line below it has room for one.
-function sweep_in(
-	lines: ReadonlyArray<string>,
-	starts: ReadonlyArray<number>,
-	size: { rows: number; columns: number },
-): Sweep | undefined {
-	const index = lines.findIndex((line) => line.includes(TICK))
-	const line = lines[index]
-
-	if (line === undefined) return undefined
-	const { column } = spot_at(line, line.indexOf(TICK), starts[index] ?? 1, size.columns)
-	const row_below = starts[index + 1] ?? Infinity
-
-	return run_board_sweep.sweep_of({ row_below, column, line_below: lines[index + 1] }, size)
-}
 
 // The frame with each placeholder drawn as `frame` and each key taken out, every placeholder's spot on
 // screen, the keyed rows that can type and the sweep.
