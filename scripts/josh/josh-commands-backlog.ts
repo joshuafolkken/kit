@@ -168,7 +168,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--waves'],
 					description:
-						'print the order the run takes, wave by wave, assuming each wave merges before the next, then `Longest serial chain: <count> — #A → #B → …` — the most issues no two of which may run together, each pair ordered by blocked-by (directly or through planned issues) or declaring overlapping paths; the floor more lanes cannot shorten (omitted under two). Read-only.',
+						'print the order the run takes, wave by wave, assuming each wave merges before the next, then `Longest serial chain: <count> — #A → …`: issues no two of which may run together (blocked-by or overlapping paths), a floor more lanes cannot shorten — found by one walk, so a larger set may exist; omitted under two. Read-only.',
 				},
 				{
 					names: [PENDING_PUBLICATION],
