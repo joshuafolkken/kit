@@ -12,6 +12,16 @@ const DEFAULT = `${ESC}[39m`
 const RESET = `${ESC}[0m`
 const LINK_CLOSE = `${ESC}]8;;${BEL}`
 
+const LINK_OPEN = `${ESC}]8;id=josh-run-board;https://example.com/7${BEL}`
+
+// An escape wrapped as `terminal-link` wraps it inside tmux: every ESC doubled.
+const DCS = `${ESC}P`
+const DOUBLED_ESC = `${ESC}${ESC}`
+
+function tmux_wrapped(sequence: string): string {
+	return `${DCS}tmux;${sequence.replaceAll(ESC, () => DOUBLED_ESC)}${ESC}\\`
+}
+
 function linked(text: string): string {
 	return `${ESC}]8;;https://example.com/7${BEL}${text}${LINK_CLOSE}`
 }
@@ -79,6 +89,28 @@ describe('run_board_cut_styled.cut_styled', () => {
 
 	it('cuts nothing off a line no wider than the columns', () => {
 		expect(cut_styled(`${GREEN}ab${DEFAULT}`, 5)).toBe(`${GREEN}ab${DEFAULT}${RESET}`)
+	})
+})
+
+// joshuafolkken/kit#8567: inside tmux `terminal-link` wraps each link escape in tmux's passthrough.
+describe('run_board_cut_styled with a tmux-wrapped link', () => {
+	it('keeps the link whole, counts no column for it and closes it wrapped', () => {
+		const line = `IS ${tmux_wrapped(LINK_OPEN)}4566${tmux_wrapped(LINK_CLOSE)} x`
+		const cut = cut_styled(line, 5)
+
+		expect(cut).toBe(`IS ${tmux_wrapped(LINK_OPEN)}45${tmux_wrapped(LINK_CLOSE)}${RESET}`)
+		expect(
+			run_board_cut_styled.pieces_of(line).reduce((columns, piece) => columns + piece.width, 0),
+		).toBe('IS 4566 x'.length)
+		expect(run_board_cut_styled.tail_styled(line, 5)).toBe(
+			`${tmux_wrapped(LINK_OPEN)}66${tmux_wrapped(LINK_CLOSE)} x${RESET}`,
+		)
+		expect(
+			run_board_cut_styled
+				.styled_pieces(line)
+				.map((piece) => piece.text)
+				.join(''),
+		).toBe('IS 4566 x')
 	})
 })
 
