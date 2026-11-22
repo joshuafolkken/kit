@@ -244,6 +244,7 @@ function live_ports(ports: BoardPorts, keys: KeyReading, live: LiveDefinition): 
 		sound: keys.sound,
 		cue: keys.cue ?? ports.cue,
 		types_rows: live.types_rows,
+		is_live: true,
 		typing_sound: trill_of(ports, keys, live),
 	}
 }
