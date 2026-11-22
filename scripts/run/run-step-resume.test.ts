@@ -57,6 +57,14 @@ describe('run:step after an implementation resume', () => {
 		expect(next_line([CUT, RESUME])).toBe(run_step.IMPLEMENT)
 	})
 
+	// joshuafolkken/kit#8583: a resume into the gate is no implementation position.
+	it('reads past a pre-gate resume, answering as the cut it follows', () => {
+		const pre_gate_cut = event(1, KIND.CUT, `#${ISSUE} cut (pre-gate)`)
+		const gate_resume = event(2, KIND.RESUME, `#${ISSUE} resumed (gate)`)
+
+		expect(next_line([pre_gate_cut, gate_resume])).toBe(RESUME_COMMAND)
+	})
+
 	it('ignores another issue resuming after this one was cut', () => {
 		const foreign = event(2, KIND.RESUME, '#9999 resumed')
 
