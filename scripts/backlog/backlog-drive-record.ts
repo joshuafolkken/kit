@@ -4,7 +4,9 @@ import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 import { backlog_arrival_added, type EventReader } from './backlog-arrival-added'
 import type { LoopPorts } from './backlog-drive'
+import type { ReadmitPorts } from './backlog-drive-adopt'
 import type { DriveLaunch } from './backlog-drive-launch-pass'
+import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_yield_cap } from './backlog-yield-cap'
 
 // The run's own record the driver reads: the carry, and the two answers the ask interval takes from the
@@ -39,14 +41,30 @@ async function stall(issue: string, outcome: DriveLaunch): Promise<void> {
 	await run_stalled_park.apply(issue, comment, `launch ${outcome}`)
 }
 
-// `read` is the tick's shared stream read (`backlog_arrival_added.tick_reader`), so the two questions
-// parse the stream once between them (joshuafolkken/kit#7016).
+// A stream that cannot be read re-admits nothing: the exclusion stands as held (joshuafolkken/kit#8599).
+async function readmit(
+	exclude: ReadonlyArray<string>,
+	read: EventReader | undefined,
+): Promise<ReadonlyArray<string>> {
+	if (read === undefined) return exclude
+
+	try {
+		return backlog_drive_restore.without_readmitted(exclude, await read())
+	} catch {
+		return exclude
+	}
+}
+
+// `read` is the tick's shared stream read (`backlog_arrival_added.tick_reader`), so the stream
+// questions parse the stream once between them (joshuafolkken/kit#7016).
 function record_ports(
 	read?: EventReader,
-): Pick<LoopPorts, 'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'> {
+): Pick<LoopPorts, 'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'> &
+	Required<ReadmitPorts> {
 	return {
 		added_since: async (since_ms) => await backlog_arrival_added.is_added_since(since_ms, read),
 		raised_since: async (since_ms) => await backlog_arrival_added.is_raised_since(since_ms, read),
+		readmit: async (exclude) => await readmit(exclude, read),
 		named_left: is_named_left,
 		...backlog_yield_cap.PORTS,
 		stall,
