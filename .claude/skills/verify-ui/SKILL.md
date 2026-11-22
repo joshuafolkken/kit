@@ -58,7 +58,8 @@ The board is text, so read it: do not look for a screenshot command, and do not 
 
 1. List the states the change affects, of: a notice or none, repeat, mute, theme (default,
    `wargames`, `matrix`), a narrow width.
-2. Per state, run `pnpm josh run:board --frame` once with the flags that fix it (`--notice <row state>`,
+2. Per state, run `pnpm josh run:board --frame` once with the flags that fix it (`--notice <row state>`
+   such as `merged` or `stopped`,
    `--issue <n>`, `--repeat`, `--mute`, `--theme <name>`, `--columns <n>`) and read the output: layout,
    wording, column alignment and width as intended. For a color change add `--ansi` and read the SGR codes.
 

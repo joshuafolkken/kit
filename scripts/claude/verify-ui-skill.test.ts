@@ -1,5 +1,6 @@
 import { AI_DOCS, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { run_board_frame_preview } from '#scripts/run/board/run-board-frame-preview'
+import { run_board_sound_transition } from '#scripts/run/board/run-board-sound-transition'
 import { ui_shot } from '#scripts/ui/ui-shot'
 import { describe, expect, it } from 'vitest'
 import { read_skill_file } from './skill-fixture'
@@ -57,6 +58,11 @@ describe(`${SKILL_PATH} — terminal UI path`, () => {
 			expect(run_board_frame_preview.FRAME_USAGE).toContain(flag)
 		},
 	)
+
+	it.each(['merged', 'stopped'])('names %s, a row state --notice takes', (state) => {
+		expect(skill).toContain(`\`${state}\``)
+		expect(run_board_sound_transition.ROW_SOUNDS).toHaveProperty(state)
+	})
 
 	it('leaves only the look, animation and sound to the post-merge check', () => {
 		expect(skill).toContain('read the SGR codes')

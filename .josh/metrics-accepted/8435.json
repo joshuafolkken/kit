@@ -2,7 +2,7 @@
 	"reason": "verify-ui gains the terminal UI path (#8435): the skill's on-demand bytes grow by design, within its 4096 byte budget",
 	"date": "2026-11-22",
 	"growth": {
-		"ai_cost.on_demand_bytes": 978,
+		"ai_cost.on_demand_bytes": 1011,
 		"prose.excess_bold": 1
 	}
 }
