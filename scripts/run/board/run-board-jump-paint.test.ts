@@ -27,6 +27,10 @@ function grid(rows: number): Array<PaintCell> {
 	)
 }
 
+function is_white(cell: PaintCell): boolean {
+	return cell.fg.join(',') === WHITE.join(',')
+}
+
 function changed(
 	before: ReadonlyArray<PaintCell>,
 	after: ReadonlyArray<PaintCell>,
@@ -133,6 +137,17 @@ describe('run_board_jump_paint.jump_cells — the fire trails', () => {
 
 		expect(jump_cells(trail, 57, LETTERS, TRAILS)[0]?.text).not.toBe('a')
 		expect(jump_cells(trail, 58, LETTERS, TRAILS)).toStrictEqual(trail)
+	})
+})
+
+describe('run_board_jump_paint.jump_cells — the time circuits roll', () => {
+	it('spins the header clock white over the wash from 12 ticks past the jump', () => {
+		const clock = [...'ET 19:52'].map((text, x) => cell_at(x, 0, { text }))
+		const before = jump_cells(clock, 11, LETTERS, SCENE)
+		const rolled = jump_cells(clock, 12, LETTERS, SCENE)
+
+		expect(before.some((cell) => is_white(cell))).toBe(false)
+		expect(rolled.filter((cell) => is_white(cell)).length).toBeGreaterThan(0)
 	})
 })
 
