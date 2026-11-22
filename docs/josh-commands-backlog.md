@@ -988,7 +988,7 @@ pnpm josh backlog:plan --waves          # the run order, wave by wave
 **Options:**
 
 - `--exclude <N>` — same exclusion as `backlog:next`.
-- `--waves` — print the order the run takes, wave by wave, assuming each wave merges before the next. Read-only.
+- `--waves` — print the order the run takes, wave by wave, assuming each wave merges before the next, then `Longest serial chain: <count> — #A → #B → …` — the longest run of issues linked by blocked-by or a declared-path overlap, the floor more lanes cannot shorten (omitted when no two issues are linked). Read-only.
 - `--pending-publication` — list each pending-publication issue that blocks an open issue, then every pending issue with its missing steps (epic placement, plan record, publish), instead of the plan. Read-only.
 
 <!-- /usage -->

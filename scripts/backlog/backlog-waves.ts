@@ -12,6 +12,7 @@ import {
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { run_stalled } from '#scripts/run/park/run-stalled'
+import { backlog_chain } from './backlog-chain'
 import { backlog_plan, type PlanContext } from './backlog-plan'
 import { backlog_rank, type GateScope } from './backlog-rank'
 
@@ -202,6 +203,10 @@ function format_waves(
 		width_line(scope.wave_limit),
 		'',
 		...(waves.length === 0 ? [backlog_plan.NOTHING] : waves),
+		...backlog_chain.chain_lines(
+			backlog_chain.longest_chain(plan.waves, scope.declared),
+			context.repo,
+		),
 		'',
 		backlog_plan.section(UNREACHED_HEADING, unreached_lines(plan, context)),
 	].join('\n')
