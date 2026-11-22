@@ -280,7 +280,12 @@ describe('run_board_spin.spun draw budget', () => {
 // joshuafolkken/kit#8367: the matrix board keeps the stress frame's cells on each redraw and writes the
 // drops' cells on every step between, so both are held under one drop step.
 // joshuafolkken/kit#8369: a pour adds four drops a step, so the step is held under one too while it pours.
-function drop_ms(at_ms: number, pours: ReadonlyArray<TypingSpan> = []): number {
+// joshuafolkken/kit#8629: a deja vu rains a hundred and twenty drops over the text in its second.
+function drop_ms(
+	at_ms: number,
+	pours: ReadonlyArray<TypingSpan> = [],
+	deja_starts: ReadonlyArray<number> = [],
+): number {
 	const started = performance.now()
 	const lines = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows)
 	const screen = run_board_drop_screen.screen_of(
@@ -288,7 +293,7 @@ function drop_ms(at_ms: number, pours: ReadonlyArray<TypingSpan> = []): number {
 		run_board_type_rows.NO_TYPING,
 		PANE,
 	)
-	const poured = run_board_rain_drop.poured(screen, pours, at_ms)
+	const poured = run_board_rain_drop.poured(screen, pours, at_ms, deja_starts)
 
 	run_board_rain_drop.drop_bytes(poured, at_ms, at_ms - run_board_rain_drop.DROP_MS)
 
@@ -319,6 +324,16 @@ describe('run_board_rain_drop draw budget', () => {
 			const at_ms = START + index * SECOND_MS
 
 			return drop_ms(at_ms, [{ from_ms: at_ms - 10 * SECOND_MS, to_ms: at_ms - SECOND_MS }])
+		})
+
+		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)
+	})
+
+	it('writes a step within one step as a deja vu’s last drops enter, every drop on screen', () => {
+		const spent = Array.from({ length: DRAWS }, (_, index) => {
+			const at_ms = START + index * SECOND_MS
+
+			return drop_ms(at_ms, [], [at_ms - SECOND_MS + run_board_rain_drop.DROP_MS])
 		})
 
 		expect(lane_stats.median(spent)).toBeLessThan(run_board_rain_drop.DROP_MS)

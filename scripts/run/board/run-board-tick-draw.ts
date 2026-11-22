@@ -224,23 +224,37 @@ function has_drop(ports: LivePorts, defs: LiveDefs = THEME_DEFS): boolean {
 	return is_colored_tty(ports)
 }
 
+// The last frame's drop and this frame's flash, which together hold the deja vus a drop rains for.
+interface DropFlash {
+	drop: DropScreen | undefined
+	flash: Flash | undefined
+}
+
+// The first frame of every deja vu whose rain can still be on screen: the last drop's and the flash's.
+function deja_starts_of(last: DropFlash): Array<number> {
+	const carried = (last.drop?.deja_spans ?? []).map((span) => span.from_ms)
+
+	return [...carried, ...(last.flash?.deja_vu ?? []).map((entry) => entry.start_ms)]
+}
+
 // The frame's cells the drop falls down, where one falls — as the theme draws them, since the drop is
 // written past the theme and puts each cell it leaves back as it was on screen — with the spans the rain
-// pours over: the last frame's carried on, this frame's rows typing added (joshuafolkken/kit#8369).
+// pours over: the last frame's carried on, this frame's rows typing added (joshuafolkken/kit#8369) — and
+// the deja vu rains, the last frame's and this frame's replays' (joshuafolkken/kit#8629).
 function drop_of(
 	redraw: Redraw,
 	drawn: Drawn,
 	typing: Typing,
-	last: DropScreen | undefined,
+	last: DropFlash,
 ): DropScreen | undefined {
 	const { ports } = redraw
 
 	if (!has_drop(ports)) return undefined
 	const lines = drawn.lines.map((line) => run_board_theme.restyle(ports.theme, line, ports.icons))
 	const screen = run_board_drop_screen.screen_of({ ...drawn, lines }, typing, drawn.size)
-	const spans = [...(last?.pours ?? []), ...run_board_type_rows.spans_of(typing)]
+	const spans = [...(last.drop?.pours ?? []), ...run_board_type_rows.spans_of(typing)]
 
-	return run_board_rain_drop.poured(screen, spans, redraw.now_ms)
+	return run_board_rain_drop.poured(screen, spans, redraw.now_ms, deja_starts_of(last))
 }
 
 // The rows this frame types where the board types them; a frame before the plan is read is no base — the
@@ -304,7 +318,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	write_frame(redraw, drawn, typing, flash)
 
 	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
-	const drop = drop_of(redraw, drawn, typing, state.drop)
+	const drop = drop_of(redraw, drawn, typing, { drop: state.drop, flash })
 
 	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop, flash }
 }

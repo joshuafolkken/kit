@@ -23,6 +23,7 @@ import type { TypingSpan } from './run-board-type-rows'
 // joshuafolkken/kit#8627: every drop's trail runs 40% to 100% of the screen's rows, `TRAIL`'s paint
 // stretched over it (`run_board_rain.paint_of`). The pour falls twice the panel's pour (`POUR_GAIN`), on
 // the drops only, and once the typing ends a poured drop gains its own pace again each second.
+// joshuafolkken/kit#8629: a deja vu pours too (`DEJA_BURST`), its drops painting over the text.
 
 const { SHADES } = run_board_header_trace
 const { cell_at, is_kept, key_of } = run_board_drop_screen
@@ -34,15 +35,7 @@ const POUR_FLOOR = POUR.least * POUR_GAIN
 const TRAIL: ReadonlyArray<Paint> = [SHADES.bright, SHADES.mid, SHADES.dark, SHADES.darkest]
 const FILM = { least: 0.4, spread: 0.6 }
 const LIT_TRAIL = 2
-const SALT = {
-	column: 1,
-	speed: 2,
-	glyph: 3,
-	pour_column: 4,
-	pour_speed: 5,
-	trail: 6,
-	pour_trail: 7,
-}
+const SALT = { column: 1, speed: 2, glyph: 3, trail: 6 }
 const SCALE = 1000
 const PAIR = 2
 const CSI = '\u{1B}['
@@ -59,12 +52,39 @@ interface Fall {
 	length: number
 	// A poured drop's typing end, from which it hurries; none for the second's drop.
 	ends_ms?: number
+	// A deja vu's drop, which paints over the board's text rather than lighting it.
+	covers?: true | undefined
 }
 
-// The step a poured drop entered on and the end of the typing that poured it.
+// A rain that pours drops in on each step of its spans: the screen's spans it reads, the drops a step and
+// the salts their column, pace and trail are drawn with.
+interface Burst {
+	spans: 'pours' | 'deja_spans'
+	per_step: number
+	salts: { column: number; speed: number; trail: number }
+	covers?: true
+}
+
+// joshuafolkken/kit#8629: a deja vu rains `DEJA_STEPS` steps from its first frame, six drops a step at
+// the pour's pace, over the board's text, hurrying once its last drop is in.
+const POUR_BURST: Burst = {
+	spans: 'pours',
+	per_step: POUR_PER_STEP,
+	salts: { column: 4, speed: 5, trail: 7 },
+}
+const DEJA_BURST: Burst = {
+	spans: 'deja_spans',
+	per_step: 6,
+	salts: { column: 8, speed: 9, trail: 10 },
+	covers: true,
+}
+const DEJA_STEPS = 20
+
+// The step a poured drop entered on, the end of the span that poured it and the rain it is in.
 interface PourStep {
 	born_ms: number
 	ends_ms: number
+	burst: Burst
 }
 
 function mixed_share(values: ReadonlyArray<number>): number {
@@ -96,11 +116,13 @@ function fall_of(born_ms: number, screen: DropScreen, share: Share): Fall {
 // The `nth` drop the rain poured in on `step`: its column, its pace in twice the pour's spread and its
 // trail.
 function poured_fall(step: PourStep, nth: number, screen: DropScreen, share: Share): Fall {
-	const column = column_of(share([step.born_ms, SALT.pour_column, nth]), screen.columns)
-	const speed = (POUR.least + share([step.born_ms, SALT.pour_speed, nth]) * POUR.spread) * POUR_GAIN
-	const length = trail_of(screen.rows.length, share([step.born_ms, SALT.pour_trail, nth]))
+	const { born_ms, ends_ms, burst } = step
+	const { salts } = burst
+	const column = column_of(share([born_ms, salts.column, nth]), screen.columns)
+	const speed = (POUR.least + share([born_ms, salts.speed, nth]) * POUR.spread) * POUR_GAIN
+	const length = trail_of(screen.rows.length, share([born_ms, salts.trail, nth]))
 
-	return { ...step, column, speed, length }
+	return { born_ms, ends_ms, column, speed, length, covers: burst.covers }
 }
 
 function steps_of(fall: Fall, at_ms: number): number {
@@ -152,26 +174,30 @@ function second_falls(screen: DropScreen, at_ms: number, share: Share): Array<Fa
 		.filter((fall) => !run_board_rain_pour.is_pouring(screen.pours ?? [], fall.born_ms))
 }
 
-// `POUR_PER_STEP` drops entered on each step up to `at_ms` the rain pours, back as far as the slowest
-// could still be on screen, each hurrying from the end of its span.
-function poured_falls(screen: DropScreen, at_ms: number, share: Share): Array<Fall> {
+// The burst's drops entered on each step up to `at_ms` of its spans, back as far as the slowest could
+// still be on screen, each hurrying from the end of its span.
+function poured_falls(screen: DropScreen, at_ms: number, share: Share, burst: Burst): Array<Fall> {
 	const from_ms = at_ms - reach_ms(screen, POUR_FLOOR)
 	const past_ms = (Math.floor(at_ms / DROP_MS) + 1) * DROP_MS
 
-	return (screen.pours ?? []).flatMap((span) =>
+	return (screen[burst.spans] ?? []).flatMap((span) =>
 		run_board_rain_pour
 			.pour_steps([span], from_ms, past_ms)
 			.flatMap((born_ms) =>
-				Array.from({ length: POUR_PER_STEP }, (_drop, nth) =>
-					poured_fall({ born_ms, ends_ms: span.to_ms }, nth, screen, share),
+				Array.from({ length: burst.per_step }, (_drop, nth) =>
+					poured_fall({ born_ms, ends_ms: span.to_ms, burst }, nth, screen, share),
 				),
 			),
 	)
 }
 
-// The drops on the screen at `at_ms`: the seconds' and the pour's.
+// The drops on the screen at `at_ms`: the seconds', the pour's and, drawn over them, the deja vu's.
 function falls_at(screen: DropScreen, at_ms: number, share: Share): Array<Fall> {
-	const falls = [...second_falls(screen, at_ms, share), ...poured_falls(screen, at_ms, share)]
+	const falls = [
+		...second_falls(screen, at_ms, share),
+		...poured_falls(screen, at_ms, share, POUR_BURST),
+		...poured_falls(screen, at_ms, share, DEJA_BURST),
+	]
 
 	return falls.filter(
 		(fall) => head_row(fall, at_ms, screen.pours) - fall.length <= screen.rows.length,
@@ -213,6 +239,23 @@ function lit_text(
 	return index <= LIT_TRAIL ? run_board_labels.painted(SHADES.bright, text) : undefined
 }
 
+// What the drop draws in its `index`th cell: a covering drop its painted code over any cell, any other
+// what `lit_text` draws.
+function drawn_text(
+	screen: DropScreen,
+	moment: { fall: Fall; at_ms: number },
+	place: ScreenPlace,
+	index: number,
+): string | undefined {
+	const { fall, at_ms } = moment
+
+	function code(): string {
+		return run_board_labels.painted(paint_at(fall, index), code_glyph(fall, place, index, at_ms))
+	}
+
+	return fall.covers === true ? code() : lit_text(screen, place, index, code)
+}
+
 // The drop's cells on the screen at `at_ms`, each as written, by `row;column`.
 function fall_cells(screen: DropScreen, fall: Fall, at_ms: number): Array<[string, string]> {
 	const head = head_row(fall, at_ms, screen.pours)
@@ -222,9 +265,7 @@ function fall_cells(screen: DropScreen, fall: Fall, at_ms: number): Array<[strin
 		column: fall.column,
 	})).flatMap((place, index) => {
 		if (place.row < 1 || place.row > screen.rows.length || is_kept(screen, place)) return []
-		const text = lit_text(screen, place, index, () =>
-			run_board_labels.painted(paint_at(fall, index), code_glyph(fall, place, index, at_ms)),
-		)
+		const text = drawn_text(screen, { fall, at_ms }, place, index)
 
 		return text === undefined ? [] : [[key_of(place), text]]
 	})
@@ -263,15 +304,24 @@ function drop_bytes(
 }
 
 // The screen with the spans the rain pours over: this frame's rows typing and the last frame's spans a
-// drop they sped up can still be on screen for, merged.
-function poured(screen: DropScreen, spans: ReadonlyArray<TypingSpan>, now_ms: number): DropScreen {
+// drop they sped up can still be on screen for, merged — and, apart, one span from each deja vu's first
+// frame (`deja_starts`) its drops can still be on screen for.
+function poured(
+	screen: DropScreen,
+	spans: ReadonlyArray<TypingSpan>,
+	now_ms: number,
+	deja_starts: ReadonlyArray<number> = [],
+): DropScreen {
 	const since_ms = now_ms - reach_ms(screen, run_board_idle_rain.pace_of(0))
 	const kept = spans.filter((span) => span.to_ms > since_ms)
+	const deja_spans = [...new Set(deja_starts)]
+		.map((from_ms) => ({ from_ms, to_ms: from_ms + DEJA_STEPS * DROP_MS }))
+		.filter((span) => span.to_ms > since_ms)
 
-	return { ...screen, pours: run_board_rain_pour.merged(kept) }
+	return { ...screen, pours: run_board_rain_pour.merged(kept), deja_spans }
 }
 
-const run_board_rain_drop = { DROP_MS, drop_bytes, falls_at, head_row, poured }
+const run_board_rain_drop = { DEJA_STEPS, DROP_MS, drop_bytes, falls_at, head_row, poured }
 
 export { run_board_rain_drop }
 export type { Fall, Share }

@@ -169,12 +169,16 @@ describe('run_board_tick_draw.draw_display with the drop', () => {
 // joshuafolkken/kit#8369: a redraw carries the last frame's pour spans on while a drop they sped up can
 // still be on screen, so the drops neither jump back up nor vanish mid-fall; an older span is let go.
 // The pour spans the matrix board's next redraw keeps, the last frame having carried `span`.
-function carried(span: TypingSpan): ReadonlyArray<TypingSpan> {
+function last_drop(): DropScreen {
 	const last = redrawn_state('matrix').drop
 
 	if (last === undefined) throw new Error('the matrix board drew no drop')
 
-	return redrawn_state('matrix', { ...last, pours: [span] }).drop?.pours ?? []
+	return last
+}
+
+function carried(span: TypingSpan): ReadonlyArray<TypingSpan> {
+	return redrawn_state('matrix', { ...last_drop(), pours: [span] }).drop?.pours ?? []
 }
 
 describe('run_board_tick_draw.draw_display with the last frame’s pours', () => {
@@ -188,5 +192,24 @@ describe('run_board_tick_draw.draw_display with the last frame’s pours', () =>
 
 	it('lets go of a span older than the slowest drop’s time on screen', () => {
 		expect(carried(STALE)).not.toContainEqual(STALE)
+	})
+})
+
+// joshuafolkken/kit#8629: a redraw carries the last frame's deja vu rains on the same way.
+function carried_deja(span: TypingSpan): ReadonlyArray<TypingSpan> {
+	return redrawn_state('matrix', { ...last_drop(), deja_spans: [span] }).drop?.deja_spans ?? []
+}
+
+describe('run_board_tick_draw.draw_display with the last frame’s deja vu rains', () => {
+	const { START } = run_board_fixture
+	const RECENT = { from_ms: START - 2000, to_ms: START - 1000 }
+	const STALE = { from_ms: START - 3_600_000, to_ms: START - 3_599_000 }
+
+	it('keeps a deja vu’s rain while its drops can still be on screen', () => {
+		expect(carried_deja(RECENT)).toStrictEqual([RECENT])
+	})
+
+	it('lets go of one older than the slowest drop’s time on screen', () => {
+		expect(carried_deja(STALE)).toStrictEqual([])
 	})
 })
