@@ -46,9 +46,12 @@ interface LiveDefinition {
 }
 
 interface ThemeDefinition {
-	// The board's name the header and the no-run line draw in place of `josh-board`, in lower case: the
-	// frame's capitals pass raises it (joshuafolkken/kit#8604).
+	// The board's name the header and the no-run line draw in place of `josh-board`, in lower case: a
+	// theme that draws in `capitals` raises it (joshuafolkken/kit#8604).
 	name: string
+	// Whether the theme draws the frame's text in capitals; `false` draws it as written
+	// (joshuafolkken/kit#8609).
+	capitals: boolean
 	// The color the theme draws text no color is given in.
 	paint: Paint
 	// Section dashes and heading text, and the theme's idle glyphs (joshuafolkken/kit#8390).
@@ -76,6 +79,7 @@ const THEME_DEFS = {
 	wargames: {
 		// The film's war-planning computer, WOPR.
 		name: 'josh-wopr',
+		capitals: true,
 		// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
 		paint: CYAN,
 		// The rules in the idle tone, behind the row typing (joshuafolkken/kit#8397).
@@ -103,15 +107,17 @@ const THEME_DEFS = {
 	matrix: {
 		// The film's opening terminal line, `Trace program: running`.
 		name: 'josh-trace',
+		// The text as written, as the film's terminal draws it (joshuafolkken/kit#8609).
+		capitals: false,
 		paint: run_board_header_trace.SHADES.body,
 		rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
 		idle: run_board_header_trace.SHADES.mid,
 		intro: {
-			line: 'KNOCK, KNOCK, JOSH.',
+			line: 'Knock, knock, Josh.',
 			letter_ms: 50,
 			hold_ms: 1300,
 			leads: {
-				lines: ['WAKE UP, JOSH...', 'THE BOARD HAS YOU...', 'FOLLOW THE WHITE RABBIT.'],
+				lines: ['Wake up, Josh...', 'The board has you...', 'Follow the white rabbit.'],
 				hold_ms: 1100,
 				gap_ms: 300,
 				paint: run_board_header_trace.SHADES.bright,

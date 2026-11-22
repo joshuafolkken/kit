@@ -103,7 +103,8 @@ describe('run_board_theme matrix rule boundaries', () => {
 			const drawn = run_board_theme.restyle('matrix', line)
 
 			expect(drawn).toContain(MATRIX_DASH.repeat(2))
-			expect(drawn).toContain(`${RGB_MID} THROUGHPUT `)
+			// joshuafolkken/kit#8609: the heading as written.
+			expect(drawn).toContain(`${RGB_MID} throughput `)
 		},
 	)
 
