@@ -1,7 +1,5 @@
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { issue_body_keys } from '#scripts/issue/issue-body-keys'
-import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { declared_growth } from '#scripts/split/declared-growth'
@@ -11,7 +9,14 @@ import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
 import { lane_plan_moves } from './lane-plan-moves'
-import { lane_plan_new_files, type NewFilesFloor } from './lane-plan-new-files'
+import { lane_plan_new_files } from './lane-plan-new-files'
+import {
+	lane_plan_size_text,
+	type FilesOver,
+	type HubOver,
+	type MeasureOver,
+	type Oversize,
+} from './lane-plan-size-text'
 import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget } from './lane-stage-budget'
 
@@ -81,32 +86,6 @@ interface PlanSignals {
 	split_filed: boolean
 	hubs?: ReadonlyArray<string> | undefined
 }
-
-interface FilesOver {
-	reason: 'files'
-	declared: number
-	limit: number
-	kept: ReadonlyArray<string>
-	split_off: ReadonlyArray<string>
-}
-
-interface MeasureOver {
-	reason: 'hunks' | 'lines'
-	declared: number
-	limit: number
-	measured: number
-	floor?: NewFilesFloor | undefined
-	moved?: number | undefined
-}
-
-// `limit` is the test-file cap the hubs' reach passes.
-interface HubOver {
-	reason: 'hub'
-	limit: number
-	hubs: ReadonlyArray<string>
-}
-
-type Oversize = (FilesOver | MeasureOver | HubOver) & { guide?: SplitGuide }
 
 interface Declared {
 	files: number
@@ -382,70 +361,17 @@ function oversize(
 	return over === undefined ? undefined : { ...over, guide: guide_of(signals) }
 }
 
-function bar_tail(): string {
-	return `A \`${split_assess.REASON_PREFIX}\` comment does not pass this bar — split-assessment.md → "${split_assess.QUESTION_SECTION}".`
-}
-
-const SIZE_PREFIX = issue_body_keys.prefix('size')
-const SINGLE_HINT =
-	'`--single "<why it cannot be merged in parts>"` — the reason goes on the Issue and the ledger'
-
-function files_text(issue: number, over: FilesOver): string {
-	const planned = [...over.kept, ...over.split_off]
-	const counted = split_assess.units_of(planned, new Set()).length
-	const bar = `${String(counted)} files (tests included, generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
-	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept].join(' ')
-
-	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
-}
-
-function waiver_text(issue: number, over: Oversize): string {
-	return `size warning (${over.reason}): ${session_cite.issue(issue)}'s plan is past its ${String(over.limit)} bar, recorded and noted on the ledger — a warning, not a stop; finish this Issue, never split it — an overrun past the cap at the merge is recorded as a pre-split miss (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
-}
-
-function measure_bar(over: MeasureOver): string {
-	if (over.reason === 'hunks') {
-		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`${SIZE_PREFIX}\` declares`
-	}
-
-	const floor =
-		over.floor === undefined ? '' : `, and ${lane_plan_new_files.floor_text(over.floor)}`
-	const moved = over.moved === undefined ? '' : `, and ${lane_plan_moves.moved_text(over.moved)}`
-
-	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration${floor}${moved} — over the ${String(over.limit)} declared lines the size bar allows`
-}
-
-function measure_text(issue: number, over: MeasureOver): string {
-	return `split (${over.reason}): ${session_cite.issue(issue)}'s ${measure_bar(over)}, so the plan is not recorded. Carve a separately-mergeable part off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. ${bar_tail()}`
-}
-
-function hub_text(issue: number, over: HubOver): string {
-	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with ${SINGLE_HINT}. ${bar_tail()}`
-}
-
-function over_text(issue: number, over: Oversize): string {
-	if (over.reason === 'files') return files_text(issue, over)
-
-	return over.reason === 'hub' ? hub_text(issue, over) : measure_text(issue, over)
-}
-
-function refusal_text(issue: number, over: Oversize): string {
-	const text = over_text(issue, over)
-	const { implement } = lane_stage_budget.BUDGET_MINUTES
-	const guide = over.guide ?? split_assess.guide_for(implement, undefined)
-
-	return `${text} ${split_assess.policy_text(guide)}`
-}
-
 const lane_plan_size = {
 	declares,
 	is_past_cap,
 	is_waived,
 	measured_of,
 	oversize,
-	refusal_text,
-	waiver_text,
+	refusal_text: lane_plan_size_text.refusal_text,
+	waiver_text: lane_plan_size_text.waiver_text,
 }
 
 export { lane_plan_size }
-export type { Oversize, PlanSignals, SplitReason }
+export type { PlanSignals, SplitReason }
+
+export { type Oversize } from './lane-plan-size-text'

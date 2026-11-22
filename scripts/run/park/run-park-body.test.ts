@@ -184,6 +184,27 @@ describe('run_park_body.adopt_problem', () => {
 	})
 })
 
+// joshuafolkken/kit#8661: #8657's park — file a prerequisite carved off its own scope, resume after it
+// merges — is a serial chain the parent does not adopt; a filing naming its order kind still is.
+describe('run_park_body.adopt_problem on a serial carve-off', () => {
+	const CARVE = single_option('A', '親（issue:file）')
+
+	it('refuses the carve-off and offers no --adopt line for it (ac-c3c5f477, ac-4789399d)', () => {
+		expect(run_park_body.adopt_problem(CARVE, 1)).toContain('a serial carve-off')
+		expect(run_park_body.adoptable_pick(CARVE)).toBeUndefined()
+	})
+
+	it('adopts a filing whose order reason names a kind', () => {
+		const body = CARVE.replace(
+			'（issue:file）',
+			'（issue:file）\n   - 順序の理由: 別の待ちがある — 上流の修正',
+		)
+
+		expect(run_park_body.adopt_problem(body, 1)).toBeUndefined()
+		expect(run_park_body.adoptable_pick(body)).toBe(1)
+	})
+})
+
 // joshuafolkken/kit#6776: a size-approval option carries the paths and both axes of the json
 // `backlog:triage --adopt` writes for it.
 const FIRST_PATH = 'scripts/a.ts'

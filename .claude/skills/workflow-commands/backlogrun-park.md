@@ -137,6 +137,8 @@ single source of the distinction, the filing, the pause and the ceiling. Then:
 the gate"): finish it, and file an independent new requirement found in it as an observation, without
 `--route split`. A park the parent takes over and splits follows "A park the parent session resolves".
 
+**Trigger: a carve-off the rest would wait on** → `split-assessment.md` → "Over the guide before the gate".
+
 A split is decided before dispatch: file the new children (Tier A, first-party; `split-assessment.md`
 → "Two or more always means an epic"), then
 `pnpm josh epic --add <E> <N...> [--before <M> | --after <M>] --order-reason "<chain>: <reason>"` —

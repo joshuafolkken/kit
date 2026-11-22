@@ -20,6 +20,7 @@ const OTHER_BODY_TEXT: ReadonlySet<string> = new Set([
 	'- 範囲（paths）:',
 	'- 層:',
 	'- 必要な権限:',
+	'- 順序の理由:',
 	'- 規模承認のパス:',
 	'- 規模承認の行数:',
 	'- 規模承認のファイル数:',
