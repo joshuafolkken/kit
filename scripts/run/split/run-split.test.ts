@@ -170,6 +170,7 @@ describe('run_split.split — an epic already tracks the issue', () => {
 		[{ ...INDEPENDENT, chains: [OUTSIDER] }],
 		[{ ...ORDERED, order_reasons: [] }],
 		[{ ...JOINED, order_reasons: JOIN_REASONS.slice(1) }],
+		[{ ...ORDERED, order_reasons: ['#10 -> #11 -> #12: uses #10'] }],
 	])('refuses `--chain` in %j before writing anything', async (request) => {
 		tracking_with.mockResolvedValue(TRACKED)
 

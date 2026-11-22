@@ -15,7 +15,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
 		reference: [
-			'<title> <issue...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <reason>"...]',
+			'<title> <issue...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]',
 			'automation',
 			['network'],
 		],

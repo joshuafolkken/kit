@@ -59,7 +59,7 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 		// `run:release` underneath can send the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'<issue> (--children <N1,N2,...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <reason>"...] | --prerequisite <P>) [--title <title>]',
+			'<issue> (--children <N1,N2,...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...] | --prerequisite <P>) [--title <title>]',
 			'automation',
 			['git', 'network', 'files'],
 		],
