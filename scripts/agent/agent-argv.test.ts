@@ -26,7 +26,7 @@ const SHIP_ARGS: ReadonlyArray<string> = [
 	'--permission-mode',
 	'bypassPermissions',
 	'--tools',
-	'Bash,Read,Edit,Write,Agent,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite',
+	'Bash,Read,Edit,Write,Agent,ToolSearch,SendMessage,TaskStop,Monitor',
 	'--strict-mcp-config',
 	'--model',
 	SONNET,
