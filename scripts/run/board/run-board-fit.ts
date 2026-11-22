@@ -50,6 +50,7 @@ type SectionKey =
 interface Foldable {
 	label?: string | undefined
 	is_folded?: boolean | undefined
+	flash_key?: string | undefined
 }
 
 // A plan section drops its heading once none of its rows is left — unless it folds: then its cut rows
@@ -90,6 +91,7 @@ interface DetailPart extends Foldable {
 // header.
 interface FrameParts {
 	above: ReadonlyArray<string>
+	more?: ((hidden: number) => string) | undefined
 	throughput?: DetailPart | undefined
 	usage?: DetailPart | undefined
 	// The usage section as drawn where the throughput rows give way: the lamp panel it shares with them
@@ -268,7 +270,7 @@ function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 		[...detail_lines(parts.processes, cut.details), ...notes_lines(parts.notes, cut.notes)],
 		sections_lines(below, cut.rows),
 	]
-	const more = more_lines(unfolded([...parts.plan, ...below], cut.rows))
+	const more = more_lines(unfolded([...parts.plan, ...below], cut.rows), parts.more)
 
 	if (below.some((section) => draws_row(section, cut.rows))) {
 		return [...plan, ...notes, ...under, ...more]
@@ -413,7 +415,7 @@ function fit(parts: FrameParts, size: TerminalSize): Array<string> {
 	return clamped(fitting ?? frames.at(-1) ?? [], size)
 }
 
-const run_board_fit = { ROW_INDENT, fit, height_of, whole, width_of }
+const run_board_fit = { ROW_INDENT, fit, height_of, plain_more, whole, width_of }
 
 export { run_board_fit }
 export type {

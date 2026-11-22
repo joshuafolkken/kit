@@ -37,6 +37,7 @@ const MATRIX_LIVE: LiveDefinition = {
 	decode: true,
 	rain: true,
 	drop: true,
+	flash: true,
 }
 const AMBER: ThemeDefinition = {
 	name: 'josh-amber',

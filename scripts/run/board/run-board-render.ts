@@ -31,6 +31,7 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_rule_width } from './run-board-rule-width'
 import type { Thanks } from './run-board-thanks-csv'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
 import { run_board_watch_panel } from './run-board-watch-panel'
 import { run_board_watch_row } from './run-board-watch-row'
@@ -233,21 +234,37 @@ function above_of(view: BoardView, rule_width: number): Array<string> {
 	return [...run_board_watch_panel.composed(header, rows, rule_width), ...resume_lines(view.resume)]
 }
 
-function render(view: BoardView): Array<string> {
-	const { header, notes } = view
-	const plan = plan_parts(header, notes, view.size)
-	const parts = {
-		above: above_of(view, plan.rule_width),
+// The throughput and usage sections, their rows keyed for the change flash where the theme flashes
+// (joshuafolkken/kit#8353).
+function figure_parts(
+	view: BoardView,
+	is_flash_keyed: boolean,
+): Pick<FrameParts, 'throughput' | 'usage'> {
+	const { header, has_lamps } = view
+
+	return {
 		throughput: run_board_render_throughput.throughput_part(
 			view.throughput,
-			view.has_lamps,
+			has_lamps,
 			run_board_header.alert_part(header),
+			is_flash_keyed,
 		),
 		usage: run_board_render_quota.usage_part({
 			...header,
 			hold: header.quota_hold,
-			has_lamps: view.has_lamps,
+			has_lamps,
+			is_flash_keyed,
 		}),
+	}
+}
+
+function render(view: BoardView): Array<string> {
+	const { header, notes } = view
+	const plan = plan_parts(header, notes, view.size)
+	const is_flash_keyed = run_board_theme_defs.live_of(header.theme).flash === true
+	const parts = {
+		above: above_of(view, plan.rule_width),
+		...figure_parts(view, is_flash_keyed),
 		...plan,
 		processes: run_board_render_processes.processes_part(header),
 		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),
@@ -256,7 +273,7 @@ function render(view: BoardView): Array<string> {
 		footer: view.footer ?? [],
 	}
 
-	return run_board_label_pair.settled(bounded(parts, view), header)
+	return run_board_label_pair.settled(bounded(parts, { ...view, is_flash_keyed }), header)
 }
 
 const run_board_render = {

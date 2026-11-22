@@ -12,6 +12,7 @@ import {
 	type GithubRateLimit,
 } from './run-board-render-quota-github'
 import { run_board_render_section } from './run-board-render-section'
+import { run_board_row_key } from './run-board-row-key'
 
 // The `⛽ usage` section (joshuafolkken/kit#5395): Claude's and Codex's usage-limit windows, one row
 // each, drawing only the windows the provider reported, shortest first, straight after the name
@@ -77,6 +78,7 @@ interface QuotaHold {
 }
 
 interface QuotaView {
+	is_flash_keyed?: boolean | undefined
 	quotas?: Quotas | undefined
 	scheduler_provider?: QuotaProvider | undefined
 	now_ms: number
@@ -227,7 +229,11 @@ function row_of(provider: QuotaProvider, view: QuotaView): string {
 			? hold_text(hold, now_ms)
 			: reading_text(view.quotas?.[provider], now_ms)
 
-	return `${INDENT}${name_cell(name_of(provider, view))}${body}`
+	return run_board_row_key.flashed(
+		`${INDENT}${name_cell(name_of(provider, view))}${body}`,
+		`quota:${provider}`,
+		view.is_flash_keyed,
+	)
 }
 
 // `42/68`: each drawn window's percent; a single `—` where none was reported.
@@ -259,7 +265,13 @@ function rate_limit_rows(view: QuotaView): Array<string> {
 
 	const body = run_board_render_quota_github.row_text(rate_limit, now_ms)
 
-	return [`${INDENT}${name_cell(name_of('github', view))}${body}`]
+	return [
+		run_board_row_key.flashed(
+			`${INDENT}${name_cell(name_of('github', view))}${body}`,
+			'quota:github',
+			view.is_flash_keyed,
+		),
+	]
 }
 
 // `GitHub REST 38% 1877/5000 ↻12:33 · ▶ GraphQL 1% 48/5000 ↻12:40`.

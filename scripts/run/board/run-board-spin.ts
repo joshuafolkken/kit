@@ -1,5 +1,6 @@
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { run_board_change_flash, type Flash } from './run-board-change-flash'
 import { run_board_codes, type RuleCell } from './run-board-codes'
 import { run_board_colon } from './run-board-colon'
 import type { DropScreen } from './run-board-drop-screen'
@@ -54,6 +55,7 @@ interface Spun {
 // What is written between redraws: the spinners turned, the sweep moved, the lamps blinked, the rules'
 // code run and the rows typing.
 interface Turning {
+	flash?: Flash | undefined
 	spots: ReadonlyArray<Spot>
 	typing: Typing
 	sweep?: Sweep | undefined
@@ -328,6 +330,7 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 	run_board_timing.drawn(ports, 'turn', () => {
 		write_drop(turning, ports, at_ms, turned)
 		ports.write(turn_bytes(turning, at_ms, turned))
+		run_board_change_flash.write(ports, turning.flash, at_ms, turned.since)
 		run_board_lamp_spots.write_lamps(
 			blinking(turning),
 			ports,
@@ -395,30 +398,29 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 	})
 }
 
-// A frame with no spinner, sweep, typing row, blinking lamp or clock colon writes nothing between
-// redraws; the colons, drawn lit with the frame, need no write before their first half second.
+// A frame with no spinner, sweep, typing row, blinking lamp, flashing cell or clock colon writes
+// nothing between redraws; the colons, drawn lit with the frame, need no write before their first
+// half second.
 function is_still(turning: Turning): boolean {
 	const is_bare = turning.spots.length === 0 && colons_of(turning).length === 0
+	// The flash is written over the frame with it, so it needs no write before its first turn.
+	const is_dark = !has_effects(turning) && !run_board_change_flash.is_lit(turning.flash)
 
-	return is_bare && turning.typing.lines.length === 0 && !has_effects(turning)
+	return is_bare && turning.typing.lines.length === 0 && is_dark
 }
 
 // Waits for the next second, turning the spinners, moving the sweep and typing the rows until then; a
 // still frame just waits.
 async function spin_to_second(turning: Turning, ports: SpinPorts): Promise<void> {
 	const now_ms = ports.now()
-	const second_ms = now_ms - (now_ms % REDRAW_MS) + REDRAW_MS
+	const second_ms = boundary_after(now_ms, REDRAW_MS)
 
-	if (is_still(turning)) {
-		await ports.sleep(second_ms - now_ms)
-
-		return
-	}
-
-	await turn_until(turning, ports, second_ms)
+	await (is_still(turning)
+		? ports.sleep(second_ms - now_ms)
+		: turn_until(turning, ports, second_ms))
 }
 
-const run_board_spin = { REDRAW_MS, SPOT, colons_in, spin_bytes, spin_to_second, spun }
+const run_board_spin = { REDRAW_MS, SPOT, colons_in, spin_bytes, spin_to_second, spun, starts_of }
 
 export { run_board_spin }
 export type { Spun, Turning }
