@@ -111,6 +111,8 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/run/board/run-board-sound-cues.ts',
 	'scripts/run/board/run-board-sound-transition.ts',
 	'scripts/run/board/run-board-sound-repeat.ts',
+	// #8658 stages the matrix notice-trace renderer; remove this entry when #8657 wires it into run:board.
+	'scripts/run/board/run-board-notice-trace.ts',
 ])
 
 interface PackedEntry {

@@ -1,0 +1,7 @@
+{
+	"reason": "New pure notice-trace renderer module requested by #8658 (split off #8657); no existing code to shrink in its place",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 116
+	}
+}
