@@ -207,6 +207,15 @@ describe('run_board_spin.spun on a rain frame', () => {
 	})
 })
 
+describe('run_board_lamp_spots.rained', () => {
+	it('leaves a placeholder past the lamps it was given as it is', () => {
+		const lamps = run_board_lamp_spots.lamps_in(LINES, [1, 2, 3, 4, 5, 6], 200).slice(1)
+		const drawn = run_board_lamp_spots.rained(LINES, lamps, IDLE)
+
+		expect(drawn.join('').split(LAMP)).toHaveLength(2)
+	})
+})
+
 function wide(): TerminalSize {
 	return { rows: 60, columns: 200 }
 }
@@ -221,17 +230,22 @@ function marks_in(frames: ReadonlyArray<string>): number {
 
 // A live redraw of a frame with throughput rows in `theme` on a terminal drawing color: its lamps and the
 // `■`s its whole draw wrote outside the header.
-function redrawn(theme: Theme): { lamps: number; marks: number } {
+function redrawn(theme: Theme): { lamps: number; rows: number; marks: number } {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { LOCAL, drawn_from, harness, plan_titled } = run_board_fixture
 	const { FRESH_STATE, layout_for } = run_board_tick
 	const { ports, frames } = harness(LOCAL, [])
-	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
+	const quotas = { claude: undefined, codex: undefined }
+	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms, quotas }
 	const local = { ...LOCAL, throughput: ROWS }
 	const redraw = { ports: { ...ports, types_rows: true, theme, size: wide }, now_ms: START }
-	const drawn = drawn_from(state, local, redraw, layout_for(state, local, START))
+	const lamps = drawn_from(state, local, redraw, layout_for(state, local, START)).lamps ?? []
 
-	return { lamps: drawn.lamps?.length ?? 0, marks: marks_in(frames) }
+	return {
+		lamps: lamps.length,
+		rows: new Set(lamps.map((lamp) => lamp.row)).size,
+		marks: marks_in(frames),
+	}
 }
 
 describe('run_board_tick_draw’s whole draw', () => {
@@ -247,5 +261,9 @@ describe('run_board_tick_draw’s whole draw', () => {
 
 		expect(lamps).toBeGreaterThan(0)
 		expect(marks).toBe(lamps)
+	})
+
+	it('runs the panel on the usage rule’s row on a matrix board only', () => {
+		expect(redrawn('matrix').rows).toBe(redrawn('wargames').rows + 1)
 	})
 })
