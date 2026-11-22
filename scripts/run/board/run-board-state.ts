@@ -1,4 +1,5 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import type { Flash } from './run-board-change-flash'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { RuleCell } from './run-board-codes'
 import type { BoardDisplay } from './run-board-display'
@@ -166,6 +167,7 @@ interface BoardData extends GatherRead {
 // What the frame keeps between redraws: its spinners, typing, sound and notice, and the total it
 // counts from.
 interface BoardView {
+	flash?: Flash | undefined
 	// The total the first frame counted, which later frames count their progress from.
 	baseline_total: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.

@@ -1,3 +1,4 @@
+import { run_board_change_flash, type Flash } from './run-board-change-flash'
 import type { BoardDisplay } from './run-board-display'
 import { run_board_drop_screen, type DropScreen } from './run-board-drop-screen'
 import type { TerminalSize } from './run-board-fit'
@@ -16,6 +17,7 @@ import { run_board_standing } from './run-board-standing'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_defs, type LiveDefs, type ThemeDefinition } from './run-board-theme-defs'
+import { run_board_tick_flash } from './run-board-tick-flash'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // The frame one `run:board` redraw draws (`run-board-tick.ts`) from what `run-board-display.ts`
@@ -31,6 +33,7 @@ const { THEME_DEFS, live_of } = run_board_theme_defs
 type DrawPorts = Pick<
 	BoardPorts,
 	| 'write'
+	| 'write_drawn'
 	| 'link'
 	| 'is_tty'
 	| 'form'
@@ -62,7 +65,7 @@ function port_header(ports: DrawPorts): PortHeader {
 	return {
 		form: ports.form,
 		spinner: ports.is_tty ? SPOT : undefined,
-		is_keyed: ports.types_rows,
+		is_keyed: ports.types_rows === true || live_of(ports.theme).flash === true,
 		theme: ports.theme,
 		is_sound_on: ports.sound?.(),
 	}
@@ -274,6 +277,19 @@ function turned_of(drawn: Drawn): Pick<Drawn, 'spots' | 'sweep' | 'lamps' | 'tra
 	return { spots, sweep, lamps, traces, colons }
 }
 
+// The frame written with the change flash over it (joshuafolkken/kit#8353), and the trill switched on
+// while a row types.
+function write_frame(redraw: Redraw, drawn: Drawn, typing: Typing, flash: Flash | undefined): void {
+	const { ports, now_ms } = redraw
+
+	draw(ports, run_board_type_rows.typed_lines(drawn.lines, typing, now_ms))
+	run_board_change_flash.write(ports, flash, now_ms)
+	ports.typing_sound?.set(
+		run_board_type_rows.is_typing(typing, now_ms),
+		run_board_type_rows.left_ms(typing, now_ms),
+	)
+}
+
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the
 // frame is written, so the notice shows on the frame it sounds on — and the trill switched on while a
 // row types, apart from the cue, so both sound on one frame (joshuafolkken/kit#8250).
@@ -283,17 +299,14 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 	if (display.cue !== undefined) redraw.ports.cue?.(display.cue)
 	const drawn = frame_of(display, header, redraw)
 	const typing = typing_of(state, drawn, header, redraw)
+	const flash = run_board_tick_flash.flash_of(state.flash, drawn, redraw, typing)
 
-	draw(redraw.ports, run_board_type_rows.typed_lines(drawn.lines, typing, redraw.now_ms))
-	redraw.ports.typing_sound?.set(
-		run_board_type_rows.is_typing(typing, redraw.now_ms),
-		run_board_type_rows.left_ms(typing, redraw.now_ms),
-	)
+	write_frame(redraw, drawn, typing, flash)
 
 	const decoded = { ...decoded_of(redraw.ports, drawn), is_rain: has_rain(redraw.ports) }
 	const drop = drop_of(redraw, drawn, typing, state.drop)
 
-	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop }
+	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop, flash }
 }
 
 const run_board_tick_draw = {

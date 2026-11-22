@@ -76,9 +76,11 @@ function tail_styled(line: string, columns: number): string {
 	return `${kept.join('')}${RESET}`
 }
 
-// A drawn line's character with the color escapes that hold at it (joshuafolkken/kit#8367).
+// A drawn line's character with the color escapes that hold at it (joshuafolkken/kit#8367) and the
+// link escape it is drawn inside, where one is open (joshuafolkken/kit#8353).
 interface StyledPiece extends Piece {
 	style: string
+	link?: string | undefined
 }
 
 const SGR_START = `${ESC}[`
@@ -90,15 +92,36 @@ function style_after(style: string, escape: string): string {
 	return escape === RESET || escape === `${SGR_START}m` ? '' : `${style}${escape}`
 }
 
-// The line's characters, each with the color escapes written since the last reset before it — the
-// same split `cut_styled` cuts by.
+// The link escape holding after `escape`: a link's opening sets it, its close clears it.
+function link_after(link: string, escape: string): string {
+	if (!run_board_escape.is_link(escape)) return link
+
+	return run_board_escape.is_link_open(escape) ? escape : ''
+}
+
+// The colors and the link holding at a point of the line.
+interface Held {
+	style: string
+	link: string
+}
+
+function held_after(held: Held, escape: string): Held {
+	return { style: style_after(held.style, escape), link: link_after(held.link, escape) }
+}
+
+function styled_of(piece: Piece, held: Held): StyledPiece {
+	return held.link === '' ? { ...piece, style: held.style } : { ...piece, ...held }
+}
+
+// The line's characters, each with the color escapes written since the last reset before it and the
+// link open at it — the same split `cut_styled` cuts by.
 function styled_pieces(line: string): Array<StyledPiece> {
-	let style = ''
+	let held: Held = { style: '', link: '' }
 	const styled: Array<StyledPiece> = []
 
 	for (const piece of pieces_of(line)) {
-		if (piece.text.startsWith(ESC)) style = style_after(style, piece.text)
-		else styled.push({ ...piece, style })
+		if (piece.text.startsWith(ESC)) held = held_after(held, piece.text)
+		else styled.push(styled_of(piece, held))
 	}
 
 	return styled
