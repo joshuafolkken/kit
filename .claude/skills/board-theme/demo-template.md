@@ -13,12 +13,11 @@ pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs [variant]…
 // Copy it to .josh/tmp/scratch/<theme>-theme-demo.mjs, then add effects and variants.
 // Usage: pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs [variant]…
 // No argument is a tour: each message types with the next variant. One or more names play those
-// variants on every message. It writes to the terminal only. Needs 100 columns, 24 rows, 24-bit color.
+// variants on every message. It writes to the terminal only. Needs the frame's columns, 24 rows, 24-bit color.
 
 import { readFileSync } from 'node:fs'
 
 const ESC = '\u001B['
-const W = 100
 // The frame's rows shown; the caption takes two more.
 const H = 22
 const TICK_MS = 50
@@ -34,13 +33,15 @@ const BODY = rgb('62;236;225')
 const WHITE = rgb('235;255;252')
 const CAPTION = rgb('150;150;150')
 
-// The base: the real colored frame beside this script, taken afresh for each proposal:
+// The base: the real colored frame beside this script, `<theme>-frame.ans` for `<theme>-theme-demo.mjs`,
+// taken afresh for each proposal:
 // `FORCE_COLOR=3 pnpm josh run:board --once --theme <theme> > .josh/tmp/scratch/<theme>-frame.ans`.
-const THEME = 'matrix'
-const FRAME = readFileSync(new URL(`${THEME}-frame.ans`, import.meta.url), 'utf8')
-// Where the frame's message line sits: the typed messages replace it from that column.
+const FRAME = readFileSync(new URL(import.meta.url.replace(/-theme-demo\.mjs$/u, '-frame.ans')), 'utf8')
+// Where the frame's message line sits — its row, its first column and the column after it (the matrix
+// frame's); read them off the frame. The typed messages replace that span only.
 const MESSAGE_Y = 2
-const MESSAGE_X = 32
+const MESSAGE_X = 45
+const MESSAGE_END = 101
 
 // The variants under comparison: its name, the caption shown while it plays, and what it draws.
 // `draw(grid, tick, typed)` changes cells of `grid[y][x] = [character, style]`; a style is escapes, `rgb()` one.
@@ -81,10 +82,13 @@ function cells_of(line) {
 		if (part.startsWith(ESC)) style += part
 		else for (const ch of part) cells.push([ch, style])
 	}
-	return [...cells, ...row_of('', '')].slice(0, W)
+	return cells
 }
 
-const BOARD = FRAME.split('\n').slice(0, H).map(cells_of)
+const LINES = FRAME.split('\n').slice(0, H).map(cells_of)
+// The frame's own width, so the demo crops no column.
+const W = Math.max(...LINES.map((cells) => cells.length))
+const BOARD = LINES.map((cells) => [...cells, ...row_of('', '')].slice(0, W))
 
 // Only the escapes a cell adds to the last cell's style; a reset and the whole style where it is not an extension.
 function style_change(last, style) {
@@ -115,13 +119,13 @@ function typed_line(tick) {
 	const { start, text } = MESSAGES[index]
 	const length = Math.min(text.length, tick - start + 1)
 	const is_typing = length < text.length
-	const cells = row_of(`${text.slice(0, length)}${is_typing ? '█' : ''}`, BODY).slice(0, W - MESSAGE_X)
+	const cells = row_of(`${text.slice(0, length)}${is_typing ? '█' : ''}`, BODY).slice(0, MESSAGE_END - MESSAGE_X)
 	return { cells, is_typing, length, total: text.length, cooled: tick - start - text.length, index }
 }
 
 function grid_of(typed) {
 	const grid = BOARD.map((row) => [...row])
-	if (typed.index >= 0) grid[MESSAGE_Y].splice(MESSAGE_X, W - MESSAGE_X, ...typed.cells)
+	if (typed.index >= 0) grid[MESSAGE_Y].splice(MESSAGE_X, MESSAGE_END - MESSAGE_X, ...typed.cells)
 	return grid
 }
 
