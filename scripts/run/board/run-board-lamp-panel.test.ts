@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit, type FrameParts } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_fold } from './run-board-fold'
+import { run_board_lamp_spots } from './run-board-lamp-spots'
+import { run_board_lamps } from './run-board-lamps'
 import type { BoardRow } from './run-board-layout'
 import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_quota_lamps } from './run-board-quota-lamps'
@@ -37,7 +39,10 @@ const SAMPLE_RULE_WIDTH = 114
 const SAMPLE_ROW_END = 67
 const SAMPLE_LAMP_COLUMN = 70
 const SAMPLE_LAMPS = 23
-const PANEL_ROWS = 6
+const PANEL_ROWS = 7
+const LIT_YELLOW = '38;2;255;214;10'
+const LIT_RED = '38;2;255;69;58'
+const SHADE_ORDER = ['yellow', 'yellow', 'yellow', 'red', 'red', 'yellow', 'red']
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -147,6 +152,7 @@ function panel_parts(usage_rows: ReadonlyArray<string>, has_panel: boolean): Fra
 		quotas: { claude: undefined, codex: undefined },
 		now_ms: START,
 		has_lamps: has_panel,
+		has_rule_lamps: true,
 	})
 	const [github = '', ...providers] = usage_rows.toReversed()
 	const lines = [
@@ -187,24 +193,24 @@ function lamp_starts(lines: ReadonlyArray<string>): Array<number> {
 		.map((line) => width_of(line.split(LAMP)[0] ?? ''))
 }
 
-describe('the lamp panel’s six rows (joshuafolkken/kit#8277, joshuafolkken/kit#8695)', () => {
-	it('runs on throughput’s two rows, the blank line, usage’s first two rows and GitHub’s alike', () => {
+// The text before a lamped line's first lamp, its blanks dropped.
+function lead_of(line: string): string {
+	return line.slice(0, line.indexOf(LAMP)).trimEnd()
+}
+
+// joshuafolkken/kit#8702: the usage rule's row runs the panel too, so it shows seven rows unbroken.
+describe('the lamp panel’s seven rows (joshuafolkken/kit#8277, joshuafolkken/kit#8695)', () => {
+	it('runs on throughput’s two rows, the blank line, the rule, usage’s two rows and GitHub’s', () => {
 		const lines = panel_frame(ROWS_TEXT)
 		const lamped = lines.filter((line) => line.includes(LAMP))
 		const [start] = lamp_starts(lines)
-		const leads = lamped.slice(2).map((line) => line.slice(0, line.indexOf(LAMP)).trimEnd())
+		const leads = lamped.slice(2).map((line) => lead_of(line))
 
 		expect(lamped).toHaveLength(PANEL_ROWS)
 		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: PANEL_ROWS }, () => start))
 		for (const line of lamped) expect(line.split(LAMP)).toHaveLength(PANEL_LAMPS + 1)
-		expect(leads).toStrictEqual(['', ...ROWS_TEXT])
-	})
-
-	it('draws none on the usage rule', () => {
-		const unlit = panel_frame(ROWS_TEXT).filter((text) => text.includes('usage'))
-
-		expect(unlit).toHaveLength(1)
-		expect(unlit.join('')).not.toContain(LAMP)
+		expect(leads.filter((lead) => !lead.includes('usage'))).toStrictEqual(['', ...ROWS_TEXT])
+		expect(leads[1]).toMatch(/usage.*─$/u)
 	})
 
 	it('cuts a row reaching the panel a blank short of it, keeping every row’s lamps', () => {
@@ -228,6 +234,31 @@ describe('the lamp panel’s six rows (joshuafolkken/kit#8277, joshuafolkken/kit
 	})
 })
 
+describe('the usage rule’s row in the lamp panel (joshuafolkken/kit#8702)', () => {
+	it('ends the usage rule two columns before the panel and runs lamps on to the rule’s end', () => {
+		const lines = panel_frame(ROWS_TEXT)
+		const rule = lines.find((text) => text.includes('usage')) ?? ''
+		const [start = 0] = lamp_starts(lines)
+
+		expect(width_of(lead_of(rule))).toBe(start - GAP)
+		expect(width_of(rule)).toBe(start + PANEL_WIDTH)
+		expect(rule.split(LAMP)).toHaveLength(PANEL_LAMPS + 1)
+	})
+
+	it('lights the seven rows yellow, yellow, yellow, red, red, yellow, red from the top', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const lines = panel_frame(ROWS_TEXT)
+		const lamps = run_board_lamp_spots.lamps_in(lines, [...lines.keys()], WIDE.columns)
+		const rows = [...new Set(lamps.map((lamp) => lamp.panel_row))]
+		const lit = rows.map((row) => run_board_lamps.lamp_text(row, true))
+
+		expect(lit.map((text) => (text.includes(LIT_RED) ? 'red' : 'yellow'))).toStrictEqual(
+			SHADE_ORDER,
+		)
+		expect(lit.filter((text) => text.includes(LIT_YELLOW))).toHaveLength(4)
+	})
+})
+
 describe('the lamp panel’s rows under the throughput rows, with no lamps', () => {
 	it('leaves the blank line and the usage rows as they were where the frame draws no lamps', () => {
 		const lines = panel_frame(ROWS_TEXT, false)
@@ -247,7 +278,7 @@ function rendered(is_lit: boolean): Array<string> {
 		quotas: { claude: undefined, codex: undefined },
 		layout: { ...EMPTY_LAYOUT, active: [WIDE_LANE] },
 	})
-	const view = { header, notes: [], throughput: ROWS, has_lamps: is_lit }
+	const view = { header, notes: [], throughput: ROWS, has_lamps: is_lit, has_rule_lamps: is_lit }
 
 	return run_board_render.render(view).map((line) => stripVTControlCharacters(line))
 }
@@ -256,7 +287,7 @@ describe('run_board_render.render with lamps', () => {
 	it('runs the panel on the usage section’s rows as well as the throughput rows', () => {
 		const lamped = rendered(true).filter((line) => line.includes(LAMP))
 
-		expect(lamped).toHaveLength(5)
+		expect(lamped).toHaveLength(6)
 		expect(lamped.filter((line) => line.includes('24h') || line.includes('7d'))).toHaveLength(2)
 	})
 

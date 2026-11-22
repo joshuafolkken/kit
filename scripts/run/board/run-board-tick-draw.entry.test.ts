@@ -13,7 +13,7 @@ import type { TypingSpan } from './run-board-type-rows'
 // joshuafolkken/kit#8356: the matrix board draws its lamp panel as the idle rain, and its new rows decode
 // on a terminal drawing color; elsewhere they type or show at once.
 
-const { entry_of, has_drop, has_lamps, has_rain, panel_of } = run_board_tick_draw
+const { entry_of, has_drop, has_lamps, has_rain, has_rule_lamps, panel_of } = run_board_tick_draw
 const MATRIX = { types_rows: true, theme: 'matrix', is_tty: true } as const
 const WARGAMES = { ...MATRIX, theme: 'wargames' } as const
 const ONCE = '--once, --chat and a pipe'
@@ -53,6 +53,25 @@ describe('run_board_tick_draw.has_rain', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(has_rain(MATRIX)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8702: the usage rule's row carries the panel in wargames and matrix, not bttf.
+describe('run_board_tick_draw.has_rule_lamps', () => {
+	it.each([
+		[WARGAMES, true],
+		[MATRIX, true],
+		[{ ...MATRIX, theme: 'bttf' } as const, false],
+	])('lamps the rule in %o: %s', (ports, expected) => {
+		vi.stubEnv('FORCE_COLOR', '3')
+
+		expect(has_rule_lamps(ports)).toBe(expected)
+	})
+
+	it('lamps none on a terminal drawing no color', () => {
+		vi.stubEnv('FORCE_COLOR', '0')
+
+		expect(has_rule_lamps(WARGAMES)).toBe(false)
 	})
 })
 

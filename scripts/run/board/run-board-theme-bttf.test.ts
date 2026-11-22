@@ -59,6 +59,13 @@ describe('run_board_theme_defs bttf', () => {
 		expect(BTTF.lamps).toBe(true)
 	})
 
+	// joshuafolkken/kit#8702: the flux figure keeps its six-row area, the usage rule whole.
+	it('keeps the usage rule out of its lamp panel', () => {
+		expect(BTTF.rule_lamped).toBe(false)
+		expect(run_board_theme_defs.is_rule_lamped('bttf')).toBe(false)
+		expect(run_board_theme_defs.is_rule_lamped(undefined)).toBe(false)
+	})
+
 	it('keeps the colon blinking every half second', () => {
 		expect(run_board_colon.COLON_MS).toBe(500)
 	})
