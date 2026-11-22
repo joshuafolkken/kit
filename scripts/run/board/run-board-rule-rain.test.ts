@@ -186,7 +186,7 @@ describe('the idle rain on six rows', () => {
 
 describe('run_board_spin.spun on a rain frame', () => {
 	it('draws every lamp as the rain’s cell, never a `■`', () => {
-		const drawn = run_board_spin.spun(LINES, '⠋', undefined, IDLE)
+		const drawn = run_board_spin.spun(LINES, '⠋', { rain: IDLE })
 
 		expect(drawn.lines.join('')).not.toContain(LAMP_MARK)
 		expect(drawn.lines.join('')).not.toContain(LAMP)
@@ -200,7 +200,7 @@ describe('run_board_spin.spun on a rain frame', () => {
 	})
 
 	it('keeps the rule row’s lamps among the cells the falling drops pass by', () => {
-		const drawn = run_board_spin.spun(LINES, '⠋', undefined, IDLE)
+		const drawn = run_board_spin.spun(LINES, '⠋', { rain: IDLE })
 		const rule_row = 4
 
 		expect(drawn.lamps.filter((lamp) => lamp.row === rule_row)).toHaveLength(4)

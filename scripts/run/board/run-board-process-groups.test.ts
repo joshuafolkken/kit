@@ -66,11 +66,16 @@ const ROOTS: ProcessRoots = { supervisor: SUPERVISOR, parent: SESSION }
 // The closed lanes' records are not ended yet: the supervisor still closes them again.
 const CLOSING: ReadonlySet<string> = new Set(['4130', '4154'])
 
+// The lanes still open, the leftovers a close could not end and the records not ended yet.
+interface LaneRecords {
+	open?: ReadonlyArray<number>
+	stuck?: ReadonlyMap<number, string>
+	closing?: ReadonlySet<string>
+}
+
 function groups_for(
 	roots: ProcessRoots,
-	open: ReadonlyArray<number> = [OPEN_LANE],
-	stuck: ReadonlyMap<number, string> = new Map(),
-	closing: ReadonlySet<string> = CLOSING,
+	{ open = [OPEN_LANE], stuck = new Map(), closing = CLOSING }: LaneRecords = {},
 ): ProcessGroups {
 	const mark = mark_of(ROWS)
 	const figures = run_board_usage.process_figures(undefined, mark)
@@ -164,7 +169,7 @@ describe('run_board_process_groups.groups_of outside the backlogrun', () => {
 	})
 
 	it('puts a lane that has closed in the leftovers', () => {
-		const { backlogrun, leftover } = groups_for(ROOTS, [])
+		const { backlogrun, leftover } = groups_for(ROOTS, { open: [] })
 
 		expect(backlogrun.lanes.count).toBe(0)
 		expect(leftover.entries.map((entry) => entry.name)).toStrictEqual([
@@ -177,7 +182,7 @@ describe('run_board_process_groups.groups_of outside the backlogrun', () => {
 	// joshuafolkken/kit#4300: a leftover that outlived a close's SIGKILL is named with why, not as
 	// one being reaped.
 	it('names a leftover a close could not end with why and its pid', () => {
-		const { leftover } = groups_for(ROOTS, [OPEN_LANE], new Map([[ESLINT_PID, 'owned by root']]))
+		const { leftover } = groups_for(ROOTS, { stuck: new Map([[ESLINT_PID, 'owned by root']]) })
 
 		expect(leftover.entries.map((entry) => entry.name)).toStrictEqual([
 			'eslint_d #4130 ⚠ owned by root (pid 400)',
@@ -185,7 +190,7 @@ describe('run_board_process_groups.groups_of outside the backlogrun', () => {
 	})
 
 	it('marks no leftover of a lane whose record is ended as being reaped', () => {
-		const { leftover } = groups_for(ROOTS, [OPEN_LANE], new Map(), new Set())
+		const { leftover } = groups_for(ROOTS, { closing: new Set() })
 
 		expect(leftover.entries.map((entry) => entry.name)).toStrictEqual(['eslint_d #4130'])
 	})

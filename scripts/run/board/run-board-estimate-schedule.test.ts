@@ -15,17 +15,13 @@ const TOTALS = [PER_CHILD]
 // What the running child has left: the 30′ total, 5′ run.
 const RUNNING_LEFT = 25 * MINUTE
 
-function waiting(number: number, waits: Array<string> = [], reason?: RowReason): BoardRow {
-	const row: BoardRow = {
-		number,
-		title: undefined,
-		kind: undefined,
-		state: 'waiting',
-		status: undefined,
-		waits,
-	}
+function waiting(number: number, waits: Array<string> = []): BoardRow {
+	return { number, title: undefined, kind: undefined, state: 'waiting', status: undefined, waits }
+}
 
-	return reason === undefined ? row : { ...row, reason }
+// A waiting child held back for `reason`, with no 🔗 waits.
+function held_on(number: number, reason: RowReason): BoardRow {
+	return { ...waiting(number), reason }
 }
 
 // A child five minutes into its implementation.
@@ -88,13 +84,13 @@ describe('run_board_estimate.left_ms for waits a child’s end lifts', () => {
 	})
 
 	it('starts a 📂 child after the child holding its path', () => {
-		const queued = queue(waiting(2, [], { icon: '📂', issues: ['1'], tail: 'a.ts' }))
+		const queued = queue(held_on(2, { icon: '📂', issues: ['1'], tail: 'a.ts' }))
 
 		expect(left({ active: [running(1)], queued })).toBe(RUNNING_LEFT + PER_CHILD)
 	})
 
 	it('fills the free lane with ready children while a 📂 child waits for its holder', () => {
-		const held = waiting(2, [], { icon: '📂', issues: ['1'], tail: 'a.ts' })
+		const held = held_on(2, { icon: '📂', issues: ['1'], tail: 'a.ts' })
 		const queued = queue(held, waiting(3), waiting(4))
 
 		// 3 and 4 run one after another on the free lane; 2 follows 1 on its own.
@@ -102,8 +98,8 @@ describe('run_board_estimate.left_ms for waits a child’s end lifts', () => {
 	})
 
 	it('starts a 🧍 solo child after the running lanes and a 🙅 child after it', () => {
-		const solo = waiting(2, [], { icon: '🧍', issues: ['1'] })
-		const behind = waiting(3, [], { icon: '🙅', issues: ['2'] })
+		const solo = held_on(2, { icon: '🧍', issues: ['1'] })
+		const behind = held_on(3, { icon: '🙅', issues: ['2'] })
 
 		expect(left({ active: [running(1)], queued: queue(solo, behind) })).toBe(
 			RUNNING_LEFT + 2 * PER_CHILD,
@@ -111,7 +107,7 @@ describe('run_board_estimate.left_ms for waits a child’s end lifts', () => {
 	})
 
 	it('starts nothing beside a placed 🧍 solo child', () => {
-		const solo = waiting(2, [], { icon: '🧍', issues: ['1'] })
+		const solo = held_on(2, { icon: '🧍', issues: ['1'] })
 		const chained = waiting(3, ['1'])
 
 		// 1 ends at 25′, 2 runs alone to 55′, then 3 — not beside 2 on the other lane.

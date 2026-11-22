@@ -97,8 +97,7 @@ describe('run_board_spin TRACE integration', () => {
 	it('restores the initial, retains visible spots and drops clipped ones', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 		const frame = run_board_spin.spun([field_of(WORST), field_of(WORST)], '', {
-			rows: 1,
-			columns: 80,
+			size: { rows: 1, columns: 80 },
 		})
 
 		expect(frame.lines).toStrictEqual([ALERT_TEXT, ALERT_TEXT])
@@ -110,7 +109,7 @@ describe('run_board_spin TRACE integration', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const clock = { ms: 0 }
 		const writes: Array<{ ms: number; text: string }> = []
-		const frame = run_board_spin.spun([field_of(WORST)], '', WIDE)
+		const frame = run_board_spin.spun([field_of(WORST)], '', { size: WIDE })
 		const ports = {
 			now: () => clock.ms,
 			sleep: async (ms: number) => {

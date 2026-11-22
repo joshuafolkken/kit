@@ -59,7 +59,7 @@ describe('run_board_layout.layout_of blocker rows (joshuafolkken/kit#8026)', () 
 
 	it('draws no blocker row for an outside blocker an earlier run lane works', () => {
 		const earlier = { lanes: [String(OUTSIDE)] }
-		const layout = run_board_layout.layout_of(OUTSIDE_PLAN, NO_STATUSES, undefined, earlier)
+		const layout = run_board_layout.layout_of(OUTSIDE_PLAN, NO_STATUSES, { earlier })
 
 		expect(layout.blockers).toStrictEqual([])
 		expect(numbers(run_board_layout.people_of(layout))).not.toContain(OUTSIDE)

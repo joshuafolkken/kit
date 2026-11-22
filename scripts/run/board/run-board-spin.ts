@@ -97,6 +97,18 @@ type SpinPorts = Pick<
 	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'typing_sound'
 >
 
+// The terminal a frame is spun for and the idle rain's moment its lamps are drawn at; none, an unbounded
+// screen and no rain.
+interface SpinView {
+	size?: TerminalSize | undefined
+	rain?: LampMoment | undefined
+}
+
+// The screen's rows and columns, at least one column; none unbounded.
+function screen_of(size: TerminalSize | undefined): TerminalSize {
+	return { columns: Math.max(1, size?.columns ?? Infinity), rows: size?.rows ?? Infinity }
+}
+
 // The cells within the terminal's `rows`; a row the frame was cut without is not on screen.
 function on_screen<Cell extends { row: number }>(
 	cells: ReadonlyArray<Cell>,
@@ -107,15 +119,9 @@ function on_screen<Cell extends { row: number }>(
 
 // The frame with each placeholder drawn as `frame` and each key taken out, every placeholder's spot on
 // screen, the keyed rows that can type and the sweep; a rain frame's lamps drawn as the idle rain's cells
-// at `rain` (joshuafolkken/kit#8647).
-function spun(
-	lines: ReadonlyArray<string>,
-	frame: string,
-	size?: TerminalSize,
-	rain?: LampMoment,
-): Spun {
-	const columns = Math.max(1, size?.columns ?? Infinity)
-	const rows = size?.rows ?? Infinity
+// at `rain` (joshuafolkken/kit#8647). No `size` spins an unbounded screen.
+function spun(lines: ReadonlyArray<string>, frame: string, { size, rain }: SpinView = {}): Spun {
+	const { columns, rows } = screen_of(size)
 	const starts = starts_of(lines, columns)
 	const found = run_board_lamp_spots.lamps_in(lines, starts, columns)
 	const drawn = keyed_of(run_board_lamp_spots.rained(lines, found, rain), frame, starts)

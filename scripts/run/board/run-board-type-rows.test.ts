@@ -50,7 +50,7 @@ function after_base(base: TypingFrame, drawn: ReadonlyArray<KeyedLine>): Typing 
 
 // The keyed rows a frame of `lines` leaves on a pane two rows tall.
 function on_screen(lines: ReadonlyArray<string>): Array<KeyedLine> {
-	return run_board_spin.spun(lines, '⠋', { rows: 2, columns: 80 }).keyed
+	return run_board_spin.spun(lines, '⠋', { size: { rows: 2, columns: 80 } }).keyed
 }
 
 function keys_of(typing: Typing): Array<string> {

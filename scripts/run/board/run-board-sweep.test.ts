@@ -58,7 +58,7 @@ describe('run_board_spin.spun — the sweep (joshuafolkken/kit#8240)', () => {
 	const THIRD_DRAWN = '⠋   16″  WRITE'
 
 	it('draws the placeholder back as `″` and records the sweep under it', () => {
-		const drawn = spun(LINES, '⠋', WIDE)
+		const drawn = spun(LINES, '⠋', { size: WIDE })
 
 		expect(drawn.lines[2]).toBe(THIRD_DRAWN)
 		expect(drawn.sweep).toStrictEqual({ row: 4, left: 1 })
@@ -66,7 +66,7 @@ describe('run_board_spin.spun — the sweep (joshuafolkken/kit#8240)', () => {
 
 	it('keeps the placeholder apart from a keyed third line’s key', () => {
 		const third = `${SPOT}   16${TICK}  ${run_board_row_key.keyed('now', 'WRITE', 'WRITE')}`
-		const drawn = spun(['▶ run', 'kit', third, ''], '⠋', WIDE)
+		const drawn = spun(['▶ run', 'kit', third, ''], '⠋', { size: WIDE })
 
 		expect(drawn.keyed.map(({ key }) => key)).toStrictEqual(['now:WRITE'])
 		expect(drawn.lines[2]).toBe(THIRD_DRAWN)
@@ -74,12 +74,12 @@ describe('run_board_spin.spun — the sweep (joshuafolkken/kit#8240)', () => {
 	})
 
 	it('records no sweep with no placeholder or no fourth row on screen', () => {
-		expect(spun(['▶ run', '', ''], '⠋', WIDE).sweep).toBeUndefined()
-		expect(spun(LINES, '⠋', { rows: 3, columns: 80 }).sweep).toBeUndefined()
+		expect(spun(['▶ run', '', ''], '⠋', { size: WIDE }).sweep).toBeUndefined()
+		expect(spun(LINES, '⠋', { size: { rows: 3, columns: 80 } }).sweep).toBeUndefined()
 	})
 
 	it('records no sweep when the placeholder is on the last line, with none below it', () => {
-		expect(spun(['▶ run', `16${TICK}`], '⠋', WIDE).sweep).toBeUndefined()
+		expect(spun(['▶ run', `16${TICK}`], '⠋', { size: WIDE }).sweep).toBeUndefined()
 	})
 })
 

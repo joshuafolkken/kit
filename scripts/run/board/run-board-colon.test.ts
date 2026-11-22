@@ -97,7 +97,9 @@ describe('run_board_spin.colons_in and spun', () => {
 	})
 
 	it('draws the colon lit', () => {
-		expect(spun(lines, '⠋', { rows: 24, columns: 80 }).lines[1]).toBe(`${CYAN_RGB}🕒 12:00`)
+		expect(spun(lines, '⠋', { size: { rows: 24, columns: 80 } }).lines[1]).toBe(
+			`${CYAN_RGB}🕒 12:00`,
+		)
 	})
 })
 

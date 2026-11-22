@@ -9,14 +9,8 @@ import type { ItemState, ItemStatus } from './run-board-status'
 const EARLY_MS = 1000
 const LATE_MS = 2000
 
-function row_of(
-	number: number,
-	state: ItemState,
-	status: Partial<ItemStatus> = {},
-	reason?: RowReason,
-): BoardRow {
+function row_of(number: number, state: ItemState, status: Partial<ItemStatus> = {}): BoardRow {
 	return {
-		...(reason !== undefined && { reason }),
 		number,
 		title: undefined,
 		kind: undefined,
@@ -24,6 +18,13 @@ function row_of(
 		status: { state, ...status },
 		waits: [],
 	}
+}
+
+// A waiting row held back until `not_before_ms`.
+function waiting_from(number: number, not_before_ms: number): BoardRow {
+	const reason: RowReason = { not_before_ms }
+
+	return { reason, ...row_of(number, 'waiting') }
 }
 
 function numbers_of(rows: ReadonlyArray<BoardRow>): Array<number> {
@@ -72,17 +73,13 @@ describe('run_board_layout_order.active_order', () => {
 
 describe('run_board_layout_order.start_order', () => {
 	it('keeps a row waiting on no start time ahead, then the earliest start first', () => {
-		const rows = [
-			row_of(1, 'waiting', {}, { not_before_ms: LATE_MS }),
-			row_of(2, 'waiting', {}, { not_before_ms: EARLY_MS }),
-			row_of(3, 'waiting'),
-		]
+		const rows = [waiting_from(1, LATE_MS), waiting_from(2, EARLY_MS), row_of(3, 'waiting')]
 
 		expect(numbers_of(rows.toSorted(run_board_layout_order.start_order))).toEqual([3, 2, 1])
 	})
 
 	it('places a row with a start time after one with none, whichever side each is on', () => {
-		const dated = row_of(1, 'waiting', {}, { not_before_ms: EARLY_MS })
+		const dated = waiting_from(1, EARLY_MS)
 		const undated = row_of(2, 'waiting')
 
 		expect(run_board_layout_order.start_order(dated, undated)).toBe(1)

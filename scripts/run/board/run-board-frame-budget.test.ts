@@ -264,7 +264,7 @@ function draw_ms(): number {
 	const started = performance.now()
 	const lines = run_board_render_stress_fixture.lines_on(PANE.columns, PANE.rows)
 
-	run_board_spin.spun(lines, run_board_labels.spinner_of(0), PANE)
+	run_board_spin.spun(lines, run_board_labels.spinner_of(0), { size: PANE })
 
 	return performance.now() - started
 }
