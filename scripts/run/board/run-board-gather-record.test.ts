@@ -19,7 +19,13 @@ const { CHAT_KEY, once_key } = run_board_frame_store
 const { RECORD_EVERY_MS } = run_board_every
 const SECOND_MS = 1000
 const ROUNDS = 12
-const SETUP: RecordSetup = { theme: undefined, icons: 'emoji', is_tty: true, is_linked: false }
+const SETUP: RecordSetup = {
+	theme: undefined,
+	icons: 'emoji',
+	is_tty: true,
+	is_linked: false,
+	color_level: '0',
+}
 const TERMINAL_ONCE = once_key(undefined, true)
 const ESCAPE = '\u{1B}'
 const OSC = `${ESCAPE}]`
@@ -259,11 +265,31 @@ describe('run_board_gather_record.started_with', () => {
 })
 
 describe('run_board_gather_record.worker_environment', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
 	it('forces the worker’s links to the board terminal’s answer', () => {
 		const { worker_environment } = run_board_gather_record
 
 		expect(worker_environment({ ...SETUP, is_linked: true })['FORCE_HYPERLINK']).toBe('1')
 		expect(worker_environment(SETUP)['FORCE_HYPERLINK']).toBe('0')
+	})
+
+	// joshuafolkken/kit#8616: the worker records under the key a terminal's `--once` reads.
+	it('forces the worker’s colors to the board terminal’s, so their once keys meet', () => {
+		vi.stubEnv('NO_COLOR', '1')
+		vi.stubEnv('FORCE_COLOR', '3')
+		const setup = run_board_gather_record.setup_of(undefined)
+		const terminal = once_key(undefined, setup.is_tty)
+		const worker = run_board_gather_record.worker_environment(setup)
+
+		vi.unstubAllEnvs()
+		vi.stubEnv('FORCE_COLOR', worker['FORCE_COLOR'])
+
+		expect(worker['NO_COLOR']).toBeUndefined()
+		expect(once_key(undefined, setup.is_tty)).toBe(terminal)
+		expect(terminal).toContain('color3')
 	})
 })
 

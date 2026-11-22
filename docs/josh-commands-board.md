@@ -244,6 +244,8 @@ While the run is at its `planning` stage, the one row it launches next — a nam
 
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 
+`FORCE_COLOR=1` (16 colors) or `FORCE_COLOR=3` (24-bit) draws a piped `--once` frame in the terminal's colors, still with no screen control; `FORCE_COLOR` wins over `NO_COLOR` (Node's rule, with a warning on stderr), and `NO_COLOR` alone draws none. Its one-minute record is kept per color depth, so a plain frame never answers a forced one; a live board records it in its terminal's colors.
+
 **Output / exit codes:** exits 0; an unknown argument, a bad `--every` or a bad `--frame` flag exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
 
 The live board writes why it ended to `.josh/tmp/run-board-exit.json` in the checkout.
