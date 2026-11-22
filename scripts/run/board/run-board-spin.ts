@@ -94,19 +94,30 @@ type SpinPorts = Pick<
 	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'typing_sound'
 >
 
+// The cells within the terminal's `rows`; a row the frame was cut without is not on screen.
+function on_screen<Cell extends { row: number }>(
+	cells: ReadonlyArray<Cell>,
+	rows: number,
+): Array<Cell> {
+	return cells.filter((cell) => cell.row <= rows)
+}
+
 // The frame with each placeholder drawn as `frame` and each key taken out, every placeholder's spot on
-// screen, the keyed rows that can type and the sweep.
-function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize): Spun {
+// screen, the keyed rows that can type and the sweep; a rain frame's lamps drawn as the idle rain's cells
+// at `rain` (joshuafolkken/kit#8647).
+function spun(
+	lines: ReadonlyArray<string>,
+	frame: string,
+	size?: TerminalSize,
+	rain?: LampMoment,
+): Spun {
 	const columns = Math.max(1, size?.columns ?? Infinity)
 	const rows = size?.rows ?? Infinity
 	const starts = starts_of(lines, columns)
-	const drawn = keyed_of(lines, frame, starts)
-	const lamps = run_board_lamp_spots
-		.lamps_in(lines, starts, columns)
-		.filter((lamp) => lamp.row <= rows)
-	const rules = run_board_codes
-		.rule_cells(lines, starts, columns)
-		.filter((cell) => cell.row <= rows)
+	const found = run_board_lamp_spots.lamps_in(lines, starts, columns)
+	const drawn = keyed_of(run_board_lamp_spots.rained(lines, found, rain), frame, starts)
+	const lamps = on_screen(found, rows)
+	const rules = on_screen(run_board_codes.rule_cells(lines, starts, columns), rows)
 
 	return {
 		lines: drawn.lines,
@@ -114,9 +125,7 @@ function spun(lines: ReadonlyArray<string>, frame: string, size?: TerminalSize):
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
 		sweep: sweep_in(lines, starts, { rows, columns }),
 		lamps,
-		traces: run_board_trace_spot
-			.traces_in(lines, starts, columns)
-			.filter((spot) => spot.row <= rows),
+		traces: on_screen(run_board_trace_spot.traces_in(lines, starts, columns), rows),
 		rules,
 		strips: run_board_strip.strip_cells(lines, starts, { lamps, rules }),
 	}

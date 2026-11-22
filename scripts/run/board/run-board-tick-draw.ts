@@ -4,6 +4,7 @@ import { run_board_drop_screen, type DropScreen } from './run-board-drop-screen'
 import type { TerminalSize } from './run-board-fit'
 import type { FrameBounds } from './run-board-fold'
 import type { BoardHeader } from './run-board-header'
+import type { RainMoment } from './run-board-idle-rain'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
@@ -152,6 +153,12 @@ function has_rain(ports: LivePorts): boolean {
 	return has_lamps(ports) && live_of(ports.theme).rain
 }
 
+// The idle rain's moment a rain frame's lamps are drawn at — none where the panel does not rain, so its
+// lamps are drawn as `■` (joshuafolkken/kit#8647).
+function rain_of(redraw: Pick<Redraw, 'ports' | 'now_ms'>): RainMoment | undefined {
+	return has_rain(redraw.ports) ? { ms: redraw.now_ms, is_burst: false } : undefined
+}
+
 // How a new row enters: typed where the rows type; in a theme whose live board decodes them, decoded on
 // a terminal drawing color and shown at once on one drawing none (joshuafolkken/kit#8356).
 type RowEntry = 'type' | 'decode' | 'none'
@@ -201,12 +208,14 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 		resume: display.resume,
 		throughput: display.throughput,
 		has_lamps: has_lamps(redraw.ports),
+		has_rain: has_rain(redraw.ports),
 		thanks: display.thanks,
 		pinned: display.pinned,
 		link: redraw.ports.link,
 		...bounds,
 	})
-	const spun = run_board_spin.spun(lines, run_board_labels.spinner_of(redraw.now_ms), bounds.size)
+	const spinner = run_board_labels.spinner_of(redraw.now_ms)
+	const spun = run_board_spin.spun(lines, spinner, bounds.size, rain_of(redraw))
 	// joshuafolkken/kit#8476: the clocks' colons found as the theme draws them, in its colors and in the
 	// icons every write draws (joshuafolkken/kit#8505), so the restyle reuses those writes' cache.
 	const { theme, icons } = redraw.ports

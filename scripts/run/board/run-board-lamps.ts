@@ -132,6 +132,19 @@ function start_of(row: number): string {
 	return lamp_text(row, false, LAMP_START)
 }
 
+// A rule ended two columns before the panel's `start`, starting a panel there as the rows around it do
+// (joshuafolkken/kit#8647); its marker is out in the blank line's shade, a rain frame's only.
+function rule_started(rule: string, start: number): string {
+	let cut = ''
+
+	for (const character of rule) {
+		if (run_board_fit.width_of(`${cut}${character}`) > start - LAMP_PITCH) break
+		cut += character
+	}
+
+	return `${cut}${start_of(PANEL_ROWS.gap)}`
+}
+
 // The text before a dropped panel's marker up to its last figure: the marker's color escapes hold no
 // blank, so the line's last blank is the gap before them.
 function dropped(before: string): string {
@@ -179,6 +192,7 @@ const run_board_lamps = {
 	look_text,
 	mixed,
 	place_of,
+	rule_started,
 	start_column,
 	start_of,
 }

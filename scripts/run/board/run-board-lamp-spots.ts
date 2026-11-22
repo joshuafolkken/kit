@@ -25,6 +25,8 @@ interface Lamp {
 	row: number
 	column: number
 	panel_row: number
+	// How many rows the frame's panel runs, which sets the idle rain's cycle (joshuafolkken/kit#8647).
+	panel_rows: number
 	group: number
 	lamp: number
 }
@@ -33,12 +35,13 @@ type LampPorts = Pick<BoardPorts, 'write' | 'write_drawn'>
 
 function row_lamps(
 	line: string,
-	at: { row: number; panel_row: number },
+	at: { row: number; panel_row: number; panel_rows: number },
 	columns: number,
 ): Array<Lamp> {
 	return [...line.matchAll(new RegExp(LAMP, 'gu'))].map((match, index) => ({
 		...spot_at(line, match.index, at.row, columns),
 		panel_row: at.panel_row,
+		panel_rows: at.panel_rows,
 		...place_of(at.panel_row, index),
 	}))
 }
@@ -53,7 +56,11 @@ function lamps_in(
 	const panel = [...lines.keys()].filter((index) => lines[index]?.includes(LAMP) === true)
 
 	return panel.flatMap((index, panel_row) =>
-		row_lamps(lines[index] ?? '', { row: starts[index] ?? 1, panel_row }, columns),
+		row_lamps(
+			lines[index] ?? '',
+			{ row: starts[index] ?? 1, panel_row, panel_rows: panel.length },
+			columns,
+		),
 	)
 }
 
@@ -97,7 +104,20 @@ function write_lamps(
 	write(run_board_screen.synced(bytes))
 }
 
-const run_board_lamp_spots = { lamps_in, write_lamps }
+// The frame's lines with each of `lamps` drawn as the idle rain's cell `at`, so a rain frame's whole draw
+// writes no `■` for the turn to paint over (joshuafolkken/kit#8647); untouched with no `at`.
+function rained(
+	lines: ReadonlyArray<string>,
+	lamps: ReadonlyArray<Lamp>,
+	at: RainMoment | undefined,
+): Array<string> {
+	if (at === undefined) return [...lines]
+	const cells = lamps.map((lamp) => run_board_idle_rain.cell_text(lamp, at)).values()
+
+	return lines.map((line) => line.replaceAll(LAMP, () => cells.next().value ?? LAMP))
+}
+
+const run_board_lamp_spots = { lamps_in, rained, write_lamps }
 
 export { run_board_lamp_spots }
 export type { Lamp, LampMoment }

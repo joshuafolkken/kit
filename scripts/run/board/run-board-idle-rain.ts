@@ -22,9 +22,9 @@ const SPEED = { least: 0.12, spread: 0.22 }
 const POUR = { least: 0.6, spread: 0.5 }
 const POUR_SPEED = (POUR.least * FRAME_MS) / run_board_sweep.SWEEP_MS
 const GAP = { least: 6, spread: 10 }
+// The panel's rows where a place does not say how many its frame runs.
 const PANEL_ROWS = 5
 const TRAIL: ReadonlyArray<Paint> = [SHADES.bright, SHADES.mid, SHADES.dark]
-const CYCLE_ROWS = PANEL_ROWS + TRAIL.length
 // Each column's drop numbers, mixed apart from its speed, its gap and where it starts.
 const SALT = { speed: 1, gap: 2, offset: 3, glyph: 4 }
 const SCALE = 1000
@@ -43,6 +43,8 @@ interface RainMoment {
 interface RainPlace {
 	column: number
 	panel_row: number
+	// How many rows the frame's panel runs: six where the usage rule's row rains (joshuafolkken/kit#8647).
+	panel_rows?: number | undefined
 }
 
 // A number in `0`..`1` mixed from the column and `salt`, the same for the same two.
@@ -61,9 +63,11 @@ function speed_of(column: number, at: RainMoment): number {
 	return at.is_burst ? POUR_SPEED : pace_of(share(column, SALT.speed))
 }
 
-// The row the column's drop is on at `at`, fractional, within its cycle of panel, trail and gap.
-function row_at(column: number, at: RainMoment): number {
-	const cycle = CYCLE_ROWS + GAP.least + Math.floor(share(column, SALT.gap) * GAP.spread)
+// The row the column's drop is on at `at`, fractional, within its cycle of the panel's `panel_rows`, the
+// trail and the gap.
+function row_at(column: number, at: RainMoment, panel_rows = PANEL_ROWS): number {
+	const gap = GAP.least + Math.floor(share(column, SALT.gap) * GAP.spread)
+	const cycle = panel_rows + TRAIL.length + gap
 	const fallen = (at.ms / FRAME_MS) * speed_of(column, at) + share(column, SALT.offset) * cycle
 
 	return fallen % cycle
@@ -78,7 +82,7 @@ function head_glyph(column: number, ms: number): string {
 
 // The cell at `place` as drawn at `at`: the head, a trail cell, or a blank.
 function cell_text(place: RainPlace, at: RainMoment): string {
-	const distance = Math.floor(row_at(place.column, at)) - place.panel_row
+	const distance = Math.floor(row_at(place.column, at, place.panel_rows)) - place.panel_row
 
 	if (distance === 0) return run_board_labels.painted(SHADES.head, head_glyph(place.column, at.ms))
 	// A cell below the head has a negative index, so no paint.

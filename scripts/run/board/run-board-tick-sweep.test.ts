@@ -57,7 +57,7 @@ describe('run_board_tick — the blinking cells of a no-run frame (joshuafolkken
 	it('drops the last frame’s lamps, TRACE field and clock colons when it draws no run', async () => {
 		const { ports } = harness(undefined, [plan_titled('a')])
 		const trace = { row: 1, column: 1, style: '' }
-		const lamp = { row: 2, column: 2, panel_row: 0, group: 0, lamp: 0 }
+		const lamp = { row: 2, column: 2, panel_row: 0, panel_rows: 5, group: 0, lamp: 0 }
 		const blinking = { ...FRESH_STATE, lamps: [lamp], traces: [trace], colons: [trace] }
 		const drawn = await tick(blinking, ports)
 

@@ -217,7 +217,7 @@ describe('run_board_codes.locked_at', () => {
 	)
 })
 
-const LAMP: Lamp = { row: 6, column: 72, panel_row: 0, group: 0, lamp: 0 }
+const LAMP: Lamp = { row: 6, column: 72, panel_row: 0, panel_rows: 5, group: 0, lamp: 0 }
 
 // Each write of the turns to the next second, keyed by the moment it was written at.
 async function timed_turns(

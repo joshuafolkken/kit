@@ -87,6 +87,8 @@ interface QuotaView {
 	rate_limit?: GithubRateLimit | undefined
 	// Whether the frame runs the WOPR lamp panel (`run-board-quota-lamps.ts`).
 	has_lamps?: boolean | undefined
+	// Whether the panel rains (matrix), running the rule's row as a panel row too (joshuafolkken/kit#8647).
+	has_rain?: boolean | undefined
 }
 
 // The windows the provider reported, shortest first — the order its row and its summary both read.
@@ -305,17 +307,15 @@ function summary_of(view: QuotaView): string {
 	return [...parts, ...rate_limit_summary(view)].join(SEPARATOR)
 }
 
-// None where no reader is open — a frame drawn with no usage read.
-function usage_part(view: QuotaView): DetailPart | undefined {
-	if (view.quotas === undefined) return undefined
-
-	const has_lamps = view.has_lamps === true
+// The provider rows, the first two starting their panels where the frame `has_lamps`, then GitHub's.
+function usage_lines(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
 	const providers = providers_of(view).map((provider) => row_of(provider, view))
 	const texts = run_board_quota_lamps.provider_rows(
 		providers.map((row) => row.text),
 		has_lamps,
 	)
-	const lines = [
+
+	return [
 		...texts.map((text, index) => ({
 			text,
 			is_detail: false,
@@ -323,10 +323,24 @@ function usage_part(view: QuotaView): DetailPart | undefined {
 		})),
 		...rate_limit_rows(view).map((text) => ({ text, is_detail: false })),
 	]
+}
+
+// None where no reader is open — a frame drawn with no usage read.
+function usage_part(view: QuotaView): DetailPart | undefined {
+	if (view.quotas === undefined) return undefined
+
+	const has_lamps = view.has_lamps === true
+	const lines = usage_lines(view, has_lamps)
 	const rule = run_board_render_section.columns_rule(LABEL, [])
 	const head = [run_board_quota_lamps.gap_line(has_lamps), rule]
 
-	return { head, lines, label: LABEL, summary: summary_of(view) }
+	return {
+		head,
+		lines,
+		label: LABEL,
+		summary: summary_of(view),
+		is_rule_lamped: has_lamps && view.has_rain === true,
+	}
 }
 
 const run_board_render_quota = { LEGEND, usage_part }
