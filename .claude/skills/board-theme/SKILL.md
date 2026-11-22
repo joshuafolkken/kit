@@ -61,7 +61,8 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
   (the real behavior wins), and which element takes which color (rules, text inside the rules,
   the waiting mark, gauges) — numbers without the assignment caused #8354's two misses (#8390).
 - **Write in the body and the acceptance criteria that the new effect leaves the existing themes'
-  look unchanged** — the user warned about the wargames lamp panel (#8376).
+  look unchanged** (#8376).
+- Demo-backed: a seam child, then parallel effect children ([split](theme-split.md)).
 
 ## 6. After the first merge
 
@@ -74,6 +75,5 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
 - matrix: epic #8357; demo code in its children's comments, #8352–#8370.
 - wargames typing effect: epic #8377 (#8375, #8376); demo code:
   https://github.com/joshuafolkken/kit/issues/8376#issuecomment-7039783569
-- A demo-versus-implementation comparison:
+- Demo-vs-implementation comparison:
   https://github.com/joshuafolkken/kit/issues/8354#issuecomment-7039850496
-- Next theme candidates: #8384.
