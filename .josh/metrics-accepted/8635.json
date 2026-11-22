@@ -1,0 +1,8 @@
+{
+	"reason": "The split assessment gains its third question (serial children fold) and the rationale for it, #8635",
+	"date": "2026-11-22",
+	"growth": {
+		"ai_cost.on_demand_bytes": 288,
+		"prose.long_paragraphs": 1
+	}
+}

@@ -19,7 +19,6 @@ const { NO_TYPING, next, type_bytes, typed_lines } = run_board_type_rows
 const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 const { CURSOR } = run_board_typing
 const ESC = '\u{1B}'
-const RESET = `${ESC}[0m`
 const START = Date.parse('2026-11-19T09:00:00.000Z')
 const SECOND = 1000
 const ROW = 'x'.repeat(100)
@@ -186,7 +185,7 @@ describe('run_board_type_rows — what is written', () => {
 		const later = next(typing, frame_of(typing.lines), START + SECOND + 10 * LETTER_MS, true)
 		const lines = typed_lines(['head', ROW, 'foot'], later, START + SECOND + 10 * LETTER_MS)
 
-		expect(lines).toStrictEqual(['head', `${'x'.repeat(11)}${RESET}${CURSOR}`, 'foot'])
+		expect(lines).toStrictEqual(['head', `${'x'.repeat(11)}${CURSOR}`, 'foot'])
 	})
 
 	it('types two rows that appear together side by side, each with its own block, at its own row', () => {
@@ -194,7 +193,7 @@ describe('run_board_type_rows — what is written', () => {
 		const bytes = type_bytes(typing, START + SECOND + 6 * LETTER_MS)
 
 		expect(bytes).toBe(
-			`${ESC}[3;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K${ESC}[5;1H${'x'.repeat(7)}${RESET}${CURSOR}${ESC}[K`,
+			`${ESC}[3;1H${'x'.repeat(7)}${CURSOR}${ESC}[K${ESC}[5;1H${'x'.repeat(7)}${CURSOR}${ESC}[K`,
 		)
 	})
 
@@ -253,7 +252,7 @@ describe('run_board_type_rows — the steady block', () => {
 			const shown = 'x'.repeat(letters + 1)
 
 			expect(type_bytes(typing, START + SECOND + letters * LETTER_MS)).toBe(
-				`${ESC}[3;1H${shown}${RESET}${CURSOR}${ESC}[K${ESC}[5;1H${shown}${RESET}${CURSOR}${ESC}[K`,
+				`${ESC}[3;1H${shown}${CURSOR}${ESC}[K${ESC}[5;1H${shown}${CURSOR}${ESC}[K`,
 			)
 		},
 	)
@@ -265,9 +264,7 @@ describe('run_board_type_rows — the header’s now line (joshuafolkken/kit#810
 		const at_ms = START + SECOND + 6 * LETTER_MS
 
 		expect(keys_of(typing)).toStrictEqual([`now:${WORDS}`])
-		expect(type_bytes(typing, at_ms)).toBe(
-			`${ESC}[3;1H${NOW_PREFIX}#8093 ·${RESET}${CURSOR}${ESC}[K`,
-		)
+		expect(type_bytes(typing, at_ms)).toBe(`${ESC}[3;1H${NOW_PREFIX}#8093 ·${CURSOR}${ESC}[K`)
 	})
 
 	it('writes the now line whole once its words are typed through', () => {
