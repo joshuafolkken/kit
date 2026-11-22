@@ -35,6 +35,11 @@ interface WaitOptions {
 const POLL_MS = 2000
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
+// A bounded check still running: non-zero so a shell `&&` stops on it, and apart from a red check's
+// code — the BSD exit status for "temporary failure, try again later".
+const PENDING_EXIT_CODE = 75
+// An exit code as the detached child writes it; anything else reads as a failure, never as green.
+const EXIT_CODE_TEXT = /^\d+$/u
 const USAGE =
 	'Usage: josh wait [--pid <pid> | --process <pattern> | --file <path> | --result <dir>]'
 const ARGUMENT_OPTIONS = {
@@ -128,9 +133,11 @@ function result_path(directory: string, file: keyof typeof RESULT_FILES): string
 function replay(directory: string): number {
 	const log = readFileSync(result_path(directory, 'log'), 'utf8')
 
+	const exit_code = readFileSync(result_path(directory, 'exit'), 'utf8')
+
 	process.stdout.write(log.replace(LOG_HEADER, ''))
 
-	return Number(readFileSync(result_path(directory, 'exit'), 'utf8'))
+	return EXIT_CODE_TEXT.test(exit_code) ? Number(exit_code) : FAILURE_EXIT_CODE
 }
 
 // One chunk of a bounded check: its result once it finishes inside, else `pending` and the next wait.
@@ -142,7 +149,7 @@ async function collect(directory: string, options: WaitOptions): Promise<number>
 		`pending — the check is still running in the background: run \`pnpm josh wait --result ${directory}\` for its output and exit code`,
 	)
 
-	return SUCCESS_EXIT_CODE
+	return PENDING_EXIT_CODE
 }
 
 function result_of(argv: ReadonlyArray<string>): string | undefined {
@@ -171,10 +178,15 @@ function read_probe(argv: ReadonlyArray<string>): Probe | undefined {
 	}
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const result = result_of(argv)
+// A directory no bounded check launched into would answer `pending` on every call, so it is refused.
+async function collect_result(directory: string): Promise<number> {
+	if (existsSync(result_path(directory, 'log'))) return await collect(directory, live_chunk())
+	console.error(`wait: no bounded check result in ${directory}`)
 
-	if (result !== undefined) return await collect(result, live_chunk())
+	return FAILURE_EXIT_CODE
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const probe = read_probe(argv)
 
 	if (probe === undefined) {
@@ -183,6 +195,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
+	const result = result_of(argv)
+
+	if (result !== undefined) return await collect_result(result)
 	const verdict = await wait_for(probe, live_chunk())
 
 	console.info(`wait: ${verdict} — ${NEXT_ACTION[verdict]}`)
@@ -192,6 +207,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 const run_wait_cli = {
 	CHUNK_MS: run_ship_wait_cli.CHUNK_MS,
+	PENDING_EXIT_CODE,
 	VERDICT,
 	collect,
 	live_chunk,

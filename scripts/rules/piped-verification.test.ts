@@ -34,6 +34,8 @@ describe('is_masked_verification', () => {
 		'pnpm josh gate | tail -40 | grep failed',
 		// joshuafolkken/kit#4940: the related checks together are a check like any of their parts.
 		PIPED_CHECK_RELATED,
+		// joshuafolkken/kit#8708: the collect of a bounded check replays that check's exit code.
+		'pnpm josh wait --result /tmp/bounded-check/x | tail -5',
 	])('reads %j as a masked verification', (command) => {
 		expect(piped_verification.is_masked_verification(command)).toBe(true)
 	})
@@ -43,6 +45,8 @@ describe('is_masked_verification', () => {
 		PIPED_LISTING,
 		'gh issue list --state open | head -30',
 		'ls -la | wc -l',
+		// A wait on a pid answers done or pending, not a check's verdict.
+		'pnpm josh wait --pid 42 | tail -1',
 		// A verification command that keeps its own status: no pipe, the far side of a `||`, or the
 		// last segment of the pipeline, whose status *is* the pipeline's.
 		REDIRECTED_GATE,

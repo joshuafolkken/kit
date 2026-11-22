@@ -5,6 +5,7 @@ import { run_wait_cli } from '#scripts/run/run-wait-cli'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { bounded_check, type BoundedCall, type Dependencies } from './bounded-check'
+import { COMMAND_MAP } from './josh-command-map'
 import { outer_command } from './outer-command'
 
 // joshuafolkken/kit#8708: a lane child's own call of a bounded check returns inside one chunk.
@@ -83,7 +84,7 @@ describe('bounded_check.run in a lane child', () => {
 		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 		const given = dependencies({ launcher: finished_launcher(undefined), wait: no_chunk })
 
-		expect(await bounded_check.run(CALL, synchronous, given)).toBe(GREEN_EXIT_CODE)
+		expect(await bounded_check.run(CALL, synchronous, given)).toBe(run_wait_cli.PENDING_EXIT_CODE)
 		const pending = String(info.mock.calls[0]?.[0])
 		const directory = /^pending — .*--result (\S+)`/u.exec(pending)?.[1] ?? ''
 
@@ -118,7 +119,44 @@ describe('bounded_check.run in the detached child', () => {
 		expect(existsSync(exit_path)).toBe(false)
 		for (const listener of listeners) listener(SYNC_EXIT_CODE)
 		expect(readFileSync(exit_path, 'utf8')).toBe(String(SYNC_EXIT_CODE))
+		expect(existsSync(`${exit_path}.tmp`)).toBe(false)
 	})
+})
+
+// A finished check's result directory, its exit code written as `exit_code`.
+function result_directory(exit_code: string): string {
+	const directory = create_directory('bounded-wait-')
+
+	writeFileSync(run_wait_cli.result_path(directory, 'log'), CHECK_OUTPUT)
+	writeFileSync(run_wait_cli.result_path(directory, 'exit'), exit_code)
+
+	return directory
+}
+
+describe('josh wait --result', () => {
+	it('reads an exit code that is not an integer as a failure, never as green', async () => {
+		vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		expect(await run_wait_cli.run(['--result', result_directory('')])).toBe(RED_EXIT_CODE)
+	})
+
+	it.each([
+		['a directory no check launched into', ['--result', '/nonexistent/bounded-check']],
+		['a second target beside it', ['--result', '/tmp', '--pid', '1']],
+	])('refuses %s', async (_case, argv) => {
+		vi.spyOn(console, 'error').mockReturnValue(undefined)
+
+		expect(await run_wait_cli.run(argv)).toBe(RED_EXIT_CODE)
+	})
+})
+
+describe('the bounded commands', () => {
+	it.each([COMMAND, 'lint:related', 'test:related', 'test:unit'])(
+		'marks %s as bounded',
+		(command) => {
+			expect(COMMAND_MAP[command]?.is_bounded).toBe(true)
+		},
+	)
 })
 
 describe('bounded_check.run synchronously', () => {

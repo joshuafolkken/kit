@@ -871,7 +871,7 @@ pnpm josh wait                             # a background subagent: the chunk
 
 <!-- /usage -->
 
-- A lane child's own `check:related`, `lint:related`, `test:related` or `test:unit` runs detached and returns within the chunk. If it finishes in time, its output and exit code print as a synchronous run's; otherwise it prints `pending` and the `josh wait --result <dir>` that collects them (`scripts/josh/bounded-check.ts`).
+- A lane child's own `check:related`, `lint:related`, `test:related` or `test:unit` runs detached and returns within the chunk. If it finishes in time, its output and exit code print as a synchronous run's; otherwise it prints `pending`, exits 75 so a `&&` chain stops, and names the `josh wait --result <dir>` that collects them (`scripts/josh/bounded-check.ts`).
 
 ### `josh ship:evidence`
 

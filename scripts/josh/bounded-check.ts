@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -71,6 +71,15 @@ function is_lane_direct(call: BoundedCall, dependencies: Dependencies): boolean 
 	)
 }
 
+// Written aside and renamed in, so the poller never reads a created but still empty file.
+function write_exit_code(directory: string, code: number): void {
+	const exit_path = run_wait_cli.result_path(directory, 'exit')
+	const staged_path = `${exit_path}.tmp`
+
+	writeFileSync(staged_path, String(code))
+	renameSync(staged_path, exit_path)
+}
+
 // On exit rather than on return, so a check ending in `process.exit` still records its code.
 async function record(
 	directory: string,
@@ -78,7 +87,7 @@ async function record(
 	dependencies: Dependencies,
 ): Promise<number> {
 	dependencies.on_exit((code) => {
-		writeFileSync(run_wait_cli.result_path(directory, 'exit'), String(code))
+		write_exit_code(directory, code)
 	})
 
 	return await dispatch()
