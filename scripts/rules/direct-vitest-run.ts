@@ -41,6 +41,8 @@ function is_exempt_flag(argument: string): boolean {
 	return EXEMPT_FLAGS.has(argument.split(FLAG_VALUE_SEPARATOR, 1)[0] ?? argument)
 }
 
+// True when `test:related` can carry a vitest call with these arguments (the words after `vitest`);
+// `lane-direct-tool` rewrites such a lane line to `test:related` on the same reading.
 function is_carried_arguments(args: ReadonlyArray<string>): boolean {
 	if (OTHER_SUBCOMMANDS.has(args[0] ?? '')) return false
 
@@ -93,6 +95,11 @@ const ROW = {
 	},
 }
 
-const direct_vitest_run = { DIRECT_VITEST_RUN_REASON, ROW, is_direct_vitest_run }
+const direct_vitest_run = {
+	DIRECT_VITEST_RUN_REASON,
+	ROW,
+	is_carried_arguments,
+	is_direct_vitest_run,
+}
 
 export { direct_vitest_run }

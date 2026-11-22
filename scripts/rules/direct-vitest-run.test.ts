@@ -68,6 +68,23 @@ describe('direct_vitest_run.is_direct_vitest_run — is silent on', () => {
 	})
 })
 
+// joshuafolkken/kit#8686: the reading `lane-direct-tool` rewrites a lane's vitest line on.
+describe('direct_vitest_run.is_carried_arguments', () => {
+	it.each([[[]], [['run', '-u', 'a.test.ts']], [['a.test.ts', '--update']]])(
+		'carries %j',
+		(args) => {
+			expect(direct_vitest_run.is_carried_arguments(args)).toBe(true)
+		},
+	)
+
+	it.each([[['run', '--project', 'unit']], [['run', '--config=v.ts']], [['list', 'a.test.ts']]])(
+		'leaves %j',
+		(args) => {
+			expect(direct_vitest_run.is_carried_arguments(args)).toBe(false)
+		},
+	)
+})
+
 describe('direct-vitest-run — delivered through the guard', () => {
 	it('refuses every occurrence, the reissue included', () => {
 		const payload = payload_of('vitest-run-every', PNPM_VITEST_RUN)
