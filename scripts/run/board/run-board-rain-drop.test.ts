@@ -22,15 +22,19 @@ const SALT_COLUMN = 1
 const SALT_SPEED = 2
 const SALT_POUR_COLUMN = 4
 const SALT_POUR_SPEED = 5
+const SALT_TRAIL = 6
 const PRECISION = 9
 
-// Every draw at its least, but the column and the pace as given.
-function share_of(column: number, speed: number): Share {
+// Every draw at its least, but the column, the pace and the trail as given.
+function share_of(column: number, speed: number, trail = 0): Share {
 	return (values) => {
-		if (values[1] === SALT_COLUMN) return column
-		if (values[1] === SALT_SPEED) return speed
+		const drawn = new Map([
+			[SALT_COLUMN, column],
+			[SALT_SPEED, speed],
+			[SALT_TRAIL, trail],
+		])
 
-		return 0
+		return drawn.get(values[1] ?? 0) ?? 0
 	}
 }
 
@@ -98,13 +102,16 @@ describe('run_board_rain_drop.falls_at — one drop a second', () => {
 
 	it('leaves once its trail falls past the frame’s last row, the rows the frame has now', () => {
 		const share = share_of(0, 1)
+		// A trail of 40% of three rows: one cell, past the last row once the head is on row 5.
 		const short = blank_screen(3, 10)
 
-		expect(falls_at(short, 1000, share).map((fall) => fall.born_ms)).toEqual([0, 1000])
-		expect(falls_at(short, 1050, share).map((fall) => fall.born_ms)).toEqual([1000])
-		expect(falls_at(tall, 1050, share).map((fall) => fall.born_ms)).toEqual([0, 1000])
+		expect(falls_at(short, 550, share).map((fall) => fall.born_ms)).toEqual([0])
+		expect(falls_at(short, 600, share).map((fall) => fall.born_ms)).toEqual([])
+		expect(falls_at(tall, 600, share).map((fall) => fall.born_ms)).toEqual([0])
 	})
 })
+
+const NO_FALL: Fall = { born_ms: 0, column: 1, speed: 0, length: 0 }
 
 // A drop the rain poured in, by its pace: the idle ones are all slower.
 function is_poured(fall: Fall): boolean {
@@ -115,7 +122,7 @@ function is_poured(fall: Fall): boolean {
 describe('run_board_rain_drop.falls_at — the pour while a row types', () => {
 	const pouring = poured(blank_screen(20, 8), [{ from_ms: 1000, to_ms: 1200 }], 1000)
 
-	it('enters four drops on each step in place of the second’s one, at 0.6..1.1 rows a step', () => {
+	it('enters four drops on each step in place of the second’s one, at 1.2..2.2 rows a step', () => {
 		const slow = falls_at(pouring, 1150, pour_share_of(0))
 		const fast = falls_at(pouring, 1150, pour_share_of(1))
 
@@ -126,30 +133,31 @@ describe('run_board_rain_drop.falls_at — the pour while a row types', () => {
 		expect(
 			new Set(slow.filter((fall) => fall.born_ms === 1000).map((fall) => fall.column)),
 		).toEqual(new Set([1, 3, 5, 7]))
-		expect(slow.at(-1)?.speed).toBeCloseTo(0.6, PRECISION)
-		expect(fast.at(-1)?.speed).toBeCloseTo(1.1, PRECISION)
+		expect(slow.at(-1)?.speed).toBeCloseTo(1.2, PRECISION)
+		expect(fast.at(-1)?.speed).toBeCloseTo(2.2, PRECISION)
 	})
 
-	it('speeds a falling drop up to the pour’s pace on each step it pours', () => {
-		const [idle] = falls_at(pouring, 1200, share_of(0, 0))
-		const fall = idle ?? { born_ms: 0, column: 1, speed: 0 }
+	it('speeds a falling drop up to twice the pour’s least pace on each step it pours', () => {
+		const [fall = NO_FALL] = falls_at(pouring, 1200, share_of(0, 0))
 
 		expect(fall.speed).toBeCloseTo(0.12, PRECISION)
 		expect(head_row(fall, 1000, pouring.pours)).toBe(3)
-		// 20 idle steps at 0.12 and 4 poured at 0.6: 4.8 rows, where 24 idle ones fall 2.88.
-		expect(head_row(fall, 1200, pouring.pours)).toBe(5)
+		// 20 idle steps at 0.12 and 4 poured at 1.2: 7.2 rows, where 24 idle ones fall 2.88.
+		expect(head_row(fall, 1200, pouring.pours)).toBe(8)
 		expect(head_row(fall, 1200)).toBe(3)
 	})
 
-	it('returns to a drop a second from the step the typing ends; a poured drop keeps its pace', () => {
-		const falls = falls_at(pouring, 2000, pour_share_of(0.5))
-		const last = falls.findLast((fall) => is_poured(fall)) ?? { born_ms: 0, column: 1, speed: 0 }
-		const seconds = falls.filter((fall) => !is_poured(fall)).map((fall) => fall.born_ms)
+	it('returns to a drop a second from the step the typing ends; a poured drop hurries', () => {
+		const fall =
+			falls_at(pouring, 1350, pour_share_of(0.5)).findLast((each) => is_poured(each)) ?? NO_FALL
+		const seconds = falls_at(pouring, 2000, pour_share_of(0.5)).filter((each) => !is_poured(each))
 
-		expect(last.born_ms).toBe(1150)
-		expect(seconds).toEqual([0, 2000])
-		expect(head_row(last, 1350, pouring.pours)).toBe(1 + Math.floor(4 * 0.85))
-		expect(head_row(last, 1350, pouring.pours)).toBe(head_row(last, 1350))
+		expect(fall.born_ms).toBe(1150)
+		expect(fall.ends_ms).toBe(1200)
+		expect(seconds.map((each) => each.born_ms)).toEqual([0, 2000])
+		// Four steps at 1.7, the last three from the typing's end hurried by 0, 0.05 and 0.1 of its pace.
+		expect(head_row(fall, 1350, pouring.pours)).toBe(1 + Math.floor(4 * 1.7 + 1.7 * 0.15))
+		expect(head_row(fall, 1350, pouring.pours)).toBe(head_row(fall, 1350))
 	})
 })
 
@@ -184,16 +192,13 @@ describe('run_board_rain_drop.drop_bytes — a pouring step', () => {
 
 	it('draws a falling drop at the head the pour sped it to', () => {
 		const sped = poured(blank_screen(20, 8), [{ from_ms: 1000, to_ms: 1200 }], 1000)
-		// The idle drop falls in the last column, the poured ones in the first; its head is on row 5.
+		// The idle drop falls in the last column, the poured ones in the first; its head is on row 8 and its
+		// trail, 40% of the 20 rows, reaches the top.
 		const keys = [...written_cells(drop_bytes(sped, 1200, undefined, share_of(0.999, 0))).keys()]
 
-		expect(keys.filter((key) => key.endsWith(';8')).toSorted(by_text)).toEqual([
-			'1;8',
-			'2;8',
-			'3;8',
-			'4;8',
-			'5;8',
-		])
+		expect(keys.filter((key) => key.endsWith(';8')).toSorted(by_text)).toEqual(
+			Array.from({ length: 8 }, (_row, index) => `${String(index + 1)};8`),
+		)
 	})
 })
 
@@ -243,7 +248,8 @@ describe('run_board_rain_drop.drop_bytes — a blank cell and the cells it skips
 	const share = share_of(0, 1)
 
 	it('shows code in a blank cell, the trail fading behind the head', () => {
-		const written = drop_bytes(blank_screen(5, 1), 600, undefined, share)
+		// A trail 70% of the five rows: four cells, the head on the last row.
+		const written = drop_bytes(blank_screen(5, 1), 600, undefined, share_of(0, 1, 0.5))
 		const glyphs = written.replaceAll(ESCAPES, '')
 
 		expect([...glyphs]).toHaveLength(5)

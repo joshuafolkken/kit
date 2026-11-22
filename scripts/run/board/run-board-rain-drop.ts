@@ -19,18 +19,32 @@ import type { TypingSpan } from './run-board-type-rows'
 // changed since the last one.
 // joshuafolkken/kit#8369: while a row types the rain pours — `POUR_PER_STEP` drops enter on each step in
 // place of the second's one, each at its own pace in the pour's spread, and every drop falling speeds
-// up to at least the pour's pace (`run_board_idle_rain.POUR`). From the step the typing ends the second's
-// drop returns; a poured drop keeps its own pace until it falls off.
+// up to at least the pour's floor (`POUR_FLOOR`). From the step the typing ends the second's drop returns.
+// joshuafolkken/kit#8627: every drop's trail runs 40% to 100% of the screen's rows, `TRAIL`'s paint
+// stretched over it (`run_board_rain.paint_of`). The pour falls twice the panel's pour (`POUR_GAIN`), on
+// the drops only, and once the typing ends a poured drop gains its own pace again each second.
 
 const { SHADES } = run_board_header_trace
 const { cell_at, is_kept, key_of } = run_board_drop_screen
 const { POUR } = run_board_idle_rain
 const DROP_MS = run_board_sweep.SWEEP_MS
 const POUR_PER_STEP = 4
+const POUR_GAIN = 2
+const POUR_FLOOR = POUR.least * POUR_GAIN
 const TRAIL: ReadonlyArray<Paint> = [SHADES.bright, SHADES.mid, SHADES.dark, SHADES.darkest]
+const FILM = { least: 0.4, spread: 0.6 }
 const LIT_TRAIL = 2
-const SALT = { column: 1, speed: 2, glyph: 3, pour_column: 4, pour_speed: 5 }
+const SALT = {
+	column: 1,
+	speed: 2,
+	glyph: 3,
+	pour_column: 4,
+	pour_speed: 5,
+	trail: 6,
+	pour_trail: 7,
+}
 const SCALE = 1000
+const PAIR = 2
 const CSI = '\u{1B}['
 const { RESET } = run_board_cut_styled
 
@@ -41,6 +55,16 @@ interface Fall {
 	born_ms: number
 	column: number
 	speed: number
+	// The cells of the trail behind the head.
+	length: number
+	// A poured drop's typing end, from which it hurries; none for the second's drop.
+	ends_ms?: number
+}
+
+// The step a poured drop entered on and the end of the typing that poured it.
+interface PourStep {
+	born_ms: number
+	ends_ms: number
 }
 
 function mixed_share(values: ReadonlyArray<number>): number {
@@ -51,38 +75,68 @@ function column_of(fraction: number, columns: number): number {
 	return 1 + Math.min(columns - 1, Math.floor(fraction * columns))
 }
 
-// The drop that entered on the second `born_ms`: its column and its pace.
-function fall_of(born_ms: number, columns: number, share: Share): Fall {
-	const column = column_of(share([born_ms, SALT.column]), columns)
-
-	return { born_ms, column, speed: run_board_idle_rain.pace_of(share([born_ms, SALT.speed])) }
+// A trail `fraction` of the way from 40% to 100% of the screen's `rows`.
+function trail_of(rows: number, fraction: number): number {
+	return Math.round(rows * (FILM.least + fraction * FILM.spread))
 }
 
-// The `nth` drop the rain poured in on the step `born_ms`: its column and its pace in the pour's spread.
-function poured_fall(born_ms: number, nth: number, columns: number, share: Share): Fall {
-	const column = column_of(share([born_ms, SALT.pour_column, nth]), columns)
-	const speed = POUR.least + share([born_ms, SALT.pour_speed, nth]) * POUR.spread
+// The drop that entered on the second `born_ms`: its column, its pace and its trail.
+function fall_of(born_ms: number, screen: DropScreen, share: Share): Fall {
+	const column = column_of(share([born_ms, SALT.column]), screen.columns)
+	const speed = run_board_idle_rain.pace_of(share([born_ms, SALT.speed]))
 
-	return { born_ms, column, speed }
+	return {
+		born_ms,
+		column,
+		speed,
+		length: trail_of(screen.rows.length, share([born_ms, SALT.trail])),
+	}
+}
+
+// The `nth` drop the rain poured in on `step`: its column, its pace in twice the pour's spread and its
+// trail.
+function poured_fall(step: PourStep, nth: number, screen: DropScreen, share: Share): Fall {
+	const column = column_of(share([step.born_ms, SALT.pour_column, nth]), screen.columns)
+	const speed = (POUR.least + share([step.born_ms, SALT.pour_speed, nth]) * POUR.spread) * POUR_GAIN
+	const length = trail_of(screen.rows.length, share([step.born_ms, SALT.pour_trail, nth]))
+
+	return { ...step, column, speed, length }
 }
 
 function steps_of(fall: Fall, at_ms: number): number {
 	return Math.floor((at_ms - fall.born_ms) / DROP_MS)
 }
 
+// `0 + 1 + … + (count - 1)`.
+function triangular(count: number): number {
+	return (count * (count - 1)) / PAIR
+}
+
+// The rows a poured drop falls in its first `steps` past its own pace: on each step starting from its
+// typing's end on, its pace once more for each second since the end.
+function hurried_rows(fall: Fall, steps: number): number {
+	if (fall.ends_ms === undefined) return 0
+	const first = Math.max(0, Math.ceil((fall.ends_ms - fall.born_ms) / DROP_MS))
+	const count = Math.max(0, steps - first)
+	const lead_ms = fall.born_ms + first * DROP_MS - fall.ends_ms
+
+	return (fall.speed * (count * lead_ms + triangular(count) * DROP_MS)) / MS_PER_SECOND
+}
+
 // The screen row the drop's head is on: the top row on the step it enters, falling at least the pour's
-// pace on each step the rain pours.
+// pace on each step the rain pours, and a poured drop hurrying once its typing ends.
 function head_row(fall: Fall, at_ms: number, pours: ReadonlyArray<TypingSpan> = []): number {
 	const steps = steps_of(fall, at_ms)
 	const sped = run_board_rain_pour.poured_steps(pours, fall.born_ms, fall.born_ms + steps * DROP_MS)
-	const fallen = (steps - sped) * fall.speed + sped * Math.max(fall.speed, POUR.least)
+	const fallen = (steps - sped) * fall.speed + sped * Math.max(fall.speed, POUR_FLOOR)
 
-	return 1 + Math.floor(fallen)
+	return 1 + Math.floor(fallen + hurried_rows(fall, steps))
 }
 
-// How far back a drop at `pace` can have entered and still have its trail on the frame's last row.
+// How far back a drop at `pace` can have entered and still have its trail, the longest one the screen
+// draws, on the frame's last row. A hurried drop only leaves sooner.
 function reach_ms(screen: DropScreen, pace: number): number {
-	return Math.ceil((screen.rows.length + TRAIL.length) / pace) * DROP_MS
+	return Math.ceil((screen.rows.length + trail_of(screen.rows.length, 1)) / pace) * DROP_MS
 }
 
 // One drop entered on each second the rain does not pour, back as far as the slowest could still be on
@@ -94,21 +148,24 @@ function second_falls(screen: DropScreen, at_ms: number, share: Share): Array<Fa
 	const seconds = Array.from({ length: last - first + 1 }, (_second, index) => first + index)
 
 	return seconds
-		.map((second) => fall_of(second * MS_PER_SECOND, screen.columns, share))
+		.map((second) => fall_of(second * MS_PER_SECOND, screen, share))
 		.filter((fall) => !run_board_rain_pour.is_pouring(screen.pours ?? [], fall.born_ms))
 }
 
 // `POUR_PER_STEP` drops entered on each step up to `at_ms` the rain pours, back as far as the slowest
-// could still be on screen.
+// could still be on screen, each hurrying from the end of its span.
 function poured_falls(screen: DropScreen, at_ms: number, share: Share): Array<Fall> {
-	const from_ms = at_ms - reach_ms(screen, POUR.least)
+	const from_ms = at_ms - reach_ms(screen, POUR_FLOOR)
 	const past_ms = (Math.floor(at_ms / DROP_MS) + 1) * DROP_MS
-	const steps = run_board_rain_pour.pour_steps(screen.pours ?? [], from_ms, past_ms)
 
-	return steps.flatMap((born_ms) =>
-		Array.from({ length: POUR_PER_STEP }, (_drop, nth) =>
-			poured_fall(born_ms, nth, screen.columns, share),
-		),
+	return (screen.pours ?? []).flatMap((span) =>
+		run_board_rain_pour
+			.pour_steps([span], from_ms, past_ms)
+			.flatMap((born_ms) =>
+				Array.from({ length: POUR_PER_STEP }, (_drop, nth) =>
+					poured_fall({ born_ms, ends_ms: span.to_ms }, nth, screen, share),
+				),
+			),
 	)
 }
 
@@ -117,7 +174,7 @@ function falls_at(screen: DropScreen, at_ms: number, share: Share): Array<Fall> 
 	const falls = [...second_falls(screen, at_ms, share), ...poured_falls(screen, at_ms, share)]
 
 	return falls.filter(
-		(fall) => head_row(fall, at_ms, screen.pours) - TRAIL.length <= screen.rows.length,
+		(fall) => head_row(fall, at_ms, screen.pours) - fall.length <= screen.rows.length,
 	)
 }
 
@@ -133,18 +190,24 @@ function code_glyph(fall: Fall, place: ScreenPlace, index: number, at_ms: number
 	return run_board_rain.settled({ x: place.column, y: place.row }, run_board_idle_rain.never)
 }
 
-// What the drop draws in its `index`th cell (0 the head): code in a blank, the cell's own character lit
-// in one with text, or nothing where the cell keeps its own colors.
+// The paint of the drop's `index`th cell (0 the head): `TRAIL` stretched over its trail.
+function paint_at(fall: Fall, index: number): Paint {
+	const paint = index === 0 ? SHADES.head : run_board_rain.paint_of(TRAIL, index, fall.length)
+
+	return paint ?? SHADES.darkest
+}
+
+// What the drop draws in its `index`th cell (0 the head): its painted `code` in a blank, the cell's own
+// character lit in one with text, or nothing where the cell keeps its own colors.
 function lit_text(
 	screen: DropScreen,
 	place: ScreenPlace,
 	index: number,
-	glyph: () => string,
+	code: () => string,
 ): string | undefined {
 	const { text } = cell_at(screen, place)
-	const paint = index === 0 ? SHADES.head : TRAIL[index - 1]
 
-	if (text === ' ') return run_board_labels.painted(paint, glyph())
+	if (text === ' ') return code()
 	if (index === 0) return run_board_labels.painted(SHADES.head, text)
 
 	return index <= LIT_TRAIL ? run_board_labels.painted(SHADES.bright, text) : undefined
@@ -154,12 +217,14 @@ function lit_text(
 function fall_cells(screen: DropScreen, fall: Fall, at_ms: number): Array<[string, string]> {
 	const head = head_row(fall, at_ms, screen.pours)
 
-	return Array.from({ length: TRAIL.length + 1 }, (_cell, index) => ({
+	return Array.from({ length: fall.length + 1 }, (_cell, index) => ({
 		row: head - index,
 		column: fall.column,
 	})).flatMap((place, index) => {
 		if (place.row < 1 || place.row > screen.rows.length || is_kept(screen, place)) return []
-		const text = lit_text(screen, place, index, () => code_glyph(fall, place, index, at_ms))
+		const text = lit_text(screen, place, index, () =>
+			run_board_labels.painted(paint_at(fall, index), code_glyph(fall, place, index, at_ms)),
+		)
 
 		return text === undefined ? [] : [[key_of(place), text]]
 	})
