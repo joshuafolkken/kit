@@ -23,7 +23,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 <for a behavior change: `- Measurement: <the number that shows a violation (command name)>`>
 <optional: `- Priority: critical（condition <1-3>）`, `- Priority: high（<basis>）` or `- Priority: normal`>
 <the diff estimate: `- Size estimate: about <N> files / <M> lines (including tests)`, counting test changes, docs, snapshots and command listings>
-<past the guide, cap or bar (`split-assessment.md` → "The question") as one Issue: `- No-split reason: <reason>`; past the lane target: `- No-split reason: <kind> — <reason>` (kinds in "The question")>
+<one Issue past guide, cap or bar: `- No-split reason: <reason>`; a folded serial chain or past the lane target: `- No-split reason: <kind> — <reason>` (kinds: `split-assessment.md` → "The question")>
 <each figure a decision used: ``- Premise: `<command>` <comparison> <figure>`` (one figure per line)>
 
 <why it is needed>

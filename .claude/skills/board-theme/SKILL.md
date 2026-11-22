@@ -1,52 +1,57 @@
 ---
 name: board-theme
-description: Build a new `run:board` theme, or add or change a theme's effect, from a JS demo the user watches and picks. Read it when asked for the next board theme or a theme effect.
+description: Show a `run:board` look change as a JS demo or a printf; build themes and effects from a demo the user picks. Read it unasked before proposing or filing a theme or board look change — not a fix restoring the look.
 ---
 
-# Build a run:board theme from a demo
+# Show and build run:board looks
 
-Kit-only: the themes live in `scripts/run/board/run-board-theme-defs.ts`, so `package.json` `files`
-keeps this skill out of the package.
+Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
+
+## 0. Show the change
+
+- Before proposing or filing a look change, unasked:
+  - It moves → a JS demo (step 3).
+  - It does not move → a `printf` command in the reply that prints the frame before and after the
+    change, for the user to paste into a terminal — you cannot see the screen.
+- Base both on a real colored frame, taken afresh for each proposal, never a hand-drawn board:
+  `FORCE_COLOR=3 pnpm josh run:board --once --theme <theme> > .josh/tmp/scratch/<theme>-frame.ans`.
+- Skip it for a fix that only restores the existing look.
 
 ## 1. Pick the subject
 
 - Candidates: #8384.
-- Echo the work through color and motion only. Put no logo or sound of the work, and no asset file, in
-  the repository — the matrix typing sound was synthesized from measurements of the original (#8365).
+- Echo the work through color and motion only; no logo, sound or asset file of the work in the
+  repository — the matrix typing sound was synthesized from measurements (#8365).
 
 ## 2. Measure the original
 
 - Reproduce first, then add one touch (`principles.md` → "reproduce-first").
-- Write down colors (hex), characters, speeds (ms) and the order of motion: step frame by frame
-  through video or frames the user supplies, pick the colors, count the time between frames. Keep only
-  the numbers; the source stays out of the repository.
+- Write down colors (hex), characters, speeds (ms) and the order of motion, stepping frame by frame
+  through video or frames the user supplies. Keep only the numbers.
 
 ## 3. Build the demo
 
 - Copy the code block of [`demo-template.md`](demo-template.md) to
-  `.josh/tmp/scratch/<theme>-theme-demo.mjs` and write the effects there in JS — a moving effect is
-  easier to decide on than a described one.
-- A consultation session runs it only through `pnpm josh scratch:run <path>`.
-- Build the mock board from a real frame: `NO_COLOR=1 pnpm josh run:board --once --theme <theme>`.
-  Keep the board's paces (a letter every 50 ms, a spinner frame every 80 ms) — the closer the mock, the
-  less drift later.
-- Sound: synthesize a WAV and play it from an HTML page the user opens in a browser — `scratch:run`
-  cannot start a child process, so it cannot call `afplay`.
+  `.josh/tmp/scratch/<theme>-theme-demo.mjs` and write the effects there in JS. It draws the step 0
+  frame. Run it only through `pnpm josh scratch:run <path>`.
+- Keep the board's paces (a letter every 50 ms, a spinner frame every 80 ms) — less drift later.
+- Sound: synthesize a WAV and play it from an HTML page in a browser — `scratch:run` starts no child
+  process, so no `afplay`.
 
 ## 4. Show it
 
 - Write the run command in every reply. One variant per argument; no argument tours them all. The
-  caption at the bottom names the variant playing — the user compared more than ten variants.
-- You cannot see the screen: write "behavior checked, look unchecked".
-- One change per reply. Show in two stages: first the demo that matches the original item by item,
-  beside the measured numbers; after the user passes it, three variants that each add a touch. A
-  rejected variant may stay in the demo; note its name.
+  caption names the variant playing — the user compared more than ten.
+- Write "behavior checked, look unchecked".
+- One change per reply, in two stages: the demo that matches the original item by item beside the
+  measured numbers; once the user passes it, three variants each adding a touch. A rejected variant
+  may stay; note its name.
 
 ## 5. File the Issue once the user decides
 
-- Only after the user says to file it (`kickoff new`). The brief carries the decided numbers, the
-  rejected variants, the demo's shortcuts and the existing behavior that must not change. List the
-  items kept as in the original apart from the items changed on purpose.
+- Only after the user says to file it (`kickoff new`). The brief carries the decided numbers and the
+  existing behavior that must not change, and lists the items kept as in the original apart from the
+  items changed on purpose.
 - **Put the demo's code in the Issue body when filing**, never in a later comment — #8354 started
   implementing before a code comment was read. Write: colors, characters, speeds and odds follow the
   code; what the demo lacks (disable conditions, simultaneous typing, existing behavior, render cost)
@@ -65,7 +70,7 @@ keeps this skill out of the package.
 
 ## Examples
 
-- matrix: epic #8357; the demo code is in the comments of its children #8352–#8370.
+- matrix: epic #8357; demo code in its children's comments, #8352–#8370.
 - wargames typing effect: epic #8377 (#8375, #8376); demo code:
   https://github.com/joshuafolkken/kit/issues/8376#issuecomment-7039783569
 - A demo-versus-implementation comparison:

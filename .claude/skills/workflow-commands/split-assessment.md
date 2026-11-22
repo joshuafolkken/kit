@@ -9,6 +9,7 @@ point applies this.
 
 1. Mergeable parts (separability)?
 2. Over guide? Test files, docs/snapshots/listings and moves (twice) count; run records do not.
+3. And no child waits on siblings? Else fold (`全体が遅くなる`) unless `1 パスで検証できない` / `別の待ちがある`.
 
 The same trailing 3-day period as the implement budget;
 median implement minutes per 100 actual changed lines;
