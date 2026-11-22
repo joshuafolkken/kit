@@ -166,8 +166,10 @@ function triage_line_flags(state: DriveState): ReadonlyArray<string> {
 	return [...owed, ...beside_flags(state.triage_pid, state.triage_start)]
 }
 
+// The drive seeds `state.exclude` from `context.exclude` (`backlog_drive_restore.left_out`), and only a
+// retry's re-admission shrinks it, so the context's list would put a lifted exclusion back.
 function resume_line(state: DriveState, context: DriveContext): string {
-	const exclude = [...new Set([...context.exclude, ...state.exclude])]
+	const { exclude } = state
 	const flags = ['--owner', context.owner, '--active', state.active, ...context.forwarded]
 
 	if (exclude.length > 0) flags.push('--exclude', exclude.join(LIST_SEPARATOR))

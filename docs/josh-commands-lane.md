@@ -515,7 +515,7 @@ A lane child runs it once its work summary settles, before the first edit, namin
 
 `plan:scaffold` prints the same input's size. `lane:plan` saves it for the split bar without lowering the body declaration.
 
-Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single "<reason>"` keeps an indivisible contract together.
+Tests and run records are excluded; docs, snapshots, fixtures and listings count. Generated pairs form one unit; both files' lines count. `--single "<reason>"` keeps an indivisible contract together. A `split` answer asks for a follow-up Issue this one does not wait on, and names `--single` for a carve-off the rest would wait on.
 
 A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document. Nor does a path under `.josh/tmp/`: git ignores it, so no lane's change carries it.
 
