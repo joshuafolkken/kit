@@ -1,3 +1,4 @@
+import { run_board_clock_roll } from './run-board-clock-roll'
 import { run_board_fire_trail } from './run-board-fire-trail'
 import { run_board_jump } from './run-board-jump'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
@@ -12,6 +13,7 @@ import { run_board_rgb, type Rgb } from './run-board-rgb'
 const { mixed, parsed, scaled } = run_board_rgb
 const { END_TICKS, THAW_AT, THAW_TICKS, WASH_TICKS, ARRIVE_TICKS, flash_of } = run_board_jump
 const { trail_cells } = run_board_fire_trail
+const { rolled_clocks } = run_board_clock_roll
 
 const WHITE = parsed('255;255;255')
 const ICE = parsed('190;235;255')
@@ -214,7 +216,16 @@ function thawing(cells: ReadonlyArray<PaintCell>, t: number): Array<PaintCell> {
 	return since >= 0 && since < THAW_TICKS ? cells.map((cell) => thawed(cell, since)) : [...cells]
 }
 
-// The board `t` ticks from the jump: the fire trails burning over the thaw, the wash over both.
+// The board `t` ticks into the wash, as it is past it.
+function washing(cells: ReadonlyArray<PaintCell>, t: number): Array<PaintCell> {
+	if (t >= WASH_TICKS) return [...cells]
+	const { color, share } = wash_of(t)
+
+	return cells.map((cell) => washed(cell, color, share))
+}
+
+// The board `t` ticks from the jump: the fire trails burning over the thaw, the wash over both, the
+// header's clocks rolling over all.
 function after_jump(
 	cells: ReadonlyArray<PaintCell>,
 	t: number,
@@ -222,10 +233,7 @@ function after_jump(
 ): Array<PaintCell> {
 	const burning = trail_cells(thawing(cells, t), t, scene.trails ?? [], noise)
 
-	if (t >= WASH_TICKS) return burning
-	const { color, share } = wash_of(t)
-
-	return burning.map((cell) => washed(cell, color, share))
+	return rolled_clocks(washing(burning, t), t, noise)
 }
 
 // The board `t` ticks from a jump over `letters`: the run up where the area is out, then the wash, the
