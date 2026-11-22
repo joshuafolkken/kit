@@ -1,5 +1,6 @@
-import type { Clash } from '#scripts/backlog/backlog-overlap'
+import { backlog_overlap, type Clash } from '#scripts/backlog/backlog-overlap'
 import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
+import { changed_paths } from '#scripts/git/changed-paths'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_plan, type LanePlan } from '#scripts/lane/lane-plan'
 import { lane_plan_probe, type Extended } from '#scripts/lane/lane-plan-probe'
@@ -58,21 +59,39 @@ async function answer(
 	return undefined
 }
 
-function widened_of(found: Unplanned, directory: string): LanePlan | undefined {
+// A directory or glob claim stays only while one of the lane's actual changes sits inside it
+// (joshuafolkken/kit#8662): a directory the plan comment's prose named but the lane never touched would
+// otherwise hold every new file under it against other Issues. A later edit there is unplanned again,
+// and the next widening restores the claim.
+function narrowed(paths: ReadonlyArray<string>, changed: ReadonlyArray<string>): Array<string> {
+	return paths.filter(
+		(path) =>
+			backlog_overlap.is_file_claim(path) ||
+			changed.some((file) => backlog_overlap.claims_meet(path, file)),
+	)
+}
+
+function widened_of(
+	found: Unplanned,
+	changed: ReadonlyArray<string>,
+	directory: string,
+): LanePlan | undefined {
 	const recorded = lane_plan.read(found.issue, directory)
+	const actual = [...changed, ...found.files]
 
 	return recorded === undefined
 		? undefined
 		: {
 				...recorded,
-				paths: [...recorded.paths, ...found.files],
+				paths: [...narrowed(recorded.paths, actual), ...found.files],
 				widened_paths: [...(recorded.widened_paths ?? []), ...found.files],
 			}
 }
 
 async function refusal_to(directory: string, inform: Inform): Promise<string | undefined> {
 	const found = await check_related_unplanned.read_unplanned()
-	const widened = found === undefined ? undefined : widened_of(found, directory)
+	const changed = found === undefined ? [] : await changed_paths.read_changed_paths(false)
+	const widened = found === undefined ? undefined : widened_of(found, changed, directory)
 
 	if (found === undefined || widened === undefined) return undefined
 

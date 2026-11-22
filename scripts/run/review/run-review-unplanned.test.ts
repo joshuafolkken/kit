@@ -1,6 +1,9 @@
 import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import { backlog_overlap, type Clash } from '#scripts/backlog/backlog-overlap'
+import type { EpicChild } from '#scripts/epic/epic-graph'
 import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
+import { changed_paths } from '#scripts/git/changed-paths'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
@@ -31,9 +34,11 @@ const REMAINING_MINUTES = 12
 const LANE_PLANNED_AT = '2026-11-02T00:00:00.000Z'
 const PASSED_WAIT = '2026-11-02T00:30:00.000Z'
 const YIELDS = 'would yield'
+const REPO = 'joshuafolkken/kit'
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 const read_unplanned = vi.spyOn(check_related_unplanned, 'read_unplanned')
+const read_changed = vi.spyOn(changed_paths, 'read_changed_paths')
 const info = vi.spyOn(console, 'info')
 
 function running(number: number): OpenIssueData {
@@ -54,6 +59,7 @@ function found(file: string): void {
 
 beforeEach(() => {
 	info.mockImplementation(vi.fn())
+	read_changed.mockResolvedValue([])
 	fetch_opted_in.mockResolvedValue(listing())
 	vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefined)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
@@ -160,6 +166,55 @@ describe('run_review_unplanned.refusal — a wait the plan already recorded', ()
 
 		expect(stop).toContain(YIELDS)
 		expect(lane_plan_wait.deadline).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8662: joshuafolkken/kit#8570's record kept `scripts/run/board/`, named only in its
+// plan comment's prose, after its changes moved to `scripts/test/`, and held joshuafolkken/kit#8658's
+// new file under it.
+const BOARD = 'scripts/run/board/'
+const NEW_FILE = 'scripts/run/board/run-board-notice-trace.ts'
+const WAITING = 8658
+
+function record_board(changed: ReadonlyArray<string>): void {
+	lane_plan.record(
+		{ issue: LANE, paths: [PLANNED, BOARD], planned_at: LANE_PLANNED_AT, cleared: true },
+		directory,
+	)
+	read_changed.mockResolvedValue([...changed])
+	found(FREE_FILE)
+}
+
+function clash_on(paths: ReadonlyArray<string>): Clash | undefined {
+	const bodies = new Map([[WAITING, new Set(paths)]])
+	const declared = lane_plan.with_plans(new Map([...bodies, [LANE, new Set()]]), directory)
+	const child: EpicChild = {
+		number: WAITING,
+		repo: REPO,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: [],
+	}
+
+	return backlog_overlap.running_clash(child, declared, { holders: [LANE], repo: REPO })
+}
+
+describe('run_review_unplanned.refusal — narrowing the record to the actual changes', () => {
+	it('drops a directory claim no change sits in, so a new file there no longer waits', async () => {
+		record_board([PLANNED, FREE_FILE])
+
+		expect(await run_review_unplanned.refusal(directory)).toBeUndefined()
+		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED, FREE_FILE])
+		expect(clash_on([NEW_FILE])).toBeUndefined()
+		expect(clash_on([FREE_FILE])?.holder).toBe(LANE)
+	})
+
+	it('keeps a directory claim a change sits in, and a new file there still waits', async () => {
+		record_board([PLANNED, `${BOARD}run-board.ts`, FREE_FILE])
+
+		expect(await run_review_unplanned.refusal(directory)).toBeUndefined()
+		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED, BOARD, FREE_FILE])
+		expect(clash_on([NEW_FILE])?.claimed).toBe(BOARD)
 	})
 })
 

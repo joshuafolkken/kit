@@ -1,0 +1,7 @@
+{
+	"reason": "Narrowing a recorded plan's directory claims to the lane's actual changes needs a filter and a changed-paths read (#8662)",
+	"date": "2026-11-22",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}
