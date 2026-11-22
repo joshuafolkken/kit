@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
+import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_sound_click } from './run-board-sound-click'
 import { run_board_sound_typing } from './run-board-sound-typing'
 import { run_board_theme } from './run-board-theme'
@@ -103,6 +104,7 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
 			alert: run_board_header_defcon.field_of,
 			lamps: true,
+			panel: run_board_panel_painters.LAMP_PAINTER,
 			spinner: '│╱─╲',
 			live: { ...OFF_LIVE, sweep: true, types_rows: true, trill: true, codes: true },
 			typing: run_board_sound_typing.teletype_wav,
@@ -142,6 +144,7 @@ describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 			},
 			alert: run_board_header_trace.field_of,
 			lamps: true,
+			panel: run_board_panel_painters.RAIN_PAINTER,
 			spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 			live: MATRIX_LIVE,
 			typing: run_board_sound_click.typing_wav,

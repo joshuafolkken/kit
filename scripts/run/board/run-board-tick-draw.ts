@@ -11,6 +11,7 @@ import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
 import { run_board_notice_turn, type NoticeTurn } from './run-board-notice-turn'
+import type { PanelDraw } from './run-board-panel-draw'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
@@ -28,7 +29,7 @@ import { run_board_type_rows, type Typing, type TypingSpan } from './run-board-t
 // the board's ports.
 
 const { SPOT } = run_board_spin
-const { THEME_DEFS, live_of } = run_board_theme_defs
+const { THEME_DEFS, live_of, panel_of: panel_painter_of } = run_board_theme_defs
 
 // The ports a frame is drawn through — no read among them, so the worker thread draws the frames it
 // records through the same ones (`run-board-gather-record.ts`).
@@ -158,6 +159,16 @@ function has_rain(ports: LivePorts): boolean {
 // lamps are drawn as `■` (joshuafolkken/kit#8647).
 function rain_of(redraw: Pick<Redraw, 'ports' | 'now_ms'>): RainMoment | undefined {
 	return has_rain(redraw.ports) ? { ms: redraw.now_ms, is_burst: false } : undefined
+}
+
+// The theme's painter of the animation area and the frame's area, where the lamp panel shows
+// (joshuafolkken/kit#8676).
+function panel_of(ports: LivePorts, drawn: Pick<Drawn, 'area'>): PanelDraw | undefined {
+	const painter = has_lamps(ports) ? panel_painter_of(ports.theme) : undefined
+
+	if (painter === undefined || drawn.area === undefined) return undefined
+
+	return { painter, area: drawn.area }
 }
 
 // How a new row enters: typed where the rows type; in a theme whose live board decodes them, decoded on
@@ -362,7 +373,7 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 
 	const decoded = {
 		...decoded_of(redraw.ports, drawn),
-		is_rain: has_rain(redraw.ports),
+		panel: panel_of(redraw.ports, drawn),
 		notice_trace,
 	}
 	const drop = drop_of(redraw, drawn, typing, { drop: state.drop, flash })
@@ -380,6 +391,7 @@ const run_board_tick_draw = {
 	has_lamps,
 	has_rain,
 	has_strip,
+	panel_of,
 }
 
 export { run_board_tick_draw }

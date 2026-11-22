@@ -7,8 +7,14 @@ import type { DropScreen } from './run-board-drop-screen'
 import type { TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels } from './run-board-labels'
-import { run_board_lamp_spots, type Lamp, type LampMoment } from './run-board-lamp-spots'
+import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
 import { run_board_notice_turn, type NoticeTurn } from './run-board-notice-turn'
+import {
+	run_board_panel_draw as panel_draw,
+	type PanelArea,
+	type PanelDraw,
+	type PanelMoment,
+} from './run-board-panel-draw'
 import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_screen } from './run-board-screen'
 import { run_board_spin_place } from './run-board-spin-place'
@@ -49,6 +55,7 @@ interface Spun {
 	keyed: Array<KeyedLine>
 	sweep: Sweep | undefined
 	lamps: Array<Lamp>
+	area: PanelArea | undefined
 	traces: Array<Spot>
 	rules: Array<RuleCell>
 	strips: Array<StripCell>
@@ -62,7 +69,7 @@ interface Turning {
 	typing: Typing
 	sweep?: Sweep | undefined
 	lamps?: ReadonlyArray<Lamp> | undefined
-	is_rain?: boolean | undefined
+	panel?: PanelDraw | undefined
 	traces?: ReadonlyArray<Spot> | undefined
 	rules?: ReadonlyArray<RuleCell> | undefined
 	strips?: ReadonlyArray<StripCell> | undefined
@@ -80,7 +87,7 @@ interface Turned {
 	is_turned: boolean
 	is_swept: boolean
 	is_blinked?: boolean | undefined
-	since: LampMoment | undefined
+	since: PanelMoment | undefined
 }
 
 // The spinner's frame, the sweep's cell, whether the colons are lit and the lamps' moment, compared turn
@@ -89,7 +96,7 @@ interface Moment {
 	frame: string
 	cell: number
 	is_lit: boolean
-	lamps: LampMoment
+	lamps: PanelMoment
 }
 
 type SpinPorts = Pick<
@@ -101,7 +108,7 @@ type SpinPorts = Pick<
 // screen and no rain.
 interface SpinView {
 	size?: TerminalSize | undefined
-	rain?: LampMoment | undefined
+	rain?: PanelMoment | undefined
 }
 
 // The screen's rows and columns, at least one column; none unbounded.
@@ -134,6 +141,7 @@ function spun(lines: ReadonlyArray<string>, frame: string, { size, rain }: SpinV
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
 		sweep: sweep_in(lines, starts, { rows, columns }),
 		lamps,
+		area: panel_draw.area_of(lines, starts, lamps),
 		traces: on_screen(run_board_trace_spot.traces_in(lines, starts, columns), rows),
 		rules,
 		strips: run_board_strip.strip_cells(lines, starts, { lamps, rules }),
@@ -162,11 +170,16 @@ function boundary_after(now_ms: number, interval_ms: number): number {
 }
 
 // The lamps blink once the first frame is out, the base the rows type against (joshuafolkken/kit#8236);
-// the idle rain runs from the first frame (joshuafolkken/kit#8356).
+// an idle painter's area — the idle rain — runs from the first frame (joshuafolkken/kit#8356).
 function blinking(turning: Turning): ReadonlyArray<Lamp> {
-	const is_ready = turning.is_rain === true || turning.typing.seen !== undefined
+	const is_ready = turning.panel?.painter.is_idle === true || turning.typing.seen !== undefined
 
 	return is_ready ? (turning.lamps ?? []) : []
+}
+
+// The theme's painter and its area where the lamps blink (joshuafolkken/kit#8676).
+function painting(turning: Turning): PanelDraw | undefined {
+	return blinking(turning).length > 0 ? turning.panel : undefined
 }
 
 function traces_of(turning: Turning): ReadonlyArray<Spot> {
@@ -217,8 +230,9 @@ function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	const is_coding = run_board_codes.is_coding(typing, cells, now_ms)
 	const code_ms = is_coding ? boundary_after(now_ms, run_board_codes.CODE_MS) : Infinity
 	const effect_ms = Math.min(sweep_boundary(turning, now_ms), blink_boundary(turning, now_ms))
+	const panel_ms = panel_draw.tick_after(painting(turning), now_ms)
 
-	return Math.min(turn_ms, letter_ms, code_ms, effect_ms, until_ms)
+	return Math.min(turn_ms, letter_ms, code_ms, effect_ms, panel_ms, until_ms)
 }
 
 // The spinners turned when their frame changed, the sweep when its cell did, then the rows typing
@@ -256,16 +270,12 @@ function write_notice(turning: Turning, ports: SpinPorts, at_ms: number, turned:
 
 // The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
 // header's now line or a section's new row — and blink apart from the step after the last is typed
-// through, so they change only on the spinner's step (joshuafolkken/kit#8237); where the frame runs the
-// idle rain in their cells, it pours instead (joshuafolkken/kit#8356).
-function lamp_moment(turning: Turning, at_ms: number): LampMoment {
+// through, so they change only on the spinner's step (joshuafolkken/kit#8237); the idle rain pours on the
+// same moment (joshuafolkken/kit#8356).
+function lamp_moment(turning: Turning, at_ms: number): PanelMoment {
 	const step_ms = at_ms - (at_ms % SPINNER_INTERVAL_MS)
 
-	return {
-		ms: at_ms,
-		is_burst: run_board_type_rows.is_typing(turning.typing, step_ms),
-		is_rain: turning.is_rain === true,
-	}
+	return { ms: at_ms, is_burst: run_board_type_rows.is_typing(turning.typing, step_ms) }
 }
 
 // The drops, then the turn built and written over them — a typing row drawn above the rain
@@ -278,12 +288,7 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 		ports.write(turn_bytes(turning, at_ms, turned))
 		run_board_change_flash.write(ports, turning.flash, at_ms, turned.since)
 		write_notice(turning, ports, at_ms, turned)
-		run_board_lamp_spots.write_lamps(
-			blinking(turning),
-			ports,
-			lamp_moment(turning, at_ms),
-			turned.since,
-		)
+		panel_draw.write_panel(painting(turning), ports, lamp_moment(turning, at_ms), turned.since)
 		run_board_codes.write_codes(coded(turning), ports, at_ms, turned.since?.ms)
 		const striped = { ...coded(turning), strips: turning.strips ?? [] }
 

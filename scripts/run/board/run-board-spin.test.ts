@@ -76,6 +76,7 @@ const UNMARKED = {
 	traces: [],
 	rules: [],
 	strips: [],
+	area: undefined,
 }
 
 describe('run_board_spin.spun', () => {
