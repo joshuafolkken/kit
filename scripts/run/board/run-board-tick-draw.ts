@@ -138,9 +138,7 @@ type LampPorts = Pick<DrawPorts, 'types_rows' | 'is_live' | 'theme'>
 function is_lamp_theme(ports: LampPorts, defs: LampDefs): boolean {
 	const is_live = ports.types_rows === true || ports.is_live === true
 
-	if (!is_live || ports.theme === undefined) return false
-
-	return defs[ports.theme]?.lamps === true
+	return is_live && ports.theme !== undefined && defs[ports.theme]?.lamps === true
 }
 
 type LivePorts = Pick<DrawPorts, 'types_rows' | 'is_live' | 'theme' | 'is_tty'>
