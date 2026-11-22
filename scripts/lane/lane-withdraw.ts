@@ -244,7 +244,11 @@ const WITHDRAWER_NAMES: ReadonlyArray<string> = Object.values(WITHDRAWER_TEXT).m
 	(text) => text.name,
 )
 
-const lane_withdraw = { WITHDRAW_OCCASION, WITHDRAWER_NAMES, describe, withdraw }
+// What a person's withdrawal event carries after its issue; the supervisor's and the merge driver's
+// closes of a closed issue name themselves instead (joshuafolkken/kit#8619).
+const PERSON_MARK = ` withdrawn by ${WITHDRAWER_TEXT.person.name}:`
+
+const lane_withdraw = { PERSON_MARK, WITHDRAW_OCCASION, WITHDRAWER_NAMES, describe, withdraw }
 
 export type { WithdrawOutcome }
 export { lane_withdraw }
