@@ -58,7 +58,7 @@ function spun(piece: StyledPiece, random: Random): string {
 }
 
 function is_blank(piece: StyledPiece): boolean {
-	return piece.text.trim() === ''
+	return piece.width === 0 || piece.text.trim() === ''
 }
 
 type Letter = (piece: StyledPiece, index: number) => string
@@ -143,7 +143,7 @@ function is_notice(slot: NoticeSlot): slot is NoticeSlot & { key: string } {
 }
 
 // The trace a frame's notice carries — the last frame's while its key holds, else one starting now, as
-// `Typing.start_of` starts a row; none for the empty slot or a standing state.
+// `run-board-type-rows.ts` → `start_of` starts a row; none for the empty slot or a standing state.
 function trace_of(
 	slot: NoticeSlot,
 	last: NoticeTrace | undefined,

@@ -21,6 +21,8 @@ const PLAIN = ' ab c '
 const PLAIN_LENGTH = 4
 const LOCKED_MS = PLAIN_LENGTH * LETTER_MS
 const STYLED = ` ${ESC}[32m通知 ab${ESC}[0m 🔊 `
+// A character no column wide between two letters.
+const ZERO_WIDTH = ' a\u{200B}b '
 const STEP_PAST_END_MS = 5000
 const NOW_MS = 9000
 const KEY = run_board_row_key.key_of('notice', '12:00 lane-end · #1 merged')
@@ -72,6 +74,18 @@ describe('run_board_notice_trace.traced — the trace', () => {
 		const glyph = head_glyph()
 
 		expect(traced(PLAIN, 0, zero)).toBe(` ${glyph}${glyph}${bright(' ')}${glyph} `)
+	})
+
+	it('draws a colored margin as the frame draws it, its color closed after it', () => {
+		const dim = `${ESC}[2m`
+
+		expect(traced(`${dim}-${run_board_cut_styled.RESET}a `, 0, zero)).toBe(
+			`${dim}-${run_board_cut_styled.RESET}${head_glyph()} `,
+		)
+	})
+
+	it('leaves a text with no letter between its margins as it is', () => {
+		expect(traced('  ', 0, zero)).toBe('  ')
 	})
 
 	it('locks the letters left of the step in bright green and spins the rest', () => {
@@ -133,7 +147,7 @@ describe('run_board_notice_trace.traced — the bar', () => {
 })
 
 describe('run_board_notice_trace.traced — the width', () => {
-	it.each([PLAIN, STYLED])('keeps %j as wide at every time', (text) => {
+	it.each([PLAIN, STYLED, ZERO_WIDTH])('keeps %j as wide at every time', (text) => {
 		const widths = times_of(text).map((at_ms) => drawn_width(traced(text, at_ms, Math.random)))
 
 		expect(new Set(widths)).toStrictEqual(new Set([drawn_width(text)]))
