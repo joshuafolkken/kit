@@ -27,14 +27,17 @@ function stops_here(
 	)
 }
 
-function is_stopped(child: Pick<EpicChild, 'labels' | 'number'>, plan: BoardPlan): boolean {
+// The plan's fields a review stop reads: a 🙋 row's read carries them as well as the plan.
+type StopRead = Pick<BoardPlan, 'now_ms' | 'review_stops'>
+
+function is_stopped(child: Pick<EpicChild, 'labels' | 'number'>, plan: StopRead): boolean {
 	return lane_review_stop.is_review_stop(child.number, child.labels, plan.review_stops)
 }
 
 // What a person does for a review stop: review the changes its lane holds; none for any other row.
 function reason_of(
 	child: Pick<EpicChild, 'labels' | 'number'>,
-	plan: BoardPlan,
+	plan: StopRead,
 ): RowReason | undefined {
 	const stop = plan.review_stops?.get(child.number)
 	if (stop === undefined || !is_stopped(child, plan)) return undefined

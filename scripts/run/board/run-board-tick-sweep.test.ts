@@ -4,6 +4,7 @@ import { run_board_fixture } from './run-board-fixture'
 import type { BoardRow } from './run-board-layout'
 import { run_board_spot } from './run-board-spot'
 import type { BoardState } from './run-board-state'
+import { run_board_theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
@@ -85,6 +86,26 @@ describe('run_board_tick — the clock colons of a run frame (joshuafolkken/kit#
 			expect(styles.filter((style) => !style.includes('[38;2;'))).toStrictEqual([])
 		},
 	)
+})
+
+// joshuafolkken/kit#8505: the colons are found in the icons every write draws, not the theme's default.
+describe('run_board_tick — the clock colons in the ports’ icons (joshuafolkken/kit#8505)', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('restyles the frame for its colons in the ports’ icons', () => {
+		const { ports } = harness(LOCAL, [])
+		const state: BoardState = { ...FRESH_STATE, run_started_ms: LOCAL.started_ms }
+		const look = { theme: 'wargames', icons: 'letters' } as const
+		const redraw = { ports: { ...ports, ...look, size: () => PANE }, now_ms: START + AGED_MS }
+		const restyle = vi.spyOn(run_board_theme, 'restyle')
+
+		drawn_from(state, LOCAL, redraw, layout_for(state, LOCAL, START))
+
+		expect(restyle).toHaveBeenCalled()
+		expect(restyle.mock.calls.map((call) => call[2])).not.toContain(undefined)
+	})
 })
 
 // joshuafolkken/kit#8404, #8425: waiting runs keep their heartbeat only in wargames.

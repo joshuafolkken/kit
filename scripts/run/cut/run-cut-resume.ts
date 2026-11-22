@@ -1,6 +1,6 @@
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
-import { issue_cite } from '#scripts/issue/issue-cite'
+import { run_event_resume } from '#scripts/run/event/run-event-resume'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_repair_attempt } from '#scripts/run/run-repair-attempt'
@@ -54,16 +54,17 @@ function take_over(target: string, cut_record: RunCut): RunCut | undefined {
 	return cut_record
 }
 
-// **An implementation resume appends a `resume` event**. It clears the record
-// the `cut` event stood for, so the stream is what moves `run:step` back to implementation; a pre-gate
-// resume keeps its record and appends nothing. Best-effort, as the cut's own append is.
+// **Every adopted cut appends a `resume` event**. An implementation resume clears the record the `cut`
+// event stood for, so the stream is what moves `run:step` back to implementation; a pre-gate resume's
+// text marks it `(gate)`, which `run:step` reads past (`run-event-resume.ts`). Both start
+// `lane:stats`'s `resume → progress`. Best-effort, as the cut's own append is.
 async function emit_resume_event(issue: string, verdict: string): Promise<void> {
-	if (verdict !== RESUME_IMPL_VERDICT) return
+	const text =
+		verdict === RESUME_IMPL_VERDICT
+			? run_event_resume.resume_text(issue)
+			: run_event_resume.gate_resume_text(issue)
 
-	await run_event_stream_emit.emit(
-		run_event_stream.EVENT_KIND.RESUME,
-		`${issue_cite.plain_for('program', issue)} resumed`,
-	)
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.RESUME, text)
 }
 
 async function adopt(target: string, cut_record: RunCut): Promise<number> {

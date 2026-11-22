@@ -44,6 +44,16 @@ describe('run_board_frame_preview — the notice', () => {
 	})
 })
 
+// joshuafolkken/kit#8505: the frame takes the icons the board would, as it takes the theme.
+describe('run_board_frame_preview — the icons', () => {
+	it('draws its icons as --icons asks', async () => {
+		const { text } = await framed(['--icons', 'shapes'])
+
+		expect(text).toContain('<) ')
+		expect(text).not.toContain('🔊')
+	})
+})
+
 describe('run_board_frame_preview — the form', () => {
 	it('keeps every line within a narrow width', async () => {
 		const { text } = await framed([...NOTICE, '--columns', String(NARROW)])

@@ -3,6 +3,7 @@ import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type ReserveOptions } from './core-budget'
 import type { WaitSink } from './core-wait-record'
+import { core_weights } from './core-weights'
 import type { MachineReading } from './machine-capacity'
 
 const MEMORY_MB = 2400
@@ -168,7 +169,7 @@ describe('memory admission of unit suites', () => {
 
 // joshuafolkken/kit#8473: the ledger's second `refactor:scan` overflowed beside a running one while
 // memory was pressured, and the machine ran out of free memory.
-const ESLINT_MB = 8590
+const ESLINT_MB = core_weights.MEMORY_MB.eslint_scan
 const PRESSURED_AVAILABLE_MB = 9400
 const TOTAL_MB = 18_432
 const PAST_RAMP_UP_MS = 40_000
