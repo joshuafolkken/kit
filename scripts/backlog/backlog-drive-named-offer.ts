@@ -185,8 +185,9 @@ async function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Promi
 	const running = lane_plan_probe.running_of(listed).map((issue) => issue.number)
 	const declared = await declared_among([...in_flight.map(Number), ...running], listed)
 	const scopes = await declared_among(yielded, listed)
+	const stops = lane_plan_probe.stops_of(listed)
 	const held = yielded.filter((issue) =>
-		lane_plan.is_yield_held(issue, declared, process.cwd(), scopes.get(issue)),
+		lane_plan.is_yield_held(issue, declared, process.cwd(), { scope: scopes.get(issue), stops }),
 	)
 
 	return [...new Set([...in_flight, ...held.map(String)])]
