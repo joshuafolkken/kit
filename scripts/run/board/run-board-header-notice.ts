@@ -9,8 +9,8 @@ import { run_board_standing, type StandingHeader } from './run-board-standing'
 
 // The end of the header's second line (joshuafolkken/kit#8107): the sound switch where the board reads
 // one, then what holds over frames (`run-board-standing.ts`), else the last notice the board picked —
-// its cue's icon, what sounded it, when, `×2` where it sounded again — faint once its cause no longer
-// holds (joshuafolkken/kit#8475). Every frame draws the slot; `--once`, `--chat` and Telegram read no
+// when, its cue's icon and name, what sounded it, `×2` where it sounded again (joshuafolkken/kit#8595)
+// — faint once its cause no longer holds (joshuafolkken/kit#8475). Every frame draws the slot; `--once`, `--chat` and Telegram read no
 // switch and draw the slot without it. `--frame` draws the switch and the notice its flags fix
 // (`run-board-frame-preview.ts`).
 
@@ -18,6 +18,7 @@ const { STATE_ICONS, minute_of } = run_board_labels
 const SOUND_ON = '🔊'
 const SOUND_OFF = '🔇'
 const NONE = '—'
+const SEPARATOR = ' · '
 const REPEAT = '×2'
 // Each cue as the state its row enters.
 const CUE_ICONS: Readonly<Record<CueName, string>> = {
@@ -63,18 +64,21 @@ function next(
 	return { ...notice, is_settled: held.every((cause) => !is_same(cause, notice.cause)) }
 }
 
-// What sounded: its issue linked as the board links one, else the run's own words.
-function cause_of(notice: Notice, link: BoardLinks['link']): string {
+// What sounded: its issue linked as the board links one and its words, else the run's own words.
+function message_of(notice: Notice, link: BoardLinks['link']): string {
 	const { issue, word } = notice.cause
 
-	return issue === undefined ? word : issue_cite.plain_for('terminal', link(String(issue)))
+	if (issue === undefined) return word
+
+	return `${issue_cite.plain_for('terminal', link(String(issue)))} ${word}`
 }
 
 function text_of(notice: Notice, link: BoardLinks['link']): string {
+	const { cue } = notice.cause
 	const repeat = notice.is_repeat ? ` ${REPEAT}` : ''
-	const words = `${CUE_ICONS[notice.cause.cue]} ${cause_of(notice, link)} ${minute_of(notice.at_ms)}`
+	const head = `${minute_of(notice.at_ms)} ${CUE_ICONS[cue]} ${cue}`
 
-	return `${words}${repeat}`
+	return `${head}${SEPARATOR}${message_of(notice, link)}${repeat}`
 }
 
 // The last notice's words, faint once settled, `—` before the first; typed by its plain words, so
