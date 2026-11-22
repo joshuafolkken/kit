@@ -24,4 +24,13 @@ describe('run_board_theme_case.capitals', () => {
 	])('draws $text as $drawn', ({ text, drawn }) => {
 		expect(run_board_theme_case.capitals(text)).toBe(drawn)
 	})
+
+	// joshuafolkken/kit#8567: inside tmux `terminal-link` wraps a link in tmux's passthrough.
+	it('keeps a tmux-wrapped link’s wrapping and URL as written', () => {
+		const wrap = `${ESCAPE}P`
+		const open = `${wrap}tmux;${ESCAPE}${ESCAPE}]8;id=josh-run-board;https://a.b/c\u{7}${ESCAPE}\\`
+		const close = `${wrap}tmux;${ESCAPE}${ESCAPE}]8;;\u{7}${ESCAPE}\\`
+
+		expect(run_board_theme_case.capitals(`is ${open}41${close} ok`)).toBe(`IS ${open}41${close} OK`)
+	})
 })
