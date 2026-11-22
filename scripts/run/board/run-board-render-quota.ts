@@ -276,20 +276,25 @@ function counts_text(reading: QuotaReading | undefined, now_ms: number): string 
 	return ` ${COUNT_MARK}${texts.join('/')}`
 }
 
-// Nothing where the allowances could not be read; gauge-less, starting the panel's sixth row, where the
-// frame `has_lamps` (joshuafolkken/kit#8695).
-function rate_limit_rows(view: QuotaView, has_lamps: boolean): Array<string> {
-	const { rate_limit, now_ms } = view
-	if (rate_limit === undefined) return []
+function github_text(view: QuotaView, rate_limit: GithubRateLimit, is_short: boolean): string {
+	const body = run_board_render_quota_github.row_text(rate_limit, view.now_ms, is_short)
 
-	const body = run_board_render_quota_github.row_text(rate_limit, now_ms, has_lamps)
-	const text = run_board_row_key.flashed(
+	return run_board_row_key.flashed(
 		`${INDENT}${name_cell(name_of('github', view))}${body}`,
 		'quota:github',
 		view.is_flash_keyed,
 	)
+}
 
-	return [run_board_quota_lamps.github_row(text, has_lamps)]
+// Nothing where the allowances could not be read; gauge-less, starting the panel's sixth row, where the
+// frame `has_lamps`, carrying its gauged text for a frame whose panel is dropped (joshuafolkken/kit#8695).
+function rate_limit_rows(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
+	if (view.rate_limit === undefined) return []
+
+	const text = github_text(view, view.rate_limit, has_lamps)
+	const full = has_lamps ? github_text(view, view.rate_limit, false) : undefined
+
+	return [{ text: run_board_quota_lamps.github_row(text, has_lamps), is_detail: false, full }]
 }
 
 // `GitHub REST 38% 1877/5000 ↻12:33 · ▶ GQL 1% 48/5000 ↻12:40`.
@@ -318,12 +323,18 @@ function is_short_of(view: QuotaView, has_lamps: boolean): boolean {
 	return has_lamps && PROVIDERS.some((provider) => windows_of(view.quotas?.[provider]).length > 1)
 }
 
-// The provider rows, the first two starting their panels where the frame `has_lamps`, then GitHub's.
+function full_row(provider: QuotaProvider | undefined, view: QuotaView): string | undefined {
+	return provider === undefined ? undefined : row_of(provider, view, false).text
+}
+
+// The provider rows, the first two starting their panels where the frame `has_lamps`, each carrying its
+// gauged text for a frame whose panel is dropped after all (joshuafolkken/kit#8695); then GitHub's.
 function usage_lines(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
 	const is_short = is_short_of(view, has_lamps)
-	const providers = providers_of(view).map((provider) => row_of(provider, view, is_short))
+	const providers = providers_of(view)
+	const rows = providers.map((provider) => row_of(provider, view, is_short))
 	const texts = run_board_quota_lamps.provider_rows(
-		providers.map((row) => row.text),
+		rows.map((row) => row.text),
 		has_lamps,
 	)
 
@@ -331,9 +342,10 @@ function usage_lines(view: QuotaView, has_lamps: boolean): DetailPart['lines'] {
 		...texts.map((text, index) => ({
 			text,
 			is_detail: false,
-			aside: has_lamps ? providers[index]?.aside : undefined,
+			aside: has_lamps ? rows[index]?.aside : undefined,
+			full: has_lamps ? full_row(providers[index], view) : undefined,
 		})),
-		...rate_limit_rows(view, has_lamps).map((text) => ({ text, is_detail: false })),
+		...rate_limit_rows(view, has_lamps),
 	]
 }
 

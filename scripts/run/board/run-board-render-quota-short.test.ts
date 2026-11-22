@@ -1,9 +1,10 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { run_board_fit, type FrameParts } from './run-board-fit'
-import { run_board_fold } from './run-board-fold'
+import { run_board_fit, type DetailPart, type FrameParts } from './run-board-fit'
+import { run_board_fold, type FrameBounds } from './run-board-fold'
 import { run_board_labels } from './run-board-labels'
 import { run_board_machine } from './run-board-machine'
+import { run_board_quota_lamps } from './run-board-quota-lamps'
 import type { QuotaReading } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 import { run_board_render_quota_cell, type Cell } from './run-board-render-quota-cell'
@@ -29,6 +30,7 @@ const WIDE_ROW = 111
 const SHORT_ROW = 67
 const ONE_CELL_ROW = 62
 const PANEL_ROWS = 6
+const PANE_COLUMNS = 200
 const BARS = /[■─┊]{20}/u
 const NAMES = ['Claude', 'Codex', 'GitHub'] as const
 const CELL: Cell = { label: '7d', used_percent: 0, pace: 1, count: '≈412', reset: 'Sat 10:00' }
@@ -84,20 +86,40 @@ function view_of(five_hour: boolean, has_lamps: boolean): QuotaView {
 	}
 }
 
-function frame_of(view: QuotaView): Array<string> {
-	const has_lamps = view.has_lamps === true
-	const parts: FrameParts = {
+function parts_of(view: QuotaView, usage = run_board_render_quota.usage_part(view)): FrameParts {
+	return {
 		above: [],
 		plan: [],
 		legend: [],
 		footer: [],
 		notes: { head: [], lines: [], hidden: 0 },
-		throughput: rows_part(ROWS, has_lamps),
-		usage: run_board_render_quota.usage_part(view),
+		throughput: rows_part(ROWS, view.has_lamps === true),
+		usage,
 		rule_width: PANEL_START + PANEL_WIDTH,
 	}
+}
 
-	return run_board_fold.bounded(parts, {}).map((line) => stripVTControlCharacters(line))
+function frame_of(view: QuotaView, bounds: FrameBounds = {}): Array<string> {
+	return run_board_fold
+		.bounded(parts_of(view), bounds)
+		.map((line) => stripVTControlCharacters(line))
+}
+
+// The color escapes a drawn row's panel opens with: what follows the gap blank before its first lamp,
+// the escapes holding no blank.
+function opening_of(line: string): string {
+	const before = line.slice(0, line.indexOf(LAMP)).trimEnd()
+
+	return before.slice(before.lastIndexOf(' ') + 1)
+}
+
+// The usage part of `view` with its first row a long one reaching the panel.
+function reaching_usage(view: QuotaView): DetailPart | undefined {
+	const usage = run_board_render_quota.usage_part(view)
+	const [long = ''] = run_board_quota_lamps.provider_rows(['x'.repeat(PANEL_START + 1)], true)
+	if (usage === undefined) return undefined
+
+	return { ...usage, lines: [{ text: long, is_detail: false }, ...usage.lines.slice(1)] }
 }
 
 // Each usage row's text before its panel, by name.
@@ -191,6 +213,41 @@ describe('the usage rows beside the panel (joshuafolkken/kit#8695)', () => {
 
 		expect(lamped(lines)).toHaveLength(PANEL_ROWS + 1)
 		expect(lamped(lines).some((line) => line.includes('usage'))).toBe(true)
+	})
+})
+
+describe('the usage rows where the panel is dropped after all (joshuafolkken/kit#8695)', () => {
+	it('keeps every row’s gauges where the throughput is folded', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const lines = frame_of(view_of(true, true), { folded: new Set(['throughput']) })
+		const bodies = bodies_of(lines)
+
+		expect(bodies.map((body) => width_of(body))).toStrictEqual([WIDE_ROW, WIDE_ROW, WIDE_ROW])
+		for (const body of bodies) expect(body).toMatch(BARS)
+		expect(lamped(lines)).toHaveLength(0)
+	})
+
+	it('keeps every row’s gauges where a pane draws the usage rows alone', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const view = view_of(true, true)
+		const size = { rows: frame_of(view).length - ROWS.length, columns: PANE_COLUMNS }
+		const lines = frame_of(view, { size })
+
+		expect(lines.join('')).not.toContain('24h')
+		for (const body of bodies_of(lines)) expect(body).toMatch(BARS)
+	})
+})
+
+describe('a cut usage row’s panel (joshuafolkken/kit#8695)', () => {
+	it('opens in the out shade an uncut row’s panel opens in', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const view = view_of(true, true)
+		const frame = run_board_fold.bounded(parts_of(view, reaching_usage(view)), {})
+		const cut = frame.find((line) => line.startsWith('x')) ?? ''
+		const uncut = frame.find((line) => line.includes('Codex')) ?? ''
+
+		expect(opening_of(cut)).not.toBe('')
+		expect(opening_of(cut)).toBe(opening_of(uncut))
 	})
 })
 

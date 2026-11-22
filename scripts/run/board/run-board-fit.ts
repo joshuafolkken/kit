@@ -78,10 +78,17 @@ interface NotesPart extends Foldable {
 
 // A part drawn after `plan` whose lines a group's parts are, `is_detail`, and give way all at once;
 // `summary` is what its folded heading says; `tail` is drawn at the right end of its rule. A line's
-// `aside` is the trailing note its `text` ends on that may be left off where it would reach a panel.
+// `aside` is the trailing note its `text` ends on that may be left off where it would reach a panel;
+// its `full` is the gauged text drawn instead where no panel runs beside a gauge-less row
+// (joshuafolkken/kit#8695).
 interface DetailPart extends Foldable {
 	head: ReadonlyArray<string>
-	lines: ReadonlyArray<{ text: string; is_detail: boolean; aside?: string | undefined }>
+	lines: ReadonlyArray<{
+		text: string
+		is_detail: boolean
+		aside?: string | undefined
+		full?: string | undefined
+	}>
 	summary?: string | undefined
 	tail?: string | undefined
 	// Whether the rule's row runs the lamp panel too, ended short of it (joshuafolkken/kit#8647).

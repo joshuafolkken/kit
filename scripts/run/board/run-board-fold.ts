@@ -201,22 +201,31 @@ function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
 }
 
 // A line reaching the panel's start still, cut a blank short of it with its panel's start kept: the
-// panel is always kept beside the usage rows (joshuafolkken/kit#8695).
+// panel is always kept beside the usage rows (joshuafolkken/kit#8695). The marker's color escapes hold
+// no blank, so the last blank before it is the gap, and the marker is kept with its escapes whole.
 function cut_line(line: DetailLine, span: PanelSpan): DetailLine {
 	const { text } = line
 	if (is_line_clear(line, span)) return line
 
-	const index = text.indexOf(LAMP_START)
-	const before = run_board_cut_styled.cut_styled(text.slice(0, index), span.start - CUT_GAP)
+	const gap = text.lastIndexOf(' ', text.indexOf(LAMP_START))
+	const before = run_board_cut_styled.cut_styled(text.slice(0, gap), span.start - CUT_GAP)
 
-	return { ...line, text: `${before} ${text.slice(index)}` }
+	return { ...line, text: `${before}${text.slice(gap)}` }
+}
+
+// A usage part with no panel beside it — a folded throughput, or no room — draws each row's gauged text
+// where it carries one (joshuafolkken/kit#8695).
+function gauged(usage: DetailPart): DetailPart {
+	return { ...usage, lines: usage.lines.map((line) => ({ ...line, text: line.full ?? line.text })) }
 }
 
 // The usage rows run their panels on every row: where one's text reaches the panel's start, the
 // reaching rows' asides — a stale reading's age — are left off first (joshuafolkken/kit#8644), then a
 // row reaching it still is cut (joshuafolkken/kit#8695); none where the span has no room for a panel.
 function rows_fit(usage: DetailPart, span: PanelSpan): RowsFit {
-	if (run_board_lamps.count_of(span.end - span.start) === 0) return { usage, rows: NO_PANEL }
+	if (run_board_lamps.count_of(span.end - span.start) === 0) {
+		return { usage: gauged(usage), rows: NO_PANEL }
+	}
 
 	const lines = usage.lines.map((line) => cut_line(without_aside(line, span), span))
 
@@ -264,7 +273,7 @@ function lamped_parts(parts: FrameParts): FrameParts {
 		...parts,
 		throughput: lamped(throughput, span),
 		usage: lamped(fit?.usage, span, fit?.rows),
-		usage_alone: lamped(usage, NO_PANEL),
+		usage_alone: lamped(usage === undefined ? undefined : gauged(usage), NO_PANEL),
 	}
 }
 
