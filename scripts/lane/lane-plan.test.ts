@@ -198,7 +198,9 @@ describe('lane_plan.is_yield_held', () => {
 		lane_plan.record(EARLIER_PLAN, DIRECTORY)
 		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
 
-		expect(lane_plan.is_yield_held(LATER, in_flight(), DIRECTORY, new Set([RANK]))).toBe(false)
+		expect(lane_plan.is_yield_held(LATER, in_flight(), DIRECTORY, { scope: new Set([RANK]) })).toBe(
+			false,
+		)
 	})
 
 	it('holds no plan its lane did not yield on', () => {
@@ -213,5 +215,70 @@ describe('lane_plan.is_yield_held', () => {
 		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
 
 		expect(lane_plan.is_yield_held(LATER, in_flight(), DIRECTORY)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8575: the earlier plan's issue stops for a person before its merge, the later one
+// completes on its own — the later one goes first, so it is not held behind the other's check.
+const EARLIER_STOPS = new Set([EARLIER])
+
+describe('lane_plan.earlier_holders when one side stops for a person', () => {
+	it('passes over an earlier cleared holder that stops for a person', () => {
+		lane_plan.record({ ...EARLIER_PLAN, cleared: true }, DIRECTORY)
+
+		expect(lane_plan.earlier_holders(LATER_PLAN, [EARLIER], DIRECTORY, EARLIER_STOPS)).toEqual([])
+	})
+
+	it('names a later self-completing holder to the lane that stops for a person', () => {
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+
+		const holders = lane_plan.earlier_holders(
+			{ ...EARLIER_PLAN, cleared: true },
+			[LATER],
+			DIRECTORY,
+			EARLIER_STOPS,
+		)
+
+		expect(holders).toEqual([LATER])
+	})
+
+	it('keeps the earlier plan first when both sides stop for a person', () => {
+		lane_plan.record(EARLIER_PLAN, DIRECTORY)
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+
+		const both = new Set([EARLIER, LATER])
+
+		expect(lane_plan.earlier_holders(LATER_PLAN, [EARLIER], DIRECTORY, both)).toEqual([EARLIER])
+		expect(lane_plan.earlier_holders(EARLIER_PLAN, [LATER], DIRECTORY, both)).toEqual([])
+	})
+})
+
+describe('lane_plan.is_yield_held when one side stops for a person', () => {
+	// The lane that stopped for a person yielded; it is held back while the self-completing lane holds
+	// the file, and re-queues once that lane's plan is released at its merge.
+	it('holds the yielded lane that stops for a person until the other lane releases its plan', () => {
+		lane_plan.record({ ...EARLIER_PLAN, yielded: true }, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, cleared: true }, DIRECTORY)
+
+		const declared = lane_plan.with_plans(new Map([[LATER, new Set<string>()]]), DIRECTORY)
+
+		expect(lane_plan.is_yield_held(EARLIER, declared, DIRECTORY)).toBe(true)
+
+		lane_plan.release(LATER, DIRECTORY)
+
+		const after = lane_plan.with_plans(new Map([[LATER, new Set<string>()]]), DIRECTORY)
+
+		expect(lane_plan.is_yield_held(EARLIER, after, DIRECTORY)).toBe(false)
+	})
+
+	it('holds no yielded self-completing lane behind a cleared lane that stops for a person', () => {
+		lane_plan.record({ ...EARLIER_PLAN, cleared: true }, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
+
+		const declared = in_flight()
+		const stopping = { stops: EARLIER_STOPS }
+
+		expect(lane_plan.is_yield_held(LATER, declared, DIRECTORY)).toBe(true)
+		expect(lane_plan.is_yield_held(LATER, declared, DIRECTORY, stopping)).toBe(false)
 	})
 })

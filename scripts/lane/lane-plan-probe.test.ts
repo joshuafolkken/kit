@@ -23,6 +23,7 @@ const HELD = 'scripts/lane/held.ts'
 const FREE_FILE = 'scripts/lane/free.ts'
 const LISTING_LIMIT = 100
 const LANE_PLAN = { issue: LANE, paths: [PLANNED], planned_at: '2026-11-02T00:00:00.000Z' }
+const HOLDER_RECORD = { issue: HOLDER, paths: [HELD], planned_at: '2026-11-01T00:00:00.000Z' }
 
 const EXTRA_FILE = 'scripts/lane/extra.ts'
 const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）\n'
@@ -55,10 +56,7 @@ beforeEach(() => {
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
 		make_directory(path.join(ROOT, 'repository-')),
 	)
-	lane_plan.record(
-		{ issue: HOLDER, paths: [HELD], planned_at: '2026-11-01T00:00:00.000Z' },
-		directory,
-	)
+	lane_plan.record(HOLDER_RECORD, directory)
 	lane_plan.record(LANE_PLAN, directory)
 })
 
@@ -113,6 +111,58 @@ describe('lane_plan_probe.extend size signals', () => {
 		await lane_plan_probe.extend({ ...LANE_PLAN, paths }, directory)
 
 		expect(signals_of).toHaveBeenCalledWith(LANE, paths)
+	})
+})
+
+// joshuafolkken/kit#8575: on 2026-11-22 joshuafolkken/kit#8505, which stops for a person before its
+// merge, widened onto a file just before joshuafolkken/kit#8476, which completes on its own, and the
+// latter yielded. The self-completing lane goes first whatever the order of the plans.
+const HUMAN_BODY = '## 背景\n\n- 人の判断: 要（マージ前の目視確認）\n'
+const HOLDER_PLAN = { ...HOLDER_RECORD, cleared: true }
+
+function human_holder_listing(): ReadonlyArray<OpenIssueData> {
+	return [running(HOLDER, HUMAN_BODY), running(LANE)]
+}
+
+describe('lane_plan_probe.probe when the holder stops for a person', () => {
+	it('clears the later self-completing plan on a file the earlier lane that stops for a person holds', () => {
+		lane_plan.record(HOLDER_PLAN, directory)
+
+		const found = lane_plan_probe.probe(
+			{ ...LANE_PLAN, paths: [HELD] },
+			human_holder_listing(),
+			directory,
+		)
+
+		expect(found).toBeUndefined()
+	})
+
+	it('answers the clash to the earlier lane that stops for a person, so that lane yields', () => {
+		lane_plan.record({ ...LANE_PLAN, paths: [HELD] }, directory)
+
+		const found = lane_plan_probe.probe(HOLDER_PLAN, human_holder_listing(), directory)
+
+		expect(found).toMatchObject({ holder: LANE, path: HELD })
+	})
+
+	it('keeps the earlier plan first when neither side stops for a person', () => {
+		lane_plan.record(HOLDER_PLAN, directory)
+
+		const found = lane_plan_probe.probe(
+			{ ...LANE_PLAN, paths: [HELD] },
+			[running(HOLDER), running(LANE)],
+			directory,
+		)
+
+		expect(found).toMatchObject({ holder: HOLDER, path: HELD })
+	})
+})
+
+describe('lane_plan_probe.stops_of', () => {
+	it('reads a listed issue with no body as completing on its own', () => {
+		const listed = [{ ...running(HOLDER), body: undefined }, running(LANE, HUMAN_BODY)]
+
+		expect(lane_plan_probe.stops_of(listed)).toEqual(new Set([LANE]))
 	})
 })
 

@@ -1,9 +1,10 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { backlog_overlap, type Clash } from '#scripts/backlog/backlog-overlap'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { issue_auto_ok } from '#scripts/issue/issue-auto-ok'
 import { has_any_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
-import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_plan, type LanePlan, type Stops } from './lane-plan'
 import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-size'
 
@@ -30,6 +31,17 @@ function running_of(issues: ReadonlyArray<OpenIssueData>): ReadonlyArray<OpenIss
 	return issues.filter((issue) => has_any_label(issue.labels, RUNNING))
 }
 
+// The listed issues that stop for a person before their merge — the body read the offer order uses
+// (`backlog-human-stop-order.ts`), so on an overlap the self-completing lane goes first
+// (joshuafolkken/kit#8575).
+function stops_of(issues: ReadonlyArray<OpenIssueData>): Stops {
+	const stopping = issues.filter((issue) =>
+		issue_auto_ok.declares_judgement_needed(issue.body ?? ''),
+	)
+
+	return new Set(stopping.map((issue) => issue.number))
+}
+
 function clash_among(
 	plan: LanePlan,
 	issues: ReadonlyArray<OpenIssueData>,
@@ -37,7 +49,7 @@ function clash_among(
 ): Clash | undefined {
 	const declared = lane_plan.with_plans(backlog_overlap.declared_of(issues), directory)
 
-	return lane_plan.clash_of(plan, declared, directory)
+	return lane_plan.clash_of(plan, declared, directory, stops_of(issues))
 }
 
 function overlap_text(issue: number, clash: Clash): string {
@@ -136,6 +148,7 @@ const lane_plan_probe = {
 	record_cleared,
 	running_of,
 	sized_listing,
+	stops_of,
 }
 
 export { lane_plan_probe }
