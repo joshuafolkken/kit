@@ -43,6 +43,12 @@ interface StartHandlers {
 	failed: () => void
 }
 
+// The platform whose players are tried and the ports they spawn and write through; this process's own when omitted.
+interface PlayerOptions {
+	platform?: NodeJS.Platform
+	ports?: SoundPorts
+}
+
 function powershell_literal(file: string): string {
 	return `'${file.replaceAll("'", "''")}'`
 }
@@ -122,8 +128,7 @@ function start_first(
 function start(
 	file: string,
 	handlers: StartHandlers,
-	platform: NodeJS.Platform = process.platform,
-	ports: SoundPorts = DEFAULT_PORTS,
+	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
 ): void {
 	start_first(file, players_for(platform), { ports, handlers })
 }
@@ -178,15 +183,19 @@ function loop_players(platform: NodeJS.Platform): Array<Player> {
 	return LOOP_PLAYERS[platform] ?? []
 }
 
+// A Linux loop streams the file's samples to its raw-PCM player; other platforms' players read the file.
+function loop_ports(file: string, platform: NodeJS.Platform, ports: SoundPorts): SoundPorts {
+	return platform === 'linux' ? run_board_sound_stream.ports_for(file, ports) : ports
+}
+
 // Loop inside one audio stream, without closing the output between WAV boundaries.
 function loop(
 	file: string,
 	handlers: StartHandlers,
-	platform: NodeJS.Platform = process.platform,
-	ports: SoundPorts = DEFAULT_PORTS,
+	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
 ): void {
 	try {
-		const output = platform === 'linux' ? run_board_sound_stream.ports_for(file, ports) : ports
+		const output = loop_ports(file, platform, ports)
 
 		start_first(file, loop_players(platform), { ports: output, handlers })
 	} catch {
@@ -196,8 +205,7 @@ function loop(
 
 function play(
 	file: string,
-	platform: NodeJS.Platform = process.platform,
-	ports: SoundPorts = DEFAULT_PORTS,
+	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
 ): void {
 	const handlers: StartHandlers = {
 		started: () => {
@@ -206,7 +214,7 @@ function play(
 		failed: () => ports.write(BEL),
 	}
 
-	start(file, handlers, platform, ports)
+	start(file, handlers, { platform, ports })
 }
 
 // A cue's WAV, synthesized once into the cache (`run-board-sound-wav.ts`), then played; a cue whose
@@ -224,7 +232,7 @@ function play_cue(
 	)
 
 	if (file === undefined) ports.write(BEL)
-	else play(file, platform, ports)
+	else play(file, { platform, ports })
 }
 
 const run_board_sound_player = {
@@ -236,5 +244,5 @@ const run_board_sound_player = {
 	start,
 }
 
-export type { Player, Playing, SoundPorts, SoundSpawner, StartHandlers }
+export type { Player, PlayerOptions, Playing, SoundPorts, SoundSpawner, StartHandlers }
 export { run_board_sound_player }

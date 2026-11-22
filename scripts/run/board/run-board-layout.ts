@@ -257,13 +257,18 @@ function layout_of(
 
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 
+// The earlier run's lanes and what each row reads; none and nothing when omitted.
+interface LocalLayoutOptions {
+	earlier?: EarlierLanes
+	read?: RowRead
+}
+
 // The run's own children before the plan is read: the stream and the lanes are local and read at
 // once, so the rows, their states and how long each has run are drawn while GitHub answers; the titles
 // and every issue the run has not touched wait for the plan.
 function local_layout_of(
 	statuses: ReadonlyMap<number, ItemStatus>,
-	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
-	read: RowRead = NO_READ,
+	{ earlier = run_board_earlier.NO_EARLIER, read = NO_READ }: LocalLayoutOptions = {},
 ): BoardLayout {
 	return {
 		...EMPTY_LAYOUT,

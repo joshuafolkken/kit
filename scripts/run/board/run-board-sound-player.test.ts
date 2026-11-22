@@ -81,7 +81,7 @@ describe('run_board_sound_player.play command table', () => {
 	it('plays through afplay on macOS', () => {
 		const test = harness()
 
-		run_board_sound_player.play(WAV, 'darwin', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'darwin', ports: test.ports })
 
 		expect(test.spawner).toHaveBeenCalledWith('afplay', [WAV], DETACHED)
 	})
@@ -89,7 +89,7 @@ describe('run_board_sound_player.play command table', () => {
 	it('plays through PowerShell SoundPlayer.PlaySync on Windows, quoting the path', () => {
 		const test = harness()
 
-		run_board_sound_player.play(QUOTED_WAV, 'win32', test.ports)
+		run_board_sound_player.play(QUOTED_WAV, { platform: 'win32', ports: test.ports })
 
 		expect(test.spawner).toHaveBeenCalledWith(
 			'powershell',
@@ -105,7 +105,7 @@ describe('run_board_sound_player.play command table', () => {
 	it('tries paplay first on Linux', () => {
 		const test = harness()
 
-		run_board_sound_player.play(WAV, 'linux', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'linux', ports: test.ports })
 
 		expect(test.spawner).toHaveBeenCalledExactlyOnceWith('paplay', [WAV], DETACHED)
 	})
@@ -121,7 +121,7 @@ describe('run_board_sound_player.play fallbacks', () => {
 	it('moves on to the next Linux candidate when one is missing', () => {
 		const test = harness()
 
-		run_board_sound_player.play(WAV, 'linux', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'linux', ports: test.ports })
 		fail_child(test, 0)
 
 		expect(test.spawner).toHaveBeenLastCalledWith('pw-play', [WAV], DETACHED)
@@ -131,7 +131,7 @@ describe('run_board_sound_player.play fallbacks', () => {
 	it('rings the bell on a platform with no player row', () => {
 		const test = harness()
 
-		run_board_sound_player.play(WAV, 'aix', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'aix', ports: test.ports })
 
 		expect(test.spawner).not.toHaveBeenCalled()
 		expect(test.write).toHaveBeenCalledExactlyOnceWith(run_board_sound_player.BEL)
@@ -140,7 +140,7 @@ describe('run_board_sound_player.play fallbacks', () => {
 	it('rings the bell when the player fails to start', () => {
 		const test = harness()
 
-		run_board_sound_player.play(WAV, 'darwin', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'darwin', ports: test.ports })
 		fail_child(test, 0)
 
 		expect(test.write).toHaveBeenCalledExactlyOnceWith(run_board_sound_player.BEL)
@@ -149,7 +149,7 @@ describe('run_board_sound_player.play fallbacks', () => {
 	it('rings the bell once every Linux candidate has failed', () => {
 		const test = harness()
 
-		run_board_sound_player.play(WAV, 'linux', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'linux', ports: test.ports })
 		fail_child(test, 0)
 		fail_child(test, 1)
 		fail_child(test, 2)
@@ -173,7 +173,7 @@ describe('run_board_sound_player.play a spawn that throws', () => {
 		throwing(test)
 
 		expect(() => {
-			run_board_sound_player.play(WAV, 'darwin', test.ports)
+			run_board_sound_player.play(WAV, { platform: 'darwin', ports: test.ports })
 		}).not.toThrow()
 		expect(test.write).toHaveBeenCalledExactlyOnceWith(run_board_sound_player.BEL)
 	})
@@ -184,7 +184,7 @@ describe('run_board_sound_player.play a spawn that throws', () => {
 		test.spawner.mockImplementationOnce(() => {
 			throw new Error('spawn EAGAIN')
 		})
-		run_board_sound_player.play(WAV, 'linux', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'linux', ports: test.ports })
 
 		expect(test.spawner).toHaveBeenLastCalledWith('pw-play', [WAV], DETACHED)
 		expect(test.write).not.toHaveBeenCalled()
@@ -195,7 +195,7 @@ describe('run_board_sound_player.play default ports', () => {
 	it('rings the bell on the terminal', () => {
 		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 
-		run_board_sound_player.play(WAV, 'aix')
+		run_board_sound_player.play(WAV, { platform: 'aix' })
 
 		expect(write).toHaveBeenCalledExactlyOnceWith(run_board_sound_player.BEL)
 		write.mockRestore()
@@ -206,7 +206,7 @@ describe('run_board_sound_player.play detachment', () => {
 	it('returns at once and lets the child go without waiting for it to end', () => {
 		const test = harness()
 
-		run_board_sound_player.play(WAV, 'darwin', test.ports)
+		run_board_sound_player.play(WAV, { platform: 'darwin', ports: test.ports })
 
 		const [child] = test.children
 
@@ -227,7 +227,7 @@ describe('run_board_sound_player.loop unsupported platform', () => {
 		const test = harness()
 		const told = handlers()
 
-		run_board_sound_player.loop(WAV, told, 'aix', test.ports)
+		run_board_sound_player.loop(WAV, told, { platform: 'aix', ports: test.ports })
 
 		expect(told.failed).toHaveBeenCalledOnce()
 		expect(test.spawner).not.toHaveBeenCalled()
@@ -243,7 +243,7 @@ describe('run_board_sound_player.loop', () => {
 
 		vi.spyOn(run_board_sound_stream, 'ports_for').mockReturnValue(test.ports)
 
-		run_board_sound_player.loop(file, told, 'linux', test.ports)
+		run_board_sound_player.loop(file, told, { platform: 'linux', ports: test.ports })
 
 		expect(test.spawner).toHaveBeenCalledExactlyOnceWith(
 			'paplay',
@@ -262,12 +262,10 @@ describe('run_board_sound_player.loop', () => {
 
 		vi.spyOn(run_board_sound_stream, 'ports_for').mockReturnValue(test.ports)
 
-		run_board_sound_player.loop(
-			rated_wav(run_board_sound_wav.SAMPLE_RATE),
-			told,
-			'linux',
-			test.ports,
-		)
+		run_board_sound_player.loop(rated_wav(run_board_sound_wav.SAMPLE_RATE), told, {
+			platform: 'linux',
+			ports: test.ports,
+		})
 		fail_child(test, 0)
 		fail_child(test, 1)
 		fail_child(test, 2)
@@ -282,7 +280,7 @@ describe('run_board_sound_player native loops', () => {
 	it('uses macOS AVAudioPlayer with indefinite looping', () => {
 		const test = harness()
 
-		run_board_sound_player.loop(WAV, handlers(), 'darwin', test.ports)
+		run_board_sound_player.loop(WAV, handlers(), { platform: 'darwin', ports: test.ports })
 
 		const [command, args] = test.spawner.mock.calls[0] ?? []
 
@@ -294,7 +292,7 @@ describe('run_board_sound_player native loops', () => {
 	it('uses Windows SoundPlayer with a quoted path and native looping', () => {
 		const test = harness()
 
-		run_board_sound_player.loop(QUOTED_WAV, handlers(), 'win32', test.ports)
+		run_board_sound_player.loop(QUOTED_WAV, handlers(), { platform: 'win32', ports: test.ports })
 
 		const [command, args] = test.spawner.mock.calls[0] ?? []
 
@@ -310,7 +308,7 @@ describe('run_board_sound_player.start', () => {
 		const test = harness()
 		const told = handlers()
 
-		run_board_sound_player.start(WAV, told, 'linux', test.ports)
+		run_board_sound_player.start(WAV, told, { platform: 'linux', ports: test.ports })
 		fail_child(test, 0)
 
 		expect(told.started.mock.calls.map(([child]) => child)).toStrictEqual(test.children)
@@ -322,7 +320,7 @@ describe('run_board_sound_player.start', () => {
 		const test = harness()
 		const told = handlers()
 
-		run_board_sound_player.start(WAV, told, 'darwin', test.ports)
+		run_board_sound_player.start(WAV, told, { platform: 'darwin', ports: test.ports })
 		fail_child(test, 0)
 
 		expect(told.failed).toHaveBeenCalledOnce()
@@ -333,7 +331,7 @@ describe('run_board_sound_player.start', () => {
 		const test = harness()
 		const told = handlers()
 
-		run_board_sound_player.start(WAV, told, 'darwin', test.ports)
+		run_board_sound_player.start(WAV, told, { platform: 'darwin', ports: test.ports })
 		told.started.mock.calls[0]?.[0].kill()
 		const [child] = test.children
 
