@@ -5,6 +5,7 @@ import type { Notice } from './run-board-header-notice'
 import type { BoardRow } from './run-board-layout'
 import type { BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 import type { DrawPorts } from './run-board-tick-draw'
 import { run_board_tick_flash } from './run-board-tick-flash'
@@ -157,6 +158,21 @@ describe('run_board_tick_flash.flash_of over the tracing notice', () => {
 
 		expect(drawn.notice_trace?.trace.start_ms).toBe(-Infinity)
 		expect(drawn.notice_trace?.place).toBeUndefined()
+	})
+})
+
+describe('run_board_tick_flash.is_enabled per effect', () => {
+	it('reads the theme’s own switch for each effect', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		vi.stubEnv('NO_COLOR', undefined)
+		const { ports } = matrix_redraw()
+		const live = run_board_theme_defs.live_of('matrix')
+
+		vi.spyOn(run_board_theme_defs, 'live_of').mockReturnValue({ ...live, notice_trace: false })
+
+		expect(run_board_tick_flash.is_enabled(ports)).toBe(true)
+		expect(run_board_tick_flash.is_enabled(ports, 'notice_trace')).toBe(false)
+		vi.restoreAllMocks()
 	})
 
 	it.each(DISABLED)('traces no notice in %s', (mode, overrides) => {

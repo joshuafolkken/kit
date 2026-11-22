@@ -114,7 +114,7 @@ describe('turn_of', () => {
 	})
 })
 
-describe('turn_of — slots, pane edges and widths', () => {
+describe('turn_of — slots and pane edges', () => {
 	it.each<[string, NoticeFields]>([
 		['the empty slot', header_of(undefined)],
 		[
@@ -130,6 +130,13 @@ describe('turn_of — slots, pane edges and widths', () => {
 		expect(turn_at(undefined, { header })).toBeUndefined()
 	})
 
+	it('places none where no keyed line carries the notice', () => {
+		const turn = turn_at(undefined, { keyed: [{ ...line_of(STOPPED), key: 'other' }] })
+
+		expect(turn?.trace.start_ms).toBe(START)
+		expect(turn?.place).toBeUndefined()
+	})
+
 	it('places none past the pane columns', () => {
 		const turn = turn_at(undefined, { columns: PREFIX_COLUMNS + WORDS.length })
 
@@ -143,7 +150,9 @@ describe('turn_of — slots, pane edges and widths', () => {
 		expect(turn?.trace.start_ms).toBe(START)
 		expect(turn?.place).toBeUndefined()
 	})
+})
 
+describe('turn_of — widths', () => {
 	it('keeps the drawn width of a wide notice', () => {
 		const place = turn_at(undefined, { keyed: [line_of(STOPPED, '全角')] })?.place
 
