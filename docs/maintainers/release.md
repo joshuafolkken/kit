@@ -22,4 +22,4 @@ Merged work has landed since the last version change and you want it published. 
 ## Common failures
 
 - The release branch already exists, the default branch cannot be read, or the tag never appears: `josh release` stops and says which ([`josh release`](../josh-commands-automation.md#josh-release)).
-- One registry has the version and the other does not: the two publish jobs run separately and one can fail while the other succeeds, so check each job's result ([publishing.md](./publishing.md#publishing-to-public-npm)).
+- Public npm lacks the version: check the `publish-npm` job's result ([publishing.md](./publishing.md#publishing-to-public-npm)). GitHub Packages staying at an older version is expected; kit no longer publishes there.
