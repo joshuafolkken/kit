@@ -69,7 +69,15 @@ describe('run_board_frame_preview — the form', () => {
 		expect(themed.text).not.toBe(plain.text)
 	})
 
-	it('neither reads nor records the frame store', async () => {
+	it('runs the lamp panel a lamp theme runs on a live board', async () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+		vi.stubEnv('NO_COLOR', undefined)
+		const { text } = await framed(['--theme', 'wargames'])
+
+		expect(text).toContain('■')
+	})
+
+	it('draws past the --once record, neither reading nor recording it', async () => {
 		const { ports } = harness(LOCAL, [plan_titled('a')])
 		const store = { load: vi.fn(), save: vi.fn() }
 
@@ -96,6 +104,8 @@ describe('run_board_frame_preview.options_of', () => {
 		['--rows', '0'],
 		['--issue', '-1'],
 		['--notice', 'nowhere'],
+		['--issue', '8426'],
+		['--repeat'],
 		['--unknown'],
 	])('refuses %s %s', (...flags: Array<string>) => {
 		expect(options_of(flags)).toBeUndefined()

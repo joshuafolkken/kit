@@ -160,7 +160,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--timing'],
 					description:
-						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat` and `--every` ignore it.',
+						'after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat`, `--every` and `--frame` ignore it.',
 				},
 				{
 					names: ['--timing'],

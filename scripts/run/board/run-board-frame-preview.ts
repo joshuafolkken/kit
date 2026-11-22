@@ -4,6 +4,7 @@ import type { Notice } from './run-board-header-notice'
 import { run_board_sound_transition, type Cause } from './run-board-sound-transition'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 
 // `josh run:board --frame` — one board frame drawn in a state fixed by its flags, for reading what a
@@ -59,10 +60,17 @@ function is_counted(values: FrameValues): boolean {
 	)
 }
 
-function is_valid(values: FrameValues): boolean {
+// `--issue` and `--repeat` only qualify a notice, so either without one is refused.
+function is_noticed(values: FrameValues): boolean {
 	const { notice } = values
 
-	return is_counted(values) && (notice === undefined || sound_of(notice) !== undefined)
+	if (notice === undefined) return values.issue === undefined && !values.repeat
+
+	return sound_of(notice) !== undefined
+}
+
+function is_valid(values: FrameValues): boolean {
+	return is_counted(values) && is_noticed(values)
 }
 
 function cause_of(values: FrameValues): Cause | undefined {
@@ -102,12 +110,14 @@ function notice_of(options: FrameOptions, now_ms: number): Notice | undefined {
 	return cause === undefined ? undefined : { cause, is_repeat, at_ms: now_ms }
 }
 
-// The live ports in the live screen form, with the size and sound switch fixed, no cue sounded and no
-// frame store; the frame is collected so its escapes can be left off.
+// The live ports in the live screen form, with the size and sound switch fixed, the rows typing where
+// the theme's live board types them (so its lamp panel shows), no cue sounded and no frame store; the
+// frame is collected so its escapes can be left off.
 function fixed_ports(
 	ports: BoardPorts,
 	options: FrameOptions,
 	write: BoardPorts['write'],
+	theme: Theme | undefined,
 ): BoardPorts {
 	return {
 		...ports,
@@ -116,6 +126,7 @@ function fixed_ports(
 		form: 'screen',
 		size: () => options.size,
 		sound: () => !options.is_muted,
+		types_rows: run_board_theme_defs.live_of(theme).types_rows,
 		cue: undefined,
 		frames: undefined,
 	}
@@ -128,9 +139,14 @@ async function draw(
 ): Promise<void> {
 	const parts: Array<string> = []
 	const read = await ports.gather('settled')
-	const fixed = fixed_ports({ ...ports, gather: async () => read }, options, (frame) => {
-		parts.push(frame)
-	})
+	const fixed = fixed_ports(
+		{ ...ports, gather: async () => read },
+		options,
+		(frame) => {
+			parts.push(frame)
+		},
+		theme,
+	)
 	// Dated as the run read, so the tick takes it for this run's view and keeps the notice
 	// (`run-board-data.ts` → `view_for`).
 	const state = {
