@@ -15,7 +15,7 @@ import { run_board_typing } from './run-board-typing'
 const { NO_TYPING, next, type_bytes, typed_lines } = run_board_type_rows
 const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 const { CURSOR } = run_board_typing
-const RESET = '\u{1B}[0m'
+const CLEAR_LINE = '\u{1B}[K'
 const START = Date.parse('2026-11-21T09:00:00.000Z')
 const SECOND = 1000
 const LANDED = START + 2 * SECOND
@@ -83,10 +83,7 @@ describe('run_board_type_rows.typed_lines over a saved frame', () => {
 	it('draws the typed part, the block, then the saved line right of it', () => {
 		const lines = typed_lines([LANE, LIVE], typing, LANDED + (TYPED - 1) * LETTER_MS)
 
-		expect(lines).toStrictEqual([
-			LANE,
-			`${LIVE.slice(0, TYPED)}${RESET}${CURSOR}${SAVED.slice(TYPED + 1)}${RESET}`,
-		])
+		expect(lines).toStrictEqual([LANE, `${LIVE.slice(0, TYPED)}${CURSOR}${SAVED.slice(TYPED + 1)}`])
 	})
 
 	it('drops the saved part past a shorter live row once the row is typed through', () => {
@@ -96,6 +93,6 @@ describe('run_board_type_rows.typed_lines over a saved frame', () => {
 	})
 
 	it('rewrites the row with the saved line right of the block between redraws', () => {
-		expect(type_bytes(typing, LANDED)).toContain(`${CURSOR}${SAVED.slice(2)}${RESET}`)
+		expect(type_bytes(typing, LANDED)).toContain(`${CURSOR}${SAVED.slice(2)}${CLEAR_LINE}`)
 	})
 })

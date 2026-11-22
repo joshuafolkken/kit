@@ -150,7 +150,7 @@ it('ac-8de5883d cools and restores a flash on spinner turns even without spinner
 	expect(overlays.at(-1)?.at_ms).toBe(
 		START + run_board_change_flash.COOL_FRAMES * SPINNER_INTERVAL_MS,
 	)
-	expect(overlays.at(-1)?.text).toBe(`${ESCAPE}[1;1Hb${ESCAPE}[0m`)
+	expect(overlays.at(-1)?.text).toBe(`${ESCAPE}[1;1Hb`)
 })
 
 describe('run_board_spin.spin_to_second', () => {
@@ -254,7 +254,7 @@ describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', (
 			letters.every((letter) => writes.some(({ at_ms }) => at_ms === START + letter * LETTER_MS)),
 		).toBe(true)
 		expect(writes[0]?.text).toBe(type_bytes(typing, first_ms))
-		expect(writes[0]?.text).toContain(`${ESCAPE}[3;1Hxx${ESCAPE}[0m█`)
+		expect(writes[0]?.text).toContain(`${ESCAPE}[3;1Hxx█`)
 	})
 })
 
@@ -343,7 +343,7 @@ describe('run_board_spin — the header’s now line (joshuafolkken/kit#8103)', 
 		const at_ms = START + LETTER_MS
 		const bytes = type_bytes(typing, at_ms)
 
-		expect(bytes).toBe(`${THIRD_ROW}KIT  ${spinner_of(at_ms)} 5″  > #8${ESCAPE}[0m█${ESCAPE}[K`)
+		expect(bytes).toBe(`${THIRD_ROW}KIT  ${spinner_of(at_ms)} 5″  > #8█${ESCAPE}[K`)
 	})
 
 	it('records no now line that wraps', () => {
