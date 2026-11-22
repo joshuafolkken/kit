@@ -23,7 +23,7 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 })
 const ESCAPE = '\u{1B}'
-const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l`
+const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l${ESCAPE}[2;1H`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ josh-board'
 const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
