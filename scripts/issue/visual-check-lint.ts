@@ -18,7 +18,9 @@ const REASON_PREFIX = issue_body_keys.prefix('pre_merge_visual_reason')
 const PLACEHOLDER_PREFIX = '<'
 
 const VISUAL = /目視|見た目|visual|appearance/iu
-const PERSON = /目視|人が|人の目|人間|human|person|manual/iu
+// A criterion is refused only when it names the person who looks: a line that merely mentions a visual
+// check, or rules one out, is not one only a person can meet.
+const PERSON = /人が|人の目|人間|human|person|manual/iu
 // The template's other judgement kinds: a reason naming one is not a visual check alone.
 const OTHER_JUDGEMENT = /方針|外部|アカウント|policy|external|account/iu
 

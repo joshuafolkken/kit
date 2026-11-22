@@ -77,6 +77,12 @@ describe('visual_check_lint.problems — passed', () => {
 		).toStrictEqual([])
 	})
 
+	it('passes a criterion that mentions a visual check without naming a person', () => {
+		const criterion = '- [ ] 目視確認なしで判定できる'
+
+		expect(visual_check_lint.problems(body_with([NOT_NEEDED], [criterion]))).toStrictEqual([])
+	})
+
 	it('passes a criterion the AI checks by reading the frame', () => {
 		const criterion = '- [ ] `run:board --frame` の出力に見出しが出る'
 
