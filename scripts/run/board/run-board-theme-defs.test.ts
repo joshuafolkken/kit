@@ -39,6 +39,7 @@ const MATRIX_LIVE: LiveDefinition = {
 	drop: true,
 }
 const AMBER: ThemeDefinition = {
+	name: 'josh-amber',
 	paint: { rgb: '255;176;0', named: 'yellow' },
 	rule: THEME_DEFS.wargames.rule,
 	idle: THEME_DEFS.wargames.idle,
@@ -87,6 +88,7 @@ describe('run_board_theme_defs.names_of', () => {
 describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 	it('keeps the phosphor cyan and the opening line the board drew before the table', () => {
 		expect(THEME_DEFS.wargames).toStrictEqual({
+			name: 'josh-wopr',
 			paint: { rgb: PHOSPHOR_RGB, named: 'cyan' },
 			// joshuafolkken/kit#8397: the rules in the idle tone's dim cyan.
 			rule: {
@@ -117,6 +119,7 @@ describe('run_board_theme_defs.THEME_DEFS typing', () => {
 describe('run_board_theme_defs.THEME_DEFS matrix', () => {
 	it('draws the green body, the TRACE alert, the approved opening, decoded rows and the idle rain', () => {
 		expect(THEME_DEFS.matrix).toStrictEqual({
+			name: 'josh-trace',
 			paint: { rgb: '0;215;60', named: 'green' },
 			rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
 			idle: run_board_header_trace.SHADES.mid,
