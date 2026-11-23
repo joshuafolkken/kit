@@ -57,7 +57,7 @@ vi.mock('#scripts/lane/lane-ledger-write', () => ({
 }))
 
 vi.mock('#scripts/lane/lane-state', () => ({
-	lane_state: { record_change: record_change_mock },
+	lane_state: { record_change: record_change_mock, read_state: vi.fn() },
 }))
 
 vi.mock('./run-merge-steps', () => ({
