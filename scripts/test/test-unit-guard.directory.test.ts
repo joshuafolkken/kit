@@ -5,6 +5,7 @@ import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_recording } from './test-read-recording'
 import { test_unit_guard } from './test-unit-guard'
+import { unit_run_marker } from './unit-run-marker'
 import { unit_share_fixture } from './unit-share-fixture'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
@@ -27,9 +28,11 @@ const ROOT = path.resolve('/repo')
 const CHECKOUT = path.resolve('/checkout')
 const RELATED = ['related', 'scripts/git/change-base.ts', '--run']
 const VITEST_OUTPUT = ' FAIL  scripts/git/change-base.test.ts > fails'
-const ISOLATED = test_unit_guard.isolated_unit_environment()
 
 beforeEach(() => {
+	// joshuafolkken/kit#8769: the unit config blanks the gate's run mark, so these runs declare
+	// themselves nested and the marker leaves the environment they hand vitest as it is.
+	vi.stubEnv(unit_run_marker.NESTED_KEY, unit_run_marker.NESTED_VALUE)
 	unit_share_fixture.stub_share(undefined)
 	unit_share_fixture.stub_free(undefined)
 	unit_share_fixture.stub_claim(undefined)
@@ -42,17 +45,20 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 describe('test_unit_guard.run_vitest_in', () => {
 	// joshuafolkken/kit#7259: launched without pnpm's wrapper, vitest still gets exactly the isolated
 	// environment it got through `pnpm exec`.
 	it('starts vitest in the given checkout rather than in this process’s directory', async () => {
+		const isolated = test_unit_guard.isolated_unit_environment()
+
 		await expect(test_unit_guard.run_vitest_in(CHECKOUT, RELATED)).resolves.toBe(0)
 		expect(mocked_execa).toHaveBeenCalledWith(
 			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', ...RELATED],
-			expect.objectContaining({ cwd: CHECKOUT, env: ISOLATED, extendEnv: false }),
+			expect.objectContaining({ cwd: CHECKOUT, env: isolated, extendEnv: false }),
 		)
 	})
 
