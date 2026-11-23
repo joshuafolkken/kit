@@ -4,6 +4,7 @@ import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { check_reuse } from './check-reuse'
 import { gate_command } from './gate-command'
+import { gate_owner_watch } from './gate-owner-watch'
 import { gate_worktree_lock } from './gate-worktree-lock'
 
 // The `josh gate` entry, kept apart from `gate-command.ts` and `verification-gate.ts` because other
@@ -16,6 +17,9 @@ import { gate_worktree_lock } from './gate-worktree-lock'
 // process end on its own, which it can, since every child has already exited by here.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const extra_arguments = process.argv.slice(changed_file_scope.ARGV_START)
+
+	// A gate whose owner died ends with its checks rather than running on unread (`gate-owner-watch.ts`).
+	gate_owner_watch.start()
 
 	const ledger_path = await lane_ledger_write.target()
 

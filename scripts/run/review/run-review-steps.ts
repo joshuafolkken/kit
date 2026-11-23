@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { core_priority } from '#scripts/gate/core-priority'
+import { gate_owner_watch } from '#scripts/gate/gate-owner-watch'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { git_location_environment } from '#scripts/git/git-location-environment'
@@ -7,6 +8,8 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_reap } from '#scripts/lane/lane-reap'
 import { poll } from '#scripts/lib/poll'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
@@ -92,8 +95,20 @@ function launch_josh(
 	return launch_josh_with(josh_args, log_path, root, {})
 }
 
+// The gate's owner (`gate-owner-watch.ts`, joshuafolkken/kit#8845): the lane child session this runs
+// under, which reads the verdict at `--join` — not this process, which exits first by design. Outside
+// a lane child no owner is named and the gate is not watched.
+function gate_owner_environment(): Record<string, string> {
+	const issue = lane_child_marker.marked_issue()
+	const pid = issue === undefined ? undefined : lane_reap.own_child(issue)
+
+	if (pid === undefined) return {}
+
+	return gate_owner_watch.environment_of(gate_owner_watch.owner_of(pid))
+}
+
 function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
-	return launch_josh([GATE_COMMAND], gate_log_path(root), root)
+	return launch_josh_with([GATE_COMMAND], gate_log_path(root), root, gate_owner_environment())
 }
 
 function to_timing(value: unknown): TimingStart | undefined {

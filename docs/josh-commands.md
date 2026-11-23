@@ -54,6 +54,7 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
   - An invalid definition (a fixed check's label as `name` included) runs none and fails as one `josh.gate.steps` check naming the error.
   - With `--static-group`, only `rest` runs them.
 
+- A gate whose owner dies ends with its checks: it sends `SIGTERM` to every process under it and exits non-zero. The launcher names the owner in `JOSH_GATE_OWNER_PID` / `JOSH_GATE_OWNER_START` (`run:review` → the lane child session, ship → itself); no owner named → no watch (`scripts/gate/gate-owner-watch.ts`).
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail".
