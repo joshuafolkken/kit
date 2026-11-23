@@ -190,6 +190,9 @@ describe('sync_configs.sync_lefthook_config', () => {
 const VSCODE_EXTENSIONS_DEST = path.join(VSCODE_DIR, 'extensions.json')
 const VSCODE_SETTINGS_DEST = path.join(VSCODE_DIR, 'settings.json')
 const EDITOR_FORMAT_ON_SAVE_KEY = 'editor.formatOnSave'
+const TERMINAL_MINIMUM_CONTRAST_RATIO_KEY = 'terminal.integrated.minimumContrastRatio'
+const CONSUMER_VSCODE_SETTINGS_KEY = 'custom.key'
+const CONSUMER_VSCODE_SETTINGS = `{"${CONSUMER_VSCODE_SETTINGS_KEY}": true}`
 
 function populate_via_sync(
 	initial_content: string,
@@ -301,14 +304,29 @@ describe('sync_configs.sync_vscode_settings_json', () => {
 	})
 
 	it('adds missing keys when outdated', () => {
-		writeFileSync(VSCODE_SETTINGS_DEST, '{"custom.key": true}')
+		writeFileSync(VSCODE_SETTINGS_DEST, CONSUMER_VSCODE_SETTINGS)
 		silence_console_info()
 		sync_configs.sync_vscode_settings_json(VSCODE_SETTINGS_DEST)
 
 		const result = readFileSync(VSCODE_SETTINGS_DEST, 'utf8')
 
-		expect(result).toContain('custom.key')
+		expect(result).toContain(CONSUMER_VSCODE_SETTINGS_KEY)
 		expect(result).toContain(EDITOR_FORMAT_ON_SAVE_KEY)
+	})
+})
+
+describe('sync_configs.sync_vscode_settings_json terminal contrast', () => {
+	// joshuafolkken/kit#8741: the terminal minimum contrast ratio reaches an existing consumer file
+	// alongside the consumer's own keys.
+	it('adds the terminal minimum contrast ratio while keeping consumer keys', () => {
+		writeFileSync(VSCODE_SETTINGS_DEST, CONSUMER_VSCODE_SETTINGS)
+		silence_console_info()
+		sync_configs.sync_vscode_settings_json(VSCODE_SETTINGS_DEST)
+
+		const result = JSON.parse(readFileSync(VSCODE_SETTINGS_DEST, 'utf8')) as Record<string, unknown>
+
+		expect(result[TERMINAL_MINIMUM_CONTRAST_RATIO_KEY]).toBe(1)
+		expect(result[CONSUMER_VSCODE_SETTINGS_KEY]).toBe(true)
 	})
 })
 
