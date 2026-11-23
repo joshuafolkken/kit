@@ -188,6 +188,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    Each `- 前提:` command runs as `lane:plan` runs it; one whose last line is not a number is refused, naming `lane:value cell` (also `issue:body`).
    A failed or unmet premise passes; `- 計測宣言:` is not run. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
+   A non-defect body citing merged or closed work in `## 概要` / `## 背景` is refused without `- 新しい目標:`.
    A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) is refused the same way.
    One projected past twice the implement stage budget at the measured rate is refused unless it declares `- 分割しない理由: <理由>`, whatever its route.
    A body that backticks a lintable file of this repository at or past 90% of its code-line limit (ESLint's `max-lines` count) is refused with the route to a refactor Issue that splits it first: refile with `- 先行リファクタ: #<refactor>`, then record that blocker with `backlog:triage --blocked-by`.
@@ -555,15 +556,35 @@ pnpm josh issue:kind 6636 non-bug --release-class other-change
 
 <!-- usage: defect:origin -->
 
-List the merged pull requests that last changed what a defect issue names, as candidates for its origin line.
+List the merged pull requests that last changed or first added what a defect issue names, as candidates for its origin line.
 
 ```bash
-pnpm josh defect:origin 4241   # newest first, merged before the issue was filed
+pnpm josh defect:origin 4241   # most targets first, merged before the issue was filed
 ```
 
 <!-- /usage -->
 
-Lists up to five merged pull requests that changed the files and names an issue cites, newest first and merged before the issue was filed. Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, or write `- 原因: 不明（<理由>）` (source: `prompts/collaboration-workflow/issue-template.md`).
+Lists up to five merged pull requests that changed the files and names an issue cites, merged before the issue was filed: the one that changed the most of them first, newest first among equals.
+
+For each cited file it also lists the pull request that first added it, marked `introduced: <file>` under its `changed:` line and kept even past the five.
+
+Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, or write `- 原因: 不明（<理由>）` (source: `prompts/collaboration-workflow/issue-template.md`).
+
+[`josh issue:file`](#josh-issuefile) lists the same candidates for a `- 種別: 不具合` body before it is filed, searched up to now: under a `- 原因: 不明（<理由>）` line it prints them and files the body; with no origin line it prints them under the refusal. A `- 原因: #<PR>` body and a non-bug body are not searched, and neither is a filing into another repository.
+
+### `josh issue:rework-candidates`
+
+<!-- usage: issue:rework-candidates -->
+
+List closed enhancements that rework delivered work, each with the merged pull request or closed Issue it cites — read-only.
+
+```bash
+pnpm josh issue:rework-candidates --since 30   # closed in the last 30 days
+```
+
+<!-- /usage -->
+
+The judgement of [`josh issue:file`](#josh-issuefile) step 3; reclassify with [`josh issue:kind`](#josh-issuekind).
 
 ### `josh defect:report`
 
@@ -718,19 +739,18 @@ Track an epic's children and pick what an unattended run takes next.
 Create an epic issue from its child issue numbers.
 
 ```bash
-pnpm josh epic "Epic: split the parser work" 101 102 103
-pnpm josh epic "Epic: staged rollout" A B --ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"
-pnpm josh epic "Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"   # a join
-pnpm josh epic "Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"                # why B waits on A
-pnpm josh epic "Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md
-pnpm josh epic --promote 858 101 102 103                                                                                                             # turn an existing issue into an epic
-pnpm josh epic --add 893 894                                                                                                                         # track #894, declaring no order for it
-pnpm josh epic --add 893 894 --before 891 --order-reason "<chain>: <reason>"                                                                         # #894 must finish before #891
-pnpm josh epic --add 893 894 --after 890 --order-reason "<chain>: <reason>"                                                                          # #894 starts once #890 is done
-pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                                        # …and record why, in one call
-pnpm josh epic --reconcile 2184                                                                                                                      # rewrite the body to match the recorded blocked-by, and record any order the body declared
+pnpm josh epic "Epic: split the parser work" 101 102 103 --rationale-file .josh/tmp/split/rationale.md
+pnpm josh epic "Epic: staged rollout" A B --rationale-file .josh/tmp/split/rationale.md--ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"
+pnpm josh epic "Epic: ..." A B C --rationale-file .josh/tmp/split/rationale.md--chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"   # a join
+pnpm josh epic "Epic: ..." A B --rationale-file .josh/tmp/split/rationale.md--chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"                # why B waits on A
+pnpm josh epic --promote 858 101 102 103 --rationale-file -                                                                                                                                       # turn an existing issue into an epic, the rationale on stdin
+pnpm josh epic --add 893 894                                                                                                                                                                      # track #894, declaring no order for it
+pnpm josh epic --add 893 894 --before 891 --order-reason "<chain>: <reason>"                                                                                                                      # #894 must finish before #891
+pnpm josh epic --add 893 894 --after 890 --order-reason "<chain>: <reason>"                                                                                                                       # #894 starts once #890 is done
+pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                                                                                     # …and record why, in one call
+pnpm josh epic --reconcile 2184                                                                                                                                                                   # rewrite the body to match the recorded blocked-by, and record any order the body declared
 pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
-pnpm josh epic --untrack 893 894                                                                                                                     # remove a child row and its connected orders
+pnpm josh epic --untrack 893 894                                                                                                                                                                  # remove a child row and its connected orders
 ```
 
 **Options:**
@@ -738,7 +758,7 @@ pnpm josh epic --untrack 893 894                                                
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--chain "#A -> #B"` — repeatable, on create or `--promote`: one dependency chain in the `## Dependencies` chain-line form; several give joins and branches. Each chain is written as a chain line with its `blocked-by` relations and a `### Declared order` entry. A value that is not a chain line, a number that is not a child, a cycle, or use with `--ordered` is refused before anything is written.
 - `--order-reason "#A -> #B: <reason>"` — repeatable, on create, `--promote` and `--add`: what the later child of one declared chain takes from the earlier one. Required per chain; written under its `### Declared order` entry. On create or `--promote` it opens with its kind (`unverifiable in one pass` / `waits on another`). A missing, undeclared, repeated, reasonless or kindless one is refused.
-- `--rationale-file <path|->` — split rationale prose, written under `.josh/tmp/` (`-` reads stdin).
+- `--rationale-file <path|->` — required on create and `--promote`: split rationale prose, written under `.josh/tmp/` (`-` reads stdin). Missing or blank, nothing is written and it exits 1.
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
 - `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.
 - `--title <title>` — with `--promote`: rename the issue first.
@@ -759,7 +779,7 @@ Children that only touch the same file get no `--chain` or `--order-reason` (`ex
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
-Appends the epic's sections to the issue's body, taking the same `--ordered` / `--chain` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
+Appends the epic's sections to the issue's body, taking the same required `--rationale-file` and the same `--ordered` / `--chain` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
 
 #### `josh epic --add` — insert children into an existing epic
 

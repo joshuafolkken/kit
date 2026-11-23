@@ -9,7 +9,8 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 
 ## Background
 
-<`- Type: defect` for a defect, else `- Type: non-defect`>
+<`- Type: defect` for a defect, else `- Type: non-defect`; rework of merged work → `issue-template.md`'s classification rules>
+<for a non-defect citing a merged PR or closed Issue: `- New goal: <when it was set, and what it is>`>
 <for a defect `- Cause: #<PR>`, or `- Cause: unknown（<reason>）` when it cannot be traced>
 <`- Human judgement: not needed` or `- Human judgement: needed（<policy decision / external account>）`; the criterion is the "人の判断" line under `issue-template.md`'s declaration table>
 <for a display change looked at after the merge, with `Human judgement: not needed`: `- Post-merge check: <where to look>`; the completion gate's handling → `.claude/skills/verify-ui/SKILL.md` → "When there is no screenshot command">
@@ -95,6 +96,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 | key     | 原因の損失           | Cause loss                     |
 | key     | 実施順               | Order                          |
 | key     | 原因                 | Cause                          |
+| key     | 新しい目標           | New goal                       |
 | key     | 規模見積もり         | Size estimate                  |
 | key     | 分割しない理由       | No-split reason                |
 | key     | 行を増やさない       | No added lines                 |

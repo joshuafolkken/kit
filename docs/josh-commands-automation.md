@@ -807,10 +807,11 @@ pnpm josh review:pair --issue 6902 --opus-agent a1b2 --sonnet-agent c3d4   # aft
 **Options:**
 
 - `--opus-agent <id>` / `--sonnet-agent <id>` — each reviewer's agentId, whose transcript prices its cost.
+- `--stats` — Sonnet's recall of Opus high/medium findings; cost per run.
 
 <!-- /usage -->
 
-Appends one line to `review-pairs.jsonl` in the git common directory. Neither `review:attest` nor the merge gate reads it.
+Ledger: `review-pairs.jsonl`, git common directory.
 
 ## Versioning
 

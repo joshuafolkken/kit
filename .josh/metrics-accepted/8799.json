@@ -1,0 +1,9 @@
+{
+	"reason": "kit#8799 adds the rework classification check, issue:rework-candidates and its docs as the Issue asks",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 209,
+		"rules.lines": 4,
+		"ai_cost.on_demand_bytes": 2133
+	}
+}

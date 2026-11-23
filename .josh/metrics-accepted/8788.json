@@ -1,0 +1,7 @@
+{
+	"reason": "The bttf arrival builds each beat lazily and writes only the changed cells, which takes a generator and a diff helper shared with the jump (#8788)",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

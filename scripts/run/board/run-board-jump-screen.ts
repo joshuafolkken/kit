@@ -2,7 +2,6 @@ import { run_board_drop_screen, type DropScreen, type ScreenCell } from './run-b
 import type { TerminalSize } from './run-board-fit'
 import { run_board_jump, type JumpRun } from './run-board-jump'
 import { run_board_jump_paint, type JumpScene, type PaintCell } from './run-board-jump-paint'
-import type { PanelArea } from './run-board-panel-draw'
 import type { Beat } from './run-board-reveal-blocks'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 import { run_board_screen } from './run-board-screen'
@@ -11,12 +10,12 @@ import type { Typing } from './run-board-type-rows'
 // joshuafolkken/kit#8677: the bttf jump written over the board between redraws, cell by cell, past the
 // theme: each cell as the theme drew it (`DropScreen`) recolored by `run_board_jump_paint`. The merge
 // jump runs at a frame a tick over every cell of the terminal, writing only the cells that changed
-// since the last turn and putting each back as it was once the jump is over; the arrival writes every
-// cell each tick. The animation area is the panel's own (it thaws its cells itself), and the cells
-// the spinners and the typing rows write are left to them.
+// since the last turn and putting each back as it was once the jump is over; the arrival writes the
+// cells that changed since its last beat (joshuafolkken/kit#8788). The animation area is the panel's
+// own (it thaws its cells itself), and the cells the spinners and the typing rows write are left to them.
 
 const { ARRIVE_TICKS, TICK_MS, is_running, tick_of } = run_board_jump
-const { arrive_cells, jump_cells } = run_board_jump_paint
+const { jump_cells } = run_board_jump_paint
 const { palette, parsed } = run_board_rgb
 const { synced } = run_board_screen
 
@@ -36,12 +35,12 @@ const BRIGHT_KIND = '9'
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
 
 // A jump being drawn: its timeline, the board's cells as the theme drew them, the rows it is painted
-// over and the animation area, whose cells it leaves alone.
+// over and the cells the animation area's painter draws, `row;column` 1-based, which it leaves alone.
 interface JumpDraw {
 	run: JumpRun
 	screen: DropScreen
 	scene: JumpScene
-	panel?: PanelArea | undefined
+	owned?: ReadonlySet<string> | undefined
 }
 
 function key_of(row: number, column: number): string {
@@ -58,20 +57,22 @@ function rgb_in(style: string, pattern: RegExp): Rgb | undefined {
 	return match === null ? undefined : parsed(match.slice(1).join(';'))
 }
 
-// Whether a cell, 1-based, is the animation area's: its rows from its first lamp place, the first
-// column the area writes (joshuafolkken/kit#8739: the one before it, written by neither, kept the
-// wash as a line after the thaw).
-function is_panel(panel: PanelArea | undefined, row: number, column: number): boolean {
-	if (panel === undefined || row < panel.top || row >= panel.top + panel.rows) return false
+// Whether the jump paints a cell, 1-based: none the typing rows or the area's painter own
+// (joshuafolkken/kit#8782: the area's cells its painter leaves, and the spinners' places, kept the
+// dark through the wash; the spinners hold while the jump runs, `is_lit`).
+function is_painted(draw: JumpDraw, row: number, column: number): boolean {
+	if (draw.owned?.has(key_of(row, column)) === true) return false
 
-	return column >= Math.min(...panel.lamps.map((lamp) => lamp.column))
+	return !run_board_drop_screen.is_held(draw.screen, { row, column })
 }
 
-// Whether the jump paints a cell, 1-based: none the spinners, the typing rows or the area own.
-function is_painted(draw: JumpDraw, row: number, column: number): boolean {
-	if (run_board_drop_screen.is_kept(draw.screen, { row, column })) return false
+function frame_of(ms: number): number {
+	return ms - (ms % FRAME_MS)
+}
 
-	return !is_panel(draw.panel, row, column)
+// Whether a jump is being drawn at `ms`, at the frame it is drawn on.
+function is_lit(draw: JumpDraw | undefined, ms: number): boolean {
+	return draw !== undefined && is_running(draw.run, frame_of(ms))
 }
 
 function last_foreground(style: string): Partial<Record<string, string>> {
@@ -169,12 +170,26 @@ function arrival_bytes(cell: PaintCell, plain: PaintCell | undefined, screen: Dr
 	return theme_bytes(key_of(cell.y + 1, cell.x + 1), style, cell.text)
 }
 
-// Every cell of the arrival `tick` ticks in (joshuafolkken/kit#8732): a cell left as the last beat
-// wrote it would stay lost to anything that wiped it since.
-function arrive_bytes(plain: ReadonlyArray<PaintCell>, screen: DropScreen, tick: number): string {
-	return arrive_cells(plain, tick)
-		.map((cell, index) => arrival_bytes(cell, plain[index], screen))
-		.join('')
+// The bytes in `now` that `before` does not already hold, by `row;column`.
+function changed_bytes(now: Map<string, string>, before: Map<string, string>): Array<string> {
+	return [...now].filter(([key, bytes]) => before.get(key) !== bytes).map(([, bytes]) => bytes)
+}
+
+// Every cell of the arrival `tick` ticks in, by `row;column`. Called through the paint module so a
+// test sees each beat built only when it is taken (joshuafolkken/kit#8788).
+function arrive_keyed(
+	plain: ReadonlyArray<PaintCell>,
+	screen: DropScreen,
+	tick: number,
+): Map<string, string> {
+	const cells = run_board_jump_paint.arrive_cells(plain, tick)
+
+	return new Map(
+		cells.map((cell, index) => [
+			key_of(cell.y + 1, cell.x + 1),
+			arrival_bytes(cell, plain[index], screen),
+		]),
+	)
 }
 
 // joshuafolkken/kit#8732: the first frame comes held, the screen wiped ahead of it
@@ -186,21 +201,22 @@ function without_wipe(drawn: string): string {
 
 // joshuafolkken/kit#8677: the bttf board's arrival over its first frame as the theme draws it, a beat
 // every tick: the screen cleared, the frame black, three flashes, then the thaw. The frame itself is
-// written whole once the beats end.
-function arrive_beats(drawn: string, size: TerminalSize | undefined): Array<Beat> {
+// written whole once the beats end. joshuafolkken/kit#8788: each beat is built when it is taken and
+// writes only the cells that changed since the beat before — the first, every cell after the clear.
+// The screen is wiped nowhere past the first beat (#8732's `without_wipe`), so no cell needs rewriting.
+function* arrive_beats(drawn: string, size: TerminalSize | undefined): Generator<Beat, void> {
 	const frame = { lines: without_wipe(drawn).split('\n'), spots: [] }
 	const screen = run_board_drop_screen.screen_of(frame, NO_TYPING, size)
 	const plain = screen_cells(screen)
+	let before = new Map<string, string>()
 
-	return Array.from({ length: ARRIVE_TICKS }, (_, tick) => {
+	for (let tick = 0; tick < ARRIVE_TICKS; tick += 1) {
+		const now = arrive_keyed(plain, screen, tick)
 		const clear = tick === 0 ? CLEAR : ''
 
-		return { text: synced(`${clear}${arrive_bytes(plain, screen, tick)}`), ms: TICK_MS }
-	})
-}
-
-function frame_of(ms: number): number {
-	return ms - (ms % FRAME_MS)
+		yield { text: synced(`${clear}${changed_bytes(now, before).join('')}`), ms: TICK_MS }
+		before = now
+	}
 }
 
 // A cell put back as the theme drew it.
@@ -222,16 +238,15 @@ function jump_bytes(
 	if (since_ms !== undefined && frame_of(since_ms) === frame_of(at_ms)) return ''
 	const now = painted_at(draw, frame_of(at_ms))
 	const before = painted_at(draw, since_ms === undefined ? undefined : frame_of(since_ms))
-	const changed = [...now].filter(([key, bytes]) => before.get(key) !== bytes)
 	const gone = [...before.keys()].filter((key) => !now.has(key))
 
 	return [
-		...changed.map(([, bytes]) => bytes),
+		...changed_bytes(now, before),
 		...gone.map((key) => restore_bytes(draw.screen, key)),
 	].join('')
 }
 
-const run_board_jump_screen = { FRAME_MS, arrive_beats, jump_bytes }
+const run_board_jump_screen = { FRAME_MS, arrive_beats, is_lit, jump_bytes }
 
 export { run_board_jump_screen }
 export type { JumpDraw }

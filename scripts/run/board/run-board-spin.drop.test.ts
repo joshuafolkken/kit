@@ -99,6 +99,35 @@ describe('run_board_spin — the drop between redraws (joshuafolkken/kit#8367)',
 	})
 })
 
+// joshuafolkken/kit#8782: the bttf jump lights the spinners' places, so they hold while it runs rather
+// than turn back to the dark over its light.
+describe('run_board_spin — the spinners through the bttf jump', () => {
+	const SPOTS = [{ row: 1, column: 1, style: '' }]
+	const SPINNER_AT = '\u{1B}[1;1H'
+	const JUMP = {
+		run: { start_ms: START, letters: 4 },
+		screen: { ...SCREEN, skips: new Set(['1;1']) },
+		scene: { rows: SIZE.rows, panel: undefined },
+	}
+
+	it('turns the spinners with no jump', async () => {
+		const { ports, themed } = drop_ports(START)
+
+		await spin_to_second({ spots: SPOTS, typing: NO_TYPING }, ports)
+
+		expect(themed.some((text) => text.includes(SPINNER_AT))).toBe(true)
+	})
+
+	it('ac-9a24befb holds the spinners while the jump runs and lights their places', async () => {
+		const { ports, themed, writes } = drop_ports(START)
+
+		await spin_to_second({ spots: SPOTS, typing: NO_TYPING, jump: JUMP }, ports)
+
+		expect(themed.some((text) => text.includes(SPINNER_AT))).toBe(false)
+		expect(writes.some(({ text }) => text.includes(SPINNER_AT))).toBe(true)
+	})
+})
+
 // joshuafolkken/kit#8370: a typing row is written over the drops of its own turn, above the rain.
 describe('run_board_spin — a typing row over the drop', () => {
 	it('writes the typing row after the drop on the same turn', async () => {

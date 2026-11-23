@@ -8,7 +8,7 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_ship_args } from '#scripts/run/ship/run-ship-args'
 import { run_chain, type ChainRun, type ChainStage, type ChainStop } from './run-chain'
-import { run_chain_background } from './run-chain-background'
+import { run_chain_background, type Worker } from './run-chain-background'
 import { run_chain_gates } from './run-chain-gates'
 import { run_chain_join } from './run-chain-join'
 
@@ -170,24 +170,28 @@ async function record_run(
 	})
 }
 
-// The opening half runs in the background so the call returns before the prompt cache expires
-// (joshuafolkken/kit#8705); a join settles an opening worker not yet read first, then runs its own
-// stages only when that worker ended green.
-function is_backgrounded(parsed: ChainArguments): boolean {
-	if (parsed.is_worker) return false
+function worker_of(parsed: ChainArguments): Worker {
+	const { HALF } = run_chain_background
 
-	return !parsed.is_join || run_chain_background.has_worker(parsed.issue)
+	return run_chain_background.worker_of(parsed.issue, parsed.is_join ? HALF.JOIN : HALF.OPENING)
 }
 
-// The call's answer when the background run settles it, else undefined: the join goes on.
-async function settle_opening(
+// Both halves run in the background so the call returns before the prompt cache expires
+// (joshuafolkken/kit#8705, joshuafolkken/kit#8761); a join settles an opening worker not yet read
+// first, then starts its own only when that worker ended green.
+async function run_in_background(
 	parsed: ChainArguments,
 	argv: ReadonlyArray<string>,
-): Promise<number | undefined> {
-	if (!is_backgrounded(parsed)) return undefined
-	const code = await run_chain_background.open(parsed.issue, argv)
+): Promise<number> {
+	const opening = run_chain_background.worker_of(parsed.issue, run_chain_background.HALF.OPENING)
 
-	return parsed.is_join && code === run_chain.SUCCESS_EXIT_CODE ? undefined : code
+	if (parsed.is_join && run_chain_background.has_worker(opening)) {
+		const code = await run_chain_background.open(opening, argv)
+
+		if (code !== run_chain.SUCCESS_EXIT_CODE) return code
+	}
+
+	return await run_chain_background.open(worker_of(parsed), argv)
 }
 
 async function run_in_place(
@@ -213,12 +217,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const { stages } = parsed
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
-	const settled = await settle_opening(parsed, argv)
-
-	if (settled !== undefined) return settled
+	if (!parsed.is_worker) return await run_in_background(parsed, argv)
+	run_chain_background.adopt_session()
 	const code = await run_in_place(parsed, stages)
 
-	if (parsed.is_worker) run_chain_background.finish(parsed.issue, code)
+	run_chain_background.finish(worker_of(parsed), code)
 
 	return code
 }

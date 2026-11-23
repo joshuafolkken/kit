@@ -140,12 +140,13 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh backlog:plan` | `[issue...] [--only] [--waves] [--pending-publication] [--exclude <n>[,<n>...]]` | automation | network | Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope |
 | `josh backlog:triage` | `--pass [--exclude <n>] \| --decide --defect yes\|no\|unknown --verification yes\|no\|unknown --every-run yes\|no\|unknown \| --apply <n> [--lane \| --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> \| --unblock <m>] --reason <text> [--clear] \| --apply <n> --adopt <k> --reason <text> [--done <text>]` | automation | files, network | Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict |
 | `josh backlogrun` · `josh blr` | `[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude\|codex] \| --stop \| --restart` | developer | files, network, processes | Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record |
+| `josh board:replay` | `[--theme wargames\|matrix\|bttf] [--icons emoji\|letters\|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]` | automation | files, network | Replay the live board on a virtual clock and a seed, one JSON beat line per beat it writes |
 | `josh cases` | `<path...>` | automation | files | Read changed paths and print the boundaries crossed and their mandatory abnormal cases: network \| process \| fs \| time \| state \| env \| none |
 | `josh clone:scan` | — | automation | files | Count code duplication across files and first-party repositories, printing each clone as file:line pairs |
 | `josh code:symbol` | `<file> <name> \| <name>` | automation | none | Print one TypeScript declaration by name, numbered, or list where a name is declared |
 | `josh cost` | `(--cut \| --over <tokens-per-request>) [--path <dir>]` | automation | none | Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over) |
 | `josh cost:audit` · `josh ca` · **kit only** | `[--period <days> \| --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]` | maintainer | none | Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before |
-| `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed what a defect issue names, as candidates for its origin line |
+| `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed or first added what a defect issue names, as candidates for its origin line |
 | `josh defect:report` | `[--since <days>]` | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
 | `josh diff:summary` | `[<base>]` | automation | files | Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole |
@@ -154,7 +155,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh doc:section` | `<file> <heading>` | automation | none | Print one section of a markdown document, for a `file.md` → "Heading" reference |
 | `josh edit:files` | `<plan-path \| ->` | automation | none | Apply several content-addressed edits from a plan in one call |
 | `josh effect:audit` | `[--days <N>] [--draft <issue>]` | automation | network, files | List closed run-time-shortening issues with their expected effect, follow-up measurement and result |
-| `josh epic` | `<title> <issue...> [--ordered \| --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]` | automation | network | Create an epic issue from its child issue numbers |
+| `josh epic` | `<title> <issue...> --rationale-file .josh/tmp/split/rationale.md[--ordered \| --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]` | automation | network | Create an epic issue from its child issue numbers |
 | `josh epic:audit` | `<epic>` | automation | network | Audit an epic's children against each other for contradictions |
 | `josh epic:bundle` | `<issue> [--apply]` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
 | `josh epic:check` | `<epic>` | automation | network | Check an epic issue against the tracking requirements |
@@ -179,6 +180,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
 | `josh issue:release-class` | `<issue> <enhancement\|other-change>` | automation | network | Write the issue body's one release classification line, replacing any earlier one |
+| `josh issue:rework-candidates` | `--since <days>` | automation | network | List closed enhancements that rework delivered work, each with the merged pull request or closed Issue it cites — read-only |
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
 | `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行" [--reason "<理由>"] [--distinct <N,…>]` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |
@@ -222,7 +224,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh retrospective` · `josh rtr` · **kit only** | — | maintainer | none | Aggregate a finished run's cost, review findings, observation ledger and events into one digest |
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
 | `josh review:brief` | `[--round <1\|2> \| --full-change] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
-| `josh review:pair` | `--issue <N> --opus-agent <id> --sonnet-agent <id>` | automation | files | Record a paired comparison under JOSH_REVIEWER_PAIRED=1: the Opus and Sonnet round-1 findings with severity and each agent cost; never gates |
+| `josh review:pair` | `--issue <N> --opus-agent <id> --sonnet-agent <id> \| --stats` | automation | files | Record a paired comparison under JOSH_REVIEWER_PAIRED=1: the Opus and Sonnet round-1 findings with severity and each agent cost; never gates |
 | `josh review:round2` | `[--record <N>] [--json]` | automation | network | Say whether the second /code-review round is due, or may be skipped entirely |
 | `josh review:selfcheck` | `[--interaction-answered]` | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
 | `josh review:submit` | `[--interaction] [--review <absolute-path> [--round <1\|2>]] < findings \| … --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call |

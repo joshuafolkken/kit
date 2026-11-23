@@ -105,8 +105,8 @@ describe('epic_cli.parse_check_argument', () => {
 })
 
 describe('epic_cli.read_rationale', () => {
-	// An omitted rationale is legitimate — the body builder substitutes a visible placeholder — so
-	// this must not throw the way a missing file would.
+	// An omitted rationale reads as empty rather than throwing the way a missing file would: the
+	// `josh epic` command refuses it, and `run:split` gets the body builder's placeholder.
 	it('returns an empty rationale when no path was given', () => {
 		expect(epic_cli.read_rationale(undefined)).toBe('')
 	})

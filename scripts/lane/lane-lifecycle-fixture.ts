@@ -101,7 +101,7 @@ async function write(world: World, change: Write): Promise<void> {
 		now: tick(world),
 	})
 
-	if (outcome.kind === 'skipped') {
+	if (outcome.kind !== 'written') {
 		throw new Error(`${change.command} #${change.issue}: ${outcome.reason}`)
 	}
 

@@ -27,7 +27,9 @@ const DISPATCH = 'lane:dispatch'
 const PAUSE = 'lane:pause'
 const CLOSE = 'lane:close'
 const HUMAN_REVIEW = 'human-review'
-const DEPENDENCY_WAIT = 'lane:dependency-wait'
+// The command each concurrent writer moves the lane by: a pause, and a person's resume of it.
+const RESUME = 'lane:resume'
+const WRITER_COMMANDS: Record<string, string> = { paused: PAUSE, running: RESUME }
 
 const state = { directory: '' }
 
@@ -94,7 +96,7 @@ describe('lane_state.record_change — resumed ownership', () => {
 
 			await record_at(change_of('running', DISPATCH, { is_launch: true }), LAUNCHED_AT)
 			await record_at(change_of('paused', PAUSE), PAUSED_AT)
-			await record_at(change_of('running', 'lane:resume'), PAUSED_AT)
+			await record_at(change_of('running', RESUME), PAUSED_AT)
 			await record_at(change_of('paused', PAUSE), PAUSED_AT)
 
 			expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({
@@ -120,6 +122,7 @@ describe('lane_state.record_change — a launch outlives the changes after it', 
 			launched_at: LAUNCHED_AT.toISOString(),
 			changed_at: PAUSED_AT.toISOString(),
 			changed_by: PAUSE,
+			paused_by: 'person',
 		})
 	})
 
@@ -162,21 +165,6 @@ describe('lane_state.read_states and paused_note', () => {
 	})
 })
 
-describe('lane_state.record_change — dependency launch ordering', () => {
-	it('keeps a supervisor dependency wait when the parent records launch after the refusal', async () => {
-		await record_at(change_of('open', OPEN), OPENED_AT)
-		await record_at(change_of('paused', DEPENDENCY_WAIT), PAUSED_AT)
-		await record_at(change_of('running', DISPATCH, { is_launch: true }), PAUSED_AT)
-		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({
-			state: 'paused',
-			changed_by: DEPENDENCY_WAIT,
-		})
-		await record_at(change_of('running', DISPATCH), PAUSED_AT)
-		await record_at(change_of('running', DISPATCH, { is_launch: true }), PAUSED_AT)
-		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({ state: 'running' })
-	})
-})
-
 describe('lane_state.record_change — transitions', () => {
 	it('keeps a human-review lane until a fresh dispatch resumes it', async () => {
 		await record_at(change_of('running', DISPATCH, { is_launch: true }), LAUNCHED_AT)
@@ -189,13 +177,13 @@ describe('lane_state.record_change — transitions', () => {
 		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({ state: 'running' })
 	})
 
-	it('writes no transition the lifecycle lacks, and warns instead', async () => {
+	it('writes no transition the lifecycle lacks, and answers it rejected with a warning', async () => {
 		await record_at(change_of('ended', CLOSE), OPENED_AT)
 		const outcome = await lane_state.record_change(change_of('paused', PAUSE), {
 			directory: state.directory,
 		})
 
-		expect(outcome.kind).toBe('skipped')
+		expect(outcome.kind).toBe('rejected')
 		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({ state: 'ended' })
 		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('lane state not recorded'))
 	})
@@ -246,7 +234,7 @@ function writer_script(to: string): string {
 	return [
 		`const { lane_state } = await import(${JSON.stringify(WRITER)})`,
 		`for (let index = 0; index < ${String(WRITES_PER_WRITER)}; index += 1) {`,
-		`  await lane_state.record_change({ issue: '${ISSUE}', state: '${to}', command: 'lane:${to}' },`,
+		`  await lane_state.record_change({ issue: '${ISSUE}', state: '${to}', command: '${WRITER_COMMANDS[to] ?? ''}' },`,
 		`    { directory: ${JSON.stringify(state.directory)} })`,
 		'}',
 	].join('\n')
@@ -323,12 +311,13 @@ describe('lane_state.record_stuck', () => {
 	})
 })
 
-// joshuafolkken/kit#4744: `lane:adopt` writes a lane a record only while it has none.
-describe('lane_state.record_adopted', () => {
+// joshuafolkken/kit#4744: `lane:adopt` writes a lane a record only while it has none — the table's
+// `adopt` event takes no lane that has one (joshuafolkken/kit#8768).
+describe('lane_state.record_owner adopt', () => {
 	const ADOPT = 'lane:adopt'
 
 	it('writes the change for a lane with no record', async () => {
-		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
+		const outcome = await lane_state.record_owner(ISSUE, 'adopt', {
 			directory: state.directory,
 			now: OPENED_AT,
 		})
@@ -343,11 +332,12 @@ describe('lane_state.record_adopted', () => {
 	it('leaves a lane that has a record as it is', async () => {
 		await record_at(change_of('ended', CLOSE), PAUSED_AT)
 
-		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
-			directory: state.directory,
-		})
+		const outcome = await lane_state.record_owner(ISSUE, 'adopt', { directory: state.directory })
 
-		expect(outcome).toStrictEqual({ kind: 'skipped', reason: 'a record exists' })
+		expect(outcome).toStrictEqual({
+			kind: 'rejected',
+			reason: 'no ended → open transition by adopt',
+		})
 		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.toMatchObject({
 			state: 'ended',
 			changed_by: CLOSE,
@@ -359,9 +349,7 @@ describe('lane_state.record_adopted', () => {
 			throw new Error('ENOSPC')
 		})
 
-		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
-			directory: state.directory,
-		})
+		const outcome = await lane_state.record_owner(ISSUE, 'adopt', { directory: state.directory })
 
 		expect(outcome).toStrictEqual({ kind: 'skipped', reason: 'ENOSPC' })
 	})

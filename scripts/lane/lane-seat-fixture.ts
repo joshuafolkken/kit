@@ -4,6 +4,7 @@ import { lane_reap_settle } from './lane-reap-settle'
 import { lane_residents } from './lane-residents'
 import { lane_seat_ownership } from './lane-seat-ownership'
 import { lane_seat_start } from './lane-seat-start'
+import { lane_transition_guards } from './lane-transition-guards'
 
 function mock_ownership(): void {
 	vi.spyOn(lane_seat_ownership, 'snapshot').mockResolvedValue({
@@ -14,6 +15,8 @@ function mock_ownership(): void {
 
 function mock_start(): void {
 	vi.spyOn(lane_dispatch_dependency, 'check').mockResolvedValue(undefined)
+	// A fixture lane has no real branch or work tree; the guards' own test covers their reads.
+	vi.spyOn(lane_transition_guards, 'rejection').mockResolvedValue(undefined)
 	vi.spyOn(lane_seat_start, 'start').mockImplementation(
 		async (seated, action) => await action(seated),
 	)

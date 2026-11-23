@@ -1,5 +1,5 @@
 import { run_board_fit } from './run-board-fit'
-import type { JumpRun } from './run-board-jump'
+import { run_board_jump, type JumpRun } from './run-board-jump'
 import { run_board_jump_figure } from './run-board-jump-figure'
 import { run_board_labels, type Paint } from './run-board-labels'
 import type { Lamp } from './run-board-lamp-spots'
@@ -129,10 +129,24 @@ function looked(draw: PanelDraw, at: PanelMoment): ReadonlyArray<PanelCell> {
 	return run_board_jump_figure.figure_look(draw.painter.cells(draw.area, at), at)
 }
 
-// The cells that changed since `since` drawn as they are `at`, every one with no `since`.
+// joshuafolkken/kit#8782: while a jump runs, the rows typing over the area write the frame's lamp
+// marks into it, so the area is written whole each tick rather than only where it changed.
+function before_of(
+	draw: PanelDraw,
+	at: PanelMoment,
+	since: PanelMoment | undefined,
+): ReadonlyArray<PanelCell> {
+	if (since === undefined) return []
+	if (at.jump !== undefined && run_board_jump.is_running(at.jump, at.ms)) return []
+
+	return looked(draw, since)
+}
+
+// The cells that changed since `since` drawn as they are `at`, every one with no `since` or through a
+// jump.
 function panel_bytes(draw: PanelDraw, at: PanelMoment, since: PanelMoment | undefined): string {
 	const now = keyed(looked(draw, at))
-	const before = keyed(since === undefined ? [] : looked(draw, since))
+	const before = keyed(before_of(draw, at, since))
 
 	return [...now]
 		.filter(([key, bytes]) => before.get(key) !== bytes)

@@ -1,13 +1,14 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json } from '#scripts/git/parse-json-array'
-import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
+import type { Breakdown } from '#scripts/lane/lane-breakdown'
 import type { LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
 import { cost_audit, type Audit, type AuditWindow, type MergeCounts } from './cost-audit'
+import { cost_audit_breakdown } from './cost-audit-breakdown'
 import { cost_audit_format } from './cost-audit-format'
 import { cost_audit_read, type AuditSession } from './cost-audit-read'
 
@@ -164,11 +165,8 @@ async function read_breakdowns(
 ): Promise<Map<number, Breakdown>> {
 	const events = await lane_net_read.read_events({})
 	const issues = new Set(sessions.flatMap((session) => session.issue ?? []))
-	const pairs = [...issues].map(
-		(issue) => [issue, lane_breakdown.of(entries, events, issue)] as const,
-	)
 
-	return new Map(pairs.filter((pair): pair is [number, Breakdown] => pair[1] !== undefined))
+	return cost_audit_breakdown.of_issues([...issues], entries, events)
 }
 
 // The Issues the ledger records a merge of, or `undefined` when the ledger could not be read.
@@ -180,13 +178,14 @@ function merged_issues_of(
 	return new Set(entries.flatMap((entry) => (entry.kind === 'merge' ? entry.issue : [])))
 }
 
+// The merge counts are read before the transcripts: the load and the breakdowns hold the event loop
+// for seconds at a time, and a `gh` request left waiting behind them timed out, so the audit printed
+// no merge count (joshuafolkken/kit#8757).
 async function measure(cwd: string, days: number, now_ms: number): Promise<Audit> {
-	const sessions = cost_audit_read.load(cwd, cost_audit.since_ms(days, now_ms))
+	const merges = await read_merges(days, now_ms)
+	const sessions = await cost_audit_read.load(cwd, cost_audit.since_ms(days, now_ms))
 	const entries = await read_ledger()
-	const [merges, breakdowns] = await Promise.all([
-		read_merges(days, now_ms),
-		read_breakdowns(sessions, entries ?? []),
-	])
+	const breakdowns = await read_breakdowns(sessions, entries ?? [])
 	const merged_issues = merged_issues_of(entries)
 
 	return cost_audit.audit({ sessions, days, now_ms, merges, breakdowns, merged_issues })
@@ -205,9 +204,9 @@ async function summary(cwd: string, now_ms: number = Date.now()): Promise<string
 // breakdowns or pricing (joshuafolkken/kit#8284), and prints a label line over the number, so the
 // number stays the output's last line; a period with no lane-child request prints nothing, never a
 // zero a declared bound would read as met.
-function density_lines(cwd: string, span: AuditSpan): Array<string> {
+async function density_lines(cwd: string, span: AuditSpan): Promise<Array<string>> {
 	const [window] = cost_audit.windows_of(span.days, span.now_ms)
-	const sessions = cost_audit_read.load_lane_children(cwd, window.start_ms)
+	const sessions = await cost_audit_read.load_lane_children(cwd, window.start_ms)
 	const value = cost_audit_format.density_value(cost_audit.density_inside(sessions, window))
 
 	return value === undefined ? [] : [cost_audit_format.density_label(window), value]
@@ -218,7 +217,7 @@ async function printed_lines(
 	cwd: string,
 	span: AuditSpan,
 ): Promise<Array<string>> {
-	if (argv.includes(DENSITY_FLAG)) return density_lines(cwd, span)
+	if (argv.includes(DENSITY_FLAG)) return await density_lines(cwd, span)
 
 	return cost_audit_format.report_lines(await measure(cwd, span.days, span.now_ms))
 }

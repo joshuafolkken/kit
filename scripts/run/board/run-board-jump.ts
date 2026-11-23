@@ -33,7 +33,10 @@ const ARRIVE_FLASHES = ['4 2 0.35', '10 2 0.65', '16 3 1'].map((flash) => {
 	return { start, ticks, white }
 })
 const THAW_AT = 19
-const ARRIVE_TICKS = THAW_AT + THAW_TICKS
+// joshuafolkken/kit#8789: the arrival opens the board rather than trailing a jump, so its thaw is
+// shorter than the jump's — about a second.
+const ARRIVE_THAW_TICKS = 20
+const ARRIVE_TICKS = THAW_AT + ARRIVE_THAW_TICKS
 // joshuafolkken/kit#8675: the ticks a jump runs past its last letter — its wash, its thaw and its fire
 // trails burning out.
 const END_TICKS = Math.max(WASH_TICKS + THAW_TICKS, run_board_fire_trail.TRAIL_TICKS)
@@ -93,7 +96,7 @@ function jump_speed(t: number, letters: number, cruise: number): number | undefi
 function arrive_speed(tick: number, cruise: number): number | undefined {
 	if (tick >= ARRIVE_TICKS) return undefined
 
-	return braked(cruise, (tick - THAW_AT) / THAW_TICKS)
+	return braked(cruise, (tick - THAW_AT) / ARRIVE_THAW_TICKS)
 }
 
 // The gauge's range through the run up, read off the letters typed rather than the speed; none outside
@@ -132,6 +135,7 @@ function flash_of(tick: number): number {
 }
 
 const run_board_jump = {
+	ARRIVE_THAW_TICKS,
 	ARRIVE_TICKS,
 	END_TICKS,
 	THAW_AT,

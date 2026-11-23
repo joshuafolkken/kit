@@ -15,29 +15,34 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
 		reference: [
-			'<title> <issue...> [--ordered | --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]',
+			'<title> <issue...> --rationale-file .josh/tmp/split/rationale.md[--ordered | --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]',
 			'automation',
 			['network'],
 		],
 		usage: {
 			examples: [
-				{ arguments: '"Epic: split the parser work" 101 102 103' },
 				{
 					arguments:
-						'"Epic: staged rollout" A B --ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"',
+						'"Epic: split the parser work" 101 102 103 --rationale-file .josh/tmp/split/rationale.md',
 				},
 				{
 					arguments:
-						'"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"',
+						'"Epic: staged rollout" A B --rationale-file .josh/tmp/split/rationale.md--ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"',
+				},
+				{
+					arguments:
+						'"Epic: ..." A B C --rationale-file .josh/tmp/split/rationale.md--chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"',
 					note: 'a join',
 				},
 				{
 					arguments:
-						'"Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"',
+						'"Epic: ..." A B --rationale-file .josh/tmp/split/rationale.md--chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"',
 					note: 'why B waits on A',
 				},
-				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
-				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
+				{
+					arguments: '--promote 858 101 102 103 --rationale-file -',
+					note: 'turn an existing issue into an epic, the rationale on stdin',
+				},
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
 				{
 					arguments: '--add 893 894 --before 891 --order-reason "<chain>: <reason>"',
@@ -76,7 +81,8 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--rationale-file <path|->'],
-					description: 'split rationale prose, written under `.josh/tmp/` (`-` reads stdin).',
+					description:
+						'required on create and `--promote`: split rationale prose, written under `.josh/tmp/` (`-` reads stdin). Missing or blank, nothing is written and it exits 1.',
 				},
 				{
 					names: ['--origin <owner/repo#N>'],
