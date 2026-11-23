@@ -169,8 +169,9 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh bytes` in detai
 Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline.
 
 ```bash
-pnpm josh metrics                             # print the totals and check them against the merge-base's
-pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and why
+pnpm josh metrics                                              # print the totals and check them against the merge-base's
+pnpm josh metrics --accept --reason "<why>"                    # record this branch's growth and why
+pnpm josh metrics --expect <total>=<growth> --reason "<why>"   # declare this branch's growth before it grows
 ```
 
 <!-- /usage -->
@@ -178,6 +179,7 @@ pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and 
 The totals: code and comment lines and the comment ratio under `scripts/` (non-test), the lines of `CLAUDE.md` and `prompts/**/*.md`, the number of `*:guard` commands, and the AI cost in bytes.
 
 - **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`, once — `josh ship` re-records a later growth of a total the approval names. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
+- A declared growth: a lane declares the totals its Issue grows with `--expect` (repeatable) before its first gate. A growth within the declaration passes; one past it, or of a total it does not name, still stops `josh gate`. `--accept` and the ship's re-record never lower it.
 - **kit only**: a consumer's gate leaves the step out.
 - The prose density is held too, over `README.md`, `docs/`, `prompts/` and `.claude/skills/`. It counts paragraphs over 400 characters, and bold spans beyond the first in each section.
 - Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.

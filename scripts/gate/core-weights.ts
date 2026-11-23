@@ -88,14 +88,15 @@ const ESLINT_HEAP_MIB = 8192
 const BYTES_PER_MIB = 1_048_576
 const BYTES_PER_MB = 1_000_000
 
-// **What one eslint process held, read off the lane ledger** (joshuafolkken/kit#8587): the largest
-// single-process reading of the `kind:"load"` samples (`lane-process-load.ts`), rounded up to a
-// hundred — its maximum, not its p90, because an under-reserved run is what swapped in
-// joshuafolkken/kit#6684. That Issue's peak was the machine-wide sum of every lane's eslint in one
-// sample, not one run, so reserving the heap cap held several runs' worth per run and admitted
-// eslint one at a time past four lanes. The readings and their period are on joshuafolkken/kit#8587.
+// **What one eslint process held at its peak footprint** (joshuafolkken/kit#8840): a lone cold
+// whole-tree `eslint . --cache --cache-strategy content` run's peak footprint (`/usr/bin/time -l`),
+// rounded up to a hundred. Footprint, not resident size, because compression shrinks resident size
+// under the very pressure this reservation guards against. The lane ledger's largest single-process
+// footprint sits under it — its periodic samples miss a short peak. The heap cap stays the crash
+// ceiling (joshuafolkken/kit#6684): the reservation is the peak, not the cap. The readings are on
+// joshuafolkken/kit#8840.
 const LEDGER_PEAK_MB = {
-	eslint: 2600,
+	eslint: 8000,
 } as const satisfies Readonly<Record<string, number>>
 
 // The heap cap in the ledger's megabytes, rounded up.

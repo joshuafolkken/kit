@@ -24,7 +24,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lint` · `josh l` | `[--changed] [--shard=<n>]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Apply eslint fixes and prettier to the resolved scope, then check remaining errors and in kit the source guard tests (whole tree on fallback) |
 | `josh lint:rule` · `josh lrr` | `<rule> [--config <path>] [--output <path>] [--paths <path>...]` | developer | files, processes | Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file |
-| `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only [--rerecord] \| --accept --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
+| `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only [--rerecord] \| --accept --reason "<why>" \| --expect <total>=<growth> --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
 | `josh port` · `josh pt` | `<dev\|preview>` | developer | none | Print the PORT_SEED-resolved dev or preview port |
 | `josh pr:classification` | — | automation | none | Require one release classification on a pull request |
 | `josh pretool:guard` | — | automation | none | Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin) |

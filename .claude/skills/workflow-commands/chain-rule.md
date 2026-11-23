@@ -88,7 +88,7 @@ These are the gate → review → PR → merge facts other documents cite; this 
   (`lint:related` / `cspell:dot` / `test:related`, `--touched` in a lane:
   `docs/josh-commands.md` → "`josh test:related`"), then `pnpm josh check:related` once
   before `run:review` (full reach); ship's scoped pair runs full reach after review fixes; `check:related` is those three plus `check`. In kit `run:chain`'s `metrics-totals` stage, right after `check:related`, stops on a metrics total past the
-  merge-base → `pnpm josh run:chain <N> --accept-metrics "<why>" --from metrics-totals` (`run-chain-gates.ts`; the ship's pre-detach check is the backstop).
+  merge-base → `pnpm josh run:chain <N> --accept-metrics "<why>" --from metrics-totals` (`run-chain-gates.ts`; the ship's pre-detach check is the backstop). A total the plan already knows grows → declare it before the first gate, as `run:step`'s `implement` stage prints (`run-step-lane-plan.ts`).
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against
   the open pull request.
