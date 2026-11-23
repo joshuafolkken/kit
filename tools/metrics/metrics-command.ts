@@ -14,14 +14,16 @@ import { metrics_base, type Reading } from './metrics-base'
 import { metrics_code_lines } from './metrics-code-lines'
 import { metrics_duration_probe, type Measurement } from './metrics-duration-probe'
 import { metrics_durations, type Durations } from './metrics-durations'
+import { metrics_expect, type Expectation, type ExpectParse } from './metrics-expect'
 import { metrics_logic, type AiCostTotals, type Metrics, type ScriptFile } from './metrics-logic'
-import { metrics_ratchet, type Verdict } from './metrics-ratchet'
+import { metrics_ratchet, type Approval, type Verdict } from './metrics-ratchet'
 import { prose_density, type ProseTotals } from './prose-density'
 
 // `josh metrics [--accept --reason "<why>"]` — the I/O around `metrics-logic.ts` and
 // `metrics-ratchet.ts`: enumerate the files, count them, print the totals, and hold them to the same
 // totals measured on the merge-base (`metrics-base.ts`). It is a step of `josh gate`: a total that
-// grew fails it, and `--accept` records the growth and its reason in the issue's own approval file.
+// grew fails it, and `--accept` records the growth and its reason in the issue's own approval file —
+// or `--expect` declares it there before it grows (`metrics-expect.ts`).
 // The durations beside the totals are held to this machine's own baseline, with a tolerance
 // (`metrics-durations.ts`).
 //
@@ -38,8 +40,8 @@ import { prose_density, type ProseTotals } from './prose-density'
 // to nothing.
 
 const ARGV_OFFSET = 2
-const USAGE =
-	'Usage: josh metrics [--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]'
+const USAGE = `Usage: josh metrics [--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]\n       ${metrics_expect.USAGE_LINE}`
+const NO_ISSUE = 'josh metrics: this branch names no issue to record under'
 const ACCEPT_FLAG = '--accept'
 const REASON_FLAG = '--reason'
 const ACCEPT_ARGUMENT_COUNT = 3
@@ -69,9 +71,12 @@ const SETTLED_LINE: Record<Exclude<Verdict['kind'], 'regressed'>, string> = {
 
 type MetricsForm = 'full' | 'totals' | 'rerecord' | 'json'
 
-interface GrowthToAccept {
-	base: Metrics
-	current: Metrics
+interface Readings {
+	base: Reading
+	current: Reading
+}
+
+interface GrowthToAccept extends Readings {
 	reason: string
 }
 
@@ -283,18 +288,38 @@ async function check(root: string, metrics: Metrics, measurement: Measurement): 
 	return Math.max(totals_exit, durations_exit)
 }
 
+// Writes `approval` raised over the one this branch already recorded (`metrics_ratchet.raised`), so
+// an `--accept` or a later `--expect` never lowers a declared ceiling.
+function write_raised(root: string, issue: number, approval: Approval, readings: Readings): string {
+	const name = metrics_base.approval_name(issue)
+	const own = metrics_ratchet.own_approval(
+		name,
+		readings.current.approvals,
+		readings.base.approvals,
+	)
+
+	return metrics_base.write_approval(root, issue, metrics_ratchet.raised(own, approval))
+}
+
 // The approval is the issue's own file, so a branch with growth to record has to name the issue — a
 // file named for nothing would be the shared one every pull request rewrote. A branch with none to
 // record is asked for no issue: an `--accept` there is the durations' alone, and it must not fail.
 function record_growth(root: string, issue: number | undefined, growth: GrowthToAccept): number {
-	const approval = metrics_ratchet.accept(growth.base, growth.current, growth.reason, today())
+	const { base, current, reason } = growth
+	const approval = metrics_ratchet.accept(base.metrics, current.metrics, reason, today())
 
 	if (approval === undefined) return say(`${NOT_GROWN} — there is no growth to record`)
-	if (issue === undefined) return fail('josh metrics: this branch names no issue to record under')
+	if (issue === undefined) return fail(NO_ISSUE)
 
-	const file = metrics_base.write_approval(root, issue, approval)
+	const file = write_raised(root, issue, approval, growth)
 
-	return say(`josh metrics: growth recorded in ${file} — ${growth.reason}`)
+	return say(`josh metrics: growth recorded in ${file} — ${reason}`)
+}
+
+async function readings_at(root: string, commit: string, metrics: Metrics): Promise<Readings> {
+	const current: Reading = { metrics, approvals: metrics_base.approval_texts(root) }
+
+	return { base: await metrics_base.read(commit, current), current }
 }
 
 async function accept_totals(root: string, metrics: Metrics, reason: string): Promise<number> {
@@ -303,10 +328,31 @@ async function accept_totals(root: string, metrics: Metrics, reason: string): Pr
 	if (commit === undefined) return fail('josh metrics: no merge-base to measure the growth from')
 
 	const issue = git_branch.issue_from_branch(await git_command.branch())
-	const current: Reading = { metrics, approvals: metrics_base.approval_texts(root) }
-	const base = await metrics_base.read(commit, current)
 
-	return record_growth(root, issue, { base: base.metrics, current: metrics, reason })
+	return record_growth(root, issue, { ...(await readings_at(root, commit, metrics)), reason })
+}
+
+// The `--expect` form: the declared growth written as the issue's approval before any growth exists
+// (`metrics-expect.ts`).
+async function expect_totals(root: string, expectation: Expectation): Promise<number> {
+	const commit = await metrics_base.resolve_commit()
+
+	if (commit === undefined) return fail('josh metrics: no merge-base to declare the growth against')
+
+	const issue = git_branch.issue_from_branch(await git_command.branch())
+
+	if (issue === undefined) return fail(NO_ISSUE)
+
+	const readings = await readings_at(root, commit, await measure(root))
+	const file = write_raised(root, issue, { ...expectation, date: today() }, readings)
+
+	return say(`josh metrics: growth declared in ${file} — ${expectation.reason}`)
+}
+
+async function run_expect(expected: ExpectParse): Promise<number> {
+	if (expected.kind === 'refused') return fail(expected.message)
+
+	return await expect_totals(await git_command.repository_root(), expected.expectation)
 }
 
 async function accept(
@@ -334,6 +380,10 @@ async function run_full(root: string, metrics: Metrics, parsed: MetricsArguments
 }
 
 async function run_metrics(argv: ReadonlyArray<string>): Promise<number> {
+	const expected = metrics_expect.parse(argv)
+
+	if (expected !== undefined) return await run_expect(expected)
+
 	const parsed = parse_arguments(argv)
 
 	if (parsed === undefined) return cli_flags.answer_usage(argv, USAGE)
@@ -354,6 +404,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const metrics_command = {
 	command_names,
 	parse_arguments,
+	record_growth,
 	run_metrics,
 }
 

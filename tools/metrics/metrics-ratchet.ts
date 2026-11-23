@@ -92,17 +92,22 @@ function fresh_approvals(
 		.flatMap(([, text]) => parse_approval(text) ?? [])
 }
 
+const RATCHETED: ReadonlyArray<readonly [string, (metrics: Metrics) => number]> = [
+	['scripts.code_lines', (metrics) => metrics.scripts.code_lines],
+	['scripts.comment_ratio', (metrics) => metrics.scripts.comment_ratio],
+	['rules.lines', (metrics) => metrics.rules.lines],
+	['guards', (metrics) => metrics.guards],
+	['ai_cost.resident_bytes', (metrics) => metrics.ai_cost.resident_bytes],
+	['ai_cost.on_demand_bytes', (metrics) => metrics.ai_cost.on_demand_bytes],
+	['prose.long_paragraphs', (metrics) => metrics.prose.long_paragraphs],
+	['prose.excess_bold', (metrics) => metrics.prose.excess_bold],
+]
+
+// The names a total is compared under — the ones an approval's growth, and a declared one, may name.
+const RATCHETED_NAMES: ReadonlyArray<string> = RATCHETED.map(([name]) => name)
+
 function ratcheted(metrics: Metrics): ReadonlyArray<[string, number]> {
-	return [
-		['scripts.code_lines', metrics.scripts.code_lines],
-		['scripts.comment_ratio', metrics.scripts.comment_ratio],
-		['rules.lines', metrics.rules.lines],
-		['guards', metrics.guards],
-		['ai_cost.resident_bytes', metrics.ai_cost.resident_bytes],
-		['ai_cost.on_demand_bytes', metrics.ai_cost.on_demand_bytes],
-		['prose.long_paragraphs', metrics.prose.long_paragraphs],
-		['prose.excess_bold', metrics.prose.excess_bold],
-	]
+	return RATCHETED.map(([name, read]) => [name, read(metrics)])
 }
 
 function growth_between(base: number, current: number): number {
@@ -203,6 +208,21 @@ function refresh(
 	return { ...approval, date, growth: { ...approval.growth, ...regrown } }
 }
 
+// `approval` raised over the one this branch already recorded: each total keeps the larger growth,
+// so a ceiling declared before the growth (`josh metrics --expect`) is never lowered to the growth an
+// `--accept` measured (joshuafolkken/kit#8860).
+function raised(own: Approval | undefined, approval: Approval): Approval {
+	if (own === undefined) return approval
+
+	const names = new Set([...Object.keys(own.growth), ...Object.keys(approval.growth)])
+	const growth = [...names].map((name): [string, number] => [
+		name,
+		approved_growth([own, approval], name),
+	])
+
+	return { ...approval, growth: Object.fromEntries(growth) }
+}
+
 function render_regression(change: Change): string {
 	const values = `merge-base ${String(change.base)} → current ${String(change.current)}`
 
@@ -218,6 +238,7 @@ function render_regressions(regressions: ReadonlyArray<Change>, commit: string):
 }
 
 const metrics_ratchet = {
+	RATCHETED_NAMES,
 	accept,
 	approval_text,
 	compare,
@@ -225,6 +246,7 @@ const metrics_ratchet = {
 	own_approval,
 	parse_approval,
 	parse_metrics,
+	raised,
 	refresh,
 	render_regressions,
 }
