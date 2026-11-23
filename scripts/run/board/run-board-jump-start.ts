@@ -6,7 +6,7 @@ import { run_board_jump, type JumpRun } from './run-board-jump'
 import type { JumpScene } from './run-board-jump-paint'
 import type { JumpDraw } from './run-board-jump-screen'
 import { run_board_lamps } from './run-board-lamps'
-import type { PanelArea } from './run-board-panel-draw'
+import type { PanelArea, PanelPainter } from './run-board-panel-draw'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import type { Theme } from './run-board-theme-defs'
@@ -24,12 +24,13 @@ const { THAW_AT, TICK_MS } = run_board_jump
 const { letters_of } = run_board_type_rows
 
 // What a frame gives the jump: its ports, its cells, the rows typing, the animation area where it is
-// out and its moment.
+// out with its painter and its moment.
 interface JumpFrame {
 	ports: Pick<BoardPorts, 'theme' | 'is_tty' | 'icons' | 'opened_ms'>
 	drawn: FrameSpots & { size: TerminalSize | undefined }
 	typing: Typing
 	area: PanelArea | undefined
+	painter?: PanelPainter | undefined
 	now_ms: number
 }
 
@@ -67,6 +68,17 @@ function cued_of(last_ms: number | undefined, typing: Typing): number | undefine
 	return Number.isFinite(latest) ? latest : undefined
 }
 
+// joshuafolkken/kit#8782: the cells the area's painter draws, `row;column` — the jump leaves those
+// to it and lights the rest of the area with the board.
+function owned_of(frame: JumpFrame): ReadonlySet<string> | undefined {
+	const { area, painter } = frame
+
+	if (area === undefined || painter === undefined) return undefined
+	const cells = painter.cells(area, { ms: frame.now_ms, is_burst: false })
+
+	return new Set(cells.map((cell) => `${String(cell.row)};${String(cell.column)}`))
+}
+
 // The board the run is painted on this frame, drawn as the theme draws it.
 function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 	const { ports, drawn, area } = frame
@@ -90,7 +102,7 @@ function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 		trails,
 	}
 
-	return { run, screen, scene, panel: area }
+	return { run, screen, scene, owned: owned_of(frame) }
 }
 
 // The last run carried on while it runs — joshuafolkken/kit#8675: once thawed, with only its trails
