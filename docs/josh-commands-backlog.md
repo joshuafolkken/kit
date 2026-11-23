@@ -572,12 +572,19 @@ Lists up to five merged pull requests that changed the files and names an issue 
 Count defects by the origin pull request their issue declares, by change kind and by area.
 
 ```bash
-pnpm josh defect:report   # every issue labelled bug, open or closed
+pnpm josh defect:report             # every issue labelled bug, open or closed
+pnpm josh defect:report --since 7   # only the bugs filed in the last 7 days, with each area's rate
 ```
 
 <!-- /usage -->
 
-Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. Unknown and undeclared origins are counted apart.
+Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. The summary line gives each origin-line kind — traced to a pull request, `不明`, no origin line — as a count and a share of the counted bugs.
+
+`--since <days>` counts only the bugs filed in the last `<days>` days and adds the defect rate by area. The numerator is the period's bugs whose origin pull request touched the area.
+
+The denominator is the pull requests merged in the period that touched the area, read from the local first-parent merge history (`git log --first-parent --merges --name-only`) with no API call per merge. An area no merge touched has no rate.
+
+`josh retrospective` prints the last 7 days' coverage and highest-rate areas as one section, and leaves it out when GitHub cannot be read.
 
 ### `josh effect:audit`
 

@@ -118,8 +118,16 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Count defects by the origin pull request their issue declares, by change kind and by area',
 		category: 'AI tools',
-		reference: ['', 'automation', ['network']],
-		usage: { examples: [{ arguments: '', note: 'every issue labelled bug, open or closed' }] },
+		reference: ['[--since <days>]', 'automation', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '', note: 'every issue labelled bug, open or closed' },
+				{
+					arguments: '--since 7',
+					note: "only the bugs filed in the last 7 days, with each area's rate",
+				},
+			],
+		},
 	},
 	'effect:audit': {
 		script: 'scripts/issue/effect-audit-cli.ts',
