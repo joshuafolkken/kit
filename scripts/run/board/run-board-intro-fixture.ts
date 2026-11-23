@@ -50,6 +50,35 @@ function recorded(intro_sleep: (ms: number) => Promise<void>): {
 	return { written, ports }
 }
 
+// joshuafolkken/kit#8787: ports on a fake clock that a pause moves on by its length and a write by
+// `write_ms`, the time a terminal takes to draw it; the pauses asked for are recorded.
+interface Clocked {
+	written: Array<string>
+	paused: Array<number>
+	clock: { at: number }
+	ports: IntroPorts
+}
+
+function clocked(write_ms: number): Clocked {
+	const written: Array<string> = []
+	const paused: Array<number> = []
+	const clock = { at: 0 }
+	const ports: IntroPorts = {
+		write: (text) => {
+			written.push(text)
+			clock.at += write_ms
+		},
+		intro_sleep: async (ms) => {
+			paused.push(ms)
+			clock.at += ms
+			await instant()
+		},
+		intro_now: () => clock.at,
+	}
+
+	return { written, paused, clock, ports }
+}
+
 interface Skippable {
 	keys: KeyReading
 	press: () => void
@@ -85,6 +114,7 @@ async function read_at_once(): Promise<string> {
 const run_board_intro_fixture = {
 	NO_KEYS,
 	READ,
+	clocked,
 	deferred,
 	instant,
 	line_of,

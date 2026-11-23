@@ -14,9 +14,11 @@ import { lane_state_record } from './lane-state-record'
 
 const WAIT_EXIT_CODE = 75
 const WAIT_COMMAND = lane_state_record.DEPENDENCY_WAIT_COMMAND
+// The wait's kind, and the pause origin it leaves on the lane's record.
+const WAIT_KIND = 'dependency-wait' as const
 
 interface DependencyWait {
-	kind: 'dependency-wait'
+	kind: typeof WAIT_KIND
 	reason: string
 }
 
@@ -62,7 +64,7 @@ function waiting(issue: string, reason: string, started: number): DependencyWait
 
 	console.error(`Lane ${session_cite.issue(issue)} waiting (${String(elapsed)} ms): ${reason}`)
 
-	return { kind: 'dependency-wait', reason }
+	return { kind: WAIT_KIND, reason }
 }
 
 // Called at each lane worker spawn, including resume generations. A failed read is a retryable wait.
@@ -79,17 +81,25 @@ async function check(issue: string): Promise<DependencyWait | undefined> {
 	}
 }
 
+async function deferred(issue: string): Promise<ReadonlyArray<string>> {
+	const origin = lane_state_record.pause_origin(await lane_state.read_state(issue))
+
+	return origin === WAIT_KIND ? ['launch dependency confirmation'] : []
+}
+
+// A lane already waiting keeps its wait; one a person paused stays theirs — the table rejects the wait
+// there, and the label still goes, since no child is launched either way.
 async function defer(issue: string): Promise<void> {
-	await lane_state.record_change({ issue, state: 'paused', command: WAIT_COMMAND })
+	const waits = await deferred(issue)
+
+	if (waits.length === 0) {
+		await lane_state.record_change({ issue, state: 'paused', command: WAIT_COMMAND })
+	}
+
 	await run_label.unmark(issue)
 }
 
-async function deferred(issue: string): Promise<ReadonlyArray<string>> {
-	const state = await lane_state.read_state(issue)
-
-	return state?.changed_by === WAIT_COMMAND ? ['launch dependency confirmation'] : []
-}
-
+// Releases only the lane's own dependency wait: a person's pause is never resumed here.
 async function begin(issue: string): Promise<void> {
 	const waits = await deferred(issue)
 	if (waits.length === 0) return

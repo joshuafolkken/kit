@@ -5,7 +5,7 @@ import { run_board_header_names } from './run-board-header-names'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import { run_board_render_throughput } from './run-board-render-throughput'
-import { run_board_spin } from './run-board-spin'
+import { run_board_spin_turn } from './run-board-spin-turn'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_case } from './run-board-theme-case'
@@ -265,7 +265,7 @@ const SPINNER_DOT = new RegExp(`[${SPINNER_FRAMES.join('')}]`, 'u')
 function spun(theme: 'matrix' | 'wargames' | undefined, style: string): string {
 	vi.stubEnv('FORCE_COLOR', '0')
 	const spot = { row: 3, column: 5, style }
-	const writes = SPINNER_FRAMES.map((frame) => run_board_spin.spin_bytes([spot], frame))
+	const writes = SPINNER_FRAMES.map((frame) => run_board_spin_turn.spin_bytes([spot], frame))
 	const themed = writes.map((write) => run_board_theme.restyle(theme, write))
 
 	return stripVTControlCharacters(themed.join(''))

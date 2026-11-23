@@ -11,6 +11,8 @@ import { lane_preserve, type KeptWork } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_residents } from './lane-residents'
+import { lane_state } from './lane-state'
+import { lane_state_record, type PauseOrigin } from './lane-state-record'
 
 // `josh lane:restart <N>` — a person stops a running lane child and starts its issue over in a fresh
 // session, typically after correcting the Issue's specification mid-run.
@@ -38,6 +40,7 @@ const NO_LANE_KIND = 'no-lane'
 const NOT_RUNNING_KIND = 'not-running'
 const UNCLAIMED_KIND = 'unclaimed'
 const CONFLICTED_KIND = 'conflicted'
+const PAUSED_KIND = 'paused'
 
 type Unsaved = Extract<KeptWork, { kind: 'unsaved' }>
 
@@ -52,6 +55,7 @@ type Refused =
 	| { kind: typeof NOT_RUNNING_KIND }
 	| { kind: typeof UNCLAIMED_KIND; reason: string }
 	| { kind: typeof CONFLICTED_KIND; directory: string }
+	| { kind: typeof PAUSED_KIND; paused_by: PauseOrigin }
 type RestartOutcome = Restarted | Unsaved | Refused
 
 // A cut the stopped child carried would hand its successor the old session's hand-off at
@@ -100,6 +104,15 @@ async function stop_and_relaunch(lane: LaneInfo): Promise<RestartOutcome> {
 	return await relaunch(lane)
 }
 
+// A paused lane's child is stopped, not ended: the table has no launch from `paused`, so a fresh child
+// would run unpaused while the record still says paused (joshuafolkken/kit#8775).
+async function idle_refusal(issue: string): Promise<Refused | undefined> {
+	if (!lane_reap.is_child_running(issue)) return { kind: NOT_RUNNING_KIND }
+	const paused_by = lane_state_record.pause_origin(await lane_state.read_state(issue))
+
+	return paused_by === undefined ? undefined : { kind: PAUSED_KIND, paused_by }
+}
+
 // A tree with unresolved conflicts (a sync's merge stopped mid-way) cannot be stashed, so it is refused
 // before the stop — stopping first would strand the lane with no child and nothing re-dispatched.
 /** Stop the running child of `#<N>`'s lane and re-dispatch the issue there in a fresh session. */
@@ -108,7 +121,9 @@ async function restart(issue: string): Promise<RestartOutcome> {
 	const lane = await lane_registry.find_open_lane(issue)
 
 	if (lane === undefined) return { kind: NO_LANE_KIND }
-	if (!lane_reap.is_child_running(issue)) return { kind: NOT_RUNNING_KIND }
+	const idle = await idle_refusal(issue)
+
+	if (idle !== undefined) return idle
 
 	if (await git_stash.has_conflict(lane.directory)) {
 		return { kind: CONFLICTED_KIND, directory: lane.directory }
@@ -142,13 +157,11 @@ function unsaved_text(outcome: Unsaved, issue: string): string {
 	return `The child for ${session_cite.issue(issue)} was stopped, but its uncommitted work could not be stashed (${outcome.reason}), so nothing was re-dispatched and the lane is left at ${outcome.directory}; \`run:merge\` will collect the stopped child.`
 }
 
-function refused_text(outcome: Refused, issue: string): string {
-	const cited = session_cite.issue(issue)
-
-	if (outcome.kind === NO_LANE_KIND) {
-		return `No lane is open for ${cited}, so there is no child to restart.`
-	}
-
+function held_text(
+	outcome: Exclude<Refused, { kind: typeof NO_LANE_KIND | typeof PAUSED_KIND }>,
+	issue: string,
+	cited: string,
+): string {
 	if (outcome.kind === CONFLICTED_KIND) {
 		return `The lane for ${cited} has unresolved conflicts, which \`git stash\` cannot keep, so the running child was left as it is — nothing was stopped or re-dispatched. Resolve them, or run \`git -C ${outcome.directory} merge --abort\`, then run \`pnpm josh lane:restart ${issue}\` again.`
 	}
@@ -158,6 +171,20 @@ function refused_text(outcome: Refused, issue: string): string {
 	}
 
 	return `No child is running in the lane for ${cited}, so nothing was stopped or re-dispatched — a child that has already ended is \`run:merge\`'s to collect.`
+}
+
+function refused_text(outcome: Refused, issue: string): string {
+	const cited = session_cite.issue(issue)
+
+	if (outcome.kind === NO_LANE_KIND) {
+		return `No lane is open for ${cited}, so there is no child to restart.`
+	}
+
+	if (outcome.kind === PAUSED_KIND) {
+		return `The lane for ${cited} is paused by ${outcome.paused_by}, so its child was left as it is — nothing was stopped or re-dispatched. Resume the lane first, then run \`pnpm josh lane:restart ${issue}\` again.`
+	}
+
+	return held_text(outcome, issue, cited)
 }
 
 function describe(outcome: RestartOutcome, issue: string): string {

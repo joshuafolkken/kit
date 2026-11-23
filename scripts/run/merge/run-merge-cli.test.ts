@@ -25,7 +25,9 @@ const health_check_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./run-merge-health', () => ({ run_merge_health: { check: health_check_mock } }))
 
-vi.mock('#scripts/lane/lane-state', () => ({ lane_state: { record_change: retain_lane_mock } }))
+vi.mock('#scripts/lane/lane-state', () => ({
+	lane_state: { record_change: retain_lane_mock, read_state: vi.fn() },
+}))
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
