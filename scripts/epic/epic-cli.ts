@@ -406,8 +406,8 @@ function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
 // else there.
 const { read_file_or_stdin } = cli_body
 
-// An omitted path yields an empty rationale, which the body builder replaces with a visible
-// placeholder rather than a blank section.
+// An omitted path yields an empty rationale, which the `josh epic` command refuses; other callers
+// (`run:split`) get the body builder's visible placeholder rather than a blank section.
 function read_rationale(rationale_path: string | undefined): string {
 	return rationale_path === undefined ? '' : read_file_or_stdin(rationale_path)
 }

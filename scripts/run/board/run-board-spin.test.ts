@@ -4,6 +4,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_notice_trace } from './run-board-notice-trace'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin, type Spot } from './run-board-spin'
+import { run_board_spin_turn } from './run-board-spin-turn'
 import { run_board_spot } from './run-board-spot'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing, type TypingLine } from './run-board-type-rows'
@@ -11,7 +12,8 @@ import { run_board_type_rows, type Typing, type TypingLine } from './run-board-t
 // joshuafolkken/kit#3495: where a frame's spinners are on screen, and the turns written between
 // redraws — a cursor move and one frame each, on the package's interval, until the next second.
 
-const { REDRAW_MS, SPOT, spin_bytes, spin_to_second, spun } = run_board_spin
+const { REDRAW_MS, SPOT, spin_to_second, spun } = run_board_spin
+const { spin_bytes } = run_board_spin_turn
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
 const { NO_TYPING, type_bytes } = run_board_type_rows
 const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
@@ -119,19 +121,6 @@ describe('run_board_spin.spun', () => {
 			[1, 1],
 			[3, 1],
 		])
-	})
-})
-
-describe('run_board_spin.spin_bytes', () => {
-	it('moves the cursor to each spot and draws the frame in its colors, then resets', () => {
-		const spots = [
-			{ row: 1, column: 1, style: GREEN },
-			{ row: 4, column: 3, style: '' },
-		]
-
-		expect(spin_bytes(spots, '⠹')).toBe(
-			`${ESCAPE}[1;1H${GREEN}⠹${ESCAPE}[0m${ESCAPE}[4;3H⠹${ESCAPE}[0m`,
-		)
 	})
 })
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { run_board_colon } from './run-board-colon'
 import { run_board_labels } from './run-board-labels'
 import { run_board_spin } from './run-board-spin'
+import { run_board_spin_turn } from './run-board-spin-turn'
 import { run_board_spot } from './run-board-spot'
 import { run_board_type_rows } from './run-board-type-rows'
 
@@ -10,7 +11,8 @@ import { run_board_type_rows } from './run-board-type-rows'
 // the redraw's second and the letters keep their own pace.
 
 const { COLON_MS, colon_boundary, colon_bytes, dark_style, is_lit } = run_board_colon
-const { REDRAW_MS, colons_in, spin_bytes, spin_to_second, spun } = run_board_spin
+const { REDRAW_MS, colons_in, spin_to_second, spun } = run_board_spin
+const { spin_bytes } = run_board_spin_turn
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
 const ESCAPE = '\u{1B}'
 const DIM = `${ESCAPE}[2m`

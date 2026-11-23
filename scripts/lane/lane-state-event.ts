@@ -13,7 +13,9 @@ import {
 // released (`dependency-resume`). **Only the pause-origin guards are evaluated here**; the others are
 // joshuafolkken/kit#8777's.
 
-const { DEPENDENCY_WAIT_COMMAND, OPEN_COMMAND, PAUSE_COMMAND } = lane_state_record
+const { ADOPT_COMMAND, DEPENDENCY_WAIT_COMMAND, OPEN_COMMAND, PAUSE_COMMAND } = lane_state_record
+// A hand-over keeps the record's `changed_by`, so this command names the event only, never a record.
+const HAND_OVER_COMMAND = 'run:hand-over'
 // The dependency wait's event and the pause origin it leaves share one name.
 const DEPENDENCY_WAIT = 'dependency-wait' as const
 const PERSON = 'person' as const
@@ -21,7 +23,7 @@ const REVIEW_RESUME = 'review-resume' as const
 
 const COMMAND_EVENTS: ReadonlyMap<string, LaneTransitionEvent> = new Map([
 	[OPEN_COMMAND, 'open'],
-	['lane:adopt', 'adopt'],
+	[ADOPT_COMMAND, 'adopt'],
 	[PAUSE_COMMAND, 'pause'],
 	[DEPENDENCY_WAIT_COMMAND, DEPENDENCY_WAIT],
 	['lane:resume', 'resume'],
@@ -37,6 +39,8 @@ const COMMAND_EVENTS: ReadonlyMap<string, LaneTransitionEvent> = new Map([
 
 // The events that start a child, each from its own states; a lane with no record takes the first.
 const LAUNCH_EVENTS: ReadonlyArray<LaneTransitionEvent> = ['launch', 'restart', REVIEW_RESUME]
+// The hand-over events, one per state: a hand-over takes the one from the state the lane is in.
+const HAND_OVER_EVENTS = lane_transition_table.hand_over_events()
 
 // Who each pausing event pauses the lane for, kept on the record as `paused_by`.
 const PAUSED_BY: Partial<Record<LaneTransitionEvent, PauseOrigin>> = {
@@ -67,7 +71,7 @@ type LaneVerdict =
 	| { kind: 'allowed'; event: LaneTransitionEvent; paused_by: PauseOrigin | undefined }
 	| { kind: 'rejected'; reason: string }
 
-function is_launch_from(event: LaneTransitionEvent, from: LaneState | undefined): boolean {
+function is_from(event: LaneTransitionEvent, from: LaneState | undefined): boolean {
 	return from === undefined || lane_transition_table.row_of(event).from.includes(from)
 }
 
@@ -76,7 +80,11 @@ function event_of(
 	request: LaneEventRequest,
 	from: LaneState | undefined,
 ): LaneTransitionEvent | undefined {
-	if (request.is_launch === true) return LAUNCH_EVENTS.find((event) => is_launch_from(event, from))
+	if (request.is_launch === true) return LAUNCH_EVENTS.find((event) => is_from(event, from))
+
+	if (request.command === HAND_OVER_COMMAND) {
+		return HAND_OVER_EVENTS.find((event) => is_from(event, from))
+	}
 
 	return COMMAND_EVENTS.get(request.command)
 }
@@ -120,7 +128,7 @@ function judge(request: LaneEventRequest, position?: LanePosition): LaneVerdict 
 	return { kind: 'allowed', event, paused_by: PAUSED_BY[event] }
 }
 
-const lane_state_event = { judge }
+const lane_state_event = { HAND_OVER_COMMAND, judge }
 
 export { lane_state_event }
 export type { LaneEventRequest, LanePosition, LaneVerdict }

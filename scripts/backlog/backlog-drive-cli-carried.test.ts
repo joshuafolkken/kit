@@ -57,7 +57,7 @@ function arrange_resumes(): void {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(DIRECTORY)
 	vi.spyOn(run_carry_ended, 'has_ended').mockReturnValue(true)
 	vi.spyOn(lane_state, 'read_state').mockImplementation(async (issue) => states.get(issue))
-	vi.spyOn(lane_state, 'record_transfer').mockImplementation(async (issue) => {
+	vi.spyOn(lane_state, 'record_owner').mockImplementation(async (issue) => {
 		transferred.push(issue)
 
 		return { kind: 'skipped', reason: 'isolated fixture' }

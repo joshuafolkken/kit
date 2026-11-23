@@ -63,7 +63,7 @@ async function adopt_stopped(issue: string, directory: string): Promise<void> {
 	// Resume before the transfer: a resume that throws leaves the lane its ended run's, so the next pass retries it.
 	if (record.state === 'paused') await resume(issue)
 
-	await lane_state.record_transfer(issue, { directory })
+	await lane_state.record_owner(issue, 'hand-over', { directory })
 }
 
 async function resume_carried(issues: ReadonlyArray<string>): Promise<void> {

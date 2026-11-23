@@ -19,6 +19,7 @@ import {
 	type LaneState,
 	type RecordOutcome,
 } from './lane-state'
+import { lane_state_record } from './lane-state-record'
 
 // `josh lane:adopt` (joshuafolkken/kit#4744): give a lane whose state record was lost — a restart, a
 // usage limit, an interrupted run — a record again, from what can be read off it, without touching its
@@ -32,7 +33,7 @@ import {
 // the next `backlogrun` takes the lane back while its issue still carries `in-progress`
 // (`backlog-drive-carried.ts`).
 
-const ADOPT_COMMAND = 'lane:adopt'
+const { ADOPT_COMMAND } = lane_state_record
 const ISSUE_FIELDS = 'state,labels'
 const SEPARATOR = ' · '
 
@@ -113,7 +114,7 @@ async function read_issue(issue: string): Promise<IssueState | undefined> {
 }
 
 async function record_open(change: LaneChange): Promise<RecordOutcome> {
-	return await lane_state.record_adopted(change)
+	return await lane_state.record_owner(change.issue, 'adopt')
 }
 
 const LIVE_PORTS: AdoptPorts = {

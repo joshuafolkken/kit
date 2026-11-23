@@ -1,0 +1,7 @@
+{
+	"reason": "review:pair --stats adds the recall aggregation the Issue asks for (review-pair-stats.ts); no existing code covers it",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 116
+	}
+}

@@ -28,7 +28,7 @@ const has_ended = vi.spyOn(run_carry_ended, 'has_ended')
 const read_carry = vi.spyOn(run_carry, 'read_carry')
 const is_same_process = vi.spyOn(process_identity, 'is_same_process')
 const josh_run = vi.spyOn(josh_command, 'josh_run')
-const record_transfer = vi.spyOn(lane_state, 'record_transfer')
+const record_owner = vi.spyOn(lane_state, 'record_owner')
 
 const STATES = new Map([
 	[CLAIMED, { labels: IN_PROGRESS, is_human_review: false }],
@@ -55,7 +55,7 @@ beforeEach(() => {
 	read_carry.mockReturnValue({ kind: 'none' })
 	is_same_process.mockReturnValue(undefined)
 	josh_run.mockResolvedValue({ code: 0, out: RESUMED })
-	record_transfer.mockResolvedValue({ kind: 'skipped', reason: 'stubbed' })
+	record_owner.mockResolvedValue({ kind: 'skipped', reason: 'stubbed' })
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 })
 
@@ -246,8 +246,8 @@ describe('adopting an ended run’s lanes', () => {
 
 		await carry_and_resume([lane(CLAIMED, '/t/a.log')])
 
-		expect(record_transfer.mock.calls).toStrictEqual(
-			adopts ? [[CLAIMED, { directory: DIRECTORY }]] : [],
+		expect(record_owner.mock.calls).toStrictEqual(
+			adopts ? [[CLAIMED, 'hand-over', { directory: DIRECTORY }]] : [],
 		)
 	})
 
@@ -257,7 +257,7 @@ describe('adopting an ended run’s lanes', () => {
 
 		await carry_and_resume([lane(CLAIMED, '/t/a.log')])
 
-		expect(record_transfer).not.toHaveBeenCalled()
+		expect(record_owner).not.toHaveBeenCalled()
 	})
 })
 
@@ -268,7 +268,7 @@ describe('resume failures and reports', () => {
 		josh_run.mockResolvedValue({ code: 1, out: NO_CHILD })
 
 		await expect(carry_and_resume([lane(CLAIMED, '/t/a.log')])).rejects.toThrow(NO_CHILD)
-		expect(record_transfer).not.toHaveBeenCalled()
+		expect(record_owner).not.toHaveBeenCalled()
 	})
 
 	it('relays the resume report on stderr, preserving the driver stdout', async () => {

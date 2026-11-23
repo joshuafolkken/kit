@@ -32,7 +32,7 @@ function missing_declaration_error(epic_number: number): string {
 // Naming both arms is what keeps the refusal one command away from being actionable rather than a
 // dead end, which is the whole point of `into <target>`.
 function promote_remedy(epic_number: number): string {
-	const promote = `josh epic --promote ${String(epic_number)} <N...>`
+	const promote = `josh epic --promote ${String(epic_number)} <N...> --rationale-file <path|->`
 
 	return `Promote it with \`${promote}\` when it is a request, a discussion or a container; create a new epic over both when it is itself one of the deliverables.`
 }

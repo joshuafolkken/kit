@@ -59,3 +59,13 @@ describe('lane_transition_table', () => {
 		for (const guard of used) expect(LANE_GUARDS).toContain(guard)
 	})
 })
+
+// joshuafolkken/kit#8768: the hand-over is the table's event, one per state a lane is handed over in.
+describe('lane_transition_table hand-over', () => {
+	it('hands over every state but ended in place, moving only the owner (ac-d6df31c5)', () => {
+		const handed = lane_transition_table.hand_over_events().map((event) => row_of(event))
+
+		expect(handed.map((row) => row.to)).toStrictEqual(['open', 'running', 'paused', HUMAN_REVIEW])
+		for (const row of handed) expect(row).toMatchObject({ from: [row.to], is_owner_only: true })
+	})
+})
