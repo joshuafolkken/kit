@@ -1,0 +1,8 @@
+{
+	"reason": "run:chain --join gains --unpinned-ok: the reason's recording helper, its tests and the chain-rule pointer to the recheck stop's rerun (#8862)",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 13,
+		"ai_cost.on_demand_bytes": 117
+	}
+}

@@ -19,6 +19,8 @@ import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 
 const RECHECK = 'recheck'
 const SUCCESS_EXIT_CODE = 0
+// A `--join` reason is recorded before its stages run (`run-chain-cli.ts`), so the rerun passes here.
+const UNPINNED_OK = ['--unpinned-ok', '"<reason>"']
 
 type Print = (text: string) => void
 
@@ -34,7 +36,7 @@ function pinned_stop(mode: ReadonlyArray<string>): HoldStop {
 	return {
 		notice: 'a changed place no test pins',
 		next: (issue) =>
-			`pin each named place with a test that turns red without it, ${run_chain.rerun(issue, RECHECK, mode)}; for a change no test can pin, ship on its own with \`pnpm josh ship --detach --review --unpinned-ok "<reason>" "<title>"\` — \`run:chain --join\` takes no \`--unpinned-ok\``,
+			`pin each named place with a test that turns red without it, ${run_chain.rerun(issue, RECHECK, mode)}; for a change no test can pin, give the reason and ${run_chain.rerun(issue, RECHECK, [...mode, ...UNPINNED_OK])}`,
 	}
 }
 
