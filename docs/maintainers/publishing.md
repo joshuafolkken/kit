@@ -1,6 +1,8 @@
 # Publishing to public npm
 
-For kit maintainers releasing the package; projects that use kit can skip this page. Kit publishes each release to GitHub Packages and public npm in separate jobs. `auto-tag.yml` starts the workflow on the release tag itself (`gh workflow run publish.yml --ref <tag>`), so both jobs publish the tag's source revision and npm provenance records the tag's commit, even when `main` has moved on since the tag was created. A failure in one job does not prevent the other job from running.
+For kit maintainers releasing the package; projects that use kit can skip this page. Kit publishes each release to public npm only. `auto-tag.yml` starts the workflow on the release tag itself (`gh workflow run publish.yml --ref <tag>`), so the publish job publishes the tag's source revision and npm provenance records the tag's commit, even when `main` has moved on since the tag was created.
+
+GitHub Packages receives no new versions; the versions already published there remain. A project that still installs kit from GitHub Packages stays on its last version there until it switches its install path to npm ([registry-migration.md](../registry-migration.md)).
 
 ## Which repositories publish
 
@@ -50,4 +52,4 @@ cd /tmp
 npm view @joshuafolkken/kit version --userconfig /dev/null '--@joshuafolkken:registry=https://registry.npmjs.org'
 ```
 
-Check the expected version and `latest` there and verify that the same version remains in GitHub Packages. Immediately after a first publish, the version-specific metadata and tarball may become available before the package-wide metadata. Continue checking until the normal installation route resolves. A plain `npm view` on a maintainer's computer may silently use the `@joshuafolkken` mapping from `~/.npmrc` and report the GitHub Packages copy instead.
+Check the expected version and `latest` there. Immediately after a first publish, the version-specific metadata and tarball may become available before the package-wide metadata. Continue checking until the normal installation route resolves. A plain `npm view` on a maintainer's computer may silently use the `@joshuafolkken` mapping from `~/.npmrc` and report the last version left in GitHub Packages instead.
