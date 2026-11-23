@@ -1,19 +1,22 @@
 import { run_board_clock_roll } from './run-board-clock-roll'
 import { run_board_fire_trail } from './run-board-fire-trail'
 import { run_board_jump } from './run-board-jump'
+import { run_board_jump_bolts, type BoltCell } from './run-board-jump-bolts'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8677: the bttf jump and arrival painted over the whole board, cell by cell. In the
-// run up's last ticks arcs crackle over the header and the animation area and sparks land on blank
-// cells (joshuafolkken/kit#8739: with or without the area out); the jump washes the board in five
-// tints and then white, and the board thaws from ice to its own colors, the top rows first, each cell at
-// its own moment. The arrival is black, three flashes, then the same thaw. The capacitor and the gauge
-// (`is_figure`) keep their own light until the thaw.
+// run up's last ticks arcs crackle over the header and the animation area (joshuafolkken/kit#8739:
+// with or without the area out), and small bolts cross every cell from its first letter
+// (joshuafolkken/kit#8740); the jump washes the board in five tints and then white, and the board thaws
+// from ice to its own colors, the top rows first, each cell at its own moment. The arrival is black,
+// three flashes, then the same thaw. The capacitor and the gauge (`is_figure`) keep their own light
+// until the thaw, crossed only by the run up's bolts.
 
 const { mixed, parsed, scaled } = run_board_rgb
 const { END_TICKS, THAW_AT, THAW_TICKS, WASH_TICKS, ARRIVE_TICKS, flash_of } = run_board_jump
 const { trail_cells } = run_board_fire_trail
 const { rolled_clocks } = run_board_clock_roll
+const { bolt_cells } = run_board_jump_bolts
 
 const WHITE = parsed('255;255;255')
 const ICE = parsed('190;235;255')
@@ -38,9 +41,7 @@ const ARC_TICKS = 15
 const ARC_MARK = 0.05
 const ARC_TINT = 0.3
 const ARC_MIX = 0.8
-const SPARKS = 14
 const ARC_MARKS = '╱ ╲ │ ─ ┼'.split(' ')
-const SPARK_MARKS = '· *'.split(' ')
 const HEADER_ROWS = 3
 // A stable noise in 0..1 for a cell, so a thaw does not flicker.
 const NOISE_X = 12.9898
@@ -110,23 +111,12 @@ function arced(cell: PaintCell, share: number, t: number): PaintCell {
 	return { ...cell, text: mark, fg: ARC }
 }
 
-// The blank cells a spark lands on `t` ticks from the jump at `share` of the crackle, by `x;y`.
-function sparks_of(share: number, t: number, scene: JumpScene, columns: number): Set<string> {
-	return new Set(
-		Array.from({ length: Math.ceil(share * SPARKS) }, (_, count) => {
-			const x = Math.floor(noise(count, t) * columns)
-			const y = Math.floor(noise(t, count) * scene.rows)
+// The cell under a bolt, if one crosses it: the bolt's letter and colors, the cell's ground kept where
+// the bolt gives none.
+function bolted(cell: PaintCell, bolts: ReadonlyMap<string, BoltCell>): PaintCell {
+	const bolt = bolts.get(`${String(cell.x)};${String(cell.y)}`)
 
-			return `${String(x)};${String(y)}`
-		}),
-	)
-}
-
-function sparked(cell: PaintCell, sparks: ReadonlySet<string>, t: number): PaintCell {
-	if (cell.text !== ' ' || !sparks.has(`${String(cell.x)};${String(cell.y)}`)) return cell
-	const mark = SPARK_MARKS[Math.floor(noise(cell.x, t) * SPARK_MARKS.length)] ?? '·'
-
-	return { ...cell, text: mark, fg: ARC }
+	return bolt === undefined ? cell : { ...cell, ...bolt, bg: bolt.bg ?? cell.bg }
 }
 
 // The run up's arcs on a cell `t` ticks from the jump.
@@ -136,13 +126,18 @@ function ramped(cell: PaintCell, t: number, scene: JumpScene): PaintCell {
 	return arcs > 0 && is_arc_row(cell.y, scene) ? arced(cell, arcs, t) : cell
 }
 
-// The run up: the figure left to its own, arcs and sparks in the last ticks, the area out or not.
-function run_up(cells: ReadonlyArray<PaintCell>, t: number, scene: JumpScene): Array<PaintCell> {
+// The run up over `letters` ticks: the figure left to its own, arcs in the last ticks, the area out or
+// not, and bolts over every cell — the figure's too — from the first letter (joshuafolkken/kit#8740).
+function run_up(
+	cells: ReadonlyArray<PaintCell>,
+	t: number,
+	letters: number,
+	scene: JumpScene,
+): Array<PaintCell> {
 	const columns = Math.max(1, ...cells.map((cell) => cell.x + 1))
-	const sparks =
-		t >= -ARC_TICKS ? sparks_of((t + ARC_TICKS) / ARC_TICKS, t, scene, columns) : new Set<string>()
+	const bolts = bolt_cells(t, { columns, rows: scene.rows, letters }, noise)
 
-	return cells.map((cell) => (cell.is_figure ? cell : sparked(ramped(cell, t, scene), sparks, t)))
+	return cells.map((cell) => bolted(cell.is_figure ? cell : ramped(cell, t, scene), bolts))
 }
 
 // The wash's color and share `t` ticks from the jump: the tints, then white.
@@ -191,7 +186,7 @@ function jump_cells(
 ): Array<PaintCell> {
 	if (t < -letters || t >= END_TICKS) return [...cells]
 
-	return t < 0 ? run_up(cells, t, scene) : after_jump(cells, t, scene)
+	return t < 0 ? run_up(cells, t, letters, scene) : after_jump(cells, t, scene)
 }
 
 // The board `tick` ticks into the arrival: black, lit by the flashes, then thawing.
