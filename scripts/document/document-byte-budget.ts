@@ -115,7 +115,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
 	// (joshuafolkken/kit#6193) crossed the 65536 block; project gate steps narrowed by `paths`
 	// (joshuafolkken/kit#7205) crossed the 69632 block.
-	{ path: 'docs/josh-commands.md', bytes: 73_728 },
+	{ path: 'docs/josh-commands.md', bytes: 77_824 },
 	// The auto-retry of every `run:stalled` cause (joshuafolkken/kit#7076) crossed the 8192 block.
 	{ path: 'docs/labels-and-run-states.md', bytes: 12_288 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },

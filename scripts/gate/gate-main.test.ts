@@ -12,6 +12,12 @@ const { run, DEFAULT_RECORDS } = vi.hoisted(() => ({
 
 vi.mock('./gate-command', () => ({ gate_command: { run_gate_command: run } }))
 vi.mock('./check-reuse', () => ({ check_reuse: { DEFAULT_RECORDS } }))
+// The real lock would refuse here whenever this suite runs inside a gate on the same worktree.
+vi.mock('./gate-worktree-lock', () => ({
+	gate_worktree_lock: {
+		run_locked: async (body: () => Promise<number>): Promise<number> => await body(),
+	},
+}))
 
 const CASES = main_entry_fixture.entry_cases({
 	command: 'gate',
