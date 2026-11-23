@@ -3,6 +3,8 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_live } from './run-board-live'
 import type { GithubRateLimit } from './run-board-render-quota-github'
+import { run_board_screen } from './run-board-screen'
+import type { TypingSound } from './run-board-sound-typing'
 import type { UsageMark } from './run-board-usage'
 
 // joshuafolkken/kit#8401: every live refresh keeps the wargames rules dimmed — the theme restyles the
@@ -132,5 +134,64 @@ describe('run_board_live.watch bttf flux panel', () => {
 
 		expect(read_rate_limit).toHaveBeenCalled()
 		expect(frames.join('')).toContain(GAUGE_FULL_CELL)
+	})
+})
+
+// joshuafolkken/kit#8796: a live matrix refresh and the rain the spin draws back over it go out in one
+// synchronized write, and leaving writes whatever is held first.
+const LEAVE = run_board_screen.screen_of('live').leave
+// A wipe below the board followed by a cursor move: the rain drawn back after the refresh's lines.
+// eslint-disable-next-line no-control-regex
+const RAIN_AFTER_ERASE = /\u{1B}\[J[^]*\u{1B}\[\d+;\d+H/u
+
+// A typing sound that leaves the screen while a redrawn frame is held: a frame sets the sound right
+// after drawing into the held joint, so nothing reached the terminal since the last set, where a spin
+// turn writes its bytes before its own set.
+function leaving_on_held_frame(
+	frames: ReadonlyArray<string>,
+	leaves: ReadonlyArray<() => void>,
+): TypingSound {
+	let written_at_set = -1
+
+	return {
+		set: () => {
+			const has_refreshed = frames.some((frame) => frame.startsWith(REFRESH_START))
+
+			if (has_refreshed && frames.length === written_at_set) leaves[0]?.()
+			written_at_set = frames.length
+		},
+		// The board stops its sound on the way out; nothing to stop here.
+		stop: () => undefined,
+	}
+}
+
+describe('run_board_live.watch matrix refresh', () => {
+	it('writes the rain drawn back over a refresh in its one synchronized write', async () => {
+		const written = await refreshes(
+			'3',
+			async (ports) => await run_board_live.watch(ports, 'matrix'),
+		)
+
+		expect(written.some((frame) => RAIN_AFTER_ERASE.test(frame))).toBe(true)
+		for (const frame of written) expect(frame.split(SYNC_END)).toHaveLength(2)
+	})
+
+	it('writes the held refresh before leaving the screen', async () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const { ports, frames, clock, leaves } = harness(LOCAL, [plan_titled('a')])
+		const typing_sound = leaving_on_held_frame(frames, leaves)
+
+		await expect(
+			run_board_live.watch(
+				{ ...ports, typing_sound, sleep: clocked(clock), intro_sleep: instant },
+				'matrix',
+			),
+		).rejects.toBe(STOPPED)
+
+		// The theme colors every write, the leave among them.
+		const left = frames.findIndex((frame) => frame.includes(LEAVE))
+
+		expect(left).toBeGreaterThan(0)
+		expect(frames[left - 1]?.startsWith(REFRESH_START)).toBe(true)
 	})
 })
