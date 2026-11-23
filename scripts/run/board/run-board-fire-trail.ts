@@ -1,4 +1,3 @@
-import type { DropScreen, ScreenCell } from './run-board-drop-screen'
 import type { PaintCell } from './run-board-jump-paint'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 
@@ -39,7 +38,6 @@ const TICK_SHIFT = 17.3
 const LEAD = /^[▸▾─]+/u
 const NAMED = new Set(['throughput', 'lanes'])
 const NAME_WORDS = 2
-const BLANK: ScreenCell = { text: ' ', style: '', is_wide: false }
 
 // A stable roll in 0..1 for a place, so a flame's height leaps by the tick but not by the redraw.
 type Roll = (x: number, y: number) => number
@@ -64,20 +62,6 @@ function rows_of(texts: ReadonlyArray<string>): Array<number> {
 	return texts
 		.map((_, y) => y - 1)
 		.filter((above) => is_rule(texts[above + 1] ?? '') && texts[above]?.trim() === '')
-}
-
-function blanks(count: number): Array<ScreenCell> {
-	return Array.from({ length: Math.max(0, count) }, () => ({ ...BLANK }))
-}
-
-// The screen with each trail row filled out to its width with blank cells: a blank line is drawn with
-// no cells, which would leave the fire nothing to burn on and nothing to put back.
-function padded(screen: DropScreen, rows: ReadonlyArray<number>): DropScreen {
-	const filled = screen.rows.map((row, y) =>
-		rows.includes(y) ? [...row, ...blanks(screen.columns - row.length)] : row,
-	)
-
-	return { ...screen, rows: filled }
 }
 
 // A flame `age` ticks old in `fire`, its height and its glow by the two rolls.
@@ -122,7 +106,6 @@ const run_board_fire_trail = {
 	HEAD_TICKS,
 	TRAIL_TICKS,
 	fire_of,
-	padded,
 	rows_of,
 	trail_cells,
 }

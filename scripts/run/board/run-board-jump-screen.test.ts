@@ -90,8 +90,34 @@ describe('run_board_jump_screen.jump_bytes around the other painters', () => {
 		const written = jump_bytes(draw, WASH_MS, undefined)
 
 		expect(written).toContain(`${ESC}[1;1H`)
-		expect(written).not.toContain(`${ESC}[3;2H`)
+		expect(written).not.toContain(`${ESC}[3;3H`)
 		expect(written).toContain(`${ESC}[3;1H`)
+	})
+
+	// joshuafolkken/kit#8739: the area's painter writes from its first lamp place, so the column before
+	// it, left to neither painter, kept the wash as a line once the jump was over.
+	it('ac-f0dce629 washes and puts back the column left of the area as its neighbors', () => {
+		const lamp = { row: 3, column: 3, panel_row: 0, panel_rows: 1, group: 0, lamp: 0 }
+		const draw = {
+			...draw_of(['ABC', 'DEF', 'GHI']),
+			panel: { top: 3, end: 4, rows: 1, lamps: [lamp] },
+		}
+
+		expect(jump_bytes(draw, WASH_MS, undefined)).toContain(`${ESC}[3;2H`)
+		expect(jump_bytes(draw, OVER_MS, WASH_MS)).toContain(`${ESC}[3;2H${ESC}[0m${STYLE}H`)
+	})
+})
+
+describe('run_board_jump_screen.jump_bytes — the frame rate', () => {
+	it('ac-ac82abe9 draws a frame every 50 ms, a tick each', () => {
+		const draw = draw_of(['AB', 'CD'])
+
+		expect(FRAME_MS).toBe(50)
+		expect(FRAME_MS).toBe(TICK_MS)
+		// The wash turns to its second tint two ticks in, a frame after the one before.
+		const second_ms = WASH_MS + 2 * FRAME_MS
+
+		expect(jump_bytes(draw, second_ms, second_ms - FRAME_MS)).not.toBe('')
 	})
 })
 
