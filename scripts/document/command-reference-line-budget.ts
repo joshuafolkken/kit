@@ -7,16 +7,20 @@
 
 // The only files under `docs/` an agent is routed to read — the command references; the rest of
 // `docs/` is reference a human browses, so the byte budget (`document/document-byte-budget.ts`)
-// covers these alone.
+// covers these alone. The one list of the pages `josh command:derive` writes usage spans into
+// (`command-usage.ts`) and `lane:plan` reads as derived from a command definition (`derived-paths.ts`);
+// the order is the span placement's tie order (`usage-span-placement.ts`).
 const COMMAND_REFERENCE_DOCS: ReadonlyArray<string> = [
 	'docs/josh-commands.md',
-	'docs/josh-commands-automation.md',
 	'docs/josh-commands-run.md',
 	'docs/josh-commands-board.md',
 	'docs/josh-commands-lane.md',
 	'docs/josh-commands-session.md',
 	'docs/josh-commands-backlog.md',
+	'docs/josh-commands-automation.md',
 ]
+// The catalog `josh command:derive` writes from every command entry (`generate-catalog.ts`).
+const COMMAND_CATALOG_DOC = 'docs/josh-command-catalog.md'
 const LONG_LINE_CHARACTERS = 400
 const MAX_LONG_LINES = 3
 
@@ -36,6 +40,7 @@ function long_line_violation(count: number): string | undefined {
 }
 
 const command_reference_line_budget = {
+	COMMAND_CATALOG_DOC,
 	COMMAND_REFERENCE_DOCS,
 	long_line_count,
 	long_line_violation,

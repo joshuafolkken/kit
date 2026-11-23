@@ -1,6 +1,8 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import { command_reference_line_budget } from '#scripts/document/command-reference-line-budget'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
@@ -260,5 +262,23 @@ describe('lane:plan — what it refuses', () => {
 		expect(info).toHaveBeenCalledWith('wait')
 		expect(error).toHaveBeenCalledWith(auto_ok_cli.UNREADABLE_MESSAGE)
 		expect(record_yield).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8859: the derived documents are read from the checkout the plan runs on, not the cwd.
+describe('lane:plan — the documents a planned command definition derives', () => {
+	it('prints the catalog a definition in the given checkout derives', async () => {
+		const definition = 'scripts/josh/josh-commands-fake.ts'
+		const file = path.join(DIRECTORY, definition)
+
+		mkdirSync(path.dirname(file), { recursive: true })
+		writeFileSync(file, "const X = {\n\t'fake:run': {\n\t},\n}")
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		await lane_plan_cli.run([String(LATER), definition], DIRECTORY)
+
+		expect(info).toHaveBeenCalledWith(
+			`derived (counted in the size): ${command_reference_line_budget.COMMAND_CATALOG_DOC}`,
+		)
 	})
 })
