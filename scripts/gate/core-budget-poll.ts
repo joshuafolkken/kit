@@ -34,10 +34,17 @@ function check_memory(context: WaitContext, reading: MachineReading): void {
 	check_capacity(command, minimum, reading.total_mb)
 }
 
+interface Reading {
+	budget: MachineBudget
+	reading: MachineReading
+	// The cores the admitted claims hold (`core_admission.ledger_load`), recorded with the admission.
+	reserved_cores: number
+}
+
 async function current_reading(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
-): Promise<{ budget: MachineBudget; reading: MachineReading }> {
+): Promise<Reading> {
 	const reading = await context.read_machine()
 	const ledger = core_admission.ledger_load(reservations, context.now())
 
@@ -52,12 +59,14 @@ async function current_reading(
 
 	context.ease = busy_average.with_ease(context.ease, mean.busy_cores, context.now())
 
-	return { budget: machine_capacity.machine_budget(context.budget, mean, ledger), reading }
+	return {
+		budget: machine_capacity.machine_budget(context.budget, mean, ledger),
+		reading,
+		reserved_cores: ledger.cores,
+	}
 }
 
-interface Decision {
-	budget: MachineBudget
-	reading: MachineReading
+interface Decision extends Reading {
 	granted: number | undefined
 	overflow?: Overflow | undefined
 	reason: string
@@ -65,7 +74,7 @@ interface Decision {
 
 function admit(context: WaitContext, decision: Decision): Admission {
 	const admitted_at = context.now()
-	const { granted, overflow, reason, budget, reading } = decision
+	const { granted, overflow, reason, budget, reading, reserved_cores } = decision
 
 	core_reservation.write_reservation(context.target, { ...context.fields, admitted_at, granted })
 
@@ -73,7 +82,7 @@ function admit(context: WaitContext, decision: Decision): Admission {
 		overflow,
 		granted,
 		waited_ms: admitted_at - context.fields.claimed_at,
-		decision: { reason, budget, reading },
+		decision: { reason, budget, reading, reserved_cores },
 	}
 }
 
@@ -168,23 +177,22 @@ async function poll_admission(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
 ): Promise<Admission | undefined> {
-	const { budget, reading } = await current_reading(context, reservations)
-	const granted = core_admission.narrowed_weight(context.key, reservations, budget.cores)
-	const reason = core_wait.hold_reason(context.key, reservations, budget, granted)
+	const current = await current_reading(context, reservations)
+	const granted = core_admission.narrowed_weight(context.key, reservations, current.budget.cores)
+	const reason = core_wait.hold_reason(context.key, reservations, current.budget, granted)
 
 	if (reason === undefined) {
 		return admit(context, {
-			budget,
-			reading,
+			...current,
 			granted,
-			reason: fit_reason(context, reservations, budget),
+			reason: fit_reason(context, reservations, current.budget),
 		})
 	}
 
-	const overflow = overflow_reason(context, reservations, budget)
+	const overflow = overflow_reason(context, reservations, current.budget)
 
 	if (overflow !== undefined) {
-		return overflow_of(context, reservations, { budget, reading, granted, reason: overflow })
+		return overflow_of(context, reservations, { ...current, granted, reason: overflow })
 	}
 
 	mark_waiting(context, reason)
