@@ -26,10 +26,10 @@ const CLEAR = `${CSI}H${CSI}J`
 // joshuafolkken/kit#8739: a frame every tick, as the demo draws it.
 const FRAME_MS = TICK_MS
 const DEFAULT_FG = parsed('204;204;204')
-const FOREGROUND = /38;2;(\d+);(\d+);(\d+)/u
 const BACKGROUND = /48;2;(\d+);(\d+);(\d+)/u
-// joshuafolkken/kit#8744: a named foreground (`styleText`'s `33m`, `90m`): its kind and color.
-const NAMED_FOREGROUND = /\[(?<kind>[39])(?<color>[0-7])m/u
+// joshuafolkken/kit#8744: each foreground a style sets, in order — 24-bit, named (`styleText`'s `33m`,
+// `90m`: its kind and color) or back to the default (`39m`); a cell's is the last.
+const FOREGROUNDS = /38;2;(?<rgb>\d+;\d+;\d+)|\[(?<kind>[39])(?<color>[0-7])m|\[39m/gu
 const BRIGHT_KIND = '9'
 // No typing rows: the arrival is drawn before the board types any (a value import of
 // `run_board_type_rows.NO_TYPING` would cycle through `run-board-intro.ts`).
@@ -74,15 +74,23 @@ function is_painted(draw: JumpDraw, row: number, column: number): boolean {
 	return !is_panel(draw.panel, row, column)
 }
 
-function named_in(style: string): Rgb | undefined {
-	const { kind, color } = NAMED_FOREGROUND.exec(style)?.groups ?? {}
-
-	return color === undefined ? undefined : palette(Number(color), kind === BRIGHT_KIND)
+function last_foreground(style: string): Partial<Record<string, string>> {
+	return [...style.matchAll(FOREGROUNDS)].at(-1)?.groups ?? {}
 }
 
-// A cell as the jump paints it, its colors the theme's: a named one as the palette draws it.
+// The foreground a style leaves a cell in: a named one as the palette draws it.
+function foreground_of(style: string): Rgb {
+	const { rgb, kind, color } = last_foreground(style)
+
+	if (rgb !== undefined) return parsed(rgb)
+	if (color === undefined) return DEFAULT_FG
+
+	return palette(Number(color), kind === BRIGHT_KIND) ?? DEFAULT_FG
+}
+
+// A cell as the jump paints it, its colors the theme's.
 function paint_cell(cell: ScreenCell, x: number, y: number): PaintCell {
-	const fg = rgb_in(cell.style, FOREGROUND) ?? named_in(cell.style) ?? DEFAULT_FG
+	const fg = foreground_of(cell.style)
 
 	return { x, y, text: cell.text, fg, bg: rgb_in(cell.style, BACKGROUND), is_figure: false }
 }

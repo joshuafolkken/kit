@@ -176,6 +176,14 @@ describe('run_board_jump_screen.arrive_beats — a named color', () => {
 		expect(Number(red) - Number(blue)).toBeGreaterThan(YELLOW_LEAD)
 	})
 
+	it('thaws plain text after a named color back to the default, not that color', () => {
+		const after = arrive_beats(`${NAMED}AB${ESC}[39mCD`, undefined)
+		const painted = after.flatMap((beat) => [...beat.text.matchAll(/38;2;(\d+);\d+;(\d+)mC/gu)])
+		const [, red = '255', blue = '0'] = painted.at(-1) ?? []
+
+		expect(Number(red) - Number(blue)).toBeLessThan(YELLOW_LEAD)
+	})
+
 	it('ac-27df273f writes it on the last beat as the frame after it draws it', () => {
 		const last = named.at(-1)?.text ?? ''
 
