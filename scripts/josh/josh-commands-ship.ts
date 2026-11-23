@@ -120,7 +120,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '<N>',
-					note: 'the same, re-run after `pending`: the opening runs in the background past the `ship:wait` chunk, and the re-run waits on that run (a `--join` first waits on it too)',
+					note: 'the same, re-run after `pending`: each half (the opening, the `--join`) runs in the background past the `ship:wait` chunk, and the re-run waits on that run (a `--join` first waits on an unread opening)',
 				},
 				{
 					arguments: '<N> --from check:related',

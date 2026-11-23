@@ -4,6 +4,7 @@ import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinne
 import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detach-pinned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
+import { run_chain_worker_fixture } from './run-chain-worker-fixture'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -43,6 +44,7 @@ function pinned_answers(code: number, out: string): ReturnType<typeof vi.spyOn> 
 }
 
 beforeEach(() => {
+	run_chain_worker_fixture.run_worker_in_place(run_chain_cli.run)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(review_record_slot, 'slot_text').mockReturnValue('')

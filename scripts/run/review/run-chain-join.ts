@@ -19,9 +19,6 @@ const RUN_REVIEW = 'run:review'
 const ATTEST = 'review:attest'
 const RECORD = 'review:record'
 const JOIN = '--join'
-// The chain's join returns `pending` before the prompt cache expires; the stop's `next:` is the same
-// command (joshuafolkken/kit#8309).
-const CHUNK = '--chunk'
 const FIXING = '--fixing'
 const SHIP = '--ship'
 const ROUND_TWO_SEVERITIES: ReadonlySet<string> = new Set(['high', 'medium'])
@@ -112,7 +109,7 @@ function join_stages(issue: string, is_fixing: boolean, title?: string): Readonl
 	return [
 		{
 			name: RUN_REVIEW,
-			argv: [RUN_REVIEW, JOIN, ...(is_fixing ? [FIXING] : []), CHUNK],
+			argv: [RUN_REVIEW, JOIN, ...(is_fixing ? [FIXING] : [])],
 			next: (target) =>
 				`settle what \`${RUN_REVIEW} ${JOIN}\` reported (\`chain-rule.md\` → "Run the review-to-merge chain", step 2), ${run_chain.rerun(target, undefined, mode)}`,
 		},
