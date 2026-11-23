@@ -246,6 +246,12 @@ describe('run_board_jump_paint.arrive_cells', () => {
 		expect(arrive_cells(cells, THAW_AT)[0]?.fg).toStrictEqual(ICE)
 		expect(arrive_cells(cells, ARRIVE_TICKS)).toStrictEqual(cells)
 	})
+
+	it('ac-2cf69f64 has every cell thawed by the last tick of its shorter thaw', () => {
+		const cells = grid(SCENE.rows)
+
+		expect(arrive_cells(cells, ARRIVE_TICKS - 1)).toStrictEqual(cells)
+	})
 })
 
 describe('run_board_jump_paint.noise', () => {

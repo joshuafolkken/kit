@@ -4,7 +4,7 @@ import { run_board_jump } from './run-board-jump'
 import { run_board_jump_paint } from './run-board-jump-paint'
 import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 
-const { ARRIVE_TICKS, TICK_MS, WASH_TICKS, THAW_TICKS } = run_board_jump
+const { ARRIVE_THAW_TICKS, ARRIVE_TICKS, TICK_MS, WASH_TICKS, THAW_TICKS } = run_board_jump
 const { FRAME_MS, arrive_beats, jump_bytes } = run_board_jump_screen
 // Taken before any spy, so a spy can call the real one.
 const { arrive_cells } = run_board_jump_paint
@@ -177,7 +177,7 @@ describe('run_board_jump_screen.arrive_beats — only the changed cells, a beat 
 	})
 
 	it('ac-454bc468 leaves the screen, every beat applied in turn, as each beat written whole', () => {
-		const ticks = [THAW_TICKS, ARRIVE_TICKS - 1]
+		const ticks = [ARRIVE_THAW_TICKS, ARRIVE_TICKS - 1]
 
 		expect(ticks.map((tick) => applied(texts.slice(0, tick + 1)))).toStrictEqual(
 			ticks.map((tick) => applied([whole(ARRIVE_FRAME, tick)])),
@@ -209,7 +209,7 @@ describe('run_board_jump_screen.arrive_beats', () => {
 	})
 
 	it('leaves no letter black while it thaws', () => {
-		const thaw = beats.slice(-THAW_TICKS)
+		const thaw = beats.slice(-ARRIVE_THAW_TICKS)
 
 		expect(thaw.some((beat) => has_black_letter(beat.text))).toBe(false)
 	})
