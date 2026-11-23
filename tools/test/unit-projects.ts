@@ -60,6 +60,15 @@ const JOSH_PREFIX = 'JOSH_'
 // stubs `TZ` itself; Node reads `process.env.TZ` live, so `vi.unstubAllEnvs()` returns it to UTC.
 const UNIT_TIME_ZONE = 'UTC'
 
+// **The locale is pinned to `C.UTF-8`** (joshuafolkken/kit#8772), CI's default, which every system ships
+// and ICU resolves to `en-US`: a shell's `ja_JP.UTF-8` would otherwise reach `Intl` and `toLocale*`.
+// Unlike `TZ`, Node fixes its default locale at process start, so the pin works only because Vitest
+// spawns each worker with this env; a stub inside a test changes nothing — pass the locale to `Intl`.
+// `LC_ALL` overrides every `LC_*`; the inherited ones and `LANGUAGE` are blanked all the same.
+const UNIT_LOCALE = 'C.UTF-8'
+const LOCALE_PREFIX = 'LC_'
+const LOCALE_LANGUAGE_KEY = 'LANGUAGE'
+
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
 
 function blank(keys: ReadonlyArray<string>): Record<string, string> {
@@ -72,9 +81,20 @@ function inherited_josh_keys(source: EnvironmentSource): ReadonlyArray<string> {
 	)
 }
 
+function locale_environment(source: EnvironmentSource): Record<string, string> {
+	const inherited = Object.keys(source).filter((key) => key.startsWith(LOCALE_PREFIX))
+
+	return {
+		...blank([...inherited, LOCALE_LANGUAGE_KEY]),
+		LANG: UNIT_LOCALE,
+		LC_ALL: UNIT_LOCALE,
+	}
+}
+
 function unit_environment(source: EnvironmentSource): Record<string, string> {
 	return {
 		...blank(inherited_josh_keys(source)),
+		...locale_environment(source),
 		...blank([
 			...agent_session_environment.PROXY_KEYS,
 			agent_session_environment.PROXY_CERTIFICATE_KEY,
@@ -193,6 +213,7 @@ const unit_projects = {
 	MAIN_EXCLUDE,
 	OPTIMIZED_DEPENDENCIES,
 	PURE_PROJECT,
+	UNIT_LOCALE,
 	UNIT_PROJECTS,
 	unit_environment,
 	unit_projects_for,
