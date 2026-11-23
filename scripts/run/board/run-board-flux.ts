@@ -1,4 +1,3 @@
-import { run_board_jump } from './run-board-jump'
 import type { Paint } from './run-board-labels'
 import type { PanelCell } from './run-board-panel-draw'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
@@ -118,9 +117,9 @@ function bar_cells(
 }
 
 // joshuafolkken/kit#8677: through a jump the capacitor floods — the two ticks before, every lamp is
-// orange; the first `WHITE_TICKS` of the flood the whole box is white with no lamp drawn, then it stands
-// on a gray darkening over `DIM_TICKS`, every lamp a white dot and the bar red. The gray is as light as
-// a white dot keeps a contrast of 4.5 on (VS Code repaints a foreground under that).
+// orange; from its first tick the box stands on a gray darkening over `DIM_TICKS`, every lamp a white
+// dot and the bar red — never a white box (joshuafolkken/kit#8739). The gray is as light as a white dot
+// keeps a contrast of 4.5 on (VS Code repaints a foreground under that).
 interface FluxFlood {
 	// The ticks since the flood began, none outside it.
 	flood?: number | undefined
@@ -132,13 +131,10 @@ const ORANGE = parsed('230;110;60')
 const FLOOD = parsed('108;114;124')
 const FLOOD_DIM = parsed('78;84;96')
 const FLOOD_BAR = parsed('250;55;70')
-const { WHITE_TICKS } = run_board_jump
 const DIM_TICKS = 12
 
 function flood_ground(flood: number): Rgb {
-	if (flood < WHITE_TICKS) return WHITE
-
-	return mixed(FLOOD, FLOOD_DIM, Math.min(1, (flood - WHITE_TICKS) / DIM_TICKS))
+	return mixed(FLOOD, FLOOD_DIM, Math.min(1, flood / DIM_TICKS))
 }
 
 // The box: every cell of the capacitor's rows, a column past it either side, blank on the ground.
@@ -155,13 +151,12 @@ function box_cells(origin: FluxOrigin, bg: Paint): Array<PanelCell> {
 
 // The flooded capacitor `flood` ticks in: the box, the bar and the lamps on its ground.
 function flooded_cells(origin: FluxOrigin, flood: number): Array<PanelCell> {
-	const is_white = flood < WHITE_TICKS
 	const bg = shade_of(flood_ground(flood), 'white')
-	const bar = shade_of(is_white ? WHITE : FLOOD_BAR, 'red')
+	const bar = shade_of(FLOOD_BAR, 'red')
 	const lamps = FLUX_LAMPS.map((lamp) => ({
 		row: origin.row + lamp.row,
 		column: origin.column + lamp.column,
-		text: is_white ? ' ' : LIT,
+		text: LIT,
 		fg: shade_of(WHITE, 'white'),
 		bg,
 	}))
@@ -201,7 +196,6 @@ const run_board_flux = {
 	FLUX_LAMPS,
 	FLUX_ROWS,
 	FLUX_WIDTH,
-	WHITE_TICKS,
 	flux_cells,
 	lamp_look,
 }

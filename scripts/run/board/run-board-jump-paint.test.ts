@@ -16,6 +16,8 @@ const SCENE = { rows: 20, panel: { top: 18, rows: 1 } }
 const COLUMNS = 80
 const HEADER_ROWS = 3
 const MIN_CONTRAST = 4.5
+const ARC_MARKS = new Set('╱ ╲ │ ─ ┼'.split(' '))
+const SPARK_MARKS = new Set('· *'.split(' '))
 
 function cell_at(x: number, y: number, extra: Partial<PaintCell> = {}): PaintCell {
 	return { x, y, text: 'a', fg: GREY, is_figure: false, ...extra }
@@ -46,10 +48,13 @@ describe('run_board_jump_paint.jump_cells — outside the jump and the run up', 
 		expect(jump_cells(cells, WASH_TICKS + 45, LETTERS, SCENE)).toStrictEqual(cells)
 	})
 
-	it('leaves the board as it is through the run up where the area is not out', () => {
-		const cells = grid(4)
+	// joshuafolkken/kit#8739: the run up crackles with the area out or not.
+	it('crackles arcs and sparks in the last ticks of the run up where the area is not out', () => {
+		const cells = [...grid(4), ...grid(1).map((cell) => ({ ...cell, y: 3, text: ' ' }))]
+		const moved = changed(cells, jump_cells(cells, -1, LETTERS, { rows: 4 }))
 
-		expect(jump_cells(cells, -1, LETTERS, { rows: 4 })).toStrictEqual(cells)
+		expect(moved.some((cell) => ARC_MARKS.has(cell.text))).toBe(true)
+		expect(moved.some((cell) => SPARK_MARKS.has(cell.text))).toBe(true)
 	})
 })
 
@@ -60,13 +65,15 @@ describe('run_board_jump_paint.jump_cells — the run up', () => {
 		expect(jump_cells(rows, -20, LETTERS, SCENE)).toStrictEqual(rows)
 	})
 
-	it('crosses a flare over the board, its core at its center on the slant', () => {
-		const center = cell_at(10, 10)
-		const far = cell_at(40, 10)
-		const [core, kept] = jump_cells([center, far], -12, LETTERS, SCENE)
+	it('ac-e24e55cd crosses no flare over the board at any tick of the run up', () => {
+		const cells = grid(SCENE.rows).filter(
+			(cell) => cell.y >= HEADER_ROWS && cell.y < SCENE.panel.top,
+		)
+		const ticks = Array.from({ length: LETTERS }, (_, index) => index - LETTERS)
 
-		expect(core?.fg).toStrictEqual(parsed('240;248;255'))
-		expect(kept).toStrictEqual(far)
+		expect(
+			ticks.every((t) => changed(cells, jump_cells(cells, t, LETTERS, SCENE)).length === 0),
+		).toBe(true)
 	})
 
 	it('crackles arcs over the header rows in its last ticks, leaving the figure and other rows', () => {

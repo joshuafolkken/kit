@@ -24,6 +24,7 @@ const DISABLED: Array<[string, Partial<DrawPorts>]> = [
 	['every', { is_tty: false, opened_ms: undefined }],
 	['noTTY', { is_tty: false }],
 	['wargames', { theme: 'wargames' }],
+	['bttf', { theme: 'bttf' }],
 	['default', { theme: undefined }],
 	['noColor', {}],
 ]

@@ -137,6 +137,69 @@ describe('run_board_jump_start.jump_of — the fire trails', () => {
 	})
 })
 
+// joshuafolkken/kit#8739: the bttf board as it draws today, with its shape icons, its two rules given.
+function bttf_draw(throughput_rule: string, lanes_rule: string): JumpDraw {
+	const lines = [
+		'> josh-flux      -> 11-23 10:53',
+		'',
+		`${throughput_rule} ──────── /h ACTIVE ─ DONE ─ PEAK ─ NOW ──`,
+		'     24h  ▄█▆▇▇▄▃▅▄▂▁▃▁█▂▃█▆▂   3.4    20h     71    7.0     2',
+		'',
+		`${lanes_rule} 1/6 ─ T+ ─────── CPU ────── MEM ──────`,
+		ROW_TEXT,
+	]
+	const ports = { theme: 'bttf' as const, is_tty: true, icons: 'shapes' as const }
+
+	return started(frame_of({ ports, drawn: { lines, spots: [], size: undefined } }))
+}
+
+describe('run_board_jump_start.jump_of — the fire trails on the bttf board', () => {
+	it('ac-876edb02 burns the trails on the bttf board as drawn today, its shape icons on', () => {
+		expect(bttf_draw('── -- throughput', '── ── lanes').scene.trails).toStrictEqual([1, 4])
+	})
+
+	// Live, an open section's rule leads with `▾`, which the bttf restyle turns into `V` with shape
+	// icons — the trails were looked for in that text and never found.
+	it('ac-876edb02 burns the trails under rules led by the fold mark the theme restyles', () => {
+		const draw = bttf_draw('\u{1B}[1m▾ -- throughput\u{1B}[0m', '▾ ── lanes')
+		const rule = draw.screen.rows[5]?.map((cell) => cell.text).join('') ?? ''
+
+		expect(rule.startsWith('▾')).toBe(false)
+		expect(draw.scene.trails).toStrictEqual([1, 4])
+	})
+
+	it('burns a trail on the screen row its blank line lands on, past a line above it that wraps', () => {
+		const size = { columns: 10, rows: 9 }
+		const lines = ['a header wider than ten', '', '── lanes ──', ROW_TEXT]
+		const draw = started(frame_of({ drawn: { lines, spots: [], size } }))
+		const above = draw.screen.rows[3]?.map((cell) => cell.text).join('')
+
+		expect(draw.scene.trails).toStrictEqual([3])
+		expect(above?.trim()).toBe('')
+	})
+})
+
+describe('run_board_jump_start.jump_of — the whole terminal', () => {
+	it('ac-a79a8a81 fills every row out to the terminal width and adds blank rows to its height', () => {
+		const size = { columns: 40, rows: 9 }
+		const draw = started(frame_of({ drawn: { lines: LINES, spots: [], size } }))
+
+		expect(draw.screen.rows).toHaveLength(size.rows)
+		expect(draw.screen.rows.every((row) => row.length === size.columns)).toBe(true)
+	})
+
+	it('ac-a79a8a81 washes the blank rows, the line ends and the rows past the board', () => {
+		const size = { columns: 40, rows: 9 }
+		const draw = started(frame_of({ drawn: { lines: LINES, spots: [], size } }))
+		const jumped_ms = NOW + draw.run.letters * TICK_MS
+		const written = run_board_jump_screen.jump_bytes(draw, jumped_ms, undefined)
+
+		// The header's line end, and the last cell of the terminal's last row, past the board.
+		expect(written).toContain('\u{1B}[1;40H')
+		expect(written).toContain('\u{1B}[9;40H')
+	})
+})
+
 describe('run_board_jump_start.jump_state once running', () => {
 	const later = NOW + TICK_MS * 2
 	const next_typing = typing_of(line_of('next row', later))

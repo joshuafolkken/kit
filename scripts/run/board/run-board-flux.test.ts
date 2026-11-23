@@ -6,7 +6,7 @@ import { run_board_rgb } from './run-board-rgb'
 // joshuafolkken/kit#8674: the flux capacitor's lamps in a Y, the light running in from the outer ends
 // at each speed range's pace, and the red bar across the stem.
 
-const { FLOOD, FLOOD_DIM, FLUX_LAMPS, FLUX_ROWS, FLUX_WIDTH, WHITE_TICKS, flux_cells, lamp_look } =
+const { FLOOD, FLOOD_DIM, FLUX_LAMPS, FLUX_ROWS, FLUX_WIDTH, flux_cells, lamp_look } =
 	run_board_flux
 const { rgb_of } = run_board_paint_fixture
 const MIN_CONTRAST = 4.5
@@ -114,8 +114,8 @@ describe('run_board_flux.flux_cells', () => {
 	})
 })
 
-// joshuafolkken/kit#8677: the capacitor through a jump — orange before the flood, a white box first,
-// then white dots on a darkening gray, every one readable.
+// joshuafolkken/kit#8677: the capacitor through a jump — orange before the flood, then white dots on a
+// darkening gray, every one readable.
 
 const WHITE = '255;255;255'
 const DIM_TICK = 20
@@ -143,11 +143,10 @@ describe('run_board_flux.flux_cells through a jump', () => {
 		expect(new Set(lamps.map((cell) => rgb_of(cell.fg)))).toStrictEqual(new Set(['230;110;60']))
 	})
 
-	it('washes the whole box white with no lamp drawn for the first ticks of the flood', () => {
+	it('covers the whole box with the lamps drawn from the first tick of the flood', () => {
 		const cells = flooded(0)
 
-		expect(new Set(cells.map((cell) => cell.bg))).toStrictEqual(new Set([WHITE]))
-		expect(cells.some((cell) => cell.text === LIT)).toBe(false)
+		expect(cells.filter((cell) => cell.text === LIT)).toHaveLength(FLUX_LAMPS.length)
 		expect(cells).toHaveLength(FLUX_ROWS * (FLUX_WIDTH + SIDES) + BAR_LENGTH + FLUX_LAMPS.length)
 		// The box: seven rows of fifteen columns.
 		expect(new Set(cells.map((cell) => cell.row))).toStrictEqual(
@@ -156,8 +155,17 @@ describe('run_board_flux.flux_cells through a jump', () => {
 		expect(new Set(cells.map((cell) => cell.column)).size).toBe(15)
 	})
 
-	it('then stands white dots and a red bar on the darkening gray', () => {
-		const first = flooded(WHITE_TICKS)
+	// joshuafolkken/kit#8739: the first ticks of the flood showed the panel as a pure white square.
+	it('ac-ecd05aa3 never grounds the box white, its first tick included', () => {
+		const grounds = Array.from({ length: DIM_TICK + 1 }, (_, flood) =>
+			flooded(flood).map((cell) => cell.bg),
+		).flat()
+
+		expect(grounds).not.toContain(WHITE)
+	})
+
+	it('stands white dots and a red bar on the darkening gray', () => {
+		const first = flooded(0)
 		const last = flooded(DIM_TICK)
 		const stem = last.filter((cell) => cell.row === STEM.row && cell.column === STEM.column)
 

@@ -224,6 +224,17 @@ describe('run_board_exit_record signals', () => {
 		expect(board.exits).toStrictEqual([code])
 	})
 
+	// joshuafolkken/kit#8747: a closed terminal still stops the board's sounds.
+	it('runs the leave on SIGHUP, as its exit follows (ac-fef89474)', () => {
+		const board = fixture()
+
+		watching(board)
+		board.process.emit('SIGHUP', 'SIGHUP')
+		board.process.emit('exit', SIGHUP_CODE)
+
+		expect(board.leaves).toStrictEqual(['left'])
+	})
+
 	it('records nothing on Ctrl-C, a normal exit', () => {
 		const board = fixture()
 

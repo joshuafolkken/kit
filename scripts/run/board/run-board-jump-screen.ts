@@ -10,10 +10,10 @@ import type { Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8677: the bttf jump written over the board between redraws, cell by cell, past the
 // theme: each cell as the theme drew it (`DropScreen`) recolored by `run_board_jump_paint`. The merge
-// jump runs at ten frames a second, writing only the cells that changed since the last turn and putting
-// each back as it was once the jump is over; the arrival writes every cell each tick. The animation
-// area is the panel's own (it thaws its cells itself), and the cells the spinners and the typing rows
-// write are left to them.
+// jump runs at a frame a tick over every cell of the terminal, writing only the cells that changed
+// since the last turn and putting each back as it was once the jump is over; the arrival writes every
+// cell each tick. The animation area is the panel's own (it thaws its cells itself), and the cells
+// the spinners and the typing rows write are left to them.
 
 const { ARRIVE_TICKS, TICK_MS, is_running, tick_of } = run_board_jump
 const { arrive_cells, jump_cells } = run_board_jump_paint
@@ -23,7 +23,8 @@ const { synced } = run_board_screen
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
 const CLEAR = `${CSI}H${CSI}J`
-const FRAME_MS = 100
+// joshuafolkken/kit#8739: a frame every tick, as the demo draws it.
+const FRAME_MS = TICK_MS
 const DEFAULT_FG = parsed('204;204;204')
 const FOREGROUND = /38;2;(\d+);(\d+);(\d+)/u
 const BACKGROUND = /48;2;(\d+);(\d+);(\d+)/u
@@ -54,11 +55,13 @@ function rgb_in(style: string, pattern: RegExp): Rgb | undefined {
 	return match === null ? undefined : parsed(match.slice(1).join(';'))
 }
 
-// Whether a cell, 1-based, is the animation area's: its rows from a column before its first lamp place.
+// Whether a cell, 1-based, is the animation area's: its rows from its first lamp place, the first
+// column the area writes (joshuafolkken/kit#8739: the one before it, written by neither, kept the
+// wash as a line after the thaw).
 function is_panel(panel: PanelArea | undefined, row: number, column: number): boolean {
 	if (panel === undefined || row < panel.top || row >= panel.top + panel.rows) return false
 
-	return column >= Math.min(...panel.lamps.map((lamp) => lamp.column)) - 1
+	return column >= Math.min(...panel.lamps.map((lamp) => lamp.column))
 }
 
 // Whether the jump paints a cell, 1-based: none the spinners, the typing rows or the area own.

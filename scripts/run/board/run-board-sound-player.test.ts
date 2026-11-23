@@ -302,6 +302,33 @@ describe('run_board_sound_player native loops', () => {
 	})
 })
 
+// joshuafolkken/kit#8747: a native loop ends at its stdin's EOF, however the board dies.
+describe('run_board_sound_player native loops end with the board', () => {
+	it.each([
+		['darwin', 'readDataToEndOfFile', 'NSRunLoop.currentRunLoop.run'],
+		['win32', '[Console]::In.ReadToEnd()', 'Wait-Event'],
+	] as const)('pipes stdin on %s and waits for its EOF (ac-6b1a2834)', (platform, waits, gone) => {
+		const test = harness()
+
+		run_board_sound_player.loop(WAV, handlers(), { platform, ports: test.ports })
+
+		const [, args, options] = test.spawner.mock.calls[0] ?? []
+		const script = args?.join(' ')
+
+		expect(options).toStrictEqual({ ...DETACHED, stdio: ['pipe', 'ignore', 'ignore'] })
+		expect(script).toContain(waits)
+		expect(script).not.toContain(gone)
+	})
+
+	it('leaves a one-shot sound without a stdin', () => {
+		const test = harness()
+
+		run_board_sound_player.play(WAV, { platform: 'darwin', ports: test.ports })
+
+		expect(test.spawner).toHaveBeenCalledExactlyOnceWith('afplay', [WAV], DETACHED)
+	})
+})
+
 // joshuafolkken/kit#8250: a start hands back each candidate it starts, so a lasting sound can be ended.
 describe('run_board_sound_player.start', () => {
 	it('tells each candidate it starts, in order, so the last one started is the one playing', () => {

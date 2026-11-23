@@ -107,14 +107,32 @@ function skips_of(frame: FrameSpots): Set<string> {
 	return new Set(places.map((place) => key_of(place)))
 }
 
+// The columns a line wraps at: the terminal's, unbounded without one.
+function columns_of(size: TerminalSize | undefined): number {
+	return size === undefined ? Infinity : Math.max(1, size.columns)
+}
+
 // The frame's screen rows, wrapped at the terminal's columns and cut to its rows; unbounded without one.
 function screen_rows(
 	lines: ReadonlyArray<string>,
 	size: TerminalSize | undefined,
 ): Array<Array<ScreenCell>> {
-	if (size === undefined) return lines.flatMap((line) => rows_of(line, Infinity))
+	const rows = lines.flatMap((line) => rows_of(line, columns_of(size)))
 
-	return lines.flatMap((line) => rows_of(line, Math.max(1, size.columns))).slice(0, size.rows)
+	return size === undefined ? rows : rows.slice(0, size.rows)
+}
+
+// joshuafolkken/kit#8739: the screen row, 0-based, each line starts on once the lines before it wrap.
+function line_tops(lines: ReadonlyArray<string>, size: TerminalSize | undefined): Array<number> {
+	let top = 0
+
+	return lines.map((line) => {
+		const start = top
+
+		top += rows_of(line, columns_of(size)).length
+
+		return start
+	})
 }
 
 // The frame's screen: its lines wrapped and cut to the terminal, and the cells the drop leaves alone.
@@ -141,7 +159,33 @@ function is_kept(screen: DropScreen, place: ScreenPlace): boolean {
 	return cell_at(screen, place).is_wide
 }
 
-const run_board_drop_screen = { WIDE_PAIR, cell_at, is_kept, key_of, screen_of, wrapped }
+function blanks(count: number): Array<ScreenCell> {
+	return Array.from({ length: Math.max(0, count) }, () => ({ ...BLANK }))
+}
+
+// joshuafolkken/kit#8739: the screen with every row filled out to its width with blank cells and blank
+// rows added to `height`: a blank line or a line's end is drawn with no cells, which would leave a
+// light over the whole screen (the bttf jump, its fire trails) nothing to paint and nothing to put back.
+function filled(screen: DropScreen, height: number): DropScreen {
+	const rows = Array.from({ length: Math.max(height, screen.rows.length) }, (_, y) => {
+		const row = screen.rows[y] ?? []
+
+		return [...row, ...blanks(screen.columns - row.length)]
+	})
+
+	return { ...screen, rows }
+}
+
+const run_board_drop_screen = {
+	WIDE_PAIR,
+	cell_at,
+	filled,
+	is_kept,
+	key_of,
+	line_tops,
+	screen_of,
+	wrapped,
+}
 
 export { run_board_drop_screen }
 export type { DropScreen, FrameSpots, ScreenCell, ScreenPlace }
