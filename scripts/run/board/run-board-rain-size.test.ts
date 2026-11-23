@@ -34,7 +34,6 @@ async function instant(): Promise<void> {
 	await Promise.resolve()
 }
 
-// Each beat's row count and the widths its rows draw.
 // The screen each beat leaves on the terminal: its row count and the widths its rows draw.
 function shapes_of(texts: ReadonlyArray<string>): Array<{ rows: number; widths: Set<number> }> {
 	return screens(texts).map((rows) => ({
