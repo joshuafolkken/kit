@@ -11,8 +11,8 @@ import {
 // The lane and run operations the lifecycle property test combines (joshuafolkken/kit#4274), each
 // offered only where the real command acts — `lane:pause` signals a child that is there, a launch
 // needs a run driving it — and each leaving what that command leaves. A launch and a restart ask the
-// table's guards first, as `lane-dispatch-prepare.ts` does (joshuafolkken/kit#8777); `lane:resume` does
-// not ask them yet (joshuafolkken/kit#8829), so neither does its model.
+// table's guards first, as `lane-dispatch-prepare.ts` does (joshuafolkken/kit#8777), and so does
+// `lane:resume`, before its signal (joshuafolkken/kit#8829).
 
 const { KIND, emit, is_refused, lane_of, try_write, write } = world_fixture
 
@@ -84,9 +84,15 @@ async function pause_lane(world: World, issue: string): Promise<void> {
 	emit(world, KIND.LANE_STATE, `#${issue} lane:pause`)
 }
 
-// `lane:resume` skips its event and ledger lines when the table refuses the write (a dependency wait).
+// `lane:resume` asks the table's work-tree guard first, and skips its event and ledger lines when the
+// table refuses the write (a dependency wait).
 async function resume_lane(world: World, issue: string): Promise<void> {
-	if (!(await try_write(world, { issue, state: 'running', command: 'lane:resume' }))) return
+	if (
+		(await is_refused(world, 'resume', issue)) ||
+		!(await try_write(world, { issue, state: 'running', command: 'lane:resume' }))
+	) {
+		return
+	}
 
 	emit(world, KIND.LANE_STATE, `#${issue} lane:resume`)
 	if (world.run.has_carry) lane_of(world, issue).launch_run = world.run.id
@@ -107,13 +113,7 @@ const LANE_OPERATIONS: ReadonlyArray<LaneOperation> = [
 	{ name: 'open', can: can_open, apply: open_lane },
 	{ name: 'launch', can: can_launch, apply: dispatch_lane },
 	{ name: 'pause', can: can_pause, apply: pause_lane },
-	{
-		name: 'resume',
-		can: can_resume,
-		apply: resume_lane,
-		lifts_pause: true,
-		skips_tree_guard: true,
-	},
+	{ name: 'resume', can: can_resume, apply: resume_lane, lifts_pause: true },
 	{ name: 'cut', can: can_cut, apply: cut_lane },
 	{ name: 'restart', can: can_restart, apply: restart_lane },
 	{ name: 'close', can: can_close, apply: close_lane, lifts_pause: true },
@@ -180,13 +180,11 @@ const RUN_OPERATIONS: ReadonlyArray<RunOperation> = [
 ]
 
 // One operation bound to the world it runs in, named as the failure trace prints it, with the lane it
-// acts on, whether it is a person's own lift of a pause and whether its writer skips the work-tree guard
-// (`lane-lifecycle-invariants-fixture.ts`).
+// acts on and whether it is a person's own lift of a pause (`lane-lifecycle-invariants-fixture.ts`).
 interface Step {
 	name: string
 	issue: string | undefined
 	lifts_pause: boolean
-	skips_tree_guard: boolean
 	apply: () => Promise<void> | void
 }
 
@@ -213,7 +211,6 @@ function lane_steps(world: World, issue: string, operations: Operations): Array<
 			name: `${operation.name} #${issue}`,
 			issue,
 			lifts_pause: operation.lifts_pause === true,
-			skips_tree_guard: operation.skips_tree_guard === true,
 			apply: operation.apply.bind(undefined, world, issue),
 		}))
 }
@@ -225,7 +222,6 @@ function steps_in(world: World, operations: Operations): Array<Step> {
 			name: operation.name,
 			issue: undefined,
 			lifts_pause: false,
-			skips_tree_guard: false,
 			apply: operation.apply.bind(undefined, world),
 		}))
 	const lanes = world_fixture.ISSUES.flatMap((issue) => lane_steps(world, issue, operations))

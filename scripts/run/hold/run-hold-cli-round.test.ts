@@ -18,6 +18,10 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('#scripts/lane/lane-state', () => ({
 	lane_state: { read_state: vi.fn(), record_change: vi.fn() },
 }))
+// joshuafolkken/kit#8829: review-resume asks the work-tree guard first; it would run against the mocked git.
+vi.mock('#scripts/lane/lane-transition-guards', () => ({
+	lane_transition_guards: { rejection: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const scratch = make_directory('run-hold-cli-round-test-')
 const WORKTREE = path.join(scratch, '.git')
