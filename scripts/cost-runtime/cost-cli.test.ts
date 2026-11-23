@@ -320,3 +320,20 @@ describe('cost_cli.session_figures', () => {
 		expect(cost_cli.session_figures({ cwd: CWD, environment: {} }).cost).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#8817: a cut trigger prices the verdict over its own measured horizon.
+describe('cost_cli.session_figures with a trigger horizon', () => {
+	it("prices the verdict over the trigger's horizon", () => {
+		const remaining = context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS
+		const threshold = context_cut_payback.break_even_context(undefined, remaining)
+
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
+			billed_input_per_request: [threshold + 1],
+		})
+
+		expect(
+			cost_cli.session_figures({ cwd: CWD, environment: OPENAI_ENV, remaining }),
+		).toStrictEqual({ verdict: 'over', cost: threshold + 1, threshold })
+		expect(threshold + 1).toBeLessThan(CONTEXT_CUT_THRESHOLD)
+	})
+})
