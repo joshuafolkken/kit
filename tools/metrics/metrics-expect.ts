@@ -93,7 +93,7 @@ function single_reason(pairs: ReadonlyArray<readonly [string, string]>): string 
 }
 
 function parse(argv: ReadonlyArray<string>): ExpectParse | undefined {
-	if (argv[0] !== EXPECT_FLAG) return undefined
+	if (!argv.includes(EXPECT_FLAG)) return undefined
 
 	const pairs = flag_pairs(argv)
 

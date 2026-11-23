@@ -84,6 +84,15 @@ describe('metrics_expect.parse', () => {
 	})
 })
 
+describe('metrics_expect.parse in any flag order', () => {
+	it('reads the --expect form whatever flag comes first', () => {
+		expect(metrics_expect.parse([REASON_FLAG, REASON, EXPECT, GUARDS_THREE])).toStrictEqual({
+			kind: 'expect',
+			expectation: { growth: { [GUARDS]: 3 }, reason: REASON },
+		})
+	})
+})
+
 describe('metrics_ratchet.compare with a declared growth', () => {
 	const declared = [approval_of({ [GUARDS]: 3, [RULE_LINES]: 20 })]
 
