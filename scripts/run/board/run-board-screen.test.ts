@@ -82,3 +82,88 @@ describe('run_board_screen.synced', () => {
 		expect(run_board_screen.synced('')).toBe('')
 	})
 })
+
+// joshuafolkken/kit#8796: the frame and what is drawn back over it, in one synchronized write.
+describe('run_board_screen.joined_synced', () => {
+	it('takes each part’s own markers out and wraps the whole once', () => {
+		expect(
+			run_board_screen.joined_synced([`${SYNC_ON}a${SYNC_OFF}`, 'b', `${SYNC_ON}c${SYNC_OFF}`]),
+		).toBe(`${SYNC_ON}abc${SYNC_OFF}`)
+	})
+
+	it('writes nothing for no parts', () => {
+		expect(run_board_screen.joined_synced([])).toBe('')
+	})
+})
+
+// A joint over a writer that keeps every write it is given.
+function kept_joint(): {
+	joint: ReturnType<typeof run_board_screen.joint_of>
+	written: Array<string>
+} {
+	const written: Array<string> = []
+	const joint = run_board_screen.joint_of((bytes) => {
+		written.push(bytes)
+	})
+
+	return { joint, written }
+}
+
+describe('run_board_screen.joint_of', () => {
+	it('writes straight through while not held', () => {
+		const { joint, written } = kept_joint()
+
+		joint.write('a')
+		joint.write('b')
+
+		expect(written).toStrictEqual(['a', 'b'])
+	})
+
+	it('keeps the writes from a hold and writes them as one synchronized write on the flush', () => {
+		const { joint, written } = kept_joint()
+
+		joint.hold()
+		joint.write(`${SYNC_ON}a${SYNC_OFF}`)
+		joint.write(`${SYNC_ON}b${SYNC_OFF}`)
+		const before = [...written]
+
+		joint.flush()
+		joint.write('c')
+
+		expect([before, written]).toStrictEqual([[], [`${SYNC_ON}ab${SYNC_OFF}`, 'c']])
+	})
+
+	it('writes nothing on a flush with nothing held', () => {
+		const { joint, written } = kept_joint()
+
+		joint.flush()
+		joint.hold()
+		joint.flush()
+
+		expect(written).toStrictEqual([])
+	})
+})
+
+describe('run_board_screen.jointed', () => {
+	it('flushes the joint before every wait', async () => {
+		const { joint, written } = kept_joint()
+		const seen: Array<Array<string>> = []
+		const ports = run_board_screen.jointed(
+			{
+				write: (bytes: string) => {
+					written.push(bytes)
+				},
+				sleep: async (_ms: number) => {
+					seen.push([...written])
+				},
+			},
+			joint,
+		)
+
+		joint.hold()
+		ports.write('a')
+		await ports.sleep(1)
+
+		expect(seen).toStrictEqual([[`${SYNC_ON}a${SYNC_OFF}`]])
+	})
+})

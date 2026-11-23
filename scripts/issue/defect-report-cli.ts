@@ -4,14 +4,26 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json } from '#scripts/git/parse-json-array'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
-import { defect_report, type OriginPr, type ReportIssue } from './defect-report'
-import { defect_report_format } from './defect-report-format'
+import { defect_merge_areas } from './defect-merge-areas'
+import { defect_report, type DefectReport, type OriginPr, type ReportIssue } from './defect-report'
+import { defect_report_format, type Period } from './defect-report-format'
 import { session_cite } from './session-cite'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const PR_CONCURRENCY = 4
-const USAGE = 'Usage: pnpm josh defect:report'
+const USAGE = 'Usage: pnpm josh defect:report [--since <days>]'
+const SINCE = /^--since (?<days>[1-9]\d*)$/u
+
+interface Arguments {
+	days: number | undefined
+}
+
+interface Counted {
+	report: DefectReport
+	period: Period | undefined
+}
+
 const UNREADABLE_MESSAGE =
 	'Could not read the bug issues from GitHub, so no report is printed — check `gh auth status`.'
 
@@ -93,36 +105,88 @@ function unreadable(): number {
 	return FAILURE_EXIT_CODE
 }
 
-async function report(repo: string): Promise<number> {
-	const issues = await read_issues(repo)
+// `--since <days>` bounds the report to the bugs filed in the last `<days>` days; no argument is
+// every bug. Anything else is refused.
+function parse_arguments(argv: ReadonlyArray<string>): Arguments | undefined {
+	if (argv.length === 0) return { days: undefined }
 
-	if (issues === undefined) return unreadable()
+	const days = SINCE.exec(argv.join(' '))?.groups?.['days']
 
-	const prs = await read_prs(repo, defect_report.origin_prs(issues))
+	return days === undefined ? undefined : { days: Number(days) }
+}
 
-	const aggregated = defect_report.aggregate(issues, prs)
+async function period_of(days: number, report: DefectReport, now: Date): Promise<Period> {
+	const merges = await defect_merge_areas.read(defect_report.since_days(days, now))
 
-	console.info(session_cite.text(defect_report_format.format(aggregated)))
+	return { days, rates: defect_report.area_rates(report.by_area, merges) }
+}
+
+async function count(
+	repo: string,
+	days: number | undefined,
+	now: Date,
+): Promise<Counted | undefined> {
+	const all = await read_issues(repo)
+
+	if (all === undefined) return undefined
+
+	const issues =
+		days === undefined ? all : defect_report.filed_since(all, defect_report.since_days(days, now))
+	const report = defect_report.aggregate(
+		issues,
+		await read_prs(repo, defect_report.origin_prs(issues)),
+	)
+	const period = days === undefined ? undefined : await period_of(days, report, now)
+
+	return { report, period }
+}
+
+async function count_in_repo(days: number | undefined): Promise<Counted | undefined> {
+	const repo = await git_gh_command.repo_get_name_with_owner()
+
+	return repo === undefined ? undefined : await count(repo, days, new Date())
+}
+
+async function print_report(days: number | undefined): Promise<number> {
+	const counted = await count_in_repo(days)
+
+	if (counted === undefined) return unreadable()
+
+	console.info(session_cite.text(defect_report_format.format(counted.report, counted.period)))
 
 	return SUCCESS_EXIT_CODE
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	if (argv.length > 0) {
+	const parsed = parse_arguments(argv)
+
+	if (parsed === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
 	try {
-		const repo = await git_gh_command.repo_get_name_with_owner()
-
-		return repo === undefined ? unreadable() : await report(repo)
+		return await print_report(parsed.days)
 	} catch {
 		return unreadable()
 	}
 }
 
-const defect_report_cli = { run }
+// The retrospective's defect section for the last `days` days, or no lines when GitHub or the
+// merge history cannot be read — the digest is printed either way.
+async function digest(days: number): Promise<ReadonlyArray<string>> {
+	try {
+		const counted = await count_in_repo(days)
+
+		return counted?.period === undefined
+			? []
+			: defect_report_format.digest(counted.report, counted.period)
+	} catch {
+		return []
+	}
+}
+
+const defect_report_cli = { digest, run }
 
 export { defect_report_cli }

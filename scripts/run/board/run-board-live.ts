@@ -5,7 +5,7 @@ import { run_board_header } from './run-board-header'
 import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
-import { run_board_screen, type Screen } from './run-board-screen'
+import { run_board_screen, type Joint, type Screen } from './run-board-screen'
 import { run_board_sound_player, type StartHandlers } from './run-board-sound-player'
 import type { TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
@@ -50,6 +50,7 @@ interface Start {
 	last: LastFrame
 	failed?: Failed | undefined
 	typing: Typing
+	hold: () => void
 }
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
@@ -83,8 +84,8 @@ function on_screen(ports: BoardPorts, screen: Screen): Framing {
 
 // Leaves the alternate screen once, whichever path gets there first: a second leave would restore the
 // cursor saved on entering and draw over whatever was printed after the first. The terminal leaves raw
-// mode with it.
-function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void {
+// mode with it, and whatever the joint still holds is written before it.
+function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading, joint: Joint): () => void {
 	let has_left = false
 
 	return () => {
@@ -92,7 +93,29 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 		has_left = true
 		keys.stop?.()
 		ports.typing_sound?.stop()
+		joint.flush()
 		ports.write(screen.leave)
+	}
+}
+
+// The board themed, its writes through a joint (`run_board_screen.jointed`).
+function themed_joint(
+	board: BoardPorts,
+	theme: Theme | undefined,
+): { ports: BoardPorts; joint: Joint } {
+	const joint = run_board_screen.joint_of(board.write)
+
+	return { ports: run_board_theme.themed(run_board_screen.jointed(board, joint), theme), joint }
+}
+
+// A frame drawn on the second holds the joint, so what the spin draws back over it shares its write.
+function frame_holding(framing: Framing, hold: () => void): Framing {
+	return {
+		wrap: framing.wrap,
+		sink: (bytes) => {
+			hold()
+			framing.sink(bytes)
+		},
 	}
 }
 
@@ -232,7 +255,7 @@ function ticker(ports: BoardPorts, screen: Screen, start: Start): Step {
 	const { last, failed } = start
 	let opening = start.reveal
 	const framing = on_screen(ports, screen)
-	const drawing = framed(ports, remembered(framing, last))
+	const drawing = framed(ports, remembered(frame_holding(framing, start.hold), last))
 	// The revealed frame is kept too, so a board closed before its second frame has one to wipe.
 	const held_wrap = remembered({ wrap: screen.held, sink: framing.sink }, last).wrap
 
@@ -319,9 +342,9 @@ function exiting(
 // each frame is restyled before its screen control bytes are added (`on_screen`).
 // Ctrl-C's first press wipes the last frame where the theme rains (`exiting`).
 async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Failed): Promise<void> {
-	const ports = run_board_theme.themed(board, theme)
+	const { ports, joint } = themed_joint(board, theme)
 	const { keys, drawn, last } = exiting(ports, theme)
-	const leave = leaver(ports, SCREEN, keys)
+	const leave = leaver(ports, SCREEN, keys, joint)
 	const live = live_ports(drawn, keys, theme)
 
 	ports.write(SCREEN.enter)
@@ -334,6 +357,7 @@ async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Faile
 			last,
 			failed,
 			typing: run_board_type_rows.NO_TYPING,
+			hold: joint.hold,
 		})
 	} finally {
 		leave()
