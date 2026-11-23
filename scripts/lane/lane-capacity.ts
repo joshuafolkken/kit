@@ -26,8 +26,8 @@ import { lane_seed_policy } from './lane-seed'
 // kit's own. A consumer reported eight cold builds of about six minutes each running at once on an
 // eight-core M1 Pro (joshuafolkken/kit#7212). A larger machine, kit's own included, raises it with
 // `JOSH_LANE_LIMIT`. joshuafolkken/kit#8762 pinned it from the ledger: over 14 days `lane:stats`'s
-// per-limit table read 4.8 merges per active hour at four lanes against 4.0 at six (733 of 868
-// merges), with the same lowest free memory and load peaks, so four stays the default and a rule
+// per-limit table read 4.8 merges per active hour at four lanes against 4.0 at six (734 of the
+// period's merges), with comparable free memory and load peaks, so four stays the default and a rule
 // derived from free memory or load was not needed — no other limit held enough hours to beat it.
 const DEFAULT_LANE_LIMIT = 4
 const LANE_LIMIT_KEY = 'JOSH_LANE_LIMIT'

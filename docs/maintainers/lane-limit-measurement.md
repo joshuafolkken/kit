@@ -485,6 +485,9 @@ most merges per active hour (`scripts/lane/lane-limit-table.ts`).
   belongs to no row.
 - Dispatches count in every row, because a lane's time runs from its dispatch, and that may fall under
   another limit than its merge.
+- Active hours are counted over the whole period's samples. The time from one sample to the next goes
+  to the limit the first sample was written under. Counting each row's own samples instead would bridge
+  a stretch that another limit held.
 - The pick only considers limits held for at least 4 active hours. A tie keeps the lower limit.
 
 To re-pin the default:
@@ -494,5 +497,5 @@ To re-pin the default:
    that cites the table.
 
 `JOSH_LANE_LIMIT` and `lane:limit` still override the default. The 2026-11-23 table read
-4.8 merges per hour at four lanes and 4.0 at six. The two limits had the same lowest free memory, so the
-default stayed at four and no rule derived from memory or load was added.
+4.8 merges per hour at four lanes and 4.0 at six. Neither free memory nor load explained the gap
+between the limits, so the default stayed at four and no rule derived from memory or load was added.

@@ -45,7 +45,7 @@ function merges(count: number, from: number, to: number): Array<LedgerEntry> {
 // Nine active hours at each limit: 18 merges under four lanes, 9 under six.
 const LEDGER: ReadonlyArray<LedgerEntry> = [
 	limit(20, LOW),
-	...samples(20, 11),
+	...samples(19, 11),
 	...merges(18, 20, 11),
 	limit(10, HIGH),
 	...samples(10, 1),
@@ -90,6 +90,21 @@ describe('lane_limit_table.slices_of', () => {
 	it('keeps a dispatch in every slice, since a lane may start under another limit', () => {
 		expect(slices.every((slice) => slice.entries.includes(dispatch))).toBe(true)
 	})
+
+	it('credits a stretch another limit held to that limit, not to the samples either side', () => {
+		// Six from 10:30 back to four at 10:12: the 11→10:30 pair is four's, 10:30→10 is six's.
+		const interleaved = [
+			limit(12, LOW),
+			...samples(12, 11),
+			limit(10.5, HIGH),
+			...samples(10.5, 10.5),
+			limit(10.2, LOW),
+			...samples(10, 10),
+		]
+		const hours = lane_limit_table.slices_of(interleaved, WINDOW).map((slice) => slice.hours)
+
+		expect(hours).toEqual([1.5, 0.5])
+	})
 })
 
 describe('lane_limit_table.best_limit', () => {
@@ -98,12 +113,15 @@ describe('lane_limit_table.best_limit', () => {
 	})
 
 	it('skips a limit held for fewer active hours than the minimum', () => {
-		const burst = [limit(0.9, SHORT), ...samples(0, 0), ...merges(5, 0.9, 0.1)]
+		// Three active hours at ten merges an hour: the best rate, held too briefly to pick.
+		const burst = [limit(3, SHORT), ...samples(3, 0), ...merges(30, 3, 0)]
 		const short_burst = [
-			...LEDGER.filter((entry) => Date.parse(entry.at) < NOW - MS_PER_HOUR),
+			...LEDGER.filter((entry) => Date.parse(entry.at) < NOW - 3 * MS_PER_HOUR),
 			...burst,
 		]
+		const slices = lane_limit_table.slices_of(short_burst, WINDOW)
 
+		expect(slices.find((slice) => slice.limit === SHORT)?.hours).toBe(3)
 		expect(lane_limit_table.best_limit(short_burst, WINDOW)).toBe(LOW)
 	})
 
