@@ -45,18 +45,12 @@ describe('run_board_intro.listen on the clock', () => {
 		expect(clock.at).toBe(TEXTS.length * BEAT_MS)
 	})
 
-	it('drops a beat already past its end and always writes the last', async () => {
+	// A rain or arrival beat writes only the cells changed since the beat before, so a late one is
+	// carried whole into the next write, never dropped; the last is always written.
+	it('carries a beat already past its end into the next write and always writes the last', async () => {
 		const { written, ports } = clocked(SLOW_WRITE_MS)
 
 		await listen(beats(), ports, NO_KEYS)
-
-		expect(written).toEqual(['a', 'c', 'd'])
-	})
-
-	it("carries a reveal's late block into the next write", async () => {
-		const { written, ports } = clocked(SLOW_WRITE_MS)
-
-		await listen(beats(), ports, NO_KEYS, run_board_beat_pace.appended)
 
 		expect(written).toEqual(['a', 'bc', 'd'])
 	})

@@ -1,4 +1,4 @@
-import { run_board_beat_pace, type Join, type Schedule } from './run-board-beat-pace'
+import { run_board_beat_pace, type Schedule } from './run-board-beat-pace'
 import { run_board_jump_screen } from './run-board-jump-screen'
 import type { KeyReading } from './run-board-keys'
 import { run_board_labels, type Paint } from './run-board-labels'
@@ -61,12 +61,11 @@ interface Skip {
 	release: () => void
 }
 
-// The beats played, as they are due (`run-board-beat-pace.ts`), and how a late one is carried.
+// The beats played, as they are due (`run-board-beat-pace.ts`).
 interface Playback {
 	beats: Iterator<Beat>
 	skip: Skip
 	schedule: Schedule
-	join: Join
 }
 
 function taken(beats: Iterator<Beat>): Beat | undefined {
@@ -85,9 +84,9 @@ async function written(
 	ports: PausedPorts,
 	carried: string,
 ): Promise<string> {
-	const { schedule, join, skip } = playback
+	const { schedule, skip } = playback
 	const end = schedule.end(beat.ms)
-	const text = join(carried, beat.text)
+	const text = `${carried}${beat.text}`
 
 	if (schedule.left(end) < 0) return text
 	ports.write(text)
@@ -128,13 +127,12 @@ function skipper(keys: KeyReading): Skip {
 }
 
 // Beats played only where the ports carry their pauses, the beats left unwritten left in `beats`; the
-// key listened for goes back to folding once they end. A late beat is carried as `join` says — a
-// whole rewrite by default. Whether all of them played, no key skipping them.
+// key listened for goes back to folding once they end. Whether all of them played, no key skipping
+// them.
 async function listen(
 	beats: Iterator<Beat>,
 	ports: IntroPorts,
 	keys: KeyReading,
-	join: Join = run_board_beat_pace.rewritten,
 ): Promise<boolean> {
 	const { intro_sleep } = ports
 	if (intro_sleep === undefined) return false
@@ -142,7 +140,7 @@ async function listen(
 	const schedule = run_board_beat_pace.scheduled(ports.intro_now)
 
 	try {
-		await beat_through({ beats, skip, schedule, join }, { ...ports, intro_sleep })
+		await beat_through({ beats, skip, schedule }, { ...ports, intro_sleep })
 	} finally {
 		skip.release()
 	}
@@ -279,7 +277,7 @@ async function reveal(
 	const lines = run_board_theme.marked(theme, frame, ports.icons).split('\n')
 	const beats = lines.flatMap((line, index) => line_beats(line, index)).values()
 
-	await listen(beats, { ...ports, write }, keys, run_board_beat_pace.appended)
+	await listen(beats, { ...ports, write }, keys)
 	const rest = [...beats]
 
 	if (rest.length > 0) write(rest.map((beat) => beat.text).join(''))
