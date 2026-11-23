@@ -473,3 +473,29 @@ started: runs and median seconds per count
 
 Read it as: medians that rise with the count show the verification calls competing for CPU. A
 `JOSH_LANE_LIMIT` or verification-parallelism change is filed in its own Issue, which cites this table.
+
+## Which lane limit merged the most
+
+The `By lane limit` table, printed under the period's row, gives one row per limit the period's entries
+were written under. It uses the same columns as the period's row
+([#8762](https://github.com/joshuafolkken/kit/issues/8762)). The line under it names the limit with the
+most merges per active hour (`scripts/lane/lane-limit-table.ts`).
+
+- An entry's limit is the last `limit` line at or before it. An entry written before any `limit` line
+  belongs to no row.
+- Dispatches count in every row, because a lane's time runs from its dispatch, and that may fall under
+  another limit than its merge.
+- Active hours are counted over the whole period's samples. The time from one sample to the next goes
+  to the limit the first sample was written under. Counting each row's own samples instead would bridge
+  a stretch that another limit held.
+- The pick only considers limits held for at least 4 active hours. A tie keeps the lower limit.
+
+To re-pin the default:
+
+1. Run `pnpm josh lane:stats --period 14` and read the pick.
+2. When the pick differs from `DEFAULT_LANE_LIMIT` in `scripts/lane/lane-capacity.ts`, file an Issue
+   that cites the table.
+
+`JOSH_LANE_LIMIT` and `lane:limit` still override the default. The 2026-11-23 table read
+4.8 merges per hour at four lanes and 4.0 at six. Neither free memory nor load explained the gap
+between the limits, so the default stayed at four and no rule derived from memory or load was added.

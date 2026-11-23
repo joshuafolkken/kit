@@ -1,15 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_header_trace } from './run-board-header-trace'
 import type { KeyInput } from './run-board-keys'
-import { run_board_labels } from './run-board-labels'
+import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_live } from './run-board-live'
 import { run_board_screen } from './run-board-screen'
 import type { TypingSound } from './run-board-sound-typing'
+import { run_board_theme_defs, type LiveDefinition } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8145: the live loop enters the alternate screen, hands its leave to the exit
 // handler, and leaves the screen once when the redraw stops — however many paths reach the leave.
 
 const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
+const { THEME_DEFS } = run_board_theme_defs
 const SCREEN = run_board_screen.screen_of('live')
 const NO_LIVE = {
 	sweep: false,
@@ -30,6 +33,11 @@ const { WORDS } = run_board_labels
 const FOOTER_LINES = 2
 const LEFT_MS = 300
 
+// joshuafolkken/kit#8745: the notice blinks three times and holds lit in the theme's look.
+function notice_of(lit: Paint, is_rain: boolean): Pick<LiveDefinition, 'notice_trace' | 'notice'> {
+	return { notice_trace: true, notice: { lit, is_rain } }
+}
+
 afterEach(() => {
 	vi.unstubAllEnvs()
 })
@@ -43,6 +51,7 @@ describe('run_board_live.live_of', () => {
 			types_rows: true,
 			trill: true,
 			codes: true,
+			...notice_of(THEME_DEFS.wargames.paint, false),
 		})
 	})
 
@@ -59,7 +68,7 @@ describe('run_board_live.live_of', () => {
 			rain: true,
 			drop: true,
 			flash: true,
-			notice_trace: true,
+			...notice_of(run_board_header_trace.SHADES.bright, true),
 		})
 	})
 
@@ -83,10 +92,12 @@ describe('run_board_live.live_of', () => {
 describe('run_board_live.live_of bttf', () => {
 	it('reads only the rows typed from the bttf definition', () => {
 		// joshuafolkken/kit#8731: its trill sounds over every typing row.
+		// joshuafolkken/kit#8745: its notice blinks three times and holds lit in its body color.
 		expect(run_board_live.live_of('bttf')).toStrictEqual({
 			...NO_LIVE,
 			types_rows: true,
 			trill: true,
+			...notice_of(THEME_DEFS.bttf.paint, false),
 		})
 	})
 })

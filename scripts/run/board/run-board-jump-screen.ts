@@ -17,7 +17,7 @@ import type { Typing } from './run-board-type-rows'
 
 const { ARRIVE_TICKS, TICK_MS, is_running, tick_of } = run_board_jump
 const { arrive_cells, jump_cells } = run_board_jump_paint
-const { parsed } = run_board_rgb
+const { palette, parsed } = run_board_rgb
 const { synced } = run_board_screen
 
 const CSI = '\u{1B}['
@@ -26,8 +26,11 @@ const CLEAR = `${CSI}H${CSI}J`
 // joshuafolkken/kit#8739: a frame every tick, as the demo draws it.
 const FRAME_MS = TICK_MS
 const DEFAULT_FG = parsed('204;204;204')
-const FOREGROUND = /38;2;(\d+);(\d+);(\d+)/u
 const BACKGROUND = /48;2;(\d+);(\d+);(\d+)/u
+// joshuafolkken/kit#8744: each foreground a style sets, in order — 24-bit, named (`styleText`'s `33m`,
+// `90m`: its kind and color) or back to the default (`39m`); a cell's is the last.
+const FOREGROUNDS = /38;2;(?<rgb>\d+;\d+;\d+)|\[(?<kind>[39])(?<color>[0-7])m|\[39m/gu
+const BRIGHT_KIND = '9'
 // No typing rows: the arrival is drawn before the board types any (a value import of
 // `run_board_type_rows.NO_TYPING` would cycle through `run-board-intro.ts`).
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
@@ -71,8 +74,23 @@ function is_painted(draw: JumpDraw, row: number, column: number): boolean {
 	return !is_panel(draw.panel, row, column)
 }
 
+function last_foreground(style: string): Partial<Record<string, string>> {
+	return [...style.matchAll(FOREGROUNDS)].at(-1)?.groups ?? {}
+}
+
+// The foreground a style leaves a cell in: a named one as the palette draws it.
+function foreground_of(style: string): Rgb {
+	const { rgb, kind, color } = last_foreground(style)
+
+	if (rgb !== undefined) return parsed(rgb)
+	if (color === undefined) return DEFAULT_FG
+
+	return palette(Number(color), kind === BRIGHT_KIND) ?? DEFAULT_FG
+}
+
+// A cell as the jump paints it, its colors the theme's.
 function paint_cell(cell: ScreenCell, x: number, y: number): PaintCell {
-	const fg = rgb_in(cell.style, FOREGROUND) ?? DEFAULT_FG
+	const fg = foreground_of(cell.style)
 
 	return { x, y, text: cell.text, fg, bg: rgb_in(cell.style, BACKGROUND), is_figure: false }
 }
@@ -136,10 +154,27 @@ function screen_cells(screen: DropScreen): Array<PaintCell> {
 	)
 }
 
+// A cell at `key` as the theme drew it.
+function theme_bytes(key: string, style: string, text: string): string {
+	return `${CSI}${key}H${RESET}${style}${text}${RESET}`
+}
+
+// joshuafolkken/kit#8744: a cell the arrival has thawed whole is written as the theme drew it, so the
+// frame after the beats brings no color the palette's guess at a named one missed.
+function arrival_bytes(cell: PaintCell, plain: PaintCell | undefined, screen: DropScreen): string {
+	const style = style_at(screen, cell)
+
+	if (plain === undefined || !is_same(cell, plain)) return painted_bytes(cell, style)
+
+	return theme_bytes(key_of(cell.y + 1, cell.x + 1), style, cell.text)
+}
+
 // Every cell of the arrival `tick` ticks in (joshuafolkken/kit#8732): a cell left as the last beat
 // wrote it would stay lost to anything that wiped it since.
 function arrive_bytes(plain: ReadonlyArray<PaintCell>, screen: DropScreen, tick: number): string {
-	return [...keyed(arrive_cells(plain, tick), screen).values()].join('')
+	return arrive_cells(plain, tick)
+		.map((cell, index) => arrival_bytes(cell, plain[index], screen))
+		.join('')
 }
 
 // joshuafolkken/kit#8732: the first frame comes held, the screen wiped ahead of it
@@ -173,7 +208,7 @@ function restore_bytes(screen: DropScreen, key: string): string {
 	const [row = 0, column = 0] = key.split(';').map(Number)
 	const cell = screen.rows[row - 1]?.[column - 1]
 
-	return cell === undefined ? '' : `${CSI}${key}H${RESET}${cell.style}${cell.text}${RESET}`
+	return cell === undefined ? '' : theme_bytes(key, cell.style, cell.text)
 }
 
 // The bytes the jump writes `at_ms`, a frame every `FRAME_MS`: each cell it paints differently since

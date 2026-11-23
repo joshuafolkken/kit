@@ -42,6 +42,7 @@ const MATRIX_LIVE: LiveDefinition = {
 	drop: true,
 	flash: true,
 	notice_trace: true,
+	notice: { lit: { rgb: '0;255;65', named: 'green' }, is_rain: true },
 }
 const AMBER: ThemeDefinition = {
 	name: 'josh-amber',
@@ -66,6 +67,24 @@ describe('run_board_theme_defs.live_of sweep', () => {
 		expect(run_board_theme_defs.live_of('matrix').sweep).toBe(false)
 		expect(run_board_theme_defs.live_of(undefined).sweep).toBe(false)
 		expect(run_board_theme_defs.live_of('wargames', {}).sweep).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8745: every theme's notice blinks and holds in its own lit color, arriving as the
+// matrix rain or the theme's typing; a board in no theme has none.
+describe('run_board_theme_defs.live_of notice', () => {
+	it.each([
+		['matrix', run_board_header_trace.SHADES.bright, true],
+		['wargames', THEME_DEFS.wargames.paint, false],
+		['bttf', THEME_DEFS.bttf.paint, false],
+	] as const)('lights the %s notice in its paint', (theme, lit, is_rain) => {
+		expect(run_board_theme_defs.live_of(theme).notice_trace).toBe(true)
+		expect(run_board_theme_defs.live_of(theme).notice).toStrictEqual({ lit, is_rain })
+	})
+
+	it('traces no notice in no theme', () => {
+		expect(run_board_theme_defs.live_of(undefined).notice_trace).toBeUndefined()
+		expect(run_board_theme_defs.live_of(undefined).notice).toBeUndefined()
 	})
 })
 
@@ -111,7 +130,15 @@ describe('run_board_theme_defs.THEME_DEFS wargames', () => {
 			panel: run_board_panel_painters.LAMP_PAINTER,
 			rule_lamped: true,
 			spinner: '│╱─╲',
-			live: { ...OFF_LIVE, sweep: true, types_rows: true, trill: true, codes: true },
+			live: {
+				...OFF_LIVE,
+				sweep: true,
+				types_rows: true,
+				trill: true,
+				codes: true,
+				notice_trace: true,
+				notice: { lit: { rgb: PHOSPHOR_RGB, named: 'cyan' }, is_rain: false },
+			},
 			typing: run_board_sound_typing.teletype_wav,
 			typed_end: THEME_DEFS.wargames.typed_end,
 		})
