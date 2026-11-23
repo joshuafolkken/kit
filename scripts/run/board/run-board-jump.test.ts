@@ -4,8 +4,11 @@ import { run_board_jump } from './run-board-jump'
 // joshuafolkken/kit#8677: the bttf time jump's and arrival's timelines in ticks.
 
 const {
+	ARRIVE_THAW_TICKS,
 	ARRIVE_TICKS,
+	END_TICKS,
 	THAW_AT,
+	THAW_TICKS,
 	TICK_MS,
 	TOP_SPEED,
 	arrive_speed,
@@ -78,8 +81,23 @@ describe('run_board_jump.arrive_speed', () => {
 	it('holds 88 until the thaw, brakes through it and has none once the arrival is over', () => {
 		expect(arrive_speed(0, CRUISE)).toBe(TOP_SPEED)
 		expect(arrive_speed(THAW_AT, CRUISE)).toBe(TOP_SPEED)
-		expect(arrive_speed(ARRIVE_TICKS - 1, CRUISE)).toBeCloseTo(41.07, 1)
+		expect(arrive_speed(ARRIVE_TICKS - 1, CRUISE)).toBeCloseTo(42.4, 1)
 		expect(arrive_speed(ARRIVE_TICKS, CRUISE)).toBeUndefined()
+	})
+
+	it('ac-2cf69f64 brakes over the arrival thaw, its own 20 ticks, halfway at its middle', () => {
+		const middle = THAW_AT + ARRIVE_THAW_TICKS / 2
+
+		expect(ARRIVE_THAW_TICKS).toBe(20)
+		expect(ARRIVE_TICKS).toBe(THAW_AT + ARRIVE_THAW_TICKS)
+		expect(arrive_speed(middle, CRUISE)).toBe((TOP_SPEED + CRUISE) / 2)
+	})
+})
+
+describe('run_board_jump — the jump thaw', () => {
+	it('ac-d8476969 keeps the jump thaw at 45 ticks and the jump over at 78', () => {
+		expect(THAW_TICKS).toBe(45)
+		expect(END_TICKS).toBe(OVER_TICK)
 	})
 })
 
