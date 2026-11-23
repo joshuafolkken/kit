@@ -11,8 +11,9 @@ import type { Typing } from './run-board-type-rows'
 // joshuafolkken/kit#8677: the bttf jump written over the board between redraws, cell by cell, past the
 // theme: each cell as the theme drew it (`DropScreen`) recolored by `run_board_jump_paint`. The merge
 // jump runs at ten frames a second, writing only the cells that changed since the last turn and putting
-// each back as it was once the jump is over; the arrival writes every cell each tick. The animation area is the panel's own (it thaws its cells itself), and the cells the
-// spinners and the typing rows write are left to them.
+// each back as it was once the jump is over; the arrival writes every cell each tick. The animation
+// area is the panel's own (it thaws its cells itself), and the cells the spinners and the typing rows
+// write are left to them.
 
 const { ARRIVE_TICKS, TICK_MS, is_running, tick_of } = run_board_jump
 const { arrive_cells, jump_cells } = run_board_jump_paint
