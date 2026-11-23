@@ -1,7 +1,9 @@
 {
-	"reason": "Per-trigger cut horizons (#8817): two measured constants and a remaining option threaded through cost_cli",
+	"reason": "The cut docs must name the per-trigger horizons (IMPLEMENTATION_REMAINING_REQUESTS / REVIEW_FIX_REMAINING_REQUESTS) beside the shared cost --cut figure (#8817)",
 	"date": "2026-11-23",
 	"growth": {
-		"scripts.code_lines": 18
+		"scripts.code_lines": 18,
+		"ai_cost.on_demand_bytes": 213,
+		"prose.long_paragraphs": 1
 	}
 }

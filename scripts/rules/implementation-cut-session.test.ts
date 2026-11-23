@@ -30,7 +30,7 @@ const CALL_CWD = path.join(CWD, 'call')
 cost_cli_fixture.capture_console()
 
 function clear_cache(): void {
-	for (const transcript of [OLD_TRANSCRIPT, NEW_TRANSCRIPT, OPENAI_TRANSCRIPT]) {
+	for (const transcript of [OLD_TRANSCRIPT, NEW_TRANSCRIPT, OPENAI_TRANSCRIPT, CWD]) {
 		stamp_file.remove_stamp(implementation_cut_verdict.cache_path(transcript))
 	}
 }
@@ -107,6 +107,25 @@ describe('implementation cut session identity', () => {
 			environment: expect.objectContaining({ CLAUDE_CODE_SESSION_ID: NEW_SESSION }),
 			remaining: REMAINING,
 		})
+	})
+})
+
+describe('implementation cut without a hook transcript', () => {
+	// joshuafolkken/kit#8817: the cwd-keyed fallback prices over the same horizon as the transcript read.
+	it('prices the implementation horizon when the hook carries no transcript', () => {
+		stub_cuttable_lane()
+		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('over')
+		const run = {
+			transcript: NEW_TRANSCRIPT,
+			now_ms: implementation_cut.REISSUE_WINDOW_MS,
+			context: hook_context.from_process(),
+		}
+
+		// A hook payload missing the field reaches the guard as a run whose transcript is absent at runtime.
+		Reflect.deleteProperty(run, 'transcript')
+
+		expect(implementation_cut.ROW.decide(EDIT_CALL, run, true, 0)).toBe(true)
+		expect(read).toHaveBeenCalledWith(expect.objectContaining({ cwd: CWD, remaining: REMAINING }))
 	})
 })
 

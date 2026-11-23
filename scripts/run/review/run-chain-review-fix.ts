@@ -17,7 +17,7 @@ import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
 // fix stays in place.
 //
 // **Only past the cut threshold** (joshuafolkken/kit#8312). The saving is the re-read context, so it is
-// priced by the same break-even every other cut reads (`context-cut-payback.ts`): below it, the fresh
+// priced by the same break-even formula every other cut reads (`context-cut-payback.ts`): below it, the fresh
 // session's preamble rewrite costs more than the fix turns re-reading this context, and the fix stays
 // in place. The horizon is the review-fix resumes' own (`REVIEW_FIX_REMAINING_REQUESTS`,
 // joshuafolkken/kit#8817). `run:cut --impl` trusts its caller to have checked (`run-cut-cli.ts` → `pre_gate_answer`),
