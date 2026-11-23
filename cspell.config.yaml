@@ -362,6 +362,7 @@ words:
   - EBADDEVENGINES
   - sonarlint
   - inlines
+  - imul
   - extensionless
   - untriaged
   - mnemecha

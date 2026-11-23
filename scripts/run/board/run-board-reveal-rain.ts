@@ -42,6 +42,19 @@ interface Drawn {
 	is_shown: boolean
 }
 
+// A row of the grid under one frame of the rain: its columns, the rain's cells as the frame reads
+// them, and what each column draws on its own.
+interface DrawnRow {
+	columns: ReadonlyArray<Column>
+	cells: ReadonlyArray<RainCell>
+	keys: Array<string>
+}
+
+interface Run {
+	start: number
+	end: number
+}
+
 const ESC = '\u{1B}'
 const CURSOR_HOME = `${ESC}[H`
 // The cursor to the start of the next row: unlike a newline it never scrolls, and it ends a pending wrap.
@@ -184,34 +197,112 @@ function area_of(grid: ReadonlyArray<ReadonlyArray<Column>>): { width: number; h
 	return { width: grid[0]?.length ?? 0, height: grid.length }
 }
 
-// One frame of the rain over the grid, its rows joined by a cursor move and written whole at once.
-function beat_of(
+// The cursor to a zero-based row and column of the screen.
+function cursor_to(y: number, x: number): string {
+	return `${ESC}[${String(y + 1)};${String(x + 1)}H`
+}
+
+// What each column of a row draws on its own, so two frames compare by what the terminal shows.
+function keys_of(columns: ReadonlyArray<Column>, cells: ReadonlyArray<RainCell>): Array<string> {
+	return columns.map(
+		(column, x) =>
+			frame_column(column, { cell: cells[x] ?? BEHIND, next: cells[x + 1] }, false).text,
+	)
+}
+
+// Whether a column is half of a wide character whose other half changed: the pair is redrawn whole.
+function is_paired(
+	columns: ReadonlyArray<Column>,
+	changed: ReadonlyArray<boolean>,
+	x: number,
+): boolean {
+	if (columns[x]?.width === 0) return changed[x - 1] === true
+
+	return columns[x + 1]?.width === 0 && changed[x + 1] === true
+}
+
+// The columns to rewrite: each that draws otherwise than before, with the other half of its wide character.
+function changed_of(row: DrawnRow, before: ReadonlyArray<string>): Array<boolean> {
+	const changed = row.keys.map((key, x) => key !== before[x])
+
+	return changed.map((is_changed, x) => is_changed || is_paired(row.columns, changed, x))
+}
+
+// Where a run of columns to rewrite starting at `start` ends: the first column left as it was.
+function run_end(changed: ReadonlyArray<boolean>, start: number): number {
+	const end = changed.indexOf(false, start)
+
+	return end === -1 ? changed.length : end
+}
+
+// The runs of consecutive columns to rewrite, each from its start up to its end.
+function runs_of(changed: ReadonlyArray<boolean>): Array<Run> {
+	return [...changed.keys()]
+		.filter((x) => changed[x] === true && changed[x - 1] !== true)
+		.map((start) => ({ start, end: run_end(changed, start) }))
+}
+
+// A run of a row written where it starts, its colors and links closed at its end.
+function run_text(row: DrawnRow, run: Run, y: number): string {
+	const { start, end } = run
+	const text = row_of(row.columns.slice(start, end), row.cells.slice(start, end + 1))
+
+	return `${cursor_to(y, start)}${text}`
+}
+
+// A row's changed runs, each written where it starts.
+function row_changes(row: DrawnRow, before: ReadonlyArray<string>, y: number): string {
+	return runs_of(changed_of(row, before))
+		.map((run) => run_text(row, run, y))
+		.join('')
+}
+
+// The grid's rows under the rain, each with the rain's cells as the frame reads them and what its
+// columns draw.
+function drawn_rows_of(
 	grid: ReadonlyArray<ReadonlyArray<Column>>,
 	cells: ReadonlyArray<ReadonlyArray<RainCell>>,
 	read: (cell: RainCell) => RainCell,
-): Beat {
-	const rows = grid.map((columns, y) =>
-		row_of(
-			columns,
-			(cells[y] ?? []).map((cell) => read(cell)),
-		),
-	)
+): Array<DrawnRow> {
+	return grid.map((columns, y) => {
+		const read_cells = (cells[y] ?? []).map((cell) => read(cell))
 
-	return { text: synced(`${CURSOR_HOME}${rows.join(NEXT_LINE)}`), ms: run_board_rain.RAIN_MS }
+		return { columns, cells: read_cells, keys: keys_of(columns, read_cells) }
+	})
 }
 
-// Every frame of one pass of the rain over the drawn frame, each a beat `RAIN_MS` long that rewrites
-// the screen from its top-left corner, written whole at once; made one at a time, so a skipped pass
-// makes no more. Rows are joined by a cursor move, not a newline, so a row as wide as the terminal or
-// the bottom row never scrolls it. `read` turns each rain cell into what the frame shows under it: the
-// frame behind the rain as it is, or another reading of it (`run-board-exit-rain.ts`); `size` is the
-// terminal the rain fills (joshuafolkken/kit#8614).
+// One frame of the rain: the first written whole from the top-left corner, its rows joined by a
+// cursor move; every later one only the columns that draw otherwise than in the frame before
+// (joshuafolkken/kit#8790), so a column the rain has passed is not written again.
+function beat_text(
+	rows: ReadonlyArray<DrawnRow>,
+	before?: ReadonlyArray<ReadonlyArray<string>>,
+): string {
+	if (before === undefined) {
+		return `${CURSOR_HOME}${rows.map((row) => row_of(row.columns, row.cells)).join(NEXT_LINE)}`
+	}
+
+	return rows.map((row, y) => row_changes(row, before[y] ?? [], y)).join('')
+}
+
+// Every frame of one pass of the rain over the drawn frame, each a beat `RAIN_MS` long written whole
+// at once (`beat_text`); made one at a time, so a skipped pass makes no more. Rows are reached by a
+// cursor move, not a newline, so a row as wide as the terminal or the bottom row never scrolls it.
+// `read` turns each rain cell into what the frame shows under it: the frame behind the rain as it is,
+// or another reading of it (`run-board-exit-rain.ts`); `size` is the terminal the rain fills
+// (joshuafolkken/kit#8614).
 function* beats_of(frame: string, random: Random, rendering: Rendering = {}): Generator<Beat> {
 	const { read = same, size, scene } = rendering
 	const grid = grid_of(frame, size)
 	const passes = run_board_rain.passes(area_of(grid), random, scene)
+	const drawn: { before?: Array<Array<string>> } = {}
 
-	for (const cells of passes) yield beat_of(grid, cells, read)
+	for (const cells of passes) {
+		const rows = drawn_rows_of(grid, cells, read)
+
+		yield { text: synced(beat_text(rows, drawn.before)), ms: run_board_rain.RAIN_MS }
+		drawn.before = rows.map((row) => row.keys)
+	}
 }
 
 // Whether stdout draws the rain's colors; where it draws none (a pipe, `NO_COLOR`) no rain falls.
