@@ -145,7 +145,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh code:symbol` | `<file> <name> \| <name>` | automation | none | Print one TypeScript declaration by name, numbered, or list where a name is declared |
 | `josh cost` | `(--cut \| --over <tokens-per-request>) [--path <dir>]` | automation | none | Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over) |
 | `josh cost:audit` · `josh ca` · **kit only** | `[--period <days> \| --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]` | maintainer | none | Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before |
-| `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed what a defect issue names, as candidates for its origin line |
+| `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed or first added what a defect issue names, as candidates for its origin line |
 | `josh defect:report` | — | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
 | `josh diff:summary` | `[<base>]` | automation | files | Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole |
