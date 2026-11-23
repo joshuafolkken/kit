@@ -27,24 +27,30 @@ function own_cpu_ms(): number {
 	return (usage.user + usage.system) / US_PER_MS
 }
 
-function reaped_cpu_ms(read: RusageReader | undefined, pid: number): number | undefined {
+function reaped_cpu_ms(
+	read: RusageReader | undefined,
+	pid: number,
+	own: () => number,
+): number | undefined {
 	const reading = read?.(pid)
 
-	return reading === undefined ? undefined : reading.cpu_ms - own_cpu_ms()
+	return reading === undefined ? undefined : reading.cpu_ms - own()
 }
 
-// One gate's reader, its baseline taken now — before any check is reaped.
+// One gate's reader, its baseline taken now — before any check is reaped. `own` reads the gate's own
+// CPU milliseconds, injectable so a test pins it rather than racing a second live read.
 function check_cpu_reader(
 	read: RusageReader | undefined = run_board_usage_rusage.rusage_reader(
 		process.platform,
 		run_board_usage_rusage.load_builtin,
 	),
 	pid: number = process.pid,
+	own: () => number = own_cpu_ms,
 ): CheckCpu {
-	const previous = { reaped_ms: reaped_cpu_ms(read, pid) }
+	const previous = { reaped_ms: reaped_cpu_ms(read, pid, own) }
 
 	return function since_previous(): number | undefined {
-		const reaped_ms = reaped_cpu_ms(read, pid)
+		const reaped_ms = reaped_cpu_ms(read, pid, own)
 		const before = previous.reaped_ms
 
 		previous.reaped_ms = reaped_ms
