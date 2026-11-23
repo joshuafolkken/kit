@@ -1,0 +1,7 @@
+{
+	"reason": "New lane-transition-guards module and its tests evaluate the table's guards in one place (#8777); the per-caller checks it replaces were shorter but duplicated",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 69
+	}
+}
