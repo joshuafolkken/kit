@@ -32,6 +32,7 @@ is the way it is, and the issues it came from, live in the matching `*-rationale
 - [fresh-machine.md](./fresh-machine.md) — `josh fresh:run`, an install scenario on a machine with nothing installed
 - [lane-limit-measurement.md](./lane-limit-measurement.md) — `josh lane:sample` / `lane:stats`, measuring a `JOSH_LANE_LIMIT` and where a lane's time goes
 - [backlogrun-driver.md](./backlogrun-driver.md) — what the `backlogrun` driver commands do on their own, kept off the parent's read path
+- [lane-lifecycle.md](./lane-lifecycle.md) — a lane's states, the events that move it, and the operations kept outside its record
 
 ## Why the rules and commands are the way they are
 
