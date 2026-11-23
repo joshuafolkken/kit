@@ -15,6 +15,7 @@ const mocked_resolve = vi.mocked(resolve_package_bin)
 const { eslint_daemon } = await import('./eslint-daemon')
 const { eslint_daemon_environment } = await import('./eslint-daemon-environment')
 const { record_file } = eslint_daemon_environment
+const { eslint_daemon_replaced } = await import('./eslint-daemon-replaced')
 const { ESLINT_HEAP_MIB } = await import('./eslint-heap')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
@@ -144,6 +145,18 @@ describe('eslint_daemon.run_or_cold daemon state', () => {
 			exit_code: 0,
 			daemon: 'daemon unreachable, cold process',
 		})
+	})
+})
+
+// joshuafolkken/kit#8848: a daemon that is current replaces any started under another environment.
+describe('eslint_daemon.run_or_cold replaced daemons', () => {
+	it('stops the daemons it replaced once one is current', async () => {
+		running()
+		const stop_replaced = vi.spyOn(eslint_daemon_replaced, 'stop_replaced')
+
+		await eslint_daemon.run_or_cold(PNPM_ESLINT)
+
+		expect(stop_replaced).toHaveBeenCalledWith(expect.stringMatching(/eslint$/u), project_root)
 	})
 })
 

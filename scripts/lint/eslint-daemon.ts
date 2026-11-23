@@ -212,10 +212,7 @@ function remember(project_root: string, current: string): void {
 	if (directory === undefined) return
 	const daemon = read_daemon(directory, project_root)
 	if (daemon === undefined) return
-	eslint_daemon_replaced.stop_replaced(
-		directory,
-		eslint_daemon_environment.record_file(directory, project_root),
-	)
+	eslint_daemon_replaced.stop_replaced(directory, project_root)
 
 	try {
 		atomic_write.replace_file(
