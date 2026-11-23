@@ -311,12 +311,13 @@ describe('lane_state.record_stuck', () => {
 	})
 })
 
-// joshuafolkken/kit#4744: `lane:adopt` writes a lane a record only while it has none.
-describe('lane_state.record_adopted', () => {
+// joshuafolkken/kit#4744: `lane:adopt` writes a lane a record only while it has none — the table's
+// `adopt` event takes no lane that has one (joshuafolkken/kit#8768).
+describe('lane_state.record_owner adopt', () => {
 	const ADOPT = 'lane:adopt'
 
 	it('writes the change for a lane with no record', async () => {
-		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
+		const outcome = await lane_state.record_owner(ISSUE, 'adopt', {
 			directory: state.directory,
 			now: OPENED_AT,
 		})
@@ -331,11 +332,12 @@ describe('lane_state.record_adopted', () => {
 	it('leaves a lane that has a record as it is', async () => {
 		await record_at(change_of('ended', CLOSE), PAUSED_AT)
 
-		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
-			directory: state.directory,
-		})
+		const outcome = await lane_state.record_owner(ISSUE, 'adopt', { directory: state.directory })
 
-		expect(outcome).toStrictEqual({ kind: 'skipped', reason: 'a record exists' })
+		expect(outcome).toStrictEqual({
+			kind: 'rejected',
+			reason: 'no ended → open transition by adopt',
+		})
 		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.toMatchObject({
 			state: 'ended',
 			changed_by: CLOSE,
@@ -347,9 +349,7 @@ describe('lane_state.record_adopted', () => {
 			throw new Error('ENOSPC')
 		})
 
-		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
-			directory: state.directory,
-		})
+		const outcome = await lane_state.record_owner(ISSUE, 'adopt', { directory: state.directory })
 
 		expect(outcome).toStrictEqual({ kind: 'skipped', reason: 'ENOSPC' })
 	})
