@@ -10,7 +10,7 @@ import { run_board_rgb, type Rgb } from './run-board-rgb'
 // (joshuafolkken/kit#8740); the jump washes the board in five tints and then white, and the board thaws
 // from ice to its own colors, the top rows first, each cell at its own moment. The arrival is black,
 // three flashes, then the same thaw. The capacitor and the gauge (`is_figure`) keep their own light
-// until the thaw.
+// until the thaw, crossed only by the run up's bolts.
 
 const { mixed, parsed, scaled } = run_board_rgb
 const { END_TICKS, THAW_AT, THAW_TICKS, WASH_TICKS, ARRIVE_TICKS, flash_of } = run_board_jump
