@@ -335,7 +335,7 @@ describe('run_ship_synced_scope.read_sync — what test:related is named over', 
 	const MAIN = Array.from({ length: MAIN_SIZE }, (_, index) => `scripts/main/m${String(index)}.ts`)
 	const MAIN_TESTS = MAIN.map((file) => file.replace('.ts', '.test.ts'))
 	const MEETING = [...MAIN, ...MAIN_TESTS]
-	const MEETS = { left: MAIN, shared: MAIN_TESTS, meeting: MEETING, touching: MEETING }
+	const MEETS = { left: MAIN, shared: [SHARED_TEST], meeting: MEETING, touching: MEETING }
 
 	beforeEach(() => {
 		vi.spyOn(changed_file_scope, 'repository_root_or_cwd').mockResolvedValue(process.cwd())
@@ -344,11 +344,11 @@ describe('run_ship_synced_scope.read_sync — what test:related is named over', 
 		split.mockResolvedValue(MEETS)
 	})
 
-	it('names the branch change alone for a merge main brought in only (ac-ea05869a)', async () => {
+	it('names the shared tests alone, not the branch change (ac-ea05869a, ac-e1870707)', async () => {
 		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
 
-		expect(reading?.test_overlap).toStrictEqual(BRANCH)
-		expect(run_ship_synced_scope.files_for(reading, TEST, MAIN)).toStrictEqual(BRANCH)
+		expect(reading?.test_overlap).toStrictEqual([SHARED_TEST])
+		expect(run_ship_synced_scope.files_for(reading, TEST, MAIN)).toStrictEqual([SHARED_TEST])
 		expect(run_ship_synced_scope.files_for(reading, LINT, BRANCH)).toBe(reading?.overlap)
 	})
 
@@ -358,7 +358,7 @@ describe('run_ship_synced_scope.read_sync — what test:related is named over', 
 		expect(await run_ship_synced_scope.read_sync(TREE, PAIR)).toStrictEqual(first)
 	})
 
-	it('keeps the branch change only where a test meets it (ac-62eacc9c)', async () => {
+	it('names no test where none meets the branch (ac-62eacc9c)', async () => {
 		split.mockResolvedValue({ ...MEETS, shared: [] })
 
 		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)

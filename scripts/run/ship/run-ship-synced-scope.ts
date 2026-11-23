@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs'
-import path from 'node:path'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import type { MovedParts } from '#scripts/gate/moved-paths'
@@ -131,20 +129,20 @@ function lint_meeting(
 	return has_check(checks, scoped_green.LINT_SCRIPT) ? split.touching : []
 }
 
-// **`test:related` is named over the branch's own change, not over `meeting`** (joshuafolkken/kit#7052):
-// each module there handed to it ran all its importers — 1,536 files where the branch changed 9. Its
-// run over the branch's change reaches every `shared` test, capped as the branch's own run is; CI runs
-// the whole suite. A file the branch deleted is no longer one to name.
-function test_overlap_of(
-	root: string,
-	branch: ReadonlyArray<string>,
-	split: SyncedSplit,
-	common: ReadonlyArray<string>,
+// **`test:related` is named over the `shared` tests, not over `meeting`** (joshuafolkken/kit#7052):
+// each module there handed to it ran all its importers — 1,536 files where the branch changed 9. Nor
+// over the branch's whole change (joshuafolkken/kit#8865): that ran every test the branch reaches, 222
+// files a sync on average, where only those reaching a synced module too read anything the merge moved —
+// the rest keep their green record over unchanged inputs. CI runs the whole suite.
+function joined(
+	first: ReadonlyArray<string>,
+	second: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
-	const own =
-		split.shared.length > 0 ? branch.filter((file) => existsSync(path.join(root, file))) : []
+	return [...new Set([...first, ...second])]
+}
 
-	return [...new Set([...common, ...own])]
+function test_overlap_of(split: SyncedSplit, common: ReadonlyArray<string>): ReadonlyArray<string> {
+	return joined(common, split.shared)
 }
 
 // What a merge-only staleness reads: the stale checks, what the merge brought in, and where it meets
@@ -165,13 +163,6 @@ interface SyncReading {
 }
 
 type Overlap = Pick<SyncReading, 'overlap' | 'test_overlap' | 'unsplit' | 'breakdown'>
-
-function joined(
-	first: ReadonlyArray<string>,
-	second: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-	return [...new Set([...first, ...second])]
-}
 
 function with_own_edits(overlap: Overlap, changed: ReadonlyArray<string>): Overlap {
 	if (overlap.overlap === undefined) return overlap
@@ -243,17 +234,12 @@ function unsplit_of(
 
 // `shared` decides only whether `test:related` runs over the branch's change: the tests it names read
 // neither change unless they import one directly, which `lint` names.
-function named_overlap(
-	root: string,
-	branch: ReadonlyArray<string>,
-	split: SyncedSplit,
-	parts: NamedParts,
-): Overlap {
+function named_overlap(split: SyncedSplit, parts: NamedParts): Overlap {
 	const common = [...parts.both, ...parts.unsplit, ...parts.read]
 
 	return {
 		overlap: [...new Set([...common, ...parts.lint])],
-		test_overlap: test_overlap_of(root, branch, split, common),
+		test_overlap: test_overlap_of(split, common),
 		breakdown: {
 			both: parts.both.length,
 			unsplit: parts.unsplit.length,
@@ -279,7 +265,7 @@ async function overlap_of(
 		return { overlap: undefined, unsplit: split.failure }
 	}
 
-	return named_overlap(root, branch, split, {
+	return named_overlap(split, {
 		both: synced.filter((file) => branch.includes(file)),
 		unsplit,
 		read: read_by_tests(checks, synced, map),

@@ -10,11 +10,11 @@ import { whole_suite_files } from './whole-suite-files'
 // **A code module a main sync brought in reaches vitest only through a test this branch's change
 // reaches too** (joshuafolkken/kit#4912). Handed to `vitest related` as a moved file, such a module ran
 // every test importing it, and main's CI had already run those against it. The tests where the two can
-// meet — whose imports reach both the synced module and this branch's own change — run through that
-// change in its place (`own_of`), which `vitest related` walks by its own graph. `shared` names them as
-// this graph reads them, but is never handed to vitest: the graph follows type-only imports and
-// ambient declarations too, and so reaches hundreds of tests the branch's change never runs
-// (joshuafolkken/kit#5066). Its being empty says the two never meet.
+// meet — whose runtime imports reach both the synced module and this branch's own change — are
+// `shared`. `josh test:related` runs them through that change in its place (`own_of`), which
+// `vitest related` walks by its own graph; `josh ship`'s scoped pair after a sync names them alone
+// (joshuafolkken/kit#8865), as the graph walks runtime edges only (joshuafolkken/kit#5368) and so
+// reaches only tests the branch's change runs too. Its being empty says the two never meet.
 //
 // **The import graph is TypeScript's, which drops an import it cannot resolve**, so only what it can
 // follow is left out. Nothing is left out where no graph can be built, the branch change or the map
