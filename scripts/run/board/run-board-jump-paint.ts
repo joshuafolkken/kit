@@ -3,9 +3,9 @@ import { run_board_fire_trail } from './run-board-fire-trail'
 import { run_board_jump } from './run-board-jump'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 
-// joshuafolkken/kit#8677: the bttf jump and arrival painted over the whole board, cell by cell. Through
-// the run up blue-white flares cross the board and, in its last ticks, arcs crackle over the header and
-// the animation area; the jump washes the board in five
+// joshuafolkken/kit#8677: the bttf jump and arrival painted over the whole board, cell by cell. In the
+// run up's last ticks arcs crackle over the header and the animation area and sparks land on blank
+// cells (joshuafolkken/kit#8739: with or without the area out); the jump washes the board in five
 // tints and then white, and the board thaws from ice to its own colors, the top rows first, each cell at
 // its own moment. The arrival is black, three flashes, then the same thaw. The capacitor and the gauge
 // (`is_figure`) keep their own light until the thaw.
@@ -19,8 +19,6 @@ const WHITE = parsed('255;255;255')
 const ICE = parsed('190;235;255')
 const ARC = parsed('150;210;255')
 const FLASH_BACK = parsed('200;230;255')
-const FLARE = parsed('130;190;255')
-const FLARE_CORE = parsed('240;248;255')
 // Through the jump the board is washed in these, two ticks each, then white until `WASH_TICKS`.
 const TINTS = ['159;216;238', '120;200;255', '150;140;235', '190;225;255', '60;160;240'].map(
 	(tint) => parsed(tint),
@@ -35,18 +33,6 @@ const WASH_GROUND = 0.4
 const THAW_SPREAD = 18
 const ROW_LAG = 0.4
 const THAW_SPAN = 14
-// A flare every `FLARE_EVERY` ticks, `FLARE_TICKS` long, once `FLARE_FROM` of the run up is typed: its
-// slant from `FLARE_START`, `FLARE_STEP` columns a tick and `FLARE_SLANT` a row, its core and its edge.
-const FLARE_EVERY = 14
-const FLARE_TICKS = 3
-const FLARE_FROM = 0.4
-const FLARE_START = 10
-const FLARE_STEP = 45
-const FLARE_SLANT = 3
-const FLARE_CORE_WIDTH = 3
-const FLARE_EDGE = 9
-const FLARE_GROUND = 0.5
-const FLARE_MIX = 0.8
 // The arcs: the last `ARC_TICKS` of the run up; at full a share of cells turns to a mark, more tinted.
 const ARC_TICKS = 15
 const ARC_MARK = 0.05
@@ -62,7 +48,6 @@ const NOISE_Y = 78.233
 const NOISE_SCALE = 43_758.5453
 // Each tick moves the arcs' noise this far.
 const TICK_SHIFT = 31.7
-const HALF = 2
 
 // A cell on screen, 0-based: its letter, its colors, and whether it is the capacitor's or the gauge's.
 interface PaintCell {
@@ -107,17 +92,6 @@ function washed(cell: PaintCell, color: Rgb, share: number): PaintCell {
 	return { ...cell, fg, bg: cell.bg ?? scaled(color, WASH_GROUND) }
 }
 
-// The cell `phase` ticks into a flare crossing the board on a slant.
-function flared(cell: PaintCell, phase: number, rows: number): PaintCell {
-	const center = FLARE_START + phase * FLARE_STEP + (rows / HALF - cell.y) * FLARE_SLANT
-	const off = Math.abs(cell.x - center)
-
-	if (off < FLARE_CORE_WIDTH) return { ...cell, fg: FLARE_CORE, bg: scaled(FLARE, FLARE_GROUND) }
-	if (off < FLARE_EDGE) return { ...cell, fg: mixed(cell.fg, FLARE, FLARE_MIX) }
-
-	return cell
-}
-
 function is_arc_row(y: number, scene: JumpScene): boolean {
 	const { panel } = scene
 	const is_panel = panel !== undefined && y >= panel.top && y < panel.top + panel.rows
@@ -155,39 +129,20 @@ function sparked(cell: PaintCell, sparks: ReadonlySet<string>, t: number): Paint
 	return { ...cell, text: mark, fg: ARC }
 }
 
-// The cell under a flare, when one crosses `share` of the way through the run up, `typed` ticks in.
-function flare_over(cell: PaintCell, share: number, typed: number, rows: number): PaintCell {
-	const phase = typed % FLARE_EVERY
-
-	return share > FLARE_FROM && phase < FLARE_TICKS ? flared(cell, phase, rows) : cell
-}
-
-// The run up's light on a cell `t` ticks from a jump over `letters`, the figure left to its own.
-function ramped(cell: PaintCell, t: number, letters: number, scene: JumpScene): PaintCell {
-	const typed = t + letters
-	const share = typed / letters
+// The run up's arcs on a cell `t` ticks from the jump.
+function ramped(cell: PaintCell, t: number, scene: JumpScene): PaintCell {
 	const arcs = (t + ARC_TICKS) / ARC_TICKS
-	const flaring = flare_over(cell, share, typed, scene.rows)
 
-	return arcs > 0 && is_arc_row(cell.y, scene) ? arced(flaring, arcs, t) : flaring
+	return arcs > 0 && is_arc_row(cell.y, scene) ? arced(cell, arcs, t) : cell
 }
 
-// The run up painted where the area is out: the figure left to its own, sparks in the last ticks.
-// Where the area is not out the run up leaves the board as it is.
-function run_up(
-	cells: ReadonlyArray<PaintCell>,
-	t: number,
-	letters: number,
-	scene: JumpScene,
-): Array<PaintCell> {
-	if (scene.panel === undefined) return [...cells]
+// The run up: the figure left to its own, arcs and sparks in the last ticks, the area out or not.
+function run_up(cells: ReadonlyArray<PaintCell>, t: number, scene: JumpScene): Array<PaintCell> {
 	const columns = Math.max(1, ...cells.map((cell) => cell.x + 1))
 	const sparks =
 		t >= -ARC_TICKS ? sparks_of((t + ARC_TICKS) / ARC_TICKS, t, scene, columns) : new Set<string>()
 
-	return cells.map((cell) =>
-		cell.is_figure ? cell : sparked(ramped(cell, t, letters, scene), sparks, t),
-	)
+	return cells.map((cell) => (cell.is_figure ? cell : sparked(ramped(cell, t, scene), sparks, t)))
 }
 
 // The wash's color and share `t` ticks from the jump: the tints, then white.
@@ -226,8 +181,8 @@ function after_jump(
 	return rolled_clocks(washing(burning, t), t, noise)
 }
 
-// The board `t` ticks from a jump over `letters`: the run up where the area is out, then the wash, the
-// thaw and the trails; as it is outside the jump.
+// The board `t` ticks from a jump over `letters`: the run up, then the wash, the thaw and the trails;
+// as it is outside the jump.
 function jump_cells(
 	cells: ReadonlyArray<PaintCell>,
 	t: number,
@@ -236,7 +191,7 @@ function jump_cells(
 ): Array<PaintCell> {
 	if (t < -letters || t >= END_TICKS) return [...cells]
 
-	return t < 0 ? run_up(cells, t, letters, scene) : after_jump(cells, t, scene)
+	return t < 0 ? run_up(cells, t, scene) : after_jump(cells, t, scene)
 }
 
 // The board `tick` ticks into the arrival: black, lit by the flashes, then thawing.

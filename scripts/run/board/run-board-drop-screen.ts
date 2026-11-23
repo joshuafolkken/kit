@@ -141,7 +141,24 @@ function is_kept(screen: DropScreen, place: ScreenPlace): boolean {
 	return cell_at(screen, place).is_wide
 }
 
-const run_board_drop_screen = { WIDE_PAIR, cell_at, is_kept, key_of, screen_of, wrapped }
+function blanks(count: number): Array<ScreenCell> {
+	return Array.from({ length: Math.max(0, count) }, () => ({ ...BLANK }))
+}
+
+// joshuafolkken/kit#8739: the screen with every row filled out to its width with blank cells and blank
+// rows added to `height`: a blank line or a line's end is drawn with no cells, which would leave a
+// light over the whole screen (the bttf jump, its fire trails) nothing to paint and nothing to put back.
+function filled(screen: DropScreen, height: number): DropScreen {
+	const rows = Array.from({ length: Math.max(height, screen.rows.length) }, (_, y) => {
+		const row = screen.rows[y] ?? []
+
+		return [...row, ...blanks(screen.columns - row.length)]
+	})
+
+	return { ...screen, rows }
+}
+
+const run_board_drop_screen = { WIDE_PAIR, cell_at, filled, is_kept, key_of, screen_of, wrapped }
 
 export { run_board_drop_screen }
 export type { DropScreen, FrameSpots, ScreenCell, ScreenPlace }

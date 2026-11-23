@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import { run_board_drop_screen, type FrameSpots } from './run-board-drop-screen'
 import { run_board_fire_trail } from './run-board-fire-trail'
 import type { TerminalSize } from './run-board-fit'
@@ -75,9 +76,12 @@ function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 		frame.typing,
 		drawn.size,
 	)
-	const texts = drawn_screen.rows.map((row) => row.map((cell) => cell.text).join(''))
-	const trails = run_board_fire_trail.rows_of(texts)
-	const screen = run_board_fire_trail.padded(drawn_screen, trails)
+	// joshuafolkken/kit#8739: the rules are found as the board writes them — a theme's restyle turns
+	// their fold mark `▾` into another letter (`V` for shapes and letters icons).
+	const trails = run_board_fire_trail.rows_of(
+		drawn.lines.map((line) => stripVTControlCharacters(line)),
+	)
+	const screen = run_board_drop_screen.filled(drawn_screen, drawn.size?.rows ?? 0)
 	const scene: JumpScene = {
 		rows: screen.rows.length,
 		panel: area === undefined ? undefined : { top: area.top - 1, rows: area.rows },

@@ -5,7 +5,7 @@ import { run_board_rgb, type Rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8675: the bttf jump's twin fire trails.
 
-const { COLUMNS_PER_TICK, FIRE_TICKS, FLAMES, HEAD_TICKS, fire_of, padded, rows_of, trail_cells } =
+const { COLUMNS_PER_TICK, FIRE_TICKS, FLAMES, HEAD_TICKS, fire_of, rows_of, trail_cells } =
 	run_board_fire_trail
 const { parsed, scaled } = run_board_rgb
 const GREY: Rgb = [100, 100, 100]
@@ -94,22 +94,24 @@ describe('run_board_fire_trail.trail_cells — the flames', () => {
 	})
 })
 
-describe('run_board_fire_trail.padded', () => {
-	it('fills the trail rows out to the screen width with blank cells, leaving the others', () => {
-		const letter = { text: 'a', style: 'S', is_wide: false }
-		const screen = {
-			rows: [[letter], []],
-			columns: 3,
-			skips: new Set<string>(),
-			typing_rows: new Set<number>(),
-		}
-		const blank = { text: ' ', style: '', is_wide: false }
-
-		expect(padded(screen, [1]).rows).toStrictEqual([[letter], [blank, blank, blank]])
-	})
-})
-
 describe('run_board_fire_trail.rows_of', () => {
+	// joshuafolkken/kit#8739: the rules as the bttf board draws them today, its shape icons on.
+	it('ac-876edb02 finds the trail rows on the bttf board as drawn today', () => {
+		const texts = [
+			'> josh-flux      -> 11-23 10:53',
+			'',
+			'── -- throughput ──────── /h ACTIVE ─ DONE ─ PEAK ─ NOW ──',
+			'     24h  ▄█▆▇▇▄▃▅▄▂▁▃▁█▂▃█▆▂   3.4    20h     71    7.0     2',
+			'',
+			'── -- usage ──────────',
+			'     Claude        7d  50% ■■■■■┊■■■■──',
+			'',
+			'── ── lanes 1/6 ─ T+ ─────── CPU ────── MEM ──────',
+		]
+
+		expect(rows_of(texts)).toStrictEqual([1, 7])
+	})
+
 	it('finds the blank row right above the throughput rule and the lanes rule', () => {
 		const texts = [
 			'header',

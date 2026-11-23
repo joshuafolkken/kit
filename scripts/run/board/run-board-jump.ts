@@ -18,9 +18,8 @@ const LEAD_SHARE = 3
 // The ticks the board's wash lasts from the jump, and the ticks a thaw takes.
 const WASH_TICKS = 13
 const THAW_TICKS = 45
-// The two ticks before the flood every lamp is orange; the first three of it the box is pure white.
+// The two ticks before the flood every lamp is orange.
 const ORANGE_TICKS = 2
-const WHITE_TICKS = 3
 // The share of the run up at which the gauge's second, third, fourth and top ranges begin.
 const STAGES = numbers_of('0 0.22 0.42 0.6')
 const LAST_STAGE = STAGES.at(-1) ?? 1
@@ -140,7 +139,6 @@ const run_board_jump = {
 	TICK_MS,
 	TOP_SPEED,
 	WASH_TICKS,
-	WHITE_TICKS,
 	arrive_speed,
 	climb_of,
 	flash_of,
