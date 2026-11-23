@@ -96,7 +96,8 @@ The child ends mid-implementation and a fresh one resumes **back into implementa
 ### The measurement is the parent hand-off's, never a second one
 
 Same `cost_verdict.per_request_cost` through `cost_cli.session_verdict` as `backlogrun-progress.md` →
-"The hand-off", against the same threshold `pnpm josh cost --cut` prints.
+"The hand-off", priced over `IMPLEMENTATION_REMAINING_REQUESTS` — below the shared threshold
+`pnpm josh cost --cut` prints ("The threshold").
 
 ### It is a guard, fired at the edit that crosses the threshold
 

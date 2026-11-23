@@ -42,7 +42,7 @@ became insurance rather than the primary trigger.
 
 **The implementation-phase cut.** joshuafolkken/kit#1933 reasoned it _could not_ be a guard, because the
 per-request cost was read asynchronously; but `cost_cli.session_verdict` is synchronous and is the exact
-verdict `pnpm josh cost --cut` prints. joshuafolkken/kit#2310 measured the child-side check across five
+statistic `pnpm josh cost --cut` prints (priced over the cut's own horizon since joshuafolkken/kit#8817). joshuafolkken/kit#2310 measured the child-side check across five
 lanes: the verdict was read once each at session entry, before the context grew, so the cut fired
 **0 times** while 33.9% of their requests ran past 200,000 tokens. A `PreToolUse` refusal lands _before_ the edit,
 so the tree is at the state the previous edit left.

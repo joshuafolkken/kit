@@ -22,12 +22,12 @@ import { shell_segments } from './shell-segments'
 // The implementation-phase cut, delivered at the call it binds on.
 //
 // **The verdict is read at the working-tree boundary, not at the entry.** A lane child ends its
-// process *during* implementation once its recent-context cost crosses the shared threshold, and a
+// process *during* implementation once its recent-context cost crosses its own threshold, and a
 // fresh one resumes back into implementation. Read only at session entry, where the context has not
 // yet grown, the verdict answers `under` by construction; so the guard reads it at each edit, the
 // same way `pre-gate-cut.ts` binds the boundary one step later. `cost_cli.session_verdict` is
-// synchronous and is the verdict `pnpm josh cost --cut` prints, priced over the implementation cut's
-// own horizon (joshuafolkken/kit#8817), so the guard reads it directly rather than approximating it —
+// synchronous and is the statistic `pnpm josh cost --cut` prints, priced over the implementation cut's
+// own horizon rather than its shared one (joshuafolkken/kit#8817), so the guard reads it directly rather than approximating it —
 // the same statistic, never a second measurement.
 
 // The two edit tools the `PreToolUse` matcher routes here (`edit-tool.ts`), and the working-tree
