@@ -39,6 +39,10 @@ describe('process_state.read_states', () => {
 		expect(states.has(gone)).toBe(false)
 	})
 
+	it('reads nothing where ps cannot start', () => {
+		expect(process_state.read_states([process.pid], '/nonexistent/ps')).toStrictEqual(new Map())
+	})
+
 	it('reads nothing for no pid', () => {
 		expect(process_state.read_states([])).toStrictEqual(new Map())
 	})

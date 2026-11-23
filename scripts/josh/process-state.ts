@@ -33,17 +33,21 @@ function parse_states(printed: string): Map<number, string> {
 	return states
 }
 
-function read_states(pids: ReadonlyArray<number>): Map<number, string> {
+// A `ps` that could not start or ran past its timeout reads nothing, and so every pid reads as running.
+function read_states(
+	pids: ReadonlyArray<number>,
+	command: string = PS_COMMAND,
+): Map<number, string> {
 	if (pids.length === 0) return new Map()
 
-	const result = spawnSync(PS_COMMAND, ['-o', STATE_FORMAT, '-p', pids.join(',')], {
+	const result = spawnSync(command, ['-o', STATE_FORMAT, '-p', pids.join(',')], {
 		encoding: 'utf8',
 		timeout: PROBE_TIMEOUT_MS,
 		stdio: ['ignore', 'pipe', 'ignore'],
 		env: process_identity.PROBE_ENVIRONMENT,
 	})
 
-	return parse_states(result.stdout)
+	return result.error === undefined ? parse_states(result.stdout) : new Map<number, string>()
 }
 
 function stopped_pids(pids: ReadonlyArray<number>, read: StateReader = read_states): Set<number> {

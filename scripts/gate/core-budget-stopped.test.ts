@@ -7,6 +7,7 @@ import type { CoreWaitRecord } from '#scripts/lane/lane-ledger-schema'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
+import { free_cores } from './free-cores'
 
 // joshuafolkken/kit#8869: a lane `lane:pause` stopped kept its steps' places in the ledger, so a running
 // lane's claim waited 30 s on `cpu-unrelieved` with the CPU idle. A stopped owner's place is not
@@ -21,8 +22,9 @@ function sleeper(): number {
 	const child = spawn('/bin/sleep', ['60'], { stdio: 'ignore' })
 
 	children.push(child)
+	if (child.pid === undefined) throw new Error('/bin/sleep did not start')
 
-	return child.pid ?? 0
+	return child.pid
 }
 
 async function stopped_sleeper(): Promise<number> {
@@ -77,6 +79,22 @@ describe('core_budget.counted_reservations — a stopped owner', () => {
 		})
 
 		expect(core_budget.counted_reservations(directory)).toHaveLength(1)
+	})
+})
+
+describe('free_cores.read — a stopped owner', () => {
+	it("does not mask outside load with a stopped owner's place", async () => {
+		const directory = make_directory('josh-free-cores-stopped-')
+		const outside_load = 5
+
+		write_full_marker(directory, await stopped_sleeper())
+		const free = await free_cores.read({
+			available_cores: BUDGET,
+			read_machine: async () => ({ busy_cores: outside_load, available_mb: undefined }),
+			directory,
+		})
+
+		expect(free.cores).toBe(BUDGET - outside_load)
 	})
 })
 

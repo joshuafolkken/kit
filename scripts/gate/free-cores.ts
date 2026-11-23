@@ -22,11 +22,12 @@ interface FreeCoresOptions {
 
 // **The claim a parent command holds for this run is left out of the ledger.** It is admitted before
 // this run starts a worker, so none of its weight is in the reading yet; counting it would subtract
-// it from load it never added and mask that much outside load (`held_mark.held_reservation`).
+// it from load it never added and mask that much outside load (`held_mark.held_reservation`). A stopped
+// owner's claim is left out too: it adds no load either (joshuafolkken/kit#8869).
 function running_claims(directory: string | undefined): Array<LiveReservation> {
 	const own = held_mark.held_reservation()
 
-	return core_budget.live_reservations(directory).filter((entry) => entry.key !== own)
+	return core_budget.counted_reservations(directory).filter((entry) => entry.key !== own)
 }
 
 // `undefined` where the machine could not be read — a CI runner, a CPU quota narrower than the host —
