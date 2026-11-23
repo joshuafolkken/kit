@@ -2,6 +2,6 @@
 	"reason": "New derived-paths module counts command-derived documents in the lane plan size (#8859)",
 	"date": "2026-11-23",
 	"growth": {
-		"scripts.code_lines": 39
+		"scripts.code_lines": 43
 	}
 }

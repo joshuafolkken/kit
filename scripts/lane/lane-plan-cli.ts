@@ -69,7 +69,7 @@ async function planned(
 // The files the plan's sources derive, which the size estimate counts (`derived-paths.ts`, #8859), then
 // the imports' probe.
 function report(plan: LanePlan, imports: ReadonlyArray<string>, directory: string): void {
-	const derived = derived_paths.of(plan.paths)
+	const derived = derived_paths.of(plan.paths, derived_paths.read_in(directory))
 
 	if (derived.length > 0) console.info(`derived (counted in the size): ${derived.join(' ')}`)
 	lane_plan_imports.report(String(plan.issue), imports, directory)

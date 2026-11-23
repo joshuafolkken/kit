@@ -165,14 +165,16 @@ function files_over(
 	signals: PlanSignals,
 ): FilesOver | undefined {
 	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
-	const counted = counted_of(plan)
+	const counted = plan.paths.filter((file) => is_counted(file))
+	const derived = counted_of(plan).length - counted.length
 	const units = units_of(ordered(counted, recorded?.paths ?? []), signals)
+	const measured = units.length + derived
 
-	if (units.length <= limit || files_approved(plan, declared, recorded, units.length)) {
-		return undefined
-	}
+	if (measured <= limit || files_approved(plan, declared, recorded, measured)) return undefined
 
-	const kept_files = new Set(split_assess.kept_units(units, limit).flat())
+	// A derived document is never split off — the kept source re-derives it — so the planned files give way
+	// for every one; a re-plan of the kept files derives no more and passes.
+	const kept_files = new Set(split_assess.kept_units(units, limit - derived).flat())
 	const kept = counted.filter((file) => kept_files.has(file))
 	const split_off = counted.filter((file) => !kept_files.has(file))
 

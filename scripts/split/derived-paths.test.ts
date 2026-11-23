@@ -42,6 +42,12 @@ describe('derived_paths.of', () => {
 		expect(derived).toStrictEqual([COMMAND_CATALOG_DOC])
 	})
 
+	it('reads the definitions and pages of the checkout it is given', () => {
+		const derived = derived_paths.of([EPIC_DEFINITION], derived_paths.read_in('/nonexistent'))
+
+		expect(derived).toStrictEqual([])
+	})
+
 	it('derives nothing from a file that is not a command definition', () => {
 		const derived = derived_paths.of([
 			'scripts/josh/josh-commands-epic.test.ts',
@@ -70,14 +76,25 @@ describe('lane_plan_size.oversize with derived documents', () => {
 		return lane_plan_size.oversize(plan, issues, undefined, QUIET)
 	}
 
-	it('counts the documents a planned command definition derives', () => {
-		const sources = Array.from({ length: 7 }, (_, index) => `scripts/lane/f-${String(index)}.ts`)
+	const sources = Array.from({ length: 7 }, (_, index) => `scripts/lane/f-${String(index)}.ts`)
 
+	it('counts the documents a planned command definition derives', () => {
 		expect(oversize_of(sources)).toBeUndefined()
+		// The derived pages stay with the kept files; planned files give way for them.
 		expect(oversize_of([...sources, EPIC_DEFINITION])).toMatchObject({
 			reason: 'files',
-			split_off: [BACKLOG_PAGE, COMMAND_CATALOG_DOC],
+			split_off: ['scripts/lane/f-6.ts', EPIC_DEFINITION],
 		})
+	})
+
+	it('measures the derived documents with the planned files', () => {
+		const plan = { issue: 1, paths: [...sources, EPIC_DEFINITION], planned_at: PLANNED_AT }
+		const over = lane_plan_size.oversize(plan, issues, undefined, QUIET)
+
+		expect(over).toBeDefined()
+		if (over === undefined) return
+		// Seven sources, the definition, and the backlog page and catalog it derives.
+		expect(lane_plan_size.measured_of(plan, over).files).toBe(10)
 	})
 })
 

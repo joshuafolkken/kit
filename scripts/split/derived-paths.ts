@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import node_path from 'node:path'
 import { command_reference_line_budget } from '#scripts/document/command-reference-line-budget'
 
 // The files a plan's sources derive, which change with them though the plan does not name them
@@ -24,8 +25,14 @@ function read_text(path: string): string | undefined {
 	return existsSync(path) ? readFileSync(path, 'utf8') : undefined
 }
 
+// A reader of the checkout at `directory`, for a caller whose working directory is not that checkout.
+function read_in(directory: string): ReadText {
+	return (file) => read_text(node_path.join(directory, file))
+}
+
 function command_names(text: string): Array<string> {
-	return [...text.matchAll(ENTRY_KEY)].map((match) => match[1] ?? '')
+	// The one capture group, as a list so a match never yields a missing name.
+	return [...text.matchAll(ENTRY_KEY)].flatMap((match) => match.slice(1))
 }
 
 function usage_marker(name: string): string {
@@ -55,7 +62,7 @@ function of(paths: ReadonlyArray<string>, read: ReadText = read_text): Array<str
 	return [...derived].filter((path) => !planned.has(path))
 }
 
-const derived_paths = { command_names, of }
+const derived_paths = { command_names, of, read_in }
 
 export { derived_paths }
 export type { ReadText }
