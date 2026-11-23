@@ -3,7 +3,6 @@ import { lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { untyped_environment } from '#eslint/untyped-environment.js'
 import { resolve_package_bin } from '#scripts/build/local-bin'
 import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
@@ -11,6 +10,8 @@ import { atomic_write } from '#scripts/lib/atomic-write'
 import type { BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { execa } from 'execa'
 import { eslint_daemon_calls, type DaemonCall } from './eslint-daemon-calls'
+import { eslint_daemon_environment } from './eslint-daemon-environment'
+import { eslint_daemon_replaced } from './eslint-daemon-replaced'
 import { eslint_daemon_sources } from './eslint-daemon-sources'
 import { eslint_heap } from './eslint-heap'
 
@@ -32,9 +33,8 @@ const PNPM_EXEC = 'exec'
 const ESLINT_BIN = 'eslint'
 const PNPM_ESLINT_PREFIX_LENGTH = 2
 const NODE_MODULES = 'node_modules'
-// `eslint_d` writes `<token> <port> <pid> <hash>` here once, when the daemon has started, and removes
-// it when the daemon stops — so its text names one daemon.
-const DAEMON_RECORD = '.eslint_d'
+// `eslint_d` writes `<token> <port> <pid> <hash>` to its record once, when the daemon has started, and
+// removes it when the daemon stops — so its text names one daemon (`eslint-daemon-environment.ts`).
 // What that daemon loaded: its record's text and the fingerprint it started under, written beside it.
 const FINGERPRINT_RECORD = '.eslint_d-toolchain'
 const RECORD_SEPARATOR = '\n'
@@ -168,12 +168,17 @@ function read_text(file: string): string | undefined {
 	}
 }
 
+// The running daemon's record as `eslint_d` names it for kit's launch environment.
+function read_daemon(directory: string, project_root: string): string | undefined {
+	return read_text(eslint_daemon_environment.record_file(directory, project_root))
+}
+
 function read_record(project_root: string): DaemonRecord {
 	const directory = eslint_directory(project_root)
 	if (directory === undefined) return { daemon: undefined, recorded: undefined }
 
 	return {
-		daemon: read_text(path.join(directory, DAEMON_RECORD)),
+		daemon: read_daemon(directory, project_root),
 		recorded: read_text(path.join(directory, FINGERPRINT_RECORD)),
 	}
 }
@@ -201,12 +206,16 @@ function state_of(record: DaemonRecord, current: string): DaemonState {
 }
 
 // Best-effort, like the daemon's own record: one that could not be written restarts the daemon once
-// more on the next run.
+// more on the next run. A daemon is current here, so any other one beside it is stopped.
 function remember(project_root: string, current: string): void {
 	const directory = eslint_directory(project_root)
 	if (directory === undefined) return
-	const daemon = read_text(path.join(directory, DAEMON_RECORD))
+	const daemon = read_daemon(directory, project_root)
 	if (daemon === undefined) return
+	eslint_daemon_replaced.stop_replaced(
+		directory,
+		eslint_daemon_environment.record_file(directory, project_root),
+	)
 
 	try {
 		atomic_write.replace_file(
@@ -255,24 +264,26 @@ function record_call(project_root: string, call: DaemonCall | undefined): void {
 	const directory = eslint_directory(project_root)
 	if (call === undefined || directory === undefined || is_borrowed_install(project_root)) return
 
-	eslint_daemon_calls.record(directory, read_text(path.join(directory, DAEMON_RECORD)), call)
+	eslint_daemon_calls.record(directory, read_daemon(directory, project_root), call)
 }
 
-// `cwd` decides which eslint installation and which flat config answer, and `ESLINT_D_MISS=fail`
-// refuses the bundled eslint the daemon would otherwise fall back to. The daemon keeps the environment
-// it started under, so the heap and the untyped switch set here hold for its whole life
-// (`eslint/untyped-environment.js`). Every path that may start it — this one and the edit hook —
-// launches with these, so whichever starts it first, the daemon gets the same heap.
-function launch_environment(): NodeJS.ProcessEnv {
-	return {
-		NODE_OPTIONS: eslint_heap.with_heap(process.env['NODE_OPTIONS']),
-		ESLINT_D_MISS: 'fail',
-		...untyped_environment.environment(),
+// How the edit hook launches one of its routes. `cwd` decides which eslint installation and which flat
+// config answer, and `ESLINT_D_MISS=fail` refuses the bundled eslint the daemon would otherwise fall
+// back to. The daemon keeps the environment it started under, so the heap and the untyped switch hold
+// for its whole life (`eslint/untyped-environment.js`). A route through the daemon takes kit's one
+// daemon environment and nothing of the caller's, so the hook reaches the daemon every other caller
+// does (joshuafolkken/kit#8848); the cold routes keep the caller's environment, PATH included.
+function launch_options(
+	first_argument: string | undefined,
+	project_root: string,
+): { env: NodeJS.ProcessEnv; extendEnv: boolean } {
+	const environment = eslint_daemon_environment.environment()
+
+	if (first_argument !== undefined && first_argument === resolve_daemon_cli(project_root)) {
+		return { env: environment, extendEnv: false }
 	}
-}
 
-function daemon_environment(): NodeJS.ProcessEnv {
-	return { ...eslint_heap.environment(), ...launch_environment() }
+	return { env: { ...environment, PATH: process.env['PATH'] }, extendEnv: true }
 }
 
 async function spawn_daemon(
@@ -284,7 +295,7 @@ async function spawn_daemon(
 		reject: false,
 		all: true,
 		cwd: options.project_root,
-		env: daemon_environment(),
+		env: eslint_daemon_environment.environment(),
 		extendEnv: false,
 		...(options.timeout_ms !== undefined && { timeout: options.timeout_ms }),
 	})
@@ -375,7 +386,7 @@ const eslint_daemon = {
 	fingerprint,
 	is_config_input,
 	is_stale,
-	launch_environment,
+	launch_options,
 	read_record,
 	record_call,
 	record_text,

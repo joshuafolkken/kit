@@ -15,6 +15,8 @@ const mocked_resolve = vi.mocked(resolve_package_bin)
 const { git_spawn_sync } = await import('#scripts/git/git-spawn-sync')
 const mocked_git_read = vi.mocked(git_spawn_sync.read)
 const { eslint_daemon } = await import('./eslint-daemon')
+const { eslint_daemon_environment } = await import('./eslint-daemon-environment')
+const { record_file } = eslint_daemon_environment
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 
@@ -54,7 +56,7 @@ function checkout(): void {
 		write_file(project_root, input, JSON_BODY)
 	}
 
-	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+	write_file(project_root, record_file(ESLINT_DIRECTORY, project_root), DAEMON)
 }
 
 // git under one commit, listing `files` as the ones the type program can resolve.
@@ -158,33 +160,6 @@ describe('eslint_daemon.fingerprint', () => {
 		expect(eslint_daemon.fingerprint(project_root)).not.toBe(before)
 		expect(mocked_git_read).toHaveBeenCalledWith(LIST_FILES, { cwd: project_root })
 	})
-})
-
-describe('eslint_daemon.is_stale', () => {
-	const current = 'fingerprint'
-
-	it('is current when the running daemon was recorded under this fingerprint', () => {
-		const record = { daemon: DAEMON, recorded: eslint_daemon.record_text(DAEMON, current) }
-
-		expect(eslint_daemon.is_stale(record, current)).toBe(false)
-	})
-
-	it('is current when no daemon runs', () => {
-		expect(eslint_daemon.is_stale({ daemon: undefined, recorded: undefined }, current)).toBe(false)
-	})
-
-	it('is stale when the fingerprint moved since the daemon started', () => {
-		const record = { daemon: DAEMON, recorded: eslint_daemon.record_text(DAEMON, 'older') }
-
-		expect(eslint_daemon.is_stale(record, current)).toBe(true)
-	})
-
-	it.each([undefined, eslint_daemon.record_text('another daemon', 'fingerprint')])(
-		'is stale for a daemon nothing recorded (%s)',
-		(recorded) => {
-			expect(eslint_daemon.is_stale({ daemon: DAEMON, recorded }, current)).toBe(true)
-		},
-	)
 })
 
 describe('eslint_daemon.read_record', () => {

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
+import { eslint_daemon_environment } from '#scripts/lint/eslint-daemon-environment'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
@@ -343,7 +344,10 @@ describe('format_edited_file — a daemon its commands started', () => {
 		await format_edited_file(
 			payload_for(file_path),
 			async () => {
-				writeFileSync(path.join(eslint_directory, '.eslint_d'), 'token 1 2 hash')
+				writeFileSync(
+					eslint_daemon_environment.record_file(eslint_directory, root),
+					'token 1 2 hash',
+				)
 
 				return { exit_code: 0, stdout: '' }
 			},

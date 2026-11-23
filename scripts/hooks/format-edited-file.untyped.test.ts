@@ -1,4 +1,6 @@
 import { untyped_environment } from '#eslint/untyped-environment.js'
+import { eslint_daemon } from '#scripts/lint/eslint-daemon'
+import { eslint_daemon_environment } from '#scripts/lint/eslint-daemon-environment'
 import { eslint_heap } from '#scripts/lint/eslint-heap'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
@@ -39,6 +41,40 @@ describe('format_edited_payload — the type program', () => {
 		for (const environment of spawned_environments()) {
 			expect(environment).toMatchObject(untyped_environment.environment())
 		}
+	})
+})
+
+function daemon_route_options(): ReadonlyArray<unknown> {
+	const cli = eslint_daemon.resolve_daemon_cli(TEST_DIRECTORY)
+
+	return mocked_execa.mock.calls
+		.filter(([, command_arguments]: ReadonlyArray<unknown>) => {
+			return Array.isArray(command_arguments) && command_arguments[0] === cli
+		})
+		.map((call) => call.at(-1))
+}
+
+// joshuafolkken/kit#8848: the route through the daemon carries kit's one daemon environment and none
+// of the hook's own, so the hook reaches the daemon `josh lint:related` and the pre-commit hook do.
+describe('format_edited_payload — the daemon environment', () => {
+	it('spawns the daemon route with only the daemon environment', async () => {
+		vi.stubEnv('CLAUDE_PROJECT_DIR', TEST_DIRECTORY)
+		mocked_execa.mockResolvedValue({ exitCode: 0, stdout: '' } as unknown as Awaited<
+			ReturnType<typeof execa_module.execa>
+		>)
+
+		await format_edited_payload(payload_for(write_fixture('edited.ts')), TEST_DIRECTORY)
+
+		expect(daemon_route_options()).not.toHaveLength(0)
+
+		for (const options of daemon_route_options()) {
+			expect(options).toMatchObject({
+				env: eslint_daemon_environment.environment(),
+				extendEnv: false,
+			})
+		}
+
+		vi.unstubAllEnvs()
 	})
 })
 

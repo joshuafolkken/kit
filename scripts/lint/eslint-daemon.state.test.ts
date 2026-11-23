@@ -13,6 +13,8 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const { resolve_package_bin } = await import('#scripts/build/local-bin')
 const mocked_resolve = vi.mocked(resolve_package_bin)
 const { eslint_daemon } = await import('./eslint-daemon')
+const { eslint_daemon_environment } = await import('./eslint-daemon-environment')
+const { record_file } = eslint_daemon_environment
 const { ESLINT_HEAP_MIB } = await import('./eslint-heap')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
@@ -41,7 +43,7 @@ function installed(): void {
 // A running daemon recorded under `recorded_under`, or under the fingerprint the checkout has now.
 function running(recorded_under?: string): void {
 	installed()
-	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+	write_file(project_root, record_file(ESLINT_DIRECTORY, project_root), DAEMON)
 	const current = recorded_under ?? eslint_daemon.fingerprint(project_root)
 
 	write_file(
@@ -75,6 +77,33 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 	rmSync(project_root, { recursive: true, force: true })
+})
+
+describe('eslint_daemon.is_stale', () => {
+	const current = 'fingerprint'
+
+	it('is current when the running daemon was recorded under this fingerprint', () => {
+		const record = { daemon: DAEMON, recorded: eslint_daemon.record_text(DAEMON, current) }
+
+		expect(eslint_daemon.is_stale(record, current)).toBe(false)
+	})
+
+	it('is current when no daemon runs', () => {
+		expect(eslint_daemon.is_stale({ daemon: undefined, recorded: undefined }, current)).toBe(false)
+	})
+
+	it('is stale when the fingerprint moved since the daemon started', () => {
+		const record = { daemon: DAEMON, recorded: eslint_daemon.record_text(DAEMON, 'older') }
+
+		expect(eslint_daemon.is_stale(record, current)).toBe(true)
+	})
+
+	it.each([undefined, eslint_daemon.record_text('another daemon', 'fingerprint')])(
+		'is stale for a daemon nothing recorded (%s)',
+		(recorded) => {
+			expect(eslint_daemon.is_stale({ daemon: DAEMON, recorded }, current)).toBe(true)
+		},
+	)
 })
 
 // joshuafolkken/kit#5712: the daemon fact `josh lint:related`'s timing line prints.
@@ -131,14 +160,19 @@ describe('eslint_daemon.run_or_cold heap', () => {
 		})
 	})
 
-	// joshuafolkken/kit#7247: the edit hook launches with the same switches, so either path that
-	// starts the daemon gives it the same heap.
-	it('starts the daemon forwarder with the shared launch environment', async () => {
+	// joshuafolkken/kit#7247, #8848: the forwarder gets kit's one daemon environment and nothing of the
+	// caller's, so every caller reaches the same daemon whatever environment it runs under.
+	it.each([
+		{ CLAUDE_SESSION_ID: 'a', NODE_OPTIONS: '--trace-warnings' },
+		{ npm_config_user_agent: 'pnpm', npm_lifecycle_event: 'josh', NODE_OPTIONS: '' },
+	])('starts the daemon forwarder with only the daemon environment (%o)', async (variables) => {
 		installed()
+		for (const [name, value] of Object.entries(variables)) vi.stubEnv(name, value)
 
 		await eslint_daemon.run_or_cold(PNPM_ESLINT)
 
-		expect(spawned_environment()).toMatchObject(eslint_daemon.launch_environment())
+		expect(spawned_environment()).toStrictEqual(eslint_daemon_environment.environment())
+		expect(mocked_execa.mock.lastCall?.at(-1)).toMatchObject({ extendEnv: false })
 	})
 
 	it('hands the cold fallback the eslint heap', async () => {
@@ -151,6 +185,35 @@ describe('eslint_daemon.run_or_cold heap', () => {
 			NODE_OPTIONS: COLD_OPTIONS,
 		})
 	})
+})
+
+// joshuafolkken/kit#8848: the edit hook's daemon route reaches the one daemon every caller does; its
+// cold routes keep the caller's PATH.
+describe('eslint_daemon.launch_options', () => {
+	const caller_path = '/project/node_modules/.bin:/usr/bin'
+
+	it('hands the daemon route only the daemon environment', () => {
+		installed()
+		vi.stubEnv('PATH', caller_path)
+
+		expect(eslint_daemon.launch_options(CLI, project_root)).toStrictEqual({
+			env: eslint_daemon_environment.environment(),
+			extendEnv: false,
+		})
+	})
+
+	it.each(['/kit/node_modules/.bin/eslint', undefined])(
+		'keeps the caller PATH on the cold route %s',
+		(first_argument) => {
+			installed()
+			vi.stubEnv('PATH', caller_path)
+
+			expect(eslint_daemon.launch_options(first_argument, project_root)).toStrictEqual({
+				env: { ...eslint_daemon_environment.environment(), PATH: caller_path },
+				extendEnv: true,
+			})
+		},
+	)
 })
 
 // joshuafolkken/kit#6768: the daemon holds no type program; the cold run — the gate's own lint
