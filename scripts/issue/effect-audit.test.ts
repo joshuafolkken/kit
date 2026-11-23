@@ -3,6 +3,7 @@ import { effect_audit, type FollowUp } from './effect-audit'
 import { MEASURED_LABEL, MEASURED_UNMET_LABEL } from './issue-labels'
 import { issue_lint } from './issue-lint'
 import type { SearchIssue } from './issue-search'
+import { rework_classification } from './rework-classification'
 
 // joshuafolkken/kit#4958: each closed run-time-shortening issue is set beside the follow-up that cites
 // it and that follow-up's recorded verdict.
@@ -129,5 +130,16 @@ describe('effect_audit.draft_body — the retirement candidate', () => {
 		expect(
 			issue_lint.starts_with_summary(row === undefined ? '' : effect_audit.draft_body(row)),
 		).toBe(true)
+	})
+
+	// joshuafolkken/kit#8799: the draft cites closed work as a non-defect, so it states its new goal.
+	it('passes the rework classification check against the delivered origin and measurement', () => {
+		const [row] = effect_audit.rows(
+			[issue(ORIGIN, ORIGIN_BODY)],
+			[follow_up([MEASURED_LABEL, MEASURED_UNMET_LABEL])],
+		)
+		const body = row === undefined ? '' : effect_audit.draft_body(row)
+
+		expect(rework_classification.problem(body, new Set([ORIGIN, FOLLOW_UP]))).toBeUndefined()
 	})
 })

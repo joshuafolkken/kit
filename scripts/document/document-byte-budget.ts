@@ -107,8 +107,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// (joshuafolkken/kit#6463) crossed the 73728 block; the drive's sample wait (joshuafolkken/kit#6503)
 	// crossed the 77824 block; `issue:fold-existing --found-during` (joshuafolkken/kit#6641) crossed the 81920 block;
 	// `--adopt`'s park loop (joshuafolkken/kit#7820) crossed the 86016 block;
-	// `backlog:plan --pending-publication` (joshuafolkken/kit#8087) crossed the 90112 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 94_208 },
+	// `backlog:plan --pending-publication` (joshuafolkken/kit#8087) crossed the 90112 block;
+	// `issue:rework-candidates` and `issue:file`'s rework check (joshuafolkken/kit#8799) crossed the 94208 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 98_304 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub

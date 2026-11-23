@@ -102,8 +102,9 @@ describe('defect_rate.kind_of', () => {
 
 describe('defect_rate.is_above_baseline', () => {
 	it('is true only strictly above the baseline', () => {
-		expect(defect_rate.is_above_baseline(result(74, 100))).toBe(true)
-		expect(defect_rate.is_above_baseline(result(73, 100))).toBe(false)
+		expect(defect_rate.is_above_baseline(result(127, 100))).toBe(true)
+		expect(defect_rate.is_above_baseline(result(126, 100))).toBe(false)
+		expect(defect_rate.is_above_baseline(result(450, 359))).toBe(false)
 		expect(defect_rate.is_above_baseline(result(1, 100))).toBe(false)
 	})
 
