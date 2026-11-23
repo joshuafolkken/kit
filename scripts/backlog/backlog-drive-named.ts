@@ -7,9 +7,11 @@ import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { run_invocation } from '#scripts/run/run-invocation'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_restore } from './backlog-drive-restore'
+import { backlog_hold_codes } from './backlog-hold-codes'
 import { backlog_named } from './backlog-named'
 
 const { MERGE_TOKEN } = run_merge_token
+const { NAMED_WAIT, ONLY_WAIT, REASON_SEPARATOR } = backlog_hold_codes
 
 const NO_RETRIES = 0
 const TERMINAL_OUTCOMES: ReadonlySet<string> = new Set([
@@ -64,8 +66,20 @@ function held_after(
 // still ran would name that lane's issue unmerged even after it merged.
 function only_end(state: DriveState): OfferRead {
 	return state.in_flight.length > 0
-		? { verdict: 'wait', issues: [], retries: NO_RETRIES }
+		? { verdict: 'wait', issues: [], retries: NO_RETRIES, cause: ONLY_WAIT }
 		: { verdict: 'stop', issues: [], retries: NO_RETRIES, reason: 'only', is_finish: true }
+}
+
+// The wait on a named issue in flight: the board names it (`named:<N>`), and `lane:stats` counts the
+// time under it in `held behind` through `waiting`.
+function named_wait(issue: number): OfferRead {
+	return {
+		verdict: 'wait',
+		issues: [],
+		retries: NO_RETRIES,
+		cause: `${NAMED_WAIT}${REASON_SEPARATOR}${String(issue)}`,
+		waiting: [issue],
+	}
 }
 
 function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead | undefined {
@@ -75,7 +89,7 @@ function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead 
 		const issue = String(next)
 
 		return state.in_flight.includes(issue)
-			? { verdict: 'wait', issues: [], retries: NO_RETRIES }
+			? named_wait(next)
 			: { verdict: 'run', issues: [issue], retries: NO_RETRIES }
 	}
 

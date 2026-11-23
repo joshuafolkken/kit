@@ -187,6 +187,23 @@ describe('lane_held_stats.blocker_table', () => {
 		])
 	})
 
+	// joshuafolkken/kit#8863: a named-run wait carries its issue under `waiting` as well as in its reason.
+	it('rows a named-run wait once by reason and sums its issue under held behind', () => {
+		const entries = [
+			waited('offer:wait:named:7', 30, [7]),
+			waited('offer:wait:named:8', 20, [8]),
+			dispatch(10),
+		]
+
+		expect(row_of(entries, 'offer:wait:named')).toBe(
+			'| offer:wait:named | 20.0 | 10.0 | 10.0 | 2 | 0 |',
+		)
+		expect(body_of(lane_held_stats.blocker_table(entries, WINDOW))).toStrictEqual([
+			'| #7 | 10.0 | 10.0 | 10.0 | 1 | 0 |',
+			'| #8 | 10.0 | 10.0 | 10.0 | 1 | 0 |',
+		])
+	})
+
 	it('keeps only the ten longest issues', () => {
 		const issues = Array.from({ length: 12 }, (_, index) => index + 1)
 

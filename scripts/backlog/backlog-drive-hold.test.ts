@@ -37,7 +37,6 @@ vi.mock('#scripts/lane/lane-hand-back-hold', () => ({
 const { backlog_drive } = await import('./backlog-drive')
 const { backlog_drive_fixture } = await import('./backlog-drive-fixture')
 const { backlog_drive_hold } = await import('./backlog-drive-hold')
-
 const { CONFIG, FIRST_CHILD, OFFERED, POLL_MS, harness, offer, state } = backlog_drive_fixture
 const ONE_PASS = { ...CONFIG, window_ms: POLL_MS }
 const TWO_PASSES = { ...CONFIG, window_ms: POLL_MS + POLL_MS }
@@ -102,6 +101,16 @@ describe('backlog_drive.run_loop — the holds it reports', () => {
 		await backlog_drive.run_loop(state([FIRST_CHILD]), ONE_PASS, ports)
 
 		expect(holds[0]).toBe('offer:watch:solo')
+	})
+
+	// joshuafolkken/kit#8863: the wait on a named issue in flight recorded a bare `offer:wait`.
+	it('reports the named issue a wait holds the free lanes for', async () => {
+		const offers = [{ ...offer('wait'), cause: 'named:8845' }]
+		const { ports, holds } = harness({ offers })
+
+		await backlog_drive.run_loop(state([FIRST_CHILD]), ONE_PASS, ports)
+
+		expect(holds[0]).toBe('offer:wait:named:8845')
 	})
 
 	it('reports the stop verdict as no hold: the run is finishing', async () => {
