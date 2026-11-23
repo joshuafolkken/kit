@@ -9,7 +9,7 @@ import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_spot } from './run-board-spot'
 import type { Theme } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
-import { run_board_tick_draw } from './run-board-tick-draw'
+import { run_board_tick_theme } from './run-board-tick-theme'
 
 // joshuafolkken/kit#8644: a stale reading's age that would reach the lamp panel is left off the usage
 // rows so both keep their panel; one that fits stays, and a board with no panel draws it as before.
@@ -119,7 +119,7 @@ describe('a stale reading’s age on the lamp panel’s usage rows (joshuafolkke
 		'keeps both usage rows’ panels and leaves the age off on the %s board',
 		(theme) => {
 			vi.stubEnv('FORCE_COLOR', '3')
-			const has_panel = run_board_tick_draw.has_lamps({ types_rows: true, theme, is_tty: true })
+			const has_panel = run_board_tick_theme.has_lamps({ types_rows: true, theme, is_tty: true })
 			const lines = frame_of(FOUR_DIGITS, has_panel)
 
 			expect(has_panel).toBe(true)

@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import { lane_dispatch_prepare } from './lane-dispatch-prepare'
 import type { LaneInfo } from './lane-registry'
+import { lane_transition_guards } from './lane-transition-guards'
 
 const ISSUE = '7349'
 const LANE_DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-prepare-lane`)
@@ -58,6 +59,8 @@ function mock_labels(labels: Array<string> | undefined): ReturnType<typeof vi.sp
 beforeEach(() => {
 	// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+	// The guards' own test reads the lane list and git; here the lane's work tree is taken as present.
+	vi.spyOn(lane_transition_guards, 'rejection').mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -97,6 +100,22 @@ describe('lane_dispatch_prepare.prepared', () => {
 		vi.spyOn(agent_role_profile, 'resolve').mockReturnValue(rejected)
 
 		expect(await lane_dispatch_prepare.prepared(lane(), false)).toStrictEqual(rejected)
+	})
+})
+
+describe('lane_dispatch_prepare.prepared — the transition table guards (joshuafolkken/kit#8777)', () => {
+	it.each<[boolean, string]>([
+		[true, 'restart'],
+		[false, 'launch'],
+	])('refuses a dispatch (fresh: %s) its %s guard rejects', async (is_fresh, event) => {
+		const note = 'its work tree is gone'
+		const rejection = vi.spyOn(lane_transition_guards, 'rejection').mockResolvedValue(note)
+
+		expect(await lane_dispatch_prepare.prepared(lane(), is_fresh)).toStrictEqual({
+			kind: 'rejected',
+			note,
+		})
+		expect(rejection).toHaveBeenCalledWith(event, ISSUE)
 	})
 })
 
