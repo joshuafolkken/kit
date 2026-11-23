@@ -157,6 +157,8 @@ const time_transcript_line = {
 	NO_MESSAGE_ID,
 	TOKEN_LINE_LIMIT: time_transcript_block.TOKEN_LINE_LIMIT,
 	guard_from_refusal: time_transcript_block.guard_from_refusal,
+	// A record already read, for a reader that parses each line once (joshuafolkken/kit#8757).
+	from_record: to_line,
 	parse_line,
 	parse_text,
 	refusal_body: time_transcript_block.refusal_body,

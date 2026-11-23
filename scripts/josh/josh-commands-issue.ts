@@ -106,11 +106,13 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'defect:origin': {
 		script: 'scripts/issue/defect-origin-main.ts',
 		description:
-			'List the merged pull requests that last changed what a defect issue names, as candidates for its origin line',
+			'List the merged pull requests that last changed or first added what a defect issue names, as candidates for its origin line',
 		category: 'AI tools',
 		reference: ['<N>', 'automation', ['network']],
 		usage: {
-			examples: [{ arguments: '4241', note: 'newest first, merged before the issue was filed' }],
+			examples: [
+				{ arguments: '4241', note: 'most targets first, merged before the issue was filed' },
+			],
 		},
 	},
 	'defect:report': {
