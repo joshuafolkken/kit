@@ -139,7 +139,7 @@ function trill_of(
 ): TypingSound | undefined {
 	const typing = ports.typing_sound
 
-	if (typing === undefined || live.trill === false) return undefined
+	if (typing === undefined || !live.trill) return undefined
 
 	const typed = switched_end(keys, typed_end)
 
@@ -333,7 +333,7 @@ async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Faile
 			reveal,
 			last,
 			failed,
-			typing: run_board_type_rows.typing_of_trill(live_of(theme).trill),
+			typing: run_board_type_rows.NO_TYPING,
 		})
 	} finally {
 		leave()

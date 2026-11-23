@@ -3,9 +3,8 @@ import { run_board_decode } from './run-board-decode'
 import { run_board_fit } from './run-board-fit'
 import { run_board_intro } from './run-board-intro'
 import { run_board_labels } from './run-board-labels'
-import { run_board_row_key } from './run-board-row-key'
 import { run_board_spot } from './run-board-spot'
-import { run_board_theme_defs, type LiveDefinition } from './run-board-theme-defs'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_type_glow } from './run-board-type-glow'
 import { run_board_typing } from './run-board-typing'
 
@@ -47,16 +46,13 @@ interface TypingLine extends KeyedLine {
 
 // The keys the last frame's layout held — none before the base frame — the rows typing, the moment the
 // last row typed through was done, kept across the redraws that drop it (joshuafolkken/kit#8375), and
-// the saved frame's faint lines by key while the plan drawn is a saved one (joshuafolkken/kit#8457),
-// and where the trill sounds over only some rows, the key prefixes of those rows, kept from frame to
-// frame (joshuafolkken/kit#8697).
+// the saved frame's faint lines by key while the plan drawn is a saved one (joshuafolkken/kit#8457).
 interface Typing {
 	seen: ReadonlySet<string> | undefined
 	lines: ReadonlyArray<TypingLine>
 	done_ms?: number | undefined
 	saved?: ReadonlyMap<string, string> | undefined
 	is_decoding?: boolean | undefined
-	heard?: ReadonlyArray<string> | undefined
 }
 
 // A frame's keyed rows that can type, the key of every row its layout holds, while the plan drawn is a
@@ -80,18 +76,6 @@ type TypingStart = Pick<TypingLine, 'start_ms' | 'under'>
 
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
 const NO_SAVED: ReadonlyMap<string, string> = new Map()
-// The key prefixes of the header's notice and now rows (`run-board-header-notice.ts`,
-// `run-board-header-time.ts`), in the key format `run-board-row-key.ts` owns.
-const HEADER_KEYS: ReadonlyArray<string> = [
-	run_board_row_key.key_of('notice', ''),
-	run_board_row_key.key_of('now', ''),
-]
-
-// The typing a live board starts from: where its theme's trill sounds over the header alone, only the
-// header's rows are heard (joshuafolkken/kit#8697).
-function typing_of_trill(trill: LiveDefinition['trill']): Typing {
-	return trill === 'header' ? { ...NO_TYPING, heard: HEADER_KEYS } : NO_TYPING
-}
 
 // The columns drawn by `now_ms`: the prefix, then one typed the moment a row starts and one more every
 // letter's pause.
@@ -103,11 +87,14 @@ function is_typed(line: TypingLine, now_ms: number): boolean {
 	return columns_at(line, now_ms) >= run_board_fit.width_of(line.text)
 }
 
+// The letters the row types: its columns past the prefix.
+function letters_of(line: KeyedLine): number {
+	return run_board_fit.width_of(line.text) - line.prefix_columns
+}
+
 // The first moment the row is typed through.
 function typed_at(line: TypingLine): number {
-	const letters = run_board_fit.width_of(line.text) - line.prefix_columns - 1
-
-	return line.start_ms + Math.max(0, letters) * LETTER_MS
+	return line.start_ms + Math.max(0, letters_of(line) - 1) * LETTER_MS
 }
 
 // The moment the row that types through last is done — still ahead while one types — none before any
@@ -242,7 +229,7 @@ function landing_of(typing: Typing, frame: TypingFrame): ReadonlyMap<string, str
 // The rows typing on this frame; the first frame where typing is on is the base and types none, and
 // with it off none types and no base is kept. A row is new by `known` — every key the layout holds,
 // drawn or not — so one a fold or the pane's fit hid types not when it shows again.
-function following(typing: Typing, frame: TypingFrame, now_ms: number, is_on: boolean): Typing {
+function next(typing: Typing, frame: TypingFrame, now_ms: number, is_on: boolean): Typing {
 	if (!is_on) return NO_TYPING
 
 	const saved = saved_of(frame)
@@ -258,14 +245,6 @@ function following(typing: Typing, frame: TypingFrame, now_ms: number, is_on: bo
 		.filter((line) => is_drawn(line, now_ms, is_decoding))
 
 	return { seen: frame.known, lines, done_ms: done_ms(typing), saved, is_decoding }
-}
-
-// `following`'s typing, the rows the trill is heard over kept from the last.
-function next(typing: Typing, frame: TypingFrame, now_ms: number, is_on: boolean): Typing {
-	const typed = following(typing, frame, now_ms, is_on)
-	const { heard } = typing
-
-	return heard === undefined ? typed : { ...typed, heard }
 }
 
 // The frame's lines, each typing row as typed by `now_ms`.
@@ -295,25 +274,16 @@ function spans_of(typing: Typing): Array<TypingSpan> {
 	return typing.lines.map((line) => ({ from_ms: line.start_ms, to_ms: typed_at(line) }))
 }
 
-// The typing rows the trill is heard over: all of them, or those whose key starts with one of `heard`.
-function heard_lines(typing: Typing): ReadonlyArray<TypingLine> {
-	const { heard } = typing
-
-	if (heard === undefined) return typing.lines
-
-	return typing.lines.filter((line) => heard.some((prefix) => line.key.startsWith(prefix)))
-}
-
-// Whether any heard row is still typing at `now_ms` — by the clock, since a row typed through stays in
+// Whether any row is still typing at `now_ms` — by the clock, since a row typed through stays in
 // `lines` until the next redraw drops it (joshuafolkken/kit#8250).
 function is_typing(typing: Typing, now_ms: number): boolean {
-	return heard_lines(typing).some((line) => now_ms < typed_at(line))
+	return typing.lines.some((line) => now_ms < typed_at(line))
 }
 
-// How long after `now_ms` the last heard row types through; 0 once none types. The trill stops itself
+// How long after `now_ms` the last row types through; 0 once none types. The trill stops itself
 // then, so a redraw held up by a slow gather does not keep it ringing (joshuafolkken/kit#8523).
 function left_ms(typing: Typing, now_ms: number): number {
-	return Math.max(0, ...heard_lines(typing).map((line) => typed_at(line) - now_ms))
+	return Math.max(0, ...typing.lines.map((line) => typed_at(line) - now_ms))
 }
 
 // The share of its letters the row that types through last has typed by `now_ms`, so every effect that
@@ -324,23 +294,21 @@ function progress(typing: Typing, now_ms: number): number {
 	const last = typing_now.find((line) => typed_at(line) === latest)
 
 	if (last === undefined) return 1
-	const letters = run_board_fit.width_of(last.text) - last.prefix_columns
 
-	return Math.min(1, (columns_at(last, now_ms) - last.prefix_columns) / letters)
+	return Math.min(1, (columns_at(last, now_ms) - last.prefix_columns) / letters_of(last))
 }
 
 const run_board_type_rows = {
-	HEADER_KEYS,
 	NO_TYPING,
 	done_ms,
 	is_typing,
 	left_ms,
+	letters_of,
 	next,
 	progress,
 	spans_of,
 	type_bytes,
 	typed_lines,
-	typing_of_trill,
 }
 
 export { run_board_type_rows }

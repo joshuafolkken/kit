@@ -1,44 +1,48 @@
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Notice } from './run-board-header-notice'
 import { run_board_jump } from './run-board-jump'
 import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 import { run_board_jump_start, type JumpFrame } from './run-board-jump-start'
-import type { CueName } from './run-board-sound-cues'
-import { run_board_type_rows, type KeyedLine } from './run-board-type-rows'
+import { run_board_row_key } from './run-board-row-key'
+import type { Typing, TypingLine } from './run-board-type-rows'
 
-const { arrive_of, jump_of } = run_board_jump_start
-const { END_TICKS, THAW_AT, THAW_TICKS, TICK_MS, WASH_TICKS } = run_board_jump
+const { arrive_of, jump_of, jump_state } = run_board_jump_start
+const { END_TICKS, THAW_AT, THAW_TICKS, TICK_MS, WASH_TICKS, tick_of } = run_board_jump
 
-const ISSUE = 8677
 const NOW = 1000
-const NOTICE_TEXT = ' merged '
-const LANE_ROW = 4
-const LINES = ['header', 'one', 'two', 'three', `lane ${issue_cite.plain_for('program', ISSUE)}`]
+const ROW_TEXT = 'lane 8731 implementing'
+const LINES = ['header', 'one', 'two', 'three', ROW_TEXT]
 
-function notice_of(cue: CueName): Notice {
-	return { cause: { cue, word: 'merged', issue: ISSUE }, is_repeat: false, at_ms: NOW }
+function line_of(text: string, start_ms = NOW, key = 'lanes:8731'): TypingLine {
+	return { key, index: 4, row: 5, text, prefix_columns: 0, start_ms }
+}
+
+function typing_of(...lines: Array<TypingLine>): Typing {
+	return { seen: new Set(), lines }
 }
 
 function frame_of(overrides: Partial<JumpFrame> = {}): JumpFrame {
 	return {
 		ports: { theme: 'bttf', is_tty: true },
-		notice: notice_of('lane-end'),
-		turn: { trace: { key: 'k', start_ms: NOW }, place: { row: 1, column: 1, text: NOTICE_TEXT } },
 		drawn: { lines: LINES, spots: [], size: undefined },
-		typing: run_board_type_rows.NO_TYPING,
+		typing: typing_of(line_of(ROW_TEXT)),
 		area: undefined,
 		now_ms: NOW,
 		...overrides,
 	}
 }
 
-function trail_draw(lines: ReadonlyArray<string>): JumpDraw {
-	const draw = jump_of(undefined, frame_of({ drawn: { lines, spots: [], size: undefined } }))
-
+function must(draw: JumpDraw | undefined): JumpDraw {
 	if (draw === undefined) throw new Error('no jump started')
 
 	return draw
+}
+
+function started(frame: JumpFrame = frame_of()): JumpDraw {
+	return must(jump_of(undefined, frame))
+}
+
+function trail_draw(lines: ReadonlyArray<string>): JumpDraw {
+	return started(frame_of({ drawn: { lines, spots: [], size: undefined } }))
 }
 
 beforeEach(() => {
@@ -49,45 +53,25 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 })
 
-describe('run_board_jump_start.jump_of', () => {
-	it('starts on the first letter of a lane-end notice, on the merging lane', () => {
-		const draw = jump_of(undefined, frame_of())
+describe('run_board_jump_start.jump_state — the typing cue', () => {
+	it('ac-075efb73 starts a jump on a bttf frame whose row starts typing, with no notice trace', () => {
+		const jump = must(jump_state({}, frame_of()).jump)
+		const jumped_ms = NOW + jump.run.letters * TICK_MS
 
-		expect(draw?.run.start_ms).toBe(NOW)
-		expect(draw?.run.issue).toBe(ISSUE)
-		expect(draw?.scene.lane).toBe(LANE_ROW)
-	})
-})
-
-describe('run_board_jump_start.jump_of — the fire trails', () => {
-	const THROUGHPUT_RULE = '── 📈 throughput ──'
-	const LANE_LINE = LINES[LANE_ROW] ?? ''
-
-	it('burns the fire trails on the blank rows above the throughput rule and the lanes rule', () => {
-		const lines = ['header', '', THROUGHPUT_RULE, 'x', '', '── 🧵 lanes ──', LANE_LINE]
-
-		expect(trail_draw(lines).scene.trails).toStrictEqual([1, 4])
+		expect(run_board_jump_screen.jump_bytes(jump, jumped_ms, undefined)).not.toBe('')
 	})
 
-	it('fills the blank trail rows out with cells, so the head burns on a real board', () => {
-		const draw = trail_draw(['header', '', THROUGHPUT_RULE, LANE_LINE])
-		const jumped_ms = NOW + draw.run.letters * TICK_MS
-		const written = run_board_jump_screen.jump_bytes(draw, jumped_ms, undefined)
+	it('ac-075efb73 starts the same jump whatever row types, a notice row or a body row', () => {
+		const notice_key = run_board_row_key.key_of('notice', 'merged')
+		const typing = typing_of(line_of(ROW_TEXT, NOW, notice_key))
 
-		expect(draw.screen.rows[1]).toHaveLength(draw.screen.columns)
-		expect(written).toMatch(/\[2;1H.*█/u)
-	})
-})
-
-describe('run_board_jump_start.jump_of — other cues and themes', () => {
-	it('starts on no other cue, nor after the first letter', () => {
-		const launch = frame_of({ notice: notice_of('launch') })
-
-		expect(jump_of(undefined, launch)).toBeUndefined()
-		expect(jump_of(undefined, frame_of({ now_ms: NOW + TICK_MS }))).toBeUndefined()
+		expect(started(frame_of({ typing })).run).toStrictEqual(started().run)
 	})
 
-	it('starts in no other theme, nor off a color terminal', () => {
+	it('starts on no typing, in no other theme, nor off a color terminal', () => {
+		const typing = typing_of()
+
+		expect(jump_of(undefined, frame_of({ typing }))).toBeUndefined()
 		expect(
 			jump_of(undefined, frame_of({ ports: { theme: 'matrix', is_tty: true } })),
 		).toBeUndefined()
@@ -99,40 +83,87 @@ describe('run_board_jump_start.jump_of — other cues and themes', () => {
 	})
 })
 
-describe('run_board_jump_start.jump_of once running', () => {
-	it('carries the running jump rather than restarting it on the next merge notice', () => {
-		const first = jump_of(undefined, frame_of())
-		const later = NOW + TICK_MS * 2
-		const next = frame_of({
-			now_ms: later,
-			turn: {
-				trace: { key: 'k2', start_ms: later },
-				place: { row: 1, column: 1, text: NOTICE_TEXT },
-			},
-		})
+describe('run_board_jump_start.jump_state — the typing run', () => {
+	it('ac-61ea24a8 jumps on the tick after the last letter, the row letters × 50 ms in', () => {
+		const { run } = started()
 
-		expect(jump_of(first, next)?.run.start_ms).toBe(NOW)
+		expect(run).toStrictEqual({ start_ms: NOW, letters: ROW_TEXT.length })
+		expect(tick_of(run, NOW + ROW_TEXT.length * TICK_MS - 1)).toBe(-1)
+		expect(tick_of(run, NOW + ROW_TEXT.length * TICK_MS)).toBe(0)
 	})
 
-	it('yields to the next merge notice once thawed, with only its fire trails burning', () => {
-		const first = jump_of(undefined, frame_of())
-		const thawed = NOW + ((first?.run.letters ?? 0) + WASH_TICKS + THAW_TICKS) * TICK_MS
-		const trace = { key: 'k2', start_ms: thawed }
-		const next = frame_of({
-			now_ms: thawed,
-			turn: { trace, place: { row: 1, column: 1, text: NOTICE_TEXT } },
-		})
+	it('counts the longest of the rows starting together', () => {
+		const typing = typing_of(line_of('short'), line_of(ROW_TEXT), line_of('mid row'))
 
-		expect(jump_of(first, next)?.run.start_ms).toBe(thawed)
-		expect(jump_of(first, frame_of({ now_ms: thawed }))?.run.start_ms).toBe(NOW)
+		expect(started(frame_of({ typing })).run.letters).toBe(ROW_TEXT.length)
+	})
+
+	it('ac-a748b0ea starts on a frame drawn late, from the typing first letter', () => {
+		const late = frame_of({ now_ms: NOW + TICK_MS * 3 })
+
+		expect(started(late).run.start_ms).toBe(NOW)
+	})
+
+	it('cues each typing once, so a typing already cued starts none', () => {
+		const state = jump_state({}, frame_of())
+
+		expect(state.cued_ms).toBe(NOW)
+		expect(jump_of(undefined, frame_of({ now_ms: NOW + TICK_MS }), state.cued_ms)).toBeUndefined()
+	})
+})
+
+describe('run_board_jump_start.jump_of — the fire trails', () => {
+	const THROUGHPUT_RULE = '── 📈 throughput ──'
+
+	it('burns the fire trails on the blank rows above the throughput rule and the lanes rule', () => {
+		const lines = ['header', '', THROUGHPUT_RULE, 'x', '', '── 🧵 lanes ──', ROW_TEXT]
+
+		expect(trail_draw(lines).scene.trails).toStrictEqual([1, 4])
+	})
+
+	it('fills the blank trail rows out with cells, so the head burns on a real board', () => {
+		const draw = trail_draw(['header', '', THROUGHPUT_RULE, ROW_TEXT])
+		const jumped_ms = NOW + draw.run.letters * TICK_MS
+		const written = run_board_jump_screen.jump_bytes(draw, jumped_ms, undefined)
+
+		expect(draw.screen.rows[1]).toHaveLength(draw.screen.columns)
+		expect(written).toMatch(/\[2;1H.*█/u)
+	})
+})
+
+describe('run_board_jump_start.jump_state once running', () => {
+	const later = NOW + TICK_MS * 2
+	const next_typing = typing_of(line_of('next row', later))
+
+	it('carries the running jump and cues the typing that starts meanwhile', () => {
+		const first = jump_state({}, frame_of())
+		const next = jump_state(first, frame_of({ now_ms: later, typing: next_typing }))
+
+		expect(next.jump?.run.start_ms).toBe(NOW)
+		expect(next.cued_ms).toBe(later)
+	})
+
+	it('never starts from a typing cued while the last jump ran', () => {
+		const over = NOW + (ROW_TEXT.length + END_TICKS) * TICK_MS
+		const frame = frame_of({ now_ms: over, typing: next_typing })
+
+		expect(jump_state({ cued_ms: later }, frame).jump).toBeUndefined()
+	})
+
+	it('yields to a typing not yet cued once thawed, with only its fire trails burning', () => {
+		const first = jump_state({}, frame_of())
+		const thawed = NOW + (ROW_TEXT.length + WASH_TICKS + THAW_TICKS) * TICK_MS
+		const fresh = frame_of({ now_ms: thawed, typing: typing_of(line_of('next row', thawed)) })
+
+		expect(jump_state(first, fresh).jump?.run.start_ms).toBe(thawed)
+		expect(jump_state(first, frame_of({ now_ms: thawed })).jump?.run.start_ms).toBe(NOW)
 	})
 
 	it('draws nothing once the jump is over', () => {
-		const first = jump_of(undefined, frame_of())
-		const letters = first?.run.letters ?? 0
-		const over = NOW + (letters + END_TICKS) * TICK_MS
+		const first = jump_state({}, frame_of())
+		const over = NOW + (ROW_TEXT.length + END_TICKS) * TICK_MS
 
-		expect(jump_of(first, frame_of({ now_ms: over }))).toBeUndefined()
+		expect(jump_state(first, frame_of({ now_ms: over })).jump).toBeUndefined()
 	})
 })
 
@@ -141,9 +172,9 @@ describe('run_board_jump_start.arrive_of', () => {
 	const live = { theme: 'bttf' as const, is_tty: true, opened_ms: 0 }
 
 	it('starts the arrival at its thaw on a live bttf board first drawing its area', () => {
-		const started = arrive_of(undefined, frame_of({ ports: live, area }))
+		const arrived = arrive_of(undefined, frame_of({ ports: live, area }))
 
-		expect(started).toBe(NOW - THAW_AT * TICK_MS)
+		expect(arrived).toBe(NOW - THAW_AT * TICK_MS)
 	})
 
 	it('keeps the arrival once it is set', () => {
@@ -159,40 +190,5 @@ describe('run_board_jump_start.arrive_of', () => {
 		const matrix = { ...live, theme: 'matrix' as const }
 
 		expect(arrive_of(undefined, frame_of({ ports: matrix, area }))).toBeUndefined()
-	})
-})
-
-describe('run_board_jump_start.jump_state — the lane swap', () => {
-	const merged: KeyedLine = {
-		key: `lanes:${String(ISSUE)}`,
-		row: LANE_ROW + 1,
-		index: LANE_ROW,
-		text: 'gone',
-		prefix_columns: 0,
-	}
-	const left = LINES.slice(0, LANE_ROW)
-
-	function dropped(): JumpFrame {
-		return frame_of({ drawn: { lines: left, spots: [], size: undefined, keyed: [] } })
-	}
-
-	it('ac-066a13f7 starts the jump on the row the merged lane left, drawing it back', () => {
-		const last = { lane_memory: { lines: [merged], left: [] } }
-		const { jump, lane_memory } = run_board_jump_start.jump_state(last, dropped())
-
-		if (jump === undefined) throw new Error('no jump started on the merged row')
-		expect(lane_memory).toStrictEqual({ lines: [], left: [merged] })
-		expect(jump.run.lane).toStrictEqual({ row: LANE_ROW, text: 'gone' })
-		expect(jump.scene.lane).toBe(LANE_ROW)
-		expect(jump.gone).toMatchObject({ row: LANE_ROW })
-		expect(jump.gone?.cells.map((cell) => cell.text).join('')).toBe('gone')
-	})
-
-	it('ac-0cd6f361 draws no merged row back where none left', () => {
-		const state = run_board_jump_start.jump_state({}, frame_of())
-
-		expect(state.jump?.run.lane).toBeUndefined()
-		expect(state.jump?.gone).toBeUndefined()
-		expect(state.lane_memory).toStrictEqual({ lines: [], left: [] })
 	})
 })

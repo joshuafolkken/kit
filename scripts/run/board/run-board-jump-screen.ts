@@ -2,8 +2,6 @@ import { run_board_drop_screen, type DropScreen, type ScreenCell } from './run-b
 import type { TerminalSize } from './run-board-fit'
 import { run_board_jump, type JumpRun } from './run-board-jump'
 import { run_board_jump_paint, type JumpScene, type PaintCell } from './run-board-jump-paint'
-import { run_board_lane_swap, type LaneSwap } from './run-board-lane-swap'
-import { run_board_notice_turn, type NoticePlace } from './run-board-notice-turn'
 import type { PanelArea } from './run-board-panel-draw'
 import type { Beat } from './run-board-reveal-blocks'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
@@ -14,11 +12,10 @@ import type { Typing } from './run-board-type-rows'
 // theme: each cell as the theme drew it (`DropScreen`) recolored by `run_board_jump_paint`, at ten frames
 // a second, writing only the cells that changed since the last turn and putting each back as it was once
 // the jump is over. The animation area is the panel's own (it thaws its cells itself), and the cells the
-// spinners, the typing rows and the notice's trace write are left to them.
+// spinners and the typing rows write are left to them.
 
 const { ARRIVE_TICKS, TICK_MS, is_running, tick_of } = run_board_jump
 const { arrive_cells, jump_cells } = run_board_jump_paint
-const { swapped } = run_board_lane_swap
 const { parsed } = run_board_rgb
 const { synced } = run_board_screen
 
@@ -33,22 +30,13 @@ const BACKGROUND = /48;2;(\d+);(\d+);(\d+)/u
 // `run_board_type_rows.NO_TYPING` would cycle through `run-board-intro.ts`).
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
 
-// The merged lane's row the jump draws back (joshuafolkken/kit#8711): its row, 0-based, and its cells as
-// the theme drew them.
-interface GoneRow {
-	row: number
-	cells: ReadonlyArray<ScreenCell>
-}
-
 // A jump being drawn: its timeline, the board's cells as the theme drew them, the rows it is painted
-// over, the cells it leaves alone — the notice's place and the animation area — and the merged row.
+// over and the animation area, whose cells it leaves alone.
 interface JumpDraw {
 	run: JumpRun
 	screen: DropScreen
 	scene: JumpScene
-	place?: NoticePlace | undefined
 	panel?: PanelArea | undefined
-	gone?: GoneRow | undefined
 }
 
 function key_of(row: number, column: number): string {
@@ -72,13 +60,11 @@ function is_panel(panel: PanelArea | undefined, row: number, column: number): bo
 	return column >= Math.min(...panel.lamps.map((lamp) => lamp.column)) - 1
 }
 
-// Whether the jump paints a cell, 1-based: none the spinners, the typing rows, the notice or the area own.
+// Whether the jump paints a cell, 1-based: none the spinners, the typing rows or the area own.
 function is_painted(draw: JumpDraw, row: number, column: number): boolean {
-	const place = { row, column }
+	if (run_board_drop_screen.is_kept(draw.screen, { row, column })) return false
 
-	if (run_board_drop_screen.is_kept(draw.screen, place)) return false
-
-	return !run_board_notice_turn.covers(draw.place, place) && !is_panel(draw.panel, row, column)
+	return !is_panel(draw.panel, row, column)
 }
 
 function paint_cell(cell: ScreenCell, x: number, y: number): PaintCell {
@@ -125,19 +111,11 @@ function keyed(cells: ReadonlyArray<PaintCell>, screen: DropScreen): Map<string,
 	)
 }
 
-function swap_of(gone: GoneRow | undefined): LaneSwap | undefined {
-	if (gone === undefined) return undefined
-
-	return { row: gone.row, cells: gone.cells.map((cell, x) => paint_cell(cell, x, gone.row)) }
-}
-
-// The cells the jump changes at `ms` from the board as drawn, by `row;column`: the lane swap's row
-// under the jump's paint.
+// The cells the jump changes at `ms` from the board as drawn, by `row;column`.
 function painted_at(draw: JumpDraw, ms: number | undefined): Map<string, string> {
 	if (ms === undefined || !is_running(draw.run, ms)) return new Map()
 	const plain = cells_of(draw)
-	const t = tick_of(draw.run, ms)
-	const painted = jump_cells(swapped(plain, t, swap_of(draw.gone)), t, draw.run.letters, draw.scene)
+	const painted = jump_cells(plain, tick_of(draw.run, ms), draw.run.letters, draw.scene)
 	const changed = painted.filter((cell, index) => {
 		const base = plain[index]
 
@@ -215,7 +193,7 @@ function jump_bytes(
 	].join('')
 }
 
-const run_board_jump_screen = { FRAME_MS, NO_TYPING, arrive_beats, jump_bytes }
+const run_board_jump_screen = { FRAME_MS, arrive_beats, jump_bytes }
 
 export { run_board_jump_screen }
-export type { GoneRow, JumpDraw }
+export type { JumpDraw }

@@ -78,8 +78,8 @@ describe('run_board_live.trill_of typed end', () => {
 		expect(typed_end).not.toHaveBeenCalled()
 	})
 
-	it('hands the header-only trill to the draws, as `true` is', () => {
-		expect(run_board_theme_defs.live_of('bttf').trill).toBe('header')
+	it('ac-f9b98b75 hands the bttf trill over every row to the draws', () => {
+		expect(run_board_theme_defs.live_of('bttf').trill).toBe(true)
 		expect(trill_with(true, () => undefined).trill).toBeDefined()
 	})
 })
