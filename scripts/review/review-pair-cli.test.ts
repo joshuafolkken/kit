@@ -108,6 +108,10 @@ describe('review_pair_cli.run --stats', () => {
 	it('prints the recall summary of the recorded comparisons under --stats', () => {
 		const log = fresh_log()
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		review_pair_cli.run([], sources(log))
+		expect(error.mock.calls[0]?.[0]).toContain('josh review:pair --stats')
 
 		review_pair_cli.run(ARGV, sources(log))
 		info.mockClear()

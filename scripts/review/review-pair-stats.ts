@@ -3,7 +3,8 @@ import type { PairFinding, PairLine, PairSide } from './review-pair-log'
 // `josh review:pair --stats` (joshuafolkken/kit#8759): how many of the Opus reviewer's high and medium
 // findings the paired Sonnet reviewer raised too, per severity, and each reviewer's mean cost per run.
 // A Sonnet finding recalls an Opus one when it names the same file within LINE_TOLERANCE lines, at
-// any severity; either side with no line number matches on the file alone. Sonnet is comparable when
+// any severity; either side with no line number matches on the file alone. Each Sonnet finding recalls
+// at most one Opus finding, high ones first. Sonnet is comparable when
 // it recalls at least COMPARABLE_RECALL of the high and medium findings together.
 
 const GRAVE_SEVERITIES = ['high', 'medium'] as const
@@ -26,6 +27,11 @@ interface SeverityRecall {
 	severity: string
 	opus: number
 	recalled: number
+}
+
+interface GraveMatch {
+	severity: string
+	recalled: boolean
 }
 
 interface PairStats {
@@ -53,20 +59,31 @@ function is_near(opus: FindingLocation, sonnet: FindingLocation | undefined): bo
 	return Math.abs(opus.line - sonnet.line) <= LINE_TOLERANCE
 }
 
-function is_recalled(finding: PairFinding, sonnet: PairSide): boolean {
+// Takes the first unused Sonnet location near the finding, so one Sonnet finding recalls one Opus finding.
+function take_match(finding: PairFinding, unused: Array<FindingLocation | undefined>): boolean {
 	const opus = location_of(finding)
+	const index = opus === undefined ? -1 : unused.findIndex((other) => is_near(opus, other))
 
-	return opus !== undefined && sonnet.findings.some((other) => is_near(opus, location_of(other)))
+	if (index === -1) return false
+	unused.splice(index, 1)
+
+	return true
 }
 
-function severity_recall(lines: ReadonlyArray<PairLine>, severity: string): SeverityRecall {
-	const pairs = lines.flatMap((line) =>
+function grave_matches(line: PairLine): ReadonlyArray<GraveMatch> {
+	const unused = line.sonnet.findings.map((finding) => location_of(finding))
+
+	return GRAVE_SEVERITIES.flatMap((severity) =>
 		line.opus.findings
 			.filter((finding) => finding.severity === severity)
-			.map((finding) => is_recalled(finding, line.sonnet)),
+			.map((finding) => ({ severity, recalled: take_match(finding, unused) })),
 	)
+}
 
-	return { severity, opus: pairs.length, recalled: pairs.filter(Boolean).length }
+function severity_recall(matches: ReadonlyArray<GraveMatch>, severity: string): SeverityRecall {
+	const rows = matches.filter((match) => match.severity === severity)
+
+	return { severity, opus: rows.length, recalled: rows.filter((row) => row.recalled).length }
 }
 
 function sum_of(values: ReadonlyArray<number>): number {
@@ -84,9 +101,11 @@ function mean_usd(sides: ReadonlyArray<PairSide>): number | undefined {
 }
 
 function stats(lines: ReadonlyArray<PairLine>): PairStats {
+	const matches = lines.flatMap((line) => grave_matches(line))
+
 	return {
 		runs: lines.length,
-		severities: GRAVE_SEVERITIES.map((severity) => severity_recall(lines, severity)),
+		severities: GRAVE_SEVERITIES.map((severity) => severity_recall(matches, severity)),
 		opus_usd: mean_usd(lines.map((line) => line.opus)),
 		sonnet_usd: mean_usd(lines.map((line) => line.sonnet)),
 	}
@@ -131,7 +150,7 @@ function report(result: PairStats): ReadonlyArray<string> {
 	]
 }
 
-const review_pair_stats = { report, stats, verdict, VERDICT }
+const review_pair_stats = { dollars, report, stats, verdict, VERDICT }
 
 export type { PairStats }
 export { review_pair_stats }

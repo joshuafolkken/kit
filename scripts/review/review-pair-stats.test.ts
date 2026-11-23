@@ -65,6 +65,23 @@ describe('review_pair_stats.stats', () => {
 	})
 })
 
+describe('review_pair_stats.stats — one Sonnet finding per Opus finding', () => {
+	it('lets one Sonnet finding recall only one Opus finding, the high one first', () => {
+		const line = pair(
+			[finding('medium', 'a.ts:10'), finding('high', 'a.ts:12')],
+			[finding('low', 'a.ts')],
+		)
+
+		expect(recall_of(line)).toStrictEqual([1, 0])
+	})
+
+	it('recalls no Opus finding that names no place', () => {
+		const line = pair([{ severity: 'medium', line: 'a finding' }], [finding('low', 'a.ts:1')])
+
+		expect(recall_of(line)).toStrictEqual([0, 0])
+	})
+})
+
 describe('review_pair_stats.verdict', () => {
 	it('is comparable at 80% recall, short below it, and no data without a grave finding', () => {
 		const hit = pair([finding('high', 'a.ts:1')], [finding('high', 'a.ts:1')])

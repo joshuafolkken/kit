@@ -21,7 +21,6 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NONE_LINE = 'none'
-const USD_DIGITS = 2
 const SEVERITY_PATTERN = /^[^:]+:(?<severity>[^:]+):/u
 const STATS_FLAG = '--stats'
 const USAGE =
@@ -113,14 +112,10 @@ function request_of(argv: ReadonlyArray<string>): PairRequest | undefined {
 	}
 }
 
-function dollars(usd: number | undefined): string {
-	return usd === undefined ? '$?' : `$${usd.toFixed(USD_DIGITS)}`
-}
-
 function summary(opus: PairSide, sonnet: PairSide): string {
 	const sides = [
-		`opus ${String(opus.findings.length)} findings ${dollars(opus.usd)}`,
-		`sonnet ${String(sonnet.findings.length)} findings ${dollars(sonnet.usd)}`,
+		`opus ${String(opus.findings.length)} findings ${review_pair_stats.dollars(opus.usd)}`,
+		`sonnet ${String(sonnet.findings.length)} findings ${review_pair_stats.dollars(sonnet.usd)}`,
 	]
 
 	return `review:pair recorded — ${sides.join(' · ')}`
