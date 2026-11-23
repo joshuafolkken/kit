@@ -6,7 +6,8 @@ import { lane_state_record, type LaneState } from './lane-state-record'
 // beside it. Which operations are events here and which live on another path (a label, a marker file,
 // the hold stamp): `docs/maintainers/lane-lifecycle.md`.
 //
-// **Guards are named, not evaluated, here** — the evaluation is joshuafolkken/kit#8777's.
+// **Guards are named, not evaluated, here** — `lane-transition-guards.ts` evaluates the ones read
+// outside the lane record (the work tree, the checkout's hold); the rest are read by the event's writer.
 
 const { HUMAN_REVIEW, LANE_STATES } = lane_state_record
 
@@ -23,6 +24,9 @@ const GUARD = {
 	OWNER_ENDED: 'owner-run-ended',
 	// The child exited before it stamped its human-review stop marker.
 	NO_STOP_MARKER: 'stop-marker-missing',
+	// No other run's hold stamp owns the primary checkout a merge switches and pulls. It gates the
+	// merge's `main:sync` (`run-merge-sync.ts`), not the human-review record write on this row.
+	CHECKOUT_FREE: 'checkout-not-held-by-another-run',
 } as const
 
 type LaneGuard = (typeof GUARD)[keyof typeof GUARD]
@@ -53,7 +57,11 @@ const LANE_EVENTS = {
 	'hand-over-running': { from: ['running'], to: 'running', guards: [GUARD.OWNER_ENDED] },
 	'hand-over-review': { from: [HUMAN_REVIEW], to: HUMAN_REVIEW, guards: [GUARD.OWNER_ENDED] },
 	'human-review': { from: ['open', 'running', HUMAN_REVIEW], to: HUMAN_REVIEW, guards: [] },
-	merge: { from: ['open', 'running'], to: HUMAN_REVIEW, guards: [GUARD.NO_STOP_MARKER] },
+	merge: {
+		from: ['open', 'running'],
+		to: HUMAN_REVIEW,
+		guards: [GUARD.NO_STOP_MARKER, GUARD.CHECKOUT_FREE],
+	},
 	'review-resume': { from: [HUMAN_REVIEW], to: 'running', guards: [GUARD.WORK_TREE] },
 	withdraw: { from: ['open', 'running', 'paused', HUMAN_REVIEW], to: 'ended', guards: [] },
 	close: { from: ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'], to: 'ended', guards: [] },
@@ -93,6 +101,7 @@ function allowed_transitions(): Record<LaneState, ReadonlyArray<LaneState>> {
 }
 
 const lane_transition_table = {
+	GUARD,
 	LANE_EVENT_NAMES,
 	LANE_GUARDS,
 	allowed_transitions,

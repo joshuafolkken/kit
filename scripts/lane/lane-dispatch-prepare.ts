@@ -10,6 +10,7 @@ import { run_ending } from '#scripts/run/run-ending'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
+import { lane_transition_guards } from './lane-transition-guards'
 
 type Prepared =
 	| {
@@ -54,7 +55,7 @@ async function worker_profile(lane: LaneInfo): Promise<ProfileResult> {
 // first because the resume mechanism is Claude Code's, and an OpenAI lane falls back to fresh. **A
 // fresh dispatch never reads the record**: a person restarting a child (`lane:restart`) wants a new
 // session that reads the Issue from the start, whatever the previous one ended on.
-async function prepared(lane: LaneInfo, is_fresh: boolean): Promise<Prepared> {
+async function prepared_for(lane: LaneInfo, is_fresh: boolean): Promise<Prepared> {
 	const resolved = await worker_profile(lane)
 
 	if (resolved.kind === 'rejected') return resolved
@@ -75,6 +76,17 @@ async function prepared(lane: LaneInfo, is_fresh: boolean): Promise<Prepared> {
 		profile: built.profile,
 		resumed_from,
 	}
+}
+
+// **A dispatch is the table's `launch`, or `restart` for a fresh one, and is refused on its guards**
+// (joshuafolkken/kit#8777): a lane whose branch or work tree is gone has nowhere for a child to run.
+async function prepared(lane: LaneInfo, is_fresh: boolean): Promise<Prepared> {
+	const event = is_fresh ? 'restart' : 'launch'
+	const note = await lane_transition_guards.rejection(event, lane.issue)
+
+	if (note !== undefined) return { kind: 'rejected', note }
+
+	return await prepared_for(lane, is_fresh)
 }
 
 const lane_dispatch_prepare = { prepared }

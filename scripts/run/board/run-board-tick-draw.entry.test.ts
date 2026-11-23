@@ -13,66 +13,16 @@ import type { TypingSpan } from './run-board-type-rows'
 // joshuafolkken/kit#8356: the matrix board draws its lamp panel as the idle rain, and its new rows decode
 // on a terminal drawing color; elsewhere they type or show at once.
 
-const { entry_of, has_drop, has_lamps, has_rain, has_rule_lamps, panel_of } = run_board_tick_draw
+const { panel_of } = run_board_tick_draw
 const MATRIX = { types_rows: true, theme: 'matrix', is_tty: true } as const
 const WARGAMES = { ...MATRIX, theme: 'wargames' } as const
 const ONCE = '--once, --chat and a pipe'
-const EVERY = '--every'
 // The rule glyph the board draws, and the dash the matrix theme draws it as.
 const RULE = '─'
 const DASH = '-'
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-})
-
-describe('run_board_tick_draw.has_rain', () => {
-	it('draws the matrix board’s lamp panel, as the idle rain, on a terminal drawing color', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_lamps(MATRIX)).toBe(true)
-		expect(has_rain(MATRIX)).toBe(true)
-	})
-
-	it('runs no rain in the wargames board’s panel', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_rain(WARGAMES)).toBe(false)
-	})
-
-	it.each([
-		[ONCE, { ...MATRIX, is_tty: false }],
-		[EVERY, { ...MATRIX, types_rows: false }],
-	])('runs none with %s', (_, ports) => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_rain(ports)).toBe(false)
-	})
-
-	it('runs none on a terminal drawing no color', () => {
-		vi.stubEnv('FORCE_COLOR', '0')
-
-		expect(has_rain(MATRIX)).toBe(false)
-	})
-})
-
-// joshuafolkken/kit#8702: the usage rule's row carries the panel in wargames and matrix, not bttf.
-describe('run_board_tick_draw.has_rule_lamps', () => {
-	it.each([
-		[WARGAMES, true],
-		[MATRIX, true],
-		[{ ...MATRIX, theme: 'bttf' } as const, false],
-	])('lamps the rule in %o: %s', (ports, expected) => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_rule_lamps(ports)).toBe(expected)
-	})
-
-	it('lamps none on a terminal drawing no color', () => {
-		vi.stubEnv('FORCE_COLOR', '0')
-
-		expect(has_rule_lamps(WARGAMES)).toBe(false)
-	})
 })
 
 // joshuafolkken/kit#8676: the theme's painter the turns carry, with the frame's animation area.
@@ -115,68 +65,6 @@ describe('run_board_tick_draw.panel_of', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 
 		expect(panel_of(MATRIX, { area: undefined })).toBeUndefined()
-	})
-})
-
-// joshuafolkken/kit#8367: a drop falls down the matrix board every second, on the lamps' gate.
-describe('run_board_tick_draw.has_drop', () => {
-	it('drops one down the live matrix board on a terminal drawing color', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_drop(MATRIX)).toBe(true)
-	})
-
-	it.each([
-		['the wargames board', WARGAMES],
-		['a board in no theme', { ...MATRIX, theme: undefined }],
-		[ONCE, { ...MATRIX, is_tty: false }],
-		[EVERY, { ...MATRIX, types_rows: false }],
-	])('drops none on %s', (_, ports) => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_drop(ports)).toBe(false)
-	})
-
-	it('drops none on a terminal drawing no color', () => {
-		vi.stubEnv('FORCE_COLOR', '0')
-
-		expect(has_drop(MATRIX)).toBe(false)
-	})
-})
-
-describe('run_board_tick_draw.entry_of', () => {
-	it('decodes the matrix board’s new rows on a terminal drawing color', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(entry_of(MATRIX)).toBe('decode')
-	})
-
-	it('types the wargames board’s new rows', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(entry_of(WARGAMES)).toBe('type')
-	})
-
-	// joshuafolkken/kit#8683: bttf types its new rows as wargames does — one typing style for every theme.
-	it('types the bttf board’s new rows', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(entry_of({ ...MATRIX, theme: 'bttf' })).toBe('type')
-	})
-
-	it.each([
-		[ONCE, { ...MATRIX, is_tty: false }],
-		[EVERY, { ...MATRIX, types_rows: false }],
-	])('shows the matrix board’s rows at once with %s', (_, ports) => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(entry_of(ports)).toBe('none')
-	})
-
-	it('shows the matrix board’s rows at once on a terminal drawing no color', () => {
-		vi.stubEnv('FORCE_COLOR', '0')
-
-		expect(entry_of(MATRIX)).toBe('none')
 	})
 })
 

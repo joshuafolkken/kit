@@ -140,6 +140,15 @@ describe('lane_pause_cli.run — the record', () => {
 		expect(record_lane_state).not.toHaveBeenCalled()
 		expect(emit).not.toHaveBeenCalled()
 	})
+
+	// joshuafolkken/kit#8775: a change the lifecycle table rejects reaches neither the ledger nor the stream.
+	it('writes no ledger row and emits nothing when the table rejects the change', async () => {
+		record_change.mockResolvedValue({ kind: 'rejected', reason: 'paused by a person' })
+		await lane_pause_cli.run(['resume', ISSUE])
+
+		expect(record_lane_state).not.toHaveBeenCalled()
+		expect(emit).not.toHaveBeenCalled()
+	})
 })
 
 describe('lane_pause_cli.run — --all', () => {

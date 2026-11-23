@@ -1,14 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DropScreen, ScreenCell } from './run-board-drop-screen'
 import { run_board_jump } from './run-board-jump'
+import { run_board_jump_paint } from './run-board-jump-paint'
 import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 
-const { ARRIVE_TICKS, TICK_MS, WASH_TICKS, THAW_TICKS } = run_board_jump
+const { ARRIVE_THAW_TICKS, ARRIVE_TICKS, TICK_MS, WASH_TICKS, THAW_TICKS } = run_board_jump
 const { FRAME_MS, arrive_beats, jump_bytes } = run_board_jump_screen
+// Taken before any spy, so a spy can call the real one.
+const { arrive_cells } = run_board_jump_paint
 
 const ESC = '\u{1B}'
 const CLEAR = `${ESC}[H${ESC}[J`
+const SYNC = new RegExp(String.raw`${ESC}\[\?2026[hl]`, 'gu')
+const PLACE = new RegExp(String.raw`${ESC}\[(\d+;\d+)H`, 'u')
+// A cell written is its place and its bytes.
+const PAIR = 2
 const STYLE = `${ESC}[38;2;10;20;30m`
+const ARRIVE_FRAME = `${STYLE}AB${ESC}[0m\n${STYLE}CD${ESC}[0m`
 const LETTERS = 4
 const RUN = { start_ms: 0, letters: LETTERS }
 // The first moment of the wash, and a moment past the end of the thaw.
@@ -47,6 +55,33 @@ function has_black_letter(text: string): boolean {
 		.split('38;2;0;0;0m')
 		.slice(1)
 		.some((rest) => rest[0] !== ' ' && rest[0] !== ESC)
+}
+
+// Each cell a beat writes, by `row;column`, with the bytes written there.
+function cells_written(text: string): Array<[string, string]> {
+	const parts = text.replaceAll(SYNC, '').split(PLACE).slice(1)
+
+	return Array.from({ length: parts.length / PAIR }, (_, index) => [
+		parts[index * PAIR] ?? '',
+		parts[index * PAIR + 1] ?? '',
+	])
+}
+
+// A terminal the beats are written to in turn: each cell's last bytes, by `row;column`.
+function applied(texts: ReadonlyArray<string>): Map<string, string> {
+	return new Map(texts.flatMap((text) => cells_written(text)))
+}
+
+// The arrival `tick` ticks in written whole: the first beat of an arrival whose every tick is that one.
+function whole(drawn: string, tick: number): string {
+	vi.spyOn(run_board_jump_paint, 'arrive_cells').mockImplementation((cells) =>
+		arrive_cells(cells, tick),
+	)
+	const first = arrive_beats(drawn, undefined).next().value?.text ?? ''
+
+	vi.restoreAllMocks()
+
+	return first
 }
 
 describe('run_board_jump_screen.jump_bytes', () => {
@@ -121,10 +156,47 @@ describe('run_board_jump_screen.jump_bytes — the frame rate', () => {
 	})
 })
 
+describe('run_board_jump_screen.arrive_beats — only the changed cells, a beat when taken', () => {
+	const texts = [...arrive_beats(ARRIVE_FRAME, undefined)].map((beat) => beat.text)
+	const CELLS = 4
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('ac-6688480d writes past the first beat only the cells that changed since the beat before', () => {
+		const is_fresh = texts.slice(1).map((text, index) => {
+			const shown = applied(texts.slice(0, index + 1))
+
+			return cells_written(text).every(([key, bytes]) => shown.get(key) !== bytes)
+		})
+
+		expect(cells_written(texts[0] ?? '')).toHaveLength(CELLS)
+		expect(is_fresh.every(Boolean)).toBe(true)
+		expect(texts.slice(1).some((text) => cells_written(text).length < CELLS)).toBe(true)
+	})
+
+	it('ac-454bc468 leaves the screen, every beat applied in turn, as each beat written whole', () => {
+		const ticks = [ARRIVE_THAW_TICKS, ARRIVE_TICKS - 1]
+
+		expect(ticks.map((tick) => applied(texts.slice(0, tick + 1)))).toStrictEqual(
+			ticks.map((tick) => applied([whole(ARRIVE_FRAME, tick)])),
+		)
+	})
+
+	it('ac-b9f6760e builds a beat only when it is taken', () => {
+		const built = vi.spyOn(run_board_jump_paint, 'arrive_cells')
+		const lazy = arrive_beats(ARRIVE_FRAME, undefined)
+
+		expect(built).not.toHaveBeenCalled()
+		lazy.next()
+		expect(built).toHaveBeenCalledOnce()
+	})
+})
+
 describe('run_board_jump_screen.arrive_beats', () => {
-	const ARRIVE_FRAME = `${STYLE}AB${ESC}[0m\n${STYLE}CD${ESC}[0m`
-	const beats = arrive_beats(ARRIVE_FRAME, undefined)
-	const PLACES = ['1;1', '1;2', '2;1', '2;2'].map((place) => `${ESC}[${place}H`)
+	const beats = [...arrive_beats(ARRIVE_FRAME, undefined)]
+	const texts = beats.map((beat) => beat.text)
 
 	it('beats every tick over the arrival', () => {
 		expect(beats).toHaveLength(ARRIVE_TICKS)
@@ -136,24 +208,24 @@ describe('run_board_jump_screen.arrive_beats', () => {
 		expect(beats.slice(1).some((beat) => beat.text.includes(CLEAR))).toBe(false)
 	})
 
-	it('writes every cell of the screen on every beat', () => {
-		expect(beats.every((beat) => PLACES.every((place) => beat.text.includes(place)))).toBe(true)
-	})
-
 	it('leaves no letter black while it thaws', () => {
-		const thaw = beats.slice(-THAW_TICKS)
+		const thaw = beats.slice(-ARRIVE_THAW_TICKS)
 
 		expect(thaw.some((beat) => has_black_letter(beat.text))).toBe(false)
 	})
 
-	it('ac-27df273f writes each cell on the last beat as the frame after it draws it', () => {
-		const last = beats.at(-1)?.text ?? ''
+	it('ac-27df273f leaves each cell after the last beat as the frame after it draws it', () => {
+		const shown = [...applied(texts).values()]
 
-		expect(['A', 'B', 'C', 'D'].every((letter) => last.includes(`${STYLE}${letter}`))).toBe(true)
+		expect(
+			['A', 'B', 'C', 'D'].every((letter) =>
+				shown.some((bytes) => bytes.includes(`${STYLE}${letter}`)),
+			),
+		).toBe(true)
 	})
 
 	it('keeps the wipe a held first frame starts with out of its cells', () => {
-		const held = arrive_beats(`${CLEAR}${ARRIVE_FRAME}`, undefined)
+		const held = [...arrive_beats(`${CLEAR}${ARRIVE_FRAME}`, undefined)]
 
 		expect(held.map((beat) => clears_in(beat.text))).toStrictEqual(
 			beats.map((_, index) => (index === 0 ? 1 : 0)),
@@ -163,7 +235,7 @@ describe('run_board_jump_screen.arrive_beats', () => {
 
 describe('run_board_jump_screen.arrive_beats — a named color', () => {
 	const NAMED = `${ESC}[33m`
-	const named = arrive_beats(`${NAMED}AB${ESC}[39m\n${ESC}[90mCD${ESC}[39m`, undefined)
+	const named = [...arrive_beats(`${NAMED}AB${ESC}[39m\n${ESC}[90mCD${ESC}[39m`, undefined)]
 	const GRAY = '38;2;204;204;204m'
 	// Yellow (229;229;16) is far more red than blue; the gray and the ice it thaws from are not.
 	const YELLOW_LEAD = 100
@@ -177,17 +249,17 @@ describe('run_board_jump_screen.arrive_beats — a named color', () => {
 	})
 
 	it('thaws plain text after a named color back to the default, not that color', () => {
-		const after = arrive_beats(`${NAMED}AB${ESC}[39mCD`, undefined)
+		const after = [...arrive_beats(`${NAMED}AB${ESC}[39mCD`, undefined)]
 		const painted = after.flatMap((beat) => [...beat.text.matchAll(/38;2;(\d+);\d+;(\d+)mC/gu)])
 		const [, red = '255', blue = '0'] = painted.at(-1) ?? []
 
 		expect(Number(red) - Number(blue)).toBeLessThan(YELLOW_LEAD)
 	})
 
-	it('ac-27df273f writes it on the last beat as the frame after it draws it', () => {
-		const last = named.at(-1)?.text ?? ''
+	it('ac-27df273f leaves it after the last beat as the frame after it draws it', () => {
+		const shown = applied(named.map((beat) => beat.text))
 
-		expect(last).toContain(`${NAMED}A${ESC}[0m`)
-		expect(last).toContain(`${ESC}[90mD${ESC}[0m`)
+		expect(shown.get('1;1')).toContain(`${NAMED}A${ESC}[0m`)
+		expect(shown.get('2;2')).toContain(`${ESC}[90mD${ESC}[0m`)
 	})
 })
