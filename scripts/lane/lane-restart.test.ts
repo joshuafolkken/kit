@@ -11,6 +11,7 @@ import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_residents } from './lane-residents'
 import { lane_restart } from './lane-restart'
+import { lane_state } from './lane-state'
 
 // joshuafolkken/kit#3772: a person stops a running lane child and re-dispatches its issue in a fresh
 // session. Every side effect is spied on — what is pinned is the order and what each step is handed.
@@ -50,6 +51,13 @@ const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const lane_cut_sync = vi.spyOn(run_cut, 'lane_cut_sync')
 const end_cut = vi.spyOn(run_cut, 'end_cut')
 const end_residents = vi.spyOn(lane_residents, 'end_residents')
+const read_state = vi.spyOn(lane_state, 'read_state')
+const PAUSED_RECORD = {
+	issue: ISSUE,
+	state: 'paused',
+	changed_at: '2026-11-23T01:00:00.000Z',
+	changed_by: 'lane:pause',
+} as const
 
 vi.spyOn(lane_residents, 'report').mockReturnValue()
 
@@ -61,6 +69,7 @@ function arrange_running_child(): void {
 	claim_marker.mockResolvedValue({ is_applied: true })
 	reap_child.mockReturnValue([PID])
 	conflict_probe.mockResolvedValue(false)
+	read_state.mockResolvedValue(undefined)
 }
 
 function arrange_relaunch(): void {
@@ -212,5 +221,18 @@ describe('lane_restart.restart — what stops before or after the kill', () => {
 
 		expect(emit).not.toHaveBeenCalled()
 		expect(lane_restart.describe(outcome, ISSUE)).toContain('`run:merge` will collect')
+	})
+})
+
+// joshuafolkken/kit#8775: the table has no launch from paused, so a fresh child would run unrecorded.
+describe('lane_restart.restart — a paused lane', () => {
+	it('leaves a paused lane as it is, naming who paused it', async () => {
+		read_state.mockResolvedValue({ ...PAUSED_RECORD, paused_by: 'person' })
+		const outcome = await lane_restart.restart(ISSUE)
+
+		expect(outcome).toStrictEqual({ kind: 'paused', paused_by: 'person' })
+		expect(claim_marker).not.toHaveBeenCalled()
+		expect(reap_child).not.toHaveBeenCalled()
+		expect(lane_restart.describe(outcome, ISSUE)).toContain('paused by person')
 	})
 })

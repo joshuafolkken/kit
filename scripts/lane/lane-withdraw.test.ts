@@ -171,7 +171,7 @@ describe('lane_withdraw.withdraw — the work and the child', () => {
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
 		expect(outcome).toMatchObject({ kind: 'withdrawn', reaped: 0, is_noted: true })
-		expect(close_lane).toHaveBeenCalledWith(ISSUE)
+		expect(close_lane).toHaveBeenCalledWith(ISSUE, WITHDRAW_COMMAND)
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('already ended')
 	})
 })
@@ -195,26 +195,13 @@ describe('lane_withdraw.withdraw — processes still running from the checkout',
 	})
 })
 
-// joshuafolkken/kit#4268: the state record names the withdrawal, not the close it ran.
+// joshuafolkken/kit#4268: the state record names the withdrawal, not the close it ran — the close
+// writes that one end itself (joshuafolkken/kit#8775), and none when it was incomplete (#4300).
 describe('lane_withdraw.withdraw — the lane state record', () => {
-	it('records the lane as ended by lane:withdraw after the close', async () => {
+	it('closes the lane as the withdrawal and writes no second end', async () => {
 		await lane_withdraw.withdraw(ISSUE, REASON)
 
-		expect(record_change).toHaveBeenCalledExactlyOnceWith({
-			issue: ISSUE,
-			state: 'ended',
-			command: WITHDRAW_COMMAND,
-		})
-		expect(first_call(record_change)).toBeGreaterThan(first_call(close_lane))
-	})
-
-	// joshuafolkken/kit#4300: a close a process outlived leaves the lane for the supervisor to close again.
-	it('records no end when the close was incomplete', async () => {
-		close_lane.mockResolvedValue({ ...CLOSED_LANE, kind: 'incomplete' })
-
-		await expect(lane_withdraw.withdraw(ISSUE, REASON)).resolves.toMatchObject({
-			lane: 'incomplete',
-		})
+		expect(close_lane).toHaveBeenCalledExactlyOnceWith(ISSUE, WITHDRAW_COMMAND)
 		expect(record_change).not.toHaveBeenCalled()
 	})
 })
@@ -229,8 +216,7 @@ describe('lane_withdraw.withdraw — a closed issue with a lane still open', () 
 		expect(outcome).toMatchObject({ kind: 'withdrawn', is_closed: true, stash: STASH })
 		expect(reap_child).toHaveBeenCalledWith(LANE)
 		expect(push).toHaveBeenCalledWith(STASH, DIRECTORY)
-		expect(close_lane).toHaveBeenCalledWith(ISSUE)
-		expect(record_change).toHaveBeenCalledWith(expect.objectContaining({ state: 'ended' }))
+		expect(close_lane).toHaveBeenCalledWith(ISSUE, WITHDRAW_COMMAND)
 	})
 
 	it('does not say the issue stays open', async () => {
@@ -355,7 +341,7 @@ describe('lane_withdraw.withdraw — what is left when a step fails', () => {
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
 		expect(outcome).toMatchObject({ kind: 'withdrawn', is_noted: false })
-		expect(close_lane).toHaveBeenCalledWith(ISSUE)
+		expect(close_lane).toHaveBeenCalledWith(ISSUE, WITHDRAW_COMMAND)
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('could not be posted')
 	})
 })

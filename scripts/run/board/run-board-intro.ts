@@ -310,9 +310,7 @@ const rain = behind((drawn, ports, random) =>
 
 // joshuafolkken/kit#8677: the bttf first frame arriving out of the time jump — black, three flashes,
 // then the thaw (`run-board-jump-screen.ts`).
-const arrive = behind((drawn, ports) =>
-	run_board_jump_screen.arrive_beats(drawn, ports.size?.()).values(),
-)
+const arrive = behind((drawn, ports) => run_board_jump_screen.arrive_beats(drawn, ports.size?.()))
 
 // The theme's own reveal: behind the rain, arriving out of the jump, or a block at a time.
 function revealer(theme: Theme): typeof reveal {

@@ -3,7 +3,7 @@ import { run_board_fit, type TerminalSize } from './run-board-fit'
 import type { Notice } from './run-board-header-notice'
 import { run_board_panel_draw, type PanelCell } from './run-board-panel-draw'
 import { run_board_sound_transition, type Cause } from './run-board-sound-transition'
-import { run_board_spin, type Turning } from './run-board-spin'
+import { run_board_spin_turn, type Turning } from './run-board-spin-turn'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_theme_defs } from './run-board-theme-defs'
@@ -186,8 +186,8 @@ function overlaid(text: string, cells: ReadonlyArray<PanelCell>): string {
 // The frame with the theme's painter drawn as the live board's first turn draws it (joshuafolkken/kit#8674):
 // its cells' escapes after the frame under `--ansi`, else laid over the plain lines.
 function painted(text: string, drawn: Turning, options: FrameOptions, now_ms: number): string {
-	const panel = run_board_spin.painting(drawn)
-	const at = run_board_spin.lamp_moment(drawn, now_ms)
+	const panel = run_board_spin_turn.painting(drawn)
+	const at = run_board_spin_turn.lamp_moment(drawn, now_ms)
 
 	if (options.is_ansi) return panel === undefined ? text : text + panel_bytes(panel, at, undefined)
 	const cells = panel === undefined ? [] : panel.painter.cells(panel.area, at)
@@ -223,7 +223,15 @@ async function draw(
 	ports.write(painted(parts.join(''), drawn, options, ports.now()))
 }
 
-const run_board_frame_preview = { FRAME_FLAG, FRAME_USAGE, draw, options_of, overlaid, painted }
+const run_board_frame_preview = {
+	FRAME_FLAG,
+	FRAME_USAGE,
+	draw,
+	fixed_ports,
+	options_of,
+	overlaid,
+	painted,
+}
 
 export { run_board_frame_preview }
 export type { FrameOptions }

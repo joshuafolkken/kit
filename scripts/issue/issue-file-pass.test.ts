@@ -1,6 +1,7 @@
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defect_origin_cli } from './defect-origin-cli'
 import { issue_cap_files } from './issue-cap-files'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
@@ -65,6 +66,7 @@ beforeEach(() => {
 	vi.spyOn(issue_sample_source, 'problem').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
 	vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue(NO_DUPLICATES)
+	vi.spyOn(defect_origin_cli, 'filing_listing').mockResolvedValue(undefined)
 	vi.spyOn(lane_net_read, 'measurements').mockResolvedValue({
 		implement_rate: undefined,
 		growth: {},
@@ -82,6 +84,32 @@ describe('issue_file_pass.labels_in_one_pass — opt-out provenance', () => {
 
 		expect(await issue_file_pass.labels_in_one_pass(filing)).toBeUndefined()
 		expect(printed()).toContain('verbatim prohibition')
+	})
+})
+
+// joshuafolkken/kit#8774: a bug filed without a traced origin is shown the candidate merges.
+describe('issue_file_pass.labels_in_one_pass — origin candidates', () => {
+	const listing = 'origin candidates for this body (newest first; …):\n#4201  2026-10-20  Draw'
+
+	it('prints the candidates and files the body when nothing refuses', async () => {
+		vi.mocked(defect_origin_cli.filing_listing).mockResolvedValue(listing)
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
+		expect(console.info).toHaveBeenCalledWith(listing)
+	})
+
+	it('puts the candidates under the refusal of a body with no origin line', async () => {
+		vi.mocked(defect_origin_cli.filing_listing).mockResolvedValue(listing)
+
+		await issue_file_pass.labels_in_one_pass(filing_of(REFUSED_BODY))
+
+		expect(printed()).toContain(listing)
+	})
+
+	it('searches no history for a filing into another repository', async () => {
+		await issue_file_pass.labels_in_one_pass({ ...filing_of(CLEAR_BODY), target: ELSEWHERE })
+
+		expect(defect_origin_cli.filing_listing).not.toHaveBeenCalled()
 	})
 })
 
