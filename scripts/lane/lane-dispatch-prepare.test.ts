@@ -160,14 +160,23 @@ describe('lane_dispatch_prepare.prepared — the josh.worker profile', () => {
 	})
 })
 
+const LIGHT_BODY = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）'
+
+function mock_body(text: string | undefined): ReturnType<typeof vi.spyOn> {
+	const read = text === undefined ? { kind: 'missing' as const } : { kind: 'read' as const, text }
+
+	return vi.spyOn(git_gh_command, 'issue_get_body_classified').mockResolvedValue(read)
+}
+
 describe('lane_dispatch_prepare.prepared — josh.worker.route (joshuafolkken/kit#8760)', () => {
-	it('routes an unlabelled light Issue to the weakest profile from its body', async () => {
+	beforeEach(() => {
 		write_worker_setting({ route: true })
 		mock_labels([])
-		const text = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）'
-		const read_body = vi
-			.spyOn(git_gh_command, 'issue_get_body_classified')
-			.mockResolvedValue({ kind: 'read', text })
+		vi.spyOn(git_gh_issue_write, 'issue_apply_label').mockResolvedValue({ is_applied: true })
+	})
+
+	it('routes an unlabelled light Issue to the weakest profile from its body', async () => {
+		const read_body = mock_body(LIGHT_BODY)
 
 		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
 			profile: { model: HAIKU.model },
@@ -175,10 +184,26 @@ describe('lane_dispatch_prepare.prepared — josh.worker.route (joshuafolkken/ki
 		expect(read_body).toHaveBeenCalledWith(ISSUE)
 	})
 
+	it('stores the routed profile as the Issue worker label', async () => {
+		mock_body(LIGHT_BODY)
+
+		await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(git_gh_issue_write.issue_apply_label).toHaveBeenCalledWith(ISSUE, `worker:${HAIKU.name}`)
+	})
+
+	it('refuses the dispatch where the routed label cannot be stored', async () => {
+		mock_body(LIGHT_BODY)
+		vi.spyOn(git_gh_issue_write, 'issue_apply_label').mockResolvedValue({
+			is_applied: false,
+			reason: 'rate limited',
+		})
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({ kind: 'rejected' })
+	})
+
 	it('keeps the default profile where the Issue body cannot be read', async () => {
-		write_worker_setting({ route: true })
-		mock_labels([])
-		vi.spyOn(git_gh_command, 'issue_get_body_classified').mockResolvedValue({ kind: 'missing' })
+		mock_body(undefined)
 
 		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
 			profile: { model: SONNET.model },
