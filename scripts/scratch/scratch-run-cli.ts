@@ -18,6 +18,9 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh scratch:run <path> [args…]'
 const NETWORK_FLAG = '--allow-net'
+const IMPORT_FLAG = '--import'
+// Lets the script import `scripts/` without extensions, as `scripts/` does (joshuafolkken/kit#8733).
+const RESOLVE_HOOK_URL = new URL('scratch-resolve-hook.ts', import.meta.url).href
 
 type NodeFlags = ReadonlySet<string>
 
@@ -65,7 +68,13 @@ function launch(
 	const real_script = realpathSync(script)
 	const result = spawnSync(
 		process.execPath,
-		[...permission_arguments(scratch_root), real_script, ...script_arguments],
+		[
+			...permission_arguments(scratch_root),
+			IMPORT_FLAG,
+			RESOLVE_HOOK_URL,
+			real_script,
+			...script_arguments,
+		],
 		// NODE_OPTIONS is dropped: an inherited `--allow-net` or `--allow-child-process` would widen the grant.
 		{
 			cwd: path.dirname(real_script),
