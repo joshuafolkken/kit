@@ -13,6 +13,7 @@ import {
 	type LaneStateRecord,
 	type StuckProcess,
 } from './lane-state-record'
+import { lane_transition_table } from './lane-transition-table'
 
 // One record per lane of where it is in its life — opened, running, paused, ended — written only by
 // the lane commands and human-review stops, so a reader asks the record rather than guessing from
@@ -36,22 +37,16 @@ import {
 const LOCK_SUFFIX = '.lock'
 // A change holds the lock for one read and one rename; a wait this long means a holder is stuck.
 const LOCK_WAIT_MS = 5000
-const { HUMAN_REVIEW, LANE_STATES, STATE_SUFFIX } = lane_state_record
+const { LANE_STATES, STATE_SUFFIX } = lane_state_record
 // What a lane with no record is answered with: its state is unknown, so it keeps its place.
 const NO_STATE_HINT = 'no lane state — counted in use'
 
 // Each lane's record, by issue; a lane with none is left out (`read_states`).
 type LaneRecords = ReadonlyMap<string, LaneStateRecord>
 
-// The states each one moves to. A lane with no record yet (opened before the record existed) moves to
-// any of them.
-const TRANSITIONS: Record<LaneState, ReadonlyArray<LaneState>> = {
-	open: ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'],
-	running: ['running', 'paused', HUMAN_REVIEW, 'ended'],
-	paused: ['paused', 'running', 'ended'],
-	[HUMAN_REVIEW]: [HUMAN_REVIEW, 'running', 'ended'],
-	ended: ['ended', 'open'],
-}
+// The states each one moves to, derived from the lifecycle's events (`lane-transition-table.ts`). A
+// lane with no record yet (opened before the record existed) moves to any of them.
+const TRANSITIONS = lane_transition_table.allowed_transitions()
 
 // One command's change: the state it leaves the lane in, and whether it launched a child — a launch
 // stamps the launch time and its run; a resume transfers ownership to the current run.
