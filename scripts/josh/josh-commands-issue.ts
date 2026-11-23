@@ -115,13 +115,31 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'issue:rework-candidates': {
+		script: 'scripts/issue/issue-rework-candidates-main.ts',
+		description:
+			'List closed enhancements that rework delivered work, each with the merged pull request or closed Issue it cites — read-only',
+		category: 'AI tools',
+		reference: ['--since <days>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '--since 30', note: 'closed in the last 30 days' }],
+		},
+	},
 	'defect:report': {
 		script: 'scripts/issue/defect-report-main.ts',
 		description:
 			'Count defects by the origin pull request their issue declares, by change kind and by area',
 		category: 'AI tools',
-		reference: ['', 'automation', ['network']],
-		usage: { examples: [{ arguments: '', note: 'every issue labelled bug, open or closed' }] },
+		reference: ['[--since <days>]', 'automation', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '', note: 'every issue labelled bug, open or closed' },
+				{
+					arguments: '--since 7',
+					note: "only the bugs filed in the last 7 days, with each area's rate",
+				},
+			],
+		},
 	},
 	'effect:audit': {
 		script: 'scripts/issue/effect-audit-cli.ts',

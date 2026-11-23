@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
+import { section_reference_resolution } from '#scripts/document/section-reference-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { issue_template_section } from './issue-template-section'
+import { issue_template_section, type PointedSection } from './issue-template-section'
 
 vi.mock(import('node:fs'), async (load_original) => {
 	const original = await load_original()
@@ -87,5 +88,16 @@ describe('issue_template_section.section (issue-template.en.md)', () => {
 		vi.stubEnv(LANG_KEY, 'ja')
 
 		expect(issue_template_section.section(ENGLISH_BACKGROUND)).toBeUndefined()
+	})
+})
+
+const POINTED_KEYS = Object.keys(issue_template_section.POINTED_SECTIONS) as Array<PointedSection>
+
+describe('issue_template_section.pointer', () => {
+	it.each(POINTED_KEYS)('cites the %s section as a reference doc:section resolves', (key) => {
+		const pointer = issue_template_section.pointer(key)
+
+		expect(pointer).toMatch(/^`issue-template\.md` → "/u)
+		expect(section_reference_resolution.broken_section_references(pointer)).toStrictEqual([])
 	})
 })

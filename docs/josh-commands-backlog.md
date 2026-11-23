@@ -188,6 +188,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    Each `- 前提:` command runs as `lane:plan` runs it; one whose last line is not a number is refused, naming `lane:value cell` (also `issue:body`).
    A failed or unmet premise passes; `- 計測宣言:` is not run. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
+   A non-defect body citing merged or closed work in `## 概要` / `## 背景` is refused without `- 新しい目標:`.
    A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) is refused the same way.
    One projected past twice the implement stage budget at the measured rate is refused unless it declares `- 分割しない理由: <理由>`, whatever its route.
    A body that backticks a lintable file of this repository at or past 90% of its code-line limit (ESLint's `max-lines` count) is refused with the route to a refactor Issue that splits it first: refile with `- 先行リファクタ: #<refactor>`, then record that blocker with `backlog:triage --blocked-by`.
@@ -571,6 +572,20 @@ Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, o
 
 [`josh issue:file`](#josh-issuefile) lists the same candidates for a `- 種別: 不具合` body before it is filed, searched up to now: under a `- 原因: 不明（<理由>）` line it prints them and files the body; with no origin line it prints them under the refusal. A `- 原因: #<PR>` body and a non-bug body are not searched, and neither is a filing into another repository.
 
+### `josh issue:rework-candidates`
+
+<!-- usage: issue:rework-candidates -->
+
+List closed enhancements that rework delivered work, each with the merged pull request or closed Issue it cites — read-only.
+
+```bash
+pnpm josh issue:rework-candidates --since 30   # closed in the last 30 days
+```
+
+<!-- /usage -->
+
+The judgement of [`josh issue:file`](#josh-issuefile) step 3; reclassify with [`josh issue:kind`](#josh-issuekind).
+
 ### `josh defect:report`
 
 <!-- usage: defect:report -->
@@ -578,12 +593,19 @@ Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, o
 Count defects by the origin pull request their issue declares, by change kind and by area.
 
 ```bash
-pnpm josh defect:report   # every issue labelled bug, open or closed
+pnpm josh defect:report             # every issue labelled bug, open or closed
+pnpm josh defect:report --since 7   # only the bugs filed in the last 7 days, with each area's rate
 ```
 
 <!-- /usage -->
 
-Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. Unknown and undeclared origins are counted apart.
+Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. The summary line gives each origin-line kind — traced to a pull request, `不明`, no origin line — as a count and a share of the counted bugs.
+
+`--since <days>` counts only the bugs filed in the last `<days>` days and adds the defect rate by area. The numerator is the period's bugs whose origin pull request touched the area.
+
+The denominator is the pull requests merged in the period that touched the area, read from the default branch's local first-parent merge history (`git log <default branch> --first-parent --merges --name-only`) with no API call per merge. An area no merge touched has no rate.
+
+`josh retrospective` prints the last 7 days' coverage and highest-rate areas as one section, and leaves it out when GitHub cannot be read.
 
 ### `josh effect:audit`
 

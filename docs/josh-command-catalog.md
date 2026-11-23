@@ -147,7 +147,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh cost` | `(--cut \| --over <tokens-per-request>) [--path <dir>]` | automation | none | Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over) |
 | `josh cost:audit` · `josh ca` · **kit only** | `[--period <days> \| --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]` | maintainer | none | Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before |
 | `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed or first added what a defect issue names, as candidates for its origin line |
-| `josh defect:report` | — | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
+| `josh defect:report` | `[--since <days>]` | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
 | `josh diff:summary` | `[<base>]` | automation | files | Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole |
 | `josh disposition` | `<path...> \| --batch <findings-file>` | automation | none | Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime) |
@@ -180,6 +180,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
 | `josh issue:release-class` | `<issue> <enhancement\|other-change>` | automation | network | Write the issue body's one release classification line, replacing any earlier one |
+| `josh issue:rework-candidates` | `--since <days>` | automation | network | List closed enhancements that rework delivered work, each with the merged pull request or closed Issue it cites — read-only |
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
 | `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行" [--reason "<理由>"] [--distinct <N,…>]` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |

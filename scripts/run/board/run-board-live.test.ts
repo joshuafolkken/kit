@@ -157,40 +157,46 @@ describe('run_board_live.watch footer', () => {
 // joshuafolkken/kit#8381: a tick that throws never ends the board; the failure is told and drawn.
 const REASON = 'snapshot half written'
 
-// The harness's ports with the drawn frame's write throwing once, on the `failing`th frame.
-function failing_on(failing: number): ReturnType<typeof harness> {
+function drawn_of(frames: ReadonlyArray<string>): Array<string> {
+	return frames.filter((frame) => frame.startsWith(REFRESH_START))
+}
+
+// The frames drawn that a test waits for: the first, the failure's warning and the one after it.
+const DRAWN_THROUGH = 3
+
+// The harness's ports with the tick after the first drawn frame throwing once, as it lays the frame
+// out, and every wait let through with the clock moved until a third frame is drawn
+// (joshuafolkken/kit#8796: a frame's write reaches the terminal only at the wait after it, joined with
+// what the spin draws back over it).
+function failing_second(): ReturnType<typeof harness> {
 	const board = harness(LOCAL, [plan_titled('a')])
-	const { write } = board.ports
-	let drawn = 0
+	const { link, sleep } = board.ports
+	const failing = { has_failed: false }
 
 	return {
 		...board,
 		ports: {
 			...board.ports,
-			write: (text) => {
-				if (text.startsWith(REFRESH_START)) drawn += 1
-
-				if (drawn === failing && text.startsWith(REFRESH_START)) {
-					throw new Error(`${REASON}\nat somewhere`)
-				}
-
-				write(text)
+			link: (text, url) => {
+				if (failing.has_failed || drawn_of(board.frames).length !== 1) return link(text, url)
+				failing.has_failed = true
+				throw new Error(`${REASON}\nat somewhere`)
+			},
+			sleep: async (ms) => {
+				board.clock.now_ms += ms
+				if (drawn_of(board.frames).length >= DRAWN_THROUGH) await sleep(ms)
 			},
 		},
 	}
 }
 
-function drawn_of(frames: ReadonlyArray<string>): Array<string> {
-	return frames.filter((frame) => frame.startsWith(REFRESH_START))
-}
-
 describe('run_board_live.watch failed tick', () => {
 	it('tells the failure and draws the last frame again with it said, its first line only', async () => {
-		const { ports, frames } = failing_on(1)
+		const { ports, frames } = failing_second()
 		const failed = vi.fn<(cause: unknown) => void>()
 
 		await expect(run_board_live.watch(ports, undefined, failed)).rejects.toBe(STOPPED)
-		const [warning] = drawn_of(frames)
+		const [, warning] = drawn_of(frames)
 
 		expect(failed).toHaveBeenCalledExactlyOnceWith(
 			expect.objectContaining({ message: expect.stringContaining(REASON) }),
@@ -201,12 +207,12 @@ describe('run_board_live.watch failed tick', () => {
 	})
 
 	it('goes on to the next tick, which draws without the failure', async () => {
-		const { ports, frames } = failing_on(1)
+		const { ports, frames } = failing_second()
 
 		await expect(run_board_live.watch(ports, undefined, vi.fn())).rejects.toBe(STOPPED)
 		const drawn = drawn_of(frames)
 
-		expect(drawn.length).toBeGreaterThan(1)
+		expect(drawn.length).toBeGreaterThan(2)
 		expect(drawn.at(-1)).not.toContain(REASON)
 		expect(drawn.at(-1)?.split('\n')).toHaveLength(drawn[0]?.split('\n').length ?? 0)
 	})
