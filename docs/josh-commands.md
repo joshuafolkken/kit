@@ -327,6 +327,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 - `--touched` rechecks changed tests, each changed module's `foo.test.ts` / `foo.*.test.ts` and its direct test importers, including fixture consumers (`scripts/test/test-related-touched.ts`). It adds the read map's listers of a directory whose entries changed, no transitive graph. The `touched` record never replaces full-reach verification.
   With no other arguments, its separate green record admits review round 2; round 1 and the gate's reuse require a full-reach run.
+- `--touched` also runs the tests a changed path's shape reaches without importing them — derived pages, tree scans, hook bundles (`scripts/test/test-related-pins.ts`), so a stale derived page fails there.
 - A bare call a lane child types itself runs as `--touched` and says so in one line; `check:related` and ship's scoped pair run the full reach. A call another josh command makes (`check:related`, `gate`, `ship`, `propagate`), the pre-push hook and any call outside a lane keep the full reach (`JOSH_OUTER_COMMAND`, `scripts/josh/outer-command.ts`).
 
 - A changed non-code file reaches the tests the read map records reading it and the test files naming its path outside a comment, in their own text or, for a test the map has not recorded, a module they import directly (`scripts/test/test-document-readers.ts`).
