@@ -33,26 +33,13 @@ function draw_of(lines: ReadonlyArray<string>): JumpDraw {
 	return {
 		run: RUN,
 		screen: screen_of(lines),
-		scene: { rows: lines.length, lane: undefined, panel: undefined },
+		scene: { rows: lines.length, panel: undefined },
 	}
 }
 
 describe('run_board_jump_screen.jump_bytes', () => {
 	it('writes nothing with no jump', () => {
 		expect(jump_bytes(undefined, WASH_MS, undefined)).toBe('')
-	})
-
-	it('ac-066a13f7 draws the merged lane row back over the row it left, then clears it', () => {
-		const draw = { ...draw_of(['AB', 'CD']), gone: { row: 1, cells: [cell('X'), cell('Y')] } }
-		const cleared_ms = WASH_MS + run_board_jump.CLEAR_AT * TICK_MS
-
-		const washed = jump_bytes(draw, WASH_MS, undefined)
-		const cleared = jump_bytes(draw, cleared_ms, undefined)
-
-		expect(washed.indexOf('X')).toBeGreaterThan(washed.indexOf(`${ESC}[2;1H`))
-		expect(washed.indexOf('Y')).toBeGreaterThan(washed.indexOf(`${ESC}[2;2H`))
-		expect(jump_bytes(draw_of(['AB', 'CD']), WASH_MS, undefined)).not.toContain('X')
-		expect(['C', 'D', 'X', 'Y'].filter((letter) => cleared.includes(letter))).toStrictEqual([])
 	})
 
 	it('writes nothing again within the frame it last wrote', () => {
@@ -82,18 +69,15 @@ describe('run_board_jump_screen.jump_bytes', () => {
 })
 
 describe('run_board_jump_screen.jump_bytes around the other painters', () => {
-	it('leaves the notice place and the animation area to their own painters', () => {
+	it('leaves the animation area to its own painter', () => {
 		const lamp = { row: 3, column: 3, panel_row: 0, panel_rows: 1, group: 0, lamp: 0 }
 		const draw = {
 			...draw_of(['ABC', 'DEF', 'GHI']),
-			place: { row: 1, column: 1, text: 'AB' },
 			panel: { top: 3, end: 4, rows: 1, lamps: [lamp] },
 		}
 		const written = jump_bytes(draw, WASH_MS, undefined)
 
-		expect(written).not.toContain(`${ESC}[1;1H`)
-		expect(written).not.toContain(`${ESC}[1;2H`)
-		expect(written).toContain(`${ESC}[1;3H`)
+		expect(written).toContain(`${ESC}[1;1H`)
 		expect(written).not.toContain(`${ESC}[3;2H`)
 		expect(written).toContain(`${ESC}[3;1H`)
 	})

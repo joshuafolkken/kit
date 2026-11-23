@@ -11,7 +11,7 @@ const AUTHENTICATION_GUIDE = 'docs/authentication.md'
 const PACKAGE_API_REFERENCE = 'docs/package-api.md'
 const TROUBLESHOOTING_GUIDE = 'docs/troubleshooting.md'
 const TEMPLATE_CI_YML = 'templates/workflows/ci.yml'
-const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
+const PUBLISH_JOB = 'publish-npm'
 const DISPATCH_TAG = '${{ github.ref_name }}'
 const TAG_REF_GUARD = "startsWith(github.ref, 'refs/tags/v')"
 const PRODUCTION_WORKFLOW = './.github/workflows/production.yml'
@@ -37,9 +37,11 @@ const JOB_SCHEMA = z.object({
 	permissions: PERMISSIONS_SCHEMA,
 	steps: z.array(STEP_SCHEMA),
 })
-const JOBS_SCHEMA = z.object({ 'publish-github': JOB_SCHEMA, 'publish-npm': JOB_SCHEMA })
+const JOBS_SCHEMA = z.object({ 'publish-npm': JOB_SCHEMA })
+const ANY_JOB_SCHEMA = z.looseObject({ permissions: PERMISSIONS_SCHEMA.optional() })
+const ANY_JOBS_SCHEMA = z.object({ jobs: z.record(z.string(), ANY_JOB_SCHEMA) })
 const PRODUCTION_JOB_SCHEMA = z.object({
-	needs: z.array(z.string()),
+	needs: z.string(),
 	uses: z.string(),
 	with: z.object({ tag: z.string() }),
 })
@@ -59,7 +61,6 @@ const TRIGGER_SCHEMA = z.object({
 const RELEASE_WORKFLOW_SCHEMA = z.object({
 	concurrency: z.unknown().optional(),
 	jobs: z.object({
-		'publish-github': JOB_SCHEMA,
 		'publish-npm': JOB_SCHEMA,
 		'update-production': PRODUCTION_JOB_SCHEMA,
 		'create-release': RELEASE_JOB_SCHEMA,
@@ -88,17 +89,14 @@ describe('release tag checkout', () => {
 		expect(workflow['run-name']).toBe(`Publish ${DISPATCH_TAG}`)
 	})
 
-	it.each(PUBLISH_JOB_NAMES)(
-		'publishes the checked-out run commit only from a release tag ref in %s',
-		(job_name: 'publish-github' | 'publish-npm') => {
-			const job = read_workflow().jobs[job_name]
-			const checkout = job.steps.find((step) => step.uses?.startsWith(CHECKOUT_ACTION))
+	it('publishes the checked-out run commit only from a release tag ref', () => {
+		const job = read_workflow().jobs[PUBLISH_JOB]
+		const checkout = job.steps.find((step) => step.uses?.startsWith(CHECKOUT_ACTION))
 
-			expect(job.if).toBe(TAG_REF_GUARD)
-			expect(checkout).toBeDefined()
-			expect(checkout?.with?.['ref']).toBeUndefined()
-		},
-	)
+		expect(job.if).toBe(TAG_REF_GUARD)
+		expect(checkout).toBeDefined()
+		expect(checkout?.with?.['ref']).toBeUndefined()
+	})
 
 	it('looks up publish runs of every trigger so pre-migration runs stay visible', () => {
 		const source = readFileSync('scripts/release/github-release-runs.ts', 'utf8')
@@ -108,32 +106,29 @@ describe('release tag checkout', () => {
 	})
 })
 
-describe('dual registry publishing', () => {
-	it('leaves registry selection to each publish job', () => {
+describe('npm-only publishing', () => {
+	it('leaves registry selection to the publish job', () => {
 		const manifest = MANIFEST_SCHEMA.parse(JSON.parse(readFileSync('package.json', 'utf8')))
 
 		expect(manifest.publishConfig).toBeUndefined()
 		expect(manifest.repository.url).toContain('github.com/joshuafolkken/kit')
 	})
 
-	it('waits only on the shared pack so one publish failure cannot block the other', () => {
-		const { jobs } = read_workflow()
+	it('publishes nothing to GitHub Packages and holds no packages permission in any job', () => {
+		const { jobs } = ANY_JOBS_SCHEMA.parse(load(readFileSync(WORKFLOW_PATH, 'utf8')))
 
-		expect(jobs['publish-github'].needs).toBe('pack')
-		expect(jobs['publish-npm'].needs).toBe('pack')
+		expect(Object.keys(jobs)).not.toContain('publish-github')
+		expect(readFileSync(WORKFLOW_PATH, 'utf8')).not.toContain('npm.pkg.github.com')
+
+		for (const job of Object.values(jobs)) expect(job.permissions?.['packages']).toBeUndefined()
 	})
 
-	it('keeps GitHub Packages publishing with package write permission', () => {
-		const job = read_workflow().jobs['publish-github']
-		const commands = job.steps.map((step) => step.run ?? '').join('\n')
-
-		expect(job.permissions['packages']).toBe('write')
-		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish "$TARBALL"')
-		expect(commands).toContain('--registry https://npm.pkg.github.com')
+	it('waits only on the shared pack', () => {
+		expect(read_workflow().jobs[PUBLISH_JOB].needs).toBe('pack')
 	})
 
 	it('publishes the shared tarball publicly from outside the pnpm project', () => {
-		const job = read_workflow().jobs['publish-npm']
+		const job = read_workflow().jobs[PUBLISH_JOB]
 		const commands = job.steps.map((step) => step.run ?? '').join('\n')
 
 		expect(job.permissions['id-token']).toBe('write')
@@ -144,14 +139,11 @@ describe('dual registry publishing', () => {
 })
 
 describe('GitHub Release job ordering', () => {
-	it('waits for both registries before updating production and waits for all three before publishing', () => {
+	it('waits for npm before updating production and waits for both before publishing', () => {
 		const workflow = RELEASE_WORKFLOW_SCHEMA.parse(load(readFileSync(WORKFLOW_PATH, 'utf8')))
 
-		expect(workflow.jobs['update-production'].needs).toEqual(PUBLISH_JOB_NAMES)
-		expect(workflow.jobs['create-release'].needs).toEqual([
-			...PUBLISH_JOB_NAMES,
-			'update-production',
-		])
+		expect(workflow.jobs['update-production'].needs).toBe(PUBLISH_JOB)
+		expect(workflow.jobs['create-release'].needs).toEqual([PUBLISH_JOB, 'update-production'])
 	})
 
 	it('passes the dispatch tag to production and checks out the same tag for the release', () => {
@@ -175,8 +167,7 @@ describe('release workflow concurrency', () => {
 		const expected = { group: PACKAGE_PUBLISH_GROUP, queue: 'max' }
 
 		expect(workflow.concurrency).toBeUndefined()
-		expect(workflow.jobs['publish-github'].concurrency).toEqual(expected)
-		expect(workflow.jobs['publish-npm'].concurrency).toEqual(expected)
+		expect(workflow.jobs[PUBLISH_JOB].concurrency).toEqual(expected)
 		expect(workflow.jobs['create-release'].concurrency).toBeUndefined()
 
 		const checkout = workflow.jobs['create-release'].steps.find((step) =>

@@ -116,7 +116,7 @@ it("keeps kit's own release on its start tag and publish jobs", () => {
 		env: {
 			RELEASE_START_TAG: 'v1.887.0',
 			RELEASE_WORKFLOW: KIT_PUBLISH_WORKFLOW,
-			RELEASE_JOBS: 'pack,publish-github,publish-npm,update-production',
+			RELEASE_JOBS: 'pack,publish-npm,update-production',
 			RELEASE_RUN_WORKFLOW: KIT_PUBLISH_WORKFLOW,
 		},
 	})

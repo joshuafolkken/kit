@@ -32,7 +32,7 @@ describe('release:github environment', () => {
 			...REQUIRED,
 			RELEASE_START_TAG: START_TAG,
 			RELEASE_WORKFLOW: WORKFLOW,
-			RELEASE_JOBS: 'publish-github, publish-npm,,update-production',
+			RELEASE_JOBS: 'pack, publish-npm,,update-production',
 			RELEASE_RUN_WORKFLOW,
 		})
 
@@ -40,7 +40,7 @@ describe('release:github environment', () => {
 			repository: REPOSITORY,
 			start_tag: START_TAG,
 			workflow: WORKFLOW,
-			jobs: ['publish-github', 'publish-npm', 'update-production'],
+			jobs: ['pack', 'publish-npm', 'update-production'],
 			await_publish: false,
 			release_run_workflow: RELEASE_RUN_WORKFLOW,
 		})

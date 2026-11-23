@@ -5,7 +5,7 @@ It does not change the user's `~/.npmrc`, authentication settings or the install
 
 ## Migration order
 
-An existing project that installs `@joshuafolkken` from GitHub Packages follows these steps in order.
+An existing project that installs `@joshuafolkken` from GitHub Packages follows these steps in order, before it updates kit: kit no longer publishes new versions to GitHub Packages, so such a project receives no newer kit until it installs from npm.
 A new setup needs no migration ([README → Quick start](../README.md#quick-start)).
 
 1. Check before installing: run `pnpm config get "@joshuafolkken:registry"` at the project root.
@@ -36,7 +36,7 @@ The global CLI installs from npm without changing `~/.npmrc` ([cli.md](./cli.md#
 
 ### Out of scope
 
-- Stopping publishing to GitHub Packages and deleting existing versions are not part of this migration. Existing installs from GitHub keep working.
+- Deleting the versions already in GitHub Packages is not part of this migration: existing installs from GitHub keep working at the last version published there. Publishing new versions there has stopped (#7492); new versions go to npm only.
 - The published entry (kit 1.3164.0) was run through isolated copies of real consumers and a fresh project, up to install, check and build ([maintainers/registry-migration-smoke.md](./maintainers/registry-migration-smoke.md), #7447).
 - Migrating without the entry is only for projects that meet the conditions in [When the entry stops](#when-the-entry-stops).
 

@@ -41,15 +41,14 @@ interface IntroDefinition {
 // whole board every second in place of the sweep (`run-board-rain-drop.ts`; joshuafolkken/kit#8367), and
 // whether a changed character lands white and cools (`run-board-change-flash.ts`; joshuafolkken/kit#8353),
 // and whether a new header notice traces in and blinks in a green bar (`run-board-notice-trace.ts`;
-// joshuafolkken/kit#8657). The trill sounds over every typing row (`true`), or only over the header's
-// notice and now rows (`'header'`; joshuafolkken/kit#8697).
+// joshuafolkken/kit#8657). The trill sounds over every typing row.
 interface LiveDefinition {
 	flash?: boolean
 	notice_trace?: boolean
 	sweep: boolean
 	drop: boolean
 	types_rows: boolean
-	trill: boolean | 'header'
+	trill: boolean
 	codes: boolean
 	strip: boolean
 	decode: boolean
@@ -228,9 +227,9 @@ const THEME_DEFS = {
 		rule_lamped: false,
 		spinner: '│╱─╲',
 		// joshuafolkken/kit#8683: its notices, operations and rows type as the other themes' do; the
-		// time-circuit keypad sounds while the opening and the header's notice and now rows type, and the
-		// circuits' ENTER once each is typed through — the body's rows type silently (joshuafolkken/kit#8697).
-		live: { ...NO_LIVE, types_rows: true, trill: 'header' },
+		// time-circuit keypad sounds while any row types, and the circuits' ENTER once each is typed
+		// through — every typing alike, each the cue of a time jump (joshuafolkken/kit#8731).
+		live: { ...NO_LIVE, types_rows: true, trill: true },
 		typing: run_board_sound_keypad.typing_wav,
 		typed_end: run_board_sound_enter.enter_wav,
 	},

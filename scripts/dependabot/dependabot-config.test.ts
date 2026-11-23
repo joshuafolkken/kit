@@ -37,10 +37,10 @@ const PUBLISH_GROUP = 'publish-actions'
 // The remaining group is named after its ecosystem.
 const ACTIONS_GROUP = ACTIONS_ECOSYSTEM
 
-// The jobs that hold publish credentials, and the `pack` job that builds the tarball they publish
+// The job that holds publish credentials, and the `pack` job that builds the tarball it publishes
 // byte for byte (joshuafolkken/kit#4654).
 const PUBLISH_WORKFLOW = path.join('.github', 'workflows', 'publish.yml')
-const PUBLISH_JOBS: ReadonlyArray<string> = ['pack', 'publish-github', 'publish-npm']
+const PUBLISH_JOBS: ReadonlyArray<string> = ['pack', 'publish-npm']
 const LOCAL_ACTION_PREFIX = './'
 const ACTION_FILE = 'action.yml'
 // An action only a local composite action runs, so the resolver is shown to follow them.

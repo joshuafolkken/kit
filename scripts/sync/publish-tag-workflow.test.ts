@@ -9,7 +9,7 @@ import { z } from 'zod'
 const make_directory = temporary_directory()
 
 const WORKFLOW_PATH = '.github/workflows/publish.yml'
-const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
+const PUBLISH_JOB_NAMES = ['publish-npm'] as const
 const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const SETUP_PNPM_ACTION = './.github/actions/setup-pnpm'
 const PUBLISH_TAG_ARGUMENT = '--tag "$PUBLISH_TAG"'
@@ -41,7 +41,6 @@ const PACK_JOB_SCHEMA = z.object({
 const WORKFLOW_SCHEMA = z.object({
 	jobs: z.object({
 		pack: PACK_JOB_SCHEMA,
-		'publish-github': PUBLISH_JOB_SCHEMA,
 		'publish-npm': PUBLISH_JOB_SCHEMA,
 	}),
 })
@@ -57,7 +56,7 @@ describe('publish tag selection', () => {
 		const { pack } = read_workflow().jobs
 		const commands = pack.steps.map((step) => step.run ?? '').join('\n')
 
-		expect(pack.permissions).toEqual({ contents: 'read', packages: 'read' })
+		expect(pack.permissions).toEqual({ contents: 'read' })
 		expect(pack.outputs['tag']).toBe('${{ steps.publish-tag.outputs.tag }}')
 		expect(commands).toContain(LATEST_LOOKUP)
 	})
@@ -168,7 +167,7 @@ describe('registry dist-tag lookup', () => {
 	)
 
 	// joshuafolkken/kit#5376: from `$RUNNER_TEMP`, npm read setup-node's `.npmrc` as the project
-	// config, so publish-github's lookup went to GitHub Packages without a token and failed with 401.
+	// config, so a scoped registry written there sent the lookup away from npmjs and failed with 401.
 	it.each(PUBLISH_JOB_NAMES)(
 		'keeps the scoped registry setup-node wrote from redirecting the lookup in %s',
 		(job_name) => {

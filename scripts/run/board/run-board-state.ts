@@ -17,7 +17,6 @@ import type { IssueCount } from './run-board-issue-count'
 import type { JumpDraw } from './run-board-jump-screen'
 import type { KeyInput } from './run-board-keys'
 import type { Lamp } from './run-board-lamp-spots'
-import type { LaneMemory } from './run-board-lane-swap'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { NoticeTurn } from './run-board-notice-turn'
@@ -208,9 +207,8 @@ interface BoardView {
 	notice_trace?: NoticeTurn | undefined
 	// The bttf time jump the last frame drew, painted between redraws (`run-board-jump-screen.ts`).
 	jump?: JumpDraw | undefined
-	// The keyed lines the last frame drew and the lane rows the board last dropped, the merged one the
-	// bttf jump draws back (`run-board-lane-swap.ts`).
-	lane_memory?: LaneMemory | undefined
+	// When the latest typing the bttf jump has taken as its cue started (`run-board-jump-start.ts`).
+	cued_ms?: number | undefined
 	// When the bttf panel's arrival started, kept once the board first draws its area (`run-board-jump-start.ts`).
 	arrive_ms?: number | undefined
 }

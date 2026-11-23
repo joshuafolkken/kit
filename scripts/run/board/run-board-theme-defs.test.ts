@@ -125,11 +125,11 @@ describe('run_board_theme_defs.THEME_DEFS typing', () => {
 		expect(THEME_DEFS.matrix.typing).toBe(run_board_sound_click.typing_wav)
 	})
 
-	// joshuafolkken/kit#8697: bttf types to the keypad over the header and sounds ENTER after each line.
-	it('types bttf to the keypad over the header rows and ends each typed line with ENTER', () => {
+	// joshuafolkken/kit#8731: bttf types every row to the keypad and sounds ENTER after each line.
+	it('ac-f9b98b75 types every bttf row to the keypad and ends each typed line with ENTER', () => {
 		expect(THEME_DEFS.bttf.typing).toBe(run_board_sound_keypad.typing_wav)
 		expect(THEME_DEFS.bttf.typed_end).toBe(run_board_sound_enter.enter_wav)
-		expect(THEME_DEFS.bttf.live.trill).toBe('header')
+		expect(THEME_DEFS.bttf.live.trill).toBe(true)
 	})
 
 	it('sounds no typed end in wargames or matrix', () => {
