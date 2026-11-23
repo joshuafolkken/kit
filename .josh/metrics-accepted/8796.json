@@ -1,0 +1,7 @@
+{
+	"reason": "the joint that puts the 1s frame and the spin's repaint in one synchronized write is new code (#8796)",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 58
+	}
+}

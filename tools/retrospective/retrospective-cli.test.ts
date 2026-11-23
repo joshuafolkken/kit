@@ -16,6 +16,7 @@ const LINE =
 	'- k:lane-ledger-line-unmerged | d1 | 2026-09-24 | pnpm josh run:tail | A lane appended this line before its merge'
 const OTHER_LINE =
 	'- k:another-lane-line | d1 | 2026-09-24 | pnpm josh run:tail | A second lane appended this one'
+const { DEFECT_LINE } = vi.hoisted(() => ({ DEFECT_LINE: 'Defects (last 7 days): none' }))
 
 vi.mock('#scripts/run/carry/run-carry', () => ({
 	run_carry: { repository_directory: vi.fn().mockResolvedValue(undefined) },
@@ -23,6 +24,9 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 vi.mock('#tools/cost/cost-run-tree', () => ({ cost_run_tree: { load: vi.fn(() => undefined) } }))
 vi.mock('#tools/cost-audit/cost-audit-cli', () => ({
 	cost_audit_cli: { summary: vi.fn().mockResolvedValue('Cost audit (7d): $0.0000') },
+}))
+vi.mock('#scripts/issue/defect-report-cli', () => ({
+	defect_report_cli: { digest: vi.fn().mockResolvedValue([DEFECT_LINE]) },
 }))
 
 const { retrospective_cli } = await import('./retrospective-cli')
@@ -36,6 +40,7 @@ describe('retrospective_cli.gather — the ledger is read from the files on disk
 		const inputs = await retrospective_cli.gather(scratch)
 
 		expect(inputs.observations).toStrictEqual([LINE, OTHER_LINE])
+		expect(inputs.defects).toStrictEqual([DEFECT_LINE])
 	})
 
 	it('reads an absent ledger as no observations rather than failing', async () => {
