@@ -62,6 +62,15 @@ describe('core_wait_record.record_admitted explicit sink', () => {
 		expect(sink).toHaveBeenCalledWith(expect.objectContaining({ overflow: true, waited_ms: 0 }))
 	})
 
+	it('records the cores the admitted claims held (joshuafolkken/kit#8869)', () => {
+		const fixture = admission_fixture(false)
+		const decision = fixture.decision && { ...fixture.decision, reserved_cores: 3 }
+		const admission = { ...fixture, decision }
+		const wait = core_wait_record.wait_of({ claimed_at: CLAIMED_AT }, ADMITTED_AT, admission)
+
+		expect(wait).toStrictEqual(expect.objectContaining({ reserved_cores: 3 }))
+	})
+
 	it('hands a wait to the sink', async () => {
 		const sink = vi.fn<WaitSink>().mockResolvedValue(undefined)
 
