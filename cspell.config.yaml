@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # SonarCloud scanner's own spelling in its pull-request fetch error, which followup reruns on (#8848).
+  - pullrequest
   # ImageMagick's command, which turns a scratch SVG into a PNG (#8262).
   - magick
   # The WarGames computer the board's lamp panel is drawn after (#8236).

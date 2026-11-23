@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { eslint_daemon_environment } from '#scripts/lint/eslint-daemon-environment'
 import { describe, expect, it } from 'vitest'
 import { josh_harness } from './josh-harness'
 import { josh_harness_fixture } from './josh-harness-fixture'
@@ -29,13 +30,15 @@ describe('josh harness — the same command launched twice at once', () => {
 })
 
 // The fixture borrows this checkout's `node_modules` through a symlink, so a daemon it reached would
-// be keyed on this checkout's own record (joshuafolkken/kit#4386).
-function daemon_record(root: string): string | undefined {
-	try {
-		return readFileSync(path.join(root, 'node_modules', 'eslint', '.eslint_d'), 'utf8')
-	} catch {
-		return undefined
-	}
+// be keyed on this checkout's own record (joshuafolkken/kit#4386). `eslint_d` names a record per
+// environment (joshuafolkken/kit#8848), so every one of them is read.
+function daemon_record(root: string): ReadonlyArray<string> {
+	const directory = path.join(root, 'node_modules', 'eslint')
+
+	return readdirSync(directory)
+		.filter((name) => eslint_daemon_environment.is_record_name(name))
+		.toSorted((left, right) => left.localeCompare(right))
+		.map((name) => `${name} ${readFileSync(path.join(directory, name), 'utf8')}`)
 }
 
 describe('josh harness — lint:related in a repository that borrows node_modules', () => {
@@ -49,7 +52,7 @@ describe('josh harness — lint:related in a repository that borrows node_module
 			const result = await josh_harness.run(kit, ['lint:related'])
 
 			expect(result.exit_code, result.stdout).toBe(0)
-			expect(daemon_record(kit.root)).toBe(before)
+			expect(daemon_record(kit.root)).toStrictEqual(before)
 		},
 		SCENARIO_TIMEOUT_MS,
 	)

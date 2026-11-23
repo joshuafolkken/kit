@@ -49,8 +49,10 @@ const FIRST_ATTEMPT = 1
 // A download that failed before the change ran: the runner's last word after its action download
 // retries, or its failure to look the action up at all; a `curl` whose last retry got a server error
 // and so ended its step — a retry that got through leaves its earlier error lines behind; the CodeQL
-// bundle answered with a server error.
+// bundle answered with a server error; the SonarCloud scanner failed to fetch the pull request from
+// the ALM before analyzing anything (joshuafolkken/kit#8848).
 const DOWNLOAD_ERRORS = [
+	/^\S+ [\d:.]+ ERROR Something went wrong while trying to get the pullrequest with key '\d+': /mu,
 	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu,
 	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ ##\[error\]Process completed with exit code 22\.$/mu,
 	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ \[ERROR\] Failed to download from https:\/\/\S+\r?\n\S+ ##\[error\]Process completed with exit code 1\.$/mu,
