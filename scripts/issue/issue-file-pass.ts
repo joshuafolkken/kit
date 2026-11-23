@@ -16,6 +16,8 @@ import { issue_scout_cli, type ScoutOutcome } from './issue-scout-cli'
 import { issue_wip, type WipCap } from './issue-wip'
 import { measure_twin } from './measure-twin'
 import { premise_judge } from './premise-judge'
+import { rework_classification } from './rework-classification'
+import { rework_reference_state } from './rework-reference-state'
 import { size_estimate } from './size-estimate'
 
 // The one pass of `josh issue:file`: every check the body and the arguments are answered by — the
@@ -230,6 +232,25 @@ async function origin_candidates(filing: Filing): Promise<ReadonlyArray<string>>
 	return listing === undefined ? [] : [listing]
 }
 
+// A non-defect body citing delivered work with no new goal is rework filed as an enhancement
+// (joshuafolkken/kit#8799). The cited states are read in one query; an unreadable state warns and
+// lets the filing through, so a GitHub outage never blocks filing.
+async function rework_refusals(filing: Filing): Promise<ReadonlyArray<string>> {
+	const cited = rework_classification.cited(filing.body)
+	if (cited.length === 0) return []
+	const delivered = await rework_reference_state.delivered(cited, filing.target)
+
+	if (delivered === undefined) {
+		console.warn('⚠ the rework check could not read the cited states; filed without it')
+
+		return []
+	}
+
+	const problem = rework_classification.problem(filing.body, delivered)
+
+	return problem === undefined ? [] : [`✖ ${problem}`]
+}
+
 function admitted_with(candidates: ReadonlyArray<string>): boolean {
 	for (const listing of candidates) console.info(listing)
 
@@ -239,9 +260,12 @@ function admitted_with(candidates: ReadonlyArray<string>): boolean {
 // The size estimate is judged at the ledger's recent implement rate (joshuafolkken/kit#6025).
 async function is_admitted(filing: Filing): Promise<boolean> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
-	const capped = await cap_refusals(filing)
-	const premised = premise_refusals(filing)
-	const refusals = [...refusals_of(filing, implement_rate, growth), ...capped, ...premised]
+	const refusals = [
+		...refusals_of(filing, implement_rate, growth),
+		...(await cap_refusals(filing)),
+		...premise_refusals(filing),
+		...(await rework_refusals(filing)),
+	]
 	const candidates = await origin_candidates(filing)
 
 	issue_lint_cli.warn(filing.body)
