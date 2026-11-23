@@ -1,4 +1,5 @@
 import { process_identity } from '#scripts/josh/process-identity'
+import { lane_reap, type ReapProbes } from '#scripts/lane/lane-reap'
 
 // Ends a `josh gate` whose owner died (joshuafolkken/kit#8845). A gate keeps running its children
 // (ESLint, vitest) when whoever reads its verdict stops — the orphan holds gigabytes and cores until a
@@ -13,16 +14,14 @@ import { process_identity } from '#scripts/josh/process-identity'
 //
 // The owner is polled with `is_same_process`, so a reissued pid reads as gone. A start time the
 // platform cannot read leaves the pid's liveness alone to decide (`!== false`). On the owner's end
-// the gate signals its own process group — itself and every check it spawned — and exits non-zero in
-// case the signal does not end it. The poll timer is `unref`ed, so a gate whose checks are done exits
+// the gate signals every process under it — each check it spawned and theirs — and exits non-zero.
+// **Its tree, not its process group:** an attached `josh ship` runs its gate in ship's own group, so a
+// group signal would reach ship's launcher and its siblings. The poll timer is `unref`ed, so a gate whose checks are done exits
 // on its own and a live owner sees no change in what the gate does or how long it takes.
 const OWNER_PID_KEY = 'JOSH_GATE_OWNER_PID'
 const OWNER_START_KEY = 'JOSH_GATE_OWNER_START'
 const OWNER_POLL_MS = 2000
 const ORPHAN_EXIT_CODE = 1
-// `process.kill(0, …)` is `kill(2)` on pid 0: the caller's own process group.
-const OWN_GROUP = 0
-const GROUP_SIGNAL = 'SIGTERM'
 const LOWEST_OWNER_PID = 2
 
 interface GateOwner {
@@ -32,7 +31,7 @@ interface GateOwner {
 
 interface OwnerProbe {
 	is_alive: (owner: GateOwner) => boolean
-	end_group: () => void
+	end_tree: () => void
 	exit: (code: number) => void
 }
 
@@ -68,20 +67,27 @@ function is_alive(owner: GateOwner): boolean {
 	return process_identity.is_same_process(owner.pid, owner.process_start) !== false
 }
 
-function end_group(): void {
-	process.kill(OWN_GROUP, GROUP_SIGNAL)
+// Every process under this one, collected before any is signalled (`lane-reap.ts`).
+function end_tree(probes: ReapProbes = lane_reap.SYSTEM_PROBES): void {
+	for (const pid of lane_reap.descendants_of(process.pid, probes)) probes.terminate(pid)
 }
 
 function exit(code: number): void {
 	process.exit(code)
 }
 
-const PROCESS_PROBE: OwnerProbe = { is_alive, end_group, exit }
+const PROCESS_PROBE: OwnerProbe = {
+	is_alive,
+	end_tree: () => {
+		end_tree()
+	},
+	exit,
+}
 
 function check_owner(owner: GateOwner, probe: OwnerProbe): void {
 	if (probe.is_alive(owner)) return
 
-	probe.end_group()
+	probe.end_tree()
 	probe.exit(ORPHAN_EXIT_CODE)
 }
 
@@ -105,6 +111,7 @@ function start(
 }
 
 const gate_owner_watch = {
+	end_tree,
 	ORPHAN_EXIT_CODE,
 	OWNER_PID_KEY,
 	OWNER_POLL_MS,

@@ -141,6 +141,11 @@ function tree_of(roots: ReadonlyArray<number>, probes: TreeProbes): Array<number
 	return tree
 }
 
+// Every process under `pid`, collected before any is signalled; `pid` itself is left out.
+function descendants_of(pid: number, probes: TreeProbes = SYSTEM_PROBES): Array<number> {
+	return tree_of([pid], probes).filter((member) => member !== pid)
+}
+
 function roots_of(issue: string, own: Set<number>, probes: TreeProbes): Array<number> {
 	const pattern = lane_child_invocation.process_pattern(issue)
 
@@ -184,6 +189,7 @@ function own_child(issue: string, probes: TreeProbes = SYSTEM_PROBES): number | 
 
 const lane_reap = {
 	ancestry_of,
+	descendants_of,
 	is_child_running,
 	own_child,
 	lane_tree,

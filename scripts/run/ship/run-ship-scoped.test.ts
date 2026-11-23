@@ -1,3 +1,4 @@
+import { gate_owner_watch } from '#scripts/gate/gate-owner-watch'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +25,7 @@ const unmoved_mock = vi.hoisted(() =>
 const lap_mock = vi.hoisted(() =>
 	vi.fn<(lap: object) => Promise<void>>().mockResolvedValue(undefined),
 )
+const OWN_PID_ENTRY = { [gate_owner_watch.OWNER_PID_KEY]: String(process.pid) }
 const LEDGER = vi.hoisted(() => 'lane-ledger.jsonl')
 const reused_ledger_mock = vi.hoisted(() =>
 	vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -75,8 +77,7 @@ const { run_ship_gate_runs } = await import('./run-ship-gate-runs')
 // joshuafolkken/kit#2946: the scoped pair the preflight, the review rounds and the gate stage all meet
 // rather than stop on — only the checks with no green record for this tree run.
 
-const OK = 0
-const FAILED = 1
+const [OK, FAILED] = [0, 1]
 // The ship's gate on the final tree runs the whole-tree checks a lane's own gate leaves out.
 const GATE = `gate ${WHOLE_TREE_FLAG}`
 // A file on disk, so the narrowed run can name it.
@@ -340,7 +341,7 @@ describe('run_ship_scoped.scoped_gate', () => {
 		expect(commands()).toStrictEqual([LINT, GATE])
 		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate', WHOLE_TREE_FLAG], {
 			should_forward_stderr: true,
-			environment: expect.objectContaining({}),
+			environment: expect.objectContaining(OWN_PID_ENTRY) as NodeJS.ProcessEnv,
 		})
 	})
 

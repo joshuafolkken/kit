@@ -25,7 +25,7 @@ function probe_fixture(): ProbeFixture {
 
 			return is_alive
 		},
-		end_group: () => {
+		end_tree: () => {
 			ended += 1
 		},
 		exit: (code) => {
@@ -56,7 +56,7 @@ describe('gate_owner_watch.start', () => {
 		vi.useRealTimers()
 	})
 
-	it('ends the process group and exits non-zero once the named owner is gone', () => {
+	it('ends its process tree and exits non-zero once the named owner is gone', () => {
 		const fixture = probe_fixture()
 
 		timer = gate_owner_watch.start(OWNED, fixture.probe)
@@ -120,6 +120,33 @@ describe('gate_owner_watch.read_owner', () => {
 
 	it.each(['', 'abc', '0', '1', '-5'])('names no owner for the pid %j', (value) => {
 		expect(gate_owner_watch.read_owner({ [OWNER_PID_KEY]: value })).toBeUndefined()
+	})
+})
+
+// An attached ship runs its gate in ship's own process group, so the gate signals only what runs
+// under it — never its parent or a sibling (joshuafolkken/kit#8845 round 1).
+describe('gate_owner_watch.end_tree', () => {
+	it('terminates every process under the gate and nothing above or beside it', () => {
+		const CHECK = 9001
+		const WORKER = 9002
+		const children = new Map<number, Array<number>>([
+			[process.pid, [CHECK]],
+			[CHECK, [WORKER]],
+		])
+		const terminated: Array<number> = []
+
+		gate_owner_watch.end_tree({
+			matching: () => [],
+			children_of: (pid) => children.get(pid) ?? [],
+			parent_of: () => undefined,
+			terminate: (pid) => {
+				terminated.push(pid)
+
+				return true
+			},
+		})
+
+		expect(terminated).toStrictEqual([CHECK, WORKER])
 	})
 })
 
