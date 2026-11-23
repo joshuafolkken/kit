@@ -212,16 +212,24 @@ function cell(value: number | undefined): string {
 	return value === undefined ? MISSING : value.toFixed(DECIMALS)
 }
 
-function throughput_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
-	const merges = entries.filter((entry) => entry.kind === 'merge').length
+function merge_count(entries: ReadonlyArray<LedgerEntry>): number {
+	return entries.filter((entry) => is_merge(entry)).length
+}
+
+// Merges per active hour; `undefined` when nothing leaves any active time.
+function merges_per_hour(entries: ReadonlyArray<LedgerEntry>): number | undefined {
 	const hours = active_hours(entries)
+
+	return hours === undefined ? undefined : merge_count(entries) / hours
+}
+
+function throughput_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
 	const lanes = entries
 		.filter(is_load)
 		.filter(is_working)
 		.map((entry) => entry.lanes)
-	const per_hour = hours === undefined ? undefined : merges / hours
 
-	return [String(merges), cell(per_hour), cell(mean(lanes))]
+	return [String(merge_count(entries)), cell(merges_per_hour(entries)), cell(mean(lanes))]
 }
 
 function dispatched_before(
@@ -345,11 +353,13 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 const lane_stats = {
 	COLUMNS,
 	MISSING,
+	active_hours,
 	header,
 	in_window,
 	mean,
 	median,
 	merge_minutes,
+	merges_per_hour,
 	peak,
 	row,
 	to_row,

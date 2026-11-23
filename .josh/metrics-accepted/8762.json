@@ -1,0 +1,7 @@
+{
+	"reason": "New per-limit lane:stats table (lane-limit-table.ts) the Issue asks for; the default is chosen from it",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 96
+	}
+}
