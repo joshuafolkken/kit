@@ -12,7 +12,6 @@ import { lane_dispatch_log } from './lane-dispatch-log'
 import { lane_reap } from './lane-reap'
 import { lane_reap_settle } from './lane-reap-settle'
 import type { LaneInfo } from './lane-registry'
-import { lane_residents } from './lane-residents'
 import { lane_seat_start } from './lane-seat-start'
 
 // Relaunching a lane child session into its own lane — a fresh agent process started detached, under
@@ -74,15 +73,17 @@ async function outlived(issue: string): Promise<boolean> {
 
 // joshuafolkken/kit#8843: a relaunch whose lane child still runs — a supervisor hand-off that judged a
 // live stage stopped — would put a second child beside it in one tree, each running its own gate. The
-// live child goes first, the way `lane:restart` stops it; one that outlives the SIGTERM refuses the
-// launch. The caller's own ancestry is never matched, so `run:cut` from inside the child reaps nothing.
-// An OpenAI lane's liveness is its supervisor's, as `lane:dispatch` leaves it.
+// live child's tree goes first, by the reap `lane:restart` uses; one that outlives the SIGTERM refuses
+// the launch. The caller's own ancestry is never matched, so `run:cut` from inside the child reaps
+// nothing. **The lane's residents stay**, unlike a restart's: a broker relaunches on a detached ship
+// supervisor's behalf, and that supervisor, its gate and any reviewer run from the lane outside the
+// broker's ancestry. An OpenAI lane's liveness is its supervisor's, as `lane:dispatch` leaves it.
 async function stop_previous(lane: LaneInfo): Promise<string | undefined> {
 	if (is_openai_lane(lane) || !lane_reap.is_child_running(lane.issue)) return undefined
-	const cited = session_cite.issue(lane.issue)
 
-	lane_residents.stop_child(lane, cited)
+	lane_reap.reap_child(lane)
 	if (!(await outlived(lane.issue))) return undefined
+	const cited = session_cite.issue(lane.issue)
 
 	return `The previous child for ${cited} still runs after a SIGTERM, so no second child was launched beside it.`
 }

@@ -4,7 +4,8 @@ import { lane_seat_fixture } from './lane-seat-fixture'
 const order = vi.hoisted((): Array<string> => [])
 const launch_mock = vi.hoisted(() => vi.fn())
 const running_mock = vi.hoisted(() => vi.fn<(issue: string) => boolean>())
-const stop_mock = vi.hoisted(() => vi.fn<(lane: unknown, cited: string) => Array<number>>())
+const stop_mock = vi.hoisted(() => vi.fn<(lane: unknown) => Array<number>>())
+const end_residents_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/agent/agent-argv', () => ({
 	agent_argv: {
@@ -19,9 +20,11 @@ vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch: laun
 vi.mock('./lane-dispatch-log', () => ({
 	lane_dispatch_log: { default_log_path: () => '/lanes/8843/lane.log' },
 }))
-vi.mock('./lane-reap', () => ({ lane_reap: { is_child_running: running_mock } }))
+vi.mock('./lane-reap', () => ({
+	lane_reap: { is_child_running: running_mock, reap_child: stop_mock },
+}))
 vi.mock('./lane-reap-settle', () => ({ lane_reap_settle: { GRACE_MS: 0 } }))
-vi.mock('./lane-residents', () => ({ lane_residents: { stop_child: stop_mock } }))
+vi.mock('./lane-residents', () => ({ lane_residents: { end_residents: end_residents_mock } }))
 
 const { lane_relaunch } = await import('./lane-relaunch')
 
@@ -59,7 +62,17 @@ describe('lane_relaunch.relaunch with a previous child', () => {
 
 		await expect(relaunch()).resolves.toMatchObject({ kind: 'launched' })
 		expect(order).toStrictEqual(['stop', 'launch'])
-		expect(stop_mock).toHaveBeenCalledWith(LANE, expect.stringContaining('8843'))
+		expect(stop_mock).toHaveBeenCalledWith(LANE)
+	})
+
+	// A broker relaunches on a detached ship supervisor's behalf; that supervisor runs from the lane
+	// outside the broker's ancestry, so ending the lane's residents would end the requester.
+	it('ends the child’s tree only, leaving the lane’s residents running', async () => {
+		answers(true, false)
+
+		await relaunch()
+
+		expect(end_residents_mock).not.toHaveBeenCalled()
 	})
 
 	it('launches without stopping anything when no child runs', async () => {

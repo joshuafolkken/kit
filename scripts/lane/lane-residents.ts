@@ -156,31 +156,7 @@ function report(ended: ReadonlyArray<number> | undefined, cited: string): void {
 	if (sentence !== undefined) console.error(sentence)
 }
 
-/**
- * Stop `lane`'s running child, then what it left running from the lane, reported for the issue
- * `cited` — the one order `lane:restart` and a relaunch share (joshuafolkken/kit#8843). Returns the
- * child's pids the signal reached; none means no child ran, and nothing else is ended.
- */
-function stop_child(
-	lane: ResidentLane,
-	cited: string,
-	probes: ResidentProbes = SYSTEM_PROBES,
-): Array<number> {
-	const reaped = lane_reap.reap_child(lane)
-
-	if (reaped.length > 0) report(end_residents(lane, reaped, probes), cited)
-
-	return reaped
-}
-
-const lane_residents = {
-	end_residents,
-	parse_groups,
-	report,
-	residents,
-	residents_sentence,
-	stop_child,
-}
+const lane_residents = { end_residents, parse_groups, report, residents, residents_sentence }
 
 export type { ResidentLane, ResidentProbes }
 export { lane_residents }
