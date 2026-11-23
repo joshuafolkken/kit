@@ -328,8 +328,8 @@ function turned_of(drawn: Drawn): Pick<Drawn, 'spots' | 'sweep' | 'lamps' | 'tra
 }
 
 // joshuafolkken/kit#8657: the header notice's trace this frame carries on, where the board traces it —
-// the flash's gate, by the theme's own switch; the frame the change flash measures against starts none
-// (the matrix types no rows, so the typing keeps no base of its own).
+// the flash's gate, by the theme's own switch; the base frame starts none — no flash and no typing base
+// yet, as a theme with no flash (wargames, bttf: joshuafolkken/kit#8745) has only the typing's.
 function notice_of(
 	state: BoardState,
 	drawn: Drawn,
@@ -343,7 +343,7 @@ function notice_of(
 	return run_board_notice_turn.turn_of(state.notice_trace, {
 		keyed: drawn.keyed,
 		header,
-		is_base: state.flash === undefined,
+		is_base: state.flash === undefined && state.typing.seen === undefined,
 		now_ms: redraw.now_ms,
 		look: { theme: ports.theme, icons: ports.icons },
 		columns: drawn.size?.columns ?? Infinity,

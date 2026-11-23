@@ -20,12 +20,42 @@ const BLUE_WEIGHT = 0.0722
 const WEIGHTS: Rgb = [RED_WEIGHT, GREEN_WEIGHT, BLUE_WEIGHT]
 // The flare WCAG adds to both sides of the ratio.
 const FLARE = 0.05
+// joshuafolkken/kit#8744: the eight named colors and their bright kin as VS Code's dark terminal draws
+// them, black to white; both whites are one.
+const WHITE = '229;229;229'
+const NAMED: ReadonlyArray<string> = [
+	'0;0;0',
+	'205;49;49',
+	'13;188;121',
+	'229;229;16',
+	'36;114;200',
+	'188;63;188',
+	'17;168;205',
+	WHITE,
+]
+const BRIGHT: ReadonlyArray<string> = [
+	'102;102;102',
+	'241;76;76',
+	'35;209;139',
+	'245;245;67',
+	'59;142;234',
+	'214;112;214',
+	'41;184;219',
+	WHITE,
+]
 
 // A color written as a shade writes it, `R;G;B`.
 function parsed(text: string): Rgb {
 	const [red = 0, green = 0, blue = 0] = text.split(';').map(Number)
 
 	return [red, green, blue]
+}
+
+// The named color at `index`, 0 for black to 7 for white, its bright kin when `is_bright`.
+function palette(index: number, is_bright: boolean): Rgb | undefined {
+	const text = (is_bright ? BRIGHT : NAMED)[index]
+
+	return text === undefined ? undefined : parsed(text)
 }
 
 // `rgb` with each channel at `share` of its value.
@@ -70,7 +100,7 @@ function contrast(first: Rgb, second: Rgb): number {
 	return (brighter + FLARE) / (darker + FLARE)
 }
 
-const run_board_rgb = { contrast, mixed, parsed, scaled, shade_of }
+const run_board_rgb = { contrast, mixed, palette, parsed, scaled, shade_of }
 
 export { run_board_rgb }
 export type { Rgb }
