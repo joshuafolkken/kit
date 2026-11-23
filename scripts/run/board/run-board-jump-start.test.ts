@@ -104,6 +104,12 @@ describe('run_board_jump_start.jump_state — the typing run', () => {
 		expect(started(late).run.start_ms).toBe(NOW)
 	})
 
+	it('starts on no row with no letters to type past its prefix', () => {
+		const typing = typing_of({ ...line_of(ROW_TEXT), prefix_columns: ROW_TEXT.length })
+
+		expect(jump_of(undefined, frame_of({ typing }))).toBeUndefined()
+	})
+
 	it('cues each typing once, so a typing already cued starts none', () => {
 		const state = jump_state({}, frame_of())
 
