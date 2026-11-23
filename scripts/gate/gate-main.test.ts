@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 // The records are a sentinel rather than the real ones: the fixture re-imports the entry, and the
 // real records carry functions that a fresh module instance would not share.
-const { run, DEFAULT_RECORDS } = vi.hoisted(() => ({ run: vi.fn(), DEFAULT_RECORDS: {} }))
+// Non-empty, so an entry handing the gate empty records (reuse off) fails the deep comparison.
+const { run, DEFAULT_RECORDS } = vi.hoisted(() => ({
+	run: vi.fn(),
+	DEFAULT_RECORDS: { sentinel: 'the default check records' },
+}))
 
 vi.mock('./gate-command', () => ({ gate_command: { run_gate_command: run } }))
 vi.mock('./check-reuse', () => ({ check_reuse: { DEFAULT_RECORDS } }))
