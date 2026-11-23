@@ -73,7 +73,8 @@ describe('cost_audit_read_pool.sessions_of — the sessions in file order', () =
 	it('reads a large set in workers, equal to the reading on this thread', async () => {
 		const files = store_files()
 		const lanes = new Set<string>()
-		const pooled = await sessions_of(files, lanes, () => [])
+		// The cores are given, so a one-core host still reads in workers rather than the empty stub.
+		const pooled = await sessions_of(files, lanes, () => [], CORES)
 
 		expect(pooled).toStrictEqual(cost_audit_read.read_files(files, lanes))
 		expect(pooled.map((one) => one.prompt)).toContain(`prompt ${String(FILE_COUNT - 1)}`)

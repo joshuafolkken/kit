@@ -165,6 +165,21 @@ describe('cost_audit_cli.run — the printed report', () => {
 	})
 })
 
+// joshuafolkken/kit#8757: a `gh` request left waiting behind the load timed out.
+describe('cost_audit_cli.run — the merge count is read first', () => {
+	beforeEach(stub_sources)
+
+	it('reads the merges before it loads the transcripts', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await cost_audit_cli.run([], '/repo', NOW_MS)
+
+		const last_gh = Math.max(...exec_gh_api.mock.invocationCallOrder)
+
+		expect(last_gh).toBeLessThan(load.mock.invocationCallOrder[0] ?? 0)
+	})
+})
+
 // joshuafolkken/kit#8383: the Issues the lane ledger records a merge of reach the audit.
 describe('cost_audit_cli.run — the merged-issue set', () => {
 	beforeEach(stub_sources)

@@ -68,13 +68,15 @@ async function read_in_worker(job: ReadJob): Promise<Array<AuditSession>> {
 	})
 }
 
-// Every file's session, in file order; `read_files` is the reading itself, run here for a small set.
+// Every file's session, in file order; `read_files` is the reading itself, run here for a small set or
+// a host with one core.
 async function sessions_of(
 	files: ReadonlyArray<SessionFile>,
 	lanes: ReadonlySet<string>,
 	read_files: ReadFiles,
+	cores: number = availableParallelism(),
 ): Promise<Array<AuditSession>> {
-	const count = worker_count(files.length)
+	const count = worker_count(files.length, cores)
 
 	if (count < MIN_WORKERS) return read_files(files, lanes)
 
