@@ -6,6 +6,8 @@ import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
 
 const make_directory = temporary_directory('suite')
+const CLOSE_COMMAND = 'lane:close'
+const WITHDRAW_COMMAND = 'lane:withdraw'
 
 // joshuafolkken/kit#1490: a lane is closed after a park, a failure or an interruption as readily as
 // after a success, so what is asserted here is that **nothing is left** in each of those states —
@@ -254,19 +256,17 @@ describe('ending the lane state record', () => {
 		expect(vi.mocked(lane_state.record_change)).toHaveBeenCalledExactlyOnceWith({
 			issue: ISSUE,
 			state: 'ended',
-			command: 'lane:close',
+			command: CLOSE_COMMAND,
 		})
 	})
 
 	// joshuafolkken/kit#8775: a withdrawal's end is this one write, named for the withdrawal.
 	it('records the end by the command it closes for', async () => {
-		const withdraw = 'lane:withdraw'
-
 		lanes_are([open_on_disk(ISSUE, SEED)])
-		await lane_close.close_lane(ISSUE, withdraw)
+		await lane_close.close_lane(ISSUE, WITHDRAW_COMMAND)
 
 		expect(vi.mocked(lane_state.record_change)).toHaveBeenCalledExactlyOnceWith(
-			expect.objectContaining({ state: 'ended', command: withdraw }),
+			expect.objectContaining({ state: 'ended', command: WITHDRAW_COMMAND }),
 		)
 	})
 
@@ -276,6 +276,24 @@ describe('ending the lane state record', () => {
 		await lane_close.close_lane(ISSUE)
 
 		expect(vi.mocked(lane_state.record_change)).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8775: the table has no ended → ended move, so a second close writes no end.
+describe('ending an already ended lane', () => {
+	it('keeps the first end of a lane already recorded ended, still releasing its plan', async () => {
+		vi.mocked(lane_state.record_change).mockClear()
+		lanes_are([open_on_disk(ISSUE, SEED)])
+		vi.mocked(lane_state.read_state).mockResolvedValueOnce({
+			issue: ISSUE,
+			state: 'ended',
+			changed_at: '2026-11-23T01:00:00.000Z',
+			changed_by: CLOSE_COMMAND,
+		})
+		await lane_close.close_lane(ISSUE, WITHDRAW_COMMAND)
+
+		expect(vi.mocked(lane_state.record_change)).not.toHaveBeenCalled()
+		expect(vi.mocked(lane_plan.release)).toHaveBeenCalled()
 	})
 })
 

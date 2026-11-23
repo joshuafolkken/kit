@@ -165,8 +165,11 @@ async function left_behind_of(issue: string, targets: LaneTargets): Promise<Arra
 
 // An ended lane's cleared plan goes with it; a plan its lane yielded on stays (`lane_plan.release`).
 // A refused end (the lane is already `ended`) still releases the plan: the close itself is done.
+// A lane already recorded ended keeps its first end; the table has no ended → ended move to write.
 async function record_end(issue: string, command: EndCommand): Promise<void> {
-	await lane_state.record_change({ issue, state: 'ended', command })
+	const record = await lane_state.read_state(issue)
+
+	if (record?.state !== 'ended') await lane_state.record_change({ issue, state: 'ended', command })
 	lane_plan.release(Number(issue), process.cwd())
 }
 
