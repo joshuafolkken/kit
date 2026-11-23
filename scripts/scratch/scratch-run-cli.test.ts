@@ -148,3 +148,23 @@ describe.skipIf(!KNOWS_NETWORK_FLAG)('scratch:run under the permission model', (
 		expect(run_probe("process.kill(process.pid, 'SIGKILL')")).toBe(1)
 	})
 })
+
+// joshuafolkken/kit#8733: a `.ts` scratch script imports `scripts/` without extensions, as `scripts/` does.
+const SCRIPTS_MODULE = fileURLToPath(new URL('../run/board/run-board-screen', import.meta.url))
+
+function run_typescript(source: string): number {
+	const { root, scratch } = setup()
+	const script = path.join(scratch, 'probe.ts')
+
+	writeFileSync(script, source)
+
+	return scratch_run_cli.run([script], { root })
+}
+
+describe.skipIf(!KNOWS_NETWORK_FLAG)('scratch:run module resolution', () => {
+	it('resolves an extensionless scripts/ import', { timeout: SPAWN_TIMEOUT_MS }, () => {
+		const source = `import { run_board_screen } from '${SCRIPTS_MODULE}'\nconsole.log(typeof run_board_screen)\n`
+
+		expect(run_typescript(source)).toBe(0)
+	})
+})
