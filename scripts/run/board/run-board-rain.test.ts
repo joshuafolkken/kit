@@ -1,46 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
 import { run_board_rain, type Head, type RainCell, type Random, type Scene } from './run-board-rain'
+import { run_board_rain_gradient } from './run-board-rain-gradient'
 
-const {
-	FADE,
-	GLYPHS,
-	MOVIE_RAMP,
-	RAIN_MS,
-	REVEAL,
-	WIPE,
-	advanced,
-	cell_of,
-	cells_of,
-	heads_of,
-	hurried,
-	paint_of,
-	passes,
-} = run_board_rain
-const { SHADES } = run_board_header_trace
+const { GLYPHS, RAIN_MS, REVEAL, WIPE, advanced, cell_of, cells_of, heads_of, hurried, passes } =
+	run_board_rain
+const { HEAD_RGB, paint_at } = run_board_rain_gradient
 
 // The approved demo's values (joshuafolkken/kit#8352, 2026-11-20T12:40:04Z comment).
 const DEMO_GLYPHS = 'ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789Z:.=*+<>'
 const DEMO_HEAD = '225;255;225'
-const DEMO_FADE = [
-	'0;255;65',
-	'0;255;65',
-	'0;215;60',
-	'0;165;40',
-	'0;165;40',
-	'0;100;22',
-	'0;55;12',
-]
-// joshuafolkken/kit#8626's approved demo `mix`: the reveal's `MOVIE_RAMP`.
-const DEMO_MOVIE_RAMP = [
-	...Array.from({ length: 3 }, () => '0;255;65'),
-	...Array.from({ length: 4 }, () => '0;215;60'),
-	...Array.from({ length: 3 }, () => '0;165;40'),
-	'0;100;22',
-	'0;55;12',
-]
 const DEMO_RAIN_MS = 45
+// A random draw under the reroll odds, then one that picks glyph 32.
+const REROLLED = [0.079, 0.5]
 const HALF = 0.5
 const SLOW = 0.55
 const FAST = 1.3
@@ -51,7 +23,6 @@ const SAMPLES = [0, 0.25, HALF, 0.999]
 // A scene falling ten rows a frame with no tail, holding its pace for `hold_ms`.
 const STEADY: Scene = {
 	tail: { least: 0, spread: 0 },
-	ramp: FADE,
 	speed: { least: 10, spread: 0 },
 	hold_ms: 0,
 }
@@ -79,7 +50,12 @@ function rgb_of(paint: Paint | undefined): unknown {
 
 // A head with today's seven-cell tail.
 function seven(at: number, speed: number): Head {
-	return { at, speed, length: SEVEN, ramp: FADE }
+	return { at, speed, length: SEVEN }
+}
+
+// The gradient's paint of each cell of a seven-cell tail, from `distance` up.
+function seven_paints(...distances: Array<number>): Array<Paint | undefined> {
+	return distances.map((distance) => paint_at(distance, SEVEN))
 }
 
 function settled_glyph(place: { x: number; y: number }): string | undefined {
@@ -97,7 +73,7 @@ function drawn_head(scene: Scene, value: number): Head {
 // The row the single column's head is on in each frame of a pass.
 function head_rows(scene: Scene, height: number): Array<number> {
 	return [...passes({ width: 1, height }, () => 0, scene)].map((frame) =>
-		frame.findIndex((row) => row[0]?.kind === 'drop' && row[0].paint === SHADES.head),
+		frame.findIndex((row) => row[0]?.kind === 'drop' && rgb_of(row[0].paint) === DEMO_HEAD),
 	)
 }
 
@@ -105,7 +81,7 @@ describe('run_board_rain heads', () => {
 	it('rain draws each column its start, speed and tail in turn', () => {
 		const heads = heads_of({ width: 2, height: 10 }, REVEAL, sequence(HALF, 0, 0, 0.25, 0.99, 0.99))
 
-		expect(heads[0]).toEqual({ at: -12, speed: SLOW, length: 10, ramp: MOVIE_RAMP })
+		expect(heads[0]).toEqual({ at: -12, speed: SLOW, length: 10 })
 		expect(heads[1]?.at).toBe(-6)
 		expect(heads[1]?.speed).toBeCloseTo(SLOW + 0.99 * 0.75, PRECISION)
 		expect(heads[1]?.length).toBe(20)
@@ -128,7 +104,6 @@ describe('run_board_rain heads', () => {
 		expect(head.length).toBeGreaterThanOrEqual(0.4 * SCREEN_ROWS)
 		expect(head.length).toBeLessThanOrEqual(SCREEN_ROWS)
 		expect(head.speed).toBeCloseTo(1.1 + value * 1.5, PRECISION)
-		expect(head.ramp).toBe(FADE)
 	})
 
 	it('rain advances each column by its own speed', () => {
@@ -137,7 +112,7 @@ describe('run_board_rain heads', () => {
 
 		expect(moved.map((head) => head.at)).toEqual([2 * SLOW, 2 * FAST])
 		expect(row?.[0]).toMatchObject({ paint: { rgb: DEMO_HEAD } })
-		expect(row?.[1]).toMatchObject({ paint: { rgb: DEMO_FADE[0] } })
+		expect(row?.[1]).toMatchObject({ paint: { rgb: HEAD_RGB[1] } })
 	})
 })
 
@@ -171,53 +146,67 @@ describe('run_board_rain pace', () => {
 
 		expect(frames).toHaveLength(4)
 		expect(frames.at(-1)?.map((row) => paint_in(row[0]))).toEqual(['behind', 'behind'])
-		expect(frames.at(-1)?.map((row) => paint_in(row[1]))).toEqual(['behind', FADE[3]])
+		expect(frames.at(-1)?.map((row) => paint_in(row[1]))).toEqual(['behind', paint_at(2, 2)])
 	})
 })
 
-describe('run_board_rain paint', () => {
-	it('rain stretched over a seven-cell tail keeps each fade step', () => {
-		const stretched = Array.from({ length: SEVEN }, (_cell, index) =>
-			paint_of(FADE, index + 1, SEVEN),
+describe('run_board_rain gradient', () => {
+	it('rain draws its two lead cells a fresh glyph every frame', () => {
+		const head = seven(4, SLOW)
+		const leads = [{ y: 4 }, { y: 3 }].map(({ y }) => ({ x: 2, y }))
+		const frames = [0.1, 0.9].map((value) =>
+			leads.map((place) => cell_of(head, place, () => value)),
 		)
 
-		expect(stretched).toEqual(FADE)
-		expect(paint_of(FADE, SEVEN + 1, SEVEN)).toBeUndefined()
+		const drawn = [0.1, 0.9].map((value) => run_board_rain.fresh(() => value))
+
+		expect(frames[0]?.map((cell) => cell.kind === 'drop' && cell.glyph)).toEqual([
+			drawn[0],
+			drawn[0],
+		])
+		expect(frames[1]?.map((cell) => cell.kind === 'drop' && cell.glyph)).toEqual([
+			drawn[1],
+			drawn[1],
+		])
+		expect(drawn[0]).not.toBe(drawn[1])
 	})
 
-	it('reveal paints its tail with the movie ramp stretched over its length', () => {
-		const length = 2 * MOVIE_RAMP.length
-		const stretched = Array.from({ length }, (_cell, index) =>
-			paint_of(MOVIE_RAMP, index + 1, length),
-		)
+	it('rain glints a tail cell only on the frame it rerolls', () => {
+		const head = seven(8, SLOW)
+		const tail = { x: 0, y: 3 }
 
-		expect(MOVIE_RAMP.map((paint) => rgb_of(paint))).toEqual(DEMO_MOVIE_RAMP)
-		expect(REVEAL.ramp).toBe(MOVIE_RAMP)
-		expect(stretched).toEqual(MOVIE_RAMP.flatMap((paint) => [paint, paint]))
+		const kept = cell_of(head, tail, () => 0.9)
+		const rerolled = cell_of(head, tail, sequence(...REROLLED))
+		const lead_rerolled = cell_of(head, { x: 0, y: 6 }, sequence(...REROLLED))
+
+		expect(paint_in(rerolled)).toEqual(paint_at(5, SEVEN, true))
+		expect(paint_in(kept)).toEqual(paint_at(5, SEVEN))
+		expect(paint_in(lead_rerolled)).toEqual(paint_at(2, SEVEN))
 	})
 })
 
 describe('run_board_rain cells', () => {
-	it('rain preserves the approved glyphs and fade sequence', () => {
+	it('rain preserves the approved glyphs and paints the gradient up its tail', () => {
 		const head = seven(8.4, SLOW)
 		const column = Array.from({ length: 10 }, (_row, y) => cell_of(head, { x: 0, y }, () => HALF))
 
 		expect(GLYPHS).toBe(DEMO_GLYPHS)
-		expect(FADE.map((paint) => rgb_of(paint))).toEqual(DEMO_FADE)
 		expect(column[9]).toEqual({ kind: 'ahead' })
 		expect(column[8]).toMatchObject({ glyph: GLYPHS[32], paint: { rgb: DEMO_HEAD } })
-		expect(column.slice(1, 8).map((cell) => paint_in(cell))).toEqual(FADE.toReversed())
+		expect(column.slice(1, 8).map((cell) => paint_in(cell))).toEqual(
+			seven_paints(7, 6, 5, 4, 3, 2, 1),
+		)
 		expect(column[0]).toEqual({ kind: 'behind' })
 	})
 
 	it('rain keeps coordinate glyphs with the approved reroll probability', () => {
 		const head = seven(4, SLOW)
 		const later = seven(4.9, SLOW)
-		const place = { x: 2, y: 3 }
+		const place = { x: 2, y: 1 }
 		const kept = settled_glyph(place)
 
 		expect(cell_of(head, place, () => 0.08)).toMatchObject({ glyph: kept })
 		expect(cell_of(later, place, () => 0.9)).toMatchObject({ glyph: kept })
-		expect(cell_of(head, place, sequence(0.079, HALF))).toMatchObject({ glyph: GLYPHS[32] })
+		expect(cell_of(head, place, sequence(...REROLLED))).toMatchObject({ glyph: GLYPHS[32] })
 	})
 })

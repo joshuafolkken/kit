@@ -3,7 +3,9 @@ import { run_board_drop_screen, type DropScreen } from './run-board-drop-screen'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_idle_rain } from './run-board-idle-rain'
 import { run_board_labels } from './run-board-labels'
+import { run_board_rain } from './run-board-rain'
 import { run_board_rain_drop, type Fall, type Share } from './run-board-rain-drop'
+import { run_board_rain_gradient } from './run-board-rain-gradient'
 import type { Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8367: one drop a second falling down the whole matrix board, in place of the sweep.
@@ -23,6 +25,7 @@ const SALT_SPEED = 2
 const SALT_POUR_COLUMN = 4
 const SALT_POUR_SPEED = 5
 const SALT_TRAIL = 6
+const HALF = 0.5
 const PRECISION = 9
 
 // Every draw at its least, but the column, the pace and the trail as given.
@@ -36,6 +39,12 @@ function share_of(column: number, speed: number, trail = 0): Share {
 
 		return drawn.get(values[1] ?? 0) ?? 0
 	}
+}
+
+// The glyph the first column's cell on screen `row` (both 1-based) settles on, which a drop's trail
+// never rerolls.
+function settled_glyph(row: number): string {
+	return run_board_rain.settled({ x: 1, y: row }, run_board_idle_rain.never)
 }
 
 // Every draw at its least, but a poured drop's pace as given and the `nth` of a step's drops a quarter
@@ -185,7 +194,8 @@ describe('run_board_rain_drop.drop_bytes — a pouring step', () => {
 			(key) => before.get(key) !== now.get(key),
 		)
 
-		expect(now.size).toBeGreaterThan(step.size)
+		// joshuafolkken/kit#8742: a trail painted a color a cell repaints nearly every cell as it falls, so
+		// the step is pinned to exactly the cells that changed.
 		expect([...step.keys()].toSorted(by_text)).toEqual(changed.toSorted(by_text))
 		for (const [key, text] of now) if (step.has(key)) expect(step.get(key)).toBe(text)
 	})
@@ -247,15 +257,29 @@ describe('run_board_rain_drop.drop_bytes — a cell with text', () => {
 describe('run_board_rain_drop.drop_bytes — a blank cell and the cells it skips', () => {
 	const share = share_of(0, 1)
 
-	it('shows code in a blank cell, the trail fading behind the head', () => {
+	it('shows code in a blank cell, the rain’s gradient fading behind the head', () => {
 		// A trail 70% of the five rows: four cells, the head on the last row.
 		const written = drop_bytes(blank_screen(5, 1), 600, undefined, share_of(0, 1, 0.5))
-		const glyphs = written.replaceAll(ESCAPES, '')
+		const glyphs = [...written.replaceAll(ESCAPES, '')]
+		const paints = glyphs.map((glyph, index) =>
+			painted(run_board_rain_gradient.paint_at(index, 4) ?? 'red', glyph),
+		)
 
-		expect([...glyphs]).toHaveLength(5)
+		expect(glyphs).toHaveLength(5)
 		expect(glyphs).not.toContain(' ')
-		expect(written).toContain(painted(SHADES.head, glyphs.at(0) ?? ''))
-		expect(written).toContain(painted(SHADES.darkest, glyphs.at(-1) ?? ''))
+		for (const paint of paints) expect(written).toContain(paint)
+	})
+
+	it('draws its two lead cells a fresh glyph, its trail the glyph its place settles on', () => {
+		const cells = written_cells(
+			drop_bytes(blank_screen(5, 1), 600, undefined, share_of(0, 1, HALF)),
+		)
+		// The head on the last row, its trail up to the first, nearest first.
+		const rows = [5, 4, 3, 2, 1]
+		const glyphs = rows.map((row) => (cells.get(`${String(row)};1`) ?? '').replaceAll(ESCAPES, ''))
+
+		expect(glyphs.slice(0, 2)).not.toEqual(rows.slice(0, 2).map((row) => settled_glyph(row)))
+		expect(glyphs.slice(2)).toEqual(rows.slice(2).map((row) => settled_glyph(row)))
 	})
 
 	it('leaves a character two columns wide whole, and writes nothing with no screen', () => {
