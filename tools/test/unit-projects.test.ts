@@ -31,6 +31,7 @@ const {
 	STDOUT_GUARD,
 	TELEGRAM_GUARD,
 	TEST_FILE_ENVIRONMENT,
+	UNIT_LOCALE,
 	UNIT_PROJECTS,
 	unit_environment,
 	unit_projects_for,
@@ -284,6 +285,32 @@ describe('the unit environment pins the time zone to UTC', () => {
 	it('draws local time in UTC in a test process', () => {
 		expect(process.env['TZ']).toBe('UTC')
 		expect(new Date(0).getHours()).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#8772: a shell's `ja_JP.UTF-8` reached `Intl` in the workers, which CI never sees.
+describe('the unit environment pins the locale', () => {
+	const japanese = 'ja_JP.UTF-8'
+	const shell = { LANG: japanese, LC_ALL: japanese, LC_TIME: japanese, LANGUAGE: 'ja' }
+
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('pins LANG and LC_ALL for %s', (name) => {
+		expect(project(name).env['LANG']).toBe(UNIT_LOCALE)
+		expect(project(name).env['LC_ALL']).toBe(UNIT_LOCALE)
+	})
+
+	it('pins the locale over an inherited Japanese one', () => {
+		expect(unit_environment(shell)).toMatchObject({ LANG: UNIT_LOCALE, LC_ALL: UNIT_LOCALE })
+	})
+
+	it('blanks the inherited LC_* and LANGUAGE keys', () => {
+		expect(unit_environment(shell)).toMatchObject({ LC_TIME: '', LANGUAGE: '' })
+	})
+
+	// The default locale is fixed when the worker process starts, so this holds only if the pin reached
+	// the worker's spawn — whatever the shell that ran Vitest exported.
+	it('starts the test process in the pinned locale', () => {
+		expect(process.env['LC_ALL']).toBe(UNIT_LOCALE)
+		expect(new Intl.DateTimeFormat().resolvedOptions().locale).toBe('en-US')
 	})
 })
 

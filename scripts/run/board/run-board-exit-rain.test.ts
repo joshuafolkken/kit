@@ -16,7 +16,7 @@ import type { Theme } from './run-board-theme'
 
 const { beats_of, gated, wipe } = run_board_exit_rain
 const { harness, plan_titled } = run_board_fixture
-const { drawn_rows } = run_board_reveal_rain_fixture
+const { drawn_rows, screens } = run_board_reveal_rain_fixture
 const { REVEAL, WIPE, passes } = run_board_rain
 const SCREEN = run_board_screen.screen_of('live')
 const ESC = '\u{1B}'
@@ -158,16 +158,16 @@ describe('run_board_exit_rain.beats_of — the rain takes the frame away', () =>
 
 	it('blanks the cells the rain has passed and erases the screen last', () => {
 		const beats = [...beats_of(FRAME, RAIN.random)]
-		const last_pass = beats.at(-2)?.text ?? ''
+		const passed = screens(beats.slice(0, -1).map((beat) => beat.text)).at(-1) ?? []
 
-		expect(drawn_rows(last_pass)[0]?.trim()).toBe('')
+		expect(passed[0]?.trim()).toBe('')
 		expect(beats.at(-1)?.text).toBe(CLEARED)
 	})
 
 	it('wipes every row and column of the terminal, a line wider than it wrapped', () => {
 		const size = { columns: 4, rows: 5 }
 		const texts = [...beats_of(`${FRAME}\n12345`, RAIN.random, size)].map((beat) => beat.text)
-		const rows = texts.slice(0, -1).map((text) => drawn_rows(text))
+		const rows = screens(texts.slice(0, -1))
 
 		expect(drawn_rows(texts[0] ?? '')).toEqual(['ONE ', 'TWO ', '1234', '5   ', ' '.repeat(4)])
 		expect(rows.every((drawn) => drawn.length === size.rows)).toBe(true)

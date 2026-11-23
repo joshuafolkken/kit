@@ -13,7 +13,7 @@ import { run_board_reveal_rain_fixture } from './run-board-reveal-rain-fixture'
 // every beat written whole at once without a newline, so the screen never scrolls.
 
 const { CLOSE, beats_of, grid_of, row_of } = run_board_reveal_rain
-const { drawn_rows } = run_board_reveal_rain_fixture
+const { drawn_rows, screens } = run_board_reveal_rain_fixture
 const ESC = '\u{1B}'
 const UNDERLINE = `${ESC}[4m`
 const OFF = `${ESC}[0m`
@@ -34,13 +34,12 @@ async function instant(): Promise<void> {
 	await Promise.resolve()
 }
 
-// Each beat's row count and the widths its rows draw.
+// The screen each beat leaves on the terminal: its row count and the widths its rows draw.
 function shapes_of(texts: ReadonlyArray<string>): Array<{ rows: number; widths: Set<number> }> {
-	return texts.map((text) => {
-		const rows = drawn_rows(text)
-
-		return { rows: rows.length, widths: new Set(rows.map((row) => run_board_fit.width_of(row))) }
-	})
+	return screens(texts).map((rows) => ({
+		rows: rows.length,
+		widths: new Set(rows.map((row) => run_board_fit.width_of(row))),
+	}))
 }
 
 const FILLED = { rows: SIZE.rows, widths: new Set([SIZE.columns]) }
@@ -119,7 +118,7 @@ describe('run_board_reveal_rain.beats_of — how each beat is written', () => {
 	it('writes each beat whole at once with no newline, so the bottom row never scrolls', () => {
 		const texts = [...beats_of(WIDE, random, { size: SIZE })].map((beat) => beat.text)
 
-		expect(texts.every((text) => drawn_rows(text).length > 0)).toBe(true)
+		expect(drawn_rows(texts[0] ?? '')).toHaveLength(SIZE.rows)
 		expect(texts.some((text) => text.includes('\n'))).toBe(false)
 	})
 
