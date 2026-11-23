@@ -30,7 +30,7 @@ vi.mock('./type-check-step', () => ({
 	},
 }))
 
-const { verification_gate } = await import('./verification-gate')
+const { gate_command } = await import('./gate-command')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
@@ -96,7 +96,7 @@ async function run_gate(log_path: string = RECORDS.log_path): Promise<GateRun> {
 	const stdout = capture_stdout()
 
 	try {
-		const exit_code = await verification_gate.run_gate_command([], { ...RECORDS, log_path })
+		const exit_code = await gate_command.run_gate_command([], { ...RECORDS, log_path })
 
 		return { exit_code, text: stdout.text() }
 	} finally {
