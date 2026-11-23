@@ -29,7 +29,7 @@ type LaneGuard = (typeof GUARD)[keyof typeof GUARD]
 
 const LANE_GUARDS: ReadonlyArray<LaneGuard> = Object.values(GUARD)
 
-interface LaneEventRow {
+interface LaneTransitionEventRow {
 	from: ReadonlyArray<LaneState>
 	to: LaneState
 	guards: ReadonlyArray<LaneGuard>
@@ -57,19 +57,19 @@ const LANE_EVENTS = {
 	'review-resume': { from: [HUMAN_REVIEW], to: 'running', guards: [GUARD.WORK_TREE] },
 	withdraw: { from: ['open', 'running', 'paused', HUMAN_REVIEW], to: 'ended', guards: [] },
 	close: { from: ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'], to: 'ended', guards: [] },
-} as const satisfies Record<string, LaneEventRow>
+} as const satisfies Record<string, LaneTransitionEventRow>
 
-type LaneEvent = keyof typeof LANE_EVENTS
+type LaneTransitionEvent = keyof typeof LANE_EVENTS
 
-const LANE_EVENT_NAMES = Object.keys(LANE_EVENTS) as ReadonlyArray<LaneEvent>
+const LANE_EVENT_NAMES = Object.keys(LANE_EVENTS) as ReadonlyArray<LaneTransitionEvent>
 
 /** The row of `event`. */
-function row_of(event: LaneEvent): LaneEventRow {
+function row_of(event: LaneTransitionEvent): LaneTransitionEventRow {
 	return LANE_EVENTS[event]
 }
 
 /** The state `event` moves a lane in `from` to, or `undefined` when the table rejects it there. */
-function next_state(from: LaneState, event: LaneEvent): LaneState | undefined {
+function next_state(from: LaneState, event: LaneTransitionEvent): LaneState | undefined {
 	const row = row_of(event)
 
 	return row.from.includes(from) ? row.to : undefined
@@ -101,4 +101,4 @@ const lane_transition_table = {
 }
 
 export { lane_transition_table }
-export type { LaneEvent, LaneEventRow, LaneGuard }
+export type { LaneTransitionEvent, LaneTransitionEventRow, LaneGuard }
