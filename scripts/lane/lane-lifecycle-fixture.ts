@@ -205,12 +205,14 @@ async function is_refused(
 }
 
 // One lane operation: offered only where the real command acts, and leaving what that command leaves.
-// `lifts_pause`: a person's own lift of a pause — a resume, a withdraw, a close.
+// `lifts_pause`: a person's own lift of a pause — a resume, a withdraw, a close. `skips_tree_guard`: a
+// writer that does not ask the work-tree guard yet — `lane:resume` and review-resume (joshuafolkken/kit#8829).
 interface LaneOperation {
 	name: string
 	can: (world: World, lane: LaneModel) => boolean
 	apply: (world: World, issue: string) => Promise<void> | void
 	lifts_pause?: boolean
+	skips_tree_guard?: boolean
 }
 
 interface RunOperation {
