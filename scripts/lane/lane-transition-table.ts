@@ -24,7 +24,8 @@ const GUARD = {
 	OWNER_ENDED: 'owner-run-ended',
 	// The child exited before it stamped its human-review stop marker.
 	NO_STOP_MARKER: 'stop-marker-missing',
-	// No other run's hold stamp owns the primary checkout a merge switches and pulls.
+	// No other run's hold stamp owns the primary checkout a merge switches and pulls. It gates the
+	// merge's `main:sync` (`run-merge-sync.ts`), not the human-review record write on this row.
 	CHECKOUT_FREE: 'checkout-not-held-by-another-run',
 } as const
 

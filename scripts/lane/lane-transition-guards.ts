@@ -9,8 +9,9 @@ import {
 
 // **The transition table's guards read outside the lane record, evaluated in one place**
 // (joshuafolkken/kit#8777): whether the lane's branch and work tree still exist (the lane list and its
-// path), and whether another run's hold stamp owns the primary checkout. Every path that applies a
-// guarded event asks here instead of spelling the check itself. The guards read on the record itself
+// path), and whether another run's hold stamp owns the primary checkout. A dispatch (`launch` /
+// `restart`), `run:entry`'s preflight and `run:merge`'s `main:sync` ask here; `lane:resume` and
+// `review-resume` do not yet, as their writers are #8775's files. The guards read on the record itself
 // (`no-record`, `paused-by-*`, `owner-run-ended`, `stop-marker-missing`) stay with the event's writer.
 
 const { GUARD, row_of } = lane_transition_table
@@ -48,7 +49,7 @@ function work_tree_reason(
 	return lane.branch === branch ? undefined : `its branch ${lane.branch} is gone`
 }
 
-/** Whether `lane` is a lane whose work tree is checked out on the existing `branch`. */
+/** Whether `lane`'s work tree is present and on `branch`; the caller has found `branch` to exist. */
 function has_work_tree(lane: LaneInfo | undefined, branch: string): lane is LaneInfo {
 	return work_tree_reason(lane, branch) === undefined
 }
