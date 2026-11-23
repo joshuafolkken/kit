@@ -1,5 +1,6 @@
 import { backlog_plan_comment } from '#scripts/backlog/backlog-plan-comment'
 import { backlog_triage_approval } from '#scripts/backlog/backlog-triage-approval'
+import { project_checks } from '#scripts/gate/project-checks'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_plan_auto } from '#scripts/lane/lane-plan-auto'
 import { shell_quote } from '#scripts/lib/shell-quote'
@@ -28,8 +29,13 @@ async function command_for(issue_number: string, issue: number): Promise<string>
 const EXPECT_HINT =
 	'Before the first gate, declare each total this Issue grows (`scripts.code_lines`, `ai_cost.on_demand_bytes`, …) so `metrics-totals` does not stop on it: pnpm josh metrics --expect <total>=<growth> --reason "<why>"'
 
+// `josh metrics` is kit-only, so a consumer's lane is never told to run it.
+function expect_lines(): ReadonlyArray<string> {
+	return project_checks.is_kit_repository(process.cwd()) ? [EXPECT_HINT] : []
+}
+
 // The lines to print under `implement` — the command and `lane_plan_auto`'s `--imports` hint while the
-// plan is not cleared, then the metrics declaration hint — or none when not a lane child.
+// plan is not cleared, then (kit only) the metrics declaration hint — or none when not a lane child.
 async function lines_for(
 	issue_number: string,
 	is_lane_child: boolean,
@@ -38,9 +44,9 @@ async function lines_for(
 
 	const issue = Number(issue_number)
 
-	if (!lane_plan.is_uncleared(issue, process.cwd())) return [EXPECT_HINT]
+	if (!lane_plan.is_uncleared(issue, process.cwd())) return expect_lines()
 
-	return [await command_for(issue_number, issue), lane_plan_auto.IMPORTS_HINT, EXPECT_HINT]
+	return [await command_for(issue_number, issue), lane_plan_auto.IMPORTS_HINT, ...expect_lines()]
 }
 
 const run_step_lane_plan = { EXPECT_HINT, lines_for }

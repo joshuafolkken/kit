@@ -59,18 +59,18 @@ function entry_of(text: string): [string, number] | undefined {
 }
 
 function expectation_of(expects: ReadonlyArray<string>, reason: string): ExpectParse {
-	const entries = expects.map((text) => ({ text, entry: entry_of(text) }))
-	const bad = entries.find(({ entry }) => entry === undefined)
+	const entries = expects
+		.map((text) => entry_of(text))
+		.filter((entry): entry is [string, number] => entry !== undefined)
+	const bad = expects.find((text) => entry_of(text) === undefined)
 
 	if (bad !== undefined) {
 		const names = metrics_ratchet.RATCHETED_NAMES.join(', ')
 
-		return refused(`--expect ${bad.text} — name one of ${names} and a growth above 0`)
+		return refused(`--expect ${bad} — name one of ${names} and a growth above 0`)
 	}
 
-	const growth = Object.fromEntries(entries.flatMap(({ entry }) => (entry ? [entry] : [])))
-
-	return { kind: 'expect', expectation: { growth, reason } }
+	return { kind: 'expect', expectation: { growth: Object.fromEntries(entries), reason } }
 }
 
 // `undefined` when argv is not the `--expect` form; a malformed one is refused with what it lacked,

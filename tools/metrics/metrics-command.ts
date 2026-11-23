@@ -404,6 +404,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const metrics_command = {
 	command_names,
 	parse_arguments,
+	record_growth,
 	run_metrics,
 }
 

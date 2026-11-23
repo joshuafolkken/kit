@@ -6,7 +6,12 @@ const approval_file_mock = vi.hoisted(() =>
 	vi.fn(async (): Promise<string | undefined> => undefined),
 )
 
+const kit_mock = vi.hoisted(() => vi.fn(() => true))
+
 vi.mock('#scripts/lane/lane-plan', () => ({ lane_plan: { is_uncleared: uncleared_mock } }))
+vi.mock('#scripts/gate/project-checks', () => ({
+	project_checks: { is_kit_repository: kit_mock },
+}))
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { plan_paths: plan_paths_mock },
 }))
@@ -25,6 +30,7 @@ const PLANNED = ['scripts/lane/lane-overrun-mechanisms-cli.ts', 'docs/josh-comma
 
 beforeEach(() => {
 	uncleared_mock.mockReturnValue(true)
+	kit_mock.mockReturnValue(true)
 	plan_paths_mock.mockResolvedValue([])
 	approval_file_mock.mockResolvedValue(undefined)
 })
@@ -85,6 +91,16 @@ describe('run_step_lane_plan.lines_for and the metrics declaration', () => {
 			run_step_lane_plan.EXPECT_HINT,
 		])
 		expect(plan_paths_mock).not.toHaveBeenCalled()
+	})
+
+	it('names no declaration outside kit, where josh metrics does not exist', async () => {
+		kit_mock.mockReturnValue(false)
+
+		expect(await run_step_lane_plan.lines_for(ISSUE, true)).not.toContain(
+			run_step_lane_plan.EXPECT_HINT,
+		)
+		uncleared_mock.mockReturnValue(false)
+		expect(await run_step_lane_plan.lines_for(ISSUE, true)).toStrictEqual([])
 	})
 })
 
