@@ -140,7 +140,14 @@ const SPINNING = { spots: SPOTS, typing: NO_TYPING }
 // A two-letter notice's trace writes: one per letter step, then the lit bar.
 const NOTICE_STEPS = [0, 50, 100]
 
-it('ac-8de5883d cools and restores a flash on spinner turns even without spinner spots', async () => {
+// Every tick a flash steps its color on, through the one that writes the cell back.
+function flash_ticks(): Array<number> {
+	const { FADE_TICKS, TICK_MS } = run_board_change_flash
+
+	return Array.from({ length: FADE_TICKS }, (_, index) => (index + 1) * TICK_MS)
+}
+
+it('ac-57779c96 cools and restores a flash on its own ticks even without spinner spots', async () => {
 	const { ports, writes } = spin_ports(START)
 	const line = { key: 'a', row: 1, index: 0, prefix_columns: 0, text: 'a' }
 	const base = run_board_change_flash.next(undefined, [line], START)
@@ -152,10 +159,10 @@ it('ac-8de5883d cools and restores a flash on spinner turns even without spinner
 	)
 	const overlays = writes.filter(({ text }) => text.includes('[1;1H'))
 
-	expect(overlays[0]?.at_ms).toBe(START + SPINNER_INTERVAL_MS)
-	expect(overlays.at(-1)?.at_ms).toBe(
-		START + run_board_change_flash.COOL_FRAMES * SPINNER_INTERVAL_MS,
+	expect(overlays.map(({ at_ms }) => at_ms - START)).toStrictEqual(
+		expect.arrayContaining(flash_ticks()),
 	)
+	expect(overlays.at(-1)?.at_ms).toBe(START + Math.max(...flash_ticks()))
 	expect(overlays.at(-1)?.text).toBe(`${ESCAPE}[1;1Hb`)
 })
 

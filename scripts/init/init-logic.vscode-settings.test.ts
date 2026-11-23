@@ -8,6 +8,7 @@ const ESLINT_ENABLE_KEY = 'eslint.enable'
 const SONARLINT_KEY = 'sonarlint.connectedMode.project'
 const ESLINT_VALIDATE_KEY = 'eslint.validate'
 const TERMINAL_LINE_HEIGHT_KEY = 'terminal.integrated.lineHeight'
+const TERMINAL_MINIMUM_CONTRAST_RATIO_KEY = 'terminal.integrated.minimumContrastRatio'
 const KIT_VSCODE_SETTINGS_PATH = '.vscode/settings.json'
 const WATCHER_EXCLUDE_KEY = 'files.watcherExclude'
 const SEARCH_EXCLUDE_KEY = 'search.exclude'
@@ -40,6 +41,18 @@ describe('strip_kit_only_vscode_settings', () => {
 		const result = init_logic.strip_kit_only_vscode_settings_content(raw)
 
 		expect(result).not.toContain(TERMINAL_LINE_HEIGHT_KEY)
+	})
+
+	// joshuafolkken/kit#8741: VS Code lifts run:board's dark matrix greens toward gray unless the
+	// minimum contrast ratio is 1, so the setting reaches consumers instead of staying kit-only.
+	it('distributes the terminal minimum contrast ratio of 1 to consumers', () => {
+		const raw = readFileSync(KIT_VSCODE_SETTINGS_PATH, 'utf8')
+		const result = JSON.parse(init_logic.strip_kit_only_vscode_settings_content(raw)) as Record<
+			string,
+			unknown
+		>
+
+		expect(result[TERMINAL_MINIMUM_CONTRAST_RATIO_KEY]).toBe(1)
 	})
 })
 
