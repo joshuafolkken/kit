@@ -128,8 +128,8 @@ describe('npm_registry.valid_version', () => {
 	})
 })
 
-// A consumer routed to GitHub Packages keeps reading it: the two registries are published by
-// parallel jobs, so public npm could name a release that consumer's registry does not carry yet.
+// A consumer routed to GitHub Packages keeps reading it: kit publishes new releases to public npm
+// only (#7492), so public npm names releases that consumer's registry never carries.
 describe('npm_registry — a scope routed to GitHub Packages', () => {
 	it('answers nothing for the latest without requesting public npm', () => {
 		respond_with(fake_result(LATEST_BODY))
