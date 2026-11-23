@@ -109,21 +109,6 @@ function walker(steps_of: StepsOf, check: Check): (picks: ReadonlyArray<Pick>) =
 const walk = walker(lane_lifecycle_operations.steps_of, expect_agreement)
 const walk_every = walker(lane_lifecycle_operations.every_step_of, expect_invariants)
 
-// The invariants with no writer excused from the work-tree guard, collected: the #8829 gap shows here.
-async function guarded_violations(steps: ReadonlyArray<Pick>): Promise<Array<string>> {
-	const found: Array<string> = []
-
-	async function collect(world: World, step: Step, before: LaneRecords): Promise<void> {
-		const read = await step_read(world, { ...step, skips_tree_guard: false }, before)
-
-		found.push(...lane_lifecycle_invariants.violations(read))
-	}
-
-	await walker(lane_lifecycle_operations.every_step_of, collect)(steps)
-
-	return found
-}
-
 describe('lane and run lifecycle combinations — the readers agree at every step', () => {
 	it('transfers a resumed lane from the ended run to the current run', async () => {
 		await expect(walk(RESUMED_IN_NEXT_RUN)).resolves.toBeUndefined()
@@ -155,14 +140,16 @@ describe('lane lifecycle with every table event — the invariants hold at every
 		await expect(walk_every(steps)).resolves.toBeUndefined()
 	})
 
-	// The known gap: `lane:resume` does not ask the work-tree guard yet. When #8829 lands, this goes red
-	// and turns back into "resumes nothing in a lane whose work tree is gone".
-	it('still resumes a lane whose work tree is gone until lane:resume asks the guard (#7657, #8829)', async () => {
+	it('resumes nothing in a paused lane whose work tree is gone (#7657, #8829)', async () => {
 		const steps = [...LAUNCHED, PAUSE, LOSE_TREE, 'resume #9101']
 
-		await expect(guarded_violations(steps)).resolves.toStrictEqual([
-			'#9101 ran with no branch or work tree',
-		])
+		await expect(walk_every(steps)).resolves.toBeUndefined()
+	})
+
+	it('resumes nothing in a reviewed lane whose work tree is gone (#8829)', async () => {
+		const steps = [...LAUNCHED, 'human-review #9101', LOSE_TREE, 'review-resume #9101']
+
+		await expect(walk_every(steps)).resolves.toBeUndefined()
 	})
 
 	it('restarts nothing in a lane whose work tree is gone (#7657)', async () => {

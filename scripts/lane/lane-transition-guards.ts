@@ -10,8 +10,8 @@ import {
 // **The transition table's guards read outside the lane record, evaluated in one place**
 // (joshuafolkken/kit#8777): whether the lane's branch and work tree still exist (the lane list and its
 // path), and whether another run's hold stamp owns the primary checkout. A dispatch (`launch` /
-// `restart`), `run:entry`'s preflight and `run:merge`'s `main:sync` ask here; `lane:resume` and
-// `review-resume` do not yet, as their writers are #8775's files. The guards read on the record itself
+// `restart`), `run:entry`'s preflight, `run:merge`'s `main:sync`, `lane:resume` and `review-resume`
+// ask here before they write (joshuafolkken/kit#8829). The guards read on the record itself
 // (`no-record`, `paused-by-*`, `owner-run-ended`, `stop-marker-missing`) stay with the event's writer.
 
 const { GUARD, row_of } = lane_transition_table

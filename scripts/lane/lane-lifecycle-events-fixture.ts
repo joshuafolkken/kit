@@ -13,13 +13,13 @@ import {
 // work tree, and another run's hold on the primary checkout. Each writes through the path its command
 // writes through — `lane_state.record_change` or `record_owner` — after the table's guards the
 // command asks (`lane_transition_guards.rejection`), so a guard or rule taken off the table shows here.
-// review-resume's `run:entry` asks none yet (joshuafolkken/kit#8829), so neither does its model.
 
 const { KIND, emit, is_refused, lane_of, try_owner, try_write, write } = world_fixture
 const { HUMAN_REVIEW } = lane_state_record
 const RUNNING = 'running'
 const DISPATCH = 'lane:dispatch'
 const RELEASE = 'dependency-resume'
+const REVIEW_RESUME = 'review-resume'
 
 // The checkout's holder that is no lane of the world: a run started outside the backlog.
 const OTHER_RUN = '9999'
@@ -127,8 +127,9 @@ function can_review_resume(world: World, lane: LaneModel): boolean {
 	return world.run.is_active && is_listed_in(lane, [HUMAN_REVIEW])
 }
 
-// `run-halfrun-resume.ts`: the next half-run round resumes the reviewed lane.
+// `run-halfrun-resume.ts`: the next half-run round resumes the reviewed lane, once its work tree passes.
 async function review_resume(world: World, issue: string): Promise<void> {
+	if (await is_refused(world, REVIEW_RESUME, issue)) return
 	await write(world, { issue, state: RUNNING, command: 'run:entry' })
 	lane_of(world, issue).is_alive = true
 }
@@ -158,12 +159,7 @@ const LANE_OPERATIONS: ReadonlyArray<LaneOperation> = [
 	{ name: RELEASE, can: can_release, apply: release_lane },
 	{ name: HUMAN_REVIEW, can: can_stop, apply: review_stop },
 	{ name: 'merge', can: can_merge, apply: merge_lane },
-	{
-		name: 'review-resume',
-		can: can_review_resume,
-		apply: review_resume,
-		skips_tree_guard: true,
-	},
+	{ name: REVIEW_RESUME, can: can_review_resume, apply: review_resume },
 	{ name: 'withdraw', can: can_withdraw, apply: withdraw_lane, lifts_pause: true },
 	{ name: 'lose work tree', can: can_lose_tree, apply: lose_tree },
 ]

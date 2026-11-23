@@ -1,5 +1,6 @@
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state } from '#scripts/lane/lane-state'
+import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import {
 	run_hold,
 	type HoldMark,
@@ -101,13 +102,16 @@ function reopen_at(target: string, issue: string): StopMark {
 }
 
 // A stop picked up again is running, so a `human-review` lane is returned to `running` — else lane
-// readers count the round's tree as idle while the board draws it running.
+// readers count the round's tree as idle while the board draws it running. A lane whose branch or work
+// tree is gone stays where it is, with the table's reason printed (joshuafolkken/kit#8829).
 async function resume_lane(issue: string, command: string): Promise<void> {
 	const lane = await lane_state.read_state(issue)
 
-	if (lane?.state === 'human-review') {
-		await lane_state.record_change({ issue, state: 'running', command })
-	}
+	if (lane?.state !== 'human-review') return
+	const note = await lane_transition_guards.rejection('review-resume', issue)
+
+	if (note === undefined) await lane_state.record_change({ issue, state: 'running', command })
+	else console.warn(`${command}: lane ${session_cite.issue(issue)} stays in human-review — ${note}`)
 }
 
 async function reopen(target: string, issue: string): Promise<StopMark> {
