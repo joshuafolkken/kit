@@ -53,6 +53,7 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
   - An invalid definition (a fixed check's label as `name` included) runs none and fails as one `josh.gate.steps` check naming the error.
   - With `--static-group`, only `rest` runs them.
 
+- A gate whose parent dies ends with its checks: it sends `SIGTERM` to its process group and exits non-zero (`scripts/gate/gate-parent-watch.ts`).
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail".
