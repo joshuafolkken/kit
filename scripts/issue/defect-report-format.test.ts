@@ -60,6 +60,14 @@ describe('defect:report output', () => {
 	})
 })
 
+describe('defect:report rate section', () => {
+	it('prints none when no area was merged in the period', () => {
+		expect(defect_report_format.format(EMPTY, { days: 7, rates: [] })).toMatch(
+			/merges in the last 7 days:\n {2}\(none\)$/u,
+		)
+	})
+})
+
 describe('defect:report retrospective digest', () => {
 	it('prints the coverage and the areas with defects', () => {
 		const lines = defect_report_format.digest({ ...EMPTY, unknown: 1 }, PERIOD)

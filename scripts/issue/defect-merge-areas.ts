@@ -1,3 +1,4 @@
+import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { defect_report } from './defect-report'
 
@@ -8,9 +9,12 @@ import { defect_report } from './defect-report'
 const RECORD = '\u{1E}'
 const PULL_REQUEST_MERGE = /^Merge pull request #\d+ /u
 
-function arguments_since(since: Date): Array<string> {
+// The default branch, not `HEAD`: a lane or an unsynced checkout lacks the newest merges, which
+// would shrink every area's denominator and overstate its rate.
+function arguments_since(since: Date, branch: string): Array<string> {
 	return [
 		'log',
+		branch,
 		'--first-parent',
 		'--merges',
 		'--diff-merges=first-parent',
@@ -41,7 +45,9 @@ function count_areas(log: string): ReadonlyMap<string, number> {
 }
 
 async function read(since: Date): Promise<ReadonlyMap<string, number>> {
-	return count_areas(await git_spawn.read(arguments_since(since)))
+	const branch = await git_command.default_branch_reference()
+
+	return count_areas(await git_spawn.read(arguments_since(since, branch)))
 }
 
 const defect_merge_areas = { count_areas, read }
