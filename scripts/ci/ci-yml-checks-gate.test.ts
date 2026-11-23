@@ -1,5 +1,6 @@
+import { gate_command } from '#scripts/gate/gate-command'
 import { gate_static_group } from '#scripts/gate/gate-static-group'
-import { GATE_TARGETS, verification_gate } from '#scripts/gate/verification-gate'
+import { GATE_TARGETS } from '#scripts/gate/verification-gate'
 import { lint_gate_scope } from '#scripts/lint/lint-gate-scope'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
@@ -72,7 +73,7 @@ describe('the static-checks job runs the verification gate', () => {
 	// reaches the gate as data rather than as an expression spliced into the script.
 	it('runs the static checks verbosely, one group per leg, the unit suite having its own job', () => {
 		expect(checks_scripts()).toContain(
-			`${GATE_STEP} ${verification_gate.VERBOSE_FLAG} ${verification_gate.NO_UNIT_FLAG} "${gate_static_group.STATIC_GROUP_FLAG_PREFIX}\${STATIC_GROUP}"`,
+			`${GATE_STEP} ${gate_command.VERBOSE_FLAG} ${gate_command.NO_UNIT_FLAG} "${gate_static_group.STATIC_GROUP_FLAG_PREFIX}\${STATIC_GROUP}"`,
 		)
 	})
 
