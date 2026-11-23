@@ -4,6 +4,7 @@ import { run_board_intro, type IntroPorts } from './run-board-intro'
 import { run_board_intro_fixture } from './run-board-intro-fixture'
 import { run_board_jump_screen } from './run-board-jump-screen'
 import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_screen } from './run-board-screen'
 import { run_board_theme } from './run-board-theme'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_typing } from './run-board-typing'
@@ -258,6 +259,9 @@ describe('run_board_intro.opening', () => {
 // joshuafolkken/kit#8677: the bttf first frame arrives out of the time jump.
 const ARRIVE_THEME = 'bttf'
 const COLORED = { random: (): number => 0, is_colored: (): boolean => true }
+const WIPE = '\u{1B}[H\u{1B}[J'
+// A frame's own color: the first frame is drawn in the theme's colors.
+const RED = '\u{1B}[38;2;255;0;0m'
 
 describe('run_board_intro.arrive', () => {
 	it('is the bttf theme’s reveal', () => {
@@ -271,8 +275,16 @@ describe('run_board_intro.arrive', () => {
 
 		await run_board_intro.arrive(FRAME, { ...ports, rain: COLORED }, NO_KEYS, ARRIVE_THEME)
 		expect(written).toHaveLength(beats.length + 1)
-		expect(written[0]).toContain('\u{1B}[H\u{1B}[J')
-		expect(written.at(-1)).toBe(drawn)
+		expect(written[0]).toContain(WIPE)
+		expect(written.at(-1)).toBe(run_board_screen.synced(drawn))
+	})
+
+	it('wipes the screen nowhere past its first beat for a held first frame (#8732)', async () => {
+		const { written, ports } = recorded(instant)
+		const held = run_board_screen.screen_of('live').held(`${RED}ONE  TWO\u{1B}[0m\nA  B`)
+
+		await run_board_intro.arrive(held, { ...ports, rain: COLORED }, NO_KEYS, ARRIVE_THEME)
+		expect(written.slice(1, -1).filter((text) => text.includes(WIPE))).toStrictEqual([])
 	})
 
 	it('writes the frame at once where stdout draws no color', async () => {
@@ -280,6 +292,8 @@ describe('run_board_intro.arrive', () => {
 		const uncolored = { ...COLORED, is_colored: (): boolean => false }
 
 		await run_board_intro.arrive(FRAME, { ...ports, rain: uncolored }, NO_KEYS, ARRIVE_THEME)
-		expect(written).toStrictEqual([run_board_theme.restyle(ARRIVE_THEME, FRAME)])
+		expect(written).toStrictEqual([
+			run_board_screen.synced(run_board_theme.restyle(ARRIVE_THEME, FRAME)),
+		])
 	})
 })

@@ -7,6 +7,7 @@ import { run_board_labels } from './run-board-labels'
 import type { RainCell } from './run-board-rain'
 import { run_board_reveal_rain } from './run-board-reveal-rain'
 import { run_board_reveal_rain_fixture } from './run-board-reveal-rain-fixture'
+import { run_board_screen } from './run-board-screen'
 import { run_board_theme } from './run-board-theme'
 
 // joshuafolkken/kit#8519: the matrix board's first frame revealed behind the code rain — the frame's
@@ -15,6 +16,7 @@ import { run_board_theme } from './run-board-theme'
 
 const { CLOSE, beats_of, grid_of, is_colored, row_of } = run_board_reveal_rain
 const { drawn_rows } = run_board_reveal_rain_fixture
+const { synced } = run_board_screen
 const ESC = '\u{1B}'
 const GREEN = `${ESC}[32m`
 const OFF = `${ESC}[0m`
@@ -154,7 +156,7 @@ describe('run_board_intro.opening in the matrix theme', () => {
 
 		expect(revealed.length).toBeGreaterThan(2)
 		expect(revealed.slice(0, -1).every((text) => drawn_rows(text).length > 0)).toBe(true)
-		expect(revealed.at(-1)).toBe(run_board_theme.restyle(THEME, `${SCREEN}${FRAME}`))
+		expect(revealed.at(-1)).toBe(synced(run_board_theme.restyle(THEME, `${SCREEN}${FRAME}`)))
 	})
 
 	it('keeps the block reveal in the wargames theme', async () => {
@@ -177,12 +179,12 @@ describe('run_board_intro.rain', () => {
 		await pending
 		expect(written).toHaveLength(2)
 		expect(drawn_rows(written[0] ?? '')).not.toHaveLength(0)
-		expect(written[1]).toBe(run_board_theme.restyle(THEME, FRAME))
+		expect(written[1]).toBe(synced(run_board_theme.restyle(THEME, FRAME)))
 		expect(released()).toBe(true)
 	})
 
 	it('rain bypasses animation without color or timed ports', async () => {
-		const drawn = run_board_theme.restyle(THEME, FRAME)
+		const drawn = synced(run_board_theme.restyle(THEME, FRAME))
 		const untimed = recorded(instant)
 		const uncolored = recorded(instant)
 

@@ -9,9 +9,9 @@ import { run_board_screen } from './run-board-screen'
 import type { Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8677: the bttf jump written over the board between redraws, cell by cell, past the
-// theme: each cell as the theme drew it (`DropScreen`) recolored by `run_board_jump_paint`, at ten frames
-// a second, writing only the cells that changed since the last turn and putting each back as it was once
-// the jump is over. The animation area is the panel's own (it thaws its cells itself), and the cells the
+// theme: each cell as the theme drew it (`DropScreen`) recolored by `run_board_jump_paint`. The merge
+// jump runs at ten frames a second, writing only the cells that changed since the last turn and putting
+// each back as it was once the jump is over; the arrival writes every cell each tick. The animation area is the panel's own (it thaws its cells itself), and the cells the
 // spinners and the typing rows write are left to them.
 
 const { ARRIVE_TICKS, TICK_MS, is_running, tick_of } = run_board_jump
@@ -132,32 +132,31 @@ function screen_cells(screen: DropScreen): Array<PaintCell> {
 	)
 }
 
-// The arrival's cells `tick` ticks in that changed since `since`, every one with no `since`.
-function arrive_bytes(screen: DropScreen, tick: number, since: number | undefined): string {
-	const plain = screen_cells(screen)
-	const now = keyed(arrive_cells(plain, tick), screen)
-	const before = since === undefined ? new Map() : keyed(arrive_cells(plain, since), screen)
+// Every cell of the arrival `tick` ticks in (joshuafolkken/kit#8732): a cell left as the last beat
+// wrote it would stay lost to anything that wiped it since.
+function arrive_bytes(plain: ReadonlyArray<PaintCell>, screen: DropScreen, tick: number): string {
+	return [...keyed(arrive_cells(plain, tick), screen).values()].join('')
+}
 
-	return [...now]
-		.filter(([key, bytes]) => before.get(key) !== bytes)
-		.map(([, bytes]) => bytes)
-		.join('')
+// joshuafolkken/kit#8732: the first frame comes held, the screen wiped ahead of it
+// (`run-board-screen.ts`); cut into cells, the wipe would ride in the first row's style and clear the
+// screen with every one of them written.
+function without_wipe(drawn: string): string {
+	return drawn.startsWith(CLEAR) ? drawn.slice(CLEAR.length) : drawn
 }
 
 // joshuafolkken/kit#8677: the bttf board's arrival over its first frame as the theme draws it, a beat
-// every `FRAME_MS`: the screen cleared, the frame black, three flashes, then the thaw. The frame itself
-// is written whole once the beats end.
+// every tick: the screen cleared, the frame black, three flashes, then the thaw. The frame itself is
+// written whole once the beats end.
 function arrive_beats(drawn: string, size: TerminalSize | undefined): Array<Beat> {
-	const frame = { lines: drawn.split('\n'), spots: [] }
+	const frame = { lines: without_wipe(drawn).split('\n'), spots: [] }
 	const screen = run_board_drop_screen.screen_of(frame, NO_TYPING, size)
-	const step = FRAME_MS / TICK_MS
-	const ticks = Array.from({ length: Math.ceil(ARRIVE_TICKS / step) }, (_, index) => index * step)
+	const plain = screen_cells(screen)
 
-	return ticks.map((tick, index) => {
-		const since = index === 0 ? undefined : tick - step
-		const clear = index === 0 ? CLEAR : ''
+	return Array.from({ length: ARRIVE_TICKS }, (_, tick) => {
+		const clear = tick === 0 ? CLEAR : ''
 
-		return { text: synced(`${clear}${arrive_bytes(screen, tick, since)}`), ms: FRAME_MS }
+		return { text: synced(`${clear}${arrive_bytes(plain, screen, tick)}`), ms: TICK_MS }
 	})
 }
 

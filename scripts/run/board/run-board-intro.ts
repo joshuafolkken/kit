@@ -4,6 +4,7 @@ import { run_board_labels, type Paint } from './run-board-labels'
 import type { Random } from './run-board-rain'
 import { run_board_reveal_blocks, type Beat } from './run-board-reveal-blocks'
 import { run_board_reveal_rain } from './run-board-reveal-rain'
+import { run_board_screen } from './run-board-screen'
 import type { BoardPorts, Pace } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_theme_defs, type IntroDefinition, type IntroLeads } from './run-board-theme-defs'
@@ -239,8 +240,8 @@ async function reveal(
 type BeatsOf = (drawn: string, ports: IntroPorts, random: Random) => Iterator<Beat>
 
 // The first frame, as the theme draws it, revealed behind `cover`'s beats, then written whole as
-// every later frame is drawn — at once where a key skips the beats, where the ports carry no pauses, or
-// where stdout draws no color.
+// every later frame is drawn, in one synchronized write (joshuafolkken/kit#8732) — at once where a key
+// skips the beats, where the ports carry no pauses, or where stdout draws no color.
 function behind(cover: BeatsOf): typeof reveal {
 	return async (frame, ports, keys, theme) => {
 		const write = ports.write_drawn ?? ports.write
@@ -248,7 +249,7 @@ function behind(cover: BeatsOf): typeof reveal {
 		const { random, is_colored } = ports.rain ?? LIVE_RAIN
 
 		if (is_colored()) await listen(cover(drawn, ports, random), { ...ports, write }, keys)
-		write(drawn)
+		write(run_board_screen.synced(drawn))
 	}
 }
 

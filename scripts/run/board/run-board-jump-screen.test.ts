@@ -37,6 +37,18 @@ function draw_of(lines: ReadonlyArray<string>): JumpDraw {
 	}
 }
 
+function clears_in(text: string): number {
+	return text.split(CLEAR).length - 1
+}
+
+// Whether a cell is painted black with a letter on it — a letter lost to the dark.
+function has_black_letter(text: string): boolean {
+	return text
+		.split('38;2;0;0;0m')
+		.slice(1)
+		.some((rest) => rest[0] !== ' ' && rest[0] !== ESC)
+}
+
 describe('run_board_jump_screen.jump_bytes', () => {
 	it('writes nothing with no jump', () => {
 		expect(jump_bytes(undefined, WASH_MS, undefined)).toBe('')
@@ -84,13 +96,13 @@ describe('run_board_jump_screen.jump_bytes around the other painters', () => {
 })
 
 describe('run_board_jump_screen.arrive_beats', () => {
-	const beats = arrive_beats(`${STYLE}AB${ESC}[0m\n${STYLE}CD${ESC}[0m`, undefined)
+	const ARRIVE_FRAME = `${STYLE}AB${ESC}[0m\n${STYLE}CD${ESC}[0m`
+	const beats = arrive_beats(ARRIVE_FRAME, undefined)
+	const PLACES = ['1;1', '1;2', '2;1', '2;2'].map((place) => `${ESC}[${place}H`)
 
-	it('beats every frame over the arrival', () => {
-		const step = FRAME_MS / TICK_MS
-
-		expect(beats).toHaveLength(Math.ceil(ARRIVE_TICKS / step))
-		expect(beats.every((beat) => beat.ms === FRAME_MS)).toBe(true)
+	it('beats every tick over the arrival', () => {
+		expect(beats).toHaveLength(ARRIVE_TICKS)
+		expect(beats.every((beat) => beat.ms === TICK_MS)).toBe(true)
 	})
 
 	it('clears the screen on the first beat only', () => {
@@ -98,11 +110,21 @@ describe('run_board_jump_screen.arrive_beats', () => {
 		expect(beats.slice(1).some((beat) => beat.text.includes(CLEAR))).toBe(false)
 	})
 
-	it('writes every cell on the first beat and only the changed ones after', () => {
-		const first = beats[0]?.text ?? ''
+	it('writes every cell of the screen on every beat', () => {
+		expect(beats.every((beat) => PLACES.every((place) => beat.text.includes(place)))).toBe(true)
+	})
 
-		expect(first).toContain(`${ESC}[2;2H`)
-		expect(beats.some((beat, index) => index > 0 && beat.text === '')).toBe(true)
-		expect(beats.some((beat, index) => index > 0 && beat.text.includes('D'))).toBe(true)
+	it('leaves no letter black while it thaws', () => {
+		const thaw = beats.slice(-THAW_TICKS)
+
+		expect(thaw.some((beat) => has_black_letter(beat.text))).toBe(false)
+	})
+
+	it('keeps the wipe a held first frame starts with out of its cells', () => {
+		const held = arrive_beats(`${CLEAR}${ARRIVE_FRAME}`, undefined)
+
+		expect(held.map((beat) => clears_in(beat.text))).toStrictEqual(
+			beats.map((_, index) => (index === 0 ? 1 : 0)),
+		)
 	})
 })
