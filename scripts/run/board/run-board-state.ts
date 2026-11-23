@@ -108,6 +108,8 @@ interface BoardPorts {
 	sleep: (ms: number) => Promise<void>
 	// The pauses of the line typed before a live board's first frame (`run-board-intro.ts`); none types no line.
 	intro_sleep?: ((ms: number) => Promise<void>) | undefined
+	// The clock the intro's beats are due by (`run-board-beat-pace.ts`); none waits each pause in full.
+	intro_now?: (() => number) | undefined
 	// Sounds the cue a redraw picked (`run-board-sound-player.ts`), without waiting; the live board alone
 	// passes one, so `--once`, `--chat` and `--every` stay silent.
 	cue?: ((name: CueName) => void) | undefined
