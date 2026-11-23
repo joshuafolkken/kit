@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_beat_pace } from './run-board-beat-pace'
+import { run_board_cli } from './run-board-cli'
 import { run_board_intro } from './run-board-intro'
 import { run_board_intro_fixture } from './run-board-intro-fixture'
 import type { Beat } from './run-board-reveal-blocks'
@@ -67,5 +68,33 @@ describe('run_board_intro.listen on the clock', () => {
 
 		expect(written).toEqual(TEXTS)
 		expect(paused).toEqual(TEXTS.map(() => BEAT_MS))
+	})
+})
+
+describe('run_board_intro.reveal on the clock', () => {
+	it('keeps every block of a frame written too slowly for its beats', async () => {
+		const frame = 'ONE  TWO\n\nA  B  C'
+		const slow = clocked(SLOW_WRITE_MS)
+		const timeless = clocked(SLOW_WRITE_MS)
+
+		await run_board_intro.reveal(frame, slow.ports, NO_KEYS, 'wargames')
+		await run_board_intro.reveal(
+			frame,
+			{ ...timeless.ports, intro_now: undefined },
+			NO_KEYS,
+			'wargames',
+		)
+
+		expect(slow.written.length).toBeLessThan(timeless.written.length)
+		expect(slow.written.join('')).toBe(timeless.written.join(''))
+	})
+})
+
+describe('run_board_cli.LIVE_PORTS.intro_now', () => {
+	it('paces the live intro by a clock that moves on', () => {
+		const first = run_board_cli.LIVE_PORTS.intro_now?.() ?? 0
+
+		expect(first).toBeGreaterThan(0)
+		expect(run_board_cli.LIVE_PORTS.intro_now?.()).toBeGreaterThanOrEqual(first)
 	})
 })
