@@ -112,7 +112,35 @@ describe('run_ship_pair_runs.one_at_a_time', () => {
 		})
 
 		await expect(first).rejects.toThrow('red')
-		expect(await second).toStrictEqual({})
+		expect(await second).toStrictEqual({ queued_ms: expect.any(Number) })
 		expect(order).toStrictEqual(['first', 'second'])
+	})
+})
+
+// joshuafolkken/kit#8864: the wait a pair spent behind another, which its lap does not include.
+describe('run_ship_pair_runs.current queued wait', () => {
+	it('records how long a turn queued behind a pair still in its turn', async () => {
+		vi.spyOn(performance, 'now')
+			.mockReturnValueOnce(0)
+			.mockReturnValueOnce(100)
+			.mockReturnValue(250)
+		const first = run_ship_pair_runs.one_at_a_time(async () => {
+			await Promise.resolve()
+		})
+		const second = run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.current())
+
+		await first
+		expect(await second).toStrictEqual({ queued_ms: 150 })
+		vi.restoreAllMocks()
+	})
+
+	it('records no wait for a turn with no pair ahead', async () => {
+		await run_ship_pair_runs.one_at_a_time(async () => {
+			await Promise.resolve()
+		})
+
+		expect(
+			await run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.current()),
+		).toStrictEqual({})
 	})
 })
