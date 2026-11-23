@@ -3,6 +3,7 @@ import {
 	transcript_record,
 	type TranscriptBlock,
 	type TranscriptContent,
+	type TranscriptRecord,
 } from '#scripts/lib/transcript-record'
 import { z } from 'zod'
 
@@ -105,14 +106,19 @@ function to_blocks(content: string | ReadonlyArray<TranscriptBlock>): Array<Cont
 // nothing to count. With the block schema accepting anything object-shaped, the only line lost whole
 // is one that is not JSON at all — which `cost-usage.ts` already counts as unparseable, so
 // reporting it again here would double one missing-data figure.
-function content_of(line: string): TranscriptContent | undefined {
-	return transcript_record.parse(line)?.message?.content ?? undefined
+function content_of(record: TranscriptRecord | undefined): TranscriptContent | undefined {
+	return record?.message?.content ?? undefined
+}
+
+// A record already read, for a reader that parses each line once (joshuafolkken/kit#8757).
+function from_record(record: TranscriptRecord | undefined): Array<ContentBlock> {
+	const content = content_of(record)
+
+	return content === undefined ? [] : to_blocks(content)
 }
 
 function parse_line(line: string): Array<ContentBlock> {
-	const content = content_of(line)
-
-	return content === undefined ? [] : to_blocks(content)
+	return from_record(transcript_record.parse(line))
 }
 
 function parse_content(text: string): Array<ContentBlock> {
@@ -124,6 +130,7 @@ const cost_blocks = {
 	TEXT_TYPE,
 	TOOL_USE_TYPE,
 	TOOL_RESULT_TYPE,
+	from_record,
 	parse_line,
 	parse_content,
 }
