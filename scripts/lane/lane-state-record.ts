@@ -22,6 +22,8 @@ const PAUSE_ORIGIN_COMMANDS = {
 const PAUSE_ORIGINS = [BY_PERSON, BY_DEPENDENCY_WAIT] as const
 // The `changed_by` of a lane no child was ever started in — `lane:dispatch` moves it on (`run-preflight.ts`).
 const OPEN_COMMAND = 'lane:open'
+// The `changed_by` of a lane `lane:adopt` gave a record again (`lane-adopt.ts`).
+const ADOPT_COMMAND = 'lane:adopt'
 // `as const` so the literal type survives export on `lane_state_record` (a bare const widens there).
 const HUMAN_REVIEW = 'human-review' as const
 const LANE_STATES = ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'] as const
@@ -89,6 +91,7 @@ function is_idle(state_root: string, common: string, issue: string): boolean {
 }
 
 const lane_state_record = {
+	ADOPT_COMMAND,
 	DEPENDENCY_WAIT_COMMAND,
 	HUMAN_REVIEW,
 	LANE_STATES,
