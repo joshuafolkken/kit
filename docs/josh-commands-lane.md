@@ -411,7 +411,9 @@ pnpm josh lane:breakdown 4970 --timeline   # when each stage ran and where the l
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
-Both forms print End-to-end from first dispatch to last merge, including verification, fixes, retries, CI, yield and human wait. The 30-minute decision includes human wait, also reported separately. Legacy `net` has broader exclusions. Internal budgets stay 25 minutes (plan 3, implement 9, ship 8, followup 5), with 5 minutes of headroom; gates stay unchanged.
+Both forms print End-to-end from first dispatch to last merge, including verification, fixes, retries, CI, yield and human wait. The target decision includes human wait, also reported separately.
+
+The target is 30 minutes, or 60 minutes when the lane's recorded actual size is past the split guide (more than 8 files or 200 lines); a lane with no recorded size keeps 30 (`lane_stage_budget.target_minutes`). Legacy `net` has broader exclusions. Internal budgets stay 25 minutes (plan 3, implement 9, ship 8, followup 5), with 5 minutes of headroom; gates stay unchanged.
 
 Exclusive wall-clock categories sum to End-to-end:
 
