@@ -215,13 +215,16 @@ function sweep_boundary(turning: Turning, now_ms: number): number {
 	return Math.min(sweep_ms, jump_ms)
 }
 
-// The next step the TRACE field blinks, the colons turn or the notice's trace changes on.
+// The next step the TRACE field blinks, the colons turn, the notice's trace changes or a flashing
+// cell's color steps on.
 function blink_boundary(turning: Turning, now_ms: number): number {
 	const trace_ms =
 		traces_of(turning).length > 0 ? run_board_header_trace.boundary_after(now_ms) : Infinity
 	const notice_ms = run_board_notice_turn.wake_after(turning.notice_trace, now_ms)
+	const colon_ms = run_board_colon.colon_boundary(colons_of(turning), now_ms)
+	const flash_ms = run_board_change_flash.wake_after(turning.flash, now_ms)
 
-	return Math.min(trace_ms, notice_ms, run_board_colon.colon_boundary(colons_of(turning), now_ms))
+	return Math.min(trace_ms, notice_ms, colon_ms, flash_ms)
 }
 
 // The rules run code only where the lamp panel blinks, so its gate is theirs (joshuafolkken/kit#8375).
