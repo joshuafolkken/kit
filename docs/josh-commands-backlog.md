@@ -555,15 +555,19 @@ pnpm josh issue:kind 6636 non-bug --release-class other-change
 
 <!-- usage: defect:origin -->
 
-List the merged pull requests that last changed what a defect issue names, as candidates for its origin line.
+List the merged pull requests that last changed or first added what a defect issue names, as candidates for its origin line.
 
 ```bash
-pnpm josh defect:origin 4241   # newest first, merged before the issue was filed
+pnpm josh defect:origin 4241   # most targets first, merged before the issue was filed
 ```
 
 <!-- /usage -->
 
-Lists up to five merged pull requests that changed the files and names an issue cites, newest first and merged before the issue was filed. Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, or write `- 原因: 不明（<理由>）` (source: `prompts/collaboration-workflow/issue-template.md`).
+Lists up to five merged pull requests that changed the files and names an issue cites, merged before the issue was filed: the one that changed the most of them first, newest first among equals.
+
+For each cited file it also lists the pull request that first added it, marked `introduced: <file>` under its `changed:` line and kept even past the five.
+
+Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, or write `- 原因: 不明（<理由>）` (source: `prompts/collaboration-workflow/issue-template.md`).
 
 [`josh issue:file`](#josh-issuefile) lists the same candidates for a `- 種別: 不具合` body before it is filed, searched up to now: under a `- 原因: 不明（<理由>）` line it prints them and files the body; with no origin line it prints them under the refusal. A `- 原因: #<PR>` body and a non-bug body are not searched, and neither is a filing into another repository.
 

@@ -8,6 +8,7 @@ const FIELD = '\u{1F}'
 const RECORD = '\u{1E}'
 const TARGET = 'run-board.ts'
 const MERGE_LOG = `2026-10-20T10:00:00+07:00${FIELD}Merge pull request #4201 from joshuafolkken/x-lane${FIELD}Draw the board${RECORD}\n`
+const ADDED_LOG = `2026-10-01T10:00:00+07:00${FIELD}Merge pull request #4100 from joshuafolkken/y-lane${FIELD}Add the board${RECORD}\n`
 
 function stub_issue(): void {
 	vi.spyOn(issue_read_cli, 'read_block').mockResolvedValue({
@@ -77,7 +78,22 @@ describe('defect:origin candidate search', () => {
 		await expect(
 			defect_origin_cli.filing_listing(`## 背景\n\n- 種別: 非不具合\n\n\`${TARGET}\``),
 		).resolves.toBe(undefined)
-		expect(read).toHaveBeenCalledTimes(1)
+		expect(read).toHaveBeenCalledTimes(2)
+	})
+
+	it('marks the merge that first added a path the issue names', async () => {
+		stub_issue()
+		vi.spyOn(git_spawn, 'read').mockImplementation(async (arguments_) =>
+			arguments_.includes('--diff-filter=A') ? `${MERGE_LOG}${ADDED_LOG}` : MERGE_LOG,
+		)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await defect_origin_cli.run(['4241'])
+
+		expect(printed(info)).toMatch(/#4201\]?.*Draw the board\n {2}changed: run-board\.ts\n/u)
+		expect(printed(info)).toMatch(
+			/#4100\]?.*2026-10-01 {2}Add the board\n {2}changed: run-board\.ts\n {2}introduced: run-board\.ts/u,
+		)
 	})
 
 	it('names a target git could not search instead of passing it for one no merge touched', async () => {

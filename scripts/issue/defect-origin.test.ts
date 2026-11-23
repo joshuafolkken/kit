@@ -49,10 +49,26 @@ describe('defect:origin merge log', () => {
 	})
 })
 
-describe('defect:origin ranking', () => {
-	const older = { pr: 4100, merged_at: '2026-10-01T00:00:00Z', title: 'Older' }
-	const newer = { pr: 4201, merged_at: FILED_AT, title: 'Newer' }
+describe('defect:origin introducing merge log', () => {
+	it('reads every merge that added a path, unlimited and bounded by the filing time', () => {
+		const introduced = defect_origin.introduced_arguments(BOARD_FILE, FILED_AT)
 
+		expect(introduced).toEqual(
+			expect.arrayContaining([
+				'--merges',
+				'--diff-filter=A',
+				`--before=${FILED_AT}`,
+				`:(glob)**/${BOARD_FILE}`,
+			]),
+		)
+		expect(introduced.join(' ')).not.toContain('--max-count')
+	})
+})
+
+const older = { pr: 4100, merged_at: '2026-10-01T00:00:00Z', title: 'Older' }
+const newer = { pr: 4201, merged_at: FILED_AT, title: 'Newer' }
+
+describe('defect:origin ranking', () => {
 	it('lists the pull requests newest first, naming every target each one changed', () => {
 		const ranked = defect_origin.rank([
 			{ target: BOARD_COMMAND, merges: [older, newer] },
@@ -62,6 +78,35 @@ describe('defect:origin ranking', () => {
 		expect(ranked.map((candidate) => [candidate.pr, candidate.targets])).toEqual([
 			[4201, [BOARD_COMMAND, BOARD_FILE]],
 			[4100, [BOARD_COMMAND]],
+		])
+	})
+
+	it('ranks a pull request that hit two targets above a newer one that hit one', () => {
+		const ranked = defect_origin.rank([
+			{ target: BOARD_COMMAND, merges: [newer, older] },
+			{ target: BOARD_FILE, merges: [older] },
+		])
+
+		expect(ranked.map(({ pr }) => pr)).toEqual([4100, 4201])
+	})
+})
+
+describe('defect:origin introduced mark', () => {
+	it('marks the pull request that first added a path, once, and keeps it past the cap', () => {
+		const merges = Array.from({ length: 5 }, (_value, index) => ({
+			pr: 4300 + index,
+			merged_at: `2026-10-1${String(index)}T00:00:00Z`,
+			title: 't',
+		}))
+		const first = defect_origin.rank([{ target: BOARD_FILE, merges, introduced: older }])
+		const changed_and_added = defect_origin.rank([
+			{ target: BOARD_FILE, merges: [newer], introduced: newer },
+		])
+
+		expect(first.at(-1)).toMatchObject({ pr: 4100, introduced: [BOARD_FILE] })
+		expect(first).toHaveLength(6)
+		expect(changed_and_added).toEqual([
+			{ ...newer, targets: [BOARD_FILE], introduced: [BOARD_FILE] },
 		])
 	})
 
@@ -76,7 +121,9 @@ describe('defect:origin ranking', () => {
 			6, 5, 4, 3, 2,
 		])
 	})
+})
 
+describe('defect:origin listing', () => {
 	it('prints the candidates, or says none was found', () => {
 		const printed = defect_origin.format(
 			'4241',
@@ -84,7 +131,14 @@ describe('defect:origin ranking', () => {
 		)
 
 		expect(printed).toContain('#4201  2026-10-20  Newer\n  changed: a.ts')
-		expect(printed).toContain('`- 原因: #<PR>`')
+		expect(printed).not.toContain('introduced:')
+		expect(printed).toContain('(most targets first, then newest; declare one as `- 原因: #<PR>`)')
+		expect(
+			defect_origin.format(
+				'4241',
+				defect_origin.rank([{ target: 'a.ts', merges: [], introduced: older }]),
+			),
+		).toContain('#4100  2026-10-01  Older\n  changed: a.ts\n  introduced: a.ts')
 		expect(defect_origin.format('4241', [])).toContain('no merged pull request')
 	})
 })
