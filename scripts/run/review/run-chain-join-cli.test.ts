@@ -5,6 +5,7 @@ import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detac
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 import { run_chain_review_fix } from './run-chain-review-fix'
+import { run_chain_worker_fixture } from './run-chain-worker-fixture'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 
 const josh_run_mock = vi.hoisted(() =>
@@ -54,6 +55,7 @@ function errors(): string {
 }
 
 beforeEach(() => {
+	run_chain_worker_fixture.run_worker_in_place(run_chain_cli.run)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	slot_holds('')

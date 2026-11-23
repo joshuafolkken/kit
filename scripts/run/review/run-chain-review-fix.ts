@@ -6,6 +6,7 @@ import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_handoff, type Handoff } from '#scripts/run/cut/run-cut-handoff'
 import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
+import { run_chain_background } from './run-chain-background'
 
 // Where a lane child fixes its round-1 findings (joshuafolkken/kit#6900). The session that implemented
 // and reviewed re-reads all of that context on every fix turn, so a held round moves the fix to a fresh
@@ -53,12 +54,14 @@ function write_handoff(issue: string, handoff: Handoff): string | undefined {
 
 // The cut needs an uncommitted tree (`run-cut-ready.ts`): a round whose `run:review` open committed it
 // is fixed in place, since a cut there answers `unready` and records a decline. An `under` or
-// unmeasurable session is fixed in place too, as `run:cut` treats them.
+// unmeasurable session is fixed in place too, as `run:cut` treats them. The join runs in a background
+// worker, so the session measured is the one that called it (`run-chain-background.ts`).
 function can_cut(): boolean {
 	return (
 		lane_child_marker.is_child_of(process.cwd()) &&
 		run_cut_ready.is_ready_sync() &&
-		cost_cli.session_verdict() === cost_verdict.OVER_VERDICT
+		cost_cli.session_verdict({ environment: run_chain_background.session_environment() }) ===
+			cost_verdict.OVER_VERDICT
 	)
 }
 
