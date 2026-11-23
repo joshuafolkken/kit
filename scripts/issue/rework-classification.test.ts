@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { issue_body_keys } from './issue-body-keys'
 import { rework_classification } from './rework-classification'
 
 // joshuafolkken/kit#8799: a non-defect body citing delivered work with no new goal is rework filed as
@@ -78,11 +79,12 @@ describe('rework_classification.problem — passes', () => {
 		expect(rework_classification.problem(body, DELIVERED)).toBeUndefined()
 	})
 
-	it('passes a body citing delivered work only on its parent line', () => {
-		const body = body_of([NON_DEFECT, `- parent: #${String(EPIC)}`])
-
-		expect(rework_classification.problem(body, DELIVERED)).toBeUndefined()
-	})
+	it.each([`- parent: #${String(EPIC)}`, `parent: #${String(EPIC)}`])(
+		'passes a body citing delivered work only on its parent line (%s)',
+		(line) => {
+			expect(rework_classification.problem(body_of([NON_DEFECT, line]), DELIVERED)).toBeUndefined()
+		},
+	)
 
 	it('does not count a citation inside a code fence', () => {
 		const body = body_of([NON_DEFECT, '```', `#${String(MERGED_PR)}`, '```'])
@@ -99,6 +101,18 @@ describe('rework_classification.problem — passes', () => {
 	it('passes when nothing cited is delivered', () => {
 		expect(rework_classification.problem(REWORK, NONE)).toBeUndefined()
 	})
+})
+
+// A declaration citing finished work by contract is not rework (the round-1 review of kit#8799).
+describe('rework_classification.problem — contract declarations', () => {
+	it.each(['sample_gate', 'decision_rule', 'cause_lane', 'cause_park', 'refactor_first'] as const)(
+		'passes a body citing delivered work only on a %s declaration',
+		(key) => {
+			const line = `${issue_body_keys.prefix(key)} #${String(MERGED_PR)}`
+
+			expect(rework_classification.problem(body_of([NON_DEFECT, line]), DELIVERED)).toBeUndefined()
+		},
+	)
 })
 
 describe('rework_classification.references', () => {

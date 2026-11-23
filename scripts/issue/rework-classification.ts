@@ -13,10 +13,13 @@ const CITING_HEADINGS = [issue_body_keys.heading('summary'), issue_body_keys.hea
 const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const NON_BUG_DECLARATION = issue_body_keys.line('kind', 'non_bug')
 const NEW_GOAL_PREFIX = issue_body_keys.prefix('new_goal')
-// An order declaration points at a sibling to run after, not at work the Issue reworks.
-const ORDER_PREFIX = issue_body_keys.prefix('order')
-// `parent: #<N>` names the epic the Issue sits in.
-const PARENT_LINE = /^-\s*parent:/iu
+// Declarations that cite finished work by contract, not as work the Issue reworks: the sibling to run
+// after, the merge a sample waits on, the rule's source, the lane or park a cause lost, the refactor first.
+const NON_CITING_PREFIXES = (
+	['order', 'sample_gate', 'decision_rule', 'cause_lane', 'cause_park', 'refactor_first'] as const
+).map((key) => issue_body_keys.prefix(key))
+// `parent: #<N>`, bulleted or bare, names the epic the Issue sits in.
+const PARENT_LINE = /^(?:-\s*)?parent:/iu
 // A same-repository `#<N>`: not `owner/repo#<N>`, an HTML entity `&#<N>` or a `##` heading.
 const REFERENCE = /(?<![\w/&#])#(?<number>\d+)\b/gu
 
@@ -41,7 +44,7 @@ function is_unexplained_non_defect(body: string): boolean {
 function is_citing(line: string): boolean {
 	const text = line.trim()
 
-	return !PARENT_LINE.test(text) && !text.startsWith(ORDER_PREFIX)
+	return !PARENT_LINE.test(text) && NON_CITING_PREFIXES.every((prefix) => !text.startsWith(prefix))
 }
 
 function numbers_in(line: string): ReadonlyArray<number> {
@@ -52,7 +55,7 @@ function section_text(body: string, heading: string): ReadonlyArray<string> {
 	return markdown_section.unfenced_lines(markdown_section.section_lines(body, heading).join('\n'))
 }
 
-// Every `#<N>` the summary and background cite outside fences, parent and order lines, once each.
+// Every `#<N>` the summary and background cite outside fences, parent and contract lines, once each.
 function references(body: string): ReadonlyArray<number> {
 	const lines = CITING_HEADINGS.flatMap((heading) => section_text(body, heading))
 
