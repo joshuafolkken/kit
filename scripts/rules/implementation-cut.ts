@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { agent_provider, type AgentEnvironment } from '#scripts/agent/agent-provider'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
+import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import type { HookContext } from '#scripts/hooks/hook-context'
@@ -122,6 +123,7 @@ function session_verdict(
 			cost_cli.session_verdict({
 				cwd: directory,
 				environment: environment_for(transcript, source),
+				remaining: context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS,
 			}),
 		transcript,
 	)
@@ -144,7 +146,12 @@ function current_state(context: HookContext, transcript?: string): LaneCostState
 		verdict: (): CostVerdict =>
 			transcript === undefined
 				? implementation_cut_verdict.reused_verdict(
-						() => cost_cli.session_verdict({ cwd, environment: env }),
+						() =>
+							cost_cli.session_verdict({
+								cwd,
+								environment: env,
+								remaining: context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS,
+							}),
 						cwd,
 					)
 				: session_verdict(transcript, cwd, env),

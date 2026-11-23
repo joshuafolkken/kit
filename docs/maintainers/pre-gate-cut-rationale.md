@@ -110,6 +110,11 @@ horizon is the measured p50 of 23 requests per resumed lane session (748 session
 predates the measured horizon, so the standard-rate figure is not checked against it. No fixed figure is
 right for every run, so every reader names `pnpm josh cost --cut`, which prints the current one.
 
+The in-lane cuts read their own horizon: joshuafolkken/kit#8817 measured resumes per trigger
+(#8761, 7 days to 2026-11-23): an implementation cut's resumed session ran a median of 65 requests
+(n=79), a review-fix cut's 27 (n=163). `implementation-cut.ts` and `run-chain-review-fix.ts` pass
+those horizons through `cost_cli.session_verdict`; every other cut keeps the shared 23.
+
 **The resume side is priced.** Until joshuafolkken/kit#2312 the pre-gate cut was unconditional, and its
 case recorded only the gain — the context reduction it carries (~130k → ~60k per request). A cut
 relaunches a fresh process that re-reads the plan and decisions off GitHub before the gate, a fixed ramp

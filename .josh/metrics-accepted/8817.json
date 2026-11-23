@@ -1,0 +1,7 @@
+{
+	"reason": "Per-trigger cut horizons (#8817): two measured constants and a remaining option threaded through cost_cli",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

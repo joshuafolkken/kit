@@ -14,7 +14,9 @@ import { implementation_cut_verdict } from './implementation-cut-verdict'
 
 const { CWD, priced_line, write_session_under } = cost_cli_fixture
 const MODEL = 'claude-opus-5-5'
-const LIMIT = context_cut_payback.break_even_context(MODEL)
+// joshuafolkken/kit#8817: the implementation cut is priced over its own measured horizon.
+const REMAINING = context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS
+const LIMIT = context_cut_payback.break_even_context(MODEL, REMAINING)
 const OLD_SESSION = 'before-resume'
 const NEW_SESSION = 'after-resume'
 const OLD_TRANSCRIPT = path.join(CWD, `${OLD_SESSION}.jsonl`)
@@ -77,7 +79,7 @@ describe('implementation cut session identity', () => {
 
 		implementation_cut.session_verdict(OPENAI_TRANSCRIPT, CWD, source)
 
-		expect(read).toHaveBeenCalledWith({ cwd: CWD, environment: source })
+		expect(read).toHaveBeenCalledWith({ cwd: CWD, environment: source, remaining: REMAINING })
 	})
 
 	it('preserves an exported Claude session id, as a unit pricing its parent has', () => {
@@ -86,7 +88,7 @@ describe('implementation cut session identity', () => {
 
 		implementation_cut.session_verdict(NEW_TRANSCRIPT, CWD, source)
 
-		expect(read).toHaveBeenCalledWith({ cwd: CWD, environment: source })
+		expect(read).toHaveBeenCalledWith({ cwd: CWD, environment: source, remaining: REMAINING })
 	})
 
 	it('prices the hook transcript when deciding whether an edit needs a cut', () => {
@@ -103,6 +105,7 @@ describe('implementation cut session identity', () => {
 		expect(read).toHaveBeenCalledWith({
 			cwd: CWD,
 			environment: expect.objectContaining({ CLAUDE_CODE_SESSION_ID: NEW_SESSION }),
+			remaining: REMAINING,
 		})
 	})
 })
