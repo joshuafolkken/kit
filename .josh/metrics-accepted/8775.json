@@ -1,0 +1,7 @@
+{
+	"reason": "#8775 adds lane-state-event.ts, the command-to-event lookup and pause-origin guard evaluation every lane-state write now passes through",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 107
+	}
+}

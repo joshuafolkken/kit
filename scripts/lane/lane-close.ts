@@ -34,6 +34,8 @@ interface ResolvedLane {
 }
 
 type CloseKind = 'closed' | 'incomplete' | 'none'
+// The command an ended lane's record names: a plain close, or the withdrawal that closed it.
+type EndCommand = 'lane:close' | 'lane:withdraw'
 
 interface CloseOutcome {
 	issue: string
@@ -162,12 +164,18 @@ async function left_behind_of(issue: string, targets: LaneTargets): Promise<Arra
 }
 
 // An ended lane's cleared plan goes with it; a plan its lane yielded on stays (`lane_plan.release`).
-async function record_end(issue: string): Promise<void> {
-	await lane_state.record_change({ issue, state: 'ended', command: 'lane:close' })
+// A refused end (the lane is already `ended`) still releases the plan: the close itself is done.
+async function record_end(issue: string, command: EndCommand): Promise<void> {
+	await lane_state.record_change({ issue, state: 'ended', command })
 	lane_plan.release(Number(issue), process.cwd())
 }
 
-async function close_lane(issue: string): Promise<CloseOutcome> {
+// `command` is the end the record names — `lane:withdraw` closes through here too, so its record says
+// the withdrawal, written once from the state the lane was in.
+async function close_lane(
+	issue: string,
+	command: EndCommand = 'lane:close',
+): Promise<CloseOutcome> {
 	const { existing, targets } = await resolve_lane(issue)
 	const did_exist = existing !== undefined || existsSync(targets.directory)
 	// Before the removal, not after: a child still running in the tree would keep writing into a
@@ -181,7 +189,7 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	const left_behind = await left_behind_of(issue, targets)
 	const kind = close_kind(did_exist, left_behind)
 
-	if (await is_ending(issue, kind)) await record_end(issue)
+	if (await is_ending(issue, kind)) await record_end(issue, command)
 
 	return { issue, kind, left_behind, reaped, residents }
 }

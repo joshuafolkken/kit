@@ -258,6 +258,18 @@ describe('ending the lane state record', () => {
 		})
 	})
 
+	// joshuafolkken/kit#8775: a withdrawal's end is this one write, named for the withdrawal.
+	it('records the end by the command it closes for', async () => {
+		const withdraw = 'lane:withdraw'
+
+		lanes_are([open_on_disk(ISSUE, SEED)])
+		await lane_close.close_lane(ISSUE, withdraw)
+
+		expect(vi.mocked(lane_state.record_change)).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({ state: 'ended', command: withdraw }),
+		)
+	})
+
 	it('records nothing when the close left something behind', async () => {
 		lanes_are([open_on_disk(ISSUE, SEED)])
 		vi.mocked(git_command.branch_exists).mockResolvedValue(true)
