@@ -10,8 +10,6 @@ interface StepFacts {
 	issue: string | undefined
 	// Whether the step is a person's own lift of a pause (`lane:resume`, a withdraw, a close).
 	lifts_pause: boolean
-	// Whether the step's writer does not ask the work-tree guard yet (joshuafolkken/kit#8829).
-	skips_tree_guard: boolean
 }
 
 interface StepRead {
@@ -66,11 +64,9 @@ function is_set_running(before: LaneStateRecord | undefined, after: LaneStateRec
 	return before?.state !== 'running' || before.launched_at !== after.launched_at
 }
 
-// joshuafolkken/kit#7657: a resume or a restart reached a lane whose branch or work tree is gone. A
-// writer that does not ask the guard yet is the known gap #8829, pinned by its own test.
+// joshuafolkken/kit#7657, joshuafolkken/kit#8829: a resume or a restart reached a lane whose branch or
+// work tree is gone.
 function no_run_without_tree(read: StepRead): string | undefined {
-	if (read.step.skips_tree_guard) return undefined
-
 	const started = first_issue(read.after, (issue, record) => {
 		return read.treeless.has(issue) && is_set_running(read.before.get(issue), record)
 	})

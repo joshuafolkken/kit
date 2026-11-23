@@ -1,5 +1,7 @@
 import path from 'node:path'
+import { session_cite } from '#scripts/issue/session-cite'
 import { lane_state } from '#scripts/lane/lane-state'
+import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import { run_board_single } from '#scripts/run/board/run-board-single'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -147,23 +149,44 @@ describe('run_halfrun_resume.reopen_at — a fix round runs on its stopped halfr
 	})
 })
 
+// Adopts #ISSUE's marked stop over a human-review lane whose work-tree guard answers `note`.
+async function adopt_review_lane(note: string | undefined): Promise<ReturnType<typeof vi.spyOn>> {
+	run_hold.create_halfrun_stop_hold(TARGET, ISSUE)
+	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(path.join(scratch, '.git'))
+	vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
+	vi.spyOn(lane_state, 'read_state').mockResolvedValue({
+		issue: ISSUE,
+		state: 'human-review',
+		changed_at: '',
+		changed_by: '',
+	})
+	vi.spyOn(lane_transition_guards, 'rejection').mockResolvedValue(note)
+	vi.spyOn(console, 'warn').mockImplementation(vi.fn())
+	const record = vi
+		.spyOn(lane_state, 'record_change')
+		.mockResolvedValue({ kind: 'skipped', reason: 'test' })
+
+	expect(await run_halfrun_resume.adopt(ISSUE, 'fullrun')).toBe(true)
+
+	return record
+}
+
 describe('run_halfrun_resume.adopt_at — a marked halfrun stop is adopted as this fullrun', () => {
 	it('returns a human-review lane to running when its verified work is adopted', async () => {
-		run_hold.create_halfrun_stop_hold(TARGET, ISSUE)
-		vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(path.join(scratch, '.git'))
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
-		vi.spyOn(lane_state, 'read_state').mockResolvedValue({
-			issue: ISSUE,
-			state: 'human-review',
-			changed_at: '',
-			changed_by: '',
-		})
-		const record = vi
-			.spyOn(lane_state, 'record_change')
-			.mockResolvedValue({ kind: 'skipped', reason: 'test' })
+		const record = await adopt_review_lane(undefined)
 
-		expect(await run_halfrun_resume.adopt(ISSUE, 'fullrun')).toBe(true)
 		expect(record).toHaveBeenCalledWith({ issue: ISSUE, state: 'running', command: 'run:entry' })
+	})
+
+	// joshuafolkken/kit#8829: the table's work-tree guard is asked before review-resume writes.
+	it('leaves a human-review lane whose work tree is gone in human-review, with the reason', async () => {
+		const record = await adopt_review_lane('its work tree is gone')
+
+		expect(lane_transition_guards.rejection).toHaveBeenCalledWith('review-resume', ISSUE)
+		expect(record).not.toHaveBeenCalled()
+		expect(console.warn).toHaveBeenCalledWith(
+			`run:entry: lane ${session_cite.issue(ISSUE)} stays in human-review — its work tree is gone`,
+		)
 	})
 
 	it('re-writes the marked hold over a dirty tree with the fullrun mark', () => {

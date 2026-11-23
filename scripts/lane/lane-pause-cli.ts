@@ -9,6 +9,7 @@ import { lane_pause, type LaneSignalled } from './lane-pause'
 import type { LaneProcesses } from './lane-reap'
 import { lane_registry } from './lane-registry'
 import { lane_state } from './lane-state'
+import { lane_transition_guards } from './lane-transition-guards'
 
 // `josh lane:pause <issue> | --all` and `josh lane:resume <issue> | --all` — one script told apart by
 // the verb the registry passes first. A named lane with no child process to signal exits non-zero, so a
@@ -28,8 +29,8 @@ const USAGE = [
 ].join('\n')
 
 const VERBS = {
-	pause: { act: 'pause_lane', done: 'paused', state: 'paused' },
-	resume: { act: 'resume_lane', done: 'resumed', state: 'running' },
+	pause: { act: 'pause_lane', done: 'paused', state: 'paused', event: 'pause' },
+	resume: { act: 'resume_lane', done: 'resumed', state: 'running', event: 'resume' },
 } as const
 
 type Verb = keyof typeof VERBS
@@ -73,10 +74,25 @@ function report(verb: Verb, issue: string, result: LaneSignalled): void {
 	)
 }
 
+// The table's guards read outside the record (a resumed lane's branch and work tree) are asked first; a
+// refusal is printed and nothing is written (joshuafolkken/kit#8829).
+async function guard_note(verb: Verb, issue: string): Promise<string | undefined> {
+	const note = await lane_transition_guards.rejection(VERBS[verb].event, issue)
+
+	if (note !== undefined) {
+		console.info(
+			`lane:${verb} ${issue_cite.plain_for('terminal', issue)}: state unchanged — ${note}`,
+		)
+	}
+
+	return note
+}
+
 // A change the lifecycle refused (a dependency wait's lane is not resumed by a person) leaves the lane
 // where it was, so the ledger and the event stream are not told it moved; the signal itself stands.
 async function record(verb: Verb, issue: string): Promise<void> {
 	const command = `lane:${verb}`
+	if ((await guard_note(verb, issue)) !== undefined) return
 	const outcome = await lane_state.record_change({ issue, state: VERBS[verb].state, command })
 
 	if (outcome.kind === 'rejected') return

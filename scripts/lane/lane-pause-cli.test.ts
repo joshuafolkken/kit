@@ -6,6 +6,7 @@ import { lane_pause } from './lane-pause'
 import { lane_pause_cli } from './lane-pause-cli'
 import { lane_registry } from './lane-registry'
 import { lane_state } from './lane-state'
+import { lane_transition_guards } from './lane-transition-guards'
 
 // joshuafolkken/kit#4198: `josh lane:pause` / `lane:resume` take one issue or `--all`, and a named lane
 // with nothing to signal exits non-zero.
@@ -34,8 +35,10 @@ const info = vi.spyOn(console, 'info')
 const record_change = vi.spyOn(lane_state, 'record_change')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const record_lane_state = vi.spyOn(lane_ledger_write, 'record_lane_state')
+const guard = vi.spyOn(lane_transition_guards, 'rejection')
 
 beforeEach(() => {
+	guard.mockResolvedValue(undefined)
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_change.mockResolvedValue({ kind: 'skipped', reason: 'test' })
@@ -139,6 +142,20 @@ describe('lane_pause_cli.run — the record', () => {
 		expect(record_change).not.toHaveBeenCalled()
 		expect(record_lane_state).not.toHaveBeenCalled()
 		expect(emit).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8829: a resume whose branch or work tree is gone is refused before the write.
+describe('lane_pause_cli.run — a refused change', () => {
+	it('leaves a lane whose work tree is gone unrecorded and prints why', async () => {
+		guard.mockResolvedValue('its work tree is gone')
+		await lane_pause_cli.run(['resume', ISSUE])
+
+		expect(guard).toHaveBeenCalledWith('resume', ISSUE)
+		expect(record_change).not.toHaveBeenCalled()
+		expect(record_lane_state).not.toHaveBeenCalled()
+		expect(emit).not.toHaveBeenCalled()
+		expect(info).toHaveBeenCalledWith('lane:resume #4198: state unchanged — its work tree is gone')
 	})
 
 	// joshuafolkken/kit#8775: a change the lifecycle table rejects reaches neither the ledger nor the stream.
