@@ -12,7 +12,6 @@ import { lane_preserve, type KeptWork } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_residents } from './lane-residents'
-import { lane_state } from './lane-state'
 import { lane_withdraw_prose, type Withdrawer } from './lane-withdraw-prose'
 import { lane_yield } from './lane-yield'
 
@@ -146,13 +145,8 @@ async function stop_and_close(lane: LaneInfo, withdrawal: Withdrawal): Promise<W
 
 	if (saved.kind === 'unsaved') return saved
 	const is_noted = await note_issue(lane.issue, withdrawal, saved.stash)
-	const closed = await lane_close.close_lane(lane.issue)
-
-	// After the close, so the record names the withdrawal rather than the close it ran. An `incomplete`
-	// close is not `ended`: the supervisor closes the lane again until its last process is gone.
-	if (closed.kind !== 'incomplete') {
-		await lane_state.record_change({ issue: lane.issue, state: 'ended', command: 'lane:withdraw' })
-	}
+	// The close records the end as the withdrawal, so the record names it rather than the close it ran.
+	const closed = await lane_close.close_lane(lane.issue, 'lane:withdraw')
 
 	return {
 		kind: 'withdrawn',

@@ -45,6 +45,16 @@ it('does not settle a dispatch whose lane state could not be recorded', async ()
 	expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 })
 
+// joshuafolkken/kit#8775: the table's merge event does not move a lane already in human review.
+it('retains a lane its child already recorded in human review, writing nothing', async () => {
+	vi.mocked(lane_state.record_change).mockClear()
+	vi.mocked(lane_state.read_state).mockResolvedValueOnce(RETAINED.record)
+
+	expect(await run_merge_human_review.retain(ISSUE)).toBe(true)
+	expect(lane_state.record_change).not.toHaveBeenCalled()
+	expect(run_event_stream_emit.emit).toHaveBeenCalled()
+})
+
 it('waits for an OPEN human merge without counting failure or outage', () => {
 	const outcome = run_merge.classify_child(
 		{ state: 'OPEN', labels: [NEEDS_HUMAN_MERGE_LABEL.toUpperCase()], is_human_review: false },

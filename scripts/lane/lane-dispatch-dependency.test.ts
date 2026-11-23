@@ -90,6 +90,35 @@ it('releases the in-progress claim when a resume is withheld', async () => {
 	expect(unmark).toHaveBeenCalledWith(String(ISSUE))
 })
 
+// joshuafolkken/kit#8775: the pause origin on the record decides the wait and its release.
+function paused_by(origin: 'person' | typeof WAIT_KIND): void {
+	vi.spyOn(lane_state, 'read_state').mockResolvedValue({
+		issue: String(ISSUE),
+		state: 'paused',
+		changed_at: '2026-11-23T01:00:00.000Z',
+		changed_by: origin === WAIT_KIND ? 'lane:dependency-wait' : 'lane:pause',
+		paused_by: origin,
+	})
+}
+
+it('writes no second wait for a lane already waiting, and still releases the claim', async () => {
+	paused_by(WAIT_KIND)
+	const record = vi.spyOn(lane_state, 'record_change')
+	const unmark = vi.spyOn(run_label, 'unmark').mockResolvedValue(true)
+
+	await lane_dispatch_dependency.defer(String(ISSUE))
+	expect(record).not.toHaveBeenCalled()
+	expect(unmark).toHaveBeenCalledWith(String(ISSUE))
+})
+
+it('does not release a lane a person paused', async () => {
+	paused_by('person')
+	const record = vi.spyOn(lane_state, 'record_change')
+
+	await lane_dispatch_dependency.begin(String(ISSUE))
+	expect(record).not.toHaveBeenCalled()
+})
+
 it('rechecks observation evidence before spawning a selected or resumed worker', async () => {
 	read.mockResolvedValue({ ...child(ISSUE), body: observation.BODY })
 	const evidence = vi.spyOn(git_gh_etag_read, 'read').mockResolvedValue(
