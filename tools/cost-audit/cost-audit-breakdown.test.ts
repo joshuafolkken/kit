@@ -44,17 +44,23 @@ const ENTRIES: ReadonlyArray<LedgerEntry> = [
 	},
 	...lane_of(HOLDER, 5, 40),
 	...lane_of(OTHER, 10, 30),
+	// The yield's wait ends at this redispatch.
+	{ kind: 'dispatch', at: at(50), issue: ISSUE },
 ]
+
+const SLEPT_MS = 5 * MINUTE_MS
+const YIELD_NOTE = `#${String(ISSUE)} yielded its lane: #${String(ISSUE)}'s planned \`a.ts\` overlaps \`a.ts\`, which #${String(HOLDER)} declares or plans · at: summary`
 
 const EVENTS: ReadonlyArray<RunEvent> = [
 	event(10, 'plan', `#${String(ISSUE)} plan`),
 	event(11, 'plan', `#${String(OTHER)} plan`),
 	event(12, 'lane-phase', `#${String(ISSUE)} implement`),
-	event(20, 'yield', `#${String(ISSUE)} yields to #${String(HOLDER)}`),
+	event(20, 'note', YIELD_NOTE),
 	event(25, 'sleep', 'host asleep'),
 	event(28, 'wake', 'host awake'),
 	event(35, 'done', `#${String(HOLDER)} done`),
-	event(36, 'sleep', `#${String(OTHER)} host asleep`),
+	// A host stop naming another Issue still stops every lane.
+	{ ...event(36, 'sleep', `#${String(OTHER)} host asleep`), elapsed_ms: SLEPT_MS },
 	event(61, SHIP_STAGE, `#${String(ISSUE)} review start`),
 	event(71, SHIP_STAGE, `#${String(ISSUE)} review done`),
 ]
@@ -71,6 +77,13 @@ describe('cost_audit_breakdown.of_issues — the partition gives the full-histor
 
 		expect(partitioned).toStrictEqual(new Map(full))
 		expect(partitioned.size).toBe(issues.length)
+	})
+
+	it("reaches a host stop naming another Issue and the yield holder's merge", () => {
+		const breakdown = cost_audit_breakdown.of_issues([ISSUE], ENTRIES, EVENTS).get(ISSUE)
+
+		expect(breakdown?.slept_ms).toBe(SLEPT_MS)
+		expect(breakdown?.yield_split?.gap_ms).toBeGreaterThan(0)
 	})
 
 	it('gives no breakdown to an Issue the ledger holds no dispatch and merge of', () => {
