@@ -73,7 +73,9 @@ describe('backlog_drive_split_unit.run — over the size bar', () => {
 		const argv = JSON.stringify(requests[0]?.argv)
 
 		expect(requests).toHaveLength(1)
-		expect(argv).toContain(`epic --promote ${ISSUE}`)
+		expect(argv).toContain(
+			`epic --promote ${ISSUE} <N1> <N2> ... --rationale-file .josh/tmp/split-${ISSUE}-rationale.md`,
+		)
 		expect(argv).not.toContain('run:split')
 		expect(argv).toContain(`.josh/tmp/split-${ISSUE}-<k>.md`)
 		expect(argv).toContain('issue:plan --planned --no-notify')

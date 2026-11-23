@@ -12,7 +12,7 @@ import { lane_state_record, type LaneState } from './lane-state-record'
 const { HUMAN_REVIEW, LANE_STATES } = lane_state_record
 
 const GUARD = {
-	// The lane has no record yet — an adopt never overwrites one (`lane-state.ts` → `record_adopted`).
+	// The lane has no record yet — an adopt never overwrites one (`lane-state.ts` → `record_owner`).
 	NO_RECORD: 'no-record',
 	// The lane's branch and work tree still exist, so a child can run in them.
 	WORK_TREE: 'work-tree-present',
@@ -33,13 +33,22 @@ type LaneGuard = (typeof GUARD)[keyof typeof GUARD]
 
 const LANE_GUARDS: ReadonlyArray<LaneGuard> = Object.values(GUARD)
 
+// `is_owner_only`: the event moves only the lane's owner run, keeping its state, who paused it and its
+// last change — a hand-over of the lane to a later run (joshuafolkken/kit#8472, joshuafolkken/kit#8455).
 interface LaneTransitionEventRow {
 	from: ReadonlyArray<LaneState>
 	to: LaneState
 	guards: ReadonlyArray<LaneGuard>
+	is_owner_only?: boolean
+}
+
+/** A hand-over of a lane in `state`: once its owner run has ended, only the owner moves. */
+function owner_row(state: LaneState): LaneTransitionEventRow {
+	return { from: [state], to: state, guards: [GUARD.OWNER_ENDED], is_owner_only: true }
 }
 
 // `from: []` is an event only a lane with no record takes; a record-less lane moves to any state.
+// An adopt writes a fresh `open` record; a hand-over keeps the record and moves only its owner run.
 const LANE_EVENTS = {
 	open: { from: ['open', 'ended'], to: 'open', guards: [] },
 	adopt: { from: [], to: 'open', guards: [GUARD.NO_RECORD] },
@@ -53,9 +62,10 @@ const LANE_EVENTS = {
 		to: 'running',
 		guards: [GUARD.BY_DEPENDENCY, GUARD.WORK_TREE],
 	},
-	'hand-over-open': { from: ['open'], to: 'open', guards: [GUARD.OWNER_ENDED] },
-	'hand-over-running': { from: ['running'], to: 'running', guards: [GUARD.OWNER_ENDED] },
-	'hand-over-review': { from: [HUMAN_REVIEW], to: HUMAN_REVIEW, guards: [GUARD.OWNER_ENDED] },
+	'hand-over-open': owner_row('open'),
+	'hand-over-running': owner_row('running'),
+	'hand-over-paused': owner_row('paused'),
+	'hand-over-review': owner_row(HUMAN_REVIEW),
 	'human-review': { from: ['open', 'running', HUMAN_REVIEW], to: HUMAN_REVIEW, guards: [] },
 	merge: {
 		from: ['open', 'running'],
@@ -74,6 +84,11 @@ const LANE_EVENT_NAMES = Object.keys(LANE_EVENTS) as ReadonlyArray<LaneTransitio
 /** The row of `event`. */
 function row_of(event: LaneTransitionEvent): LaneTransitionEventRow {
 	return LANE_EVENTS[event]
+}
+
+/** The hand-over events, one per state a lane is handed over in. */
+function hand_over_events(): ReadonlyArray<LaneTransitionEvent> {
+	return LANE_EVENT_NAMES.filter((event) => row_of(event).is_owner_only === true)
 }
 
 /** The state `event` moves a lane in `from` to, or `undefined` when the table rejects it there. */
@@ -105,6 +120,7 @@ const lane_transition_table = {
 	LANE_EVENT_NAMES,
 	LANE_GUARDS,
 	allowed_transitions,
+	hand_over_events,
 	next_state,
 	row_of,
 }

@@ -127,7 +127,9 @@ describe('epic_add_plan.build_plan — what it refuses without writing', () => {
 	it('names both ways out of a target that is not an epic', () => {
 		const error = error_of(plan({ labels: [] }))
 
-		expect(error).toContain(`josh epic --promote ${String(EPIC_NUMBER)} <N...>`)
+		expect(error).toContain(
+			`josh epic --promote ${String(EPIC_NUMBER)} <N...> --rationale-file <path|->`,
+		)
 		expect(error).toContain('create a new epic over both')
 	})
 

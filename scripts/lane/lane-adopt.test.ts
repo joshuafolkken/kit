@@ -28,7 +28,8 @@ const ISSUE = '4744'
 const PULL = 4801
 const UNPUSHED = 2
 const DIRTY_STATUS = ' M scripts/lane/lane-adopt.ts\n'
-const RECORD_EXISTS = 'a record exists'
+// What the transition table's adopt row answers for a record that appeared since the read.
+const RECORD_EXISTS = 'no open → open transition by adopt'
 const OPEN_ISSUE: IssueState = { state: 'OPEN', labels: ['in-progress'], is_human_review: false }
 const NO_RECORDS: LaneRecords = new Map()
 const MERGED_AT = '2026-10-27T01:23:45Z'
@@ -119,7 +120,7 @@ describe('lane_adopt.adopt — every fact read', () => {
 	})
 
 	it('leaves the lane unknown when the record is not written', async () => {
-		const record = vi.fn(async () => ({ kind: 'skipped' as const, reason: RECORD_EXISTS }))
+		const record = vi.fn(async () => ({ kind: 'rejected' as const, reason: RECORD_EXISTS }))
 
 		const adoption = await lane_adopt.adopt(LANE, NO_RECORDS, ports_of({ record }))
 

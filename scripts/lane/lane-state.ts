@@ -15,7 +15,7 @@ import {
 	type PauseOrigin,
 	type StuckProcess,
 } from './lane-state-record'
-import { lane_transition_table } from './lane-transition-table'
+import { lane_transition_table, type LaneTransitionEvent } from './lane-transition-table'
 
 // One record per lane of where it is in its life — opened, running, paused, ended — written only by
 // the lane commands and human-review stops, so a reader asks the record rather than guessing from
@@ -117,11 +117,11 @@ function resume_fields(change: LaneChange, directory: string): Partial<LaneState
 interface NextRecordInput {
 	change: LaneChange
 	previous: LaneStateRecord | undefined
-	paused_by: PauseOrigin | undefined
+	verdict: { event: LaneTransitionEvent; paused_by: PauseOrigin | undefined }
 }
 
 function next_record(input: NextRecordInput, directory: string, now: Date): LaneStateRecord {
-	const { change, previous, paused_by } = input
+	const { change, previous } = input
 
 	return {
 		// An open starts a fresh life: a reopened lane keeps nothing of the run that launched it before.
@@ -130,7 +130,7 @@ function next_record(input: NextRecordInput, directory: string, now: Date): Lane
 		state: change.state,
 		changed_at: now.toISOString(),
 		changed_by: change.command,
-		paused_by,
+		paused_by: input.verdict.paused_by,
 		...launch_fields(change, directory, now),
 		...resume_fields(change, directory),
 	}
@@ -142,17 +142,60 @@ function position_of(previous: LaneStateRecord | undefined): LanePosition | unde
 	return { state: previous.state, paused_by: lane_state_record.pause_origin(previous) }
 }
 
-function apply_held(change: LaneChange, directory: string, now: Date): RecordOutcome {
-	const previous = read_record(directory, change.issue)
+const NO_RECORD_OR_RUN: RecordOutcome = { kind: 'skipped', reason: 'no record or run' }
+
+// A hand-over: the record as it is — its state, who paused it, its last change — owned by the
+// current run.
+function handed_over(
+	input: NextRecordInput,
+	directory: string,
+	now: Date,
+): LaneStateRecord | undefined {
+	const { previous } = input
+	const run = current_run(directory)
+
+	if (run === undefined || previous === undefined) return undefined
+
+	return { ...previous, run, adopted_at: now.toISOString() }
+}
+
+function record_for(
+	input: NextRecordInput,
+	directory: string,
+	now: Date,
+): LaneStateRecord | undefined {
+	const { is_owner_only } = lane_transition_table.row_of(input.verdict.event)
+
+	return is_owner_only === true
+		? handed_over(input, directory, now)
+		: next_record(input, directory, now)
+}
+
+interface Held {
+	directory: string
+	now: Date
+}
+
+function apply_to(
+	change: LaneChange,
+	previous: LaneStateRecord | undefined,
+	held: Held,
+): RecordOutcome {
 	const verdict = lane_state_event.judge(change, position_of(previous))
 
 	if (verdict.kind === 'rejected') return verdict
 
-	const record = next_record({ change, previous, paused_by: verdict.paused_by }, directory, now)
+	const record = record_for({ change, previous, verdict }, held.directory, held.now)
 
-	write_record(directory, record)
+	if (record === undefined) return NO_RECORD_OR_RUN
+
+	write_record(held.directory, record)
 
 	return { kind: 'written', record }
+}
+
+function apply_held(change: LaneChange, directory: string, now: Date): RecordOutcome {
+	return apply_to(change, read_record(directory, change.issue), { directory, now })
 }
 
 const NO_DIRECTORY: RecordOutcome = { kind: 'skipped', reason: 'no git directory' }
@@ -263,63 +306,40 @@ async function record_stuck(
 	return locked(root, issue, () => stuck_held(issue, stuck, root))
 }
 
-function adopted_held(change: LaneChange, directory: string, now: Date): RecordOutcome {
-	if (read_record(directory, change.issue) !== undefined) {
-		return { kind: 'skipped', reason: 'a record exists' }
-	}
+// `adopt`: a lane with no record is given an `open` one (`lane:adopt`); `hand-over`: a lane whose owner
+// run ended becomes the current run's, its state and pause kept (`backlog-drive-carried.ts`).
+type OwnerMove = 'adopt' | 'hand-over'
 
-	return apply_held(change, directory, now)
+function owner_change(issue: string, move: OwnerMove, previous?: LaneStateRecord): LaneChange {
+	if (move === 'adopt') return { issue, state: 'open', command: lane_state_record.ADOPT_COMMAND }
+
+	return { issue, state: previous?.state ?? 'open', command: lane_state_event.HAND_OVER_COMMAND }
+}
+
+function owner_held(issue: string, move: OwnerMove, held: Held): RecordOutcome {
+	const previous = read_record(held.directory, issue)
+
+	return apply_to(owner_change(issue, move, previous), previous, held)
 }
 
 /**
- * Write `change` for a lane that has no record, and only then: a record that appeared since the caller
- * read none is the lane command's, and is never overwritten (`lane:adopt`).
+ * Move the lane to a new owner by the table's adopt or hand-over event. An adopt never overwrites a
+ * record that appeared since the caller read none; a hand-over keeps the state and who paused it
+ * (joshuafolkken/kit#8455, joshuafolkken/kit#8472). The caller has judged the owner run ended.
  */
-async function adopted_outcome(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
-	const directory = await resolve_directory(options.directory)
-
-	if (directory === undefined) return NO_DIRECTORY
-
-	const now = options.now ?? new Date()
-
-	return locked(directory, change.issue, () => adopted_held(change, directory, now))
-}
-
-async function record_adopted(
-	change: LaneChange,
+async function record_owner(
+	issue: string,
+	move: OwnerMove,
 	options: StateOptions = {},
 ): Promise<RecordOutcome> {
-	return await settled(async () => await adopted_outcome(change, options))
-}
-
-function transfer_held(issue: string, directory: string, now: Date): RecordOutcome {
-	const previous = read_record(directory, issue)
-	const run = current_run(directory)
-
-	if (previous === undefined || run === undefined) {
-		return { kind: 'skipped', reason: 'no record or run' }
-	}
-
-	const record = { ...previous, run, adopted_at: now.toISOString() }
-
-	write_record(directory, record)
-
-	return { kind: 'written', record }
-}
-
-/**
- * Hand the lane's record to the current run, leaving its state as it is: a run that adopts a lane its
- * ended owner left behind counts it as its own (joshuafolkken/kit#8455).
- */
-async function record_transfer(issue: string, options: StateOptions = {}): Promise<RecordOutcome> {
 	return await settled(async () => {
 		const directory = await resolve_directory(options.directory)
 
 		if (directory === undefined) return NO_DIRECTORY
 
-		const now = options.now ?? new Date()
+		const held = { directory, now: options.now ?? new Date() }
 
-		return locked(directory, issue, () => transfer_held(issue, directory, now))
+		return locked(directory, issue, () => owner_held(issue, move, held))
 	})
 }
 
@@ -363,15 +383,14 @@ const lane_state = {
 	read_records,
 	read_state,
 	read_states,
-	record_adopted,
 	record_change,
+	record_owner,
 	record_stuck,
-	record_transfer,
 	recorded_issues,
 	state_path,
 }
 
 export { lane_state }
-export type { LaneChange, LaneRecords, RecordOutcome }
+export type { LaneChange, LaneRecords, OwnerMove, RecordOutcome }
 
 export { type LaneState, type LaneStateRecord, type StuckProcess } from './lane-state-record'
