@@ -88,7 +88,7 @@ async function pause_lane(world: World, issue: string): Promise<void> {
 // table refuses the write (a dependency wait).
 async function resume_lane(world: World, issue: string): Promise<void> {
 	if (
-		(await world_fixture.is_refused(world, 'resume', issue)) ||
+		(await is_refused(world, 'resume', issue)) ||
 		!(await try_write(world, { issue, state: 'running', command: 'lane:resume' }))
 	) {
 		return
