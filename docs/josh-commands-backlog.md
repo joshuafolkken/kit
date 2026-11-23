@@ -718,17 +718,17 @@ Create an epic issue from its child issue numbers.
 
 ```bash
 pnpm josh epic "Epic: split the parser work" 101 102 103 --rationale-file .josh/tmp/split/rationale.md
-pnpm josh epic "Epic: staged rollout" A B --rationale-file <path|-> --ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"
-pnpm josh epic "Epic: ..." A B C --rationale-file <path|-> --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"   # a join
-pnpm josh epic "Epic: ..." A B --rationale-file <path|-> --chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"                # why B waits on A
-pnpm josh epic --promote 858 101 102 103 --rationale-file -                                                                                                                    # turn an existing issue into an epic, the rationale on stdin
-pnpm josh epic --add 893 894                                                                                                                                                   # track #894, declaring no order for it
-pnpm josh epic --add 893 894 --before 891 --order-reason "<chain>: <reason>"                                                                                                   # #894 must finish before #891
-pnpm josh epic --add 893 894 --after 890 --order-reason "<chain>: <reason>"                                                                                                    # #894 starts once #890 is done
-pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                                                                  # …and record why, in one call
-pnpm josh epic --reconcile 2184                                                                                                                                                # rewrite the body to match the recorded blocked-by, and record any order the body declared
+pnpm josh epic "Epic: staged rollout" A B --rationale-file .josh/tmp/split/rationale.md--ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"
+pnpm josh epic "Epic: ..." A B C --rationale-file .josh/tmp/split/rationale.md--chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"   # a join
+pnpm josh epic "Epic: ..." A B --rationale-file .josh/tmp/split/rationale.md--chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"                # why B waits on A
+pnpm josh epic --promote 858 101 102 103 --rationale-file -                                                                                                                                       # turn an existing issue into an epic, the rationale on stdin
+pnpm josh epic --add 893 894                                                                                                                                                                      # track #894, declaring no order for it
+pnpm josh epic --add 893 894 --before 891 --order-reason "<chain>: <reason>"                                                                                                                      # #894 must finish before #891
+pnpm josh epic --add 893 894 --after 890 --order-reason "<chain>: <reason>"                                                                                                                       # #894 starts once #890 is done
+pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                                                                                                                                     # …and record why, in one call
+pnpm josh epic --reconcile 2184                                                                                                                                                                   # rewrite the body to match the recorded blocked-by, and record any order the body declared
 pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
-pnpm josh epic --untrack 893 894                                                                                                                                               # remove a child row and its connected orders
+pnpm josh epic --untrack 893 894                                                                                                                                                                  # remove a child row and its connected orders
 ```
 
 **Options:**
