@@ -40,6 +40,7 @@ test('names the issue in flight as the cause of the wait on it', () => {
 	expect(backlog_drive_named.offer(carry, running, false)).toMatchObject({
 		verdict: 'wait',
 		cause: 'named:2',
+		waiting: [2],
 	})
 	expect(backlog_drive_named.offer(CARRY, running, true)?.cause).toBeUndefined()
 })

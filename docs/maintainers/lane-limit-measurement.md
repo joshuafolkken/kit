@@ -293,7 +293,8 @@ the next offer in that same pass, so a freed lane is offered at once. Two passes
   solo run left empty show apart from every other `blocked` offer.
 - A named run's `wait` names what it waits on: `offer:wait:named:<N>` the named issue in flight, whose
   end lets the `auto-ok` queue start, and `offer:wait:only` an `--only` run waiting on its last named
-  issue before it closes (`scripts/backlog/backlog-drive-named.ts`).
+  issue before it closes (`scripts/backlog/backlog-drive-named.ts`). The first lists `<N>` under
+  `waiting`, and `lane:stats` rows it once as `offer:wait:named`.
 - A `blocked` offer names why its issues wait: `:chain` another issue, `:gate` a start condition,
   `:publication` their filing's publication, `:lane` a running lane (a path overlap or `run:solo`),
   or a `+` join such as `offer:watch:gate+lane`; `waiting` lists

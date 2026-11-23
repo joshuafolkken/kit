@@ -70,6 +70,18 @@ function only_end(state: DriveState): OfferRead {
 		: { verdict: 'stop', issues: [], retries: NO_RETRIES, reason: 'only', is_finish: true }
 }
 
+// The wait on a named issue in flight: the board names it (`named:<N>`), and `lane:stats` counts the
+// time under it in `held behind` through `waiting`.
+function named_wait(issue: number): OfferRead {
+	return {
+		verdict: 'wait',
+		issues: [],
+		retries: NO_RETRIES,
+		cause: `${NAMED_WAIT}${REASON_SEPARATOR}${String(issue)}`,
+		waiting: [issue],
+	}
+}
+
 function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead | undefined {
 	const next = next_of(carry, state.in_flight)
 
@@ -77,12 +89,7 @@ function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead 
 		const issue = String(next)
 
 		return state.in_flight.includes(issue)
-			? {
-					verdict: 'wait',
-					issues: [],
-					retries: NO_RETRIES,
-					cause: `${NAMED_WAIT}${REASON_SEPARATOR}${issue}`,
-				}
+			? named_wait(next)
 			: { verdict: 'run', issues: [issue], retries: NO_RETRIES }
 	}
 
