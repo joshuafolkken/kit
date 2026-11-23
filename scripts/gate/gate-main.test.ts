@@ -5,23 +5,22 @@ import { describe, expect, it, vi } from 'vitest'
 // The records are a sentinel rather than the real ones: the fixture re-imports the entry, and the
 // real records carry functions that a fresh module instance would not share.
 // Non-empty, so an entry handing the gate empty records (reuse off) fails the deep comparison.
-const { run, DEFAULT_RECORDS } = vi.hoisted(() => ({
+const { run, run_locked, DEFAULT_RECORDS } = vi.hoisted(() => ({
 	run: vi.fn(),
+	run_locked: vi.fn(async (body: () => Promise<number>): Promise<number> => await body()),
 	DEFAULT_RECORDS: { sentinel: 'the default check records' },
 }))
 
 vi.mock('./gate-command', () => ({ gate_command: { run_gate_command: run } }))
 vi.mock('./check-reuse', () => ({ check_reuse: { DEFAULT_RECORDS } }))
 // The real lock would refuse here whenever this suite runs inside a gate on the same worktree.
-vi.mock('./gate-worktree-lock', () => ({
-	gate_worktree_lock: {
-		run_locked: async (body: () => Promise<number>): Promise<number> => await body(),
-	},
-}))
+vi.mock('./gate-worktree-lock', () => ({ gate_worktree_lock: { run_locked } }))
+
+const ENTRY = 'scripts/gate/gate-main.ts'
 
 const CASES = main_entry_fixture.entry_cases({
 	command: 'gate',
-	entry: 'scripts/gate/gate-main.ts',
+	entry: ENTRY,
 	library: 'scripts/gate/gate-command.ts',
 	run,
 	called_with: [
@@ -39,5 +38,13 @@ describe('gate-main', () => {
 	// stays gone (joshuafolkken/kit#8844).
 	it('leaves the gate module without a main guard', () => {
 		expect(import_closure.has_main_guard('scripts/gate/verification-gate.ts')).toBe(false)
+	})
+
+	it('runs the gate inside the worktree lock', async () => {
+		run_locked.mockClear()
+
+		await main_entry_fixture.run_entry(ENTRY, main_entry_fixture.ARGUMENTS)
+
+		expect(run_locked).toHaveBeenCalledOnce()
 	})
 })

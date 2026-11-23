@@ -114,7 +114,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
 	// (joshuafolkken/kit#6193) crossed the 65536 block; project gate steps narrowed by `paths`
-	// (joshuafolkken/kit#7205) crossed the 69632 block.
+	// (joshuafolkken/kit#7205) crossed the 69632 block; one gate per worktree (joshuafolkken/kit#8846)
+	// crossed the 73728 block.
 	{ path: 'docs/josh-commands.md', bytes: 77_824 },
 	// The auto-retry of every `run:stalled` cause (joshuafolkken/kit#7076) crossed the 8192 block.
 	{ path: 'docs/labels-and-run-states.md', bytes: 12_288 },

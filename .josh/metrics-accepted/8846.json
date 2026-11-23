@@ -2,6 +2,6 @@
 	"reason": "new per-worktree gate lock module and its test (#8846)",
 	"date": "2026-11-23",
 	"growth": {
-		"scripts.code_lines": 101
+		"scripts.code_lines": 108
 	}
 }
