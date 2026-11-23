@@ -276,6 +276,19 @@ The merge that releases its hold keeps the run's issue, start and end, so a merg
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 
+### `josh board:replay`
+
+<!-- usage: board:replay -->
+
+Replay the live board on a virtual clock and a seed, one JSON beat line per beat it writes.
+
+```bash
+pnpm josh board:replay --theme bttf --seed 1            # the bttf arrival, each beat 50 ms apart
+pnpm josh board:replay --theme matrix --seed 2 --at 0   # the rain another seed draws
+```
+
+<!-- /usage -->
+
 ### `josh run:pickup`
 
 <!-- usage: run:pickup -->

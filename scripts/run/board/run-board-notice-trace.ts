@@ -1,19 +1,20 @@
 import { styleText } from 'node:util'
 import { run_board_cut_styled, type StyledPiece } from './run-board-cut-styled'
 import { run_board_header_trace } from './run-board-header-trace'
-import { run_board_labels } from './run-board-labels'
+import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_rain, type Random } from './run-board-rain'
 import { run_board_row_key } from './run-board-row-key'
 
-// joshuafolkken/kit#8658: the matrix board's notice trace (joshuafolkken/kit#8657's approved demo). A new
-// notice's letters spin as the rain's glyphs in the head's white-green, lock from the left one per
-// `LETTER_MS` in bright green, then a green inverse bar — one column past each end — is lit, off and lit
-// again, and the notice stays bright a while more. Pure: the time and the random are passed in.
+// joshuafolkken/kit#8658: the board's notice trace (joshuafolkken/kit#8657's approved demo). A new notice
+// arrives — in matrix its letters spin as the rain's glyphs in the head's white-green and lock from the
+// left one per `LETTER_MS`, elsewhere the theme types it — then an inverse bar in the theme's lit color,
+// one column past each end, is lit and off three times (joshuafolkken/kit#8745), and the notice holds lit
+// until it changes. Pure: the time and the random are passed in.
 
 const LETTER_MS = 50
 const TRACE_BLINK_MS = 1000
 const TRACE_GAP_MS = 1000
-const TRACE_BRIGHT_MS = 4000
+const BLINKS = 3
 
 // The notice slot's empty state (`run-board-header-notice.ts` → `NONE`) never traces.
 const NONE_KEY = run_board_row_key.key_of('notice', '—')
@@ -21,30 +22,42 @@ const NONE_KEY = run_board_row_key.key_of('notice', '—')
 const MARGINS = 2
 const BLANK = ' '
 
-type Stage = 'bar' | 'bright'
+// How a theme's notice traces: the color it is lit and barred in, and whether it arrives as the rain.
+interface NoticeLook {
+	lit: Paint
+	is_rain: boolean
+}
 
-// What the notice holds once its last letter locks, by how long it has held: each stage until its time.
-const STAGES: ReadonlyArray<readonly [number, Stage]> = [
-	[TRACE_BLINK_MS, 'bar'],
-	[TRACE_BLINK_MS + TRACE_GAP_MS, 'bright'],
-	[TRACE_BLINK_MS + TRACE_GAP_MS + TRACE_BLINK_MS, 'bar'],
-	[TRACE_BRIGHT_MS, 'bright'],
-]
+type Stage = 'bar' | 'lit'
+
+const PAIR_MS = TRACE_BLINK_MS + TRACE_GAP_MS
+
+// What the notice shows once its last letter lands, by how long it has: each stage until its time, bar
+// and lit alternating from a bar; past the last bar it holds lit.
+const STAGES: ReadonlyArray<readonly [number, Stage]> = Array.from(
+	{ length: BLINKS },
+	(_, index): ReadonlyArray<readonly [number, Stage]> => [
+		[index * PAIR_MS + TRACE_BLINK_MS, 'bar'],
+		[(index + 1) * PAIR_MS, 'lit'],
+	],
+)
+	.flat()
+	.slice(0, -1)
 
 const { RESET } = run_board_cut_styled
 const { SHADES } = run_board_header_trace
 const { painted } = run_board_labels
 
-function hold_style(held_ms: number): Stage | undefined {
-	return STAGES.find(([until_ms]) => held_ms < until_ms)?.[1]
+function stage_of(held_ms: number): Stage {
+	return STAGES.find(([until_ms]) => held_ms < until_ms)?.[1] ?? 'lit'
 }
 
-function bright(text: string): string {
-	return painted(SHADES.bright, text)
+function lit(look: NoticeLook, text: string): string {
+	return painted(look.lit, text)
 }
 
-function bar(text: string): string {
-	return styleText('inverse', bright(text))
+function bar(look: NoticeLook, text: string): string {
+	return styleText('inverse', lit(look, text))
 }
 
 // A column as the frame draws it, its colors closed after it.
@@ -75,27 +88,22 @@ function framed(pieces: ReadonlyArray<StyledPiece>, letter: Letter, margin: Marg
 		.join('')
 }
 
-function bar_letter(piece: StyledPiece): string {
-	return bar(piece.text)
+// A stage's letters and margins in the look's color: the bar inverts both, lit leaves the margins drawn.
+function held(look: NoticeLook, stage: Stage): readonly [Letter, Margin] {
+	if (stage === 'lit') return [(piece) => lit(look, piece.text), as_drawn]
+
+	return [(piece) => bar(look, piece.text), (piece) => bar(look, BLANK.repeat(piece.width))]
 }
 
-function bar_margin(piece: StyledPiece): string {
-	return bar(BLANK.repeat(piece.width))
-}
-
-function bright_letter(piece: StyledPiece): string {
-	return bright(piece.text)
-}
-
-const HELD: Readonly<Record<Stage, readonly [Letter, Margin]>> = {
-	bar: [bar_letter, bar_margin],
-	bright: [bright_letter, as_drawn],
-}
-
-// The letters while they lock: those left of the step and the blanks bright, the rest spinning.
-function tracing(pieces: ReadonlyArray<StyledPiece>, step: number, random: Random): string {
+// The letters while they lock: those left of the step and the blanks lit, the rest spinning.
+function tracing(
+	pieces: ReadonlyArray<StyledPiece>,
+	step: number,
+	look: NoticeLook,
+	random: Random,
+): string {
 	function letter(piece: StyledPiece, index: number): string {
-		return index < step || is_blank(piece) ? bright(piece.text) : spun(piece, random)
+		return index < step || is_blank(piece) ? lit(look, piece.text) : spun(piece, random)
 	}
 
 	return framed(pieces, letter, as_drawn)
@@ -106,9 +114,9 @@ function length_of(text: string): number {
 	return run_board_cut_styled.styled_pieces(text).length - MARGINS
 }
 
-// `text` — the notice and its margins — `since_ms` after it began, as wide as it is drawn; past the
-// trace, as the frame draws it.
-function traced(text: string, since_ms: number, random: Random): string {
+// `text` — the notice and its margins — `since_ms` after it began, as wide as it is drawn: the rain while
+// a rain look's letters lock (a typed look's arrival is the frame's own, so `text`), then the stage.
+function traced(text: string, since_ms: number, look: NoticeLook, random: Random): string {
 	const pieces = run_board_cut_styled.styled_pieces(text)
 	const length = pieces.length - MARGINS
 
@@ -116,24 +124,26 @@ function traced(text: string, since_ms: number, random: Random): string {
 
 	const step = Math.floor(since_ms / LETTER_MS)
 
-	if (step < length) return tracing(pieces, step, random)
+	if (step >= length) return framed(pieces, ...held(look, stage_of(since_ms - length * LETTER_MS)))
 
-	const stage = hold_style(since_ms - length * LETTER_MS)
-
-	return stage === undefined ? text : framed(pieces, ...HELD[stage])
+	return look.is_rain ? tracing(pieces, step, look, random) : text
 }
 
-function is_tracing(since_ms: number, length: number): boolean {
-	return since_ms < length * LETTER_MS + TRACE_BRIGHT_MS
+// Whether the trace draws the notice `since_ms` after it began: a rain look from the start, a typed one
+// once the theme has typed its `length` letters.
+function is_drawn(since_ms: number, length: number, look: NoticeLook): boolean {
+	return look.is_rain || since_ms >= length * LETTER_MS
 }
 
 // joshuafolkken/kit#8657: how long after it began the notice of `length` letters next changes its look,
-// `since_ms` after it began — the next letter's step while they lock, the stage's end after; none once
-// the trace is over.
-function change_after(since_ms: number, length: number): number {
+// `since_ms` after it began — while they arrive, the rain's next letter step or the typed letters' end,
+// the stage's end after; none once it holds lit.
+function change_after(since_ms: number, length: number, look: NoticeLook): number {
 	const lock_ms = length * LETTER_MS
 
-	if (since_ms < lock_ms) return (Math.floor(since_ms / LETTER_MS) + 1) * LETTER_MS
+	if (since_ms < lock_ms) {
+		return look.is_rain ? (Math.floor(since_ms / LETTER_MS) + 1) * LETTER_MS : lock_ms
+	}
 
 	const until_ms = STAGES.find(([stage_ms]) => since_ms - lock_ms < stage_ms)?.[0]
 
@@ -169,15 +179,15 @@ function trace_of(
 
 const run_board_notice_trace = {
 	LETTER_MS,
+	PAIR_MS,
 	TRACE_BLINK_MS,
-	TRACE_BRIGHT_MS,
 	TRACE_GAP_MS,
 	change_after,
-	is_tracing,
+	is_drawn,
 	length_of,
 	trace_of,
 	traced,
 }
 
 export { run_board_notice_trace }
-export type { NoticeSlot, NoticeTrace }
+export type { NoticeLook, NoticeSlot, NoticeTrace }

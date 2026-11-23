@@ -1,5 +1,6 @@
+import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { run_board_fit } from './run-board-fit'
+import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_intro, type IntroPorts } from './run-board-intro'
 import type { KeyReading } from './run-board-keys'
@@ -15,7 +16,7 @@ import { run_board_theme } from './run-board-theme'
 // no pauses or no color draw the frame whole at once.
 
 const { CLOSE, beats_of, grid_of, is_colored, row_of } = run_board_reveal_rain
-const { drawn_rows } = run_board_reveal_rain_fixture
+const { drawn_rows, screens } = run_board_reveal_rain_fixture
 const { synced } = run_board_screen
 const ESC = '\u{1B}'
 const GREEN = `${ESC}[32m`
@@ -126,12 +127,13 @@ describe('run_board_reveal_rain.row_of', () => {
 })
 
 describe('run_board_reveal_rain.beats_of', () => {
-	it('draws every frame from the top-left, one column a cell, at the frame width', () => {
+	it('draws the first frame whole from the top-left, every screen at the frame width', () => {
 		const beats = [...beats_of(`${GREEN}漢字${OFF}ab\ncd`, () => HALF)]
-		const rows = beats.map((beat) => drawn_rows(beat.text))
+		const rows = screens(beats.map((beat) => beat.text))
 		const widths = rows.flat().map((line) => run_board_fit.width_of(line))
 
 		expect(beats.length).toBeGreaterThan(1)
+		expect(drawn_rows(beats[0]?.text ?? '')).toHaveLength(2)
 		expect(rows.every((drawn) => drawn.length === 2)).toBe(true)
 		expect(beats.every((beat) => beat.ms === RAIN_MS)).toBe(true)
 		expect(new Set(widths)).toStrictEqual(new Set([6]))
@@ -140,6 +142,70 @@ describe('run_board_reveal_rain.beats_of', () => {
 	it('falls no rain where stdout draws no color', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 		expect(is_colored()).toBe(false)
+	})
+})
+
+// A reading that shows each cell as the queue gives it, then the frame behind the rain.
+function queued(cells: Array<RainCell>): (cell: RainCell) => RainCell {
+	return () => cells.shift() ?? BEHIND
+}
+
+// The first beats of a rain over 'abcd' whose cells are read as the queue gives them.
+function scripted(cells: Array<RainCell>, count: number): Array<string> {
+	const beats = beats_of('abcd', () => HALF, { read: queued(cells) })
+
+	return [...beats].slice(0, count).map((beat) => beat.text)
+}
+
+// A reading that shows the frame behind the rain as it is, keeping each cell it read.
+function kept(seen: Array<RainCell>): (cell: RainCell) => RainCell {
+	return (cell) => {
+		seen.push(cell)
+
+		return cell
+	}
+}
+
+// Each beat's text with the screen the rain's cells it read draw when written whole.
+function beats_with_screens(frame: string, size: TerminalSize): Array<[string, Array<string>]> {
+	const grid = grid_of(frame, size)
+	const seen: Array<RainCell> = []
+	const beats = beats_of(frame, () => HALF, { size, read: kept(seen) })
+
+	// `Array.from` maps each beat as the generator makes it, so `seen` holds that beat's cells alone.
+	return Array.from(beats, (beat): [string, Array<string>] => {
+		const cells = seen.splice(0)
+		const rows = grid.map((columns, y) =>
+			row_of(columns, cells.slice(y * size.columns, (y + 1) * size.columns)),
+		)
+
+		return [beat.text, rows.map((row) => stripVTControlCharacters(row))]
+	})
+}
+
+describe('run_board_reveal_rain.beats_of — a later beat writes only what changed', () => {
+	it('writes only the cells that draw otherwise than in the beat before', () => {
+		const behind = [BEHIND, BEHIND, BEHIND, BEHIND]
+		const [, dropped, same_again] = scripted([...behind, BEHIND, DROP, BEHIND, BEHIND], 3)
+
+		expect(dropped).toBe(synced(`${ESC}[1;2H${DRAWN_DROP}`))
+		expect(same_again).toBe(synced(`${ESC}[1;2Hb${CLOSE}`))
+	})
+
+	it('writes no column the rain has passed again', () => {
+		const behind = [BEHIND, BEHIND, BEHIND, BEHIND]
+		const [, ...later] = scripted([...behind, ...behind, ...behind], 3)
+
+		expect(later).toStrictEqual([synced(''), synced('')])
+	})
+
+	it('leaves on the terminal, after every beat, the screen that beat draws written whole', () => {
+		const size = { columns: 6, rows: 3 }
+		const beats = beats_with_screens(`${GREEN}漢字${OFF}ab\ncd\n漢x`, size)
+		const applied = screens(beats.map(([text]) => text))
+
+		expect(beats.length).toBeGreaterThan(2)
+		expect(applied).toStrictEqual(beats.map(([, rows]) => rows))
 	})
 })
 
@@ -155,7 +221,7 @@ describe('run_board_intro.opening in the matrix theme', () => {
 		const revealed = written.slice(before)
 
 		expect(revealed.length).toBeGreaterThan(2)
-		expect(revealed.slice(0, -1).every((text) => drawn_rows(text).length > 0)).toBe(true)
+		expect(drawn_rows(revealed[0] ?? '')).not.toHaveLength(0)
 		expect(revealed.at(-1)).toBe(synced(run_board_theme.restyle(THEME, `${SCREEN}${FRAME}`)))
 	})
 

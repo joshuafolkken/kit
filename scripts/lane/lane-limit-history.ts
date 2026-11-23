@@ -72,6 +72,6 @@ async function label(
 	return limits.length === 0 ? await current_label() : limits.map(String).join(CHANGE_SEPARATOR)
 }
 
-const lane_limit_history = { label, record_current, record_launch }
+const lane_limit_history = { is_limit, label, record_current, record_launch }
 
 export { lane_limit_history }
