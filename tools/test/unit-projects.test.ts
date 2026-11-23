@@ -2,20 +2,25 @@ import { agent_headless } from '#scripts/agent/agent-headless'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comments-unreadable'
+import { GIT_BINARY_KEY } from '#scripts/git/constants'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { review_pair } from '#scripts/review/review-pair'
 import { run_board_theme } from '#scripts/run/board/run-board-theme'
 import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { run_startup } from '#scripts/run/startup/run-startup'
+import { test_read_trace } from '#scripts/test/test-read-trace'
 import { PURE_FILES } from '#tools/test/pure-files'
+import { GUARD_LOG_KEY } from '#tools/test/unit-guard-environment'
 import { unit_projects, type UnitProject } from '#tools/test/unit-projects'
 import { VITEST_INCLUDE_GLOBS } from '#tools/test/vitest-include-globs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const {
 	DEPENDENCY_OPTIMIZER,
+	INHERITED_JOSH_KEYS,
 	ISOLATED_PROJECT,
 	MACHINE_GUARD,
 	MAIN_EXCLUDE,
@@ -26,6 +31,7 @@ const {
 	STDOUT_GUARD,
 	TELEGRAM_GUARD,
 	TEST_FILE_ENVIRONMENT,
+	UNIT_LOCALE,
 	UNIT_PROJECTS,
 	unit_environment,
 	unit_projects_for,
@@ -121,31 +127,10 @@ describe('each project carries the per-run environment and timeout', () => {
 		expect(env[agent_session_environment.PROXY_CERTIFICATE_KEY]).toBe('')
 	})
 
-	// joshuafolkken/kit#2456: the pre-push run inside a detached ship supervisor would otherwise send a
-	// ship fixture down the supervised stop path.
-	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the ship supervisor marks for %s', (name) => {
-		const { env } = project(name)
-
-		expect(env[run_ship_detach.SUPERVISED_KEY]).toBe('')
-		expect(env[agent_role_profile.HANDED_PROVIDER_KEY]).toBe('')
-	})
-
 	// joshuafolkken/kit#3419: a supervisor outliving its session would otherwise record a gone owner on
 	// every fixture's hold, which then reads back as stale.
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session pid for %s', (name) => {
 		expect(project(name).env[agent_session_environment.AGENT_PID_KEY]).toBe('')
-	})
-
-	// joshuafolkken/kit#3623: a ship reviewer running the suite would otherwise carry its role into every
-	// cut-guard delivery fixture, which then stands down where the refusal is expected.
-	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
-		expect(project(name).env[agent_session_role.KEY]).toBe('')
-	})
-
-	// joshuafolkken/kit#6902: a lane run with the paired review on would otherwise make every run:review
-	// fixture write a paired brief its stubs never planned.
-	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the paired review switch for %s', (name) => {
-		expect(project(name).env[review_pair.PAIRED_ENV]).toBe('')
 	})
 })
 
@@ -165,72 +150,76 @@ describe('the unit environment blanks inherited ship and lane marks without a li
 		expect(loaded.unit_projects.ENV[RETRY_PENDING_KEY]).toBe('')
 	})
 
-	it('blanks the retry-pending mark a ship supervisor sets', () => {
-		const environment = unit_environment({ [RETRY_PENDING_KEY]: RETRY_PENDING_VALUE })
-
-		expect(environment[RETRY_PENDING_KEY]).toBe('')
-	})
-
 	it('blanks a ship mark it has no entry for, by its prefix alone', () => {
-		const environment = unit_environment({ JOSH_SHIP_FUTURE_MARK: '1', JOSH_SESSION_LANG: 'ja' })
-
-		expect(environment['JOSH_SHIP_FUTURE_MARK']).toBe('')
-		expect(Object.hasOwn(environment, 'JOSH_SESSION_LANG')).toBe(false)
-	})
-
-	it('blanks every mark a lane launcher sets on a child', () => {
-		const environment = unit_environment({})
-
-		for (const key of lane_child_mark_keys.MARK_KEYS) expect(environment[key]).toBe('')
+		expect(unit_environment({ JOSH_SHIP_FUTURE_MARK: '1' })['JOSH_SHIP_FUTURE_MARK']).toBe('')
 	})
 })
 
-// joshuafolkken/kit#5863: a lane exporting `JOSH_WORKER_SHIP_MODEL` turned every fixture that resolves a
-// profile off its default model, so the gate went red there alone.
-describe('the unit environment blanks the agent profile keys', () => {
-	it('blanks every inherited key a profile is read from', () => {
-		const inherited = Object.fromEntries(
-			agent_role_profile.PROFILE_KEYS.map((key) => [key, 'claude-sonnet-5-5']),
-		)
-		const environment = unit_environment(inherited)
+// joshuafolkken/kit#8769: a hand-kept list of blanked keys let every `JOSH_*` key it missed reach the
+// suite from a developer's shell, so a test could pass locally and fail in CI, which has none of them.
+describe('the unit environment blanks every inherited JOSH_ key the allow-list does not keep', () => {
+	// The keys earlier leaks named one at a time (#2456, #3623, #5029, #5863, #6902, #7035, #7309, #7509,
+	// #8214), each read from its owner so a renamed key still has to start with `JOSH_` to stay covered.
+	const NAMED_MARKS: ReadonlyArray<string> = [
+		RETRY_PENDING_KEY,
+		run_ship_detach.SUPERVISED_KEY,
+		agent_role_profile.HANDED_PROVIDER_KEY,
+		agent_session_role.KEY,
+		review_pair.PAIRED_ENV,
+		run_startup.ENVIRONMENT_KEY,
+		run_board_theme.THEME_ENV,
+		agent_headless.KEY,
+		...run_headless_keys.MARK_KEYS,
+		...lane_child_mark_keys.MARK_KEYS,
+		...agent_role_profile.PROFILE_KEYS,
+	]
+	const UNLISTED = ['JOSH_BOARD_ICONS', 'JOSH_SESSION_LANG', 'JOSH_NEW_KEY', 'JOSH_MODEL']
 
-		expect(agent_role_profile.PROFILE_KEYS).toContain('JOSH_WORKER_SHIP_MODEL')
-		for (const key of agent_role_profile.PROFILE_KEYS) expect(environment[key]).toBe('')
+	it.each([...NAMED_MARKS, ...UNLISTED])('blanks an inherited %s', (key) => {
+		expect(unit_environment({ [key]: RETRY_PENDING_VALUE })[key]).toBe('')
 	})
 
-	it('leaves a key that only resembles one alone', () => {
-		const environment = unit_environment({ JOSH_MODEL: 'opus', JOSH_WORKER_MODELS: 'opus' })
+	it('turns every inherited switch and mark off for its reader', () => {
+		const environment = unit_environment(Object.fromEntries(NAMED_MARKS.map((key) => [key, '1'])))
 
-		expect(Object.hasOwn(environment, 'JOSH_MODEL')).toBe(false)
-		expect(Object.hasOwn(environment, 'JOSH_WORKER_MODELS')).toBe(false)
-	})
-})
-
-// joshuafolkken/kit#7035: a session exporting `JOSH_REVIEWER_PAIRED=1` turned the run:review suites red,
-// because the paired review reached a stamp-file mock without `stamp_path`.
-describe('the unit environment blanks the paired review switch', () => {
-	it('turns an inherited paired review off', () => {
-		const environment = unit_environment({ [review_pair.PAIRED_ENV]: '1' })
-
-		expect(environment[review_pair.PAIRED_ENV]).toBe('')
 		expect(review_pair.is_enabled(environment)).toBe(false)
-	})
-})
-
-// joshuafolkken/kit#7309: a lane carries the headless marks, so the unattended-filing rule passed the
-// gate there and failed in CI, which runs unmarked.
-describe('the unit environment blanks the headless agent and run marks', () => {
-	const MARKS: ReadonlyArray<string> = [agent_headless.KEY, ...run_headless_keys.MARK_KEYS]
-
-	it('blanks every inherited headless mark', () => {
-		const environment = unit_environment(Object.fromEntries(MARKS.map((key) => [key, '1'])))
-
-		expect(MARKS.map((key) => environment[key])).toStrictEqual(MARKS.map(() => ''))
 		expect(agent_headless.is_headless(environment)).toBe(false)
+		expect(run_board_theme.choose([], environment)?.theme).toBeUndefined()
 	})
 
 	it('leaves no launcher headless mark in a test process', () => {
+		const MARKS: ReadonlyArray<string> = [agent_headless.KEY, ...run_headless_keys.MARK_KEYS]
+
 		expect(MARKS.filter((key) => (process.env[key] ?? '') !== '')).toStrictEqual([])
+	})
+})
+
+describe('the unit environment keeps the machinery keys and pins the rest it sets', () => {
+	it('keeps exactly the keys the unit-test machinery hands its workers', () => {
+		expect([...INHERITED_JOSH_KEYS]).toStrictEqual([
+			GIT_BINARY_KEY,
+			platform_temporary.TEMP_ROOT_KEY,
+			GUARD_LOG_KEY,
+			test_read_trace.RECORD_DIRECTORY_KEY,
+			test_read_trace.ROOT_KEY,
+		])
+	})
+
+	it('leaves every allow-listed key out, so the value the machinery sets reaches the workers', () => {
+		const inherited = Object.fromEntries([...INHERITED_JOSH_KEYS].map((key) => [key, '/run']))
+		const environment = unit_environment(inherited)
+
+		for (const key of INHERITED_JOSH_KEYS) expect(Object.hasOwn(environment, key)).toBe(false)
+	})
+
+	it('pins the GitHub transport over an inherited one', () => {
+		const key = 'JOSH_GH_TRANSPORT'
+
+		expect(unit_environment({ [key]: 'auto' })[key]).toBe('graphql')
+	})
+
+	it('leaves a key outside the JOSH_ namespace it does not pin alone', () => {
+		expect(Object.hasOwn(unit_environment({ HOME: '/home/dev' }), 'HOME')).toBe(false)
 	})
 })
 
@@ -246,12 +235,6 @@ describe('the unit environment blanks the live run startup scope', () => {
 
 	afterEach(() => {
 		vi.unstubAllEnvs()
-	})
-
-	it('blanks the key run_startup inherits its scope through', () => {
-		const environment = unit_environment({ [run_startup.ENVIRONMENT_KEY]: LIVE_SCOPE })
-
-		expect(environment[run_startup.ENVIRONMENT_KEY]).toBe('')
 	})
 
 	it('leaves run_startup no scope to hand a spawned step', () => {
@@ -302,6 +285,32 @@ describe('the unit environment pins the time zone to UTC', () => {
 	it('draws local time in UTC in a test process', () => {
 		expect(process.env['TZ']).toBe('UTC')
 		expect(new Date(0).getHours()).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#8772: a shell's `ja_JP.UTF-8` reached `Intl` in the workers, which CI never sees.
+describe('the unit environment pins the locale', () => {
+	const japanese = 'ja_JP.UTF-8'
+	const shell = { LANG: japanese, LC_ALL: japanese, LC_TIME: japanese, LANGUAGE: 'ja' }
+
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('pins LANG and LC_ALL for %s', (name) => {
+		expect(project(name).env['LANG']).toBe(UNIT_LOCALE)
+		expect(project(name).env['LC_ALL']).toBe(UNIT_LOCALE)
+	})
+
+	it('pins the locale over an inherited Japanese one', () => {
+		expect(unit_environment(shell)).toMatchObject({ LANG: UNIT_LOCALE, LC_ALL: UNIT_LOCALE })
+	})
+
+	it('blanks the inherited LC_* and LANGUAGE keys', () => {
+		expect(unit_environment(shell)).toMatchObject({ LC_TIME: '', LANGUAGE: '' })
+	})
+
+	// The default locale is fixed when the worker process starts, so this holds only if the pin reached
+	// the worker's spawn — whatever the shell that ran Vitest exported.
+	it('starts the test process in the pinned locale', () => {
+		expect(process.env['LC_ALL']).toBe(UNIT_LOCALE)
+		expect(new Intl.DateTimeFormat().resolvedOptions().locale).toBe('en-US')
 	})
 })
 

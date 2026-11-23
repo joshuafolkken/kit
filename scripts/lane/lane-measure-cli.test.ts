@@ -116,6 +116,7 @@ describe('lane_measure_cli.run — stats window', () => {
 
 		expect(printed.startsWith(lane_stats.header())).toBe(true)
 		expect(printed).toContain(row)
+		expect(printed).toContain('By lane limit')
 	})
 })
 

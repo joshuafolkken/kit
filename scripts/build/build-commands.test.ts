@@ -6,6 +6,7 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { josh_in_process } from '#scripts/josh/josh-in-process'
 import { josh_logic } from '#scripts/josh/josh-logic'
 import { run_board_worker_entry } from '#scripts/run/board/run-board-worker-entry'
+import { cost_audit_read_pool } from '#tools/cost-audit/cost-audit-read-pool'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { build_commands, built_scripts, bundled_scripts } from './build-commands'
@@ -99,6 +100,17 @@ describe('every script command is pre-built', () => {
 		const chunks = readdirSync(out_directory).filter((name) => name.startsWith(CHUNK_PREFIX))
 
 		expect(chunks.length).toBeGreaterThan(0)
+	})
+})
+
+// joshuafolkken/kit#8757: the cost audit's transcript readers start from their own bundle.
+describe('the cost audit read worker is pre-built', () => {
+	it('builds the read worker beside the commands and loads it under plain node', () => {
+		const bundle = bundle_of(cost_audit_read_pool.WORKER_SCRIPT)
+		const result = spawnSync('node', [bundle], { cwd: PACKAGE_DIR, encoding: 'utf8' })
+
+		expect(existsSync(bundle)).toBe(true)
+		expect(result.status).toBe(0)
 	})
 })
 

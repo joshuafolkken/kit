@@ -7,7 +7,6 @@ import type { BoardHeader } from './run-board-header'
 import type { RainMoment } from './run-board-idle-rain'
 import { run_board_jump_start, type JumpState } from './run-board-jump-start'
 import { run_board_labels } from './run-board-labels'
-import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
@@ -20,8 +19,9 @@ import { run_board_spin, type Spot, type Spun } from './run-board-spin'
 import { run_board_standing } from './run-board-standing'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
-import { run_board_theme_defs, type LiveDefs, type ThemeDefinition } from './run-board-theme-defs'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick_flash } from './run-board-tick-flash'
+import { run_board_tick_theme, type LivePorts } from './run-board-tick-theme'
 import { run_board_type_rows, type Typing, type TypingSpan } from './run-board-type-rows'
 
 // The frame one `run:board` redraw draws (`run-board-tick.ts`) from what `run-board-display.ts`
@@ -30,7 +30,8 @@ import { run_board_type_rows, type Typing, type TypingSpan } from './run-board-t
 // the board's ports.
 
 const { SPOT } = run_board_spin
-const { THEME_DEFS, live_of, panel_of: panel_painter_of, is_rule_lamped } = run_board_theme_defs
+const { live_of, panel_of: panel_painter_of } = run_board_theme_defs
+const { decoded_of, entry_of, has_drop, has_lamps, has_rain, has_rule_lamps } = run_board_tick_theme
 
 // The ports a frame is drawn through — no read among them, so the worker thread draws the frames it
 // records through the same ones (`run-board-gather-record.ts`).
@@ -128,44 +129,6 @@ type Drawn = Spun & {
 	colons: ReadonlyArray<Spot>
 }
 
-// The theme rows whose lamp choice the panel reads.
-type LampDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'lamps'>>>>
-
-type LampPorts = Pick<DrawPorts, 'types_rows' | 'is_live' | 'theme'>
-
-// Whether a live board — its rows typing, or the board live though they do not (joshuafolkken/kit#8674)
-// — is drawn in a theme whose definition draws lamps (joshuafolkken/kit#8359).
-function is_lamp_theme(ports: LampPorts, defs: LampDefs): boolean {
-	const is_live = ports.types_rows === true || ports.is_live === true
-
-	return is_live && ports.theme !== undefined && defs[ports.theme]?.lamps === true
-}
-
-type LivePorts = Pick<DrawPorts, 'types_rows' | 'is_live' | 'theme' | 'is_tty'>
-
-// Whether the board draws on a terminal drawing color.
-function is_colored_tty(ports: Pick<DrawPorts, 'is_tty'>): boolean {
-	return ports.is_tty && run_board_lamps.is_colored()
-}
-
-// The lamp panel shows where the rows type — a live board in a theme that draws lamps — on a terminal
-// drawing color (joshuafolkken/kit#8236).
-function has_lamps(ports: LivePorts, defs: LampDefs = THEME_DEFS): boolean {
-	return is_lamp_theme(ports, defs) && is_colored_tty(ports)
-}
-
-// Whether the lamp panel's cells run the idle rain: where the panel shows, in a theme whose live board
-// rains there (joshuafolkken/kit#8356).
-function has_rain(ports: LivePorts): boolean {
-	return has_lamps(ports) && live_of(ports.theme).rain
-}
-
-// Whether the lamp panel runs over the usage rule's row: where the panel shows, in a theme whose
-// definition lamps the rule (joshuafolkken/kit#8702).
-function has_rule_lamps(ports: LivePorts): boolean {
-	return has_lamps(ports) && is_rule_lamped(ports.theme)
-}
-
 // The idle rain's moment a rain frame's lamps are drawn at — none where the panel does not rain, so its
 // lamps are drawn as `■` (joshuafolkken/kit#8647).
 function rain_of(redraw: Pick<Redraw, 'ports' | 'now_ms'>): RainMoment | undefined {
@@ -180,44 +143,6 @@ function panel_of(ports: LivePorts, drawn: Pick<Drawn, 'area'>): PanelDraw | und
 	if (painter === undefined || drawn.area === undefined) return undefined
 
 	return { painter, area: drawn.area }
-}
-
-// How a new row enters: typed where the rows type; in a theme whose live board decodes them, decoded on
-// a terminal drawing color and shown at once on one drawing none (joshuafolkken/kit#8356).
-type RowEntry = 'type' | 'decode' | 'none'
-
-function entry_of(ports: LivePorts, defs: LiveDefs = THEME_DEFS): RowEntry {
-	if (ports.types_rows !== true) return 'none'
-	if (!live_of(ports.theme, defs).decode) return 'type'
-
-	return is_colored_tty(ports) ? 'decode' : 'none'
-}
-
-// Whether the section rules run code while a row types: a theme whose live board decodes them, where its
-// lamp panel shows — the spin gates them on the lamps it blinks (joshuafolkken/kit#8375).
-function has_codes(ports: Pick<DrawPorts, 'theme'>, defs: LiveDefs = THEME_DEFS): boolean {
-	return live_of(ports.theme, defs).codes
-}
-
-// Whether a lamp strip fills above each rule: where the rules run code, in a theme whose definition
-// switches the strip on (joshuafolkken/kit#8376) — off by default (joshuafolkken/kit#8398).
-function has_strip(ports: Pick<DrawPorts, 'theme'>, defs: LiveDefs = THEME_DEFS): boolean {
-	const live = live_of(ports.theme, defs)
-
-	return live.codes && live.strip
-}
-
-// The rules running code and the strips filling above them that the spin draws, each kept only where its
-// switch is on — off, the board holds no cell for it and the spin writes none.
-function decoded_of(
-	ports: Pick<DrawPorts, 'theme'>,
-	drawn: Pick<Drawn, 'rules' | 'strips'>,
-	defs: LiveDefs = THEME_DEFS,
-): Pick<Drawn, 'rules' | 'strips'> {
-	return {
-		rules: has_codes(ports, defs) ? drawn.rules : [],
-		strips: has_strip(ports, defs) ? drawn.strips : [],
-	}
 }
 
 // The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen;
@@ -246,14 +171,6 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 	const colons = run_board_spin.colons_in(themed, bounds.size)
 
 	return { ...spun, notes, size: bounds.size, colons }
-}
-
-// Whether a drop falls down the board between redraws: a live board on a terminal drawing color, in a
-// theme whose live board drops one (joshuafolkken/kit#8367) — the lamps' gate, by the theme's own switch.
-function has_drop(ports: LivePorts, defs: LiveDefs = THEME_DEFS): boolean {
-	if (ports.types_rows !== true || !live_of(ports.theme, defs).drop) return false
-
-	return is_colored_tty(ports)
 }
 
 // The last frame's drop and this frame's flash, which together hold the deja vus a drop rains for.
@@ -413,15 +330,8 @@ function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw):
 
 const run_board_tick_draw = {
 	bounds_of,
-	decoded_of,
 	draw,
 	draw_display,
-	entry_of,
-	has_drop,
-	has_lamps,
-	has_rain,
-	has_rule_lamps,
-	has_strip,
 	panel_of,
 }
 

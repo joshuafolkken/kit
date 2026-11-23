@@ -49,10 +49,9 @@ function can_cut(world: World, lane: LaneModel): boolean {
 	return world.run.is_active && is_running_child(lane)
 }
 
+// `lane:restart` refuses a paused lane: the table has no launch from paused (joshuafolkken/kit#8775).
 function can_restart(world: World, lane: LaneModel): boolean {
-	const is_held = lane.state === 'running' || lane.state === 'paused'
-
-	return world.run.is_active && lane.is_listed && is_held
+	return world.run.is_active && lane.is_listed && lane.state === 'running'
 }
 
 function can_close(_world: World, lane: LaneModel): boolean {

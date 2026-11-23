@@ -73,10 +73,13 @@ function report(verb: Verb, issue: string, result: LaneSignalled): void {
 	)
 }
 
+// A change the lifecycle refused (a dependency wait's lane is not resumed by a person) leaves the lane
+// where it was, so the ledger and the event stream are not told it moved; the signal itself stands.
 async function record(verb: Verb, issue: string): Promise<void> {
 	const command = `lane:${verb}`
+	const outcome = await lane_state.record_change({ issue, state: VERBS[verb].state, command })
 
-	await lane_state.record_change({ issue, state: VERBS[verb].state, command })
+	if (outcome.kind === 'rejected') return
 	await lane_ledger_write.record_lane_state({ issue: Number(issue), state: VERBS[verb].state })
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.LANE_STATE,

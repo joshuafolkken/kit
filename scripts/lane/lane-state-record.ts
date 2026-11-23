@@ -9,7 +9,17 @@ import { z } from 'zod'
 // lanes out of the worker share (`unit-run-marker.ts`, joshuafolkken/kit#6916).
 
 const STATE_SUFFIX = '.json'
+const PAUSE_COMMAND = 'lane:pause'
 const DEPENDENCY_WAIT_COMMAND = 'lane:dependency-wait'
+// Who paused a lane, each with the command that pauses it so: a person (`lane:pause`), or a dependency
+// wait the launch found. A dependency wait's release resumes only its own pause, never a person's.
+const BY_PERSON = 'person' as const
+const BY_DEPENDENCY_WAIT = 'dependency-wait' as const
+const PAUSE_ORIGIN_COMMANDS = {
+	[BY_PERSON]: PAUSE_COMMAND,
+	[BY_DEPENDENCY_WAIT]: DEPENDENCY_WAIT_COMMAND,
+} as const
+const PAUSE_ORIGINS = [BY_PERSON, BY_DEPENDENCY_WAIT] as const
 // The `changed_by` of a lane no child was ever started in — `lane:dispatch` moves it on (`run-preflight.ts`).
 const OPEN_COMMAND = 'lane:open'
 // `as const` so the literal type survives export on `lane_state_record` (a bare const widens there).
@@ -36,12 +46,23 @@ const lane_state_schema = z.object({
 	adopted_at: z.string().optional(),
 	changed_at: z.string(),
 	changed_by: z.string(),
+	// Set while the lane is `paused`; a record written before it existed is read off `changed_by`.
+	paused_by: z.enum(PAUSE_ORIGINS).optional(),
 	stuck: z.array(stuck_schema).optional(),
 })
 
 type LaneRun = z.infer<typeof lane_run_schema>
 type LaneStateRecord = z.infer<typeof lane_state_schema>
 type StuckProcess = z.infer<typeof stuck_schema>
+type PauseOrigin = (typeof PAUSE_ORIGINS)[number]
+
+/** Who paused a `paused` lane — its `paused_by`, or an older record's `changed_by` — else `undefined`. */
+function pause_origin(record: LaneStateRecord | undefined): PauseOrigin | undefined {
+	if (record?.state !== 'paused') return undefined
+	if (record.paused_by !== undefined) return record.paused_by
+
+	return record.changed_by === DEPENDENCY_WAIT_COMMAND ? BY_DEPENDENCY_WAIT : BY_PERSON
+}
 
 // The record's file name, keyed on the common git directory as `durable_state.path` keys it.
 function record_name(common: string, issue: string): string {
@@ -72,11 +93,14 @@ const lane_state_record = {
 	HUMAN_REVIEW,
 	LANE_STATES,
 	OPEN_COMMAND,
+	PAUSE_COMMAND,
+	PAUSE_ORIGIN_COMMANDS,
 	STATE_SUFFIX,
 	is_idle,
+	pause_origin,
 	read_record_file,
 	record_name,
 }
 
 export { lane_state_record }
-export type { LaneRun, LaneState, LaneStateRecord, StuckProcess }
+export type { LaneRun, LaneState, LaneStateRecord, PauseOrigin, StuckProcess }

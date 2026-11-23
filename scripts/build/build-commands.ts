@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { BUNDLED_COMMAND_DIRECTORY, josh_in_process } from '#scripts/josh/josh-in-process'
 import { run_board_worker_entry } from '#scripts/run/board/run-board-worker-entry'
+import { cost_audit_read_pool } from '#tools/cost-audit/cost-audit-read-pool'
 import { build } from 'esbuild'
 import { build_inputs, place_build, source_recorder } from './build-hooks'
 import { bundle_flag } from './bundle-flag'
@@ -27,8 +28,9 @@ function bundled_scripts(): Array<string> {
 }
 
 // Entries a bundled command starts itself rather than the dispatcher: the live board's worker thread
-// (`run-board-worker-entry.ts`), so a board built into `dist/` never starts tsx for it.
-const THREAD_SCRIPTS = [run_board_worker_entry.WORKER_SCRIPT]
+// (`run-board-worker-entry.ts`) and the cost audit's transcript readers (`cost-audit-read-pool.ts`), so
+// a command built into `dist/` never starts tsx for them.
+const THREAD_SCRIPTS = [run_board_worker_entry.WORKER_SCRIPT, cost_audit_read_pool.WORKER_SCRIPT]
 
 function built_scripts(): Array<string> {
 	return [...bundled_scripts(), ...THREAD_SCRIPTS]

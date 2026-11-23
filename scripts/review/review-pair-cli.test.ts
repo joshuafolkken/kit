@@ -102,3 +102,22 @@ describe('review_pair_cli.run', () => {
 		expect(review_pair_log.read(log)).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#8759: --stats reads the ledger back without recording anything.
+describe('review_pair_cli.run --stats', () => {
+	it('prints the recall summary of the recorded comparisons under --stats', () => {
+		const log = fresh_log()
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		review_pair_cli.run([], sources(log))
+		expect(error.mock.calls[0]?.[0]).toContain('josh review:pair --stats')
+
+		review_pair_cli.run(ARGV, sources(log))
+		info.mockClear()
+
+		expect(review_pair_cli.run(['--stats'], sources(log))).toBe(0)
+		expect(review_pair_log.read(log)).toHaveLength(1)
+		expect(info.mock.calls[0]?.[0]).toContain('high: opus 1 · sonnet recalled 0 · recall 0%')
+	})
+})

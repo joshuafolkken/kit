@@ -13,7 +13,10 @@ import { run_board_rgb, type Rgb } from './run-board-rgb'
 // until the thaw, crossed only by the run up's bolts.
 
 const { mixed, parsed, scaled } = run_board_rgb
-const { END_TICKS, THAW_AT, THAW_TICKS, WASH_TICKS, ARRIVE_TICKS, flash_of } = run_board_jump
+const { END_TICKS, THAW_AT, THAW_TICKS, WASH_TICKS, ARRIVE_TICKS, ARRIVE_THAW_TICKS, flash_of } =
+	run_board_jump
+// joshuafolkken/kit#8789: the arrival runs the jump's thaw this much faster, to fit its shorter thaw.
+const ARRIVE_PACE = THAW_TICKS / ARRIVE_THAW_TICKS
 const { trail_cells } = run_board_fire_trail
 const { rolled_clocks } = run_board_clock_roll
 const { bolt_cells } = run_board_jump_bolts
@@ -192,7 +195,7 @@ function jump_cells(
 // The board `tick` ticks into the arrival: black, lit by the flashes, then thawing.
 function arrive_cells(cells: ReadonlyArray<PaintCell>, tick: number): Array<PaintCell> {
 	if (tick >= ARRIVE_TICKS) return [...cells]
-	if (tick >= THAW_AT) return cells.map((cell) => thawed(cell, tick - THAW_AT))
+	if (tick >= THAW_AT) return cells.map((cell) => thawed(cell, (tick - THAW_AT) * ARRIVE_PACE))
 	const fg = scaled(WHITE, flash_of(tick))
 
 	return cells.map((cell) => ({ ...cell, fg }))
