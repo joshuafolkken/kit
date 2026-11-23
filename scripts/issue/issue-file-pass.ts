@@ -2,6 +2,7 @@ import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
+import { defect_origin_cli } from './defect-origin-cli'
 import { issue_auto_ok, type AutoOkFiling } from './issue-auto-ok'
 import { issue_cap_files } from './issue-cap-files'
 import { issue_file, type FileArguments } from './issue-file'
@@ -220,18 +221,37 @@ function premise_refusals(filing: Filing): ReadonlyArray<string> {
 	return premise_judge.draft_problems(filing.body).map((problem) => `✖ ${problem}`)
 }
 
+// A bug body with no traced origin gets the merges `defect:origin` would propose, searched in this
+// checkout — so only for a filing into this repository (joshuafolkken/kit#8774).
+async function origin_candidates(filing: Filing): Promise<ReadonlyArray<string>> {
+	if (!issue_file.is_same_repository(filing.target, filing.current)) return []
+	const listing = await defect_origin_cli.filing_listing(filing.body)
+
+	return listing === undefined ? [] : [listing]
+}
+
+function admitted_with(candidates: ReadonlyArray<string>): boolean {
+	for (const listing of candidates) console.info(listing)
+
+	return true
+}
+
 // The size estimate is judged at the ledger's recent implement rate (joshuafolkken/kit#6025).
 async function is_admitted(filing: Filing): Promise<boolean> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
-	const capped = await cap_refusals(filing)
 	const premised = premise_refusals(filing)
-	const refusals = [...refusals_of(filing, implement_rate, growth), ...capped, ...premised]
+	const refusals = [
+		...refusals_of(filing, implement_rate, growth),
+		...(await cap_refusals(filing)),
+		...premised,
+	]
+	const candidates = await origin_candidates(filing)
 
 	issue_lint_cli.warn(filing.body)
-	if (refusals.length === 0) return true
+	if (refusals.length === 0) return admitted_with(candidates)
 	const hint = await issue_file_lane_hint.lines_of(filing.args.found_during, filing.body)
 
-	console.error([...refusals, ...hint].join('\n'))
+	console.error([...refusals, ...candidates, ...hint].join('\n'))
 
 	return false
 }

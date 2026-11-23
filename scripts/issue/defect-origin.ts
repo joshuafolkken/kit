@@ -99,8 +99,9 @@ function format_candidate(candidate: Candidate): string {
 	return `${issue_cite.plain_for('linked', candidate.pr)}  ${date}  ${candidate.title}\n  changed: ${changed}`
 }
 
-function format(issue_number: string, candidates: ReadonlyArray<Candidate>): string {
-	const header = `origin candidates for ${issue_cite.plain_for('linked', issue_number)} (newest first; declare one as ${ORIGIN_HINT}):`
+// `subject` names what the candidates are for: a cited issue, or the body being filed.
+function format(subject: string, candidates: ReadonlyArray<Candidate>): string {
+	const header = `origin candidates for ${subject} (newest first; declare one as ${ORIGIN_HINT}):`
 	const lines =
 		candidates.length === 0
 			? [NO_CANDIDATES]
