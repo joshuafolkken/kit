@@ -3,6 +3,7 @@ import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_command } from './epic'
+import { epic_cli } from './epic-cli'
 
 // joshuafolkken/kit#5846: `run:split` creates its epic through `epic_command.create`, which answers
 // what happened rather than an exit code — a refusal apart from a created epic and its number.
@@ -102,6 +103,29 @@ describe('epic_command.run — the split rationale', () => {
 		expect(await epic_command.run([...PROMOTE, ...WITH_RATIONALE])).toBe(0)
 
 		expect(promote_epic).toHaveBeenCalledWith(expect.objectContaining({ rationale: WHY_SPLIT }))
+	})
+})
+
+describe('epic_command.run — reading the split rationale', () => {
+	// `--rationale-file -` reads stdin, which a second read would find empty.
+	it.each([
+		['creation', ARGV],
+		['promotion', ['--promote', '9', '10', '11']],
+	])('reads the rationale once on a %s', async (_name, argv) => {
+		const read = vi.spyOn(epic_cli, 'read_rationale')
+
+		expect(await epic_command.run([...argv, ...WITH_RATIONALE])).toBe(0)
+
+		expect(read).toHaveBeenCalledTimes(1)
+		read.mockRestore()
+	})
+
+	it('prints --rationale-file as required in the usage', async () => {
+		await epic_command.run(ARGV)
+
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+			expect.stringContaining('<N2> ... --rationale-file <path|-> [--ordered'),
+		)
 	})
 })
 

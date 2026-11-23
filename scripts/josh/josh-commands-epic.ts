@@ -27,16 +27,16 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments:
-						'"Epic: staged rollout" A B --ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"',
+						'"Epic: staged rollout" A B --rationale-file <path|-> --ordered --order-reason "#A -> #B: unverifiable in one pass — B ships the flag A adds once A runs live"',
 				},
 				{
 					arguments:
-						'"Epic: ..." A B C --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"',
+						'"Epic: ..." A B C --rationale-file <path|-> --chain "#A -> #C" --chain "#B -> #C" --order-reason "#A -> #C: <kind> — …" --order-reason "#B -> #C: <kind> — …"',
 					note: 'a join',
 				},
 				{
 					arguments:
-						'"Epic: ..." A B --chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"',
+						'"Epic: ..." A B --rationale-file <path|-> --chain "#A -> #B" --order-reason "#A -> #B: waits on another — #B also waits on the upstream release"',
 					note: 'why B waits on A',
 				},
 				{
