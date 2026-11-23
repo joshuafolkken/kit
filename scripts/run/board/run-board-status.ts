@@ -71,6 +71,8 @@ interface ItemStatus {
 	// What stopped the lane or its ship — the command its record or its labels name
 	// (`run-board-lane-stop.ts`).
 	stop_reason?: string | undefined
+	// joshuafolkken/kit#8855: why a child an outage stopped is not restarted yet (`run-resume-wait.ts`).
+	resume_wait?: string | undefined
 	// A running lane's transcript result (`run_liveness.read_agent_state`); `undefined` where unread.
 	result?: AgentResult | undefined
 	// When a running lane's transcript was last written — the latest an idle lane can have stopped.

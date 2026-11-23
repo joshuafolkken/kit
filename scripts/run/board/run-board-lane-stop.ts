@@ -83,12 +83,11 @@ function own_status(
 }
 
 // joshuafolkken/kit#8855: a stopped child an outage left awaiting a restart says why it is not
-// restarted yet (`run-resume-wait.ts`), beside whatever stopped it.
+// restarted yet (`run-resume-wait.ts`), in its own field so the label-derived stop reason still settles.
 function waited(status: ItemStatus, wait: string | undefined): ItemStatus {
 	if (wait === undefined || status.state !== 'stopped') return status
-	const stop_reason = status.stop_reason === undefined ? wait : `${status.stop_reason} · ${wait}`
 
-	return { ...status, stop_reason }
+	return { ...status, resume_wait: wait }
 }
 
 // Each running child of `statuses` whose lane stopped, stopped: an open lane of this run's once read

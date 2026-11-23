@@ -98,9 +98,9 @@ describe('run_board_lane_stop.stop_lanes', () => {
 
 describe('run_board_lane_stop.stop_lanes outage waits', () => {
 	it.each([
-		['beside the reason it stopped for', CLOSER, `${CLOSER} · ${SEAT_WAIT}`],
-		['alone where nothing named the stop', undefined, SEAT_WAIT],
-	])('appends an outage wait %s', (_case, stop_reason, expected) => {
+		['beside the reason it stopped for', CLOSER],
+		['where nothing named the stop', undefined],
+	])('carries an outage wait %s in its own field', (_case, stop_reason) => {
 		const stopped: ItemStatus = {
 			state: STOPPED,
 			...(stop_reason !== undefined && { stop_reason }),
@@ -109,7 +109,8 @@ describe('run_board_lane_stop.stop_lanes outage waits', () => {
 
 		run_board_lane_stop.stop_lanes(statuses, run_board_lane_state.NO_LANES, new Map(), WAITING)
 
-		expect(statuses.get(ISSUE)?.stop_reason).toBe(expected)
+		expect(statuses.get(ISSUE)?.resume_wait).toBe(SEAT_WAIT)
+		expect(statuses.get(ISSUE)?.stop_reason).toBe(stop_reason)
 	})
 
 	it('leaves a running child, and a wait with no reason yet, unchanged', () => {

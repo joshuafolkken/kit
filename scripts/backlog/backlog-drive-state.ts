@@ -5,7 +5,8 @@ import type { DriveState } from './backlog-drive'
 // joshuafolkken/kit#8855: a seeded child whose process is gone is reported finished only after the
 // re-confirm window, so the first offer waits until then and a dead child is collected — and ranked as
 // an outage — before a fresh issue takes its seat. Twice the window covers the poll lag between the start
-// and the first idle read. A window restart re-seeds, so each invocation pays this once.
+// and the first idle read. The window counts from `--active`, the carried last-activity time, so only a
+// fresh activity pays it; a restart or re-drive with a stale one offers at once.
 const SETTLING_FACTOR = 2
 
 function settling_until(in_flight: ReadonlyArray<string>, active: string): number | undefined {
