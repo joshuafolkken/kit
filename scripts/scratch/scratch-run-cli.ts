@@ -20,7 +20,7 @@ const USAGE = 'Usage: josh scratch:run <path> [args…]'
 const NETWORK_FLAG = '--allow-net'
 const IMPORT_FLAG = '--import'
 // Lets the script import `scripts/` without extensions, as `scripts/` does (joshuafolkken/kit#8733).
-const RESOLVE_HOOK_URL = new URL('scratch-resolve-hook.ts', import.meta.url).href
+const RESOLVE_HOOK_URL = new URL('scratch-resolve-hook.mjs', import.meta.url).href
 
 type NodeFlags = ReadonlySet<string>
 

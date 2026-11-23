@@ -70,7 +70,7 @@ const PATH_LAUNCHED_ENTRIES = [
 	'scripts/registry-migration/migrate-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
 	'scripts/run/run-label-main.ts',
-	'scripts/scratch/scratch-resolve-hook.ts',
+	'scripts/scratch/scratch-resolve-hook.mjs',
 ]
 
 // Shipped although no consumer entry reaches them: kit's own build and release entries, which run
