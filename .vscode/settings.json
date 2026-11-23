@@ -56,5 +56,6 @@
 	"sonarlint.connectedMode.project": {
 		"connectionId": "joshuafolkken",
 		"projectKey": "joshuafolkken_kit"
-	}
+	},
+	"terminal.integrated.minimumContrastRatio": 1
 }
