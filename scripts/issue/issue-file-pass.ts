@@ -239,12 +239,9 @@ function admitted_with(candidates: ReadonlyArray<string>): boolean {
 // The size estimate is judged at the ledger's recent implement rate (joshuafolkken/kit#6025).
 async function is_admitted(filing: Filing): Promise<boolean> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
+	const capped = await cap_refusals(filing)
 	const premised = premise_refusals(filing)
-	const refusals = [
-		...refusals_of(filing, implement_rate, growth),
-		...(await cap_refusals(filing)),
-		...premised,
-	]
+	const refusals = [...refusals_of(filing, implement_rate, growth), ...capped, ...premised]
 	const candidates = await origin_candidates(filing)
 
 	issue_lint_cli.warn(filing.body)
