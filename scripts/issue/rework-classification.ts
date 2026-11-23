@@ -1,3 +1,4 @@
+import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 import { session_cite } from './session-cite'
@@ -18,8 +19,6 @@ const NEW_GOAL_PREFIX = issue_body_keys.prefix('new_goal')
 const NON_CITING_PREFIXES = (
 	['order', 'sample_gate', 'decision_rule', 'cause_lane', 'cause_park', 'refactor_first'] as const
 ).map((key) => issue_body_keys.prefix(key))
-// `parent: #<N>`, bulleted or bare, names the epic the Issue sits in.
-const PARENT_LINE = /^(?:-\s*)?parent:/iu
 // A same-repository `#<N>`: not `owner/repo#<N>`, an HTML entity `&#<N>` or a `##` heading.
 const REFERENCE = /(?<![\w/&#])#(?<number>\d+)\b/gu
 
@@ -41,10 +40,14 @@ function is_unexplained_non_defect(body: string): boolean {
 	)
 }
 
+// A parent line names the epic the Issue sits in, in every spelling `epic:audit` reads.
 function is_citing(line: string): boolean {
 	const text = line.trim()
 
-	return !PARENT_LINE.test(text) && NON_CITING_PREFIXES.every((prefix) => !text.startsWith(prefix))
+	return (
+		!epic_audit_logic.has_parent_marker(text) &&
+		NON_CITING_PREFIXES.every((prefix) => !text.startsWith(prefix))
+	)
 }
 
 function numbers_in(line: string): ReadonlyArray<number> {

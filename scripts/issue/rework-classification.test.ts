@@ -79,13 +79,6 @@ describe('rework_classification.problem — passes', () => {
 		expect(rework_classification.problem(body, DELIVERED)).toBeUndefined()
 	})
 
-	it.each([`- parent: #${String(EPIC)}`, `parent: #${String(EPIC)}`])(
-		'passes a body citing delivered work only on its parent line (%s)',
-		(line) => {
-			expect(rework_classification.problem(body_of([NON_DEFECT, line]), DELIVERED)).toBeUndefined()
-		},
-	)
-
 	it('does not count a citation inside a code fence', () => {
 		const body = body_of([NON_DEFECT, '```', `#${String(MERGED_PR)}`, '```'])
 
@@ -103,8 +96,19 @@ describe('rework_classification.problem — passes', () => {
 	})
 })
 
-// A declaration citing finished work by contract is not rework (the round-1 review of kit#8799).
-describe('rework_classification.problem — contract declarations', () => {
+// A parent line or a declaration citing finished work by contract is not rework (the review rounds of
+// kit#8799); the parent spellings are the ones `epic:audit` reads.
+describe('rework_classification.problem — parent and contract declarations', () => {
+	it.each([
+		`- parent: #${String(EPIC)}`,
+		`parent: #${String(EPIC)}`,
+		`親: #${String(EPIC)}`,
+		`親：#${String(EPIC)}`,
+		`- **Parent:** #${String(EPIC)}`,
+	])('passes a body citing delivered work only on its parent line (%s)', (line) => {
+		expect(rework_classification.problem(body_of([NON_DEFECT, line]), DELIVERED)).toBeUndefined()
+	})
+
 	it.each(['sample_gate', 'decision_rule', 'cause_lane', 'cause_park', 'refactor_first'] as const)(
 		'passes a body citing delivered work only on a %s declaration',
 		(key) => {
