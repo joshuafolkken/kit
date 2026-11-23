@@ -2,7 +2,6 @@ import { run_board_drop_screen, type DropScreen, type ScreenCell } from './run-b
 import type { TerminalSize } from './run-board-fit'
 import { run_board_jump, type JumpRun } from './run-board-jump'
 import { run_board_jump_paint, type JumpScene, type PaintCell } from './run-board-jump-paint'
-import type { PanelArea } from './run-board-panel-draw'
 import type { Beat } from './run-board-reveal-blocks'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 import { run_board_screen } from './run-board-screen'
@@ -36,12 +35,12 @@ const BRIGHT_KIND = '9'
 const NO_TYPING: Typing = { seen: undefined, lines: [] }
 
 // A jump being drawn: its timeline, the board's cells as the theme drew them, the rows it is painted
-// over and the animation area, whose cells it leaves alone.
+// over and the cells the animation area's painter draws, `row;column` 1-based, which it leaves alone.
 interface JumpDraw {
 	run: JumpRun
 	screen: DropScreen
 	scene: JumpScene
-	panel?: PanelArea | undefined
+	owned?: ReadonlySet<string> | undefined
 }
 
 function key_of(row: number, column: number): string {
@@ -58,20 +57,22 @@ function rgb_in(style: string, pattern: RegExp): Rgb | undefined {
 	return match === null ? undefined : parsed(match.slice(1).join(';'))
 }
 
-// Whether a cell, 1-based, is the animation area's: its rows from its first lamp place, the first
-// column the area writes (joshuafolkken/kit#8739: the one before it, written by neither, kept the
-// wash as a line after the thaw).
-function is_panel(panel: PanelArea | undefined, row: number, column: number): boolean {
-	if (panel === undefined || row < panel.top || row >= panel.top + panel.rows) return false
+// Whether the jump paints a cell, 1-based: none the typing rows or the area's painter own
+// (joshuafolkken/kit#8782: the area's cells its painter leaves, and the spinners' places, kept the
+// dark through the wash; the spinners hold while the jump runs, `is_lit`).
+function is_painted(draw: JumpDraw, row: number, column: number): boolean {
+	if (draw.owned?.has(key_of(row, column)) === true) return false
 
-	return column >= Math.min(...panel.lamps.map((lamp) => lamp.column))
+	return !run_board_drop_screen.is_held(draw.screen, { row, column })
 }
 
-// Whether the jump paints a cell, 1-based: none the spinners, the typing rows or the area own.
-function is_painted(draw: JumpDraw, row: number, column: number): boolean {
-	if (run_board_drop_screen.is_kept(draw.screen, { row, column })) return false
+function frame_of(ms: number): number {
+	return ms - (ms % FRAME_MS)
+}
 
-	return !is_panel(draw.panel, row, column)
+// Whether a jump is being drawn at `ms`, at the frame it is drawn on.
+function is_lit(draw: JumpDraw | undefined, ms: number): boolean {
+	return draw !== undefined && is_running(draw.run, frame_of(ms))
 }
 
 function last_foreground(style: string): Partial<Record<string, string>> {
@@ -218,10 +219,6 @@ function* arrive_beats(drawn: string, size: TerminalSize | undefined): Generator
 	}
 }
 
-function frame_of(ms: number): number {
-	return ms - (ms % FRAME_MS)
-}
-
 // A cell put back as the theme drew it.
 function restore_bytes(screen: DropScreen, key: string): string {
 	const [row = 0, column = 0] = key.split(';').map(Number)
@@ -249,7 +246,7 @@ function jump_bytes(
 	].join('')
 }
 
-const run_board_jump_screen = { FRAME_MS, arrive_beats, jump_bytes }
+const run_board_jump_screen = { FRAME_MS, arrive_beats, is_lit, jump_bytes }
 
 export { run_board_jump_screen }
 export type { JumpDraw }

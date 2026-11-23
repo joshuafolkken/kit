@@ -1,0 +1,7 @@
+{
+	"reason": "Bug fix #8782: the painter's owned cells, the spinners' hold through the jump and the area written whole while a jump runs add small helpers (owned_of, is_held, before_of, lit_cell)",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}

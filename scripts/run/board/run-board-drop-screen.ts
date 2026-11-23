@@ -152,11 +152,15 @@ function cell_at(screen: DropScreen, place: ScreenPlace): ScreenCell {
 	return screen.rows[place.row - 1]?.[place.column - 1] ?? BLANK
 }
 
-// Whether the drop leaves the cell alone: something else writes it, or it is half a wide character.
-function is_kept(screen: DropScreen, place: ScreenPlace): boolean {
-	if (screen.typing_rows.has(place.row) || screen.skips.has(key_of(place))) return true
+// Whether a light over the screen leaves the cell alone: a typing row writes it, or it is half a wide
+// character.
+function is_held(screen: DropScreen, place: ScreenPlace): boolean {
+	return screen.typing_rows.has(place.row) || cell_at(screen, place).is_wide
+}
 
-	return cell_at(screen, place).is_wide
+// Whether the drop leaves the cell alone: held, or a spot the frame turns writes it.
+function is_kept(screen: DropScreen, place: ScreenPlace): boolean {
+	return screen.skips.has(key_of(place)) || is_held(screen, place)
 }
 
 function blanks(count: number): Array<ScreenCell> {
@@ -180,6 +184,7 @@ const run_board_drop_screen = {
 	WIDE_PAIR,
 	cell_at,
 	filled,
+	is_held,
 	is_kept,
 	key_of,
 	line_tops,

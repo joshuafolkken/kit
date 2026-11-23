@@ -32,6 +32,7 @@ const KEYS = {
 	cause_loss: { ja: '原因の損失', en: 'Cause loss' },
 	order: { ja: '実施順', en: 'Order' },
 	origin: { ja: '原因', en: 'Cause' },
+	new_goal: { ja: '新しい目標', en: 'New goal' },
 	size: { ja: '規模見積もり', en: 'Size estimate' },
 	no_split_reason: { ja: '分割しない理由', en: 'No-split reason' },
 	no_lines: { ja: '行を増やさない', en: 'No added lines' },

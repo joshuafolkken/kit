@@ -115,6 +115,16 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'issue:rework-candidates': {
+		script: 'scripts/issue/issue-rework-candidates-main.ts',
+		description:
+			'List closed enhancements that rework delivered work, each with the merged pull request or closed Issue it cites — read-only',
+		category: 'AI tools',
+		reference: ['--since <days>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '--since 30', note: 'closed in the last 30 days' }],
+		},
+	},
 	'defect:report': {
 		script: 'scripts/issue/defect-report-main.ts',
 		description:
