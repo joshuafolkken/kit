@@ -1,0 +1,7 @@
+{
+	"reason": "Pin the unit-test locale (LANG/LC_ALL, blank LC_*) beside the TZ pin",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}
