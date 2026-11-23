@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const unmoved_mock = vi.hoisted(() => vi.fn(() => true))
 
@@ -119,6 +119,10 @@ describe('run_ship_pair_runs.one_at_a_time', () => {
 
 // joshuafolkken/kit#8864: the wait a pair spent behind another, which its lap does not include.
 describe('run_ship_pair_runs.current queued wait', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	it('records how long a turn queued behind a pair still in its turn', async () => {
 		vi.spyOn(performance, 'now')
 			.mockReturnValueOnce(0)
@@ -131,7 +135,6 @@ describe('run_ship_pair_runs.current queued wait', () => {
 
 		await first
 		expect(await second).toStrictEqual({ queued_ms: 150 })
-		vi.restoreAllMocks()
 	})
 
 	it('records no wait for a turn with no pair ahead', async () => {
@@ -142,5 +145,44 @@ describe('run_ship_pair_runs.current queued wait', () => {
 		expect(
 			await run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.current()),
 		).toStrictEqual({})
+	})
+})
+
+describe('run_ship_pair_runs queued wait reset', () => {
+	it('drops the wait of an earlier turn once a later one queued behind none', async () => {
+		const first = run_ship_pair_runs.one_at_a_time(async () => {
+			await Promise.resolve()
+		})
+		const second = run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.current())
+
+		await first
+		expect(await second).toStrictEqual({ queued_ms: expect.any(Number) })
+		expect(
+			await run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.current()),
+		).toStrictEqual({})
+	})
+
+	it('forgets the recorded wait', async () => {
+		const first = run_ship_pair_runs.one_at_a_time(async () => {
+			await Promise.resolve()
+		})
+
+		await run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.current())
+		await first
+		run_ship_pair_runs.forget()
+
+		expect(run_ship_pair_runs.current()).toStrictEqual({})
+	})
+
+	it('forgets the turns still pending, so the next turn queues behind none', async () => {
+		const first = run_ship_pair_runs.one_at_a_time(async () => {
+			await Promise.resolve()
+		})
+
+		run_ship_pair_runs.forget()
+		const second = run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.current())
+
+		await first
+		expect(await second).toStrictEqual({})
 	})
 })
