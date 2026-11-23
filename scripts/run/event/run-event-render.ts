@@ -26,6 +26,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'human-review': { ja: '人のレビュー待ち', en: 'human review' },
 	split: { ja: '分割', en: 'split' },
 	outage: { ja: '障害', en: 'outage' },
+	'resume-wait': { ja: '再開待ち', en: 'resume wait' },
 	'usage-limit': { ja: '利用上限', en: 'usage limit' },
 	cut: { ja: 'セッション交代', en: 'session cut' },
 	resume: { ja: '実装を再開', en: 'implementation resumed' },

@@ -205,6 +205,9 @@ const EVENT_KIND = {
 	// JSON text with the cycle's `used_delta`, `remaining` and `reset`, or `is_missing` when a read failed
 	// (`backlog-drive-rate.ts`). A trace written every cycle, so the bound rolls it off with the heartbeats.
 	RATE_LIMIT: 'rate-limit',
+	// Why an issue stopped by an outage has not been re-dispatched yet (joshuafolkken/kit#8855):
+	// `#<N> <reason>` — waiting for a seat, or on a blocker (`run-resume-wait.ts`). A trace.
+	RESUME_WAIT: 'resume-wait',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -238,6 +241,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.ONLINE,
 	EVENT_KIND.PLAN_WAIT,
 	EVENT_KIND.RATE_LIMIT,
+	EVENT_KIND.RESUME_WAIT,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or

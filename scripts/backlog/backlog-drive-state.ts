@@ -1,5 +1,19 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { lane_await } from '#scripts/lane/lane-await'
 import type { DriveState } from './backlog-drive'
+
+// joshuafolkken/kit#8855: a seeded child whose process is gone is reported finished only after the
+// re-confirm window, so the first offer waits until then and a dead child is collected — and ranked as
+// an outage — before a fresh issue takes its seat. Twice the window covers the poll lag between the start
+// and the first idle read. The window counts from `--active`, the carried last-activity time, so only a
+// fresh activity pays it; a restart or re-drive with a stale one offers at once.
+const SETTLING_FACTOR = 2
+
+function settling_until(in_flight: ReadonlyArray<string>, active: string): number | undefined {
+	if (in_flight.length === 0) return undefined
+
+	return Date.parse(active) + SETTLING_FACTOR * lane_await.RECONFIRM_MS
+}
 
 function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveState {
 	return {
@@ -8,6 +22,7 @@ function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveS
 		active,
 		retries: 0,
 		is_stopping: false,
+		settling_until_ms: settling_until(in_flight, active),
 	}
 }
 

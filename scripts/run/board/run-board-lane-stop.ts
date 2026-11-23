@@ -1,5 +1,6 @@
 import { parked_label_of } from '#scripts/issue/issue-labels'
 import { issue_run_hold } from '#scripts/issue/issue-run-hold'
+import type { ResumeWaits } from '#scripts/run/event/run-resume-wait'
 import { run_board_human } from './run-board-human'
 import type { IdleSince } from './run-board-idle'
 import type { BoardLanes } from './run-board-lane-state'
@@ -81,11 +82,27 @@ function own_status(
 	return settled.state === 'running' ? { ...settled, is_live: true } : settled
 }
 
+// joshuafolkken/kit#8855: a stopped child an outage left awaiting a restart says why it is not
+// restarted yet (`run-resume-wait.ts`), in its own field so the label-derived stop reason still settles.
+function waited(status: ItemStatus, wait: string | undefined): ItemStatus {
+	if (wait === undefined || status.state !== 'stopped') return status
+
+	return { ...status, resume_wait: wait }
+}
+
 // Each running child of `statuses` whose lane stopped, stopped: an open lane of this run's once read
 // idle, or a lane this run's record ended — a closed lane is no longer open, so only its record says.
-function stop_lanes(statuses: Map<number, ItemStatus>, lanes: BoardLanes, idle: IdleSince): void {
+function stop_lanes(
+	statuses: Map<number, ItemStatus>,
+	lanes: BoardLanes,
+	idle: IdleSince,
+	waits: ResumeWaits,
+): void {
 	for (const [issue, status] of statuses) {
-		statuses.set(issue, own_status(issue, status, lanes, idle))
+		const settled = own_status(issue, status, lanes, idle)
+		const wait = waits.get(String(issue))
+
+		statuses.set(issue, waited(settled, wait))
 	}
 }
 

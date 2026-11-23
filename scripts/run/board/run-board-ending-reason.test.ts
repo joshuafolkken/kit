@@ -16,6 +16,7 @@ import {
 
 const KIND = run_event_stream.EVENT_KIND
 const REVIEW_FAILED = 'run:stalled: review failed'
+const LANE_CLOSE = 'lane:close'
 
 function event(kind: string, text: string): RunEvent {
 	return { pos: 1, at: '2026-10-18T09:00:00.000Z', kind, text }
@@ -92,11 +93,11 @@ describe('run_board_ending_reason.row_reason — a stop reason', () => {
 	const read = { titles: new Map(), labels: new Map() }
 
 	it('names the command that stopped the lane, or the ship of a child still working', () => {
-		const stopped = { state: 'stopped', stop_reason: 'lane:close' } as const
+		const stopped = { state: 'stopped', stop_reason: LANE_CLOSE } as const
 		const running = { state: 'running', stop_reason: RUN_STALLED_LABEL } as const
 
 		expect(run_board_ending_reason.row_reason(13, stopped, read)).toStrictEqual({
-			reason: { tail: 'stopped by lane:close' },
+			reason: { tail: `stopped by ${LANE_CLOSE}` },
 		})
 		expect(run_board_ending_reason.row_reason(13, running, read)).toStrictEqual({
 			reason: { tail: `ship stopped by ${RUN_STALLED_LABEL}` },
@@ -105,6 +106,20 @@ describe('run_board_ending_reason.row_reason — a stop reason', () => {
 
 	it('draws no reason where nothing recorded one', () => {
 		expect(run_board_ending_reason.row_reason(13, { state: 'stopped' }, read)).toStrictEqual({})
+	})
+
+	// joshuafolkken/kit#8855: an outage wait follows the stop reason, or stands alone after "stopped".
+	it.each([
+		['after the stop reason', LANE_CLOSE, `stopped by ${LANE_CLOSE} · 席待ち`],
+		['alone where nothing named the stop', undefined, 'stopped · 席待ち'],
+	])('appends an outage wait %s', (_case, stop_reason, tail) => {
+		const status = {
+			state: 'stopped',
+			resume_wait: '席待ち',
+			...(stop_reason !== undefined && { stop_reason }),
+		} as const
+
+		expect(run_board_ending_reason.row_reason(13, status, read)).toStrictEqual({ reason: { tail } })
 	})
 })
 
