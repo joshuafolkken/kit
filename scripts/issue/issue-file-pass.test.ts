@@ -8,6 +8,7 @@ import { issue_file_lane_hint } from './issue-file-lane-hint'
 import { issue_file_pass, type Filing } from './issue-file-pass'
 import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli } from './issue-scout-cli'
+import { rework_reference_state } from './rework-reference-state'
 import { trusted_measure } from './trusted-measure'
 
 // joshuafolkken/kit#5833: every step of the pass runs whatever the others answer, so one call prints
@@ -314,5 +315,32 @@ describe('issue_file_pass.labels_in_one_pass — measured speed', () => {
 		const labels = await issue_file_pass.labels_in_one_pass(filing_of(body))
 
 		expect(labels !== undefined).toBe(passes)
+	})
+})
+
+// joshuafolkken/kit#8799: rework of delivered work filed as a non-defect is refused; an unreadable
+// state warns rather than blocking the filing.
+describe('issue_file_pass.labels_in_one_pass — rework filed as a non-defect', () => {
+	const REWORKED = 7963
+	const REWORK_REFUSAL = 'rework filed as a non-defect'
+	const REWORK_LINES = `- 種別: 非不具合\n- 目的: 機能改善\n- #${String(REWORKED)} の品質が低い`
+	const REWORK_BODY = CLEAR_BODY.replace('- 種別: 不具合\n- 原因: #4201', () => REWORK_LINES)
+
+	it('refuses when a cited number is delivered work', async () => {
+		vi.spyOn(rework_reference_state, 'delivered').mockResolvedValue(new Set([REWORKED]))
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(REWORK_BODY))).toBeUndefined()
+		expect(printed()).toContain(REWORK_REFUSAL)
+	})
+
+	it('warns and does not refuse when the states cannot be read', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		vi.spyOn(rework_reference_state, 'delivered').mockResolvedValue(undefined)
+
+		await issue_file_pass.labels_in_one_pass(filing_of(REWORK_BODY))
+
+		expect(printed()).not.toContain(REWORK_REFUSAL)
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('rework check'))
 	})
 })
