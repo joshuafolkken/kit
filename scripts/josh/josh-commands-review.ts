@@ -114,7 +114,11 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Record a paired comparison under JOSH_REVIEWER_PAIRED=1: the Opus and Sonnet round-1 findings with severity and each agent cost; never gates',
 		category: 'AI tools',
-		reference: ['--issue <N> --opus-agent <id> --sonnet-agent <id>', 'automation', ['files']],
+		reference: [
+			'--issue <N> --opus-agent <id> --sonnet-agent <id> | --stats',
+			'automation',
+			['files'],
+		],
 		usage: {
 			examples: [
 				{
@@ -126,6 +130,10 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--opus-agent <id>', '--sonnet-agent <id>'],
 					description: "each reviewer's agentId, whose transcript prices its cost.",
+				},
+				{
+					names: ['--stats'],
+					description: "Sonnet's recall of Opus high/medium findings; cost per run.",
 				},
 			],
 		},
