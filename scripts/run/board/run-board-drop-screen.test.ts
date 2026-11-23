@@ -4,7 +4,7 @@ import type { Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8367: the last frame drawn, cell by cell on screen, for the drop to light and put back.
 
-const { cell_at, filled, is_kept, screen_of } = run_board_drop_screen
+const { cell_at, filled, is_kept, line_tops, screen_of } = run_board_drop_screen
 const GREEN = '\u{1B}[32m'
 const RESET = '\u{1B}[0m'
 const IDLE: Typing = { seen: undefined, lines: [] }
@@ -59,6 +59,18 @@ describe('run_board_drop_screen.screen_of — a wide character at a row’s end'
 		expect(cell_at(screen, { row: 1, column: 4 }).text).toBe(' ')
 		expect(cell_at(screen, { row: 2, column: 1 }).text).toBe('日')
 		expect(cell_at(screen, { row: 2, column: 3 }).text).toBe('d')
+	})
+})
+
+describe('run_board_drop_screen.line_tops', () => {
+	it('starts each line on the screen row past the rows the lines above it wrap into', () => {
+		const lines = ['abcdefgh', '', 'ab', 'abcde']
+
+		expect(line_tops(lines, { rows: 9, columns: 3 })).toStrictEqual([0, 3, 4, 5])
+	})
+
+	it('starts each line on its own row without a terminal', () => {
+		expect(line_tops(['abcdefgh', '', 'ab'], undefined)).toStrictEqual([0, 1, 2])
 	})
 })
 

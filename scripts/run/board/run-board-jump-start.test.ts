@@ -167,6 +167,16 @@ describe('run_board_jump_start.jump_of — the fire trails on the bttf board', (
 		expect(rule.startsWith('▾')).toBe(false)
 		expect(draw.scene.trails).toStrictEqual([1, 4])
 	})
+
+	it('burns a trail on the screen row its blank line lands on, past a line above it that wraps', () => {
+		const size = { columns: 10, rows: 9 }
+		const lines = ['a header wider than ten', '', '── lanes ──', ROW_TEXT]
+		const draw = started(frame_of({ drawn: { lines, spots: [], size } }))
+		const above = draw.screen.rows[3]?.map((cell) => cell.text).join('')
+
+		expect(draw.scene.trails).toStrictEqual([3])
+		expect(above?.trim()).toBe('')
+	})
 })
 
 describe('run_board_jump_start.jump_of — the whole terminal', () => {

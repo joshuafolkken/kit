@@ -77,10 +77,12 @@ function draw_of(run: JumpRun, frame: JumpFrame): JumpDraw {
 		drawn.size,
 	)
 	// joshuafolkken/kit#8739: the rules are found as the board writes them — a theme's restyle turns
-	// their fold mark `▾` into another letter (`V` for shapes and letters icons).
-	const trails = run_board_fire_trail.rows_of(
-		drawn.lines.map((line) => stripVTControlCharacters(line)),
-	)
+	// their fold mark `▾` into another letter (`V` for shapes and letters icons) — and each found line
+	// is burned on the screen row it starts on, past the lines above it that wrap.
+	const tops = run_board_drop_screen.line_tops(lines, drawn.size)
+	const trails = run_board_fire_trail
+		.rows_of(drawn.lines.map((line) => stripVTControlCharacters(line)))
+		.flatMap((line) => tops[line] ?? [])
 	const screen = run_board_drop_screen.filled(drawn_screen, drawn.size?.rows ?? 0)
 	const scene: JumpScene = {
 		rows: screen.rows.length,
