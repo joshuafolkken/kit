@@ -1,0 +1,7 @@
+{
+	"reason": "cost:audit worker-thread read pool and per-Issue ledger/event partition (#8757) add new modules",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 202
+	}
+}
