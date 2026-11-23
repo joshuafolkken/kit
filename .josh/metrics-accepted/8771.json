@@ -1,0 +1,7 @@
+{
+	"reason": "#8771 adds the model-based lane lifecycle test fixtures (events and invariants); test-only code",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 342
+	}
+}
