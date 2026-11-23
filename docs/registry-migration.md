@@ -47,7 +47,7 @@ The entry stops before changing anything in these cases ([Verified conditions](#
 - pnpm version mismatch: the project pins a pnpm other than 12.22.0 (`ERR_PNPM_BAD_PM_VERSION` and similar).
 - Missing version: a locked kit, app-kit or similar is not on npm. The oldest versions on npm are kit 1.872.0 and app-kit 0.98.0.
 
-In these cases, skip the entry: move up to versions that are on npm and create a new lockfile.
+In these cases, skip the entry: move up to versions that are on npm, and let pnpm write their new lockfile entries (step 4).
 The old lockfile's integrity is not carried over. Never disable checksums or rewrite integrity.
 
 This assumes every `@joshuafolkken` package in the lockfile is on npm. A project that depends on a package not on npm (`npm view <name> --registry https://registry.npmjs.org/` returns 404) cannot migrate with these steps either.
@@ -68,6 +68,8 @@ This assumes every `@joshuafolkken` package in the lockfile is on npm. A project
 
 4. Check the latest version on npm with `pnpm view @joshuafolkken/kit version`, and upgrade the kit and app-kit you depend on directly from npm. `--ignore-scripts` keeps `prepare` from running before the sync.
 
+   Keep `pnpm-lock.yaml`: `pnpm add` replaces the kit and app-kit entries, tarball URL and integrity included, and leaves every other dependency at its locked version.
+
    ```sh
    pnpm add -D @joshuafolkken/kit@<kit-version> @joshuafolkken/app-kit@<app-kit-version> --ignore-scripts
    pnpm exec josh sync
@@ -76,8 +78,24 @@ This assumes every `@joshuafolkken` package in the lockfile is on npm. A project
 
 5. Run the same check as step 5 of [Migration order](#migration-order): `pnpm config get "@joshuafolkken:registry"` returns `https://registry.npmjs.org/`, and no `npm.pkg.github.com` remains in `pnpm-lock.yaml`.
 
+If `npm.pkg.github.com` remains in `pnpm-lock.yaml`, find which package it belongs to.
+A line for another scope you still install from GitHub Packages is expected and stays.
+
+For an `@joshuafolkken` line, check that the project `.npmrc` maps the scope to npm (step 2) and that the package is on npm.
+Then delete `pnpm-lock.yaml` and repeat step 4. Do not edit the lockfile by hand.
+
+```sh
+rm pnpm-lock.yaml
+```
+
+The rebuilt lockfile also moves other dependencies to the newest versions their ranges allow.
+Run the project's own checks afterwards and fix what moved.
+
 [Work left after the migration](#work-left-after-the-migration) is the same on this path.
 These steps were confirmed on isolated copies of consumers that locked kit 1.206.0 and 1.340.0 (#7654).
+
+On a kit 1.206.0 copy, keeping the lockfile left no GitHub URL and the checks passed.
+Rebuilding it moved svelte to a newer minor, and the type check failed (#8736).
 
 ## Distribution and boundaries
 

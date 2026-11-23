@@ -11,6 +11,7 @@ const HEADING = '## When the entry stops'
 const ANCHOR = `${DOCUMENT}#when-the-entry-stops`
 const WORK_LEFT_ANCHOR = `${DOCUMENT}#work-left-after-the-migration`
 const UTF8 = 'utf8'
+const LOCKFILE_REMOVAL = 'rm pnpm-lock.yaml'
 
 function read_document(relative: string): string {
 	return readFileSync(path.join(DOCS_DIR, relative), UTF8)
@@ -55,5 +56,30 @@ describe('registry-migration.md stopped-entry section', () => {
 		['authentication.md', WORK_LEFT_ANCHOR],
 	])('is linked from %s at %s', (relative, anchor) => {
 		expect(read_document(relative)).toContain(anchor)
+	})
+})
+
+// joshuafolkken/kit#8736: step 4 keeps the lockfile so only kit and app-kit move, and the
+// lockfile is rebuilt only when a GitHub Packages URL survives the step 5 check.
+describe('registry-migration.md stopped-entry lockfile rebuild', () => {
+	it('keeps the lockfile while upgrading kit from npm', () => {
+		const section = stopped_entry_section()
+
+		expect(section).toContain(
+			'Keep `pnpm-lock.yaml`: `pnpm add` replaces the kit and app-kit entries',
+		)
+		expect(section.indexOf(LOCKFILE_REMOVAL)).toBeGreaterThan(
+			section.indexOf('pnpm add -D @joshuafolkken/kit@'),
+		)
+	})
+
+	it('rebuilds the lockfile only when a GitHub Packages URL remains after the check', () => {
+		const section = stopped_entry_section()
+		const check = section.indexOf('5. Run the same check')
+		const recovery = section.indexOf('If `npm.pkg.github.com` remains in `pnpm-lock.yaml`')
+
+		expect(recovery).toBeGreaterThan(check)
+		expect(section.indexOf(LOCKFILE_REMOVAL)).toBeGreaterThan(recovery)
+		expect(section).toContain('delete `pnpm-lock.yaml` and repeat step 4')
 	})
 })
