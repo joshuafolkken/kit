@@ -12,7 +12,7 @@ const { contrast, mixed, parsed, scaled } = run_board_rgb
 const GREY: Rgb = [100, 100, 100]
 const WHITE = parsed('255;255;255')
 const LETTERS = 40
-const SCENE = { rows: 20, lane: 5, panel: { top: 18, rows: 1 } }
+const SCENE = { rows: 20, panel: { top: 18, rows: 1 } }
 const COLUMNS = 80
 const HEADER_ROWS = 3
 const MIN_CONTRAST = 4.5
@@ -49,18 +49,15 @@ describe('run_board_jump_paint.jump_cells — outside the jump and the run up', 
 	it('leaves the board as it is through the run up where the area is not out', () => {
 		const cells = grid(4)
 
-		expect(jump_cells(cells, -1, LETTERS, { rows: 4, lane: 2 })).toStrictEqual(cells)
+		expect(jump_cells(cells, -1, LETTERS, { rows: 4 })).toStrictEqual(cells)
 	})
 })
 
 describe('run_board_jump_paint.jump_cells — the run up', () => {
-	it('whitens the merging lane row with the letters typed, leaving other rows', () => {
-		const lane = cell_at(30, SCENE.lane)
-		const other = cell_at(30, SCENE.lane + 1)
-		const [lit, kept] = jump_cells([lane, other], -20, LETTERS, SCENE)
+	it('ac-f86ed9ae whitens no lane row through the run up, painting every row alike', () => {
+		const rows = [cell_at(30, 5), cell_at(30, 6)]
 
-		expect(lit?.fg).toStrictEqual(mixed(GREY, WHITE, 0.35))
-		expect(kept).toStrictEqual(other)
+		expect(jump_cells(rows, -20, LETTERS, SCENE)).toStrictEqual(rows)
 	})
 
 	it('crosses a flare over the board, its core at its center on the slant', () => {
@@ -77,7 +74,7 @@ describe('run_board_jump_paint.jump_cells — the run up', () => {
 		const moved = changed(cells, jump_cells(cells, -1, LETTERS, SCENE))
 
 		expect(moved.length).toBeGreaterThan(0)
-		expect(moved.every((cell) => cell.y < HEADER_ROWS || cell.y === SCENE.lane)).toBe(true)
+		expect(moved.every((cell) => cell.y < HEADER_ROWS)).toBe(true)
 		expect(moved.some((cell) => cell.is_figure)).toBe(false)
 	})
 })

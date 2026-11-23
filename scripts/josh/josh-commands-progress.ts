@@ -173,7 +173,12 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BTTF_THEME],
 					description:
-						'names the board `josh-flux` and types its opening line as written; no alert sound. The keypad beeps every two letters while the opening and the header’s notice and now rows type, and ENTER once they have typed through (`run-board-sound-keypad.ts`, `run-board-sound-enter.ts`).',
+						'names the board `josh-flux` and types its opening line as written; no alert sound. The keypad beeps every two letters while any row types, and ENTER once each has typed through (`run-board-sound-keypad.ts`, `run-board-sound-enter.ts`).',
+				},
+				{
+					names: [BTTF_THEME],
+					description:
+						'every row that starts typing on a live board starts the time jump, which jumps on the tick after its last letter; a row that starts while a jump runs starts none, one that starts once it has thawed does (`run-board-jump-start.ts`).',
 				},
 				{
 					names: [BTTF_THEME],

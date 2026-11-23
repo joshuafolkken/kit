@@ -15,8 +15,8 @@ import { run_board_rgb } from './run-board-rgb'
 // the rule, and the speed readout in the rule over the capacitor. The frame's lamp places and the usage
 // rule are blanked across the area; where the throughput rows leave too little room, only the lamp
 // places are blanked.
-// joshuafolkken/kit#8677: through a jump the speed climbs to 88 and the gauge steps up with the merge
-// notice's letters, the capacitor floods; on the arrival the speed brakes from 88.
+// joshuafolkken/kit#8677: through a jump the speed climbs to 88 and the gauge steps up with the cueing
+// typing row's letters (joshuafolkken/kit#8731), the capacitor floods; on the arrival the speed brakes from 88.
 
 const { FLUX_WIDTH, flux_cells } = run_board_flux
 const { LED_COLUMNS, gauge_cells, range_of } = run_board_flux_gauge

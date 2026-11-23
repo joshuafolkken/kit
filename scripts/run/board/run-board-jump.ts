@@ -1,7 +1,7 @@
 import { run_board_fire_trail } from './run-board-fire-trail'
 
 // joshuafolkken/kit#8677: the bttf theme's time jump and arrival as timelines in ticks of
-// `TICK_MS`. A jump runs up over the merge notice's letters — one tick each, so it starts on the first
+// `TICK_MS`. A jump runs up over a typing row's letters — one tick each, so it starts on the first
 // letter — and jumps on the tick after the last: the speed climbs to 88, the gauge steps up with the
 // letters typed, the capacitor floods `LEAD` before the jump, the board is washed and then thaws. The
 // arrival at the start flashes three times and thaws.
@@ -35,32 +35,14 @@ const ARRIVE_FLASHES = ['4 2 0.35', '10 2 0.65', '16 3 1'].map((flash) => {
 })
 const THAW_AT = 19
 const ARRIVE_TICKS = THAW_AT + THAW_TICKS
-// joshuafolkken/kit#8711: the merged lane's row is cleared `CLEAR_AT` ticks after the jump and the next
-// row arrives `NEXT_AT` ticks after it, thawing over `NEXT_TICKS`.
-const CLEAR_AT = 10
-const NEXT_AT = 70
-const NEXT_TICKS = 40
-// joshuafolkken/kit#8675: the ticks a jump runs past its last letter — its wash, its thaw, its fire
-// trails burning out and the next lane's row thawing in.
-const END_TICKS = Math.max(
-	WASH_TICKS + THAW_TICKS,
-	run_board_fire_trail.TRAIL_TICKS,
-	NEXT_AT + NEXT_TICKS,
-)
+// joshuafolkken/kit#8675: the ticks a jump runs past its last letter — its wash, its thaw and its fire
+// trails burning out.
+const END_TICKS = Math.max(WASH_TICKS + THAW_TICKS, run_board_fire_trail.TRAIL_TICKS)
 
-// The lane row a merge took off the board, 0-based, and its text as the frame drew it.
-interface LeftLane {
-	row: number
-	text: string
-}
-
-// A jump: the moment the merge notice started typing, its letter count, the issue it merged and the
-// row that lane left.
+// A jump: the moment the typing it runs up over started and its letter count.
 interface JumpRun {
 	start_ms: number
 	letters: number
-	issue?: number | undefined
-	lane?: LeftLane | undefined
 }
 
 // The ticks from the jump at `ms`, negative through the run up.
@@ -152,10 +134,7 @@ function flash_of(tick: number): number {
 
 const run_board_jump = {
 	ARRIVE_TICKS,
-	CLEAR_AT,
 	END_TICKS,
-	NEXT_AT,
-	NEXT_TICKS,
 	THAW_AT,
 	THAW_TICKS,
 	TICK_MS,
@@ -177,4 +156,4 @@ const run_board_jump = {
 }
 
 export { run_board_jump }
-export type { JumpRun, LeftLane }
+export type { JumpRun }

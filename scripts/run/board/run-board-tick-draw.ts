@@ -379,14 +379,7 @@ function effects_of(
 ): Pick<BoardState, 'rules' | 'strips' | 'panel' | 'notice_trace'> & JumpState {
 	const { drawn, notice_trace } = frame
 	const panel = panel_of(redraw.ports, drawn)
-	const jump_frame = {
-		...frame,
-		ports: redraw.ports,
-		notice: frame.header.notice,
-		turn: notice_trace,
-		area: panel?.area,
-		now_ms: redraw.now_ms,
-	}
+	const jump_frame = { ...frame, ports: redraw.ports, area: panel?.area, now_ms: redraw.now_ms }
 	const jumped = run_board_jump_start.jump_state(state, jump_frame)
 
 	return { ...decoded_of(redraw.ports, drawn), panel, notice_trace, ...jumped }

@@ -4,8 +4,8 @@ import { run_board_jump } from './run-board-jump'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 
 // joshuafolkken/kit#8677: the bttf jump and arrival painted over the whole board, cell by cell. Through
-// the run up the merging lane's row whitens, blue-white flares cross the board and, in its last ticks,
-// arcs crackle over the header, the animation area and that row; the jump washes the board in five
+// the run up blue-white flares cross the board and, in its last ticks, arcs crackle over the header and
+// the animation area; the jump washes the board in five
 // tints and then white, and the board thaws from ice to its own colors, the top rows first, each cell at
 // its own moment. The arrival is black, three flashes, then the same thaw. The capacitor and the gauge
 // (`is_figure`) keep their own light until the thaw.
@@ -56,8 +56,6 @@ const SPARKS = 14
 const ARC_MARKS = '╱ ╲ │ ─ ┼'.split(' ')
 const SPARK_MARKS = '· *'.split(' ')
 const HEADER_ROWS = 3
-// The merging lane's row whitens to this at most.
-const LANE_WHITE = 0.7
 // A stable noise in 0..1 for a cell, so a thaw does not flicker.
 const NOISE_X = 12.9898
 const NOISE_Y = 78.233
@@ -76,11 +74,10 @@ interface PaintCell {
 	is_figure: boolean
 }
 
-// The board a jump is painted on: its rows, the merging lane's row and the animation area's rows, none
-// where the area is not out — then the jump is the wash and the thaw only — and the fire trails' rows.
+// The board a jump is painted on: its rows and the animation area's rows, none where the area is not
+// out — then the jump is the wash and the thaw only — and the fire trails' rows.
 interface JumpScene {
 	rows: number
-	lane?: number | undefined
 	panel?: { top: number; rows: number } | undefined
 	trails?: ReadonlyArray<number> | undefined
 }
@@ -125,7 +122,7 @@ function is_arc_row(y: number, scene: JumpScene): boolean {
 	const { panel } = scene
 	const is_panel = panel !== undefined && y >= panel.top && y < panel.top + panel.rows
 
-	return y < HEADER_ROWS || is_panel || y === scene.lane
+	return y < HEADER_ROWS || is_panel
 }
 
 // The cell under arcs at `share` of their crackle, `t` ticks from the jump.
@@ -158,13 +155,6 @@ function sparked(cell: PaintCell, sparks: ReadonlySet<string>, t: number): Paint
 	return { ...cell, text: mark, fg: ARC }
 }
 
-// The merging lane's row whitened `share` of the way through the run up.
-function lane_lit(cell: PaintCell, share: number, scene: JumpScene): PaintCell {
-	if (cell.y !== scene.lane) return cell
-
-	return { ...cell, fg: mixed(cell.fg, WHITE, share * LANE_WHITE) }
-}
-
 // The cell under a flare, when one crosses `share` of the way through the run up, `typed` ticks in.
 function flare_over(cell: PaintCell, share: number, typed: number, rows: number): PaintCell {
 	const phase = typed % FLARE_EVERY
@@ -177,7 +167,7 @@ function ramped(cell: PaintCell, t: number, letters: number, scene: JumpScene): 
 	const typed = t + letters
 	const share = typed / letters
 	const arcs = (t + ARC_TICKS) / ARC_TICKS
-	const flaring = flare_over(lane_lit(cell, share, scene), share, typed, scene.rows)
+	const flaring = flare_over(cell, share, typed, scene.rows)
 
 	return arcs > 0 && is_arc_row(cell.y, scene) ? arced(flaring, arcs, t) : flaring
 }
@@ -258,7 +248,7 @@ function arrive_cells(cells: ReadonlyArray<PaintCell>, tick: number): Array<Pain
 	return cells.map((cell) => ({ ...cell, fg }))
 }
 
-const run_board_jump_paint = { HEADER_ROWS, ICE, TINTS, arrive_cells, jump_cells, noise }
+const run_board_jump_paint = { ICE, TINTS, arrive_cells, jump_cells, noise }
 
 export { run_board_jump_paint }
 export type { JumpScene, PaintCell }
