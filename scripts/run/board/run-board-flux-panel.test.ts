@@ -128,6 +128,7 @@ describe('run_board_flux_panel.FLUX_PAINTER timing', () => {
 // white, the capacitor flooded, and back to cruising once each is over.
 
 const ARRIVE_OVER_MS = 3200
+const CSI = '\u{1B}['
 const TOP_WHITE = '255;255;255'
 
 function speed_cell(at: PanelMoment): PanelCell | undefined {
@@ -162,5 +163,40 @@ describe('run_board_flux_panel.FLUX_PAINTER through a jump', () => {
 
 		expect(speed_cell({ ms: 0, is_burst: false, arrive_ms: 0 })?.text).toBe(' 88.0 ')
 		expect(speed_cell({ ...over, arrive_ms: 0 })).toStrictEqual(speed_cell(over))
+	})
+})
+
+// joshuafolkken/kit#8782: the area written through a jump — whole on every tick, since the rows typing
+// through it write the frame's lamp marks into it, and its blanks on the wash.
+
+const DRAW = { painter: FLUX_PAINTER, area: WIDE }
+const JUMP_OVER_MS = 1000 * PANEL_TICK_MS
+const [FIRST_LAMP] = WIDE.lamps
+
+function place_of(row: number, column: number): string {
+	return `${CSI}${String(row)};${String(column)}H`
+}
+
+describe('run_board_flux_panel.FLUX_PAINTER area through a jump', () => {
+	it('ac-db23cc24 writes every lamp place blank on each tick through the jump', () => {
+		const before = { ms: JUMP_MS - PANEL_TICK_MS, is_burst: false, jump: JUMP }
+		const written = panel_bytes(DRAW, { ...before, ms: JUMP_MS - 1 }, before)
+
+		for (const lamp of WIDE.lamps) expect(written).toContain(place_of(lamp.row, lamp.column))
+	})
+
+	it('writes only what changed once the jump is over', () => {
+		const over = { ms: JUMP_OVER_MS, is_burst: false, jump: JUMP }
+
+		expect(panel_bytes(DRAW, { ...over, ms: JUMP_OVER_MS + 1 }, over)).toBe('')
+	})
+
+	it('ac-712f67d1 puts the blanks on the wash through the flash, none while cruising', () => {
+		const lit = run_board_panel_draw.looked(DRAW, { ms: JUMP_MS, is_burst: false, jump: JUMP })
+		const idle = run_board_panel_draw.looked(DRAW, AT)
+		const lamp = FIRST_LAMP ?? { row: 0, column: 0 }
+
+		expect(cell_at(lit, lamp.row, lamp.column)?.bg).toBeDefined()
+		expect(cell_at(idle, lamp.row, lamp.column)?.bg).toBeUndefined()
 	})
 })

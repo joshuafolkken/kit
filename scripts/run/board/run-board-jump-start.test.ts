@@ -200,6 +200,26 @@ describe('run_board_jump_start.jump_of — the whole terminal', () => {
 	})
 })
 
+// joshuafolkken/kit#8782: the jump leaves the area's painter only the cells it draws.
+describe('run_board_jump_start.jump_of — the area painter’s cells', () => {
+	const AREA = { top: 2, end: 10, rows: 2, lamps: [] }
+	const PAINTER = {
+		is_idle: true,
+		is_ticking: true,
+		cells: () => [{ row: 3, column: 9, text: ' ' }],
+	}
+
+	it('hands the jump the cells the painter draws, by row and column', () => {
+		const draw = started(frame_of({ area: AREA, painter: PAINTER }))
+
+		expect(draw.owned).toStrictEqual(new Set(['3;9']))
+	})
+
+	it('hands it none with no area out', () => {
+		expect(started(frame_of({ painter: PAINTER })).owned).toBeUndefined()
+	})
+})
+
 describe('run_board_jump_start.jump_state once running', () => {
 	const later = NOW + TICK_MS * 2
 	const next_typing = typing_of(line_of('next row', later))

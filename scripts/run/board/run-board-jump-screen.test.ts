@@ -4,7 +4,7 @@ import { run_board_jump } from './run-board-jump'
 import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 
 const { ARRIVE_TICKS, TICK_MS, WASH_TICKS, THAW_TICKS } = run_board_jump
-const { FRAME_MS, arrive_beats, jump_bytes } = run_board_jump_screen
+const { FRAME_MS, arrive_beats, is_lit, jump_bytes } = run_board_jump_screen
 
 const ESC = '\u{1B}'
 const CLEAR = `${ESC}[H${ESC}[J`
@@ -15,6 +15,7 @@ const RUN = { start_ms: 0, letters: LETTERS }
 const WASH_MS = LETTERS * TICK_MS
 const OVER_MS = (LETTERS + WASH_TICKS + THAW_TICKS) * TICK_MS
 const HALF_FRAME = FRAME_MS / 2
+const LONG_AFTER_MS = 1000 * TICK_MS
 
 function cell(text: string): ScreenCell {
 	return { text, style: STYLE, is_wide: false }
@@ -81,12 +82,8 @@ describe('run_board_jump_screen.jump_bytes', () => {
 })
 
 describe('run_board_jump_screen.jump_bytes around the other painters', () => {
-	it('leaves the animation area to its own painter', () => {
-		const lamp = { row: 3, column: 3, panel_row: 0, panel_rows: 1, group: 0, lamp: 0 }
-		const draw = {
-			...draw_of(['ABC', 'DEF', 'GHI']),
-			panel: { top: 3, end: 4, rows: 1, lamps: [lamp] },
-		}
+	it("leaves the cells the area's painter draws to it", () => {
+		const draw = { ...draw_of(['ABC', 'DEF', 'GHI']), owned: new Set(['3;3']) }
 		const written = jump_bytes(draw, WASH_MS, undefined)
 
 		expect(written).toContain(`${ESC}[1;1H`)
@@ -94,17 +91,50 @@ describe('run_board_jump_screen.jump_bytes around the other painters', () => {
 		expect(written).toContain(`${ESC}[3;1H`)
 	})
 
-	// joshuafolkken/kit#8739: the area's painter writes from its first lamp place, so the column before
-	// it, left to neither painter, kept the wash as a line once the jump was over.
+	// joshuafolkken/kit#8739: the column left of the painter's cells, left to neither painter, kept the
+	// wash as a line once the jump was over.
 	it('ac-f0dce629 washes and puts back the column left of the area as its neighbors', () => {
-		const lamp = { row: 3, column: 3, panel_row: 0, panel_rows: 1, group: 0, lamp: 0 }
-		const draw = {
-			...draw_of(['ABC', 'DEF', 'GHI']),
-			panel: { top: 3, end: 4, rows: 1, lamps: [lamp] },
-		}
+		const draw = { ...draw_of(['ABC', 'DEF', 'GHI']), owned: new Set(['3;3']) }
 
 		expect(jump_bytes(draw, WASH_MS, undefined)).toContain(`${ESC}[3;2H`)
 		expect(jump_bytes(draw, OVER_MS, WASH_MS)).toContain(`${ESC}[3;2H${ESC}[0m${STYLE}H`)
+	})
+
+	// joshuafolkken/kit#8782: the area's lamp rows and the gauge's right, which its painter does not
+	// draw, stayed black through the flash.
+	it('ac-712f67d1 washes the cells of the area its painter does not draw', () => {
+		const draw = { ...draw_of(['AB C', 'DE F']), owned: new Set(['2;2', '2;3']) }
+		const written = jump_bytes(draw, WASH_MS, undefined)
+
+		expect(written).toContain(`${ESC}[2;4H`)
+		expect(written).toContain(`${ESC}[2;1H`)
+		expect(written).not.toContain(`${ESC}[2;2H`)
+	})
+
+	// joshuafolkken/kit#8782: the lanes' spinners, kept out of the light, drew a black line down their
+	// left edge through the flash.
+	it('ac-9a24befb washes the spinners as their neighbors', () => {
+		const base = draw_of(['ABC', 'DEF'])
+		const draw = { ...base, screen: { ...base.screen, skips: new Set(['1;1', '2;1']) } }
+		const written = jump_bytes(draw, WASH_MS, undefined)
+
+		expect(written).toContain(`${ESC}[1;1H`)
+		expect(written).toContain(`${ESC}[2;1H`)
+	})
+
+	it('still leaves the rows typing alone', () => {
+		const base = draw_of(['ABC', 'DEF'])
+		const draw = { ...base, screen: { ...base.screen, typing_rows: new Set([2]) } }
+
+		expect(jump_bytes(draw, WASH_MS, undefined)).not.toContain(`${ESC}[2;1H`)
+	})
+})
+
+describe('run_board_jump_screen.is_lit', () => {
+	it('holds while the jump runs, not before a jump or once it is over', () => {
+		expect(is_lit(draw_of(['AB']), WASH_MS)).toBe(true)
+		expect(is_lit(draw_of(['AB']), LONG_AFTER_MS)).toBe(false)
+		expect(is_lit(undefined, WASH_MS)).toBe(false)
 	})
 })
 

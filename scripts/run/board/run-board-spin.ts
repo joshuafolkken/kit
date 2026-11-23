@@ -249,10 +249,18 @@ function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
 	return Math.min(turn_ms, letter_ms, code_ms, effect_ms, panel_ms, until_ms)
 }
 
-// The spinners turned when their frame changed, the sweep when its cell did, then the rows typing
-// written over them, in one synchronized write (joshuafolkken/kit#8125).
+// The spinners turned when their frame changed, held while the bttf jump lights their places
+// (joshuafolkken/kit#8782).
+function spun_bytes(turning: Turning, at_ms: number, turned: Turned): string {
+	if (!turned.is_turned || run_board_jump_screen.is_lit(turning.jump, at_ms)) return ''
+
+	return spin_bytes(turning.spots, spinner_of(at_ms))
+}
+
+// The spinners turned, the sweep when its cell changed, then the rows typing written over them, in
+// one synchronized write (joshuafolkken/kit#8125).
 function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
-	const spin = turned.is_turned ? spin_bytes(turning.spots, spinner_of(at_ms)) : ''
+	const spin = spun_bytes(turning, at_ms, turned)
 	const { sweep } = turning
 	const swept = sweep !== undefined && turned.is_swept ? sweep_bytes(sweep, at_ms) : ''
 	const blinked = turned.is_blinked === true ? colon_bytes(colons_of(turning), at_ms) : ''
