@@ -5,6 +5,7 @@ import {
 	type ProfileResult,
 } from '#scripts/agent/agent-role-profile'
 import { agent_worker_profile } from '#scripts/agent/agent-worker-profile'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { run_ending } from '#scripts/run/run-ending'
 import { lane_dispatch_log } from './lane-dispatch-log'
@@ -33,6 +34,13 @@ function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): Age
 	return agent_argv.with_profile_in(plan.invocation, profile, lane.directory)
 }
 
+// The Issue body `josh.worker.route` reads; `undefined` when the read fails, which keeps the default.
+async function issue_body(issue: string): Promise<string | undefined> {
+	const body = await git_gh_command.issue_get_body_classified(issue)
+
+	return body.kind === 'read' ? body.text : undefined
+}
+
 // **The worker profile the lane's Issue selects, where the repository opts into `josh.worker`**.
 // The Issue's `worker:<name>` label (else the configured default) wins over `JOSH_WORKER_MODEL` /
 // `JOSH_WORKER_EFFORT`; a repository without the setting resolves the worker from the environment as
@@ -42,6 +50,7 @@ async function worker_profile(lane: LaneInfo): Promise<ProfileResult> {
 	const worker = await agent_worker_profile.resolve(
 		lane.directory,
 		async () => await git_gh_issue_write.read_label_names(lane.issue),
+		async () => await issue_body(lane.issue),
 	)
 
 	if (worker.kind === 'unset') return agent_role_profile.resolve(agent_role_profile.WORKER)

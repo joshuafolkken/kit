@@ -1,0 +1,7 @@
+{
+	"reason": "Route-by-body rule, its settings schema and tests add 73 script lines for #8760",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 73
+	}
+}

@@ -16,7 +16,7 @@ const REASON = 'Needs a cross-module redesign.'
 const ARGV = [ISSUE, run_park_escalate.ESCALATE_FLAG, REASON]
 
 function settings_with(escalate: boolean): SettingsResult {
-	return { kind: 'settings', settings: { default: 'sonnet', escalate, profiles: [] } }
+	return { kind: 'settings', settings: { default: 'sonnet', escalate, route: false, profiles: [] } }
 }
 
 beforeEach(() => {

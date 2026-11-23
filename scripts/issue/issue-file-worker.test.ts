@@ -13,6 +13,7 @@ const AGENT = {
 const SETTINGS: WorkerSettings = {
 	default: 'sonnet',
 	escalate: false,
+	route: false,
 	profiles: [
 		{ name: 'haiku', when: 'Mechanical work', agent: AGENT },
 		{ name: 'sonnet', when: 'A brief', agent: AGENT },

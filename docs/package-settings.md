@@ -101,12 +101,13 @@ Leave it out: `josh gate` runs only its fixed checks.
 
 ## `josh.worker`
 
-Picks the model and effort each lane worker runs on, per Issue, for a [`josh backlogrun`](./josh-commands-backlog.md). kit never picks a profile from an Issue's content: a person chooses it with a label.
+Picks the model and effort each lane worker runs on, per Issue, for a [`josh backlogrun`](./josh-commands-backlog.md). A person chooses a profile with a label; with `route: true`, kit picks one for an unlabelled Issue from its body.
 
 | Setting                         | Value                                                        | Default  |
 | ------------------------------- | ------------------------------------------------------------ | -------- |
 | `josh.worker.default`           | the name of the profile an unlabelled Issue runs on          | required |
 | `josh.worker.escalate`          | `true` lets a stuck worker resume one profile up             | `false`  |
+| `josh.worker.route`             | `true` runs a light unlabelled Issue on the weakest profile  | `false`  |
 | `josh.worker.profiles`          | a non-empty list of profiles, weakest first                  | required |
 | `josh.worker.profiles[].name`   | the profile's name, unique; the label is `worker:<name>`     | required |
 | `josh.worker.profiles[].model`  | a Claude model, such as `claude-sonnet-5-5`                  | required |
@@ -116,6 +117,7 @@ Picks the model and effort each lane worker runs on, per Issue, for a [`josh bac
 How kit uses it:
 
 - Choosing a profile: an Issue labelled `worker:<name>` runs on that profile; an Issue with no such label runs on `default`. More than one `worker:` label, or one naming no profile, stops the lane's dispatch with a note. [`josh issue:file`](./josh-commands-backlog.md) prints the profiles with their `when`, refuses a `worker:` label naming none of them and creates the chosen label.
+- Routing: with `route: true`, an Issue with no `worker:` label runs on the first profile in `profiles` when its `## 背景` declares a size within the split guide, no `振る舞い変更` or `破壊的変更`, and no person's judgement; otherwise, or when its body cannot be read, it runs on `default`. A label always wins. `route: false` returns every unlabelled Issue to `default` in one step.
 - Environment variables: the chosen profile wins over `JOSH_WORKER_MODEL` and `JOSH_WORKER_EFFORT`. Those two, and kit's defaults, decide only when `josh.worker` is unset.
 - Model and effort: a profile is held to the same rules as `JOSH_WORKER_MODEL` / `JOSH_WORKER_EFFORT`; a consultation model (Fable) is rejected. Every profile names an effort, because kit always passes one: give a model without an effort setting, such as Haiku, `"low"`.
 - The ship phase: once a lane reaches the gate it relaunches on the ship model (`JOSH_WORKER_SHIP_MODEL`, default `claude-sonnet-5-5`) at effort `low`, but never on a model above the Issue's profile: the weaker of the two, ranked by the order of `profiles`, wins. A ship model no profile names is kept.
@@ -127,6 +129,7 @@ How kit uses it:
 		"worker": {
 			"default": "opus-medium",
 			"escalate": true,
+			"route": true,
 			"profiles": [
 				{
 					"name": "haiku",

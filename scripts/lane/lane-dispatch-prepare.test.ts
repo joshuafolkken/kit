@@ -4,6 +4,7 @@ import path from 'node:path'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { run_ending } from '#scripts/run/run-ending'
@@ -47,9 +48,11 @@ function write_outage_log(): void {
 	writeFileSync(LOG_PATH, `${OUTAGE_LINE}\n`, 'utf8')
 }
 
-function write_worker_setting(): void {
+function write_worker_setting(change: object = {}): void {
+	const worker = { ...WORKER, ...change }
+
 	mkdirSync(LANE_DIRECTORY, { recursive: true })
-	writeFileSync(MANIFEST_PATH, JSON.stringify({ name: 'app', josh: { worker: WORKER } }), 'utf8')
+	writeFileSync(MANIFEST_PATH, JSON.stringify({ name: 'app', josh: { worker } }), 'utf8')
 }
 
 function mock_labels(labels: Array<string> | undefined): ReturnType<typeof vi.spyOn> {
@@ -154,5 +157,31 @@ describe('lane_dispatch_prepare.prepared — the josh.worker profile', () => {
 			before.kind === 'rejected' ? before.note : before.argv,
 		)
 		expect(read_labels).not.toHaveBeenCalled()
+	})
+})
+
+describe('lane_dispatch_prepare.prepared — josh.worker.route (joshuafolkken/kit#8760)', () => {
+	it('routes an unlabelled light Issue to the weakest profile from its body', async () => {
+		write_worker_setting({ route: true })
+		mock_labels([])
+		const text = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）'
+		const read_body = vi
+			.spyOn(git_gh_command, 'issue_get_body_classified')
+			.mockResolvedValue({ kind: 'read', text })
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			profile: { model: HAIKU.model },
+		})
+		expect(read_body).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('keeps the default profile where the Issue body cannot be read', async () => {
+		write_worker_setting({ route: true })
+		mock_labels([])
+		vi.spyOn(git_gh_command, 'issue_get_body_classified').mockResolvedValue({ kind: 'missing' })
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			profile: { model: SONNET.model },
+		})
 	})
 })
