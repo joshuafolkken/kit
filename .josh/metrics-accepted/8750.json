@@ -2,7 +2,7 @@
 	"reason": "#8750 adds the board:replay command (seeded replay, virtual clock) and the demo template's DEMO_BEATS/DEMO_SEED form the Issue asks for",
 	"date": "2026-11-23",
 	"growth": {
-		"scripts.code_lines": 180,
-		"ai_cost.on_demand_bytes": 1214
+		"scripts.code_lines": 194,
+		"ai_cost.on_demand_bytes": 1379
 	}
 }

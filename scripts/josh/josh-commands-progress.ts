@@ -274,13 +274,13 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'board:replay': {
 		script: 'scripts/run/board/run-board-replay.ts',
-		// It draws through `run:board`'s live path, which reaches the Telegram sender, so `.env` loads as there.
+		// Its imports reach `run:board`'s Telegram sender, which the replay never calls; `.env` loads as there.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
 			'Replay the live board on a virtual clock and a seed, one JSON beat line per beat it writes',
 		category: 'AI tools',
 		reference: [
-			'[--theme wargames|matrix|bttf] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]',
+			'[--theme wargames|matrix|bttf] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]',
 			'automation',
 			['files', 'network'],
 		],

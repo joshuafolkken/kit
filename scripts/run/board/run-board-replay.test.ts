@@ -4,7 +4,7 @@ import { run_board_replay } from './run-board-replay'
 import type { Beat } from './run-board-reveal-blocks'
 
 const { LOCAL, harness, plan_titled } = run_board_fixture
-const { lines_of, options_of, replay } = run_board_replay
+const { lines_of, options_of, replay, run } = run_board_replay
 const SIZE = ['--columns', '100', '--rows', '30']
 const ARRIVE_TICK_MS = 50
 const MINIMUM_ARRIVE_BEATS = 10
@@ -27,6 +27,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('run_board_replay.replay', () => {
@@ -57,6 +58,24 @@ describe('run_board_replay.replay', () => {
 	})
 })
 
+describe('run_board_replay.run', () => {
+	it('writes the replayed beats as JSON lines and succeeds', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+		const { ports } = harness(LOCAL, [plan_titled('a')])
+
+		await expect(run(['--theme', 'bttf', ...SIZE], ports)).resolves.toBe(0)
+		expect(String(write.mock.calls.at(0)?.[0])).toMatch(/^\{"text":/u)
+	})
+
+	it('prints the usage and fails on arguments it refuses', async () => {
+		const error = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		const { ports } = harness(LOCAL, [plan_titled('a')])
+
+		await expect(run(['--theme', 'nope'], ports)).resolves.not.toBe(0)
+		expect(String(error.mock.calls.at(0)?.[0])).toContain('Usage: josh board:replay')
+	})
+})
+
 describe('run_board_replay.options_of', () => {
 	it.each([
 		[['--seed', 'x']],
@@ -64,8 +83,14 @@ describe('run_board_replay.options_of', () => {
 		[['--theme', 'nope']],
 		[['--notice', 'merged']],
 		[['--unknown']],
+		[['--icons', 'nope']],
 	])('refuses %j', (argv) => {
 		expect(options_of(argv, {})).toBeUndefined()
+	})
+
+	it('takes the icons from the arguments, else JOSH_BOARD_ICONS, as the live board does', () => {
+		expect(options_of(['--icons', 'letters'], {})).toMatchObject({ icons: 'letters' })
+		expect(options_of([], { JOSH_BOARD_ICONS: 'shapes' })).toMatchObject({ icons: 'shapes' })
 	})
 
 	it('takes the seed, the clock start and the redraws, passing the rest to the frame options', () => {

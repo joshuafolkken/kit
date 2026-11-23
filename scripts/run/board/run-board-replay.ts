@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { run_board_cli } from './run-board-cli'
 import { run_board_frame_preview, type FrameOptions } from './run-board-frame-preview'
+import { run_board_icons, type Icons } from './run-board-icons'
 import type { IntroPorts } from './run-board-intro'
 import { run_board_live } from './run-board-live'
 import type { Beat } from './run-board-reveal-blocks'
@@ -17,7 +18,7 @@ import { run_board_theme, type Theme } from './run-board-theme'
 // one `--seed` write the same bytes. The matrix rain draws from the seed.
 
 const USAGE =
-	'Usage: josh board:replay [--theme wargames|matrix|bttf] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]'
+	'Usage: josh board:replay [--theme wargames|matrix|bttf] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]'
 const OWN_OPTIONS = {
 	seed: { type: 'string' },
 	at: { type: 'string' },
@@ -40,6 +41,13 @@ interface Counts {
 interface ReplayOptions extends Counts {
 	readonly frame: FrameOptions
 	readonly theme: Theme | undefined
+	readonly icons: Icons
+}
+
+interface Look {
+	readonly theme: Theme | undefined
+	readonly icons: Icons
+	readonly argv: Array<string>
 }
 
 interface Recorder {
@@ -95,21 +103,32 @@ function is_refused(frame: FrameOptions, counts: Counts): boolean {
 	return frame.cause !== undefined || Object.values(counts).some((count) => Number.isNaN(count))
 }
 
+// The theme and the icons the arguments, else the environment, name, as the live board takes them, with
+// the arguments left; undefined where either names none.
+function look_of(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): Look | undefined {
+	const themed = run_board_theme.choose(argv, environment)
+
+	if (themed === undefined) return undefined
+	const drawn = run_board_icons.choose(themed.argv, environment, themed.theme)
+
+	return drawn && { theme: themed.theme, icons: drawn.icons, argv: drawn.argv }
+}
+
 // The options the arguments name; undefined for an unknown theme, anything `--frame` refuses, a notice
 // (the live board starts with none) or an own flag without a count.
 function options_of(
 	argv: ReadonlyArray<string>,
 	environment: NodeJS.ProcessEnv,
 ): ReplayOptions | undefined {
-	const themed = run_board_theme.choose(argv, environment)
+	const look = look_of(argv, environment)
 
-	if (themed === undefined) return undefined
-	const { counts, rest } = split(themed.argv)
+	if (look === undefined) return undefined
+	const { counts, rest } = split(look.argv)
 	const frame = run_board_frame_preview.options_of(rest)
 
 	if (frame === undefined || is_refused(frame, counts)) return undefined
 
-	return { ...counts, frame, theme: themed.theme }
+	return { ...counts, frame, theme: look.theme, icons: look.icons }
 }
 
 // The beat open now closed after `ms`, the clock moved on by it.
@@ -144,6 +163,7 @@ function replay_ports(
 
 	return {
 		...fixed,
+		icons: options.icons,
 		now: () => recorder.now_ms,
 		intro_sleep: async (ms) => {
 			advanced(recorder, ms)
@@ -201,6 +221,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run(process.argv.slice(ARGV_OFFSET), run_board_cli.live_ports(false))
 }
 
-const run_board_replay = { lines_of, options_of, replay }
+const run_board_replay = { lines_of, options_of, replay, run }
 
 export { run_board_replay }

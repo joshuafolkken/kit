@@ -226,6 +226,8 @@ async function main() {
 	const [key = '0'] = process.argv.slice(2)
 	if (!(key in SCENES)) throw new Error(`Unknown scene: ${key}. Known: ${Object.keys(SCENES).join(', ')}`)
 	playing.key = key
+	// No wait slows the beats form, so the frame count is what ends it.
+	if (IS_BEATS && !process.env.DEMO_STEPS) throw new Error('DEMO_BEATS=1 takes DEMO_STEPS=<n>')
 	if (!IS_BEATS) enter_screen()
 	await play(Number(process.env.DEMO_STEPS || Infinity))
 	process.exit(0)
