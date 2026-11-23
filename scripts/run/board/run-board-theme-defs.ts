@@ -2,6 +2,7 @@ import { run_board_flux_panel } from './run-board-flux-panel'
 import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
+import type { NoticeLook } from './run-board-notice-trace'
 import type { PanelPainter } from './run-board-panel-draw'
 import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_sound_click } from './run-board-sound-click'
@@ -40,11 +41,13 @@ interface IntroDefinition {
 // rather than blink (`run-board-idle-rain.ts`; joshuafolkken/kit#8356), and whether a drop falls down the
 // whole board every second in place of the sweep (`run-board-rain-drop.ts`; joshuafolkken/kit#8367), and
 // whether a changed character lands white and cools (`run-board-change-flash.ts`; joshuafolkken/kit#8353),
-// and whether a new header notice traces in and blinks in a green bar (`run-board-notice-trace.ts`;
-// joshuafolkken/kit#8657). The trill sounds over every typing row.
+// and whether a new header notice blinks in a bar three times and holds lit, in `notice`'s look
+// (`run-board-notice-trace.ts`; joshuafolkken/kit#8657, joshuafolkken/kit#8745). The trill sounds over
+// every typing row.
 interface LiveDefinition {
 	flash?: boolean
 	notice_trace?: boolean
+	notice?: NoticeLook
 	sweep: boolean
 	drop: boolean
 	types_rows: boolean
@@ -161,6 +164,8 @@ const THEME_DEFS = {
 			strip: false,
 			decode: false,
 			rain: false,
+			notice_trace: true,
+			notice: { lit: CYAN, is_rain: false },
 		},
 		typing: run_board_sound_typing.teletype_wav,
 		typed_end: no_sound,
@@ -203,6 +208,7 @@ const THEME_DEFS = {
 			rain: true,
 			flash: true,
 			notice_trace: true,
+			notice: { lit: run_board_header_trace.SHADES.bright, is_rain: true },
 		},
 		// A key click every two letters while the intro types and new rows decode (joshuafolkken/kit#8365).
 		typing: run_board_sound_click.typing_wav,
@@ -229,7 +235,13 @@ const THEME_DEFS = {
 		// joshuafolkken/kit#8683: its notices, operations and rows type as the other themes' do; the
 		// time-circuit keypad sounds while any row types, and the circuits' ENTER once each is typed
 		// through — every typing alike, each the cue of a time jump (joshuafolkken/kit#8731).
-		live: { ...NO_LIVE, types_rows: true, trill: true },
+		live: {
+			...NO_LIVE,
+			types_rows: true,
+			trill: true,
+			notice_trace: true,
+			notice: { lit: BTTF.body, is_rain: false },
+		},
 		typing: run_board_sound_keypad.typing_wav,
 		typed_end: run_board_sound_enter.enter_wav,
 	},
