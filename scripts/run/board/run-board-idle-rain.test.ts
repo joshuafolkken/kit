@@ -2,9 +2,11 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_idle_rain, type RainMoment } from './run-board-idle-rain'
+import type { Paint } from './run-board-labels'
 import { run_board_lamp_spots } from './run-board-lamp-spots'
 import { run_board_panel_draw } from './run-board-panel-draw'
 import { run_board_panel_painters } from './run-board-panel-painters'
+import { run_board_rain_gradient } from './run-board-rain-gradient'
 import { run_board_spot } from './run-board-spot'
 import { run_board_sweep } from './run-board-sweep'
 
@@ -14,6 +16,8 @@ import { run_board_sweep } from './run-board-sweep'
 
 const { POUR, SPEED, cell_text, row_at, speed_of } = run_board_idle_rain
 const PRECISION = 9
+const { paint_at } = run_board_rain_gradient
+const TRAIL_CELLS = 3
 const { lamps_in } = run_board_lamp_spots
 const { area_of, write_panel } = run_board_panel_draw
 const { LAMP } = run_board_spot
@@ -55,6 +59,20 @@ function head_moment(column: number): RainMoment {
 	}
 }
 
+// A computed paint's 24-bit color, or a marker no cell contains.
+function rgb_of(paint: Paint | undefined): string {
+	return typeof paint === 'object' && 'rgb' in paint ? paint.rgb : '-'
+}
+
+// The first moment from `START` the column's head is on the panel's last row, its trail above it.
+function bottom_moment(column: number): RainMoment {
+	for (let frame = 0; ; frame += 1) {
+		const at = { ms: START + frame * FRAME_MS, is_burst: false }
+
+		if (Math.floor(row_at(column, at)) === PANEL_ROWS - 1) return at
+	}
+}
+
 describe('run_board_idle_rain.cell_text', () => {
 	it('draws every cell one column wide', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
@@ -77,6 +95,21 @@ describe('run_board_idle_rain.cell_text', () => {
 			expect(cell_text({ column, panel_row: row + 1 }, at)).toBe(' ')
 		},
 	)
+
+	it('paints the head and its three-cell trail through the rain’s gradient, the two lead cells fresh each frame', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const at = bottom_moment(1)
+		const next = { ...at, ms: at.ms + FRAME_MS }
+		const cells = [4, 3, 2, 1, 0].map((panel_row) => cell_text({ column: 1, panel_row }, at))
+		const painted = [0, 1, 2, 3].map(
+			(distance) => cells[distance]?.includes(rgb_of(paint_at(distance, TRAIL_CELLS))) ?? false,
+		)
+
+		expect(painted).toEqual([true, true, true, true])
+		expect(paint_at(TRAIL_CELLS + 1, TRAIL_CELLS)).toBeUndefined()
+		expect(cells.at(-1)).toBe(' ')
+		expect(cell_text({ column: 1, panel_row: 3 }, next)).not.toBe(cells[1])
+	})
 })
 
 describe('run_board_idle_rain.speed_of', () => {
