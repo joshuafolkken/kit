@@ -41,15 +41,30 @@ async function read_merges(
 	}
 }
 
+// A path's last changing merges, and the oldest of the merges that added a file it matches.
+async function path_merges(
+	target: string,
+	before: string | undefined,
+): Promise<TargetMerges | undefined> {
+	const merges = await read_merges(target, defect_origin.path_arguments(target, before))
+
+	if (merges.length === 0) return undefined
+
+	const added = await read_merges(target, defect_origin.introduced_arguments(target, before))
+
+	return { target, merges, introduced: added.at(-1) }
+}
+
 // A path is looked up by pathspec; a name no path matches, by the merges that added or removed it.
 async function merges_for(target: string, before: string | undefined): Promise<TargetMerges> {
-	const by_path = await read_merges(target, defect_origin.path_arguments(target, before))
-	const merges =
-		by_path.length > 0
-			? by_path
-			: await read_merges(target, defect_origin.pickaxe_arguments(target, before))
+	const by_path = await path_merges(target, before)
 
-	return { target, merges }
+	return (
+		by_path ?? {
+			target,
+			merges: await read_merges(target, defect_origin.pickaxe_arguments(target, before)),
+		}
+	)
 }
 
 async function candidates_for(issue: IssueText): Promise<ReadonlyArray<Candidate>> {

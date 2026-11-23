@@ -17,7 +17,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { repo_get_name_with_owner: vi.fn() },
 }))
 vi.mock('./cost-audit-read', () => ({
-	cost_audit_read: { load: vi.fn(), load_lane_children: vi.fn(() => []) },
+	cost_audit_read: { load: vi.fn(), load_lane_children: vi.fn(async () => []) },
 }))
 vi.mock('#scripts/lane/lane-net-read', () => ({
 	lane_net_read: { read_ledger: vi.fn(() => []), read_events: vi.fn(() => []) },
@@ -112,7 +112,7 @@ describe('cost_audit_cli.merged_query — the GitHub search for merged pull requ
 })
 
 function stub_sources(): void {
-	load.mockReturnValue(SESSIONS)
+	load.mockResolvedValue(SESSIONS)
 	repo_name.mockResolvedValue('o/r')
 	exec_gh_api.mockResolvedValue(JSON.stringify({ total_count: 2 }))
 }
@@ -150,7 +150,7 @@ describe('cost_audit_cli.run — the printed report', () => {
 		const of = vi.spyOn(lane_breakdown, 'of').mockReturnValue(breakdown)
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		load.mockReturnValue([LANE_SESSION])
+		load.mockResolvedValue([LANE_SESSION])
 		await cost_audit_cli.run([], '/repo', NOW_MS)
 
 		expect(of).toHaveBeenCalledWith([], [], 7)
@@ -162,6 +162,21 @@ describe('cost_audit_cli.run — the printed report', () => {
 
 		expect(await cost_audit_cli.run(['--period', '0'], '/repo', NOW_MS)).toBe(1)
 		expect(error).toHaveBeenCalledWith(cost_audit_cli.USAGE)
+	})
+})
+
+// joshuafolkken/kit#8757: a `gh` request left waiting behind the load timed out.
+describe('cost_audit_cli.run — the merge count is read first', () => {
+	beforeEach(stub_sources)
+
+	it('reads the merges before it loads the transcripts', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await cost_audit_cli.run([], '/repo', NOW_MS)
+
+		const last_gh = Math.max(...exec_gh_api.mock.invocationCallOrder)
+
+		expect(last_gh).toBeLessThan(load.mock.invocationCallOrder[0] ?? 0)
 	})
 })
 
@@ -212,7 +227,7 @@ describe('cost_audit_cli.run — --density', () => {
 		const of = vi.spyOn(lane_breakdown, 'of')
 
 		vi.spyOn(console, 'info').mockImplementation(() => undefined)
-		load_lane_children.mockReturnValue([DENSITY_SESSION])
+		load_lane_children.mockResolvedValue([DENSITY_SESSION])
 
 		expect(await cost_audit_cli.run(DENSITY_ARGV, '/repo', NOW_MS)).toBe(0)
 		expect(load_lane_children).toHaveBeenCalledWith('/repo', ms(day(7)))
@@ -224,7 +239,7 @@ describe('cost_audit_cli.run — --density', () => {
 	it('prints the label line, then the number a measure declaration reads as the last line', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		load_lane_children.mockReturnValue([DENSITY_SESSION])
+		load_lane_children.mockResolvedValue([DENSITY_SESSION])
 		await cost_audit_cli.run(DENSITY_ARGV, '/repo', NOW_MS)
 
 		const output = info.mock.calls.map(([line]) => String(line))

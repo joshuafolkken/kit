@@ -199,12 +199,18 @@ function classify(data: ParsedLine): LineOutcome {
 	return usage ? { kind: 'record', record: to_record(data, usage) } : { kind: 'no_usage' }
 }
 
+// A line already JSON-parsed, for a reader that parses each line once for several readings
+// (joshuafolkken/kit#8757); `undefined` — a line that was not JSON — is malformed.
+function parse_value(value: unknown): LineOutcome {
+	const parsed = LINE_SCHEMA.safeParse(value)
+
+	return parsed.success ? classify(parsed.data) : { kind: 'malformed' }
+}
+
 function parse_line(line: string): LineOutcome {
 	if (line.trim() === '') return { kind: 'skipped' }
 
-	const parsed = LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
-
-	return parsed.success ? classify(parsed.data) : { kind: 'malformed' }
+	return parse_value(json_value.parse_or_undefined(line))
 }
 
 // The later of two request instants, treating `undefined` as no reading rather than as an early one:
@@ -276,6 +282,7 @@ const cost_usage = {
 	UNKNOWN_MODEL,
 	SYNTHETIC_MODEL,
 	parse_line,
+	parse_value,
 	dedupe,
 	add_totals,
 	sum_totals,

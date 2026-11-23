@@ -271,7 +271,7 @@ describe('run_board_intro.arrive', () => {
 	it('plays the arrival from a cleared screen, then writes the frame whole', async () => {
 		const { written, ports } = recorded(instant)
 		const drawn = run_board_theme.restyle(ARRIVE_THEME, FRAME)
-		const beats = run_board_jump_screen.arrive_beats(drawn, undefined)
+		const beats = [...run_board_jump_screen.arrive_beats(drawn, undefined)]
 
 		await run_board_intro.arrive(FRAME, { ...ports, rain: COLORED }, NO_KEYS, ARRIVE_THEME)
 		expect(written).toHaveLength(beats.length + 1)
