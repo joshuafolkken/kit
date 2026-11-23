@@ -52,6 +52,20 @@ describe('run_board_lane_state.lanes_of — a lane handed over', () => {
 		expect(lanes.own.get(NUMBER)).toMatchObject({ state: 'running', is_adopted: true })
 		expect(lanes.earlier.size).toBe(0)
 	})
+
+	it('draws a paused lane handed over to this run as its own (ac-dc5e1765)', () => {
+		const record = {
+			...record_of('paused'),
+			launched_at: EARLIER_RUN,
+			adopted_at: LAUNCHED,
+			changed_by: 'lane:pause',
+			paused_by: 'person' as const,
+		}
+		const lanes = lanes_of([record])
+
+		expect(lanes.own.get(NUMBER)).toMatchObject({ state: 'paused', is_adopted: true })
+		expect(lanes.earlier.size).toBe(0)
+	})
 })
 
 describe('run_board_lane_state.lanes_of — whose lane it is', () => {

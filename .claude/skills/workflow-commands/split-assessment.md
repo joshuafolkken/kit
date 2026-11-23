@@ -103,7 +103,7 @@ Over the bar before dispatch → a split-only unit answers question 1 (`scripts/
 on the Issue, without asking.
 
 - **`#N` is a request, a discussion, or a container → promote it.**
-  `pnpm josh epic --promote <N> <N1> <N2> ... [--chain "#A -> #C" ... --order-reason "#A -> #C: <kind> — <reason>" ...]` — one `--chain` per child's real prerequisite, each with its kind and reason; `--ordered` only when every child waits on the one before. The body is appended to, never replaced.
+  `pnpm josh epic --promote <N> <N1> <N2> ... --rationale-file .josh/tmp/<dir>/rationale.md [--chain "#A -> #C" ... --order-reason "#A -> #C: <kind> — <reason>" ...]` — one `--chain` per child's real prerequisite, each with its kind and reason; `--ordered` only when every child waits on the one before. The body is appended to, never replaced.
 - **`#N` is itself one of the deliverables → keep `#N` as a child and create a new epic** — e.g. a bug
   report that needs three fixes.
 
