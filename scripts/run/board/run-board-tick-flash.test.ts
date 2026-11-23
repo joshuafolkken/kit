@@ -132,7 +132,7 @@ describe('run_board_tick_flash.flash_of over the tracing notice', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		vi.stubEnv('NO_COLOR', undefined)
 		const redraw = matrix_redraw()
-		const notice = { row: 1, column: 1, text: '1' }
+		const notice = { row: 1, column: 1, text: '1', look: { lit: 'green', is_rain: true } as const }
 		const drawn = { lines: ['12'], keyed: [], spots: [], notice }
 		const base = run_board_tick_flash.flash_of(undefined, drawn, redraw, FRESH_STATE.typing)
 		const changed = { ...drawn, lines: ['34'] }
@@ -159,6 +159,32 @@ describe('run_board_tick_flash.flash_of over the tracing notice', () => {
 		expect(drawn.notice_trace?.trace.start_ms).toBe(-Infinity)
 		expect(drawn.notice_trace?.place).toBeUndefined()
 	})
+})
+
+// joshuafolkken/kit#8745: the typed themes, with no flash, take the rows' typing base as their base frame.
+describe('run_board_tick_flash.flash_of over a typed theme’s notice', () => {
+	it.each(['wargames', 'bttf'] as const)('places a new notice in the %s look', (theme) => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		vi.stubEnv('NO_COLOR', undefined)
+		const typed = { theme, types_rows: true }
+		const base = flash_over(planned(), typed)
+		const drawn = flash_over({ ...base, notice: STOP_NOTICE }, typed)
+
+		expect(drawn.notice_trace?.trace.start_ms).toBe(START)
+		expect(drawn.notice_trace?.place?.look).toBe(run_board_theme_defs.live_of(theme).notice)
+	})
+
+	it.each(['wargames', 'bttf'] as const)(
+		'never traces a %s notice there on the base frame',
+		(theme) => {
+			vi.stubEnv('FORCE_COLOR', '3')
+			vi.stubEnv('NO_COLOR', undefined)
+			const drawn = flash_over({ ...planned(), notice: STOP_NOTICE }, { theme, types_rows: true })
+
+			expect(drawn.notice_trace?.trace.start_ms).toBe(-Infinity)
+			expect(drawn.notice_trace?.place).toBeUndefined()
+		},
+	)
 })
 
 describe('run_board_tick_flash.is_enabled per effect', () => {

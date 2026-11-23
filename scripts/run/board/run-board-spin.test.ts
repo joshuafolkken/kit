@@ -161,7 +161,7 @@ it('ac-8de5883d cools and restores a flash on spinner turns even without spinner
 
 it('writes a placed notice trace on its letter steps until the bar is lit', async () => {
 	const { ports, writes } = spin_ports(START)
-	const place = { row: 2, column: 5, text: ' ab ' }
+	const place = { row: 2, column: 5, text: ' ab ', look: { lit: 'green', is_rain: true } as const }
 	const notice_trace = { trace: { key: 'notice', start_ms: START }, place }
 
 	await spin_to_second(
@@ -175,7 +175,9 @@ it('writes a placed notice trace on its letter steps until the bar is lit', asyn
 	expect(traced.map(({ at_ms }) => at_ms - START)).toStrictEqual(
 		expect.arrayContaining(NOTICE_STEPS),
 	)
-	expect(lit?.text).toContain(run_board_notice_trace.traced(place.text, lit_ms, Math.random))
+	expect(lit?.text).toContain(
+		run_board_notice_trace.traced(place.text, lit_ms, place.look, Math.random),
+	)
 })
 
 describe('run_board_spin.spin_to_second', () => {

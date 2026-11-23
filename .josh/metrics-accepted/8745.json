@@ -1,0 +1,7 @@
+{
+	"reason": "kit#8745 adds a per-theme notice look (lit paint, rain or typed) and the three-pair-then-hold stages to the notice trace for wargames and bttf",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 16
+	}
+}
