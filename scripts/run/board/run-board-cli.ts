@@ -109,6 +109,7 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	intro_sleep: async (ms) => {
 		await sleep(ms)
 	},
+	intro_now: () => performance.now(),
 }
 
 // A live board's worker gathers, its heap readable for `--timing` (`run-board-heap.ts`); a single

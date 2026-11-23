@@ -1,3 +1,4 @@
+import { run_board_beat_pace, type Join, type Schedule } from './run-board-beat-pace'
 import { run_board_jump_screen } from './run-board-jump-screen'
 import type { KeyReading } from './run-board-keys'
 import { run_board_labels, type Paint } from './run-board-labels'
@@ -29,7 +30,7 @@ interface RainSource {
 
 type IntroPorts = Pick<
 	BoardPorts,
-	'icons' | 'intro_sleep' | 'write' | 'write_drawn' | 'typing_sound' | 'size'
+	'icons' | 'intro_sleep' | 'intro_now' | 'write' | 'write_drawn' | 'typing_sound' | 'size'
 > & {
 	rain?: RainSource
 }
@@ -53,33 +54,65 @@ function letter_beats({ line, letter_ms }: IntroDefinition): ReadonlyArray<Beat>
 	}))
 }
 
-// Each beat taken and written, then its pause raced against the skip; a skip takes no further beat,
-// so the beats left unwritten stay in `beats` — made one at a time, a skip makes no more.
-async function beat_through(
-	beats: Iterator<Beat>,
-	ports: IntroPorts & { intro_sleep: (ms: number) => Promise<void> },
-	skip: { pressed: Promise<undefined>; is_pressed: () => boolean },
-): Promise<void> {
-	if (skip.is_pressed()) return
-	const beat = beats.next()
-	if (beat.done === true) return
-
-	ports.write(beat.value.text)
-	await Promise.race([ports.intro_sleep(beat.value.ms), skip.pressed])
-	await beat_through(beats, ports, skip)
+// The key that skips the beats: pressed once it comes, released once they end.
+interface Skip {
+	pressed: Promise<undefined>
+	is_pressed: () => boolean
+	release: () => void
 }
 
-// Beats played only where the ports carry their pauses, the beats left unwritten left in `beats`; the
-// key listened for goes back to folding once they end. Whether all of them played, no key skipping
-// them.
-async function listen(
-	beats: Iterator<Beat>,
-	ports: IntroPorts,
-	keys: KeyReading,
-): Promise<boolean> {
-	const { intro_sleep } = ports
-	if (intro_sleep === undefined) return false
+// The beats played, as they are due (`run-board-beat-pace.ts`), and how a late one is carried.
+interface Playback {
+	beats: Iterator<Beat>
+	skip: Skip
+	schedule: Schedule
+	join: Join
+}
 
+function taken(beats: Iterator<Beat>): Beat | undefined {
+	const beat = beats.next()
+
+	return beat.done === true ? undefined : beat.value
+}
+
+type PausedPorts = IntroPorts & { intro_sleep: (ms: number) => Promise<void> }
+
+// The beat, joined after what is carried, written, then what is left of its pause raced against the
+// skip; one already past its end is not written but carried into the next write. What is carried next.
+async function written(
+	beat: Beat,
+	playback: Playback,
+	ports: PausedPorts,
+	carried: string,
+): Promise<string> {
+	const { schedule, join, skip } = playback
+	const end = schedule.end(beat.ms)
+	const text = join(carried, beat.text)
+
+	if (schedule.left(end) < 0) return text
+	ports.write(text)
+	const left = Math.max(0, schedule.left(end))
+
+	await Promise.race([ports.intro_sleep(left), skip.pressed])
+
+	return ''
+}
+
+// Each beat taken and written as it is due, and what is carried when the beats end written then. A skip
+// takes no further beat, so the beats left unwritten stay in `beats` — made one at a time, a skip makes
+// no more.
+async function beat_through(playback: Playback, ports: PausedPorts, carried = ''): Promise<void> {
+	const beat = playback.skip.is_pressed() ? undefined : taken(playback.beats)
+
+	if (beat !== undefined) {
+		await beat_through(playback, ports, await written(beat, playback, ports, carried))
+	} else if (carried !== '') {
+		ports.write(carried)
+	}
+}
+
+// The key listened for, which goes back to folding once released.
+function skipper(keys: KeyReading): Skip {
 	const held: { is_pressed: boolean; release: (() => void) | undefined } = {
 		is_pressed: false,
 		release: undefined,
@@ -90,15 +123,31 @@ async function listen(
 			resolve(undefined)
 		})
 	})
-	const skip = { pressed, is_pressed: (): boolean => held.is_pressed }
+
+	return { pressed, is_pressed: () => held.is_pressed, release: () => held.release?.() }
+}
+
+// Beats played only where the ports carry their pauses, the beats left unwritten left in `beats`; the
+// key listened for goes back to folding once they end. A late beat is carried as `join` says — a
+// whole rewrite by default. Whether all of them played, no key skipping them.
+async function listen(
+	beats: Iterator<Beat>,
+	ports: IntroPorts,
+	keys: KeyReading,
+	join: Join = run_board_beat_pace.rewritten,
+): Promise<boolean> {
+	const { intro_sleep } = ports
+	if (intro_sleep === undefined) return false
+	const skip = skipper(keys)
+	const schedule = run_board_beat_pace.scheduled(ports.intro_now)
 
 	try {
-		await beat_through(beats, { ...ports, intro_sleep }, skip)
+		await beat_through({ beats, skip, schedule, join }, { ...ports, intro_sleep })
 	} finally {
-		held.release?.()
+		skip.release()
 	}
 
-	return !held.is_pressed
+	return !skip.is_pressed()
 }
 
 // Letters typed with the trill sounding (joshuafolkken/kit#8250), which stops however they end — typed
@@ -230,7 +279,7 @@ async function reveal(
 	const lines = run_board_theme.marked(theme, frame, ports.icons).split('\n')
 	const beats = lines.flatMap((line, index) => line_beats(line, index)).values()
 
-	await listen(beats, { ...ports, write }, keys)
+	await listen(beats, { ...ports, write }, keys, run_board_beat_pace.appended)
 	const rest = [...beats]
 
 	if (rest.length > 0) write(rest.map((beat) => beat.text).join(''))
