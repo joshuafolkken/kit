@@ -135,7 +135,7 @@ async function create_epic(input: ApplyInput): Promise<number> {
 }
 
 function unplaced_line(issue_number: number): string {
-	return `✖ ${issue_cite.plain_for('github', issue_number)} is unpublished and in no confirmed epic, so publishing cannot reach it and no run picks it up. It is filed — do not file it again: create its epic with \`pnpm josh epic "<title>" ${String(issue_number)}\`, record the epic's plan, then publish it with \`pnpm josh issue:file --publish <E>\`.`
+	return `✖ ${issue_cite.plain_for('github', issue_number)} is unpublished and in no confirmed epic, so publishing cannot reach it and no run picks it up. It is filed — do not file it again: create its epic with \`pnpm josh epic "<title>" ${String(issue_number)} --rationale-file .josh/tmp/<dir>/rationale.md\`, record the epic's plan, then publish it with \`pnpm josh issue:file --publish <E>\`.`
 }
 
 // A subject an epic already tracks was placed before, whatever this decision wrote.

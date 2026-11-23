@@ -236,7 +236,7 @@ describe('epic_bundle_apply.apply_decision — placement required', () => {
 		expect(await epic_bundle_apply.apply_decision(placement)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(epic_bundle_apply.unplaced_line(SUBJECT_NUMBER))
 		expect(epic_bundle_apply.unplaced_line(SUBJECT_NUMBER)).toContain(
-			'`pnpm josh epic "<title>" 894`',
+			'`pnpm josh epic "<title>" 894 --rationale-file .josh/tmp/<dir>/rationale.md`',
 		)
 		expect(epic_bundle_apply.unplaced_line(SUBJECT_NUMBER)).toContain('issue:file --publish <E>')
 	})

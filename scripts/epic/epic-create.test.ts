@@ -1,5 +1,9 @@
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_command } from './epic'
+import { epic_cli } from './epic-cli'
 
 // joshuafolkken/kit#5846: `run:split` creates its epic through `epic_command.create`, which answers
 // what happened rather than an exit code — a refusal apart from a created epic and its number.
@@ -19,6 +23,16 @@ const ARGV = [TITLE, '10', '11']
 const CHAIN = '--chain'
 const REASON = '--order-reason'
 const TEN_TO_ELEVEN = '#10 -> #11'
+const WHY_SPLIT = 'Each part merges alone and the whole is over the guide.'
+const RATIONALE_DIRECTORY = temporary_directory('suite')('josh-epic-rationale-')
+const RATIONALE_PATH = path.join(RATIONALE_DIRECTORY, 'rationale.md')
+const BLANK_PATH = path.join(RATIONALE_DIRECTORY, 'blank.md')
+const RATIONALE_FLAG = '--rationale-file'
+const WITH_RATIONALE = [RATIONALE_FLAG, RATIONALE_PATH]
+const WITH_BLANK = [RATIONALE_FLAG, BLANK_PATH]
+
+writeFileSync(RATIONALE_PATH, WHY_SPLIT)
+writeFileSync(BLANK_PATH, ' \n\t\n')
 
 beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -46,6 +60,72 @@ describe('epic_command.create', () => {
 
 	it('answers 1 from `run` on a refusal', async () => {
 		expect(await epic_command.run([TITLE])).toBe(1)
+	})
+
+	// `run:split` passes no rationale; only the `josh epic` command requires one.
+	it('creates without a rationale when called directly', async () => {
+		expect(await epic_command.create(ARGV)).toStrictEqual({ kind: 'created', epic: 30 })
+		expect(create_epic_number).toHaveBeenCalledWith(expect.objectContaining({ rationale: '' }))
+	})
+})
+
+// joshuafolkken/kit#8798: an epic filed without a reason kept the template placeholder.
+describe('epic_command.run — the split rationale', () => {
+	const PROMOTE = ['--promote', '9', '10', '11']
+
+	it.each([
+		['creation without --rationale-file', ARGV],
+		['creation with a blank rationale', [...ARGV, ...WITH_BLANK]],
+		['promotion without --rationale-file', PROMOTE],
+		['promotion with a blank rationale', [...PROMOTE, ...WITH_BLANK]],
+	])('refuses a %s with 1, writing nothing', async (_name, argv) => {
+		expect(await epic_command.run(argv)).toBe(1)
+
+		expect(create_epic_number).not.toHaveBeenCalled()
+		expect(promote_epic).not.toHaveBeenCalled()
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+			expect.stringContaining('A split rationale is required'),
+		)
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+			expect.stringContaining('--rationale-file .josh/tmp/<dir>/rationale.md'),
+		)
+	})
+
+	it('creates with the rationale read from the file', async () => {
+		expect(await epic_command.run([...ARGV, ...WITH_RATIONALE])).toBe(0)
+
+		expect(create_epic_number).toHaveBeenCalledWith(
+			expect.objectContaining({ rationale: WHY_SPLIT }),
+		)
+	})
+
+	it('promotes with the rationale read from the file', async () => {
+		expect(await epic_command.run([...PROMOTE, ...WITH_RATIONALE])).toBe(0)
+
+		expect(promote_epic).toHaveBeenCalledWith(expect.objectContaining({ rationale: WHY_SPLIT }))
+	})
+})
+
+describe('epic_command.run — reading the split rationale', () => {
+	// `--rationale-file -` reads stdin, which a second read would find empty.
+	it.each([
+		['creation', ARGV],
+		['promotion', ['--promote', '9', '10', '11']],
+	])('reads the rationale once on a %s', async (_name, argv) => {
+		const read = vi.spyOn(epic_cli, 'read_rationale')
+
+		expect(await epic_command.run([...argv, ...WITH_RATIONALE])).toBe(0)
+
+		expect(read).toHaveBeenCalledTimes(1)
+		read.mockRestore()
+	})
+
+	it('prints --rationale-file as required in the usage', async () => {
+		await epic_command.run(ARGV)
+
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+			expect.stringContaining('<N2> ... --rationale-file <path|-> [--ordered'),
+		)
 	})
 })
 
@@ -89,7 +169,7 @@ describe('epic_command.create — --chain', () => {
 })
 
 describe('epic_command.run — --promote with --chain', () => {
-	const PROMOTE = ['--promote', '9', '10', '11']
+	const PROMOTE = ['--promote', '9', '10', '11', ...WITH_RATIONALE]
 
 	it('passes the declared --chain lines to the promotion', async () => {
 		const reason = [REASON, `${TEN_TO_ELEVEN}: 別の待ちがある — #11 reads #10`]
@@ -121,7 +201,9 @@ describe('epic_command — --order-reason', () => {
 	})
 
 	it('passes the per-chain reasons to the promotion', async () => {
-		expect(await epic_command.run(['--promote', '9', '10', '11', ...REASON_ARGS])).toBe(0)
+		expect(
+			await epic_command.run(['--promote', '9', '10', '11', ...REASON_ARGS, ...WITH_RATIONALE]),
+		).toBe(0)
 
 		expect(promote_epic).toHaveBeenCalledWith(expect.objectContaining({ order_reasons: REASONS }))
 	})
