@@ -1,10 +1,10 @@
-import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
+import { run_board_rain_gradient } from './run-board-rain-gradient'
 
 // joshuafolkken/kit#8442: the matrix board's code rain, one part every rain effect draws through — the
 // first frame's reveal (joshuafolkken/kit#8519), the idle rain and the exit wipe. Each column of the
-// screen has a head falling at its own speed from its own start; a cell at the head is a fresh white-green
-// glyph, the tail above it fades through the trace greens over the column's own length; the cells above
+// screen has a head falling at its own speed from its own start; the head's cells and the tail above it
+// are painted through `run_board_rain_gradient` over the column's own length; the cells above
 // the tail the rain has passed (`behind`), and the cells below the head it has not reached (`ahead`).
 // What those show is the caller's: a reveal leaves its frame behind the rain, a wipe leaves blanks. The
 // random source is injected, so a test pins every glyph, speed and tail.
@@ -15,9 +15,8 @@ interface Head {
 	// The row the head is on, fractional between frames, and the rows it falls per frame.
 	at: number
 	speed: number
-	// The tail's cells above the head, and their paint from the head upward, stretched over them.
+	// The tail's cells above the head, painted through `run_board_rain_gradient` (joshuafolkken/kit#8742).
 	length: number
-	ramp: ReadonlyArray<Paint>
 }
 
 // At least `least`, and up to `spread` more.
@@ -27,11 +26,10 @@ interface Span {
 }
 
 // joshuafolkken/kit#8626: one pass's own rain — each column's tail as a share of the screen's height,
-// the tail's paint, each head's speed in rows a frame, and how long every head keeps that speed before
-// it gains one more for each second past the hold.
+// each head's speed in rows a frame, and how long every head keeps that speed before it gains one more
+// for each second past the hold.
 interface Scene {
 	tail: Span
-	ramp: ReadonlyArray<Paint>
 	speed: Span
 	hold_ms: number
 }
@@ -45,6 +43,11 @@ interface Drop {
 	kind: 'drop'
 	glyph: string
 	paint: Paint
+}
+
+interface Settling {
+	glyph: string
+	is_rerolled: boolean
 }
 
 // A cell the head has not reached, one the whole tail has passed, or a glyph of the rain itself.
@@ -67,44 +70,16 @@ const REROLL = 0.08
 const SETTLE = { x: 31, y: 17 }
 // Half-width katakana, digits and signs, each one UTF-16 unit and one terminal column.
 const GLYPHS = 'ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789Z:.=*+<>'
-const { SHADES } = run_board_header_trace
-// The tail's paint by its distance above the head, nearest first: the wipe's, and on a seven-cell tail
-// each cell its own step.
-const FADE: ReadonlyArray<Paint> = [
-	SHADES.bright,
-	SHADES.bright,
-	SHADES.body,
-	SHADES.mid,
-	SHADES.mid,
-	SHADES.dark,
-	SHADES.darkest,
-]
-// The reveal's paint: bright for longer, dark only at the very end of the tail.
-const MOVIE_RAMP: ReadonlyArray<Paint> = [
-	SHADES.bright,
-	SHADES.bright,
-	SHADES.bright,
-	SHADES.body,
-	SHADES.body,
-	SHADES.body,
-	SHADES.body,
-	SHADES.mid,
-	SHADES.mid,
-	SHADES.mid,
-	SHADES.dark,
-	SHADES.darkest,
-]
+const { is_flicker, paint_at } = run_board_rain_gradient
 // The first frame's reveal: tails one to two screens long at today's pace.
 const REVEAL: Scene = {
 	tail: { least: 1, spread: 1 },
-	ramp: MOVIE_RAMP,
 	speed: SPEED,
 	hold_ms: HOLD_MS,
 }
 // The exit wipe: tails 40% to 100% of the screen, falling twice today's pace.
 const WIPE: Scene = {
 	tail: { least: 0.4, spread: 0.6 },
-	ramp: FADE,
 	speed: { least: 1.1, spread: 1.5 },
 	hold_ms: HOLD_MS,
 }
@@ -121,11 +96,15 @@ function fresh(random: Random): string {
 	return glyph_at(pick(GLYPHS.length, random))
 }
 
-// The glyph a tail cell keeps from frame to frame, unless it rerolls.
-function settled(place: Place, random: Random): string {
-	if (random() < REROLL) return fresh(random)
+// The glyph a tail cell keeps from frame to frame, unless it rerolls — and whether it did.
+function settling(place: Place, random: Random): Settling {
+	if (random() < REROLL) return { glyph: fresh(random), is_rerolled: true }
 
-	return glyph_at(place.x * SETTLE.x + place.y * SETTLE.y)
+	return { glyph: glyph_at(place.x * SETTLE.x + place.y * SETTLE.y), is_rerolled: false }
+}
+
+function settled(place: Place, random: Random): string {
+	return settling(place, random).glyph
 }
 
 function spanned(span: Span, random: Random): number {
@@ -138,7 +117,7 @@ function head_of(scene: Scene, height: number, random: Random): Head {
 	const speed = spanned(scene.speed, random)
 	const length = Math.round(height * spanned(scene.tail, random))
 
-	return { at, speed, length, ramp: scene.ramp }
+	return { at, speed, length }
 }
 
 // One head a column.
@@ -161,22 +140,23 @@ function is_through(heads: ReadonlyArray<Head>, height: number): boolean {
 	return heads.every((head) => head.at - head.length >= height)
 }
 
-// The paint `distance` cells above the head in a tail of `length` cells, the ramp stretched over the
-// tail; none past the tail.
-function paint_of(ramp: ReadonlyArray<Paint>, distance: number, length: number): Paint | undefined {
-	if (distance > length) return undefined
+// A cell of the head or tail: the two lead cells a fresh glyph every frame, the rest the glyph their
+// place settles on, a rerolled one glinting for the frame.
+function drop_of(head: Head, place: Place, distance: number, random: Random): RainCell {
+	const { glyph, is_rerolled } = is_flicker(distance)
+		? { glyph: fresh(random), is_rerolled: false }
+		: settling(place, random)
+	const paint = paint_at(distance, head.length, is_rerolled)
 
-	return ramp[Math.min(ramp.length - 1, Math.floor(((distance - 1) / length) * ramp.length))]
+	return paint === undefined ? { kind: 'behind' } : { kind: 'drop', glyph, paint }
 }
 
 function cell_of(head: Head, place: Place, random: Random): RainCell {
 	const distance = Math.floor(head.at) - place.y
 	if (distance < 0) return { kind: 'ahead' }
-	if (distance === 0) return { kind: 'drop', glyph: fresh(random), paint: SHADES.head }
-	const paint = paint_of(head.ramp, distance, head.length)
-	if (paint === undefined) return { kind: 'behind' }
+	if (distance > head.length) return { kind: 'behind' }
 
-	return { kind: 'drop', glyph: settled(place, random), paint }
+	return drop_of(head, place, distance, random)
 }
 
 // The screen's cells under the heads, a row at a time from the top.
@@ -208,9 +188,7 @@ function* passes(
 }
 
 const run_board_rain = {
-	FADE,
 	GLYPHS,
-	MOVIE_RAMP,
 	RAIN_MS,
 	REVEAL,
 	WIPE,
@@ -220,7 +198,6 @@ const run_board_rain = {
 	fresh,
 	heads_of,
 	hurried,
-	paint_of,
 	passes,
 	settled,
 }

@@ -1,7 +1,7 @@
-import { run_board_header_trace } from './run-board-header-trace'
-import { run_board_labels, type Paint } from './run-board-labels'
+import { run_board_labels } from './run-board-labels'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_rain } from './run-board-rain'
+import { run_board_rain_gradient } from './run-board-rain-gradient'
 import { run_board_sweep } from './run-board-sweep'
 
 // joshuafolkken/kit#8356: the matrix board's idle rain, drawn in the lamp panel's cells — from past the
@@ -11,7 +11,6 @@ import { run_board_sweep } from './run-board-sweep'
 // faster pace. Like the lamps, a cell is read off the moment, its column and its row alone, so only the
 // cells that change are written between redraws.
 
-const { SHADES } = run_board_header_trace
 const { mixed } = run_board_lamps
 // The demo's live frame, the rows a drop falls a frame idle, and its gap's rows.
 const FRAME_MS = 70
@@ -24,7 +23,8 @@ const POUR_SPEED = (POUR.least * FRAME_MS) / run_board_sweep.SWEEP_MS
 const GAP = { least: 6, spread: 10 }
 // The panel's rows where a place does not say how many its frame runs.
 const PANEL_ROWS = 5
-const TRAIL: ReadonlyArray<Paint> = [SHADES.bright, SHADES.mid, SHADES.dark]
+// The trail's cells behind the head, painted through the rain's gradient (joshuafolkken/kit#8742).
+const TRAIL_CELLS = 3
 // Each column's drop numbers, mixed apart from its speed, its gap and where it starts.
 const SALT = { speed: 1, gap: 2, offset: 3, glyph: 4 }
 const SCALE = 1000
@@ -67,31 +67,36 @@ function speed_of(column: number, at: RainMoment): number {
 // trail and the gap.
 function row_at(column: number, at: RainMoment, panel_rows = PANEL_ROWS): number {
 	const gap = GAP.least + Math.floor(share(column, SALT.gap) * GAP.spread)
-	const cycle = panel_rows + TRAIL.length + gap
+	const cycle = panel_rows + TRAIL_CELLS + gap
 	const fallen = (at.ms / FRAME_MS) * speed_of(column, at) + share(column, SALT.offset) * cycle
 
 	return fallen % cycle
 }
 
-// The head's glyph, changing every frame, and the same for the same column and frame.
-function head_glyph(column: number, ms: number): string {
+// A lead cell's glyph `distance` from the head, changing every frame, and the same for the same column,
+// frame and distance.
+function lead_glyph(column: number, ms: number, distance: number): string {
 	const frame = Math.floor(ms / FRAME_MS)
 
-	return run_board_rain.fresh(() => share(column, mixed([frame, SALT.glyph])))
+	return run_board_rain.fresh(() => share(column, mixed([frame, SALT.glyph, distance])))
+}
+
+// The glyph of the cell `distance` from the head: a lead cell's fresh one, a trail cell's settled one.
+function glyph_of(place: RainPlace, at: RainMoment, distance: number): string {
+	if (run_board_rain_gradient.is_flicker(distance)) return lead_glyph(place.column, at.ms, distance)
+
+	return run_board_rain.settled({ x: place.column, y: place.panel_row }, never)
 }
 
 // The cell at `place` as drawn at `at`: the head, a trail cell, or a blank.
 function cell_text(place: RainPlace, at: RainMoment): string {
 	const distance = Math.floor(row_at(place.column, at, place.panel_rows)) - place.panel_row
-
-	if (distance === 0) return run_board_labels.painted(SHADES.head, head_glyph(place.column, at.ms))
-	// A cell below the head has a negative index, so no paint.
-	const paint = TRAIL[distance - 1]
+	// A cell below the head has a negative distance, so no paint.
+	const paint = run_board_rain_gradient.paint_at(distance, TRAIL_CELLS)
 
 	if (paint === undefined) return BLANK
-	const glyph = run_board_rain.settled({ x: place.column, y: place.panel_row }, never)
 
-	return run_board_labels.painted(paint, glyph)
+	return run_board_labels.painted(paint, glyph_of(place, at, distance))
 }
 
 const run_board_idle_rain = { POUR, SPEED, cell_text, never, pace_of, row_at, speed_of }
