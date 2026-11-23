@@ -8,6 +8,7 @@ import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seat_start } from './lane-seat-start'
+import { lane_transition_guards } from './lane-transition-guards'
 
 const ISSUE = '5444'
 const SEAT = 2
@@ -27,9 +28,15 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-function prepare(): void {
+function prepare_checks(): void {
 	vi.spyOn(lane_dispatch_dependency, 'check').mockResolvedValue(undefined)
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+	// The guards' own test reads the lane list and git; here the lane's work tree is taken as present.
+	vi.spyOn(lane_transition_guards, 'rejection').mockResolvedValue(undefined)
+}
+
+function prepare(): void {
+	prepare_checks()
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(LANE)
 	vi.spyOn(lane_output, 'record_output').mockResolvedValue({
 		kind: 'recorded',
