@@ -218,6 +218,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
 	if (!parsed.is_worker) return await run_in_background(parsed, argv)
+	run_chain_background.adopt_session()
 	const code = await run_in_place(parsed, stages)
 
 	run_chain_background.finish(worker_of(parsed), code)

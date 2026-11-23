@@ -86,6 +86,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 })
 
@@ -354,5 +355,20 @@ describe('run_chain_cli.run — the background join (ac-40e0ddab)', () => {
 
 		expect(ran()).toHaveLength(1)
 		expect(finish).toHaveBeenCalledExactlyOnceWith(worker(JOIN), code)
+	})
+})
+
+describe('run_chain_cli.run — a worker’s session', () => {
+	it('runs its stages under the session id the call forwarded, which the detached launch stripped', async () => {
+		const session_id = 'session-8761'
+
+		vi.spyOn(run_chain_background, 'finish').mockReturnValue()
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', undefined)
+		vi.stubEnv('JOSH_RUN_CHAIN_SESSION_ID', session_id)
+		josh_run_mock.mockResolvedValue({ code: STOP_EXIT, out: '' })
+
+		await run_chain_cli.run([ISSUE, '--join', run_chain_background.WORKER_FLAG])
+
+		expect(process.env['CLAUDE_CODE_SESSION_ID']).toBe(session_id)
 	})
 })

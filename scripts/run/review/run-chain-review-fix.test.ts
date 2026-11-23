@@ -73,23 +73,6 @@ describe('run_chain_review_fix.route — a lane child past the cut threshold (ac
 	})
 })
 
-describe('run_chain_review_fix.route — the cut check in the join’s worker', () => {
-	it('measures the session the call forwarded, not a guessed one', () => {
-		const session_id = 'session-8761'
-
-		vi.stubEnv('CLAUDE_CODE_SESSION_ID', undefined)
-		vi.stubEnv('JOSH_RUN_CHAIN_SESSION_ID', session_id)
-		in_lane(true)
-
-		run_chain_review_fix.route(ISSUE, FINDINGS, fix_next)
-
-		expect(cost_cli.session_verdict).toHaveBeenCalledWith({
-			environment: expect.objectContaining({ CLAUDE_CODE_SESSION_ID: session_id }),
-		})
-		vi.unstubAllEnvs()
-	})
-})
-
 describe('run_chain_review_fix.route — the fix stays in place', () => {
 	it('outside a lane, writing no handoff', () => {
 		in_lane(false)

@@ -71,19 +71,20 @@ function is_done(files: WorkerFiles): () => Promise<boolean> {
 	}
 }
 
-// The detached launch strips the agent session id, yet the join's cut check
-// (`run-chain-review-fix.ts`) must measure this session, not a guessed one: the worker gets the id
-// under its own key and puts it back for that check.
+// The detached launch strips the agent session id, yet the stages the worker runs in the session's
+// stead — the join's cut check (`run-chain-review-fix.ts`), the ship's `cost --cut` and its
+// section-once marker — must see this session, not a guessed one: the worker gets the id under its
+// own key and, as it starts, puts it back for every stage it runs.
 function forwarded_environment(source: Environment = process.env): Record<string, string> {
 	const id = source[SESSION_ID_KEY]
 
 	return id === undefined ? {} : { [FORWARDED_SESSION_KEY]: id }
 }
 
-function session_environment(source: Environment = process.env): Environment {
-	const id = source[FORWARDED_SESSION_KEY]
+function adopt_session(environment: Record<string, string | undefined> = process.env): void {
+	const id = environment[FORWARDED_SESSION_KEY]
 
-	return id === undefined ? source : { ...source, [SESSION_ID_KEY]: id }
+	if (id !== undefined) environment[SESSION_ID_KEY] = id
 }
 
 function launch(worker: Worker, argv: ReadonlyArray<string>): string | undefined {
@@ -165,11 +166,11 @@ function finish(worker: Worker, code: number): void {
 const run_chain_background = {
 	HALF,
 	WORKER_FLAG,
+	adopt_session,
 	finish,
 	forwarded_environment,
 	has_worker,
 	open,
-	session_environment,
 	worker_of,
 }
 

@@ -171,17 +171,21 @@ describe('run_chain_background — the session id forwarded to the worker', () =
 	})
 
 	it('puts the forwarded id back as the session id in the worker', () => {
-		const environment = run_chain_background.session_environment({
+		const environment: Record<string, string | undefined> = {
 			JOSH_RUN_CHAIN_SESSION_ID: SESSION_ID,
-		})
+		}
+
+		run_chain_background.adopt_session(environment)
 
 		expect(environment['CLAUDE_CODE_SESSION_ID']).toBe(SESSION_ID)
 	})
 
 	it('leaves the environment as it is when nothing was forwarded', () => {
-		const source = { PATH: '/bin' }
+		const environment = { PATH: '/bin' }
 
-		expect(run_chain_background.session_environment(source)).toBe(source)
+		run_chain_background.adopt_session(environment)
+
+		expect(environment).toStrictEqual({ PATH: '/bin' })
 	})
 })
 
