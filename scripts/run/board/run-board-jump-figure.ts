@@ -7,7 +7,7 @@ import { run_board_rgb, type Rgb } from './run-board-rgb'
 // joshuafolkken/kit#8677: the animation area's own cells — the capacitor and the gauge — through the
 // bttf jump and arrival. They keep their own light through the run up and the wash, thaw from ice with
 // the rest of the board, and go dark and flash with it on the arrival. A cell with no 24-bit color of
-// its own is left as it is.
+// its own takes the jump's wash as its ground (joshuafolkken/kit#8782) and is left as it is otherwise.
 
 const { arrive_cells, jump_cells } = run_board_jump_paint
 const { TICK_MS, tick_of } = run_board_jump
