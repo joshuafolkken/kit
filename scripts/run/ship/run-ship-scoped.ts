@@ -1,5 +1,6 @@
 import { check_reuse } from '#scripts/gate/check-reuse'
 import { gate_ledger } from '#scripts/gate/gate-ledger'
+import { gate_owner_watch } from '#scripts/gate/gate-owner-watch'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
@@ -7,6 +8,7 @@ import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { whole_tree_reuse } from '#scripts/gate/whole-tree-reuse'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { process_identity } from '#scripts/josh/process-identity'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_ship_gate_runs } from './run-ship-gate-runs'
 import { run_ship_lap, type LapNote } from './run-ship-lap'
@@ -330,6 +332,14 @@ async function reused_gate(tree: GateTree): Promise<JoshResult> {
 	)
 }
 
+// Ship reads its gate's verdict, so it names itself the gate's owner (joshuafolkken/kit#8845).
+function gate_environment(): Record<string, string> {
+	return {
+		...run_ship_lap.caller_environment(),
+		...gate_owner_watch.environment_of(process_identity.own_fields()),
+	}
+}
+
 // A gate that runs names why on its log line and its lap (`run-ship-gate-runs.ts`).
 async function ran_gate(tree: GateTree): Promise<JoshResult> {
 	const reason = run_ship_gate_runs.reason_of(tree)
@@ -341,7 +351,7 @@ async function ran_gate(tree: GateTree): Promise<JoshResult> {
 		async () =>
 			await josh_command.josh_run(GATE_ARGUMENTS, {
 				should_forward_stderr,
-				environment: run_ship_lap.caller_environment(),
+				environment: gate_environment(),
 			}),
 		{ note_of: () => ({ rerun: reason }) },
 	)

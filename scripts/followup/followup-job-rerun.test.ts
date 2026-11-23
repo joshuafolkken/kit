@@ -77,6 +77,7 @@ const FAILED_TEST = `${OUTSIDE_TEST} > frame budget > reads the budget`
 const UNIT_LOG = `2026-10-27T10:00:00.0000000Z  FAIL  ${FAILED_TEST}\n`
 const CURL_ERROR = '2026-11-08T08:58:56.5220933Z curl: (22) The requested URL returned error:'
 const CURL_EXIT = '2026-11-08T08:59:02.6053812Z ##[error]Process completed with exit code 22.'
+const SONAR_FETCH_FAILED = `2026-11-23T12:26:40.7559275Z 12:26:40.755 ERROR Something went wrong while trying to get the pullrequest with key '8853': Illegal base64 character 2d\n`
 
 function curl_failed(status: number): string {
 	return `${CURL_ERROR} ${String(status)}\n${CURL_EXIT}\n`
@@ -275,6 +276,7 @@ const NOT_DOWNLOAD_FAILURES = [
 		'whose curl got through on a retry and a test of the change failed',
 		`${CURL_ERROR} 504\n${UNIT_LOG}`,
 	],
+	['whose Sonar quality gate failed', '12:26:40Z 12:26:40.755 ERROR QUALITY GATE STATUS: FAILED\n'],
 ]
 
 describe('rerun_failed_jobs — a job red because a download failed', () => {
@@ -293,6 +295,7 @@ describe('rerun_failed_jobs — a job red because a download failed', () => {
 			'the CodeQL bundle got a server error',
 			'2026-11-08T10:12:01.0000000Z ##[error]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 504\n',
 		],
+		['the SonarCloud scanner could not fetch the pull request', SONAR_FETCH_FAILED],
 	])('reruns the run once when %s', async (_label, log) => {
 		answer_checks([as_check(failed_unit())])
 		answer_actions({ jobs: [failed_unit()], log })

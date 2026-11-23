@@ -40,6 +40,7 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
 - Static checks: `pnpm josh lint`, `cspell:dot`, `behavior`, `exports:unused`, `metrics` (kit only); the unit leg is `pnpm josh test:related`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check`, `exports` and `metrics` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`), and `test:unit` while `josh test:related` would run no test for what moved (no test-read map, or one git can no longer diff against, runs it); the header reads `reused — inputs unchanged since it passed at <time>`.
 - The other checks always run; `--force` reuses nothing.
+- One gate per worktree: a second exits 1 naming the live owner's pid; a dead owner's lock is taken over (`scripts/gate/gate-worktree-lock.ts`).
 - **Refuses to start when the scoped pair has not been green on this tree**: a unit-included local gate reads the record `josh review:brief` does and names `pnpm josh lint:related && pnpm josh test:related` (`pnpm josh check:related` in a lane). Not for `--no-unit` or `--force`; `JOSH_SCOPED_GREEN=0` turns it off.
 - `--static-group=<lint-1|lint-2|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`). `lint-<n>` runs the lint check alone on that `josh lint --shard`.
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
@@ -53,7 +54,7 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
   - An invalid definition (a fixed check's label as `name` included) runs none and fails as one `josh.gate.steps` check naming the error.
   - With `--static-group`, only `rest` runs them.
 
-- A gate whose parent dies ends with its checks: it sends `SIGTERM` to its process group and exits non-zero (`scripts/gate/gate-parent-watch.ts`).
+- A gate whose owner dies ends with its checks: it sends `SIGTERM` to its process group and exits non-zero. The launcher names the owner in `JOSH_GATE_OWNER_PID` / `JOSH_GATE_OWNER_START` (`run:review` → the lane child session, ship → itself); no owner named → no watch (`scripts/gate/gate-owner-watch.ts`).
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail".

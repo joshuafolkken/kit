@@ -4,6 +4,7 @@ import { temporary_directory } from '#tools/test/temporary-directory'
 import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eslint_daemon_calls } from './eslint-daemon-calls'
+import { eslint_daemon_environment } from './eslint-daemon-environment'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 vi.mock('#scripts/build/local-bin', () => ({ resolve_package_bin: vi.fn() }))
@@ -18,6 +19,7 @@ const PNPM_ESLINT = ['exec', 'eslint', '--quiet', 'src/a.ts']
 const ESLINT_DIRECTORY = 'node_modules/eslint'
 const DAEMON = 'token 4321 77 hash'
 const { CALLS_RECORD } = eslint_daemon_calls
+const { record_file } = eslint_daemon_environment
 const CALL = { caller: eslint_daemon_calls.DAEMON_CALLER.PRE_COMMIT, files: 1 }
 
 const make_directory = temporary_directory('suite')
@@ -29,7 +31,7 @@ function current_checkout(): void {
 		write_file(project_root, input, '{}')
 	}
 
-	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+	write_file(project_root, record_file(ESLINT_DIRECTORY, project_root), DAEMON)
 	write_file(
 		project_root,
 		`${ESLINT_DIRECTORY}/.eslint_d-toolchain`,
@@ -70,7 +72,7 @@ describe('eslint_daemon — the call record', () => {
 
 		// An eslint the borrowing checkout resolves, so only the borrowed-install guard holds the record back.
 		write_file(lender, 'eslint/package.json', '{}')
-		write_file(lender, 'eslint/.eslint_d', DAEMON)
+		write_file(lender, record_file('eslint', project_root), DAEMON)
 		symlinkSync(lender, path.join(project_root, 'node_modules'), 'dir')
 
 		eslint_daemon.record_call(project_root, CALL)

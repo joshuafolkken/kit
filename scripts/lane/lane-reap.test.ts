@@ -143,6 +143,24 @@ describe('lane_reap.is_child_running', () => {
 	})
 })
 
+// joshuafolkken/kit#8845: `run:review` names the lane child it runs under as its gate's owner.
+describe('lane_reap.own_child', () => {
+	it('answers the matched process among the caller’s ancestors, never another lane’s child', () => {
+		const probes = probes_over(
+			{ matching: [CHILD, OWN_PARENT], children: {}, parents: own_ancestry() },
+			[],
+		)
+
+		expect(lane_reap.own_child(ISSUE, probes)).toBe(OWN_PARENT)
+	})
+
+	it('answers undefined where no ancestor is the lane child', () => {
+		const probes = probes_over({ matching: [CHILD], children: {}, parents: own_ancestry() }, [])
+
+		expect(lane_reap.own_child(ISSUE, probes)).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#2472: the Stop hook matches a carry record's owner against this chain.
 describe('lane_reap.own_ancestry', () => {
 	it('holds this process and every process above it', () => {

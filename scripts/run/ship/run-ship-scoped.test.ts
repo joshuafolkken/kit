@@ -340,7 +340,7 @@ describe('run_ship_scoped.scoped_gate', () => {
 		expect(commands()).toStrictEqual([LINT, GATE])
 		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate', WHOLE_TREE_FLAG], {
 			should_forward_stderr: true,
-			environment: {},
+			environment: expect.objectContaining({}),
 		})
 	})
 

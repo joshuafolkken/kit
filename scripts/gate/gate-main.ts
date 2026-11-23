@@ -4,7 +4,8 @@ import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { check_reuse } from './check-reuse'
 import { gate_command } from './gate-command'
-import { gate_parent_watch } from './gate-parent-watch'
+import { gate_owner_watch } from './gate-owner-watch'
+import { gate_worktree_lock } from './gate-worktree-lock'
 
 // The `josh gate` entry, kept apart from `gate-command.ts` and `verification-gate.ts` because other
 // modules import those: a bundle is one file, so a main guard there would fire for every command that
@@ -17,11 +18,16 @@ import { gate_parent_watch } from './gate-parent-watch'
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const extra_arguments = process.argv.slice(changed_file_scope.ARGV_START)
 
-	// A gate whose parent died ends with its checks rather than running on unread (`gate-parent-watch.ts`).
-	gate_parent_watch.start()
+	// A gate whose owner died ends with its checks rather than running on unread (`gate-owner-watch.ts`).
+	gate_owner_watch.start()
 
-	process.exitCode = await gate_command.run_gate_command(extra_arguments, {
-		ledger_path: await lane_ledger_write.target(),
-		check_records: check_reuse.DEFAULT_RECORDS,
-	})
+	const ledger_path = await lane_ledger_write.target()
+
+	process.exitCode = await gate_worktree_lock.run_locked(
+		async () =>
+			await gate_command.run_gate_command(extra_arguments, {
+				ledger_path,
+				check_records: check_reuse.DEFAULT_RECORDS,
+			}),
+	)
 }
