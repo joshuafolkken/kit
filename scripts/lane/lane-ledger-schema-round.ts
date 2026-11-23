@@ -50,6 +50,8 @@ const core_wait_schema = z.object({
 	budget_memory_mb: z.number().optional(),
 	available_mb: z.number().optional(),
 	busy_cores: z.number().optional(),
+	// The cores the admitted claims held at the admission (joshuafolkken/kit#8869).
+	reserved_cores: z.number().optional(),
 	requested_cores: z.number().optional(),
 	granted_cores: z.number().optional(),
 	memory_mb: z.number().optional(),

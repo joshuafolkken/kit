@@ -4,6 +4,7 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
+import { process_state } from '#scripts/josh/process-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { poll } from '#scripts/lib/poll'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
@@ -159,6 +160,16 @@ function live_reservations(
 	})
 }
 
+// **A stopped owner's place is not counted, and its marker stays** (joshuafolkken/kit#8869): `lane:pause`
+// sends SIGSTOP, so a paused lane's step keeps a marker it is not using while its process lives. The
+// marker is left for the next read, which counts it again once `lane:resume` lets the process run.
+function counted_reservations(directory: string = PLATFORM_TEMP_ROOT): Array<LiveReservation> {
+	const live = live_reservations(directory)
+	const stopped = process_state.stopped_pids(live.map((entry) => entry.reservation.pid))
+
+	return live.filter((entry) => !stopped.has(entry.reservation.pid))
+}
+
 // `Math.max` propagates `NaN` rather than clamping it, so an unusable budget is caught before it could
 // make every comparison false and admit everything — the hole `gate-plan.ts` closes for the same reason.
 function normalize_budget(budget: number): number {
@@ -194,7 +205,7 @@ interface WaitContext extends TimingConfig {
 // the run queue reads the machine overloaded (`machine_capacity.machine_budget`, joshuafolkken/kit#4361).
 async function poll_admission(context: WaitContext): Promise<Admission | undefined> {
 	try {
-		return await core_budget_poll.poll_admission(context, live_reservations(context.directory))
+		return await core_budget_poll.poll_admission(context, counted_reservations(context.directory))
 	} catch (error) {
 		sweep_marker(context.target)
 		throw error
@@ -348,6 +359,7 @@ const core_budget = {
 	admitted_load: core_admission.admitted_load,
 	budget_waits,
 	claim,
+	counted_reservations,
 	describe_overflow: core_admission.describe_overflow,
 	held_unit_claim,
 	is_covered,

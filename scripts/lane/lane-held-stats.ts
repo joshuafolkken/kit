@@ -36,8 +36,9 @@ const { NOT_MEASURED } = lane_stage_stats
 // A period with no hold: the table still prints, so a reader sees zero holds rather than no table.
 const NONE_ROW = ['none', NOT_MEASURED, NOT_MEASURED, NOT_MEASURED, '0', '0']
 const { is_dispatch, is_number } = lane_stage_stats
-const { OFFER_PREFIX, REASON_SEPARATOR, WATCH_VERDICT } = backlog_hold_codes
+const { NAMED_WAIT, OFFER_PREFIX, REASON_SEPARATOR, WATCH_VERDICT } = backlog_hold_codes
 const WATCH_PREFIX = `${OFFER_PREFIX}${REASON_SEPARATOR}${WATCH_VERDICT}${REASON_SEPARATOR}`
+const NAMED_REASON = [OFFER_PREFIX, 'wait', NAMED_WAIT].join(REASON_SEPARATOR)
 const CAUSE_HEADER = 'held by cause (a hold with several causes counts in full under each)'
 const BLOCKER_HEADER =
 	'held behind (any cause; a hold naming several issues counts in full under each)'
@@ -75,11 +76,17 @@ function wait_ms(held: HeldEntry, ends: ReadonlyArray<number>): number | undefin
 	return end_ms === undefined ? undefined : Math.min(end_ms - from_ms, MAX_HOLD_MS)
 }
 
+// A named-run wait (`offer:wait:named:<N>`) rows once, not once per issue: its issue counts under
+// `held behind` through `waiting` (joshuafolkken/kit#8863).
+function row_reason(reason: string): string {
+	return reason.startsWith(`${NAMED_REASON}${REASON_SEPARATOR}`) ? NAMED_REASON : reason
+}
+
 function holds_of(entries: ReadonlyArray<LedgerEntry>): Array<Hold> {
 	const ends = end_times(entries)
 
 	return entries.filter(is_held).map((held) => ({
-		reason: held.reason,
+		reason: row_reason(held.reason),
 		wait_ms: wait_ms(held, ends),
 		waiting: held.waiting ?? [],
 	}))
