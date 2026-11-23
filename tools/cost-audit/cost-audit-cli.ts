@@ -11,6 +11,7 @@ import { cost_audit, type Audit, type AuditWindow, type MergeCounts } from './co
 import { cost_audit_breakdown } from './cost-audit-breakdown'
 import { cost_audit_format } from './cost-audit-format'
 import { cost_audit_read, type AuditSession } from './cost-audit-read'
+import { cost_audit_read_chars } from './cost-audit-read-chars'
 
 // `josh cost:audit [--period <days>]` — what AI work cost over a period, by session kind, tool
 // category and guard, with the cost per merged pull request, set against the period before it. It
@@ -23,13 +24,14 @@ import { cost_audit_read, type AuditSession } from './cost-audit-read'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: pnpm josh cost:audit [--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]'
-const DENSITY_FLAG = '--density'
+	'Usage: pnpm josh cost:audit [--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density | --read-chars <path> | --lane-read-chars]'
 const OPTIONS = {
 	period: { type: 'string' },
 	since: { type: 'string' },
 	until: { type: 'string' },
 	density: { type: 'boolean' },
+	'read-chars': { type: 'string' },
+	'lane-read-chars': { type: 'boolean' },
 } as const
 // A positive whole number of days (`cli_flags.to_positive`), at most ten years.
 const MAX_PERIOD_DAYS = 3650
@@ -212,12 +214,52 @@ async function density_lines(cwd: string, span: AuditSpan): Promise<Array<string
 	return value === undefined ? [] : [cost_audit_format.density_label(window), value]
 }
 
+// `--read-chars` reads every session of the current period, as the Read-file table does;
+// `--lane-read-chars` the lane children's own alone, like `--density`.
+async function read_chars_lines(
+	cwd: string,
+	span: AuditSpan,
+	path: string,
+): Promise<Array<string>> {
+	const [window] = cost_audit.windows_of(span.days, span.now_ms)
+	const sessions = await cost_audit_read.load(cwd, window.start_ms)
+
+	return cost_audit_read_chars.file_lines(sessions, window, path)
+}
+
+async function lane_read_chars_lines(cwd: string, span: AuditSpan): Promise<Array<string>> {
+	const [window] = cost_audit.windows_of(span.days, span.now_ms)
+	const sessions = await cost_audit_read.load_lane_children(cwd, window.start_ms)
+
+	return cost_audit_read_chars.lane_lines(sessions, window)
+}
+
+// The single-number mode the flags name, `undefined` for the full report.
+function single_lines(
+	argv: ReadonlyArray<string>,
+	cwd: string,
+	span: AuditSpan,
+): Promise<Array<string>> | undefined {
+	const values = cli_flags.values_of(argv, OPTIONS)
+
+	if (values === undefined) return undefined
+
+	const path = values['read-chars']
+
+	if (path !== undefined) return read_chars_lines(cwd, span, path)
+	if (values['lane-read-chars'] === true) return lane_read_chars_lines(cwd, span)
+
+	return values.density === true ? density_lines(cwd, span) : undefined
+}
+
 async function printed_lines(
 	argv: ReadonlyArray<string>,
 	cwd: string,
 	span: AuditSpan,
 ): Promise<Array<string>> {
-	if (argv.includes(DENSITY_FLAG)) return await density_lines(cwd, span)
+	const single = single_lines(argv, cwd, span)
+
+	if (single !== undefined) return await single
 
 	return cost_audit_format.report_lines(await measure(cwd, span.days, span.now_ms))
 }

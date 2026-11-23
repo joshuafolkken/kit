@@ -355,10 +355,12 @@ pnpm josh lane:value cell --table "test:related scope" --row related --column "m
 
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
 
-Two figures outside `lane:value` print the number alone as the last line; `--density` with no lane-child request prints nothing and exits non-zero too:
+Figures outside `lane:value` print the number alone as the last line; a `cost:audit` mode with no sample (no lane-child request, no Read of the file, no lane-child session) prints nothing and exits non-zero too:
 
 ```bash
 pnpm josh cost:audit --density --period 7   # lane-child calls per request over the period
+pnpm josh cost:audit --read-chars prompts/collaboration-workflow/issue-template.md   # Read chars of one file over the period
+pnpm josh cost:audit --lane-read-chars      # lane-child Read chars per lane Issue over the period
 pnpm josh read:set fullrun --bytes          # total bytes the fullrun entry reads
 ```
 
