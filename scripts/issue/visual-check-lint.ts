@@ -1,5 +1,6 @@
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_body_keys } from './issue-body-keys'
+import { issue_template_section } from './issue-template-section'
 import { markdown_section } from './markdown-section'
 import { measure_declaration } from './measure-declaration'
 
@@ -54,7 +55,7 @@ const NON_LETTERS = /[^a-z]+/u
 // The template's other judgement kinds: a reason naming one is not a visual check alone.
 const OTHER_JUDGEMENT = /方針|外部|アカウント|policy|external|account/iu
 
-const REWRITE = `a display change is checked after merge and fixed in a follow-up Issue: declare \`${JUDGEMENT_NOT_NEEDED}\` and \`${POST_MERGE_CHECK} <where to look>\` under ${BACKGROUND_HEADING}; only a change that cannot be fixed after merge declares \`${REASON_PREFIX} <why>\` (\`issue-template.md\`)`
+const REWRITE = `a display change is checked after merge and fixed in a follow-up Issue: declare \`${JUDGEMENT_NOT_NEEDED}\` and \`${POST_MERGE_CHECK} <where to look>\` under ${BACKGROUND_HEADING}; only a change that cannot be fixed after merge declares \`${REASON_PREFIX} <why>\` (${issue_template_section.pointer('judgement')})`
 
 function declares_reason(body: string): boolean {
 	const value = measure_declaration.background_value(body, REASON_PREFIX)
