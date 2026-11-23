@@ -3,6 +3,7 @@ import { run_board_drop_screen, type DropScreen } from './run-board-drop-screen'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_rain_drop, type Fall, type Share } from './run-board-rain-drop'
+import { run_board_rain_gradient } from './run-board-rain-gradient'
 import type { Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8627: the matrix board's drops with a film's long trail, the pour twice as fast and
@@ -66,6 +67,14 @@ function written_rows(bytes: string): Map<number, string> {
 	)
 
 	return new Map([...cells].map((match) => [Number(match[1]), (match[2] ?? '').replace(RESET, '')]))
+}
+
+// The gradient's paint `distance` from the head of a `length`-cell trail.
+function gradient_at(distance: number, length: number): Paint {
+	const paint = run_board_rain_gradient.paint_at(distance, length)
+	if (paint === undefined) throw new Error(`no paint ${String(distance)} into ${String(length)}`)
+
+	return paint
 }
 
 // Whether `text` is one glyph painted `paint`.
@@ -139,30 +148,26 @@ describe('run_board_rain_drop — a trail 40% to 100% of the screen', () => {
 	})
 })
 
-describe('run_board_rain_drop — the trail’s paint stretched over its length', () => {
-	it('paints a four-cell trail exactly as `TRAIL` did', () => {
+describe('run_board_rain_drop — the rain’s gradient over its trail', () => {
+	it('paints a four-cell trail through the gradient', () => {
 		// Ten rows at 40%: four cells behind the head on row 5.
 		const rows = written_rows(drop_bytes(blank_screen(10, 2), 600, undefined, lone_share))
-		const paints = [SHADES.head, SHADES.bright, SHADES.mid, SHADES.dark, SHADES.darkest]
 
 		expect([...rows.keys()]).toEqual([5, 4, 3, 2, 1])
 
-		for (const [index, paint] of paints.entries()) {
-			expect(is_painted(rows.get(5 - index), paint)).toBe(true)
+		for (let distance = 0; distance <= 4; distance += 1) {
+			expect(is_painted(rows.get(5 - distance), gradient_at(distance, 4))).toBe(true)
 		}
 	})
 
-	it('spreads each of `TRAIL`’s shades over a quarter of a long trail', () => {
+	it('paints each cell of a long trail its own step of the gradient', () => {
 		// Fifty rows at 40%: twenty cells behind the head on row 21.
 		const rows = written_rows(drop_bytes(blank_screen(ROWS, 2), 3000, undefined, lone_share))
-		const paints = [SHADES.bright, SHADES.mid, SHADES.dark, SHADES.darkest]
 
 		expect(rows.size).toBe(21)
 
-		for (const [quarter, paint] of paints.entries()) {
-			for (let cell = 1; cell <= 5; cell += 1) {
-				expect(is_painted(rows.get(21 - quarter * 5 - cell), paint)).toBe(true)
-			}
+		for (let distance = 0; distance <= 20; distance += 1) {
+			expect(is_painted(rows.get(21 - distance), gradient_at(distance, 20))).toBe(true)
 		}
 	})
 })
