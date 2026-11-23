@@ -140,7 +140,9 @@ const scope_breakdown_schema = z
 	.partial()
 
 // `resumed_from` says whether a scoped pair lap started from the tree a stopped round 2 read
-// (`round-2-fix`) or not (`none`) — `run-ship-narrowed.ts` (joshuafolkken/kit#7789).
+// (`round-2-fix`) or not (`none`) — `run-ship-narrowed.ts` (joshuafolkken/kit#7789). `queued_ms` is the
+// wait a scoped pair spent behind another pair of the same ship before its lap started, absent when
+// none was ahead (`run-ship-pair-runs.ts`, joshuafolkken/kit#8864).
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -151,6 +153,7 @@ const ship_lap_schema = z.object({
 	fallback: z.string().optional(),
 	runs: z.number().optional(),
 	rerun: z.string().optional(),
+	queued_ms: z.number().optional(),
 	reused_tree: z.string().optional(),
 	is_reused: z.boolean().optional(),
 	named: z.number().optional(),

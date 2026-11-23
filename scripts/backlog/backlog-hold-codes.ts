@@ -15,13 +15,19 @@ const WATCH_VERDICT = 'watch'
 // The hand-back reason of a window that closed after a `watch` offer: the backlog had drained
 // (joshuafolkken/kit#7510), told apart from a window that closed mid-work.
 const DRAINED_REASON = 'drained'
+// The `wait` details of a named run (`backlog-drive-named.ts`, joshuafolkken/kit#8863): a named
+// issue in flight holds the free lanes (`named:<N>`), and an `--only` run waits on its last one to close (`only`).
+const NAMED_WAIT = 'named'
+const ONLY_WAIT = 'only'
 
 const backlog_hold_codes = {
 	DRAINED_REASON,
 	DRIVERLESS_PREFIX,
 	HAND_BACK_PREFIX,
 	MEMORY_REASON,
+	NAMED_WAIT,
 	OFFER_PREFIX,
+	ONLY_WAIT,
 	REASON_SEPARATOR,
 	USAGE_LIMIT_REASON,
 	WATCH_VERDICT,

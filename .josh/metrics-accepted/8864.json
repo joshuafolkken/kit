@@ -1,0 +1,7 @@
+{
+	"reason": "The scoped pair's queued-wait record (queued_ms) is new behaviour the ledger lacked (#8864)",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 23
+	}
+}
