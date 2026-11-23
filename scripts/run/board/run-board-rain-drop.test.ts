@@ -278,7 +278,10 @@ describe('run_board_rain_drop.drop_bytes — a blank cell and the cells it skips
 		const rows = [5, 4, 3, 2, 1]
 		const glyphs = rows.map((row) => (cells.get(`${String(row)};1`) ?? '').replaceAll(ESCAPES, ''))
 
-		expect(glyphs.slice(0, 2)).not.toEqual(rows.slice(0, 2).map((row) => settled_glyph(row)))
+		expect(glyphs[0]).not.toBe(settled_glyph(5))
+		expect(glyphs[1]).not.toBe(settled_glyph(4))
+		// Each lead cell draws its own fresh glyph, not one shared by the pair.
+		expect(glyphs[0]).not.toBe(glyphs[1])
 		expect(glyphs.slice(2)).toEqual(rows.slice(2).map((row) => settled_glyph(row)))
 	})
 
