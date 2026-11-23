@@ -2,6 +2,6 @@
 	"reason": "New cost:audit --read-chars and --lane-read-chars modes (#8834): a new module and its CLI wiring",
 	"date": "2026-11-23",
 	"growth": {
-		"scripts.code_lines": 83
+		"scripts.code_lines": 91
 	}
 }

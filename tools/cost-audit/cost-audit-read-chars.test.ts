@@ -30,6 +30,8 @@ const LABEL_PATTERN = /^Read chars of .+ \d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$
 const LANE_LABEL_PATTERN = /^lane-child Read chars per lane Issue \d{4}-/u
 const REPO = '/repo'
 const READ_CHARS_ARGV = ['--read-chars', TEMPLATE]
+const LANE_FLAG = '--lane-read-chars'
+const DENSITY_FLAG = '--density'
 
 function read(path: string): { name: string; input: unknown } {
 	return { name: 'Read', input: { file_path: path } }
@@ -77,6 +79,20 @@ describe('cost_audit_read_chars.file_lines', () => {
 		]
 
 		expect(cost_audit_read_chars.file_lines(sessions, WINDOW, TEMPLATE).at(-1)).toBe('30')
+	})
+
+	it('counts a key that is the path itself', () => {
+		const sessions = [reading(TEMPLATE, 30, IN_PERIOD, 'a')]
+
+		expect(cost_audit_read_chars.file_lines(sessions, WINDOW, TEMPLATE).at(-1)).toBe('30')
+	})
+
+	it('counts no key whose last segment only ends with the path file name', () => {
+		const sessions = [reading('/Users/me/Development/kit/my-issue-template.md', 30, IN_PERIOD, 'a')]
+
+		expect(cost_audit_read_chars.file_lines(sessions, WINDOW, 'issue-template.md')).toStrictEqual(
+			[],
+		)
 	})
 
 	it('prints nothing when no Read of the file ran in the period', () => {
@@ -131,7 +147,7 @@ describe('cost:audit --read-chars and --lane-read-chars', () => {
 		vi.mocked(cost_audit_read.load_lane_children).mockResolvedValue([session])
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		const code = await cost_audit_cli.run(['--lane-read-chars'], REPO, NOW_MS)
+		const code = await cost_audit_cli.run([LANE_FLAG], REPO, NOW_MS)
 
 		expect(code).toBe(0)
 		expect(cost_audit_read.load_lane_children).toHaveBeenCalledWith(REPO, WINDOW.start_ms)
@@ -146,5 +162,28 @@ describe('cost:audit --read-chars and --lane-read-chars', () => {
 
 		expect(code).toBe(1)
 		expect(info).not.toHaveBeenCalled()
+	})
+})
+
+describe('cost_audit_cli.USAGE single-number modes', () => {
+	it('names the two Read-chars modes beside --density', () => {
+		expect(cost_audit_cli.USAGE).toContain('[--density | --read-chars <path> | --lane-read-chars]')
+	})
+})
+
+describe('cost:audit single-number modes together', () => {
+	it.each([
+		[[...READ_CHARS_ARGV, LANE_FLAG]],
+		[[...READ_CHARS_ARGV, DENSITY_FLAG]],
+		[[LANE_FLAG, DENSITY_FLAG]],
+	])('refuses more than one with the usage line: %j', async (argv) => {
+		vi.mocked(cost_audit_read.load).mockClear()
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		const code = await cost_audit_cli.run(argv, REPO, NOW_MS)
+
+		expect(code).toBe(1)
+		expect(error).toHaveBeenCalledWith(cost_audit_cli.USAGE)
+		expect(cost_audit_read.load).not.toHaveBeenCalled()
 	})
 })

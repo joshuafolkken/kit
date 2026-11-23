@@ -54,6 +54,11 @@ interface SpanValues {
 	until?: string | undefined
 }
 
+// The single-number modes' values exclude each other: two given would silently print only one.
+function is_one_mode(modes: ReadonlyArray<unknown>): boolean {
+	return modes.filter((mode) => mode !== undefined).length <= 1
+}
+
 // An unknown flag or a `--period` with no value is refused, not read as the default period.
 function read_period(argv: ReadonlyArray<string>): number | undefined {
 	const values = cli_flags.values_of(argv, OPTIONS)
@@ -109,7 +114,12 @@ function absolute_span(values: SpanValues): AuditSpan | undefined {
 function read_span(argv: ReadonlyArray<string>, now_ms: number): AuditSpan | undefined {
 	const values = cli_flags.values_of(argv, OPTIONS)
 
-	if (values === undefined) return undefined
+	if (
+		values === undefined ||
+		!is_one_mode([values.density, values['read-chars'], values['lane-read-chars']])
+	) {
+		return undefined
+	}
 
 	const is_dated = values.since !== undefined || values.until !== undefined
 
@@ -240,10 +250,8 @@ function single_lines(
 	cwd: string,
 	span: AuditSpan,
 ): Promise<Array<string>> | undefined {
-	const values = cli_flags.values_of(argv, OPTIONS)
-
-	if (values === undefined) return undefined
-
+	// `read_span` has already refused flags that do not parse.
+	const values = cli_flags.values_of(argv, OPTIONS) ?? {}
 	const path = values['read-chars']
 
 	if (path !== undefined) return read_chars_lines(cwd, span, path)

@@ -1,4 +1,5 @@
 import { cost_audit, type AuditWindow } from './cost-audit'
+import { cost_audit_format } from './cost-audit-format'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_result, type ResultChars } from './cost-audit-result'
 
@@ -8,15 +9,8 @@ import { cost_audit_result, type ResultChars } from './cost-audit-result'
 // the number is the table's own sum; a period with no matching read prints nothing, never a zero a
 // declared bound would read as met.
 
-const ISO_DATE_LENGTH = 10
 const PATH_SEPARATOR = '/'
-
-function utc_range(window: AuditWindow): string {
-	const first = new Date(window.start_ms).toISOString().slice(0, ISO_DATE_LENGTH)
-	const last = new Date(window.end_ms - 1).toISOString().slice(0, ISO_DATE_LENGTH)
-
-	return `${first}..${last}`
-}
+const { utc_range } = cost_audit_format
 
 function read_rows(
 	sessions: ReadonlyArray<AuditSession>,
