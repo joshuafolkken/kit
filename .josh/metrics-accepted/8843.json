@@ -1,0 +1,7 @@
+{
+	"reason": "Relaunch now reaps a live lane child before launching (#8843): the liveness check, grace wait and refusal note are new behavior; the shared stop replaces restart's inline copy",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 34
+	}
+}
