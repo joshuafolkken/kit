@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { issue_body_keys } from './issue-body-keys'
+import { issue_template_section } from './issue-template-section'
 import { rework_classification } from './rework-classification'
 
 // joshuafolkken/kit#8799: a non-defect body citing delivered work with no new goal is rework filed as
@@ -39,6 +40,12 @@ describe('rework_classification.problem — refusal', () => {
 		expect(problem).toContain('- 種別: 不具合')
 		expect(problem).toContain('- 原因: #<PR>')
 		expect(problem).toContain('- 新しい目標:')
+	})
+
+	it('points at the kind section of issue-template.md, not the whole document', () => {
+		expect(rework_classification.problem(REWORK, DELIVERED)).toContain(
+			issue_template_section.pointer('kind'),
+		)
 	})
 
 	it('refuses on a citation in the summary as well', () => {

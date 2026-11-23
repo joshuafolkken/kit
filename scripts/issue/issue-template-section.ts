@@ -13,6 +13,17 @@ const TEMPLATE_PATHS: Readonly<Record<Column, string>> = {
 	en: 'prompts/collaboration-workflow/issue-template.en.md',
 }
 const TEMPLATE_FENCE = '````'
+// The sections of `issue-template.md` a refusal sends the filer to, so the filer reads that one section
+// (`josh doc:section`) rather than the whole document (joshuafolkken/kit#8763). They live in the
+// Japanese document alone: the English one carries the template and its correspondence table only.
+const POINTED_SECTIONS = {
+	declarations: `\`## ${issue_body_keys.TABLES.headings.background.ja}\` 直下の宣言と分類ラベル`,
+	judgement: '人の判断の選び方',
+	priority: '優先度の基準',
+	kind: '種別の分け方',
+} as const
+
+type PointedSection = keyof typeof POINTED_SECTIONS
 
 // The lines inside the document's four-backtick template fence; an empty array when it has none.
 function template_lines(document: string): ReadonlyArray<string> {
@@ -49,6 +60,12 @@ function section(heading: string): string | undefined {
 	return section_of(readFileSync(template_path, 'utf8'), heading)
 }
 
-const issue_template_section = { document_name, section, section_of }
+// `` `issue-template.md` → "<heading>" `` — the section reference a refusal cites.
+function pointer(section_key: PointedSection): string {
+	return `\`${path.basename(TEMPLATE_PATHS.ja)}\` → "${POINTED_SECTIONS[section_key]}"`
+}
+
+const issue_template_section = { POINTED_SECTIONS, document_name, pointer, section, section_of }
 
 export { issue_template_section }
+export type { PointedSection }
