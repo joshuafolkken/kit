@@ -1,27 +1,19 @@
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { lane_lifecycle_events } from './lane-lifecycle-events-fixture'
 import {
 	lane_lifecycle_fixture as world_fixture,
 	type LaneModel,
+	type LaneOperation,
+	type RunOperation,
 	type World,
 } from './lane-lifecycle-fixture'
 
 // The lane and run operations the lifecycle property test combines (joshuafolkken/kit#4274), each
 // offered only where the real command acts — `lane:pause` signals a child that is there, a launch
-// needs a run driving it — and each leaving what that command leaves.
+// needs a run driving it — and each leaving what that command leaves. A launch, a restart and a resume
+// ask the table's guards first, as `lane-dispatch-prepare.ts` does (joshuafolkken/kit#8777).
 
-const { KIND, emit, lane_of, write } = world_fixture
-
-interface LaneOperation {
-	name: string
-	can: (world: World, lane: LaneModel) => boolean
-	apply: (world: World, issue: string) => Promise<void> | void
-}
-
-interface RunOperation {
-	name: string
-	can: (world: World) => boolean
-	apply: (world: World) => void
-}
+const { KIND, emit, is_refused, lane_of, try_write, write } = world_fixture
 
 function is_running_child(lane: LaneModel): boolean {
 	return lane.is_listed && lane.state === 'running' && lane.is_alive
@@ -59,6 +51,10 @@ function can_close(_world: World, lane: LaneModel): boolean {
 }
 
 async function launched(world: World, issue: string, command: string, kind: string): Promise<void> {
+	const event = lane_of(world, issue).state === 'running' ? 'restart' : 'launch'
+
+	if (await is_refused(world, event, issue)) return
+
 	await write(world, { issue, state: 'running', command, is_launch: true })
 	Object.assign(lane_of(world, issue), { is_alive: true, launch_run: world.run.id })
 	emit(world, kind, `#${issue} ${command}`)
@@ -77,19 +73,21 @@ async function restart_lane(world: World, issue: string): Promise<void> {
 	await launched(world, issue, 'lane:restart', KIND.RESTART)
 }
 
-async function signalled(world: World, issue: string, to: 'paused' | 'running'): Promise<void> {
-	const command = to === 'paused' ? 'lane:pause' : 'lane:resume'
-
-	await write(world, { issue, state: to, command })
-	emit(world, KIND.LANE_STATE, `#${issue} ${command}`)
-}
-
 async function pause_lane(world: World, issue: string): Promise<void> {
-	await signalled(world, issue, 'paused')
+	await write(world, { issue, state: 'paused', command: 'lane:pause' })
+	emit(world, KIND.LANE_STATE, `#${issue} lane:pause`)
 }
 
+// `lane:resume` skips its event and ledger lines when the table refuses the write (a dependency wait).
 async function resume_lane(world: World, issue: string): Promise<void> {
-	await signalled(world, issue, 'running')
+	if (
+		(await is_refused(world, 'resume', issue)) ||
+		!(await try_write(world, { issue, state: 'running', command: 'lane:resume' }))
+	) {
+		return
+	}
+
+	emit(world, KIND.LANE_STATE, `#${issue} lane:resume`)
 	if (world.run.has_carry) lane_of(world, issue).launch_run = world.run.id
 }
 
@@ -108,10 +106,10 @@ const LANE_OPERATIONS: ReadonlyArray<LaneOperation> = [
 	{ name: 'open', can: can_open, apply: open_lane },
 	{ name: 'launch', can: can_launch, apply: dispatch_lane },
 	{ name: 'pause', can: can_pause, apply: pause_lane },
-	{ name: 'resume', can: can_resume, apply: resume_lane },
+	{ name: 'resume', can: can_resume, apply: resume_lane, lifts_pause: true },
 	{ name: 'cut', can: can_cut, apply: cut_lane },
 	{ name: 'restart', can: can_restart, apply: restart_lane },
-	{ name: 'close', can: can_close, apply: close_lane },
+	{ name: 'close', can: can_close, apply: close_lane, lifts_pause: true },
 ]
 
 function carry_path(world: World): string {
@@ -174,32 +172,67 @@ const RUN_OPERATIONS: ReadonlyArray<RunOperation> = [
 	{ name: 'run end', can: can_end_run, apply: end_run },
 ]
 
-// One operation bound to the world it runs in, named as the failure trace prints it.
+// One operation bound to the world it runs in, named as the failure trace prints it, with the lane it
+// acts on and whether it is a person's own lift of a pause (`lane-lifecycle-invariants-fixture.ts`).
 interface Step {
 	name: string
+	issue: string | undefined
+	lifts_pause: boolean
 	apply: () => Promise<void> | void
 }
 
-function lane_steps(world: World, issue: string): Array<Step> {
+interface Operations {
+	lanes: ReadonlyArray<LaneOperation>
+	runs: ReadonlyArray<RunOperation>
+}
+
+const BASIC: Operations = { lanes: LANE_OPERATIONS, runs: RUN_OPERATIONS }
+
+// joshuafolkken/kit#8771: adopt, hand-over, the dependency wait, human-review, merge, withdraw, a lost
+// work tree and another run's hold on the checkout, beside the operations above.
+const EVERY: Operations = {
+	lanes: [...LANE_OPERATIONS, ...lane_lifecycle_events.LANE_OPERATIONS],
+	runs: [...RUN_OPERATIONS, ...lane_lifecycle_events.RUN_OPERATIONS],
+}
+
+function lane_steps(world: World, issue: string, operations: Operations): Array<Step> {
 	const lane = lane_of(world, issue)
 
-	return LANE_OPERATIONS.filter((operation) => operation.can(world, lane)).map((operation) => ({
-		name: `${operation.name} #${issue}`,
-		apply: operation.apply.bind(undefined, world, issue),
-	}))
+	return operations.lanes
+		.filter((operation) => operation.can(world, lane))
+		.map((operation) => ({
+			name: `${operation.name} #${issue}`,
+			issue,
+			lifts_pause: operation.lifts_pause === true,
+			apply: operation.apply.bind(undefined, world, issue),
+		}))
 }
 
-/** Every operation the world allows now — never none, as a run either starts or ends. */
+function steps_in(world: World, operations: Operations): Array<Step> {
+	const runs = operations.runs
+		.filter((operation) => operation.can(world))
+		.map((operation) => ({
+			name: operation.name,
+			issue: undefined,
+			lifts_pause: false,
+			apply: operation.apply.bind(undefined, world),
+		}))
+	const lanes = world_fixture.ISSUES.flatMap((issue) => lane_steps(world, issue, operations))
+
+	return [...lanes, ...runs]
+}
+
+/** Every basic operation the world allows now — never none, as a run either starts or ends. */
 function steps_of(world: World): Array<Step> {
-	const runs = RUN_OPERATIONS.filter((operation) => operation.can(world)).map((operation) => ({
-		name: operation.name,
-		apply: operation.apply.bind(undefined, world),
-	}))
-
-	return [...world_fixture.ISSUES.flatMap((issue) => lane_steps(world, issue)), ...runs]
+	return steps_in(world, BASIC)
 }
 
-const lane_lifecycle_operations = { steps_of }
+/** Every operation, the #8771 ones included, the world allows now. */
+function every_step_of(world: World): Array<Step> {
+	return steps_in(world, EVERY)
+}
+
+const lane_lifecycle_operations = { every_step_of, steps_of }
 
 export { lane_lifecycle_operations }
 export type { Step }
