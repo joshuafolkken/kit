@@ -168,12 +168,14 @@ function mock_body(text: string | undefined): ReturnType<typeof vi.spyOn> {
 	return vi.spyOn(git_gh_command, 'issue_get_body_classified').mockResolvedValue(read)
 }
 
+function set_up_route(): void {
+	write_worker_setting({ route: true })
+	mock_labels([])
+	vi.spyOn(git_gh_issue_write, 'issue_apply_label').mockResolvedValue({ is_applied: true })
+}
+
 describe('lane_dispatch_prepare.prepared — josh.worker.route (joshuafolkken/kit#8760)', () => {
-	beforeEach(() => {
-		write_worker_setting({ route: true })
-		mock_labels([])
-		vi.spyOn(git_gh_issue_write, 'issue_apply_label').mockResolvedValue({ is_applied: true })
-	})
+	beforeEach(set_up_route)
 
 	it('routes an unlabelled light Issue to the weakest profile from its body', async () => {
 		const read_body = mock_body(LIGHT_BODY)
@@ -208,5 +210,20 @@ describe('lane_dispatch_prepare.prepared — josh.worker.route (joshuafolkken/ki
 		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
 			profile: { model: SONNET.model },
 		})
+	})
+})
+
+describe('lane_dispatch_prepare.prepared — josh.worker.route on a labelled Issue', () => {
+	beforeEach(set_up_route)
+
+	it('keeps the worker label an Issue already carries and writes no label', async () => {
+		mock_labels([`worker:${SONNET.name}`])
+		mock_body(LIGHT_BODY)
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			kind: 'prepared',
+			profile: { model: SONNET.model },
+		})
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
 	})
 })
