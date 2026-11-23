@@ -4,10 +4,12 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { describe, expect, it } from 'vitest'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
+import { test_related_pins } from './test-related-pins'
 import { test_related_touched, type CallSite, type ListDirectory } from './test-related-touched'
 
 const ROOT = path.resolve('/repo')
-const DIRECTORY = path.join('scripts', 'test')
+// Outside `scripts/` and `tools/`, so no pin of `test-related-pins.ts` joins the fixture's tests.
+const DIRECTORY = path.join('src', 'lib')
 const MODULE = 'foo.ts'
 const MODULE_TEST = 'foo.test.ts'
 const MODULE_CLAIM_TEST = 'foo.claim.test.ts'
@@ -24,6 +26,12 @@ const LISTING = [
 	DATA_FILE,
 	'notes.test.ts',
 ]
+
+const COMMAND_DERIVE_TEST = 'tools/document/command-derive.test.ts'
+const ENVIRONMENT_TEST = 'scripts/document/environment-file-reference.test.ts'
+const TELEGRAM_TEST = 'scripts/josh/josh-command-telegram-environment.test.ts'
+const UNTESTED_TEST = 'tools/test/untested-sources.test.ts'
+const BUILD_HOOKS_TEST = 'scripts/build/build-hooks.test.ts'
 
 function at(name: string): string {
 	return path.join(DIRECTORY, name)
@@ -57,22 +65,40 @@ describe('test_related_touched.touched_tests', () => {
 		).toEqual([])
 	})
 
-	// joshuafolkken/kit#5642: a command-table change also runs the registry tests it never names.
-	it('adds the pinned registry tests to a command-table change', () => {
+	it('names each test once when the module and its test are both in the diff', () => {
+		expect(test_related_touched.touched_tests(ROOT, [at(MODULE), at(MODULE_TEST)], LIST)).toEqual([
+			at(MODULE_TEST),
+			at(MODULE_CLAIM_TEST),
+		])
+	})
+})
+
+// joshuafolkken/kit#8861: the shapes of the lanes whose first `check:related` went red — each reaches a
+// test that reads a derived artifact or walks a tree, and imports none of it.
+describe('test_related_touched.touched_tests with a derived-artifact pin', () => {
+	// joshuafolkken/kit#5642: a command added to a table also runs the registry tests it never names.
+	it('adds the pinned registry and derived-artifact tests to a command-table change', () => {
 		const command_table = path.join('scripts', 'josh', 'josh-commands-development.ts')
 
 		expect(test_related_touched.touched_tests(ROOT, [command_table], LIST)).toEqual([
 			'scripts/josh/josh-logic.test.ts',
 			'scripts/josh/josh-command-map.test.ts',
 			'scripts/josh/josh-in-process.test.ts',
+			COMMAND_DERIVE_TEST,
+			ENVIRONMENT_TEST,
+			TELEGRAM_TEST,
+			UNTESTED_TEST,
 		])
 	})
 
-	it('names each test once when the module and its test are both in the diff', () => {
-		expect(test_related_touched.touched_tests(ROOT, [at(MODULE), at(MODULE_TEST)], LIST)).toEqual([
-			at(MODULE_TEST),
-			at(MODULE_CLAIM_TEST),
-		])
+	it.each([
+		['a derived usage page (#8798, #8770)', 'docs/josh-commands-lane.md', COMMAND_DERIVE_TEST],
+		['a hook source (#8782, #8771)', 'scripts/hooks/stop-guard.ts', BUILD_HOOKS_TEST],
+		['a new source under tools/ (#8757)', 'tools/lane/lane-new.ts', UNTESTED_TEST],
+		['the env-loading command list (#8750)', 'docs/environment-variables.md', ENVIRONMENT_TEST],
+		['a script under scripts/ (#8750)', 'scripts/notify/notify-new.ts', TELEGRAM_TEST],
+	])('runs the test %s reaches', (_shape, file, test) => {
+		expect(test_related_touched.touched_tests(ROOT, [file], LIST)).toContain(test)
 	})
 })
 
@@ -194,12 +220,18 @@ describe('test_related_touched.listing_readers', () => {
 	it('runs that listing test in the touched scope', () => {
 		const changed = [ADDED, ...listing_readers([ADDED], BOARD_MAP)]
 
-		expect(touched_scope(ROOT, changed, list_board).files).toEqual([path.join(ROOT, GLYPHS_TEST)])
+		expect(touched_scope(ROOT, changed, list_board).files).toEqual(
+			[GLYPHS_TEST, ...test_related_pins.pinned_tests([ADDED])].map((file) =>
+				path.join(ROOT, file),
+			),
+		)
 	})
 
-	it('adds no listing reader when there is no map, leaving the touched scope as it was', () => {
+	it('adds no listing reader when there is no map, leaving the touched scope to the pins', () => {
 		expect(listing_readers([ADDED], undefined)).toEqual([])
-		expect(touched_scope(ROOT, [ADDED], list_board)).toMatchObject({ mode: 'none' })
+		expect(touched_scope(ROOT, [ADDED], list_board).files).toEqual(
+			test_related_pins.pinned_tests([ADDED]).map((file) => path.join(ROOT, file)),
+		)
 	})
 })
 

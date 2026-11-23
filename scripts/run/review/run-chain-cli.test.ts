@@ -208,13 +208,12 @@ describe('run_chain_cli.run — refusals', () => {
 		['a non-number', ['abc']],
 		['an unknown flag', [ISSUE, '--bogus']],
 		['--fixing without --join', [ISSUE, '--fixing']],
-		['--unpinned-ok on the join', [ISSUE, '--join', ...UNPINNED_OK]],
 		['--accept-metrics on the join', [ISSUE, '--join', ...ACCEPT_METRICS]],
 		['--ship without --join', [ISSUE, '--ship', TITLE]],
 		['--ship without a title', [ISSUE, '--join', '--ship']],
 		['--ship without an issue suffix', [ISSUE, '--join', '--ship', 'Title']],
 		['--ship for another issue', [ISSUE, '--join', '--ship', 'Title #5631']],
-		['--ship with opening flags', [ISSUE, '--join', '--ship', TITLE, ...UNPINNED_OK]],
+		['--ship with opening flags', [ISSUE, '--join', '--ship', TITLE, ...ACCEPT_METRICS]],
 	])('refuses %s with the usage and runs nothing', async (_label, argv) => {
 		await expect(run_chain_cli.run(argv)).resolves.toBe(1)
 
@@ -228,7 +227,7 @@ describe('run_chain_cli.run — refusals', () => {
 
 	it('names the --join form in the usage', () => {
 		expect(run_chain_cli.USAGE).toContain('<N> --join [--fixing] [--from <stage>]')
-		expect(run_chain_cli.USAGE).toContain('[--ship "<title> #<N>"]')
+		expect(run_chain_cli.USAGE).toContain('[--ship "<title> #<N>"] [--unpinned-ok "<reason>"]')
 	})
 
 	it('refuses a --from no stage carries and runs nothing', async () => {
