@@ -8,7 +8,7 @@ FORCE_COLOR=3 pnpm josh run:board --once --theme <theme> > .josh/tmp/scratch/<th
 pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs
 ```
 
-`DEMO_STEPS=<n>` ends it after n frames: the check without a terminal.
+`DEMO_STEPS=<n>` ends it after n frames: the check without a terminal. `DEMO_BEATS=1` and `DEMO_SEED=<n>` → the code's comments.
 
 ```js
 // Template for a `run:board` theme demo: a real board frame, a typed message, and scenes a number key picks.
@@ -16,7 +16,8 @@ pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs
 // Usage: pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs
 // A number key picks a scene; it loops with two seconds of normal display between plays; Q or Ctrl-C
 // quits. An optional [scene] picks the first. DEMO_STEPS=<n> ends it after n frames. Terminal only;
-// needs the frame's columns, 24 rows, 24-bit color.
+// needs the frame's columns, 24 rows, 24-bit color. DEMO_BEATS=1 writes each frame as a JSON
+// `{ text, ms }` line on a virtual clock instead; DEMO_SEED=<n> seeds `random()`.
 
 import { readFileSync } from 'node:fs'
 
@@ -71,12 +72,35 @@ const SCENES = {
 const GAP_TICKS = 40
 const NORMAL_FROM = 230
 
-function out(text) {
-	process.stdout.write(text)
+// The beats form: each frame's bytes held, then written as one JSON line when the frame's wait comes.
+const IS_BEATS = process.env.DEMO_BEATS === '1'
+const beat = { text: '' }
+
+// The random source effects draw from: mulberry32, the formula `scripts/run/board/run-board-seeded.ts`
+// gives `run-board-replay.ts --seed`, so one seed draws one sequence in both.
+function seeded(seed) {
+	let state = seed >>> 0
+	return () => {
+		state = (state + 0x6d2b79f5) >>> 0
+		let mixed = Math.imul(state ^ (state >>> 15), state | 1)
+		mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61)
+		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296
+	}
 }
 
+const random = seeded(Number(process.env.DEMO_SEED || 1))
+
+function out(text) {
+	if (IS_BEATS) beat.text += text
+	else process.stdout.write(text)
+}
+
+// A wait: real time on a terminal; in the beats form, the frame's line, the clock moved on at once.
 function sleep(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms))
+	if (!IS_BEATS) return new Promise((resolve) => setTimeout(resolve, ms))
+	process.stdout.write(`${JSON.stringify({ text: beat.text, ms })}\n`)
+	beat.text = ''
+	return Promise.resolve()
 }
 
 function row_of(line, style) {
@@ -190,15 +214,21 @@ async function play(last_step) {
 	}
 }
 
-async function main() {
-	const [key = '0'] = process.argv.slice(2)
-	if (!(key in SCENES)) throw new Error(`Unknown scene: ${key}. Known: ${Object.keys(SCENES).join(', ')}`)
-	playing.key = key
-	// The alternate screen, with the cursor hidden; both are put back however the script ends.
+// The alternate screen, with the cursor hidden; both are put back however the script ends.
+function enter_screen() {
 	process.on('exit', () => out(`${ESC}0m${ESC}?25h${ESC}?1049l`))
 	process.on('SIGINT', () => process.exit(0))
 	out(`${ESC}?1049h${ESC}?25l${ESC}2J`)
 	listen()
+}
+
+async function main() {
+	const [key = '0'] = process.argv.slice(2)
+	if (!(key in SCENES)) throw new Error(`Unknown scene: ${key}. Known: ${Object.keys(SCENES).join(', ')}`)
+	playing.key = key
+	// No wait slows the beats form, so the frame count is what ends it.
+	if (IS_BEATS && !process.env.DEMO_STEPS) throw new Error('DEMO_BEATS=1 takes DEMO_STEPS=<n>')
+	if (!IS_BEATS) enter_screen()
 	await play(Number(process.env.DEMO_STEPS || Infinity))
 	process.exit(0)
 }
