@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { defect_report_cli } from '#scripts/issue/defect-report-cli'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { observation_ledger_line } from '#scripts/observations/observation-ledger-line'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
@@ -25,6 +26,8 @@ import { retrospective, type RetrospectiveInputs } from './retrospective'
 // there, through the existing `is_kit_only` declaration rather than a new judgement.
 
 const SUCCESS_EXIT_CODE = 0
+// The defect section looks back one week, the span a fix is compared over before and after.
+const DEFECT_PERIOD_DAYS = 7
 // `read_from` returns every event past the given position, so zero is "the whole stream from the start".
 const STREAM_START = 0
 
@@ -91,9 +94,11 @@ async function gather(cwd: string): Promise<RetrospectiveInputs> {
 	const run_read = await read_run()
 	const tree = read_tree(cwd)
 	const audit_summary = await cost_audit_cli.summary(cwd)
+	const defects = await defect_report_cli.digest(DEFECT_PERIOD_DAYS)
 
 	return {
 		audit_summary,
+		defects,
 		cost: tree.cost,
 		sessions: tree.sessions,
 		findings: review_finding_ledger.category_counts(ledger),

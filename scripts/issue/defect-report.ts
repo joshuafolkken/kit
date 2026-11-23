@@ -52,6 +52,15 @@ interface DefectReport {
 	added_within_week: ReadonlyMap<number, number>
 }
 
+// One area's defect rate over a period: the merged pull requests that touched it, the period's
+// defects whose origin pull request touched it, and the one over the other.
+interface AreaRate {
+	area: string
+	merges: number
+	defects: number
+	rate: number
+}
+
 // The run's own records, which nearly every merge adds, say nothing about what the pull request
 // changed.
 function changed(files: ReadonlyArray<PrFile>): ReadonlyArray<PrFile> {
@@ -83,8 +92,15 @@ function area_of(filename: string): string {
 	return segments.slice(0, depth).join('/')
 }
 
+// The areas a change's file names touch, once each, leaving out the run's own records.
+function path_areas(filenames: ReadonlyArray<string>): ReadonlyArray<string> {
+	const kept = filenames.filter((filename) => !run_record_path.is_run_record(filename))
+
+	return [...new Set(kept.map((filename) => area_of(filename)))]
+}
+
 function areas(files: ReadonlyArray<PrFile>): ReadonlyArray<string> {
-	return [...new Set(changed(files).map((file) => area_of(file.filename)))]
+	return path_areas(files.map((file) => file.filename))
 }
 
 function increment<K>(counts: Map<K, number>, key: K): void {
@@ -154,7 +170,41 @@ function aggregate(
 	}
 }
 
-const defect_report = { aggregate, area_of, areas, change_kind, origin_prs, WEEK_DAYS }
+// The issues filed at or after `since` — the period a `--since <days>` report counts.
+function filed_since(issues: ReadonlyArray<ReportIssue>, since: Date): ReadonlyArray<ReportIssue> {
+	return issues.filter((issue) => Date.parse(issue.created_at) >= since.getTime())
+}
 
-export type { ChangeKind, DefectReport, OriginPr, PrFile, ReportIssue }
+function since_days(days: number, now: Date): Date {
+	return new Date(now.getTime() - days * MS_PER_DAY)
+}
+
+// Each area a period's merges touched, highest rate first: an area no merge touched has no rate.
+function area_rates(
+	by_area: ReadonlyMap<string, number>,
+	merges: ReadonlyMap<string, number>,
+): ReadonlyArray<AreaRate> {
+	return [...merges]
+		.map(([area, count]) => {
+			const defects = by_area.get(area) ?? 0
+
+			return { area, merges: count, defects, rate: defects / count }
+		})
+		.toSorted((left, right) => right.rate - left.rate || right.merges - left.merges)
+}
+
+const defect_report = {
+	aggregate,
+	area_of,
+	area_rates,
+	areas,
+	change_kind,
+	filed_since,
+	origin_prs,
+	path_areas,
+	since_days,
+	WEEK_DAYS,
+}
+
+export type { AreaRate, ChangeKind, DefectReport, OriginPr, PrFile, ReportIssue }
 export { defect_report }

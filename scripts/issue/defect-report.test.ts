@@ -119,3 +119,47 @@ describe('defect:report origin pull requests', () => {
 		expect(defect_report.origin_prs(ISSUES)).toEqual([4201, 4150, 9999])
 	})
 })
+
+describe('defect:report --since period', () => {
+	const NOW = new Date('2026-11-23T00:00:00Z')
+
+	it('leaves out the bugs filed before the period', () => {
+		const since = defect_report.since_days(7, NOW)
+		const kept = defect_report.filed_since(
+			[
+				bug(1, '2026-11-15T23:59:59Z', ADDING_ORIGIN),
+				bug(2, '2026-11-16T00:00:00Z', ADDING_ORIGIN),
+			],
+			since,
+		)
+
+		expect(kept.map((issue) => issue.number)).toEqual([2])
+	})
+})
+
+describe('defect:report area rates', () => {
+	it('rates each merged area by its defects over its merges, highest first', () => {
+		const rates = defect_report.area_rates(
+			new Map([
+				[RUN_AREA, 3],
+				[UNREAD, 1],
+			]),
+			new Map([
+				[LANE_AREA, 4],
+				[RUN_AREA, 10],
+			]),
+		)
+
+		expect(rates).toEqual([
+			{ area: RUN_AREA, merges: 10, defects: 3, rate: 0.3 },
+			{ area: LANE_AREA, merges: 4, defects: 0, rate: 0 },
+		])
+	})
+
+	it('reads the areas of file names without the run records', () => {
+		expect(defect_report.path_areas([SOURCE, 'scripts/a/b.ts', 'README.md'])).toEqual([
+			'scripts/a',
+			'(root)',
+		])
+	})
+})
