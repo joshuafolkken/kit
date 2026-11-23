@@ -132,7 +132,7 @@ describe('defect:origin listing', () => {
 
 		expect(printed).toContain('#4201  2026-10-20  Newer\n  changed: a.ts')
 		expect(printed).not.toContain('introduced:')
-		expect(printed).toContain('`- 原因: #<PR>`')
+		expect(printed).toContain('(most targets first, then newest; declare one as `- 原因: #<PR>`)')
 		expect(
 			defect_origin.format(
 				'4241',
