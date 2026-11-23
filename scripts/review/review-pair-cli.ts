@@ -8,12 +8,14 @@ import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { z } from 'zod'
 import { review_pair } from './review-pair'
 import { review_pair_log, type PairFinding, type PairSide } from './review-pair-log'
+import { review_pair_stats } from './review-pair-stats'
 import { review_record_slot } from './review-record-slot'
 
 // `josh review:pair` — record one paired comparison (joshuafolkken/kit#6902): the Opus reviewer's
 // findings from the code slot, the Sonnet reviewer's from the paired findings file, and each agent's
 // cost from its transcript, appended to `review-pairs.jsonl`. It reads the code slot and writes the
-// ledger alone, so neither `review:attest` nor the merge gate sees the paired result.
+// ledger alone, so neither `review:attest` nor the merge gate sees the paired result. `--stats` reads
+// the ledger back and prints Sonnet's recall of the Opus findings (joshuafolkken/kit#8759).
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -21,7 +23,9 @@ const FAILURE_EXIT_CODE = 1
 const NONE_LINE = 'none'
 const USD_DIGITS = 2
 const SEVERITY_PATTERN = /^[^:]+:(?<severity>[^:]+):/u
-const USAGE = 'Usage: josh review:pair --issue <N> --opus-agent <id> --sonnet-agent <id>'
+const STATS_FLAG = '--stats'
+const USAGE =
+	'Usage: josh review:pair --issue <N> --opus-agent <id> --sonnet-agent <id> | josh review:pair --stats'
 const OPTIONS = {
 	issue: { type: 'string' },
 	'opus-agent': { type: 'string' },
@@ -141,7 +145,16 @@ const SOURCES: PairSources = {
 	log_path: review_pair_log.target(),
 }
 
+function print_stats(log_path: string | undefined): number {
+	const report = review_pair_stats.report(review_pair_stats.stats(review_pair_log.read(log_path)))
+
+	console.info(report.join('\n'))
+
+	return SUCCESS_EXIT_CODE
+}
+
 function run(argv: ReadonlyArray<string>, sources: PairSources = SOURCES): number {
+	if (argv.includes(STATS_FLAG)) return print_stats(sources.log_path)
 	const request = request_of(argv)
 
 	return request === undefined ? refuse(USAGE) : record(request, sources)
