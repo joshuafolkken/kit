@@ -786,7 +786,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/run/progress/run-progress-cli-imports.test.ts',
 	'scripts/run/review/run-chain.test.ts',
 	'scripts/run/review/run-review-cli.test.ts',
-	'scripts/run/review/run-review-steps.test.ts',
 	'scripts/run/review/run-review.test.ts',
 	'scripts/run/run-ending.test.ts',
 	'scripts/run/run-invocation.test.ts',
