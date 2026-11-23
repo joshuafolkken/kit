@@ -223,7 +223,7 @@ Delivers a trigger-delivered rule at the call that binds it, in place of a rule 
 - **Piped verification** — trigger is a check (`gate`, `check*`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
 - **The pre-gate cut row** — trigger is a `Bash` call running `pnpm josh gate` from a **lane** working tree that **has not yet taken its cut**; hands over `pnpm josh run:cut <N>` with what each of its six verdicts obliges. It exists because the step, carried as prose, fired **0 times in 6 lane children**. `--resume`, `--end` and `--json` do not count as taking the cut. Procedure: `.claude/skills/workflow-commands/pre-gate-cut.md`.
-- **The implementation-phase cut row** — an `Edit` / `Write` from a lane that has not taken its cut, once `pnpm josh cost --cut` is over the shared threshold; hands over `pnpm josh run:cut --impl <N> --handoff <path>` on every threshold crossing.
+- **The implementation-phase cut row** — an `Edit` / `Write` from a lane that has not taken its cut, once over its own horizon's break-even; hands over `pnpm josh run:cut --impl <N> --handoff <path>` on every threshold crossing.
 - **Bare `pnpm josh git`** — trigger is a `pnpm josh git` with no `-y` / `--yes` (it prompts, and cancels with no TTY); hands over `pnpm josh git -y "<title> #<N>"` on every occurrence. Disjoint from the run-tail push row, which requires `-y`.
 
 Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deliver once per run, some on every occurrence, and some refuse until an earlier command has run.

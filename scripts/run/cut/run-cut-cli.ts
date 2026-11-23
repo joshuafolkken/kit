@@ -90,8 +90,8 @@ function verdict_answer(verdict: CostVerdict): number | undefined {
 // **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**.
 // `cost_cli.session_verdict` prices the newest request against the `--cut` break-even, so no second
 // threshold is introduced — only an `over` session is cut, an unmeasurable one skips it (joshuafolkken/kit#6576).
-// Only the pre-gate phase is checked here; the implementation-phase caller gates its own
-// `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
+// Only the pre-gate phase is checked here; the implementation-phase and review-fix callers gate their
+// own `--impl` cut, each over its own horizon (joshuafolkken/kit#8817), before it is ever issued.
 //
 // **Size never reaches the cut** (joshuafolkken/kit#7183): `lane:plan` warned once, and an overrun is
 // recorded at the merge as a pre-split miss. **Nor does an implementation past its budget**

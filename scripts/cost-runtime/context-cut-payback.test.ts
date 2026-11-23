@@ -86,6 +86,33 @@ describe("context_cut_payback.break_even_context reads the model's cache-read ra
 	})
 })
 
+// joshuafolkken/kit#8817: each in-lane cut breaks even over its own trigger's measured resumes — an
+// implementation cut's 65 requests and a review-fix cut's 27 — rather than the shared 23.
+describe('context_cut_payback prices each in-lane cut over its own horizon', () => {
+	it.each([
+		['an implementation cut', context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS, 83_077],
+		['a review-fix cut', context_cut_payback.REVIEW_FIX_REMAINING_REQUESTS, 115_556],
+	])('breaks even for Opus 5.5 over %s (%i requests) at %i', (_trigger, remaining, tokens) => {
+		expect(context_cut_payback.break_even_context(OPUS, remaining)).toBe(tokens)
+	})
+
+	// The longer a trigger's resumes run, the earlier its cut pays back.
+	it('prices both in-lane cuts below the shared default horizon', () => {
+		const shared = context_cut_payback.break_even_context(OPUS)
+		const review_fix = context_cut_payback.break_even_context(
+			OPUS,
+			context_cut_payback.REVIEW_FIX_REMAINING_REQUESTS,
+		)
+		const implementation = context_cut_payback.break_even_context(
+			OPUS,
+			context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS,
+		)
+
+		expect(implementation).toBeLessThan(review_fix)
+		expect(review_fix).toBeLessThan(shared)
+	})
+})
+
 describe('context_cut_payback.break_even_requests is the same decision from the other end', () => {
 	const boundary = context_cut_payback.break_even_context(OPUS, HORIZON)
 
