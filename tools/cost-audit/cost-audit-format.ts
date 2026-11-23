@@ -113,10 +113,15 @@ function utc_date(at_ms: number): string {
 	return new Date(at_ms).toISOString().slice(0, ISO_DATE_LENGTH)
 }
 
-// The line `--density` prints above its number, naming the value and the UTC dates the window covers,
-// its end excluded (joshuafolkken/kit#8284).
+// The UTC dates a window covers, its end excluded — the range each single-number mode's label names.
+function utc_range(window: AuditWindow): string {
+	return `${utc_date(window.start_ms)}..${utc_date(window.end_ms - 1)}`
+}
+
+// The line `--density` prints above its number, naming the value and the UTC dates the window covers
+// (joshuafolkken/kit#8284).
 function density_label(window: AuditWindow): string {
-	return `lane-child calls per request ${utc_date(window.start_ms)}..${utc_date(window.end_ms - 1)}`
+	return `lane-child calls per request ${utc_range(window)}`
 }
 
 function rewrite_figures(count: RewriteCount): string {
@@ -359,6 +364,7 @@ const cost_audit_format = {
 	filing_lines,
 	report_lines,
 	summary_line,
+	utc_range,
 }
 
 export { cost_audit_format }

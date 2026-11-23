@@ -270,10 +270,12 @@ The cost and time section ends with the `josh cost:audit` summary line for the l
 Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before.
 
 ```bash
-pnpm josh cost:audit                                         # the last 7 days against the 7 before
-pnpm josh cost:audit --period 30                             # the last 30 days against the 30 before
-pnpm josh cost:audit --since 2026-10-27 --until 2026-11-10   # those 15 UTC days against the 15 before
-pnpm josh cost:audit --density                               # the lane-child calls per request alone, as the last line
+pnpm josh cost:audit                                                                 # the last 7 days against the 7 before
+pnpm josh cost:audit --period 30                                                     # the last 30 days against the 30 before
+pnpm josh cost:audit --since 2026-10-27 --until 2026-11-10                           # those 15 UTC days against the 15 before
+pnpm josh cost:audit --density                                                       # the lane-child calls per request alone, as the last line
+pnpm josh cost:audit --read-chars prompts/collaboration-workflow/issue-template.md   # the period's Read chars of that file alone, as the last line
+pnpm josh cost:audit --lane-read-chars --period 3                                    # the last 3 days of lane-child Read chars per lane Issue alone, as the last line
 ```
 
 **Options:**
@@ -281,6 +283,8 @@ pnpm josh cost:audit --density                               # the lane-child ca
 - `--period <days>` — the length of each period, a positive whole number of days (default 7).
 - `--since <YYYY-MM-DD>` / `--until <YYYY-MM-DD>` — a fixed period instead, from the first UTC date through the second, both included; given together and never beside `--period`.
 - `--density` — print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it; no lane-child request prints nothing and exits 1.
+- `--read-chars <path>` — print only the period's Read chars of one repository-relative file (the Read-file rows whose path ends with it, summed); no such Read prints nothing and exits 1.
+- `--lane-read-chars` — print only the period's lane-child Read chars divided by the distinct lane Issues they ran for, rounded; no lane-child session prints nothing and exits 1.
 
 <!-- /usage -->
 
