@@ -35,6 +35,8 @@ const STAND_IN_FRAME = `\u{1B}[38;2;1;2;3m${'.'.repeat(FRAME_WIDTH)}\n`.repeat(F
 const SCENE_TICKS = 70
 const GAP_TICKS = 40
 const AGAIN_TICKS = 5
+const BEAT_STEPS = 3
+const TICK_MS = 50
 const RUN_TIMEOUT_MS = 30_000
 const SCENE_CAPTION = /\[1\] TYPE - (?<what>normal|one)/gu
 
@@ -45,7 +47,11 @@ interface TemplateRun {
 
 // Runs scene 1 of the template headless on the stand-in frame for `steps` frames, stdout to a file so
 // `process.exit` loses no write.
-function run_template(code: string, steps: number): TemplateRun {
+function run_template(
+	code: string,
+	steps: number,
+	environment: NodeJS.ProcessEnv = {},
+): TemplateRun {
 	const directory = create_directory('board-theme-run-')
 	const script = path.join(directory, 'stand-in-theme-demo.mjs')
 	const output_file = path.join(directory, 'out.txt')
@@ -54,7 +60,7 @@ function run_template(code: string, steps: number): TemplateRun {
 	writeFileSync(path.join(directory, 'stand-in-frame.ans'), STAND_IN_FRAME)
 	const output = openSync(output_file, 'w')
 	const { status } = spawnSync(process.execPath, [script, '1'], {
-		env: { ...process.env, DEMO_STEPS: String(steps) },
+		env: { ...process.env, ...environment, DEMO_STEPS: String(steps) },
 		stdio: ['ignore', output, 'inherit'],
 		timeout: RUN_TIMEOUT_MS,
 	})
@@ -138,6 +144,26 @@ describe('board-theme demo template run headless', () => {
 		},
 		RUN_TIMEOUT_MS,
 	)
+
+	it(
+		'writes one JSON beat line per frame under DEMO_BEATS=1 and draws nothing on the terminal',
+		() => {
+			const { status, output } = run_template(code, BEAT_STEPS, { DEMO_BEATS: '1' })
+			const lines = output.trimEnd().split('\n')
+			const beats = lines.map((line) => JSON.parse(line) as { text: string; ms: number })
+
+			expect(status).toBe(0)
+			expect(beats.map((beat) => beat.ms)).toStrictEqual([TICK_MS, TICK_MS, TICK_MS])
+			expect(beats.every((beat) => beat.text.includes('[1] TYPE'))).toBe(true)
+			expect(output).not.toContain('?1049h')
+		},
+		RUN_TIMEOUT_MS,
+	)
+
+	it('seeds random() with the mulberry32 run-board-seeded.ts names', () => {
+		expect(code).toContain('process.env.DEMO_SEED')
+		expect(code).toContain('scripts/run/board/run-board-seeded.ts')
+	})
 })
 
 describe('board-theme skill', () => {

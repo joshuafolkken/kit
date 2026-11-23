@@ -223,7 +223,15 @@ async function draw(
 	ports.write(painted(parts.join(''), drawn, options, ports.now()))
 }
 
-const run_board_frame_preview = { FRAME_FLAG, FRAME_USAGE, draw, options_of, overlaid, painted }
+const run_board_frame_preview = {
+	FRAME_FLAG,
+	FRAME_USAGE,
+	draw,
+	fixed_ports,
+	options_of,
+	overlaid,
+	painted,
+}
 
 export { run_board_frame_preview }
 export type { FrameOptions }
