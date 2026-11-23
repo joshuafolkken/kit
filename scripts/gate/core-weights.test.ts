@@ -4,8 +4,8 @@ import { core_weights } from './core-weights'
 
 // joshuafolkken/kit#4362: eslint ran at 124–147% CPU while the floored weights claimed one core for it.
 const ESLINT_PEAK_CORES = 1.5
-// joshuafolkken/kit#8587: the largest single eslint process the lane ledger's load samples recorded.
-const ESLINT_PROCESS_MAX_MB = 2552
+// joshuafolkken/kit#8840: the peak footprint of a lone cold whole-tree eslint run.
+const ESLINT_PROCESS_MAX_MB = 7922
 // joshuafolkken/kit#6331: the heap typed whole-tree lint needs; #8587 left it unchanged.
 const ESLINT_HEAP_CAP_MIB = 8192
 const BYTES_PER_MIB = 1_048_576
