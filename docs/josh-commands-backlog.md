@@ -565,6 +565,8 @@ pnpm josh defect:origin 4241   # newest first, merged before the issue was filed
 
 Lists up to five merged pull requests that changed the files and names an issue cites, newest first and merged before the issue was filed. Pick one for the `- 原因: #<PR>` line a `- 種別: 不具合` body declares, or write `- 原因: 不明（<理由>）` (source: `prompts/collaboration-workflow/issue-template.md`).
 
+[`josh issue:file`](#josh-issuefile) lists the same candidates for a `- 種別: 不具合` body before it is filed, searched up to now: under a `- 原因: 不明（<理由>）` line it prints them and files the body; with no origin line it prints them under the refusal. A `- 原因: #<PR>` body and a non-bug body are not searched, and neither is a filing into another repository.
+
 ### `josh defect:report`
 
 <!-- usage: defect:report -->

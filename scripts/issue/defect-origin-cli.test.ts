@@ -22,6 +22,10 @@ function stub_issue(): void {
 	})
 }
 
+function bug_body(origin_line: string): string {
+	return `## 背景\n\n- 種別: 不具合\n${origin_line}\n\nThe board breaks in \`${TARGET}\`.`
+}
+
 function printed(spy: MockInstance<(message: unknown) => void>): string {
 	return spy.mock.calls.map(([message]) => String(message)).join('\n')
 }
@@ -45,6 +49,35 @@ describe('defect:origin command', () => {
 
 		await expect(defect_origin_cli.run(['4241'])).resolves.toBe(0)
 		expect(printed(info)).toMatch(/#4201\]?.*2026-10-20 {2}Draw the board/u)
+	})
+
+	it('lists the same candidates for a body being filed as for the filed issue', async () => {
+		stub_issue()
+		vi.spyOn(git_spawn, 'read').mockResolvedValue(MERGE_LOG)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await defect_origin_cli.run(['4241'])
+		const by_body = await defect_origin_cli.filing_listing(bug_body('- 原因: 不明（未特定）'))
+		const candidate = /#4201\]?.*2026-10-20 {2}Draw the board\n {2}changed: run-board\.ts/u
+
+		expect(printed(info)).toMatch(candidate)
+		expect(by_body).toMatch(candidate)
+		expect(by_body).toContain('origin candidates for this body')
+	})
+})
+
+describe('defect:origin candidate search', () => {
+	it('searches a bug body with no origin line, but not a traced bug or a non-bug body', async () => {
+		const read = vi.spyOn(git_spawn, 'read').mockResolvedValue(MERGE_LOG)
+
+		await expect(defect_origin_cli.filing_listing(bug_body(''))).resolves.toContain('#4201')
+		await expect(defect_origin_cli.filing_listing(bug_body('- 原因: #4201'))).resolves.toBe(
+			undefined,
+		)
+		await expect(
+			defect_origin_cli.filing_listing(`## 背景\n\n- 種別: 非不具合\n\n\`${TARGET}\``),
+		).resolves.toBe(undefined)
+		expect(read).toHaveBeenCalledTimes(1)
 	})
 
 	it('names a target git could not search instead of passing it for one no merge touched', async () => {
