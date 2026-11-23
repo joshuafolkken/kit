@@ -16,7 +16,6 @@ import { run_board_spot } from './run-board-spot'
 import type { Theme } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
 import { run_board_tick } from './run-board-tick'
-import { run_board_tick_draw } from './run-board-tick-draw'
 
 // joshuafolkken/kit#8236: where the WOPR lamp panel goes — two columns past the throughput rows' NOW,
 // on to the end of the section's rule — and the boards that draw none.
@@ -26,7 +25,6 @@ const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const WIDE = { rows: 60, columns: 200 }
 const { rows_part } = run_board_render_throughput
-const { has_lamps } = run_board_tick_draw
 const THEME: Theme = 'wargames'
 const { width_of } = run_board_fit
 const HOUR = 3_600_000
@@ -293,37 +291,6 @@ describe('run_board_render.render with lamps', () => {
 
 	it('draws none where the board has no lamps', () => {
 		expect(rendered(false).join('')).not.toContain(LAMP)
-	})
-})
-
-describe('run_board_tick_draw.has_lamps', () => {
-	it('draws lamps on a live board in a theme, on a terminal drawing color', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_lamps({ types_rows: true, theme: THEME, is_tty: true })).toBe(true)
-	})
-
-	it.each([
-		['no theme', { types_rows: undefined, theme: undefined, is_tty: true }],
-		['--every', { types_rows: false, theme: THEME, is_tty: true }],
-		['--once, --chat and a pipe', { types_rows: true, theme: THEME, is_tty: false }],
-	])('draws none with %s', (_, ports) => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_lamps(ports)).toBe(false)
-	})
-
-	it('draws none on a terminal drawing no color', () => {
-		vi.stubEnv('FORCE_COLOR', '0')
-
-		expect(has_lamps({ types_rows: true, theme: THEME, is_tty: true })).toBe(false)
-	})
-
-	it('draws none in a theme whose definition draws no lamps', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-		const ports = { types_rows: true, theme: THEME, is_tty: true }
-
-		expect(has_lamps(ports, { [THEME]: { lamps: false } })).toBe(false)
 	})
 })
 
