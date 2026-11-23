@@ -1,3 +1,4 @@
+import { import_closure } from '#scripts/build/import-closure-fixture'
 import { main_entry_fixture } from '#scripts/josh/main-entry-fixture'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -22,5 +23,11 @@ const CASES = main_entry_fixture.entry_cases({
 describe('gate-main', () => {
 	it.each(CASES)('%s', async (_name, check) => {
 		await check()
+	})
+
+	// The gate itself is imported by every gate suite and by `gate-command.ts`, so its old main guard
+	// stays gone (joshuafolkken/kit#8844).
+	it('leaves the gate module without a main guard', () => {
+		expect(import_closure.has_main_guard('scripts/gate/verification-gate.ts')).toBe(false)
 	})
 })
