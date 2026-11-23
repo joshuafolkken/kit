@@ -11,8 +11,8 @@ import {
 // The lane and run operations the lifecycle property test combines (joshuafolkken/kit#4274), each
 // offered only where the real command acts — `lane:pause` signals a child that is there, a launch
 // needs a run driving it — and each leaving what that command leaves. A launch and a restart ask the
-// table's guards first, as `lane-dispatch-prepare.ts` does (joshuafolkken/kit#8777); `lane:resume` does
-// not ask them yet (joshuafolkken/kit#8829), so neither does its model.
+// table's guards first, as `lane-dispatch-prepare.ts` does (joshuafolkken/kit#8777), and so does
+// `lane:resume`, before its signal (joshuafolkken/kit#8829).
 
 const { KIND, emit, is_refused, lane_of, try_write, write } = world_fixture
 

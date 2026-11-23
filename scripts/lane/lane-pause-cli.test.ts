@@ -21,6 +21,7 @@ const TREE = { signalled: [101, 102], child: [101, 102], is_unread: false }
 const NOTHING = { signalled: [], child: [], is_unread: false }
 const RESIDENT_ONLY = { signalled: [103], child: [], is_unread: false }
 const UNREAD = { ...TREE, is_unread: true }
+const GONE = 'its work tree is gone'
 const USAGE = [
 	'Usage: josh lane:pause <issue-number> | josh lane:pause --all',
 	'       josh lane:resume <issue-number> | josh lane:resume --all',
@@ -148,7 +149,7 @@ describe('lane_pause_cli.run — the record', () => {
 // joshuafolkken/kit#8829: a resume whose branch or work tree is gone is refused before the write.
 describe('lane_pause_cli.run — a refused change', () => {
 	it('leaves a lane whose work tree is gone unrecorded and prints why', async () => {
-		guard.mockResolvedValue('its work tree is gone')
+		guard.mockResolvedValue(GONE)
 		await lane_pause_cli.run(['resume', ISSUE])
 
 		expect(guard).toHaveBeenCalledWith('resume', ISSUE)
@@ -156,6 +157,13 @@ describe('lane_pause_cli.run — a refused change', () => {
 		expect(record_lane_state).not.toHaveBeenCalled()
 		expect(emit).not.toHaveBeenCalled()
 		expect(info).toHaveBeenCalledWith('lane:resume #4198: state unchanged — its work tree is gone')
+	})
+
+	it('signals nothing and exits non-zero when the resume is refused', async () => {
+		guard.mockResolvedValue(GONE)
+
+		expect(await lane_pause_cli.run(['resume', ISSUE])).toBe(FAILURE)
+		expect(resume_lane).not.toHaveBeenCalled()
 	})
 
 	// joshuafolkken/kit#8775: a change the lifecycle table rejects reaches neither the ledger nor the stream.

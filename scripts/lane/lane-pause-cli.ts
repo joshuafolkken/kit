@@ -74,8 +74,9 @@ function report(verb: Verb, issue: string, result: LaneSignalled): void {
 	)
 }
 
-// The table's guards read outside the record (a resumed lane's branch and work tree) are asked first; a
-// refusal is printed and nothing is written (joshuafolkken/kit#8829).
+// The table's guards read outside the record (a resumed lane's branch and work tree) are asked before the
+// signal; a refusal is printed and nothing is signalled or written, so a stopped child is not continued
+// under a record that still says paused (joshuafolkken/kit#8829).
 async function guard_note(verb: Verb, issue: string): Promise<string | undefined> {
 	const note = await lane_transition_guards.rejection(VERBS[verb].event, issue)
 
@@ -88,11 +89,14 @@ async function guard_note(verb: Verb, issue: string): Promise<string | undefined
 	return note
 }
 
+function nothing_signalled(): LaneSignalled {
+	return { signalled: [], child: [], is_unread: false }
+}
+
 // A change the lifecycle refused (a dependency wait's lane is not resumed by a person) leaves the lane
 // where it was, so the ledger and the event stream are not told it moved; the signal itself stands.
 async function record(verb: Verb, issue: string): Promise<void> {
 	const command = `lane:${verb}`
-	if ((await guard_note(verb, issue)) !== undefined) return
 	const outcome = await lane_state.record_change({ issue, state: VERBS[verb].state, command })
 
 	if (outcome.kind === 'rejected') return
@@ -104,6 +108,7 @@ async function record(verb: Verb, issue: string): Promise<void> {
 }
 
 async function settle(verb: Verb, lane: LaneProcesses): Promise<LaneSignalled> {
+	if ((await guard_note(verb, lane.issue)) !== undefined) return nothing_signalled()
 	const result = lane_pause[VERBS[verb].act](lane)
 
 	report(verb, lane.issue, result)
