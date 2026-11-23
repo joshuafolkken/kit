@@ -77,8 +77,9 @@ function is_unparsed(raw: string | undefined, parsed: number | undefined): boole
 
 // The cut threshold of a measured session: the break-even for its newest request's model. With no
 // measurement it is the standard-rate break-even, the figure a report quotes beside no cost.
-function cut_threshold(measurement: OverMeasurement | undefined): number {
-	return context_cut_payback.break_even_context(measurement?.model)
+// `remaining` is the cut trigger's horizon; absent, the shared default.
+function cut_threshold(measurement: OverMeasurement | undefined, remaining?: number): number {
+	return context_cut_payback.break_even_context(measurement?.model, remaining)
 }
 
 function limit_of(limit: Limit, measurement: OverMeasurement): number {
@@ -256,28 +257,31 @@ function run_over(
 
 // A measurement priced against the shared cut threshold, or `unmeasurable` for the empty session a
 // `report_over` would refuse. Split from `session_verdict` so neither carries more than one decision.
-function verdict_of(measurement: OverMeasurement | undefined): CostVerdict {
+function verdict_of(measurement: OverMeasurement | undefined, threshold: number): CostVerdict {
 	if (measurement === undefined || measurement.billed_input_per_request.length === 0) {
 		return UNMEASURABLE_VERDICT
 	}
 
-	return cost_verdict.classify(measurement, cut_threshold(measurement))
+	return cost_verdict.classify(measurement, threshold)
 }
 
 // The verdict with the figures it was decided on — the newest request's billed input and the shared
 // threshold — so a report that cites the verdict quotes the same numbers rather than re-measuring.
 // An unmeasurable session has no cost to quote, which is `undefined`, never `0`.
-function figures_of(measurement: OverMeasurement | undefined): SessionFigures {
-	const verdict = verdict_of(measurement)
+function figures_of(measurement: OverMeasurement | undefined, remaining?: number): SessionFigures {
+	const threshold = cut_threshold(measurement, remaining)
+	const verdict = verdict_of(measurement, threshold)
 	const is_priced = measurement !== undefined && verdict !== UNMEASURABLE_VERDICT
 	const cost = is_priced ? cost_verdict.per_request_cost(measurement) : undefined
 
-	return { verdict, cost, threshold: cut_threshold(measurement) }
+	return { verdict, cost, threshold }
 }
 
+// `remaining` prices the cut for its trigger's measured horizon (`context-cut-payback.ts`).
 interface SessionScope {
 	cwd?: string | undefined
 	environment?: Environment | undefined
+	remaining?: number | undefined
 }
 
 // The `--cut` verdict and its figures as a value, printing nothing. `run:report --handoff` quotes the
@@ -285,10 +289,12 @@ interface SessionScope {
 function session_figures({
 	cwd = process.cwd(),
 	environment = process.env,
+	remaining,
 }: SessionScope = {}): SessionFigures {
 	const provider = provider_of(environment)
+	const measurement = provider === undefined ? undefined : measure(cwd, provider, environment)
 
-	return figures_of(provider === undefined ? undefined : measure(cwd, provider, environment))
+	return figures_of(measurement, remaining)
 }
 
 // The `--cut` verdict as a value, printing nothing. `run:status` bundles
