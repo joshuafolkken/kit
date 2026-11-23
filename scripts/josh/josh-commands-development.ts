@@ -26,7 +26,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	[GATE_COMMAND]: {
-		script: 'scripts/gate/verification-gate.ts',
+		script: 'scripts/gate/gate-main.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
 		reference: [

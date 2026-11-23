@@ -8,29 +8,34 @@ const PID = 4362
 const FIRST_CHECK_MS = 30_000
 const SECOND_CHECK_MS = 12_000
 const FOOTPRINT_BYTES = 0
-const US_PER_MS = 1000
+const OWN_CPU_MS = 1000
 
-// A reader whose reaped-children time steps through `totals`, on top of the gate's own usage — so the
-// subtraction of `process.cpuUsage()` leaves exactly the step.
+// The gate's own CPU, pinned so the subtraction leaves exactly the step however long the runner takes
+// between the reader's call and the subtraction (joshuafolkken/kit#8843: two live reads flaked on CI).
+function pinned_own(): number {
+	return OWN_CPU_MS
+}
+
+// A reader whose reaped-children time steps through `totals`, on top of the gate's pinned own usage.
 function stepping_reader(totals: ReadonlyArray<number>): RusageReader {
 	const readings = [...totals]
 
 	return function read(): ReturnType<RusageReader> {
 		const total = readings.shift()
 		if (total === undefined) return undefined
-		const own = process.cpuUsage()
 
-		return { cpu_ms: total + (own.user + own.system) / US_PER_MS, footprint_bytes: FOOTPRINT_BYTES }
+		return { cpu_ms: total + OWN_CPU_MS, footprint_bytes: FOOTPRINT_BYTES }
 	}
 }
 
 describe('check_cpu.check_cpu_reader', () => {
 	it('gives each finished check the growth since the previous one finished', () => {
 		const total = FIRST_CHECK_MS + SECOND_CHECK_MS
-		const cpu = check_cpu.check_cpu_reader(stepping_reader([0, FIRST_CHECK_MS, total]), PID)
+		const reader = stepping_reader([0, FIRST_CHECK_MS, total])
+		const cpu = check_cpu.check_cpu_reader(reader, PID, pinned_own)
 
-		expect(Math.round(cpu() ?? -1)).toBe(FIRST_CHECK_MS)
-		expect(Math.round(cpu() ?? -1)).toBe(SECOND_CHECK_MS)
+		expect(cpu()).toBe(FIRST_CHECK_MS)
+		expect(cpu()).toBe(SECOND_CHECK_MS)
 	})
 
 	it('reads nothing where the gate has no reader', () => {
@@ -38,7 +43,7 @@ describe('check_cpu.check_cpu_reader', () => {
 	})
 
 	it('reads nothing where the gate could not be read at the baseline', () => {
-		const cpu = check_cpu.check_cpu_reader(stepping_reader([]), PID)
+		const cpu = check_cpu.check_cpu_reader(stepping_reader([]), PID, pinned_own)
 
 		expect(cpu()).toBeUndefined()
 	})

@@ -25,6 +25,14 @@ const POST_CUT_CONTEXT = 60_000
 // few long resumes do not pull every cut earlier.
 const EXPECTED_REMAINING_REQUESTS = 23
 
+// The horizon per cut trigger, where its resumes are measured apart (joshuafolkken/kit#8817). One
+// shared 23 misjudged the two in-lane cuts, whose resumed sessions run far apart. Measured with
+// `pnpm josh cost:audit --period 7` to 2026-11-23 (#8761), the median requests per resumed session:
+// an implementation cut (`implementation-cut.ts`) 65 (n=79; p25 53, p90 92); a review-fix cut
+// (`run-chain-review-fix.ts`) 27 (n=163; p25 20, p90 57). Every other cut keeps the shared default.
+const IMPLEMENTATION_REMAINING_REQUESTS = 65
+const REVIEW_FIX_REMAINING_REQUESTS = 27
+
 // The price of a dropped token relative to a rewritten one, from `cost-pricing.ts`. A cache read bills
 // the running model's cache-read multiplier of base input and a 5-minute cache write
 // `CACHE_WRITE_5M_MULTIPLIER`, so a preamble rewrite costs this many per-request cache reads. The base
@@ -75,6 +83,8 @@ function pays_back(
 const context_cut_payback = {
 	POST_CUT_CONTEXT,
 	EXPECTED_REMAINING_REQUESTS,
+	IMPLEMENTATION_REMAINING_REQUESTS,
+	REVIEW_FIX_REMAINING_REQUESTS,
 	break_even_context,
 	break_even_requests,
 	pays_back,

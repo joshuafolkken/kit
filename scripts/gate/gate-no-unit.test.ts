@@ -32,7 +32,7 @@ vi.mock('./type-check-step', () => ({
 	},
 }))
 
-const { verification_gate } = await import('./verification-gate')
+const { gate_command } = await import('./gate-command')
 const { review_stamps } = await import('#scripts/review/review-stamps')
 const { unit_worker_share } = await import('#scripts/test/unit-worker-share')
 const execa_module = await import('execa')
@@ -41,7 +41,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const PASS = 0
 const { as_execa_implementation, capture_stdout, fake_result } = gate_test_fixture
 const RECORDS = gate_test_fixture.suite_records('no-unit')
-const NO_UNIT: ReadonlyArray<string> = [verification_gate.NO_UNIT_FLAG]
+const NO_UNIT: ReadonlyArray<string> = [gate_command.NO_UNIT_FLAG]
 
 function every_step_passes(): void {
 	mocked_execa.mockImplementation(
@@ -69,7 +69,7 @@ async function run_gate(argv: ReadonlyArray<string>): Promise<number> {
 	const stdout = capture_stdout()
 
 	try {
-		return await verification_gate.run_gate_command(argv, RECORDS)
+		return await gate_command.run_gate_command(argv, RECORDS)
 	} finally {
 		stdout.restore()
 	}
@@ -114,7 +114,7 @@ describe('josh gate --whole-tree', () => {
 	})
 
 	it('runs every check, the whole-tree ones included, with the flag', async () => {
-		expect(await run_gate([verification_gate.WHOLE_TREE_FLAG])).toBe(0)
+		expect(await run_gate([gate_command.WHOLE_TREE_FLAG])).toBe(0)
 
 		expect(spawned_checks()).toHaveLength(gate_plan.GATE_CHECKS.length)
 	})

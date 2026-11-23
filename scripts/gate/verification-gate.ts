@@ -1,12 +1,6 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
-import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
-import { composite_arguments } from '#scripts/josh/josh-composite-arguments'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
-import { cli_flags } from '#scripts/lib/cli-flags'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
@@ -31,9 +25,6 @@ import { whole_tree_reuse } from './whole-tree-reuse'
 //
 // Each step shells out to the `josh` sub-command that already defines it, rather than repeating the
 // underlying tool invocations here — one definition per check, in `josh-commands-development.ts`.
-
-// `process.argv` is [runner, script, ...arguments].
-const FIRST_ARGUMENT_INDEX = 2
 
 const { GATE_CHECKS } = gate_plan
 
@@ -228,7 +219,7 @@ interface GateOptions {
 	log_path?: string
 	// **The scoped pre-check the CLI entry turns on**. Off everywhere else so
 	// that a direct `run_verification_gate` call — the whole of `verification-gate.test.ts` — is never
-	// refused by a real checkout's missing scoped record; `run_gate_command` sets it true.
+	// refused by a real checkout's missing scoped record; `gate_command.run_gate_command` sets it true.
 	is_scoped_enforced?: boolean
 	// The scoped records' paths, overridable so a test can plant a green pair rather than depend on the
 	// surrounding checkout's — the reason `scoped-green.ts` takes a `source` per stamp.
@@ -435,89 +426,9 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 	return await run_checked_gate(tree, { ...options, reuse_miss: short_circuit }, started_at)
 }
 
-// `josh gate` fans out to four sub-commands and forwards nothing to them, so an appended flag
-// would vanish exactly the way it does behind an `sh -c` composite — a run that looks configured
-// and is not. The composite guard only inspects `shell` entries, so a `script` entry that fans out
-// has to refuse for itself; the message comes from that guard so the two read identically.
-// `--verbose` and `--force` are consumed here rather than forwarded, which is why they do not fall
-// foul of the refusal above: the refusal exists because a forwarded flag vanishes into the
-// sub-commands, and a flag the gate reads itself never reaches them. Every other argument is still
-// refused.
-const VERBOSE_FLAG = '--verbose'
-// Read here and never forwarded, exactly as the two above are: it selects which sub-commands the
-// gate fans out to rather than being passed to one of them.
-const NO_UNIT_FLAG = '--no-unit'
-const { WHOLE_TREE_FLAG } = whole_tree_reuse
-const ACCEPTED_FLAGS: ReadonlyArray<string> = [
-	VERBOSE_FLAG,
-	gate_skip.FORCE_FLAG,
-	NO_UNIT_FLAG,
-	WHOLE_TREE_FLAG,
-]
-
-// The flags are the caller's, the destinations are the run's, so the two are merged here rather than
-// letting an option override a flag the user typed.
-function unknown_arguments(extra_arguments: ReadonlyArray<string>): ReadonlyArray<string> {
-	return extra_arguments.filter(
-		(argument) =>
-			!ACCEPTED_FLAGS.includes(argument) && gate_static_group.group_of(argument) === undefined,
-	)
-}
-
-// The shared refusal, plus the arguments it is actually about — or, on `--help`, the usage. Some flags
-// are accepted, so the bare "takes no extra arguments" would send a reader to drop the ones that work.
-// The list is interpolated rather than spelled out here, so adding a flag cannot leave this line stale.
-function refuse(extra_arguments: ReadonlyArray<string>, unknown: ReadonlyArray<string>): number {
-	const groups = Object.keys(gate_static_group.STATIC_GROUPS).join('|')
-	const accepted = [...ACCEPTED_FLAGS, `${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>`]
-	const refusal =
-		`${composite_arguments.format_rejection(GATE_COMMAND, GATE_TARGETS)}\n` +
-		`  refused: ${unknown.join(' ')}\n  accepted here: ${accepted.join(' ')}`
-	const usage = cli_flags.usage_line(accepted, GATE_COMMAND)
-
-	return cli_flags.answer_usage(extra_arguments, usage, refusal)
-}
-
-async function run_gate_command(
-	extra_arguments: ReadonlyArray<string>,
-	options: GateOptions = {},
-): Promise<number> {
-	const unknown = unknown_arguments(extra_arguments)
-
-	if (unknown.length > 0) return refuse(extra_arguments, unknown)
-
-	// A static group is a part of the static set, so it implies `--no-unit` and every withholding that flag carries.
-	const static_group = gate_static_group.find_group(extra_arguments)
-	const is_unit_included = !extra_arguments.includes(NO_UNIT_FLAG) && static_group === undefined
-
-	return await run_verification_gate({
-		is_scoped_enforced: true,
-		...options,
-		is_verbose: extra_arguments.includes(VERBOSE_FLAG),
-		is_forced: extra_arguments.includes(gate_skip.FORCE_FLAG),
-		is_unit_included,
-		is_whole_tree_included: !is_unit_included || extra_arguments.includes(WHOLE_TREE_FLAG),
-		static_group,
-	})
-}
-
-// `process.exitCode` rather than `process.exit()`: the gate's output is buffered per step and
-// written all at once, and `process.exit()` truncates a piped stdout at its buffer size — the
-// summary, written last, is the first thing lost. Setting the code lets the writes drain and the
-// process end on its own, which it can, since every child has already exited by here.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run_gate_command(process.argv.slice(FIRST_ARGUMENT_INDEX), {
-		ledger_path: await lane_ledger_write.target(),
-		check_records: check_reuse.DEFAULT_RECORDS,
-	})
-}
-
+// The `josh gate` arguments are read in `gate-command.ts`, and its entry is `gate-main.ts`.
 const verification_gate = {
-	ACCEPTED_FLAGS,
-	NO_UNIT_FLAG,
 	UNIT_WORKER_FLAG,
-	VERBOSE_FLAG,
-	WHOLE_TREE_FLAG,
 	build_gate_step,
 	build_gate_steps,
 	clear_gate_running,
@@ -526,7 +437,6 @@ const verification_gate = {
 	run_gate_steps: gate_run_steps.run_gate_steps,
 	scoped_precheck_refusal,
 	with_gate_marker,
-	run_gate_command,
 	run_gate_step: gate_run_steps.run_gate_step,
 	run_verification_gate,
 }

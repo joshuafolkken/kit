@@ -1,5 +1,6 @@
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { issue_body_keys } from './issue-body-keys'
+import { issue_template_section } from './issue-template-section'
 import { markdown_section } from './markdown-section'
 import { session_cite } from './session-cite'
 
@@ -78,7 +79,7 @@ function reworked(body: string, delivered: ReadonlySet<number>): ReadonlyArray<n
 function message(numbers: ReadonlyArray<number>): string {
 	const listed = numbers.map((number) => session_cite.issue(number)).join(', ')
 
-	return `rework filed as a non-defect: the body cites delivered work (${listed}) and declares \`${NON_BUG_DECLARATION}\` with no new goal. Work that fell short of its Issue or the owner's expectation (quality, speed, cost, look) is a defect — write \`${issue_body_keys.line('kind', 'bug')}\` and \`${issue_body_keys.prefix('origin')} #<PR>\`; a goal set after that delivery — add \`${NEW_GOAL_PREFIX} <when it was set, and what it is>\` (issue-template.md → the classification rules).`
+	return `rework filed as a non-defect: the body cites delivered work (${listed}) and declares \`${NON_BUG_DECLARATION}\` with no new goal. Work that fell short of its Issue or the owner's expectation (quality, speed, cost, look) is a defect — write \`${issue_body_keys.line('kind', 'bug')}\` and \`${issue_body_keys.prefix('origin')} #<PR>\`; a goal set after that delivery — add \`${NEW_GOAL_PREFIX} <when it was set, and what it is>\` (${issue_template_section.pointer('kind')}).`
 }
 
 function problem(body: string, delivered: ReadonlySet<number>): string | undefined {

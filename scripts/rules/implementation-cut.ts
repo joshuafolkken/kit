@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { agent_provider, type AgentEnvironment } from '#scripts/agent/agent-provider'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
+import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import type { HookContext } from '#scripts/hooks/hook-context'
@@ -21,13 +22,13 @@ import { shell_segments } from './shell-segments'
 // The implementation-phase cut, delivered at the call it binds on.
 //
 // **The verdict is read at the working-tree boundary, not at the entry.** A lane child ends its
-// process *during* implementation once its recent-context cost crosses the shared threshold, and a
+// process *during* implementation once its recent-context cost crosses its own threshold, and a
 // fresh one resumes back into implementation. Read only at session entry, where the context has not
 // yet grown, the verdict answers `under` by construction; so the guard reads it at each edit, the
 // same way `pre-gate-cut.ts` binds the boundary one step later. `cost_cli.session_verdict` is
-// synchronous and is the very verdict `pnpm josh cost --cut` prints, so the guard reads it directly
-// rather than approximating it — the same statistic and the same threshold, never a second
-// measurement.
+// synchronous and is the statistic `pnpm josh cost --cut` prints, priced over the implementation cut's
+// own horizon rather than its shared one (joshuafolkken/kit#8817), so the guard reads it directly rather than approximating it —
+// the same statistic, never a second measurement.
 
 // The two edit tools the `PreToolUse` matcher routes here (`edit-tool.ts`), and the working-tree
 // boundary the cut is taken at. A `PreToolUse` refusal fires *before* the edit lands, so the tree is at
@@ -61,8 +62,7 @@ function resumes_a_cut(command: string): boolean {
 
 // What the trigger has to know about the world, passed in so the decision is testable without a lane on
 // disk, a cut record, or a session transcript. `verdict` is the synchronous `pnpm josh cost --cut`
-// reading — the same per-request billed-input statistic against the same threshold — so the guard
-// prices its cut on exactly what the parent hand-off does.
+// reading — the same per-request billed-input statistic, priced over the implementation cut's horizon.
 interface LaneCostState {
 	directory: string
 	source: MarkerSource
@@ -122,6 +122,7 @@ function session_verdict(
 			cost_cli.session_verdict({
 				cwd: directory,
 				environment: environment_for(transcript, source),
+				remaining: context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS,
 			}),
 		transcript,
 	)
@@ -144,7 +145,12 @@ function current_state(context: HookContext, transcript?: string): LaneCostState
 		verdict: (): CostVerdict =>
 			transcript === undefined
 				? implementation_cut_verdict.reused_verdict(
-						() => cost_cli.session_verdict({ cwd, environment: env }),
+						() =>
+							cost_cli.session_verdict({
+								cwd,
+								environment: env,
+								remaining: context_cut_payback.IMPLEMENTATION_REMAINING_REQUESTS,
+							}),
 						cwd,
 					)
 				: session_verdict(transcript, cwd, env),
@@ -244,10 +250,11 @@ function is_over_threshold_edit(call: GuardedCall, state: LaneCostState): boolea
 	return warrants_the_cut(state) && state.can_cut(issue)
 }
 
-// **The threshold in the refusal text is named by its command, never spelled**. It is priced at the
-// session's own model (`context-cut-payback.ts`), so no one number is right for every reader, and a
-// spelled literal is left behind when the price list moves.
-const THRESHOLD_TEXT = '`pnpm josh cost --cut`'
+// **The threshold in the refusal text is named as the row's own break-even, never spelled**. It is
+// priced at the session's own model over `IMPLEMENTATION_REMAINING_REQUESTS` (`context-cut-payback.ts`),
+// so it sits below the shared figure `pnpm josh cost --cut` prints, and a spelled literal would go
+// stale; the pointed-to `pre-gate-cut.md` names the horizon (#8817).
+const THRESHOLD_TEXT = "its horizon's break-even"
 
 // The instruction in the shape a refusal can carry: the handoff in the format the parser reads, the
 // cut, and the one verdict that ends the turn — `cut` is the only one, so a run told merely to "take
@@ -329,7 +336,7 @@ const ROW = {
 		topic:
 			'`.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold"',
 		fires:
-			'an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing',
+			'an `Edit` / `Write` by an uncut lane child whose recent context is over the break-even at its own horizon (`IMPLEMENTATION_REMAINING_REQUESTS`, below `pnpm josh cost --cut`); it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing',
 		quiet:
 			"not a lane child, a non-editing tool, the run's own handoff file, already cut, or under the threshold",
 	},
