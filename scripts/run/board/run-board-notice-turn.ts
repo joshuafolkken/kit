@@ -110,19 +110,18 @@ function wake_after(turn: NoticeTurn | undefined, now_ms: number): number {
 	return turn.trace.start_ms + after_ms
 }
 
-// The placed notice drawn as traced at `at_ms`, from the turn after the last one at `last_ms` — none
-// while a typed look's letters type at the last turn, which the theme draws.
+// The placed notice drawn as traced at `at_ms` — none while a typed look's letters still type, which
+// the theme draws; from the turn they land on, its first bar.
 function notice_bytes(
 	turn: NoticeTurn | undefined,
 	at_ms: number,
-	last_ms: number | undefined,
 	random: Random = Math.random,
 ): string {
 	if (!is_placed(turn)) return ''
 	const { row, column, text, look } = turn.place
 	const length = run_board_notice_trace.length_of(text)
 
-	if (!run_board_notice_trace.is_drawn(since_of(turn, last_ms ?? at_ms), length, look)) return ''
+	if (!run_board_notice_trace.is_drawn(since_of(turn, at_ms), length, look)) return ''
 	const traced = run_board_notice_trace.traced(text, since_of(turn, at_ms), look, random)
 
 	return `${CSI}${String(row)};${String(column)}H${traced}${RESET}`

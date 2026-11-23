@@ -234,27 +234,27 @@ describe('notice_bytes', () => {
 		const { text = '', look = BTTF_LOOK } = turn?.place ?? {}
 		const traced = run_board_notice_trace.traced(text, LETTER_MS, look, zero)
 
-		expect(notice_bytes(turn, START + LETTER_MS, START, zero)).toBe(
+		expect(notice_bytes(turn, START + LETTER_MS, zero)).toBe(
 			`\u{1B}[${String(ROW)};${String(PREFIX_COLUMNS)}H${traced}${run_board_cut_styled.RESET}`,
 		)
 	})
 
-	it('leaves a typed notice to the theme while it types, then bars it', () => {
+	it('leaves a typed notice to the theme while it types, then bars it on the turn it lands', () => {
 		const turn = turn_at(undefined)
 
-		expect(notice_bytes(turn, START + LANDED_MS - 1, START, zero)).toBe('')
-		expect(notice_bytes(turn, START + LANDED_MS, START + LANDED_MS, zero)).toContain(INVERSE)
+		expect(notice_bytes(turn, START + LANDED_MS - 1, zero)).toBe('')
+		expect(notice_bytes(turn, START + LANDED_MS, zero)).toContain(INVERSE)
 	})
 
 	it('writes the notice lit at every turn while it holds, until it changes', () => {
 		const turn = turn_at(undefined)
 		const held_ms = START + HELD_MS + MINUTE_MS
-		const lit = notice_bytes(turn, held_ms, held_ms - 1, zero)
+		const lit = notice_bytes(turn, held_ms, zero)
 
 		expect(stripVTControlCharacters(lit)).toContain(PLACED.text)
 		expect(lit).toContain(BTTF_LOOK.lit.rgb)
 		expect(lit).not.toContain(INVERSE)
-		expect(notice_bytes(undefined, START, undefined, zero)).toBe('')
+		expect(notice_bytes(undefined, START, zero)).toBe('')
 	})
 })
 

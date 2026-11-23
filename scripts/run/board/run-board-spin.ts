@@ -276,8 +276,8 @@ function write_drop(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 
 // joshuafolkken/kit#8657: the header notice traced over the drops and the flash, past the theme like
 // the flash — at every turn, so a drop that crossed it is written over.
-function write_notice(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
-	const bytes = run_board_notice_turn.notice_bytes(turning.notice_trace, at_ms, turned.since?.ms)
+function write_notice(turning: Turning, ports: SpinPorts, at_ms: number): void {
+	const bytes = run_board_notice_turn.notice_bytes(turning.notice_trace, at_ms)
 
 	if (bytes !== '') ports.write_drawn?.(run_board_screen.synced(bytes))
 }
@@ -303,7 +303,7 @@ function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: T
 		write_drop(turning, ports, at_ms, turned)
 		ports.write(turn_bytes(turning, at_ms, turned))
 		run_board_change_flash.write(ports, turning.flash, at_ms, turned.since)
-		write_notice(turning, ports, at_ms, turned)
+		write_notice(turning, ports, at_ms)
 		panel_draw.write_panel(painting(turning), ports, lamp_moment(turning, at_ms), turned.since)
 		run_board_codes.write_codes(coded(turning), ports, at_ms, turned.since?.ms)
 		const striped = { ...coded(turning), strips: turning.strips ?? [] }
