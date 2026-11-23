@@ -96,10 +96,9 @@ async function relaunch(lane: LaneInfo): Promise<RestartOutcome> {
 // What the stopped child started outside its tree goes with it, so the fresh session starts beside none
 // of it (`lane-residents.ts`).
 async function stop_and_relaunch(lane: LaneInfo): Promise<RestartOutcome> {
-	const reaped = lane_reap.reap_child(lane)
+	const reaped = lane_residents.stop_child(lane, session_cite.issue(lane.issue))
 
 	if (reaped.length === 0) return { kind: NOT_RUNNING_KIND }
-	lane_residents.report(lane_residents.end_residents(lane, reaped), session_cite.issue(lane.issue))
 
 	return await relaunch(lane)
 }

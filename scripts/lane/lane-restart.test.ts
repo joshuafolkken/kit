@@ -50,7 +50,7 @@ const dispatch_child = vi.spyOn(lane_dispatch, 'dispatch_child')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const lane_cut_sync = vi.spyOn(run_cut, 'lane_cut_sync')
 const end_cut = vi.spyOn(run_cut, 'end_cut')
-const end_residents = vi.spyOn(lane_residents, 'end_residents')
+const stop_child = vi.spyOn(lane_residents, 'stop_child')
 const read_state = vi.spyOn(lane_state, 'read_state')
 const PAUSED_RECORD = {
 	issue: ISSUE,
@@ -58,8 +58,6 @@ const PAUSED_RECORD = {
 	changed_at: '2026-11-23T01:00:00.000Z',
 	changed_by: 'lane:pause',
 } as const
-
-vi.spyOn(lane_residents, 'report').mockReturnValue()
 
 vi.spyOn(lane_dispatch, 'describe').mockReturnValue('dispatch described')
 
@@ -80,7 +78,7 @@ function arrange_relaunch(): void {
 	emit.mockResolvedValue()
 	lane_cut_sync.mockReturnValue(undefined)
 	end_cut.mockReturnValue()
-	end_residents.mockReturnValue([])
+	stop_child.mockImplementation((lane) => lane_reap.reap_child(lane))
 }
 
 beforeEach(() => {
@@ -118,12 +116,13 @@ describe('lane_restart.restart — stopping and re-dispatching', () => {
 		)
 	})
 
-	// joshuafolkken/kit#4315: what the stopped child started outside its tree goes before the relaunch.
-	it('ends the stopped child’s residents, sparing what the reap ended, before the dispatch', async () => {
+	// joshuafolkken/kit#4315, joshuafolkken/kit#8843: the child and what it started outside its tree
+	// go before the relaunch, through the stop a relaunch shares.
+	it('stops the child and its residents through the shared stop before the dispatch', async () => {
 		await lane_restart.restart(ISSUE)
 
-		expect(end_residents).toHaveBeenCalledWith(LANE, [PID])
-		expect(end_residents.mock.invocationCallOrder[0]).toBeLessThan(
+		expect(stop_child).toHaveBeenCalledWith(LANE, expect.stringContaining(ISSUE))
+		expect(stop_child.mock.invocationCallOrder[0]).toBeLessThan(
 			dispatch_child.mock.invocationCallOrder[0] ?? 0,
 		)
 	})

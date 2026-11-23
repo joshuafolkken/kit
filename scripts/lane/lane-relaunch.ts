@@ -1,5 +1,7 @@
+import { setTimeout } from 'node:timers/promises'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
@@ -7,7 +9,10 @@ import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_dependency } from './lane-dispatch-dependency'
 import { lane_dispatch_log } from './lane-dispatch-log'
+import { lane_reap } from './lane-reap'
+import { lane_reap_settle } from './lane-reap-settle'
 import type { LaneInfo } from './lane-registry'
+import { lane_residents } from './lane-residents'
 import { lane_seat_start } from './lane-seat-start'
 
 // Relaunching a lane child session into its own lane — a fresh agent process started detached, under
@@ -53,6 +58,35 @@ function launch_ready(
 	)
 }
 
+// An OpenAI lane's process is started by its supervisor, never by a relaunch — both `run:cut` and the
+// `run:merge` cut fallback ask this one predicate.
+function is_openai_lane(lane: LaneInfo): boolean {
+	return lane.profile?.provider === OPENAI_PROVIDER
+}
+
+// Whether the stopped child still runs once its exit handlers had the close's grace window.
+async function outlived(issue: string): Promise<boolean> {
+	if (!lane_reap.is_child_running(issue)) return false
+	await setTimeout(lane_reap_settle.GRACE_MS, 0)
+
+	return lane_reap.is_child_running(issue)
+}
+
+// joshuafolkken/kit#8843: a relaunch whose lane child still runs — a supervisor hand-off that judged a
+// live stage stopped — would put a second child beside it in one tree, each running its own gate. The
+// live child goes first, the way `lane:restart` stops it; one that outlives the SIGTERM refuses the
+// launch. The caller's own ancestry is never matched, so `run:cut` from inside the child reaps nothing.
+// An OpenAI lane's liveness is its supervisor's, as `lane:dispatch` leaves it.
+async function stop_previous(lane: LaneInfo): Promise<string | undefined> {
+	if (is_openai_lane(lane) || !lane_reap.is_child_running(lane.issue)) return undefined
+	const cited = session_cite.issue(lane.issue)
+
+	lane_residents.stop_child(lane, cited)
+	if (!(await outlived(lane.issue))) return undefined
+
+	return `The previous child for ${cited} still runs after a SIGTERM, so no second child was launched beside it.`
+}
+
 async function launch(
 	lane: LaneInfo,
 	built: Prepared,
@@ -66,6 +100,9 @@ async function launch(
 		return { kind: 'rejected', note: wait.reason }
 	}
 
+	const alive = await stop_previous(lane)
+
+	if (alive !== undefined) return { kind: 'rejected', note: alive }
 	await lane_dispatch_dependency.begin(lane.issue)
 
 	return launch_ready(lane, built, on_note)
@@ -89,12 +126,6 @@ async function relaunch(
 	} catch (error) {
 		return { kind: 'failed', note: error_text.message_of(error) }
 	}
-}
-
-// An OpenAI lane's process is started by its supervisor, never by a relaunch — both `run:cut` and the
-// `run:merge` cut fallback ask this one predicate.
-function is_openai_lane(lane: LaneInfo): boolean {
-	return lane.profile?.provider === OPENAI_PROVIDER
 }
 
 // The relaunch after a cut: the resume-specific prompt, not the record's bare `fullrun #<N>`,
