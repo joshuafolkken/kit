@@ -52,14 +52,15 @@ A split into two or more issues always gets an epic (`prompts/collaboration-work
 created with the command, never by hand:
 
 ```bash
-pnpm josh epic "<epic-title>" <N1> <N2> ...            # order-free batch
+pnpm josh epic "<epic-title>" <N1> <N2> ... --rationale-file .josh/tmp/<dir>/rationale.md   # order-free batch
 pnpm josh epic "<epic-title>" A B C --chain "#A -> #C" --chain "#B -> #C" \
   --order-reason "#A -> #C: <kind> — <reason>" --order-reason "#B -> #C: <kind> — <reason>"   # a join
 pnpm josh epic --add <E> D --chain "#C -> #D" --order-reason "#C -> #D: <reason>"
 pnpm josh epic "<epic-title>" A B C --ordered --order-reason "#A -> #B -> #C: <kind> — <reason>"
 # --ordered: a true series only; one --order-reason per chain (docs/josh-commands-backlog.md → "josh epic")
 # <kind> on create / --promote: the refusal lists them (scripts/epic/epic-chain-kind.ts)
-# --rationale-file <path|-> fills Split rationale; --origin <owner/repo#N> adds the backlink
+# --rationale-file <path|-> is required on create / --promote (fills Split rationale; refused when missing or blank)
+# --origin <owner/repo#N> adds the backlink
 ```
 
 After any hand edit run `pnpm josh epic:check <E>` (exit 1 when the body no longer parses).

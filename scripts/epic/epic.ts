@@ -17,7 +17,7 @@ import { epic_split_reach } from './epic-split-reach'
 import { epic_untrack } from './epic-untrack'
 
 const FLAGS =
-	'[--ordered | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <kind> — <reason>" ...] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
+	'--rationale-file <path|-> [--ordered | --chain "#A -> #B" ...] [--order-reason "#A -> #B: <kind> — <reason>" ...] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
@@ -50,6 +50,39 @@ function is_chain_refused(parsed: ChainRead): boolean {
 	return parsed.chain_refusal !== undefined
 }
 
+// Whether the rationale read is blank, the refusal printed — an epic whose `## Split rationale` is the
+// template placeholder records no reason for the split (joshuafolkken/kit#8798).
+function is_rationale_missing(rationale: string): boolean {
+	if (rationale.trim() !== '') return false
+
+	console.error(
+		`✖ A split rationale is required: write it under .josh/tmp/ and pass \`--rationale-file .josh/tmp/<dir>/rationale.md\` (\`-\` reads stdin); nothing was written.\n${USAGE}`,
+	)
+
+	return true
+}
+
+interface GuardedSplit extends ChainRead {
+	children: ReadonlyArray<number>
+	rationale_path?: string | undefined
+}
+
+// The rationale, read once (`-` is stdin, which cannot be read twice), or `undefined` when a guard
+// refused, its reason printed — all before anything is written. `run:split` creates through
+// `create` without a rationale, so only the `josh epic` command requires one.
+async function rationale_past_guards(
+	parsed: GuardedSplit,
+	is_rationale_required: boolean,
+): Promise<string | undefined> {
+	if (is_chain_refused(parsed) || (await is_split_stranded(parsed.children))) return undefined
+
+	const rationale = epic_cli.read_rationale(parsed.rationale_path)
+
+	if (is_rationale_required && is_rationale_missing(rationale)) return undefined
+
+	return rationale
+}
+
 async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_promote_arguments(argv)
 
@@ -59,14 +92,14 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	if (is_chain_refused(parsed) || (await is_split_stranded(parsed.children))) {
-		return FAILURE_EXIT_CODE
-	}
+	const rationale = await rationale_past_guards(parsed, true)
+
+	if (rationale === undefined) return FAILURE_EXIT_CODE
 
 	const exit_code = await epic_run.promote_epic({
 		epic_number: parsed.epic_number,
 		children: parsed.children,
-		rationale: epic_cli.read_rationale(parsed.rationale_path),
+		rationale,
 		is_ordered: parsed.is_ordered,
 		chains: parsed.chains,
 		order_reasons: parsed.order_reasons,
@@ -227,7 +260,10 @@ async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> 
 // `epic: undefined` is a created epic whose URL could not be read — still a success here.
 type Creation = { kind: 'refused' } | { kind: 'created'; epic: number | undefined }
 
-async function create(argv: ReadonlyArray<string>): Promise<Creation> {
+async function create(
+	argv: ReadonlyArray<string>,
+	is_rationale_required = false,
+): Promise<Creation> {
 	const parsed = epic_cli.parse_create_arguments(argv)
 
 	if (parsed === undefined) {
@@ -236,14 +272,14 @@ async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 		return { kind: 'refused' }
 	}
 
-	if (is_chain_refused(parsed) || (await is_split_stranded(parsed.children))) {
-		return { kind: 'refused' }
-	}
+	const rationale = await rationale_past_guards(parsed, is_rationale_required)
+
+	if (rationale === undefined) return { kind: 'refused' }
 
 	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
 		children: parsed.children,
-		rationale: epic_cli.read_rationale(parsed.rationale_path),
+		rationale,
 		is_ordered: parsed.is_ordered,
 		chains: parsed.chains,
 		order_reasons: parsed.order_reasons,
@@ -256,7 +292,7 @@ async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 }
 
 async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
-	const creation = await create(argv)
+	const creation = await create(argv, true)
 
 	return creation.kind === 'refused' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }

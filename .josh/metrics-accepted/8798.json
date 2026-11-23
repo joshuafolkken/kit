@@ -1,0 +1,8 @@
+{
+	"reason": "#8798 adds the josh epic refusal of a missing or blank split rationale (guard + its type) and states --rationale-file as required in the skill/kickoff docs",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 21,
+		"ai_cost.on_demand_bytes": 159
+	}
+}

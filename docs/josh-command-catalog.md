@@ -155,7 +155,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh doc:section` | `<file> <heading>` | automation | none | Print one section of a markdown document, for a `file.md` → "Heading" reference |
 | `josh edit:files` | `<plan-path \| ->` | automation | none | Apply several content-addressed edits from a plan in one call |
 | `josh effect:audit` | `[--days <N>] [--draft <issue>]` | automation | network, files | List closed run-time-shortening issues with their expected effect, follow-up measurement and result |
-| `josh epic` | `<title> <issue...> [--ordered \| --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]` | automation | network | Create an epic issue from its child issue numbers |
+| `josh epic` | `<title> <issue...> --rationale-file <path\|-> [--ordered \| --chain <chain>...] [--order-reason "<chain>: <kind> — <reason>"...]` | automation | network | Create an epic issue from its child issue numbers |
 | `josh epic:audit` | `<epic>` | automation | network | Audit an epic's children against each other for contradictions |
 | `josh epic:bundle` | `<issue> [--apply]` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
 | `josh epic:check` | `<epic>` | automation | network | Check an epic issue against the tracking requirements |
