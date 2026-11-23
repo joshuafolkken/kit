@@ -3,6 +3,7 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { declared_growth } from '#scripts/split/declared-growth'
+import { derived_paths } from '#scripts/split/derived-paths'
 import { split_assess, type SplitGuide } from '#scripts/split/split-assess'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
@@ -25,7 +26,8 @@ import { lane_stage_budget } from './lane-stage-budget'
 // off rather than writing why it stays one. Two lanes declared at 4 files planned 9 with that comment
 // and shipped 16 and 18, their implement step twice the median. Files count as the declaration counts
 // them (`size-estimate.ts`): tests, documents and snapshots included, and a generated artifact
-// planned beside its source (`codex_hooks.GENERATED_SOURCES`) excluded. An Issue with no
+// planned beside its source (`codex_hooks.GENERATED_SOURCES`) excluded; the documents the plan's command
+// definitions derive count though the plan omits them (`derived-paths.ts`). An Issue with no
 // declaration — an epic — or one declaring 0 files, as `lane:stats` skips it, is never refused.
 //
 // **Two more axes answer `split`** (joshuafolkken/kit#5568), since declarations run short — merged lanes
@@ -151,6 +153,11 @@ function is_counted(file: string): boolean {
 	return split_assess.is_deliverable({ path: file, changed_lines: 0 })
 }
 
+// The plan's counted files and what its sources derive (`derived-paths.ts`, joshuafolkken/kit#8859).
+function counted_of(plan: LanePlan): Array<string> {
+	return [...plan.paths, ...derived_paths.of(plan.paths)].filter((file) => is_counted(file))
+}
+
 function files_over(
 	plan: LanePlan,
 	declared: number,
@@ -158,7 +165,7 @@ function files_over(
 	signals: PlanSignals,
 ): FilesOver | undefined {
 	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
-	const counted = plan.paths.filter((file) => is_counted(file))
+	const counted = counted_of(plan)
 	const units = units_of(ordered(counted, recorded?.paths ?? []), signals)
 
 	if (units.length <= limit || files_approved(plan, declared, recorded, units.length)) {
@@ -312,7 +319,7 @@ function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
 
 // The size `over` measured: the plan's counted files and the lines axis's projection, else none.
 function measured_of(plan: LanePlan, over: Oversize): { files: number; lines: number } {
-	const files = plan.paths.filter((file) => is_counted(file)).length
+	const files = counted_of(plan).length
 
 	return { files, lines: over.reason === 'lines' ? over.measured : 0 }
 }

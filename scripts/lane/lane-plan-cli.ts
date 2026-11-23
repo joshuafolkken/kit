@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { derived_paths } from '#scripts/split/derived-paths'
 import type { LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
 import { lane_plan_check } from './lane-plan-check'
@@ -65,6 +66,15 @@ async function planned(
 	return await lane_plan_approval.attach(lane_plan_check.placed(scoped, directory), input.file)
 }
 
+// The files the plan's sources derive, which the size estimate counts (`derived-paths.ts`, #8859), then
+// the imports' probe.
+function report(plan: LanePlan, imports: ReadonlyArray<string>, directory: string): void {
+	const derived = derived_paths.of(plan.paths)
+
+	if (derived.length > 0) console.info(`derived (counted in the size): ${derived.join(' ')}`)
+	lane_plan_imports.report(String(plan.issue), imports, directory)
+}
+
 async function run(
 	argv: ReadonlyArray<string>,
 	directory: string = process.cwd(),
@@ -84,7 +94,7 @@ async function run(
 		: lane_plan_check.check_plan
 	const code = await action(plan, directory)
 
-	lane_plan_imports.report(String(plan.issue), imports, directory)
+	report(plan, imports, directory)
 
 	return code
 }
