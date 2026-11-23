@@ -23,19 +23,26 @@ async function command_for(issue_number: string, issue: number): Promise<string>
 		: `${command} --size-approval ${shell_quote.word(approval)}`
 }
 
-// The lines to print under `implement` — the command, then `lane_plan_auto`'s `--imports` hint — or
-// none when not a lane child or its plan is cleared.
+// Nine lanes in ten stopped once on `metrics-totals` for a growth their plan already foresaw, since
+// only a growth already measured could be accepted (joshuafolkken/kit#8860).
+const EXPECT_HINT =
+	'Before the first gate, declare each total this Issue grows (`scripts.code_lines`, `ai_cost.on_demand_bytes`, …) so `metrics-totals` does not stop on it: pnpm josh metrics --expect <total>=<growth> --reason "<why>"'
+
+// The lines to print under `implement` — the command and `lane_plan_auto`'s `--imports` hint while the
+// plan is not cleared, then the metrics declaration hint — or none when not a lane child.
 async function lines_for(
 	issue_number: string,
 	is_lane_child: boolean,
 ): Promise<ReadonlyArray<string>> {
+	if (!is_lane_child) return []
+
 	const issue = Number(issue_number)
 
-	if (!is_lane_child || !lane_plan.is_uncleared(issue, process.cwd())) return []
+	if (!lane_plan.is_uncleared(issue, process.cwd())) return [EXPECT_HINT]
 
-	return [await command_for(issue_number, issue), lane_plan_auto.IMPORTS_HINT]
+	return [await command_for(issue_number, issue), lane_plan_auto.IMPORTS_HINT, EXPECT_HINT]
 }
 
-const run_step_lane_plan = { lines_for }
+const run_step_lane_plan = { EXPECT_HINT, lines_for }
 
 export { run_step_lane_plan }

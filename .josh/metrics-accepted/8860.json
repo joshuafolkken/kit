@@ -1,0 +1,8 @@
+{
+	"reason": "Adds josh metrics --expect, the growth a lane declares before its first gate (#8860)",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 200,
+		"ai_cost.on_demand_bytes": 200
+	}
+}
