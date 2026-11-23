@@ -130,6 +130,35 @@ describe('lane_elapsed_time — bounds and retry evidence', () => {
 	})
 })
 
+function sized(files: number, lines: number): Array<LedgerEntry> {
+	const counts = { files, lines }
+
+	return [
+		...entries(),
+		{ kind: 'size', issue: ISSUE, at: at(39), declared: counts, actual: counts },
+	]
+}
+
+describe('lane_elapsed_time — two-tier target by actual size (#8729)', () => {
+	it('judges a 40-minute lane past the split guide within the 60-minute target', () => {
+		const parts = lane_elapsed_time.of(sized(9, 300), [], ISSUE, [])
+
+		expect(parts?.target_minutes).toBe(60)
+		expect(parts?.within_target).toBe(true)
+		expect(parts && lane_elapsed_time.text(parts)).toContain('(within the 60-min target)')
+	})
+	it('judges the same lane at or within the split guide against 30 minutes', () => {
+		const parts = lane_elapsed_time.of(sized(8, 200), [], ISSUE, [])
+
+		expect(parts?.target_minutes).toBe(30)
+		expect(parts?.within_target).toBe(false)
+		expect(parts && lane_elapsed_time.text(parts)).toContain('(over the 30-min target)')
+	})
+	it('keeps 30 minutes when no size is recorded', () => {
+		expect(lane_elapsed_time.of(entries(), [], ISSUE, [])?.target_minutes).toBe(30)
+	})
+})
+
 it('refuses missing merge evidence', () => {
 	expect(lane_elapsed_time.of([], [], ISSUE, [])).toBeUndefined()
 })
