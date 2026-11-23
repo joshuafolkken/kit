@@ -146,11 +146,40 @@ describe('run_board_jump_screen.arrive_beats', () => {
 		expect(thaw.some((beat) => has_black_letter(beat.text))).toBe(false)
 	})
 
+	it('ac-27df273f writes each cell on the last beat as the frame after it draws it', () => {
+		const last = beats.at(-1)?.text ?? ''
+
+		expect(['A', 'B', 'C', 'D'].every((letter) => last.includes(`${STYLE}${letter}`))).toBe(true)
+	})
+
 	it('keeps the wipe a held first frame starts with out of its cells', () => {
 		const held = arrive_beats(`${CLEAR}${ARRIVE_FRAME}`, undefined)
 
 		expect(held.map((beat) => clears_in(beat.text))).toStrictEqual(
 			beats.map((_, index) => (index === 0 ? 1 : 0)),
 		)
+	})
+})
+
+describe('run_board_jump_screen.arrive_beats — a named color', () => {
+	const NAMED = `${ESC}[33m`
+	const named = arrive_beats(`${NAMED}AB${ESC}[39m\n${ESC}[90mCD${ESC}[39m`, undefined)
+	const GRAY = '38;2;204;204;204m'
+	// Yellow (229;229;16) is far more red than blue; the gray and the ice it thaws from are not.
+	const YELLOW_LEAD = 100
+
+	it('ac-5324c95f thaws a named color toward itself, not gray', () => {
+		const painted = named.flatMap((beat) => [...beat.text.matchAll(/38;2;(\d+);\d+;(\d+)mA/gu)])
+		const [, red = '0', blue = '255'] = painted.at(-1) ?? []
+
+		expect(named.some((beat) => beat.text.includes(GRAY))).toBe(false)
+		expect(Number(red) - Number(blue)).toBeGreaterThan(YELLOW_LEAD)
+	})
+
+	it('ac-27df273f writes it on the last beat as the frame after it draws it', () => {
+		const last = named.at(-1)?.text ?? ''
+
+		expect(last).toContain(`${NAMED}A${ESC}[0m`)
+		expect(last).toContain(`${ESC}[90mD${ESC}[0m`)
 	})
 })
