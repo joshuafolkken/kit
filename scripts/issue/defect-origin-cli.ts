@@ -6,6 +6,9 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_prep_locate } from '#scripts/run/run-prep-locate'
 import { z } from 'zod'
 import { defect_origin, type Candidate, type Merge, type TargetMerges } from './defect-origin'
+import { defect_origin_line } from './defect-origin-line'
+import { issue_bug_label } from './issue-bug-label'
+import { issue_cite } from './issue-cite'
 import { issue_read_cli } from './issue-read-cli'
 import { session_cite } from './session-cite'
 
@@ -14,6 +17,7 @@ const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: pnpm josh defect:origin <N>'
 const UNREADABLE_MESSAGE = 'Could not read the issue, so no origin candidate is listed:'
 const UNSEARCHABLE_MESSAGE = 'Could not search the merge history for'
+const FILING_SUBJECT = 'this body'
 
 const filed_schema = z.object({ createdAt: z.string() })
 
@@ -58,7 +62,24 @@ async function candidates_for(issue: IssueText): Promise<ReadonlyArray<Candidate
 }
 
 async function listing(issue_number: string, issue: IssueText): Promise<string> {
-	return defect_origin.format(issue_number, await candidates_for(issue))
+	return defect_origin.format(
+		issue_cite.plain_for('linked', issue_number),
+		await candidates_for(issue),
+	)
+}
+
+// The candidates `issue:file` shows for a bug body not yet filed whose origin is untraced — unknown,
+// missing or malformed — searched as `defect:origin <N>` searches, bounded by now. A traced bug and a
+// non-bug body are not searched: `undefined`.
+async function filing_listing(body: string): Promise<string | undefined> {
+	if (!issue_bug_label.is_bug_fix(body) || defect_origin_line.parse(body)?.kind === 'pr') {
+		return undefined
+	}
+
+	return defect_origin.format(
+		FILING_SUBJECT,
+		await candidates_for({ text: body, filed_at: undefined }),
+	)
 }
 
 // An unreadable filing time leaves the log unbounded rather than listing nothing.
@@ -101,6 +122,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-const defect_origin_cli = { USAGE, run }
+const defect_origin_cli = { USAGE, filing_listing, run }
 
 export { defect_origin_cli }
