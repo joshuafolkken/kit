@@ -9,6 +9,7 @@ import { run_board_screen } from './run-board-screen'
 import type { BoardPorts, Pace } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_theme_defs, type IntroDefinition, type IntroLeads } from './run-board-theme-defs'
+import { run_board_timing } from './run-board-timing'
 import { run_board_typing } from './run-board-typing'
 
 // The line a live board in a theme types before its first frame, a letter at a time with a block cursor after
@@ -30,7 +31,14 @@ interface RainSource {
 
 type IntroPorts = Pick<
 	BoardPorts,
-	'icons' | 'intro_sleep' | 'intro_now' | 'write' | 'write_drawn' | 'typing_sound' | 'size'
+	| 'icons'
+	| 'intro_sleep'
+	| 'intro_now'
+	| 'write'
+	| 'write_drawn'
+	| 'typing_sound'
+	| 'size'
+	| 'time_draw'
 > & {
 	rain?: RainSource
 }
@@ -68,6 +76,35 @@ interface Playback {
 	schedule: Schedule
 }
 
+// joshuafolkken/kit#8825: the opening's and the reveal's own work, timed as `reveal` where `--timing`
+// times draws — each beat made and written, never the pauses between them.
+function revealed<T>(ports: IntroPorts, draw: () => T): T {
+	return run_board_timing.drawn(ports, 'reveal', draw)
+}
+
+// The ports with each write timed as `reveal`; the ports as they came where nothing times draws.
+function timed_writes(ports: IntroPorts): IntroPorts {
+	const { write, write_drawn } = ports
+
+	if (ports.time_draw === undefined) return ports
+
+	return {
+		...ports,
+		write: (text) => {
+			revealed(ports, () => {
+				write(text)
+			})
+		},
+		write_drawn:
+			write_drawn &&
+			((text) => {
+				revealed(ports, () => {
+					write_drawn(text)
+				})
+			}),
+	}
+}
+
 function taken(beats: Iterator<Beat>): Beat | undefined {
 	const beat = beats.next()
 
@@ -101,7 +138,7 @@ async function written(
 // takes no further beat, so the beats left unwritten stay in `beats` — made one at a time, a skip makes
 // no more.
 async function beat_through(playback: Playback, ports: PausedPorts, carried = ''): Promise<void> {
-	const beat = playback.skip.is_pressed() ? undefined : taken(playback.beats)
+	const beat = playback.skip.is_pressed() ? undefined : revealed(ports, () => taken(playback.beats))
 
 	if (beat !== undefined) {
 		await beat_through(playback, ports, await written(beat, playback, ports, carried))
@@ -274,11 +311,11 @@ async function reveal(
 	theme: Theme,
 ): Promise<void> {
 	const write = ports.write_drawn ?? ports.write
-	const lines = run_board_theme.marked(theme, frame, ports.icons).split('\n')
+	const lines = revealed(ports, () => run_board_theme.marked(theme, frame, ports.icons).split('\n'))
 	const beats = lines.flatMap((line, index) => line_beats(line, index)).values()
 
 	await listen(beats, { ...ports, write }, keys)
-	const rest = [...beats]
+	const rest = revealed(ports, () => [...beats])
 
 	if (rest.length > 0) write(rest.map((beat) => beat.text).join(''))
 }
@@ -292,7 +329,7 @@ type BeatsOf = (drawn: string, ports: IntroPorts, random: Random) => Iterator<Be
 function behind(cover: BeatsOf): typeof reveal {
 	return async (frame, ports, keys, theme) => {
 		const write = ports.write_drawn ?? ports.write
-		const drawn = run_board_theme.restyle(theme, frame, ports.icons)
+		const drawn = revealed(ports, () => run_board_theme.restyle(theme, frame, ports.icons))
 		const { random, is_colored } = ports.rain ?? LIVE_RAIN
 
 		if (is_colored()) await listen(cover(drawn, ports, random), { ...ports, write }, keys)
@@ -347,11 +384,12 @@ function opening<Read>(
 	theme: Theme | undefined,
 ): { gather: (pace: Pace) => Promise<Read>; reveal: Reveal | undefined } {
 	if (theme === undefined) return { gather, reveal: undefined }
+	const timed = timed_writes(ports)
 
 	return {
-		gather: after(gather, play(ports, keys, theme)),
+		gather: after(gather, play(timed, keys, theme)),
 		reveal: async (frame) => {
-			await revealer(theme)(frame, ports, keys, theme)
+			await revealer(theme)(frame, timed, keys, theme)
 		},
 	}
 }
