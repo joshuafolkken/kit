@@ -1,4 +1,3 @@
-import type { AgentArgv } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -17,7 +16,7 @@ import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_dependency, type DependencyWait } from './lane-dispatch-dependency'
 import { lane_dispatch_log } from './lane-dispatch-log'
-import { lane_dispatch_prepare } from './lane-dispatch-prepare'
+import { lane_dispatch_prepare, type Prepared } from './lane-dispatch-prepare'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_reap } from './lane-reap'
@@ -88,13 +87,10 @@ type DispatchOutcome =
 
 type LogOutcome = { kind: 'ready'; path: string } | { kind: 'unrecordable'; reason: string }
 
-interface StartRequest {
+// The prepared launch (`invocation`, `argv`, `profile`, `resumed_from`, `reason`) in its seated lane.
+type StartRequest = Omit<Extract<Prepared, { kind: 'prepared' }>, 'kind'> & {
 	lane: LaneInfo
 	log_path: string
-	invocation: string
-	argv: AgentArgv
-	profile: AgentProfile
-	resumed_from: string | undefined
 }
 
 /** The prompt the headless child is given: `fullrun #<N>`, and nothing a caller supplied verbatim. */
@@ -299,7 +295,8 @@ async function mark_in_progress(issue: string): Promise<LabelWrite> {
 // stream is capped, so a period's earlier dispatches would be gone from there. The lane's state record
 // takes the stream's launch instant as its own, so `run:board`, which reads the lane's events from
 // the record's launch on, keeps the launch event that opens them (joshuafolkken/kit#4269).
-async function record_started(issue: string, start: DispatchStart): Promise<void> {
+async function record_started(request: StartRequest, start: DispatchStart): Promise<void> {
+	const { issue } = request.lane
 	const now = new Date()
 
 	await run_event_stream_emit.emit(
@@ -307,7 +304,9 @@ async function record_started(issue: string, start: DispatchStart): Promise<void
 		`${issue_cite.plain_for('program', issue)} dispatched`,
 		{ at: now },
 	)
-	await lane_ledger_write.record_dispatch(Number(issue))
+	const { model } = request.profile
+
+	await lane_ledger_write.record_dispatch({ issue: Number(issue), model, reason: request.reason })
 	await lane_state.record_change(
 		{
 			issue,
@@ -361,9 +360,7 @@ async function finish_dispatch(
 	await lane_dispatch_dependency.begin(issue)
 	const outcome = await started(request)
 
-	const is_failed = outcome.kind === 'failed'
-
-	await (is_failed ? run_label.unmark(issue) : record_started(issue, start))
+	await (outcome.kind === 'failed' ? run_label.unmark(issue) : record_started(request, start))
 
 	return outcome
 }

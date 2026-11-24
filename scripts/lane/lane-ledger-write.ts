@@ -25,6 +25,7 @@ import type {
 	UnitFileRecord,
 	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
+import type { DispatchRecord } from './lane-ledger-schema-dispatch'
 import type { EstimateRecord } from './lane-ledger-schema-estimate'
 import type { OfferRecord } from './lane-ledger-schema-offer'
 import type { ChainRecord, PreflightLedgerRecord } from './lane-ledger-schema-ship'
@@ -141,8 +142,8 @@ async function record_merge(issue: number, at: Date = new Date()): Promise<void>
 	await record({ kind: KIND.MERGE, at: at.toISOString(), issue })
 }
 
-async function record_dispatch(issue: number, path?: string): Promise<void> {
-	await record({ kind: KIND.DISPATCH, at: now_iso(), issue }, path)
+async function record_dispatch(dispatch: DispatchRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.DISPATCH, at: now_iso(), ...dispatch }, path)
 }
 
 async function record_estimate(estimate: EstimateRecord, path?: string): Promise<void> {

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { josh_cli_fixture } from '#scripts/josh/josh-cli-fixture'
 import { process_identity } from '#scripts/josh/process-identity'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -15,6 +16,7 @@ const NEVER_ENDS_MS = 30_000
 const TIMER_MS = 200
 const HARNESS_TIMEOUT_MS = 500
 const EXIT_WAIT_MS = 5000
+const UTF8 = 'utf8'
 // A shell that starts a grandchild, records its pid, and waits on it — the shape of a gate whose
 // checks outlive a killed `pnpm`.
 const PID_FILE = 'grandchild.pid'
@@ -43,7 +45,7 @@ function pid_file(): string {
 async function grandchild_pid(): Promise<number> {
 	expect(await josh_harness.wait_for(() => existsSync(pid_file()), EXIT_WAIT_MS)).toBe(true)
 
-	return Number(readFileSync(pid_file(), 'utf8').trim())
+	return Number(readFileSync(pid_file(), UTF8).trim())
 }
 
 async function settled_as(label: string, pending: Promise<unknown>): Promise<string> {
@@ -125,5 +127,33 @@ describe('josh harness — the environment a child starts in (#3309)', () => {
 		const result = await josh_harness.run(environment, [])
 
 		expect(result.stdout).toBe(unit_worker_share.NESTED_VALUE)
+	})
+})
+
+function josh_script(root: string): string {
+	const manifest = readFileSync(path.join(root, 'package.json'), UTF8)
+
+	return (JSON.parse(manifest) as { scripts: { josh: string } }).scripts.josh
+}
+
+describe('josh harness — the launcher a kit environment runs (#8884)', () => {
+	it('spawns josh, and its own `pnpm josh`, through tools/josh/josh-ready.ts', async () => {
+		const environment = await josh_harness.open_environment('kit')
+
+		try {
+			expect(environment.launcher).toBe(josh_cli_fixture.READY_JOSH)
+			expect(josh_script(environment.root)).toContain(path.join('tools', 'josh', 'josh-ready.ts'))
+		} finally {
+			josh_harness.close_environment(environment)
+		}
+	})
+
+	it('launches exactly as the kit’s own `pnpm josh` script does', () => {
+		const [flag, entry = ''] = josh_cli_fixture.READY_JOSH.leading_arguments
+		const relative_entry = path.relative(josh_cli_fixture.REPO_ROOT, entry)
+
+		expect(josh_script(josh_cli_fixture.REPO_ROOT)).toBe(
+			`node ${flag} ${relative_entry.replaceAll(path.sep, '/')}`,
+		)
 	})
 })
