@@ -1,6 +1,9 @@
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_handoff_launch, type HandoffChild } from './run-handoff-launch'
 
@@ -19,7 +22,13 @@ const KICKOFF = {
 const WORKER = 'worker'
 const SCHEDULER_MODEL = 'claude-opus-5-5'
 const SONNET_MODEL = 'claude-sonnet-5-5'
-const KIT_ROOT = path.resolve(import.meta.dirname, '../../..')
+const SONNET = { name: 'sonnet', model: SONNET_MODEL, effort: 'low', when: 'Small work' }
+const OPUS = { name: 'opus', model: SCHEDULER_MODEL, effort: 'high', when: 'Design work' }
+const ROUTED_JOSH = {
+	handoff: { route: true },
+	worker: { default: 'opus', profiles: [SONNET, OPUS] },
+}
+const make_directory = temporary_directory()
 const LOG = '/repo/.git/handoff.log'
 const BRIEF = 'File the CSV export.'
 const SCRATCH = '.josh/tmp/handoff-kickoff-1'
@@ -127,11 +136,26 @@ describe('run_handoff_launch.argv_of', () => {
 	})
 })
 
-// joshuafolkken/kit#8891: kit's own `josh.handoff.route` runs the kickoff child on Sonnet.
+function routed_repository(): string {
+	const directory = make_directory('handoff-launch-route-')
+	const manifest = JSON.stringify({ name: 'app', josh: ROUTED_JOSH })
+
+	writeFileSync(path.join(directory, PACKAGE_JSON), manifest)
+
+	return directory
+}
+
+// joshuafolkken/kit#8891: `josh.handoff.route` runs the kickoff child on the weakest worker profile.
 describe('run_handoff_launch.argv_of — josh.handoff.route', () => {
+	const routed = { cwd: '' }
+
+	beforeEach(() => {
+		routed.cwd = routed_repository()
+	})
+
 	it('hands kickoff in a repository with josh.handoff.route on to the weakest worker profile', () => {
 		const built = run_handoff_launch.argv_of(
-			child({ keyword: 'kickoff', cwd: KIT_ROOT }),
+			child({ keyword: 'kickoff', cwd: routed.cwd }),
 			ENVIRONMENT,
 		)
 
@@ -146,7 +170,7 @@ describe('run_handoff_launch.argv_of — josh.handoff.route', () => {
 
 	it('keeps the retrospective child on the scheduler model in that repository', () => {
 		const built = run_handoff_launch.argv_of(
-			child({ keyword: 'retrospective', cwd: KIT_ROOT }),
+			child({ keyword: 'retrospective', cwd: routed.cwd }),
 			ENVIRONMENT,
 		)
 
@@ -154,7 +178,7 @@ describe('run_handoff_launch.argv_of — josh.handoff.route', () => {
 	})
 
 	it('keeps a fullrun child on the worker profile in that repository', () => {
-		const fullrun = child({ keyword: 'fullrun', role: WORKER, cwd: KIT_ROOT })
+		const fullrun = child({ keyword: 'fullrun', role: WORKER, cwd: routed.cwd })
 
 		expect(run_handoff_launch.argv_of(fullrun, ENVIRONMENT)).toMatchObject({
 			kind: 'argv',

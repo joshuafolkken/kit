@@ -172,7 +172,7 @@ How kit uses it:
 - Unchanged: the `retrospective` child, the `fullrun` / `halfrun` / `prrun` children, the `josh backlogrun` parent, `josh backlog:drive` and the wake session keep their role profiles.
 - Environment variables: `JOSH_SCHEDULER_MODEL` or `JOSH_SCHEDULER_EFFORT`, when set, win over the route.
 - The revert switch: `route: false` returns the `kickoff` child to the scheduler profile in one step.
-- Reading the cost: [`josh cost:audit`](./josh-commands-board.md) splits the hand-off rows by keyword (`handoff:kickoff`, `handoff:retrospective`, …); compare the `handoff:kickoff` row over the same period before and after the switch.
+- Reading the cost: [`josh cost:audit`](./josh-commands-session.md) splits the hand-off rows by keyword (`handoff:kickoff`, `handoff:retrospective`, …); compare the `handoff:kickoff` row over the same period before and after the switch.
 - Reading the quality: over the Issues the `kickoff` child filed in the same two periods, count those whose plan was recorded more than once (`josh issue:plan`), those split again after filing (a `josh lane:plan` `split`, an `epic --promote`) and those sent back with `needs-decision`. More of any of them after the switch → set `route: false`.
 
 ```json
