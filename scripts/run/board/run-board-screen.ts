@@ -59,9 +59,8 @@ function joined_synced(parts: ReadonlyArray<string>): string {
 }
 
 // joshuafolkken/kit#8796: a writer that, once held, keeps every write until it is flushed, then writes
-// them as one synchronized write; not held, each write goes straight through. The redraw holds it on
-// its frame, so the rain, lamps and jump the spin draws back over the frame share the frame's write —
-// split, a terminal could show the cleared frame without them for a frame.
+// them as one synchronized write; not held, each write goes straight through. A live board's redraw
+// no longer holds it: the frame loop composes every layer into one write (joshuafolkken/kit#8826).
 interface Joint {
 	write: (bytes: string) => void
 	hold: () => void

@@ -137,6 +137,25 @@ describe('run_board_frame_loop.run — where it writes', () => {
 	})
 })
 
+describe('run_board_frame_loop.run — a resized terminal', () => {
+	it('clears and rewrites the screen whole when the terminal is another size than its front', async () => {
+		const fake = fake_of()
+		const screen = screen_of()
+		const resized = { rows: SIZE.rows + 1, columns: SIZE.columns }
+
+		revealed(screen, 'hello', SIZE)
+		await run(
+			{ layers: [base_layer(screen)], until_ms: START + SECOND_MS, is_still: true },
+			{ ...fake.ports, size: () => resized },
+			screen,
+		)
+
+		expect(fake.writes).toHaveLength(1)
+		expect(fake.writes[0]?.bytes.startsWith(`${SYNC_ON}${CLEAR}`)).toBe(true)
+		expect(fake.writes[0]?.bytes).toContain('hello')
+	})
+})
+
 describe('run_board_frame_loop.run — wakes', () => {
 	it('wakes on each 80 ms spinner step until the second', async () => {
 		const fake = fake_of()
