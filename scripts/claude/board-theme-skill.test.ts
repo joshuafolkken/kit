@@ -279,6 +279,53 @@ describe('board-theme skill theme split', () => {
 	})
 })
 
+const COST_FILE = 'render-cost.md'
+// A millisecond limit, apart from the board's paces the demo keeps.
+const MS_NUMBER = /\d ?ms\b/u
+const PACE_LINE = 'a letter every 50 ms'
+const EFFECT_BUDGET = 'Each effect child keeps the budget test green'
+
+describe('board-theme skill render cost', () => {
+	const skill = read_skill_file('SKILL.md')
+	const split = read_skill_file(SPLIT_FILE)
+	const cost = read_skill_file(COST_FILE)
+
+	it.each([
+		['5. File the Issue once the user decides', '"When filing"'],
+		['6. After the first merge', '"After every effect child has merged"'],
+	])('points step %s at the render-cost section %s', (step, heading) => {
+		expect(section_of(skill, `## ${step}`)).toContain(`(${COST_FILE}) → ${heading}`)
+	})
+
+	it.each([
+		'#8825, `scripts/run/board/run-board-composite-budget.test.ts`',
+		'stays green',
+		'wargames, matrix and bttf, each run on the real board with its opening',
+		'`pnpm josh run:board --timing --theme <theme>`',
+		'stall and wake lag no worse than',
+		'baseline recorded on #8904',
+		'The seam child adds the new theme to the budget test',
+		EFFECT_BUDGET,
+		'the stalls (count, length, `at` and\n  stage), the wake lag',
+		'the `redraw` breakdown outside the draws',
+	])('the render-cost steps carry "%s"', (rule) => {
+		expect(cost).toContain(rule)
+	})
+
+	it.each(['the new theme in the budget test', EFFECT_BUDGET])(
+		'the split carries the budget rule "%s"',
+		(rule) => {
+			expect(split).toContain(rule)
+		},
+	)
+
+	it.each(['SKILL.md', SPLIT_FILE, COST_FILE])('%s holds no millisecond limit', (name) => {
+		const lines = read_skill_file(name).split('\n')
+
+		expect(lines.filter((line) => MS_NUMBER.test(line) && !line.includes(PACE_LINE))).toEqual([])
+	})
+})
+
 describe('board-theme skill demo shape', () => {
 	const skill = read_skill_file('SKILL.md')
 
