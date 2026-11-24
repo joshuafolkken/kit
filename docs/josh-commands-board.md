@@ -304,6 +304,19 @@ pnpm josh board:compare <demo.mjs> --theme matrix --loose   # glyph and color se
 
 Both streams (`DEMO_BEATS=1`, `board:replay`) run through `@xterm/headless`; screens pair by write time (`board-compare-diff.ts`).
 
+The gate's golden check (`tools/board/board-golden.test.ts`): each theme in `THEMES` (`tools/board/board-golden.ts`) is replayed on the unit-test fixture (seed 1, one redraw, 100×30).
+
+- Each replay is compared cell by cell with its recorded one in `tools/board/golden/<theme>.jsonl.gz` (the `board:replay` beat lines, gzipped).
+- A moved cell fails the unit tests with the first diverging moment, its beat and the cells that differ.
+
+- A look change you intend → record the golden replays again in the same PR and commit `tools/board/golden/`:
+
+  ```bash
+  BOARD_GOLDEN_UPDATE=1 pnpm josh test:unit tools/board/board-golden.test.ts
+  ```
+
+- A new theme → once the owner approves its look, add it to `THEMES` and record the same way.
+
 ### `josh run:pickup`
 
 <!-- usage: run:pickup -->
