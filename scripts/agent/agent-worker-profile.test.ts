@@ -196,8 +196,8 @@ describe('agent_worker_profile.resolve — the profile an Issue runs on', () => 
 
 describe('agent_worker_profile.resolve — a setting with keys it does not name (#8882)', () => {
 	it.each([
-		['the worker setting', { ...WORKER, route: 'next' }],
-		['a profile', { ...WORKER, profiles: [HAIKU, { ...SONNET, route: 'next' }, OPUS] }],
+		['the worker setting', { ...WORKER, pool: 'next' }],
+		['a profile', { ...WORKER, profiles: [HAIKU, { ...SONNET, pool: 'next' }, OPUS] }],
 	])('starts on the default when %s carries one', async (_label, worker) => {
 		write_worker(worker)
 		const result = await agent_worker_profile.resolve(fixture.directory, async () => [])
