@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { josh_cli_fixture } from '#scripts/josh/josh-cli-fixture'
 import { process_identity } from '#scripts/josh/process-identity'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -125,5 +126,21 @@ describe('josh harness — the environment a child starts in (#3309)', () => {
 		const result = await josh_harness.run(environment, [])
 
 		expect(result.stdout).toBe(unit_worker_share.NESTED_VALUE)
+	})
+})
+
+describe('josh harness — the launcher a kit environment runs (#8884)', () => {
+	it('spawns josh, and its own `pnpm josh`, through the built dispatcher rather than tsx', async () => {
+		const environment = await josh_harness.open_environment('kit')
+
+		try {
+			const manifest = readFileSync(path.join(environment.root, 'package.json'), 'utf8')
+			const { scripts } = JSON.parse(manifest) as { scripts: { josh: string } }
+
+			expect(environment.launcher).toBe(josh_cli_fixture.READY_JOSH)
+			expect(scripts.josh).toContain(path.join('tools', 'josh', 'josh-ready.ts'))
+		} finally {
+			josh_harness.close_environment(environment)
+		}
 	})
 })

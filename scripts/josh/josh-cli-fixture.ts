@@ -19,7 +19,7 @@ interface JoshLauncher {
 	leading_arguments: ReadonlyArray<string>
 }
 
-// The source CLI as one launcher, so the integration harness spawns exactly what `run_josh` does.
+// The source CLI as one launcher: what `run_josh` spawns.
 const SOURCE_JOSH: JoshLauncher = {
 	executable: TSX_RUNNER.executable,
 	leading_arguments: [...TSX_RUNNER.leading_arguments, JOSH_ENTRY],
