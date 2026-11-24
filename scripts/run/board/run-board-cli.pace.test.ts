@@ -79,3 +79,12 @@ describe('run_board_cli.run redraw pace', () => {
 		expect(board.read_local).toHaveBeenCalledOnce()
 	})
 })
+
+// joshuafolkken/kit#8826: the live board writes through a port that waits out the terminal's
+// backpressure, so the frame loop makes no frame the terminal is not ready for.
+describe('run_board_cli.LIVE_PORTS backpressure', () => {
+	it('gives the live board a drained wait beside its write', () => {
+		expect(run_board_cli.LIVE_PORTS.write).toBeTypeOf('function')
+		expect(run_board_cli.LIVE_PORTS.drained).toBeTypeOf('function')
+	})
+})
