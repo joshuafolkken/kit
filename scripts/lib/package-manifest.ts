@@ -45,6 +45,7 @@ const WORKER_SCHEMA = z
 	.object({
 		default: z.string().min(1),
 		escalate: z.boolean().default(false),
+		route: z.boolean().default(false),
 		profiles: WORKER_PROFILES_SCHEMA,
 	})
 	.refine((worker) => worker.profiles.some((profile) => profile.name === worker.default), {

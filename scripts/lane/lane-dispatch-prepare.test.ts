@@ -4,6 +4,7 @@ import path from 'node:path'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { run_ending } from '#scripts/run/run-ending'
@@ -47,9 +48,11 @@ function write_outage_log(): void {
 	writeFileSync(LOG_PATH, `${OUTAGE_LINE}\n`, 'utf8')
 }
 
-function write_worker_setting(): void {
+function write_worker_setting(change: object = {}): void {
+	const worker = { ...WORKER, ...change }
+
 	mkdirSync(LANE_DIRECTORY, { recursive: true })
-	writeFileSync(MANIFEST_PATH, JSON.stringify({ name: 'app', josh: { worker: WORKER } }), 'utf8')
+	writeFileSync(MANIFEST_PATH, JSON.stringify({ name: 'app', josh: { worker } }), 'utf8')
 }
 
 function mock_labels(labels: Array<string> | undefined): ReturnType<typeof vi.spyOn> {
@@ -154,5 +157,103 @@ describe('lane_dispatch_prepare.prepared — the josh.worker profile', () => {
 			before.kind === 'rejected' ? before.note : before.argv,
 		)
 		expect(read_labels).not.toHaveBeenCalled()
+	})
+})
+
+const LIGHT_BODY = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）'
+
+function mock_body(text: string | undefined): ReturnType<typeof vi.spyOn> {
+	const read = text === undefined ? { kind: 'missing' as const } : { kind: 'read' as const, text }
+
+	return vi.spyOn(git_gh_command, 'issue_get_body_classified').mockResolvedValue(read)
+}
+
+function set_up_route(): void {
+	write_worker_setting({ route: true })
+	mock_labels([])
+	vi.spyOn(git_gh_issue_write, 'issue_apply_label').mockResolvedValue({ is_applied: true })
+}
+
+describe('lane_dispatch_prepare.prepared — josh.worker.route (joshuafolkken/kit#8760)', () => {
+	beforeEach(set_up_route)
+
+	it('routes an unlabelled light Issue to the weakest profile from its body', async () => {
+		const read_body = mock_body(LIGHT_BODY)
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			profile: { model: HAIKU.model },
+		})
+		expect(read_body).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('stores the routed profile as the Issue worker label', async () => {
+		mock_body(LIGHT_BODY)
+
+		await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(git_gh_issue_write.issue_apply_label).toHaveBeenCalledWith(ISSUE, `worker:${HAIKU.name}`)
+	})
+
+	it('refuses the dispatch where the routed label cannot be stored', async () => {
+		mock_body(LIGHT_BODY)
+		vi.spyOn(git_gh_issue_write, 'issue_apply_label').mockResolvedValue({
+			is_applied: false,
+			reason: 'rate limited',
+		})
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({ kind: 'rejected' })
+	})
+
+	it('keeps the default profile where the Issue body cannot be read', async () => {
+		mock_body(undefined)
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			profile: { model: SONNET.model },
+		})
+	})
+})
+
+describe('lane_dispatch_prepare.prepared — josh.worker.route keeping the default', () => {
+	beforeEach(set_up_route)
+
+	it('writes no label where the Issue body cannot be read, so a later dispatch routes again', async () => {
+		mock_body(undefined)
+
+		await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
+	})
+
+	it('writes no label where the body routes the Issue to the default', async () => {
+		mock_body('## 背景\n\n- 種別: 振る舞い変更')
+
+		await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
+	})
+})
+
+describe('lane_dispatch_prepare.prepared — josh.worker.route on a labelled Issue', () => {
+	beforeEach(set_up_route)
+
+	it('keeps the worker label an Issue already carries and writes no label', async () => {
+		mock_labels([`worker:${SONNET.name}`])
+		mock_body(LIGHT_BODY)
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			kind: 'prepared',
+			profile: { model: SONNET.model },
+		})
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
+	})
+
+	it('rewrites no non-default worker label an Issue already carries', async () => {
+		mock_labels([`worker:${HAIKU.name}`])
+		mock_body(LIGHT_BODY)
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			profile: { model: HAIKU.model },
+		})
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
 	})
 })

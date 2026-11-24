@@ -4,7 +4,8 @@ import {
 	type AgentProfile,
 	type ProfileResult,
 } from '#scripts/agent/agent-role-profile'
-import { agent_worker_profile } from '#scripts/agent/agent-worker-profile'
+import { agent_worker_profile, type WorkerResult } from '#scripts/agent/agent-worker-profile'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { run_ending } from '#scripts/run/run-ending'
 import { lane_dispatch_log } from './lane-dispatch-log'
@@ -33,6 +34,40 @@ function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): Age
 	return agent_argv.with_profile_in(plan.invocation, profile, lane.directory)
 }
 
+// The Issue body `josh.worker.route` reads; `undefined` when the read fails, which keeps the default.
+async function issue_body(issue: string): Promise<string | undefined> {
+	const body = await git_gh_command.issue_get_body_classified(issue)
+
+	return body.kind === 'read' ? body.text : undefined
+}
+
+type Resolved = Extract<WorkerResult, { kind: 'worker' }>
+
+// Whether routing chose a profile other than the default: an unlabelled Issue already reads as the
+// default, and a stored default would pin it there past a failed body read.
+function is_routed_away(worker: Resolved): boolean {
+	return worker.settings.route && worker.worker.name !== worker.settings.default
+}
+
+// joshuafolkken/kit#8760: a routed profile is stored as the Issue's `worker:<name>` label, the one
+// place the cut relaunch's ship cap and the escalation read the profile from. `undefined` where the
+// Issue already carries a label or routing kept the default; a refusal where the label cannot be
+// written.
+async function stored(lane: LaneInfo, worker: Resolved): Promise<ProfileResult | undefined> {
+	if (!is_routed_away(worker)) return undefined
+
+	const labels = await git_gh_issue_write.read_label_names(lane.issue)
+	const is_unlabelled = !labels?.some((name) => name.startsWith(agent_worker_profile.LABEL_PREFIX))
+	if (!is_unlabelled) return undefined
+
+	const label = `${agent_worker_profile.LABEL_PREFIX}${worker.worker.name}`
+	const write = await git_gh_issue_write.issue_apply_label(lane.issue, label)
+
+	return write.is_applied
+		? undefined
+		: { kind: 'rejected', note: `could not store ${label}: ${write.reason}` }
+}
+
 // **The worker profile the lane's Issue selects, where the repository opts into `josh.worker`**.
 // The Issue's `worker:<name>` label (else the configured default) wins over `JOSH_WORKER_MODEL` /
 // `JOSH_WORKER_EFFORT`; a repository without the setting resolves the worker from the environment as
@@ -42,11 +77,13 @@ async function worker_profile(lane: LaneInfo): Promise<ProfileResult> {
 	const worker = await agent_worker_profile.resolve(
 		lane.directory,
 		async () => await git_gh_issue_write.read_label_names(lane.issue),
+		async () => await issue_body(lane.issue),
 	)
 
 	if (worker.kind === 'unset') return agent_role_profile.resolve(agent_role_profile.WORKER)
+	if (worker.kind === 'rejected') return worker
 
-	return worker.kind === 'rejected' ? worker : { kind: 'profile', profile: worker.worker.agent }
+	return (await stored(lane, worker)) ?? { kind: 'profile', profile: worker.worker.agent }
 }
 
 // **The re-dispatch decides resume-or-fresh from the lane's own exit record**.

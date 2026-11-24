@@ -1,0 +1,7 @@
+{
+	"reason": "Route-by-body rule, stored worker label and tests add script lines for #8760",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 92
+	}
+}

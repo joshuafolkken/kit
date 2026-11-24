@@ -31,14 +31,18 @@ function worker_labels(labels: ReadonlyArray<string>): ReadonlyArray<string> {
 	return [...new Set(labels.filter((label) => label.startsWith(LABEL_PREFIX)))]
 }
 
-// The profiles weakest first, as `josh.worker` lists them, and the one an unlabelled Issue runs on.
+// The profiles weakest first, as `josh.worker` lists them, and the one an unlabelled Issue runs on —
+// with `route` on, the dispatch picks from the Issue body (joshuafolkken/kit#8760) before the default.
 function guide_of(settings: WorkerSettings): string {
 	const rows = settings.profiles.map(
 		(profile) => `  ${LABEL_PREFIX}${profile.name} — ${profile.when}`,
 	)
+	const fallback = settings.route
+		? `routed from the body, else ${settings.default}`
+		: settings.default
 
 	return [
-		`worker profiles (josh.worker, weakest first) — choose one with --label ${LABEL_PREFIX}<name>; none → ${settings.default}:`,
+		`worker profiles (josh.worker, weakest first) — choose one with --label ${LABEL_PREFIX}<name>; none → ${fallback}:`,
 		...rows,
 	].join('\n')
 }

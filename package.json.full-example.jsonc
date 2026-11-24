@@ -49,6 +49,9 @@
 			"default": "opus-medium",
 			// true lets a stuck worker resume one profile up. Default: false.
 			"escalate": true,
+			// true runs an unlabelled Issue whose body declares light work on the first profile;
+			// false runs every unlabelled Issue on default. Default: false.
+			"route": true,
 			// Listed weakest first; this order is the escalation order and the ship-phase cap.
 			// An Issue labeled worker:<name> runs on that profile.
 			"profiles": [

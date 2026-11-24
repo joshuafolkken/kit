@@ -27,7 +27,25 @@
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
 	"josh": {
-		"progress_interval_minutes": 15
+		"progress_interval_minutes": 15,
+		"worker": {
+			"default": "opus",
+			"route": true,
+			"profiles": [
+				{
+					"name": "sonnet",
+					"model": "claude-sonnet-5-5",
+					"effort": "medium",
+					"when": "A small Issue declaring no behaviour change, breaking change or person's judgement"
+				},
+				{
+					"name": "opus",
+					"model": "claude-opus-5-5",
+					"effort": "medium",
+					"when": "Design judgement: a behaviour or breaking change, or work over the size guide"
+				}
+			]
+		}
 	},
 	"bin": {
 		"josh": "dist/josh.js"
