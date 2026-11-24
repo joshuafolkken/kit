@@ -1,0 +1,7 @@
+{
+	"reason": "resume and review-resume now ask the work-tree guard before writing running (#8829)",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}

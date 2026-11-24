@@ -40,6 +40,7 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
 - Static checks: `pnpm josh lint`, `cspell:dot`, `behavior`, `exports:unused`, `metrics` (kit only); the unit leg is `pnpm josh test:related`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check`, `exports` and `metrics` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`), and `test:unit` while `josh test:related` would run no test for what moved (no test-read map, or one git can no longer diff against, runs it); the header reads `reused — inputs unchanged since it passed at <time>`.
 - The other checks always run; `--force` reuses nothing.
+- One gate per worktree: a second exits 1 naming the live owner's pid; a dead owner's lock is taken over (`scripts/gate/gate-worktree-lock.ts`).
 - **Refuses to start when the scoped pair has not been green on this tree**: a unit-included local gate reads the record `josh review:brief` does and names `pnpm josh lint:related && pnpm josh test:related` (`pnpm josh check:related` in a lane). Not for `--no-unit` or `--force`; `JOSH_SCOPED_GREEN=0` turns it off.
 - `--static-group=<lint-1|lint-2|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`). `lint-<n>` runs the lint check alone on that `josh lint --shard`.
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
@@ -53,6 +54,7 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
   - An invalid definition (a fixed check's label as `name` included) runs none and fails as one `josh.gate.steps` check naming the error.
   - With `--static-group`, only `rest` runs them.
 
+- A gate whose owner dies ends with its checks: it sends `SIGTERM` to every process under it and exits non-zero. The launcher names the owner in `JOSH_GATE_OWNER_PID` / `JOSH_GATE_OWNER_START` (`run:review` → the lane child session, ship → itself); no owner named → no watch (`scripts/gate/gate-owner-watch.ts`).
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail".
@@ -167,8 +169,9 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh bytes` in detai
 Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline.
 
 ```bash
-pnpm josh metrics                             # print the totals and check them against the merge-base's
-pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and why
+pnpm josh metrics                                              # print the totals and check them against the merge-base's
+pnpm josh metrics --accept --reason "<why>"                    # record this branch's growth and why
+pnpm josh metrics --expect <total>=<growth> --reason "<why>"   # declare this branch's growth before it grows
 ```
 
 <!-- /usage -->
@@ -176,6 +179,7 @@ pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and 
 The totals: code and comment lines and the comment ratio under `scripts/` (non-test), the lines of `CLAUDE.md` and `prompts/**/*.md`, the number of `*:guard` commands, and the AI cost in bytes.
 
 - **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`, once — `josh ship` re-records a later growth of a total the approval names. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
+- A declared growth: a lane declares the totals its Issue grows with `--expect` (repeatable) before its first gate. A growth within the declaration passes; one past it, or of a total it does not name, still stops `josh gate`. `--accept` and the ship's re-record never lower it.
 - **kit only**: a consumer's gate leaves the step out.
 - The prose density is held too, over `README.md`, `docs/`, `prompts/` and `.claude/skills/`. It counts paragraphs over 400 characters, and bold spans beyond the first in each section.
 - Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
@@ -325,6 +329,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 - `--touched` rechecks changed tests, each changed module's `foo.test.ts` / `foo.*.test.ts` and its direct test importers, including fixture consumers (`scripts/test/test-related-touched.ts`). It adds the read map's listers of a directory whose entries changed, no transitive graph. The `touched` record never replaces full-reach verification.
   With no other arguments, its separate green record admits review round 2; round 1 and the gate's reuse require a full-reach run.
+- `--touched` also runs the tests a changed path's shape reaches without importing them — derived pages, tree scans, hook bundles (`scripts/test/test-related-pins.ts`), so a stale derived page fails there.
 - A bare call a lane child types itself runs as `--touched` and says so in one line; `check:related` and ship's scoped pair run the full reach. A call another josh command makes (`check:related`, `gate`, `ship`, `propagate`), the pre-push hook and any call outside a lane keep the full reach (`JOSH_OUTER_COMMAND`, `scripts/josh/outer-command.ts`).
 
 - A changed non-code file reaches the tests the read map records reading it and the test files naming its path outside a comment, in their own text or, for a test the map has not recorded, a module they import directly (`scripts/test/test-document-readers.ts`).

@@ -27,7 +27,9 @@ const GATE_STEPS_SCHEMA = z
 const GATE_SCHEMA = z.object({ steps: GATE_STEPS_SCHEMA.optional() })
 // A worker profile a lane may run on: `profiles` runs weakest first, which is the escalation order.
 // The model and effort are checked against the agent rules by `agent-worker-profile.ts`.
-const WORKER_PROFILE_SCHEMA = z.strictObject({
+// The worker schemas drop keys they do not name rather than refuse them: a lane runs main's schema
+// against its own branch's manifest, so a branch that adds a key would otherwise never start (#8882).
+const WORKER_PROFILE_SCHEMA = z.object({
 	name: z.string().min(1),
 	model: z.string().min(1),
 	effort: z.string().min(1),
@@ -40,7 +42,7 @@ const WORKER_PROFILES_SCHEMA = z
 		message: 'profile names must be unique',
 	})
 const WORKER_SCHEMA = z
-	.strictObject({
+	.object({
 		default: z.string().min(1),
 		escalate: z.boolean().default(false),
 		route: z.boolean().default(false),

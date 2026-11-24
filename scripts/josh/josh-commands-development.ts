@@ -26,7 +26,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	[GATE_COMMAND]: {
-		script: 'scripts/gate/verification-gate.ts',
+		script: 'scripts/gate/gate-main.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
 		reference: [
@@ -90,7 +90,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline',
 		category: 'Development',
 		reference: [
-			'[--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]',
+			'[--no-startup | --totals-only [--rerecord] | --accept --reason "<why>" | --expect <total>=<growth> --reason "<why>"]',
 			'developer',
 			['files'],
 		],
@@ -101,6 +101,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '', note: "print the totals and check them against the merge-base's" },
 				{ arguments: '--accept --reason "<why>"', note: "record this branch's growth and why" },
+				{
+					arguments: '--expect <total>=<growth> --reason "<why>"',
+					note: "declare this branch's growth before it grows",
+				},
 			],
 		},
 	},

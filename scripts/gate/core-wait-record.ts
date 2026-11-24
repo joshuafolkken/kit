@@ -52,6 +52,7 @@ function admission_fields(claim: AdmittedClaim, admission?: Admission): Partial<
 			: undefined,
 		available_mb: decision.reading.available_mb,
 		busy_cores: decision.reading.busy_cores,
+		reserved_cores: decision.reserved_cores,
 		memory_pressured: decision.reading.memory_pressured,
 	}
 }

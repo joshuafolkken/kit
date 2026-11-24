@@ -30,36 +30,60 @@ interface Last {
 	seq: number
 }
 
+// `queued_at` is how many pairs had been met when the turn joined the queue, `joined_ms` when it did, and
+// `is_behind` whether a pair was still in its turn then.
+interface Turn {
+	queued_at: number
+	joined_ms: number
+	is_behind: boolean
+}
+
 // `current` is the run the pair now in its turn started, absent while it started none; `queued_at` is
-// how many pairs had been met when the pair in its turn joined the queue.
+// how many pairs had been met when the pair in its turn joined the queue; `queued_ms` how long it
+// waited behind another pair, absent when none was ahead; `pending` the turns not yet ended.
 const state: {
 	runs: number
 	met_count: number
+	pending: number
 	queued_at?: number
+	queued_ms?: number
 	last?: Last
 	current?: PairRun
 	queue: Promise<unknown>
-} = { runs: 0, met_count: 0, queue: Promise.resolve() }
+} = { runs: 0, met_count: 0, pending: 0, queue: Promise.resolve() }
+
+// The wait a pair spent behind another, which its lap starts after (joshuafolkken/kit#8864).
+function note_wait(turn: Turn): void {
+	delete state.queued_ms
+	if (turn.is_behind) state.queued_ms = performance.now() - turn.joined_ms
+}
 
 // The earlier pair's own caller reads its failure; the queue only waits for it to end.
-async function after<T>(
-	ahead: Promise<unknown>,
-	run: () => Promise<T>,
-	queued_at: number,
-): Promise<T> {
+async function after<T>(ahead: Promise<unknown>, run: () => Promise<T>, turn: Turn): Promise<T> {
 	await Promise.allSettled([ahead])
 	delete state.current
-	state.queued_at = queued_at
+	state.queued_at = turn.queued_at
+	note_wait(turn)
 
 	return await run()
 }
 
 async function one_at_a_time<T>(run: () => Promise<T>): Promise<T> {
-	const turn = after(state.queue, run, state.met_count)
+	const joined = {
+		queued_at: state.met_count,
+		joined_ms: performance.now(),
+		is_behind: state.pending > 0,
+	}
+	const turn = after(state.queue, run, joined)
 
+	state.pending += 1
 	state.queue = turn
 
-	return await turn
+	try {
+		return await turn
+	} finally {
+		state.pending -= 1
+	}
 }
 
 function reason_of(last: Last, tree: GateTree): Reason {
@@ -110,14 +134,19 @@ function red_on(tree: GateTree): { code: number; out: string } | undefined {
 	return scoped_green.is_unmoved(last.tree, tree) ? { code: last.code, out: last.out } : undefined
 }
 
-function current(): PairRun | Record<string, never> {
-	return state.current ?? {}
+// The run the pair in its turn started and the wait it spent queued, each absent when there was none.
+function current(): Partial<PairRun> & { queued_ms?: number } {
+	const waited = state.queued_ms === undefined ? {} : { queued_ms: state.queued_ms }
+
+	return { ...state.current, ...waited }
 }
 
 function forget(): void {
 	state.runs = 0
 	state.met_count = 0
+	state.pending = 0
 	delete state.queued_at
+	delete state.queued_ms
 	delete state.last
 	delete state.current
 }

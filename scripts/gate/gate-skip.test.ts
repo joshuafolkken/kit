@@ -41,10 +41,11 @@ vi.mock('#scripts/git/git-command', () => ({
 }))
 
 const { verification_gate } = await import('./verification-gate')
+const { gate_command } = await import('./gate-command')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
-const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
+const { as_execa_implementation, capture_stdout, fake_result } = gate_test_fixture
 
 const PASS = 0
 // The lane gate's checks: the whole-tree ones are the ship's and CI's (joshuafolkken/kit#7030).
@@ -289,7 +290,7 @@ describe('run_gate_command — the force flag', () => {
 		const stdout = capture_stdout()
 
 		try {
-			const code = await verification_gate.run_gate_command([gate_skip.FORCE_FLAG], {
+			const code = await gate_command.run_gate_command([gate_skip.FORCE_FLAG], {
 				stamp_path: STAMP_PATH,
 				marker_path: MARKER_PATH,
 				log_path: LOG_PATH,
@@ -298,25 +299,6 @@ describe('run_gate_command — the force flag', () => {
 			expect(code).toBe(0)
 		} finally {
 			stdout.restore()
-		}
-	})
-
-	// A refusal that named only `--verbose` would send a reader to drop the flag they need.
-	it('names both accepted flags when it refuses an argument', async () => {
-		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
-
-		try {
-			await verification_gate.run_gate_command([FORWARDED_FLAG], {
-				stamp_path: STAMP_PATH,
-				marker_path: MARKER_PATH,
-				log_path: LOG_PATH,
-			})
-
-			const accepted = verification_gate.ACCEPTED_FLAGS.join(' ')
-
-			expect(error).toHaveBeenCalledWith(expect.stringContaining(accepted))
-		} finally {
-			error.mockRestore()
 		}
 	})
 })

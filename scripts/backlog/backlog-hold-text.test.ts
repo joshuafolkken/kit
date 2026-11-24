@@ -60,6 +60,8 @@ describe('backlog_hold_text.text_of — offer holds', () => {
 		['offer:wait:untriaged', AWAIT_TRIAGE],
 		['offer:wait:parked', 'parked issues await your decision'],
 		['offer:wait:unreadable', 'the backlog could not be read'],
+		['offer:wait:named:8845', 'named #8845 runs first; the auto-ok queue starts when it ends'],
+		['offer:wait:only', 'the run closes once its named issues finish'],
 		['offer:wait', 'the backlog is waiting (wait)'],
 		['offer:watch:other', 'the backlog is waiting (watch:other)'],
 	])(AS_SENTENCE, (code, text) => {

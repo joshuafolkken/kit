@@ -60,10 +60,11 @@ async function read_external_cores(): Promise<number | undefined> {
 }
 
 // The cores other processes' admitted claims hold now. This gate's own claims are written by this
-// process, and its checks' dispatches claim nothing under its held mark.
+// process, and its checks' dispatches claim nothing under its held mark. A stopped owner's claim holds
+// no cores, as admission reads it (joshuafolkken/kit#8869).
 function read_foreign_cores(): number {
 	const foreign = core_budget
-		.live_reservations()
+		.counted_reservations()
 		.filter(
 			({ reservation }) =>
 				!process_identity.is_own_process(reservation.pid, reservation.process_start),

@@ -141,6 +141,11 @@ function tree_of(roots: ReadonlyArray<number>, probes: TreeProbes): Array<number
 	return tree
 }
 
+// Every process under `pid`, collected before any is signalled; `pid` itself is left out.
+function descendants_of(pid: number, probes: TreeProbes = SYSTEM_PROBES): Array<number> {
+	return tree_of([pid], probes).filter((member) => member !== pid)
+}
+
 function roots_of(issue: string, own: Set<number>, probes: TreeProbes): Array<number> {
 	const pattern = lane_child_invocation.process_pattern(issue)
 
@@ -171,9 +176,22 @@ function is_child_running(issue: string, probes: TreeProbes = SYSTEM_PROBES): bo
 	return roots_of(issue, own_ancestry(probes), probes).length > 0
 }
 
+/**
+ * The lane child for `issue` this process runs under — a process of its own ancestry that the child's
+ * pattern matches — `undefined` where it runs under none, as an interactive session does.
+ */
+function own_child(issue: string, probes: TreeProbes = SYSTEM_PROBES): number | undefined {
+	const own = own_ancestry(probes)
+	const pattern = lane_child_invocation.process_pattern(issue)
+
+	return probes.matching(pattern).find((pid) => own.has(pid))
+}
+
 const lane_reap = {
 	ancestry_of,
+	descendants_of,
 	is_child_running,
+	own_child,
 	lane_tree,
 	own_ancestry,
 	parse_pids,

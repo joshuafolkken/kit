@@ -42,7 +42,7 @@ became insurance rather than the primary trigger.
 
 **The implementation-phase cut.** joshuafolkken/kit#1933 reasoned it _could not_ be a guard, because the
 per-request cost was read asynchronously; but `cost_cli.session_verdict` is synchronous and is the exact
-verdict `pnpm josh cost --cut` prints. joshuafolkken/kit#2310 measured the child-side check across five
+statistic `pnpm josh cost --cut` prints (priced over the cut's own horizon since joshuafolkken/kit#8817). joshuafolkken/kit#2310 measured the child-side check across five
 lanes: the verdict was read once each at session entry, before the context grew, so the cut fired
 **0 times** while 33.9% of their requests ran past 200,000 tokens. A `PreToolUse` refusal lands _before_ the edit,
 so the tree is at the state the previous edit left.
@@ -109,6 +109,11 @@ horizon is the measured p50 of 23 requests per resumed lane session (748 session
 2026-10-28; p25 11, p90 68): ~125,000 for Opus 5.5, ~93,000 at the standard rate — #2374's band
 predates the measured horizon, so the standard-rate figure is not checked against it. No fixed figure is
 right for every run, so every reader names `pnpm josh cost --cut`, which prints the current one.
+
+The in-lane cuts read their own horizon: joshuafolkken/kit#8817 measured resumes per trigger
+(#8761, 7 days to 2026-11-23): an implementation cut's resumed session ran a median of 65 requests
+(n=79), a review-fix cut's 27 (n=163). `implementation-cut.ts` and `run-chain-review-fix.ts` pass
+those horizons through `cost_cli.session_verdict`; every other cut keeps the shared 23.
 
 **The resume side is priced.** Until joshuafolkken/kit#2312 the pre-gate cut was unconditional, and its
 case recorded only the gain — the context reduction it carries (~130k → ~60k per request). A cut

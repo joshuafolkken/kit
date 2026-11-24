@@ -130,14 +130,28 @@ function unlabelled_tail(status: ItemStatus): string {
 
 // joshuafolkken/kit#6577: what stopped a lane, or the ship of a child still working, by the command its
 // record or labels name (`run-board-lane-stop.ts`).
-function stop_reason_of(status: ItemStatus): RowReason | undefined {
+// A stop no command named is drawn only where an outage wait still has to be said.
+function unreasoned_tail(status: ItemStatus): string | undefined {
+	return status.resume_wait === undefined ? undefined : 'stopped'
+}
+
+function stop_tail(status: ItemStatus): string | undefined {
 	const reason = status.stop_reason
-	if (reason === undefined) return undefined
-	if (reason === run_board_lane_stop.UNLABELLED_REASON) return { tail: unlabelled_tail(status) }
+	if (reason === undefined) return unreasoned_tail(status)
+	if (reason === run_board_lane_stop.UNLABELLED_REASON) return unlabelled_tail(status)
 
 	const subject = status.state === 'running' ? 'ship stopped' : 'stopped'
 
-	return { tail: `${subject} by ${reason}` }
+	return `${subject} by ${reason}`
+}
+
+// joshuafolkken/kit#8855: a stopped child an outage left awaiting a restart names that wait last.
+function stop_reason_of(status: ItemStatus): RowReason | undefined {
+	const tail = stop_tail(status)
+	if (tail === undefined) return undefined
+	const wait = status.resume_wait
+
+	return { tail: wait === undefined ? tail : `${tail} · ${wait}` }
 }
 
 function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {

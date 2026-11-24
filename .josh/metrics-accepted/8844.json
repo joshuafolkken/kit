@@ -1,0 +1,7 @@
+{
+	"reason": "Splitting the gate entry into gate-command.ts and gate-main.ts adds each module's imports and export object (+10 code lines); the entry itself drops from 297 to 238",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 10
+	}
+}

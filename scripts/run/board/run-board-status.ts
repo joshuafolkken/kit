@@ -5,6 +5,7 @@ import type { Span } from '#scripts/lane/lane-spans'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_resume_wait, type ResumeWaits } from '#scripts/run/event/run-resume-wait'
 import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_board_closed, type ClosedIssue, type ListingRead } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
@@ -70,6 +71,8 @@ interface ItemStatus {
 	// What stopped the lane or its ship — the command its record or its labels name
 	// (`run-board-lane-stop.ts`).
 	stop_reason?: string | undefined
+	// joshuafolkken/kit#8855: why a child an outage stopped is not restarted yet (`run-resume-wait.ts`).
+	resume_wait?: string | undefined
 	// A running lane's transcript result (`run_liveness.read_agent_state`); `undefined` where unread.
 	result?: AgentResult | undefined
 	// When a running lane's transcript was last written — the latest an idle lane can have stopped.
@@ -234,6 +237,7 @@ function fold_events(
 const { remembered } = run_board_events_memo
 const FOLDED: EventsMemo<ReadonlyMap<number, ItemStatus>> = new WeakMap()
 const SPANS: EventsMemo<ReadonlyMap<number | undefined, ReadonlyArray<Span>>> = new WeakMap()
+const WAITS: EventsMemo<ResumeWaits> = new WeakMap()
 
 // A child the stream never saw launched keeps no spans, so its row is timed from its lane record.
 function with_spans(statuses: Map<number, ItemStatus>, events: ReadonlyArray<RunEvent>): void {
@@ -268,7 +272,12 @@ function statuses_of(
 
 	for (const [issue, status] of lanes.own) statuses.set(issue, status)
 
-	run_board_lane_stop.stop_lanes(statuses, lanes, idle)
+	run_board_lane_stop.stop_lanes(
+		statuses,
+		lanes,
+		idle,
+		remembered(WAITS, events, run_resume_wait.awaiting),
+	)
 	with_spans(statuses, events)
 
 	return statuses

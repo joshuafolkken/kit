@@ -58,3 +58,13 @@ describe('package_manifest.read_manifest_if_valid — a manifest that may be abs
 		expect(package_manifest.read_manifest_if_valid(fixture.directory, name_schema)).toBeUndefined()
 	})
 })
+
+describe('package_manifest.josh_schemas.worker — keys it does not name', () => {
+	it('drops them from the setting and its profiles instead of refusing (#8882)', () => {
+		const profile = { name: 'haiku', model: 'claude-haiku-5-5', effort: 'low', when: 'Mechanical' }
+		const worker = { default: 'haiku', route: 'next', profiles: [{ ...profile, route: 'next' }] }
+		const parsed = package_manifest.josh_schemas.worker.parse({ josh: { worker } })
+
+		expect(parsed.josh?.worker).toEqual({ default: 'haiku', escalate: false, profiles: [profile] })
+	})
+})

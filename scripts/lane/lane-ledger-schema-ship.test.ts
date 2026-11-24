@@ -59,6 +59,13 @@ describe('lane_ledger_schema_ship — the scoped pair lap', () => {
 
 		expect(lane_ledger_schema.entry_schema.safeParse(pair).success).toBe(false)
 	})
+
+	// joshuafolkken/kit#8864: the wait a scoped pair spent behind another pair.
+	it('keeps the wait a scoped pair queued behind another pair', () => {
+		const pair = { ...PAIR, queued_ms: 150 }
+
+		expect(lane_ledger_schema.entry_schema.parse(pair)).toEqual(pair)
+	})
 })
 
 describe('lane_ledger_schema_ship — the lines josh ship writes, read through the entry union', () => {

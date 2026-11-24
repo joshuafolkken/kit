@@ -1,3 +1,4 @@
+import { command_reference_line_budget } from '#scripts/document/command-reference-line-budget'
 import { canonical_command } from './josh-aliases'
 import { COMMAND_MAP } from './josh-command-map'
 import type { CommandUsage } from './josh-command-types'
@@ -5,17 +6,10 @@ import type { CommandUsage } from './josh-command-types'
 // The single renderer of a command's usage. `josh help <command>` prints it and
 // `josh command:derive` writes it between a reference page's usage markers,
 // so the terminal and the page are one text (#3932). The usage itself sits on each command's entry
-// (#4185); which page renders it is the page's own `<!-- usage: <command> -->` span.
+// (#4185); which page renders it is the page's own `<!-- usage: <command> -->` span. The pages are
+// the command reference's one list (`command-reference-line-budget.ts`, #8859).
 
-const USAGE_PAGES: ReadonlyArray<string> = [
-	'docs/josh-commands.md',
-	'docs/josh-commands-run.md',
-	'docs/josh-commands-board.md',
-	'docs/josh-commands-lane.md',
-	'docs/josh-commands-session.md',
-	'docs/josh-commands-backlog.md',
-	'docs/josh-commands-automation.md',
-]
+const USAGE_PAGES = command_reference_line_budget.COMMAND_REFERENCE_DOCS
 const NOTE_GAP = 3
 
 interface ExampleLine {

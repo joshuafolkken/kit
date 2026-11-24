@@ -21,7 +21,7 @@ const read_machine = vi.spyOn(machine_capacity, 'read_machine')
 const QUIET_BUSY = gate_ledger.BACKGROUND_CORES
 const BUSY_EXTERNAL = 3
 const OUTCOME = { elapsed_ms: 1000, is_passed: true }
-const live_reservations = vi.spyOn(core_budget, 'live_reservations')
+const counted_reservations = vi.spyOn(core_budget, 'counted_reservations')
 const MID_GATE_CORES = 2
 const SAMPLES = 3
 const CHECK_CPU_MS = 6812.4
@@ -60,8 +60,8 @@ async function recorded(name: string, samples = 0): Promise<number | undefined> 
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
 	read_machine.mockReset()
-	live_reservations.mockReset()
-	live_reservations.mockReturnValue([])
+	counted_reservations.mockReset()
+	counted_reservations.mockReturnValue([])
 })
 
 afterEach(() => {
@@ -109,7 +109,7 @@ describe('gate_ledger — the external load a gate ran beside', () => {
 		await gate_ledger.record(await gate_ledger.start(undefined), [], OUTCOME)
 
 		expect(read_machine).not.toHaveBeenCalled()
-		expect(live_reservations).not.toHaveBeenCalled()
+		expect(counted_reservations).not.toHaveBeenCalled()
 	})
 })
 
@@ -239,28 +239,28 @@ describe('gate_ledger — the reuses and the fallbacks', () => {
 describe('gate_ledger — the load between the ends', () => {
 	it('records another process admitted claim held mid-gate, though both ends were quiet', async () => {
 		reads(QUIET_BUSY, QUIET_BUSY)
-		live_reservations.mockReturnValue([held('other-lint', FOREIGN, MID_GATE_CORES)])
+		counted_reservations.mockReturnValue([held('other-lint', FOREIGN, MID_GATE_CORES)])
 
 		await expect(recorded('busy-middle', SAMPLES)).resolves.toBe(MID_GATE_CORES)
 	})
 
 	it('records no external cores when the ledger held only this gate own claims', async () => {
 		reads(QUIET_BUSY, QUIET_BUSY)
-		live_reservations.mockReturnValue([held('own-unit', OWN, MID_GATE_CORES)])
+		counted_reservations.mockReturnValue([held('own-unit', OWN, MID_GATE_CORES)])
 
 		await expect(recorded('quiet-throughout', SAMPLES)).resolves.toBe(0)
 	})
 
 	it('does not count a claim still waiting for its place', async () => {
 		reads(QUIET_BUSY, QUIET_BUSY)
-		live_reservations.mockReturnValue([waiting('other-waiting', MID_GATE_CORES)])
+		counted_reservations.mockReturnValue([waiting('other-waiting', MID_GATE_CORES)])
 
 		await expect(recorded('waiting', SAMPLES)).resolves.toBe(0)
 	})
 
 	it('records no reading when an end could not be read, whatever the middle held', async () => {
 		reads(QUIET_BUSY, undefined)
-		live_reservations.mockReturnValue([held('other-test', FOREIGN, MID_GATE_CORES)])
+		counted_reservations.mockReturnValue([held('other-test', FOREIGN, MID_GATE_CORES)])
 
 		await expect(recorded('unread-end', SAMPLES)).resolves.toBeUndefined()
 	})
@@ -268,11 +268,11 @@ describe('gate_ledger — the load between the ends', () => {
 	it('stops sampling once the gate is recorded', async () => {
 		reads(QUIET_BUSY, QUIET_BUSY)
 		await recorded('stopped', SAMPLES)
-		live_reservations.mockClear()
+		counted_reservations.mockClear()
 
 		vi.advanceTimersByTime(gate_ledger.SAMPLE_INTERVAL_MS * SAMPLES)
 
-		expect(live_reservations).not.toHaveBeenCalled()
+		expect(counted_reservations).not.toHaveBeenCalled()
 	})
 })
 

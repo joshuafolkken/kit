@@ -31,6 +31,30 @@ test('dispatches named issues in order and waits for the first one in flight', (
 	expect(backlog_drive_named.offer(CARRY, running, true)?.verdict).toBe('wait')
 })
 
+// joshuafolkken/kit#8863: the wait on a named issue in flight carried no cause, so the board's seat line
+// read only `the backlog is waiting (wait)`.
+test('names the issue in flight as the cause of the wait on it', () => {
+	const carry = { ...CARRY, done: [1] }
+	const running = backlog_drive.initial_state(['2'], ACTIVE)
+
+	expect(backlog_drive_named.offer(carry, running, false)).toMatchObject({
+		verdict: 'wait',
+		cause: 'named:2',
+		waiting: [2],
+	})
+	expect(backlog_drive_named.offer(CARRY, running, true)?.cause).toBeUndefined()
+})
+
+test('gives the wait an --only run holds for its last named issue its own cause', () => {
+	const carry = { ...CARRY, done: [1, 2], added: [{ issue: 9, is_priority: false }] }
+	const running = backlog_drive.initial_state(['9'], ACTIVE)
+
+	expect(backlog_drive_named.offer(carry, running, true)).toMatchObject({
+		verdict: 'wait',
+		cause: 'only',
+	})
+})
+
 // joshuafolkken/kit#4746: the stop's reason is read when it is offered, so one offered while a lane ran
 // named that lane's issue unmerged even after it merged.
 test('ends an --only run with every named issue done only once nothing is in flight', () => {

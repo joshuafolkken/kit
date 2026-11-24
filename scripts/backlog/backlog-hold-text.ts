@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { HoldCause } from '#scripts/run/merge/run-merge-usage-limit'
 import { backlog_hold_codes } from './backlog-hold-codes'
 import { backlog_wait_cause, type WaitCause } from './backlog-wait-cause'
@@ -13,7 +14,9 @@ const {
 	DRIVERLESS_PREFIX,
 	HAND_BACK_PREFIX,
 	MEMORY_REASON,
+	NAMED_WAIT,
 	OFFER_PREFIX,
+	ONLY_WAIT,
 	REASON_SEPARATOR,
 	USAGE_LIMIT_REASON,
 } = backlog_hold_codes
@@ -42,6 +45,7 @@ const OFFER_TEXT: ReadonlyMap<string, string> = new Map([
 	['untriaged', AWAIT_TRIAGE],
 	['parked', 'parked issues await your decision'],
 	['unreadable', 'the backlog could not be read'],
+	[ONLY_WAIT, 'the run closes once its named issues finish'],
 ])
 
 // A wait-cause detail (`chain`, `gate+lane`, …, `backlog-wait-cause.ts`) names each of its causes.
@@ -81,12 +85,25 @@ function cause_text(detail: string): string | undefined {
 	return `queued issues wait on ${causes.map((cause) => CAUSE_TEXT[cause]).join(CAUSE_JOINER)}`
 }
 
-// `rest` is `<verdict>[:<detail>]`; a detail neither the table nor a wait cause knows names the whole.
+// A `named:<N>` detail: the declared issue in flight holds the free lanes until it ends (joshuafolkken/kit#8863).
+function named_text(detail: string): string | undefined {
+	const issue = rest_after(detail, NAMED_WAIT)
+
+	return issue === undefined
+		? undefined
+		: `named ${issue_cite.plain_for('terminal', issue)} runs first; the auto-ok queue starts when it ends`
+}
+
+function detail_text(detail: string): string | undefined {
+	return OFFER_TEXT.get(detail) ?? cause_text(detail) ?? named_text(detail)
+}
+
+// `rest` is `<verdict>[:<detail>]`; a detail no reader above knows names the whole.
 function offer_text(rest: string): string {
 	const index = rest.indexOf(REASON_SEPARATOR)
 	const detail = index === NOT_FOUND ? '' : rest.slice(index + REASON_SEPARATOR.length)
 
-	return OFFER_TEXT.get(detail) ?? cause_text(detail) ?? `the backlog is waiting (${rest})`
+	return detail_text(detail) ?? `the backlog is waiting (${rest})`
 }
 
 function prefixed_text(code: string): string | undefined {

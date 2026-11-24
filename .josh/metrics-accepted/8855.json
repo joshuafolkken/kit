@@ -1,0 +1,7 @@
+{
+	"reason": "#8855 adds the outage resume-wait record (run-resume-wait.ts), the settling window on the first offer and the board wait suffix, with their tests",
+	"date": "2026-11-23",
+	"growth": {
+		"scripts.code_lines": 125
+	}
+}

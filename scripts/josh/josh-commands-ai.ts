@@ -129,7 +129,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
 		category: 'AI tools',
 		reference: [
-			'[--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]',
+			'[--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density | --read-chars <path> | --lane-read-chars]',
 			'maintainer',
 			['none'],
 		],
@@ -150,6 +150,14 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '--density',
 					note: 'the lane-child calls per request alone, as the last line',
 				},
+				{
+					arguments: '--read-chars prompts/collaboration-workflow/issue-template.md',
+					note: "the period's Read chars of that file alone, as the last line",
+				},
+				{
+					arguments: '--lane-read-chars --period 3',
+					note: 'the last 3 days of lane-child Read chars per lane Issue alone, as the last line',
+				},
 			],
 			flags: [
 				{
@@ -165,6 +173,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--density'],
 					description:
 						"print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it; no lane-child request prints nothing and exits 1.",
+				},
+				{
+					names: ['--read-chars <path>'],
+					description:
+						"print only the period's Read chars of one repository-relative file (the Read-file rows whose path ends with it, summed); no such Read prints nothing and exits 1.",
+				},
+				{
+					names: ['--lane-read-chars'],
+					description:
+						"print only the period's lane-child Read chars divided by the distinct lane Issues they ran for, rounded; no lane-child session prints nothing and exits 1.",
 				},
 			],
 		},
