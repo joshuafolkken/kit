@@ -1,7 +1,4 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { run_board_cli } from './run-board-cli'
 import { run_board_frame_preview, type FrameOptions } from './run-board-frame-preview'
 import { run_board_icons, type Icons } from './run-board-icons'
 import type { IntroPorts } from './run-board-intro'
@@ -27,7 +24,6 @@ const OWN_OPTIONS = {
 const DEFAULT_SEED = 1
 const DEFAULT_TICKS = 1
 const COUNT = /^\d+$/u
-const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 2
 // Thrown from the redraw sleep once the asked redraws are drawn: the live board never returns on its own.
 const REPLAY_END = new Error('replay end')
@@ -144,6 +140,23 @@ async function redraw_sleep(recorder: Recorder, ms: number): Promise<void> {
 	advanced(recorder, ms)
 }
 
+// Every clock the board reads, the opening's beat schedule included, on the recorder's virtual time:
+// the live `performance.now()` made the opening's beat lengths differ per run.
+function virtual_clock(
+	recorder: Recorder,
+): Pick<Required<BoardPorts>, 'now' | 'intro_now' | 'intro_sleep' | 'sleep'> {
+	return {
+		now: () => recorder.now_ms,
+		intro_now: () => recorder.now_ms,
+		intro_sleep: async (ms) => {
+			advanced(recorder, ms)
+		},
+		sleep: async (ms) => {
+			await redraw_sleep(recorder, ms)
+		},
+	}
+}
+
 function stay(): void {
 	// The replay holds no exit handler: it ends when its redraws are drawn.
 }
@@ -164,13 +177,7 @@ function replay_ports(
 	return {
 		...fixed,
 		icons: options.icons,
-		now: () => recorder.now_ms,
-		intro_sleep: async (ms) => {
-			advanced(recorder, ms)
-		},
-		sleep: async (ms) => {
-			await redraw_sleep(recorder, ms)
-		},
+		...virtual_clock(recorder),
 		keys: undefined,
 		on_exit: stay,
 		typing_sound: undefined,
@@ -215,10 +222,6 @@ async function run(argv: ReadonlyArray<string>, ports: BoardPorts): Promise<numb
 	process.stdout.write(lines_of(await replay(ports, options)))
 
 	return 0
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET), run_board_cli.live_ports(false))
 }
 
 const run_board_replay = { lines_of, options_of, replay, run }

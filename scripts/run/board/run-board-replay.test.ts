@@ -53,6 +53,16 @@ describe('run_board_replay.replay', () => {
 		expect(arrival.length).toBeGreaterThanOrEqual(MINIMUM_ARRIVE_BEATS)
 	})
 
+	it('times the opening on the virtual clock, whatever the live clock does', async () => {
+		const first = lines_of(await replayed(['--theme', 'bttf', '--seed', '1']))
+		let live_ms = 0
+
+		vi.spyOn(performance, 'now').mockImplementation(() => (live_ms += ARRIVE_TICK_MS))
+		const second = lines_of(await replayed(['--theme', 'bttf', '--seed', '1']))
+
+		expect(second).toBe(first)
+	})
+
 	it('writes one JSON line per beat', () => {
 		expect(lines_of([{ text: 'a', ms: 1 }])).toBe('{"text":"a","ms":1}\n')
 	})

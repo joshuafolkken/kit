@@ -1,0 +1,8 @@
+{
+	"reason": "Generated catalog row marks board:compare **kit only** (it imports the devDependency @xterm/headless), #8754",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 370,
+		"prose.excess_bold": 1
+	}
+}

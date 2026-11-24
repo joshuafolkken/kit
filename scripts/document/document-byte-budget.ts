@@ -94,7 +94,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `run:board --timing` (joshuafolkken/kit#7929) crossed the 28672 block.
 	// `run:board --theme matrix` (joshuafolkken/kit#8354) crossed the 32768 block.
 	// `run:board --icons` (joshuafolkken/kit#8505) crossed the 36864 block.
-	{ path: 'docs/josh-commands-board.md', bytes: 40_960 },
+	// `josh board:compare` (joshuafolkken/kit#8754) crossed the 40960 block.
+	{ path: 'docs/josh-commands-board.md', bytes: 45_056 },
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
 	// `josh lane:phases` (joshuafolkken/kit#8287) crossed the 36864 block.
 	{ path: 'docs/josh-commands-lane.md', bytes: 40_960 },
