@@ -13,11 +13,11 @@ const ESC = '\u{1B}'
 const BEL = '\u{7}'
 // One escape sequence (CSI or an OSC ended by BEL or ST), or a run of text without one.
 const TOKEN = new RegExp(
-	`${ESC}\\[[0-?]*[ -/]*[@-~]|${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)|${ESC}.?|[^${ESC}]+`,
+	String.raw`${ESC}\[[0-?]*[ -/]*[@-~]|${ESC}\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\)|${ESC}.?|[^${ESC}]+`,
 	'gu',
 )
-const CSI_PARTS = new RegExp(`^${ESC}\\[([0-?]*)[ -/]*([@-~])$`, 'u')
-const OSC_LINK = new RegExp(`^${ESC}\\]8;[^;]*;([^${BEL}${ESC}]*)`, 'u')
+const CSI_PARTS = new RegExp(String.raw`^${ESC}\[([0-?]*)[ -/]*([@-~])$`, 'u')
+const OSC_LINK = new RegExp(String.raw`^${ESC}\]8;[^;]*;([^${BEL}${ESC}]*)`, 'u')
 const LINE_BREAK = /([\n\r])/u
 const SEGMENTER = new Intl.Segmenter()
 const WIDE = 2
