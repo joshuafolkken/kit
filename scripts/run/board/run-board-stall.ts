@@ -171,17 +171,16 @@ function rows(stalls: ReadonlyArray<Stall>): Array<[string, string]> {
 	return [count, ...listed.map((stall, index) => stall_row(stall, index))]
 }
 
-// The wake lag's longest and median, and how many wakes ran later than `LATE_MS`; none before a probe.
-function lag_rows(lags: ReadonlyArray<number>): Array<[string, string]> {
+// A wake lag's row under `name`: its longest and median, and how many wakes ran later than `LATE_MS`;
+// none before a wake. The probes' is `wake lag`, the spinners' own wakes `run-board-timing.ts`'s.
+function lag_rows(name: string, lags: ReadonlyArray<number>): Array<[string, string]> {
 	const median = lane_stats.median(lags)
 
 	if (median === undefined) return []
 	const late = lags.filter((ms) => ms > LATE_MS).length
 	const counted = `n ${String(late)} over ${String(LATE_MS)} (n ${String(lags.length)})`
 
-	return [
-		['wake lag', `max ${longest(lags).toFixed(1)} · median ${median.toFixed(1)} · ${counted}`],
-	]
+	return [[name, `max ${longest(lags).toFixed(1)} · median ${median.toFixed(1)} · ${counted}`]]
 }
 
 // Watches from here until `stop`.
@@ -200,7 +199,7 @@ function watch(probes: StallProbes): StallWatch {
 		},
 		stalls: () => watching.stalls,
 		lags: () => watching.lags,
-		rows: () => [...rows(watching.stalls), ...lag_rows(watching.lags)],
+		rows: () => [...rows(watching.stalls), ...lag_rows('wake lag', watching.lags)],
 		stop: () => {
 			stop_probe()
 			stop_gc()
@@ -238,7 +237,7 @@ const PROCESS_PROBES: StallProbes = {
 	observe_gc,
 }
 
-const run_board_stall = { LATE_MS, PROBE_MS, PROCESS_PROBES, STALL_MS, longest, watch }
+const run_board_stall = { LATE_MS, PROBE_MS, PROCESS_PROBES, STALL_MS, lag_rows, longest, watch }
 
 export { run_board_stall }
 export type { Stall, StallProbes, StallWatch }

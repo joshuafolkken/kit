@@ -213,7 +213,12 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--timing'],
 					description:
-						"on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`) and the GC within it (`run-board-stall.ts`).",
+						"on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`), the GC within it and when it began (`at`, ms from the screen taken; `run-board-stall.ts`).",
+				},
+				{
+					names: ['--timing'],
+					description:
+						'on a live board, `wake lag` is the stall probe’s lateness and `spin wake lag` each spinner wake’s past its due time: max, median and the wakes over 50 ms.',
 				},
 			],
 		},

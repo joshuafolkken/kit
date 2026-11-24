@@ -201,6 +201,17 @@ function start_sweep(turning: Turning, ports: SpinPorts): void {
 	write_turn(turning, ports, ports.now(), { is_turned: false, is_swept: true, since: undefined })
 }
 
+// Sleeps from `now_ms` until `due_ms`, handing the wake's due and actual time to the ports that time
+// wakes (joshuafolkken/kit#8902); the time it woke at.
+async function sleep_until(ports: SpinPorts, now_ms: number, due_ms: number): Promise<number> {
+	await ports.sleep(due_ms - now_ms)
+	const woke_ms = ports.now()
+
+	ports.time_wake?.(due_ms, woke_ms)
+
+	return woke_ms
+}
+
 // joshuafolkken/kit#8123: a wake for a letter or the sweep between frame boundaries writes no spinner,
 // so each frame is written once, on its boundary; the sweep is written likewise once per cell. The
 // frame drew its colons lit, so a frame finished past the half second darkens them on the first wake.
@@ -213,9 +224,7 @@ async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number):
 		interval_ms: 0,
 		sleeper: async () => {
 			const now_ms = ports.now()
-
-			await ports.sleep(next_turn(now_ms, until_ms, turning) - now_ms)
-			const at_ms = ports.now()
+			const at_ms = await sleep_until(ports, now_ms, next_turn(now_ms, until_ms, turning))
 			const at = moment_of(turning, at_ms)
 
 			if (at_ms < until_ms) write_turn(turning, ports, at_ms, turned_since(last, at))
@@ -242,7 +251,7 @@ async function spin_to_second(turning: Turning, ports: SpinPorts): Promise<void>
 	const second_ms = boundary_after(now_ms, REDRAW_MS)
 
 	await (is_still(turning)
-		? ports.sleep(second_ms - now_ms)
+		? sleep_until(ports, now_ms, second_ms)
 		: turn_until(turning, ports, second_ms))
 }
 
