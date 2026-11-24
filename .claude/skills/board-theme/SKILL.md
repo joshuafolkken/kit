@@ -55,8 +55,10 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
   items changed on purpose.
 - **Put the demo's code in the Issue body when filing**, never in a later comment — #8354 started
   implementing before a code comment was read. Write: colors, characters, speeds and odds follow the
-  code; what the demo lacks (disable conditions, simultaneous typing, existing behavior, render cost)
-  follows the body.
+  code; what the demo lacks (disable conditions, simultaneous typing, existing behavior) follows
+  the body.
+- Write the render-cost conditions in the body and the acceptance criteria — the demo's
+  lightness proves nothing: [render cost](render-cost.md) → "When filing".
 - The body names the functions to read, the rejected variants (not implemented), the demo's shortcuts
   (the real behavior wins), and which element takes which color (rules, text inside the rules,
   the waiting mark, gauges) — numbers without the assignment caused #8354's two misses (#8390).
@@ -71,6 +73,8 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
 - **Compare the implementation's commit with the demo's code**, comment the matches and the
   differences on the Issue, and file each difference as a fix Issue — #8354's comparison caught three
   (#8390, #8391).
+- Comment the real board's `--timing` values on the Issue once every effect child has merged:
+  [render cost](render-cost.md) → "After every effect child has merged".
 
 ## Examples
 
