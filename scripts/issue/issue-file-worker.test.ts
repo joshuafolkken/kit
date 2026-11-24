@@ -13,6 +13,7 @@ const AGENT = {
 const SETTINGS: WorkerSettings = {
 	default: 'sonnet',
 	escalate: false,
+	route: false,
 	profiles: [
 		{ name: 'haiku', when: 'Mechanical work', agent: AGENT },
 		{ name: 'sonnet', when: 'A brief', agent: AGENT },
@@ -34,6 +35,18 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	vi.spyOn(agent_worker_profile, 'read').mockReturnValue({ kind: 'settings', settings: SETTINGS })
+})
+
+describe('issue_file_worker.is_worker_clear — with josh.worker.route on', () => {
+	it('says an unlabelled Issue is routed from its body before the default', () => {
+		vi.spyOn(agent_worker_profile, 'read').mockReturnValue({
+			kind: 'settings',
+			settings: { ...SETTINGS, route: true },
+		})
+
+		expect(issue_file_worker.is_worker_clear(HERE, ['enhancement'])).toBe(true)
+		expect(printed.info()).toContain('none → routed from the body, else sonnet')
+	})
 })
 
 describe('issue_file_worker.is_worker_clear — with josh.worker set', () => {
