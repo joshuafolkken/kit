@@ -1,14 +1,12 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
-import {
-	agent_role_profile,
-	type AgentProfile,
-	type ProfileResult,
-} from '#scripts/agent/agent-role-profile'
+import type { Rejected } from '#scripts/agent/agent-provider'
+import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { agent_worker_profile, type WorkerResult } from '#scripts/agent/agent-worker-profile'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { run_ending } from '#scripts/run/run-ending'
 import { lane_dispatch_log } from './lane-dispatch-log'
+import type { DispatchReason } from './lane-ledger-schema-dispatch'
 import type { LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
 import { lane_transition_guards } from './lane-transition-guards'
@@ -20,8 +18,11 @@ type Prepared =
 			argv: AgentArgv
 			profile: AgentProfile
 			resumed_from: string | undefined
+			reason: DispatchReason
 	  }
 	| { kind: 'rejected'; note: string }
+
+type RoutedProfile = Rejected | { kind: 'profile'; profile: AgentProfile; reason: DispatchReason }
 
 // Build the argv the plan calls for: a resume carries the stored session id, a fresh start does not.
 // Both run the same profile diagnostics under the already-resolved profile, so a resume is refused for
@@ -53,7 +54,7 @@ function is_routed_away(worker: Resolved): boolean {
 // place the cut relaunch's ship cap and the escalation read the profile from. `undefined` where the
 // Issue already carries a label or routing kept the default; a refusal where the label cannot be
 // written.
-async function stored(lane: LaneInfo, worker: Resolved): Promise<ProfileResult | undefined> {
+async function stored(lane: LaneInfo, worker: Resolved): Promise<Rejected | undefined> {
 	if (!is_routed_away(worker)) return undefined
 
 	const labels = await git_gh_issue_write.read_label_names(lane.issue)
@@ -68,22 +69,31 @@ async function stored(lane: LaneInfo, worker: Resolved): Promise<ProfileResult |
 		: { kind: 'rejected', note: `could not store ${label}: ${write.reason}` }
 }
 
+function from_environment(): RoutedProfile {
+	const result = agent_role_profile.resolve(agent_role_profile.WORKER)
+
+	return result.kind === 'rejected' ? result : { ...result, reason: 'environment' }
+}
+
 // **The worker profile the lane's Issue selects, where the repository opts into `josh.worker`**.
 // The Issue's `worker:<name>` label (else the configured default) wins over `JOSH_WORKER_MODEL` /
 // `JOSH_WORKER_EFFORT`; a repository without the setting resolves the worker from the environment as
 // before and never reads the labels. `record_output` keeps the chosen profile in the lane's `.env`,
 // which a cut relaunch resumes on.
-async function worker_profile(lane: LaneInfo): Promise<ProfileResult> {
+// The answer also says why (joshuafolkken/kit#8815), which the lane ledger's `dispatch` row keeps.
+async function worker_profile(lane: LaneInfo): Promise<RoutedProfile> {
 	const worker = await agent_worker_profile.resolve(
 		lane.directory,
 		async () => await git_gh_issue_write.read_label_names(lane.issue),
 		async () => await issue_body(lane.issue),
 	)
 
-	if (worker.kind === 'unset') return agent_role_profile.resolve(agent_role_profile.WORKER)
 	if (worker.kind === 'rejected') return worker
+	if (worker.kind === 'unset') return from_environment()
 
-	return (await stored(lane, worker)) ?? { kind: 'profile', profile: worker.worker.agent }
+	const { reason } = worker
+
+	return (await stored(lane, worker)) ?? { kind: 'profile', profile: worker.worker.agent, reason }
 }
 
 // **The re-dispatch decides resume-or-fresh from the lane's own exit record**.
@@ -112,6 +122,7 @@ async function prepared_for(lane: LaneInfo, is_fresh: boolean): Promise<Prepared
 		argv: built.argv,
 		profile: built.profile,
 		resumed_from,
+		reason: resolved.reason,
 	}
 }
 

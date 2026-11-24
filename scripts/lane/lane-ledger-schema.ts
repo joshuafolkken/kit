@@ -2,6 +2,7 @@ import { run_startup_schema } from '#scripts/run/startup/run-startup-schema'
 import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
+import { lane_ledger_schema_dispatch } from './lane-ledger-schema-dispatch'
 import { lane_ledger_schema_estimate } from './lane-ledger-schema-estimate'
 import { lane_ledger_schema_load } from './lane-ledger-schema-load'
 import { lane_ledger_schema_offer } from './lane-ledger-schema-offer'
@@ -21,6 +22,7 @@ const { lint_related_schema, test_related_schema } = lane_ledger_schema_related
 const { round_one_schema, round_two_schema, offerable_schema, core_wait_schema } =
 	lane_ledger_schema_round
 const { split_notice_schema, split_filed_schema, push_miss_schema } = lane_ledger_schema_split
+const { dispatch_schema } = lane_ledger_schema_dispatch
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -64,12 +66,6 @@ const gate_schema = z.object({
 	// The lane the gate ran in, so `josh lane:breakdown` puts its checks under the lane's ship gate;
 	// absent outside a lane and on a row written before it (joshuafolkken/kit#5319).
 	issue: z.number().optional(),
-})
-// A lane child started on `issue` — the instant its implementation is timed from.
-const dispatch_schema = z.object({
-	kind: z.literal(KIND.DISPATCH),
-	at: z.string(),
-	issue: z.number(),
 })
 // One finished stage of a lane's run, passed or failed: `at` is its end and `elapsed_ms` its length, so
 // its start is read from the two. `issue` is absent where the writer does not hold one — `followup`'s

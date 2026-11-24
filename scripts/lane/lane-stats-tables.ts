@@ -19,6 +19,7 @@ import { lane_implement_stats } from './lane-implement-stats'
 import { lane_implement_tool_split } from './lane-implement-tool-split'
 import type { lane_ledger } from './lane-ledger'
 import { lane_lint_related_stats } from './lane-lint-related-stats'
+import { lane_model_stats } from './lane-model-stats'
 import { lane_paused_spans } from './lane-paused-spans'
 import { lane_prefix_stats, type SessionPrefix } from './lane-prefix-stats'
 import { lane_process_stats } from './lane-process-stats'
@@ -104,6 +105,7 @@ function plan_tables(
 		lane_held_stats.cause_table(entries, window),
 		lane_held_stats.blocker_table(entries, window),
 		lane_dispatch_wait_stats.table(entries, window, events),
+		lane_model_stats.table(entries, window),
 		lane_core_wait_stats.table(entries, window, options),
 	]
 }
