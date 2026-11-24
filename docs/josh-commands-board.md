@@ -289,6 +289,21 @@ pnpm josh board:replay --theme matrix --seed 2 --at 0   # the rain another seed 
 
 <!-- /usage -->
 
+### `josh board:compare`
+
+<!-- usage: board:compare -->
+
+Compare a theme demo and the replayed board cell by cell per beat; exit 1 at the first divergence.
+
+```bash
+pnpm josh board:compare <demo.mjs> --theme bttf             # cell by cell
+pnpm josh board:compare <demo.mjs> --theme matrix --loose   # glyph and color sets
+```
+
+<!-- /usage -->
+
+Both streams (`DEMO_BEATS=1`, `board:replay`) run through `@xterm/headless`; screens pair by write time (`board-compare-diff.ts`).
+
 ### `josh run:pickup`
 
 <!-- usage: run:pickup -->

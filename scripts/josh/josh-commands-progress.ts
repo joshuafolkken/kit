@@ -273,7 +273,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'board:replay': {
-		script: 'scripts/run/board/run-board-replay.ts',
+		script: 'scripts/run/board/run-board-replay-main.ts',
 		// Its imports reach `run:board`'s Telegram sender, which the replay never calls; `.env` loads as there.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
@@ -289,6 +289,26 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: `${BTTF_THEME} --seed 1`, note: 'the bttf arrival, each beat 50 ms apart' },
 				{ arguments: `${MATRIX_THEME} --seed 2 --at 0`, note: 'the rain another seed draws' },
+			],
+		},
+	},
+	'board:compare': {
+		script: 'scripts/run/board/board-compare-cli.ts',
+		// It replays the board as `board:replay` does, so its imports and `.env` load the same way.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Compare a theme demo and the replayed board cell by cell per beat; exit 1 at the first divergence',
+		category: 'AI tools',
+		reference: [
+			'<demo.mjs> --theme <theme> [--scene <n>] [--seed <n>] [--steps <n>] [--loose] [--columns <n>] [--rows <n>]',
+			'automation',
+			['files', 'network', 'processes'],
+		],
+		is_read_only: true,
+		usage: {
+			examples: [
+				{ arguments: `<demo.mjs> ${BTTF_THEME}`, note: 'cell by cell' },
+				{ arguments: `<demo.mjs> ${MATRIX_THEME} --loose`, note: 'glyph and color sets' },
 			],
 		},
 	},

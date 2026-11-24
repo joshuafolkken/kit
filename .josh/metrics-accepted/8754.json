@@ -1,0 +1,7 @@
+{
+	"reason": "New josh board:compare command (terminal-emulator screen diff, beat pairing, CLI) and its tests, #8754",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 357
+	}
+}
