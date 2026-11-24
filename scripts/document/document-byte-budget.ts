@@ -61,6 +61,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 8192 },
 	// The `DEMO_BEATS` / `DEMO_SEED` replay form (joshuafolkken/kit#8750) crossed the 8192 block.
 	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 12_288 },
+	{ path: '.claude/skills/board-theme/render-cost.md', bytes: 4096 },
 	{ path: '.claude/skills/board-theme/theme-split.md', bytes: 4096 },
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 4096 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 8192 },

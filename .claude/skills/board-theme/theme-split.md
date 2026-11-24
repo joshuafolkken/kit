@@ -13,13 +13,15 @@ draw; that shape is the split.
   - the signal each effect reads from the board;
   - the draw order — the order the demo's frame function calls its `draw_*` functions;
   - the shared timing constants the effects read (jump ticks, run-up length, lead times);
-  - per effect, its own file holding a function that draws nothing.
+  - per effect, its own file holding a function that draws nothing;
+  - the new theme in the budget test ([render cost](render-cost.md)).
 - An effect the existing fields cannot express needs a new `ThemeDefinition` field — add it here.
 
 ## Second: effect children in parallel
 
 - One child per effect. It touches its own files and tests only, never a shared file
   (`run-board-theme-defs.ts` and the other files the seam child wrote).
+- Each effect child keeps the budget test green with its effect drawing.
 - Declare no dependency between effect children.
 - Each effect child waits on the seam child only. Create the epic with one chain and one reason per
   effect child:
