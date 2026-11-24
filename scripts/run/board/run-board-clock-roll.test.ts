@@ -95,6 +95,19 @@ describe('run_board_clock_roll.rolled_clocks — the order the places stop', () 
 	})
 })
 
+describe('run_board_clock_roll.rolled_clocks — the board below the header', () => {
+	// joshuafolkken/kit#8826: one scan of the board, and no copy of a cell the roll leaves alone.
+	it('returns the very same cell objects for the cells the roll does not spin', () => {
+		const below = row_of('BOARD ROW 12:34', HEADER.length)
+		const cells = [...header(), ...below]
+		const rolled = rolled_clocks(cells, ROLL_AT, noise)
+
+		for (const cell of below) expect(rolled[cells.indexOf(cell)]).toBe(cell)
+		expect(rolled).toHaveLength(cells.length)
+		expect(rolled.some((cell) => is_white(cell))).toBe(true)
+	})
+})
+
 describe('run_board_clock_roll.rolled_clocks — finding the clock', () => {
 	it('finds the clock where the blinking colons are left out of the cells', () => {
 		const rolled = rolled_clocks(header(':'), ROLL_AT, noise)

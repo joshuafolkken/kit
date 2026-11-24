@@ -1,6 +1,7 @@
 import { poll } from '#scripts/lib/poll'
 import { run_board_exit_rain } from './run-board-exit-rain'
 import { run_board_fold } from './run-board-fold'
+import { run_board_frame_loop, type FrameScreen } from './run-board-frame-loop'
 import { run_board_header } from './run-board-header'
 import { run_board_intro, type Reveal } from './run-board-intro'
 import { run_board_keys, type KeyReading } from './run-board-keys'
@@ -50,14 +51,15 @@ interface Start {
 	last: LastFrame
 	failed?: Failed | undefined
 	typing: Typing
-	hold: () => void
 }
 
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
 // close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
 // so a frame that fills the pane never scrolls the header off the top.
-// The keys are named under it where a person can type them.
+// The keys are named under it where a person can type them. What the tick would write over its frame
+// (the change flash) is left to the frame loop's layers, so the terminal gets one write per frame
+// (joshuafolkken/kit#8826).
 function framed(ports: BoardPorts, framing: Framing): BoardPorts {
 	const keys = ports.folded === undefined ? [] : [run_board_fold.KEYS_LINE]
 
@@ -67,18 +69,23 @@ function framed(ports: BoardPorts, framing: Framing): BoardPorts {
 		write: (frame) => {
 			framing.sink(framing.wrap(frame.replace(TRAILING_NEWLINE, '')))
 		},
+		write_drawn: () => {
+			// drawn by the frame loop's layers
+		},
 	}
 }
 
 // A redrawn frame: the theme restyles the board's own lines, then the screen's control bytes go in
-// front of them and the whole is written past the theme, so no line the theme reads starts with an
-// erase (joshuafolkken/kit#8401).
-function on_screen(ports: BoardPorts, screen: Screen): Framing {
+// front of them, so no line the theme reads starts with an erase (joshuafolkken/kit#8401). The whole is
+// the base the next frames draw on (joshuafolkken/kit#8826), written by the first of them.
+function on_screen(ports: BoardPorts, screen: Screen, frame_screen: FrameScreen): Framing {
 	const { icons, theme } = ports
 
 	return {
 		wrap: (text) => screen.frame(run_board_theme.restyle(theme, text, icons)),
-		sink: ports.write_drawn ?? ports.write,
+		sink: (bytes) => {
+			run_board_frame_loop.set_base(frame_screen, bytes)
+		},
 	}
 }
 
@@ -106,17 +113,6 @@ function themed_joint(
 	const joint = run_board_screen.joint_of(board.write)
 
 	return { ports: run_board_theme.themed(run_board_screen.jointed(board, joint), theme), joint }
-}
-
-// A frame drawn on the second holds the joint, so what the spin draws back over it shares its write.
-function frame_holding(framing: Framing, hold: () => void): Framing {
-	return {
-		wrap: framing.wrap,
-		sink: (bytes) => {
-			hold()
-			framing.sink(bytes)
-		},
-	}
 }
 
 // A typed end is part of the typing voice, so where no player starts it falls silent as the trill does,
@@ -249,13 +245,26 @@ function surviving(step: Step, fail: Failed): Step {
 	}
 }
 
+// The revealed frame as the screen holds it, so the next frame writes only what changed over it.
+function on_revealed(
+	ports: BoardPorts,
+	framing: Framing,
+	last: LastFrame,
+	frame_screen: FrameScreen,
+): void {
+	if (last.text === undefined) return
+	const text = framing.wrap(last.text.replace(TRAILING_NEWLINE, ''))
+
+	run_board_frame_loop.revealed(frame_screen, text, run_board_frame_loop.size_of(ports))
+}
+
 // A tick drawing each frame, the plan read in the background so the first is drawn without waiting on
 // GitHub. Where the board reveals, the first frame is revealed; every later one is written as drawn.
-function ticker(ports: BoardPorts, screen: Screen, start: Start): Step {
+function ticker(ports: BoardPorts, screen: Screen, start: Start, frame_screen: FrameScreen): Step {
 	const { last, failed } = start
 	let opening = start.reveal
-	const framing = on_screen(ports, screen)
-	const drawing = framed(ports, remembered(frame_holding(framing, start.hold), last))
+	const framing = on_screen(ports, screen, frame_screen)
+	const drawing = framed(ports, remembered(framing, last))
 	// The revealed frame is kept too, so a board closed before its second frame has one to wipe.
 	const held_wrap = remembered({ wrap: screen.held, sink: framing.sink }, last).wrap
 
@@ -266,8 +275,11 @@ function ticker(ports: BoardPorts, screen: Screen, start: Start): Step {
 			opening = undefined
 
 			if (revealing === undefined) return await tick(state, drawing, 'background')
+			const next = await revealed_tick(state, ports, held_wrap, revealing)
 
-			return await revealed_tick(state, ports, held_wrap, revealing)
+			on_revealed(ports, framing, last, frame_screen)
+
+			return next
 		},
 		on_failure(ports, framing, last, failed),
 	)
@@ -278,7 +290,8 @@ function ticker(ports: BoardPorts, screen: Screen, start: Start): Step {
 // `--chat` and `--once` answer from are recorded on the worker thread (`run-board-gather-record.ts`),
 // so this thread only draws. Each stage is marked as it is entered, for `--timing`'s stalls.
 async function redraw_forever(ports: BoardPorts, screen: Screen, start: Start): Promise<void> {
-	const step = ticker(ports, screen, start)
+	const frame_screen = run_board_frame_loop.screen_of()
+	const step = ticker(ports, screen, start, frame_screen)
 	let state: BoardState = { ...FRESH_STATE, typing: start.typing }
 
 	await poll.wait_for(
@@ -291,7 +304,7 @@ async function redraw_forever(ports: BoardPorts, screen: Screen, start: Start): 
 			interval_ms: run_board_spin.REDRAW_MS,
 			sleeper: async () => {
 				ports.enter_stage?.('turn')
-				await run_board_spin.spin_to_second(state, ports)
+				await run_board_spin.spin_to_second(state, ports, frame_screen)
 			},
 		},
 	)
@@ -357,7 +370,6 @@ async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Faile
 			last,
 			failed,
 			typing: run_board_type_rows.NO_TYPING,
-			hold: joint.hold,
 		})
 	} finally {
 		leave()

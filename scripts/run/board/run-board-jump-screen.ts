@@ -2,6 +2,7 @@ import { run_board_drop_screen, type DropScreen, type ScreenCell } from './run-b
 import type { TerminalSize } from './run-board-fit'
 import { run_board_jump, type JumpRun } from './run-board-jump'
 import { run_board_jump_paint, type JumpScene, type PaintCell } from './run-board-jump-paint'
+import type { GlyphBytes } from './run-board-layer'
 import type { Beat } from './run-board-reveal-blocks'
 import { run_board_rgb, type Rgb } from './run-board-rgb'
 import { run_board_screen } from './run-board-screen'
@@ -9,8 +10,8 @@ import type { Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8677: the bttf jump written over the board between redraws, cell by cell, past the
 // theme: each cell as the theme drew it (`DropScreen`) recolored by `run_board_jump_paint`. The merge
-// jump runs at a frame a tick over every cell of the terminal, writing only the cells that changed
-// since the last turn and putting each back as it was once the jump is over; the arrival writes the
+// jump runs at a frame a tick over every cell of the terminal, giving the frame layer the cells it
+// paints (joshuafolkken/kit#8826) and none once it is over; the arrival writes the
 // cells that changed since its last beat (joshuafolkken/kit#8788). The animation area is the panel's
 // own (it thaws its cells itself), and the cells the spinners and the typing rows write are left to them.
 
@@ -97,7 +98,7 @@ function paint_cell(cell: ScreenCell, x: number, y: number): PaintCell {
 }
 
 // The board's cells the jump paints, 0-based.
-function cells_of(draw: JumpDraw): Array<PaintCell> {
+function painted_cells(draw: JumpDraw): Array<PaintCell> {
 	return draw.screen.rows.flatMap((row, y) =>
 		row
 			.map((cell, x) => ({ cell, x }))
@@ -106,37 +107,70 @@ function cells_of(draw: JumpDraw): Array<PaintCell> {
 	)
 }
 
+// joshuafolkken/kit#8826: a draw's cells never change while it runs, so every frame of it shares the
+// cells its first frame found.
+const cells_of_draw = new WeakMap<JumpDraw, ReadonlyArray<PaintCell>>()
+
+function cells_of(draw: JumpDraw): ReadonlyArray<PaintCell> {
+	const known = cells_of_draw.get(draw)
+
+	if (known !== undefined) return known
+	const cells = painted_cells(draw)
+
+	cells_of_draw.set(draw, cells)
+
+	return cells
+}
+
 function rgb_text(rgb: Rgb): string {
 	return rgb.join(';')
 }
 
-// A cell's bytes: the cursor there, the theme's style with the jump's colors over it, the letter.
-function painted_bytes(cell: PaintCell, style: string): string {
+// A cell's style: the theme's with the jump's colors over it.
+function cell_style(cell: PaintCell, style: string): string {
 	const bg = cell.bg === undefined ? '' : `${CSI}48;2;${rgb_text(cell.bg)}m`
-	const at = `${CSI}${key_of(cell.y + 1, cell.x + 1)}H`
 
-	return `${at}${RESET}${style}${CSI}38;2;${rgb_text(cell.fg)}m${bg}${cell.text}${RESET}`
+	return `${RESET}${style}${CSI}38;2;${rgb_text(cell.fg)}m${bg}`
+}
+
+// A cell's bytes with no cursor: its style, the letter.
+function cell_bytes(cell: PaintCell, style: string): string {
+	return `${cell_style(cell, style)}${cell.text}${RESET}`
+}
+
+// A cell's bytes: the cursor there, then the cell.
+function painted_bytes(cell: PaintCell, style: string): string {
+	return `${CSI}${key_of(cell.y + 1, cell.x + 1)}H${cell_bytes(cell, style)}`
+}
+
+// joshuafolkken/kit#8826: compared channel by channel — every jump frame compares every cell, and
+// joining the channels into strings cost the frame tens of milliseconds.
+function is_same_rgb(first: Rgb | undefined, second: Rgb | undefined): boolean {
+	if (first === undefined || second === undefined) return first === second
+
+	return first.every((channel, index) => channel === second[index])
 }
 
 function is_same(painted: PaintCell, plain: PaintCell): boolean {
-	const is_bg_same = painted.bg?.join(',') === plain.bg?.join(',')
+	const is_bg_same = is_same_rgb(painted.bg, plain.bg)
 
-	return painted.text === plain.text && painted.fg.join(',') === plain.fg.join(',') && is_bg_same
+	return painted.text === plain.text && is_same_rgb(painted.fg, plain.fg) && is_bg_same
 }
 
-// Each cell's bytes by `row;column`.
-function keyed(cells: ReadonlyArray<PaintCell>, screen: DropScreen): Map<string, string> {
+// Each cell's style and letter by `row;column`.
+function keyed(cells: ReadonlyArray<PaintCell>, screen: DropScreen): Map<string, GlyphBytes> {
 	return new Map(
 		cells.map((cell) => [
 			key_of(cell.y + 1, cell.x + 1),
-			painted_bytes(cell, style_at(screen, cell)),
+			{ style: cell_style(cell, style_at(screen, cell)), text: cell.text },
 		]),
 	)
 }
 
-// The cells the jump changes at `ms` from the board as drawn, by `row;column`.
-function painted_at(draw: JumpDraw, ms: number | undefined): Map<string, string> {
-	if (ms === undefined || !is_running(draw.run, ms)) return new Map()
+// joshuafolkken/kit#8826: the frame a draw painted last, which every layer drawn again at it shares.
+const last_painted = new WeakMap<JumpDraw, { ms: number; painted: Map<string, GlyphBytes> }>()
+
+function changed_at(draw: JumpDraw, ms: number): Map<string, GlyphBytes> {
 	const plain = cells_of(draw)
 	const painted = jump_cells(plain, tick_of(draw.run, ms), draw.run.letters, draw.scene)
 	const changed = painted.filter((cell, index) => {
@@ -146,6 +180,19 @@ function painted_at(draw: JumpDraw, ms: number | undefined): Map<string, string>
 	})
 
 	return keyed(changed, draw.screen)
+}
+
+// The cells the jump changes at `ms` from the board as drawn, by `row;column`.
+function painted_at(draw: JumpDraw, ms: number): Map<string, GlyphBytes> {
+	if (!is_running(draw.run, ms)) return new Map()
+	const last = last_painted.get(draw)
+
+	if (last?.ms === ms) return last.painted
+	const painted = changed_at(draw, ms)
+
+	last_painted.set(draw, { ms, painted })
+
+	return painted
 }
 
 // Every cell of the screen but half a wide character, 0-based.
@@ -219,34 +266,16 @@ function* arrive_beats(drawn: string, size: TerminalSize | undefined): Generator
 	}
 }
 
-// A cell put back as the theme drew it.
-function restore_bytes(screen: DropScreen, key: string): string {
-	const [row = 0, column = 0] = key.split(';').map(Number)
-	const cell = screen.rows[row - 1]?.[column - 1]
+const NO_WASH: ReadonlyMap<string, GlyphBytes> = new Map()
 
-	return cell === undefined ? '' : theme_bytes(key, cell.style, cell.text)
+// joshuafolkken/kit#8826: the cells the jump paints at `ms`, a frame every `FRAME_MS`, each its style
+// and letter by `row;column`; none once it is over. A cell it no longer paints shows the board
+// beneath it again (`run_board_layer.glyph_layer`), so nothing is put back.
+function wash_at(draw: JumpDraw | undefined, ms: number): ReadonlyMap<string, GlyphBytes> {
+	return draw === undefined ? NO_WASH : painted_at(draw, frame_of(ms))
 }
 
-// The bytes the jump writes `at_ms`, a frame every `FRAME_MS`: each cell it paints differently since
-// `since_ms`, and each it painted then and no longer does put back as the theme drew it.
-function jump_bytes(
-	draw: JumpDraw | undefined,
-	at_ms: number,
-	since_ms: number | undefined,
-): string {
-	if (draw === undefined) return ''
-	if (since_ms !== undefined && frame_of(since_ms) === frame_of(at_ms)) return ''
-	const now = painted_at(draw, frame_of(at_ms))
-	const before = painted_at(draw, since_ms === undefined ? undefined : frame_of(since_ms))
-	const gone = [...before.keys()].filter((key) => !now.has(key))
-
-	return [
-		...changed_bytes(now, before),
-		...gone.map((key) => restore_bytes(draw.screen, key)),
-	].join('')
-}
-
-const run_board_jump_screen = { FRAME_MS, arrive_beats, is_lit, jump_bytes }
+const run_board_jump_screen = { FRAME_MS, arrive_beats, is_lit, wash_at }
 
 export { run_board_jump_screen }
 export type { JumpDraw }

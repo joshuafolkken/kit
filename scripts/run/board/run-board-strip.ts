@@ -2,8 +2,6 @@ import { stripVTControlCharacters } from 'node:util'
 import { run_board_codes, type RuleCell } from './run-board-codes'
 import type { Lamp } from './run-board-lamp-spots'
 import { run_board_lamps, type LampLook } from './run-board-lamps'
-import { run_board_screen } from './run-board-screen'
-import type { BoardPorts } from './run-board-state'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // joshuafolkken/kit#8376: while the rules run launch codes on a live board whose theme switches the strip
@@ -36,8 +34,6 @@ interface Striped {
 	cells: ReadonlyArray<RuleCell>
 	strips: ReadonlyArray<StripCell>
 }
-
-type StripPorts = Pick<BoardPorts, 'write' | 'write_drawn'>
 
 function is_blank(line: string | undefined): boolean {
 	return line !== undefined && stripVTControlCharacters(line).trim() === ''
@@ -104,22 +100,7 @@ function strip_bytes(striped: Striped, at_ms: number, since_ms: number | undefin
 		.join('')
 }
 
-// The strip cells that changed, written outside the theme's restyling, as the lamps are.
-function write_strips(
-	striped: Striped,
-	ports: StripPorts,
-	at_ms: number,
-	since_ms: number | undefined,
-): void {
-	const bytes = strip_bytes(striped, at_ms, since_ms)
-
-	if (bytes === '') return
-	const write = ports.write_drawn ?? ports.write
-
-	write(run_board_screen.synced(bytes))
-}
-
-const run_board_strip = { strip_bytes, strip_cells, write_strips }
+const run_board_strip = { strip_bytes, strip_cells }
 
 export { run_board_strip }
 export type { StripCell }

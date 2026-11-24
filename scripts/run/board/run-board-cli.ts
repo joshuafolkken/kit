@@ -25,6 +25,7 @@ import { run_board_theme, type Theme } from './run-board-theme'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
+import { run_board_write_port } from './run-board-write-port'
 
 // `josh run:board` — a full-screen board of the running `backlogrun`, redrawn once a second, its
 // spinners turned between redraws, for a person to keep open beside the run. What one redraw reads,
@@ -75,7 +76,7 @@ function on_exit(leave: () => void): void {
 const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	...run_board_data_ports.live(),
 	now: () => Date.now(),
-	write: (frame) => process.stdout.write(frame),
+	...run_board_write_port.port_of(process.stdout),
 	link: run_board_gather_record.link,
 	is_tty: process.stdout.isTTY,
 	// Read on every redraw, so a resized pane is fitted on the next one.

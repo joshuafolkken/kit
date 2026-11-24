@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import { run_board_spin, type Turning } from './run-board-spin'
 import { run_board_stall, type StallProbes } from './run-board-stall'
 import { run_board_timing } from './run-board-timing'
@@ -57,7 +58,7 @@ describe('run_board_spin.spin_to_second wakes', () => {
 		const { ports, wakes } = waking()
 		const turning: Turning = { spots: [], typing: NO_TYPING }
 
-		await run_board_spin.spin_to_second(turning, ports)
+		await run_board_frame_fixture.spin_to_second(turning, ports)
 
 		expect(wakes).toStrictEqual([[REDRAW_MS, REDRAW_MS + OVERSLEEP_MS]])
 	})
@@ -66,7 +67,7 @@ describe('run_board_spin.spin_to_second wakes', () => {
 		const { ports, wakes } = waking()
 		const turning: Turning = { spots: [{ row: 1, column: 1, style: '' }], typing: NO_TYPING }
 
-		await run_board_spin.spin_to_second(turning, ports)
+		await run_board_frame_fixture.spin_to_second(turning, ports)
 
 		expect(wakes.length).toBeGreaterThan(1)
 		expect(wakes.map(([due_ms, woke_ms]) => woke_ms - due_ms)).toStrictEqual(
@@ -105,7 +106,7 @@ describe('run_board_timing.timed wakes', () => {
 
 		expect(board.time_wake).toBeUndefined()
 		await expect(
-			run_board_spin.spin_to_second({ spots: [], typing: NO_TYPING }, board),
+			run_board_frame_fixture.spin_to_second({ spots: [], typing: NO_TYPING }, board),
 		).resolves.toBeUndefined()
 	})
 })

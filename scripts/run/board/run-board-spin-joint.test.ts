@@ -1,58 +1,61 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_drop_screen } from './run-board-drop-screen'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
+import { run_board_frame_loop } from './run-board-frame-loop'
 import { run_board_rain_drop } from './run-board-rain-drop'
-import { run_board_reveal_rain_fixture } from './run-board-reveal-rain-fixture'
 import { run_board_screen } from './run-board-screen'
-import { run_board_spin } from './run-board-spin'
 import { run_board_type_rows } from './run-board-type-rows'
 
 // joshuafolkken/kit#8796: the frame drawn on the second and the rain the spin draws back over it go
 // out in one synchronized write, so no terminal shows the frame without its rain; the turns after the
-// spin's first wait are written as before.
+// spin's first wait show what the split writes did. joshuafolkken/kit#8826: the frame is the base layer
+// the spin's first frame draws, so the two are one frame's write.
 
-const { spin_to_second } = run_board_spin
+const { settled, spin_to_second, terminal_of } = run_board_frame_fixture
 const { NO_TYPING } = run_board_type_rows
 const { drop_bytes } = run_board_rain_drop
-const { screens } = run_board_reveal_rain_fixture
 const START = Date.parse('2026-10-08T09:00:00.000Z')
 const SYNC_ON = '\u{1B}[?2026h'
 const SYNC_OFF = '\u{1B}[?2026l'
-const ERASE_BELOW = '\u{1B}[J'
 const SIZE = { rows: 24, columns: 40 }
 const LINES = Array.from({ length: SIZE.rows }, () => 'x'.repeat(SIZE.columns))
 const SCREEN = run_board_drop_screen.screen_of({ lines: LINES, spots: [] }, NO_TYPING, SIZE)
 const FRAME = run_board_screen.screen_of('live').frame(LINES.join('\n'))
 
-// Every write the terminal is given over the frame's second: the frame, then the spin until the next
-// second, through a joint held on the frame where `is_held` says so, as the live board's is.
-async function second_of(is_held: boolean): Promise<Array<string>> {
-	const written: Array<string> = []
+interface Written {
+	at_ms: number
+	raw: string
+}
+
+// Every write the terminal is given over the frame's second: the frame set as the base over the last
+// second's screen, then the spin until the next second.
+async function second_of(): Promise<Array<Written>> {
+	const written: Array<Written> = []
 	const clock = { now_ms: START }
-	const joint = run_board_screen.joint_of((bytes) => {
-		written.push(bytes)
-	})
-	const terminal = {
+	const ports = {
 		now: () => clock.now_ms,
-		write: joint.write,
+		write: (raw: string) => {
+			written.push({ at_ms: clock.now_ms, raw })
+		},
 		sleep: async (ms: number) => {
 			clock.now_ms += ms
 		},
+		size: () => SIZE,
 	}
-	const ports = run_board_screen.jointed(terminal, joint)
+	const screen = settled('', SIZE)
 
-	if (is_held) joint.hold()
-	ports.write(FRAME)
-	await spin_to_second(
-		{ spots: [], typing: NO_TYPING, drop: SCREEN },
-		{ ...ports, write_drawn: ports.write },
-	)
+	run_board_frame_loop.set_base(screen, FRAME)
+	await spin_to_second({ spots: [], typing: NO_TYPING, drop: SCREEN }, ports, screen)
 
 	return written
 }
 
-// The split writes the held one joins: all but the turns written after the first wait.
-function opening_of(split: ReadonlyArray<string>, held: ReadonlyArray<string>): Array<string> {
-	return split.slice(0, split.length - held.length + 1)
+// The screen the split writes left at `at_ms`: the frame, then the drop's change at each step up to it.
+function split_at(steps: ReadonlyArray<number>, at_ms: number): ReturnType<typeof terminal_of> {
+	const upto = steps.filter((step_ms) => step_ms <= at_ms)
+	const dropped = upto.map((step_ms, index) => drop_bytes(SCREEN, step_ms, upto[index - 1]))
+
+	return terminal_of([FRAME, ...dropped], SIZE)
 }
 
 beforeEach(() => {
@@ -65,29 +68,27 @@ afterEach(() => {
 
 describe('run_board_spin — the frame and its rain in one write (joshuafolkken/kit#8796)', () => {
 	it('ac-44d74ade writes the cleared frame and the rain drawn back in one block, none ending between', async () => {
-		const [joined = ''] = await second_of(true)
-		const rain = drop_bytes(SCREEN, START, undefined)
+		const [first] = await second_of()
+		const joined = first?.raw ?? ''
 
-		expect(rain).not.toBe('')
+		expect(drop_bytes(SCREEN, START, undefined)).not.toBe('')
+		expect(first?.at_ms).toBe(START)
 		expect([joined.startsWith(SYNC_ON), joined.endsWith(SYNC_OFF)]).toStrictEqual([true, true])
 		expect(joined.split(SYNC_OFF)).toHaveLength(2)
-		expect(joined.indexOf(ERASE_BELOW)).toBeLessThan(joined.indexOf(rain))
 	})
 
 	it('ac-d0223835 leaves the terminal with the same cells as the split writes did', async () => {
-		const held = await second_of(true)
-		const split = await second_of(false)
-		const [joined = ''] = held
+		const [first] = await second_of()
 
-		expect(opening_of(split, held).length).toBeGreaterThan(1)
-		expect(screens([joined]).at(-1)).toStrictEqual(screens(opening_of(split, held)).at(-1))
+		expect(terminal_of([first?.raw ?? ''], SIZE)).toStrictEqual(split_at([START], START))
 	})
 
-	it('ac-fd08ac21 writes every turn after the first wait as it did unjoined', async () => {
-		const held = await second_of(true)
-		const split = await second_of(false)
+	it('ac-fd08ac21 shows every turn after the first wait as it did unjoined', async () => {
+		const written = await second_of()
+		const steps = written.map(({ at_ms }) => at_ms)
+		const shown = written.map((_, index) => terminal_of(written.slice(0, index + 1), SIZE))
 
-		expect(held.length).toBeGreaterThan(1)
-		expect(held.slice(1)).toStrictEqual(split.slice(opening_of(split, held).length))
+		expect(written.length).toBeGreaterThan(1)
+		expect(shown).toStrictEqual(steps.map((at_ms) => split_at(steps, at_ms)))
 	})
 })

@@ -2,9 +2,9 @@ import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_codes, type RuleCell } from './run-board-codes'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import type { Lamp } from './run-board-lamp-spots'
 import { run_board_lamps } from './run-board-lamps'
-import { run_board_spin } from './run-board-spin'
 import type { Theme } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 import type { Typing } from './run-board-type-rows'
@@ -234,9 +234,13 @@ async function timed_turns(
 		sleep: async (ms: number) => {
 			now_ms += ms
 		},
+		// joshuafolkken/kit#8826: a frame that changes no cell writes nothing, so each wake is kept too.
+		time_wake: (_due_ms: number, woke_ms: number) => {
+			writes.set(woke_ms, writes.get(woke_ms) ?? '')
+		},
 	}
 
-	await run_board_spin.spin_to_second({ spots: [], typing, lamps, rules: CELLS }, ports)
+	await run_board_frame_fixture.spin_to_second({ spots: [], typing, lamps, rules: CELLS }, ports)
 
 	return writes
 }
@@ -264,7 +268,9 @@ describe('run_board_spin.spin_to_second — the rules', () => {
 		const last = Math.max(...CELLS.map((cell) => back_step(cell))) + 1
 		const steps = Array.from({ length: last }, (_, index) => START + (index + 1) * CODE_MS)
 
-		expect(steps.filter((at_ms) => !writes.has(at_ms))).toStrictEqual([])
+		const woke = new Set(writes.keys())
+
+		expect(steps.filter((at_ms) => !woke.has(at_ms))).toStrictEqual([])
 	})
 })
 

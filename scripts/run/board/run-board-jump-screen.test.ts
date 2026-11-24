@@ -5,7 +5,7 @@ import { run_board_jump_paint } from './run-board-jump-paint'
 import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
 
 const { ARRIVE_THAW_TICKS, ARRIVE_TICKS, TICK_MS, WASH_TICKS, THAW_TICKS } = run_board_jump
-const { FRAME_MS, arrive_beats, is_lit, jump_bytes } = run_board_jump_screen
+const { FRAME_MS, arrive_beats, is_lit, wash_at } = run_board_jump_screen
 // Taken before any spy, so a spy can call the real one.
 const { arrive_cells } = run_board_jump_paint
 
@@ -85,65 +85,58 @@ function whole(drawn: string, tick: number): string {
 	return first
 }
 
-describe('run_board_jump_screen.jump_bytes', () => {
-	it('writes nothing with no jump', () => {
-		expect(jump_bytes(undefined, WASH_MS, undefined)).toBe('')
+describe('run_board_jump_screen.wash_at', () => {
+	it('paints nothing with no jump', () => {
+		expect(wash_at(undefined, WASH_MS).size).toBe(0)
 	})
 
-	it('writes nothing again within the frame it last wrote', () => {
+	it('paints the same cells through a frame', () => {
 		const draw = draw_of(['AB', 'CD'])
 
-		expect(jump_bytes(draw, WASH_MS + HALF_FRAME - 1, WASH_MS)).toBe('')
+		expect(wash_at(draw, WASH_MS + HALF_FRAME - 1)).toStrictEqual(wash_at(draw, WASH_MS))
 	})
 
-	it('paints every cell the wash changes, at its place', () => {
-		const written = jump_bytes(draw_of(['AB', 'CD']), WASH_MS, undefined)
+	it('paints every cell the wash changes, at its place, with no cursor', () => {
+		const wash = wash_at(draw_of(['AB', 'CD']), WASH_MS)
 
-		expect(written).toContain(`${ESC}[1;1H`)
-		expect(written).toContain(`${ESC}[2;2H`)
-		expect(written).toContain('D')
+		expect([...wash.keys()]).toStrictEqual(['1;1', '1;2', '2;1', '2;2'])
+		expect(wash.get('2;2')?.text).toBe('D')
+		expect([...wash.values()].map(({ style }) => style).join('')).not.toMatch(PLACE)
 	})
 
-	it('puts each painted cell back as the theme drew it once the jump is over', () => {
-		const written = jump_bytes(draw_of(['AB']), OVER_MS, WASH_MS)
-
-		expect(written).toContain(`${ESC}[1;1H${ESC}[0m${STYLE}A${ESC}[0m`)
-		expect(written).toContain(`${ESC}[1;2H${ESC}[0m${STYLE}B${ESC}[0m`)
-	})
-
-	it('writes nothing once the jump is over and already put back', () => {
-		expect(jump_bytes(draw_of(['AB']), OVER_MS + FRAME_MS, OVER_MS)).toBe('')
+	it('paints nothing once the jump is over', () => {
+		expect(wash_at(draw_of(['AB']), OVER_MS).size).toBe(0)
 	})
 })
 
-describe('run_board_jump_screen.jump_bytes around the other painters', () => {
+describe('run_board_jump_screen.wash_at around the other painters', () => {
 	it("leaves the cells the area's painter draws to it", () => {
 		const draw = { ...draw_of(['ABC', 'DEF', 'GHI']), owned: new Set(['3;3']) }
-		const written = jump_bytes(draw, WASH_MS, undefined)
+		const wash = wash_at(draw, WASH_MS)
 
-		expect(written).toContain(`${ESC}[1;1H`)
-		expect(written).not.toContain(`${ESC}[3;3H`)
-		expect(written).toContain(`${ESC}[3;1H`)
+		expect(wash.has('1;1')).toBe(true)
+		expect(wash.has('3;3')).toBe(false)
+		expect(wash.has('3;1')).toBe(true)
 	})
 
 	// joshuafolkken/kit#8739: the column left of the painter's cells, left to neither painter, kept the
 	// wash as a line once the jump was over.
-	it('ac-f0dce629 washes and puts back the column left of the area as its neighbors', () => {
+	it('ac-f0dce629 washes the column left of the area as its neighbors and lets it go after', () => {
 		const draw = { ...draw_of(['ABC', 'DEF', 'GHI']), owned: new Set(['3;3']) }
 
-		expect(jump_bytes(draw, WASH_MS, undefined)).toContain(`${ESC}[3;2H`)
-		expect(jump_bytes(draw, OVER_MS, WASH_MS)).toContain(`${ESC}[3;2H${ESC}[0m${STYLE}H`)
+		expect(wash_at(draw, WASH_MS).has('3;2')).toBe(true)
+		expect(wash_at(draw, OVER_MS).has('3;2')).toBe(false)
 	})
 
 	// joshuafolkken/kit#8782: the area's lamp rows and the gauge's right, which its painter does not
 	// draw, stayed black through the flash.
 	it('ac-712f67d1 washes the cells of the area its painter does not draw', () => {
 		const draw = { ...draw_of(['AB C', 'DE F']), owned: new Set(['2;2', '2;3']) }
-		const written = jump_bytes(draw, WASH_MS, undefined)
+		const wash = wash_at(draw, WASH_MS)
 
-		expect(written).toContain(`${ESC}[2;4H`)
-		expect(written).toContain(`${ESC}[2;1H`)
-		expect(written).not.toContain(`${ESC}[2;2H`)
+		expect(wash.has('2;4')).toBe(true)
+		expect(wash.has('2;1')).toBe(true)
+		expect(wash.has('2;2')).toBe(false)
 	})
 
 	// joshuafolkken/kit#8782: the lanes' spinners, kept out of the light, drew a black line down their
@@ -151,17 +144,17 @@ describe('run_board_jump_screen.jump_bytes around the other painters', () => {
 	it('ac-9a24befb washes the spinners as their neighbors', () => {
 		const base = draw_of(['ABC', 'DEF'])
 		const draw = { ...base, screen: { ...base.screen, skips: new Set(['1;1', '2;1']) } }
-		const written = jump_bytes(draw, WASH_MS, undefined)
+		const wash = wash_at(draw, WASH_MS)
 
-		expect(written).toContain(`${ESC}[1;1H`)
-		expect(written).toContain(`${ESC}[2;1H`)
+		expect(wash.has('1;1')).toBe(true)
+		expect(wash.has('2;1')).toBe(true)
 	})
 
 	it('still leaves the rows typing alone', () => {
 		const base = draw_of(['ABC', 'DEF'])
 		const draw = { ...base, screen: { ...base.screen, typing_rows: new Set([2]) } }
 
-		expect(jump_bytes(draw, WASH_MS, undefined)).not.toContain(`${ESC}[2;1H`)
+		expect(wash_at(draw, WASH_MS).has('2;1')).toBe(false)
 	})
 })
 
@@ -173,7 +166,7 @@ describe('run_board_jump_screen.is_lit', () => {
 	})
 })
 
-describe('run_board_jump_screen.jump_bytes — the frame rate', () => {
+describe('run_board_jump_screen.wash_at — the frame rate', () => {
 	it('ac-ac82abe9 draws a frame every 50 ms, a tick each', () => {
 		const draw = draw_of(['AB', 'CD'])
 
@@ -182,7 +175,7 @@ describe('run_board_jump_screen.jump_bytes — the frame rate', () => {
 		// The wash turns to its second tint two ticks in, a frame after the one before.
 		const second_ms = WASH_MS + 2 * FRAME_MS
 
-		expect(jump_bytes(draw, second_ms, second_ms - FRAME_MS)).not.toBe('')
+		expect(wash_at(draw, second_ms)).not.toStrictEqual(wash_at(draw, second_ms - FRAME_MS))
 	})
 })
 

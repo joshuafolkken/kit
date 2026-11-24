@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { KeyInput } from './run-board-keys'
 import { run_board_labels, type Paint } from './run-board-labels'
@@ -25,12 +26,9 @@ const NO_LIVE = {
 	drop: false,
 }
 const ESCAPE = '\u{1B}'
-const DIM_RULE = new RegExp(`${ESCAPE}\\[2m─+${ESCAPE}\\[22m`, 'u')
-const REFRESH_START = `${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`
-const DIM_HEADING_START = `\n${ESCAPE}[K${ESCAPE}[2m──${ESCAPE}[22m `
 const { WORDS } = run_board_labels
-// The keeps-running line and the line after it or before it (the keys, or the blank) end every frame.
-const FOOTER_LINES = 2
+const { attributes_of, cell_at, is_synced_once, lines_of, rule_cells, terminal_of } =
+	run_board_frame_fixture
 const LEFT_MS = 300
 
 // joshuafolkken/kit#8745: the notice blinks three times and holds lit in the theme's look.
@@ -103,21 +101,21 @@ describe('run_board_live.live_of bttf', () => {
 })
 
 describe('run_board_live.watch', () => {
-	it('dims default rules once before the screen control bytes on every redraw', async () => {
+	// joshuafolkken/kit#8826: a redraw is the base the frame loop paints, so the rules are read off the
+	// screen its writes leave.
+	it('dims default rules once, in a synchronized write, on the screen a redraw draws', async () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
 
 		await expect(run_board_live.watch(ports, undefined)).rejects.toBe(STOPPED)
-		const drawn = frames.filter((frame) => frame.startsWith(REFRESH_START))
+		const drawn = frames.slice(1, -1)
+		const rules = rule_cells(terminal_of(frames))
 
 		expect(drawn.length).toBeGreaterThan(0)
-
-		for (const frame of drawn) {
-			expect(frame.endsWith(`${ESCAPE}[?2026l`)).toBe(true)
-			expect(frame).toContain(DIM_HEADING_START)
-			expect(frame).toMatch(DIM_RULE)
-			expect(frame).not.toContain(`${ESCAPE}[2m${ESCAPE}[2m`)
-		}
+		expect(drawn.every((frame) => is_synced_once(frame))).toBe(true)
+		expect(rules.length).toBeGreaterThan(0)
+		expect(rules.every(({ sgr }) => attributes_of(sgr).is_dim)).toBe(true)
+		expect(rules.filter(({ sgr }) => sgr.includes(`${ESCAPE}[2m${ESCAPE}[2m`))).toStrictEqual([])
 	})
 
 	it('enters the alternate screen first and leaves it last when the redraw stops', async () => {
@@ -140,51 +138,54 @@ describe('run_board_live.watch', () => {
 
 // joshuafolkken/kit#8510: the footer under the legend is drawn at full brightness.
 describe('run_board_live.watch footer', () => {
-	it('draws the footer lines with no dim escape on every redraw', async () => {
+	it('draws the footer lines with no dim on the screen a redraw draws', async () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
 
 		await expect(run_board_live.watch(ports, undefined)).rejects.toBe(STOPPED)
-		const drawn = frames.filter((frame) => frame.startsWith(REFRESH_START))
-		const footers = drawn.flatMap((frame) => frame.split('\n').slice(-FOOTER_LINES))
+		const screen = terminal_of(frames)
+		const lines = lines_of(screen)
+		const footer_row = lines.findIndex((line) => line.includes(WORDS.keeps_running)) + 1
+		const footer = Array.from({ length: screen.columns }, (_, index) =>
+			cell_at(screen, footer_row, index + 1),
+		)
 
-		expect(drawn.length).toBeGreaterThan(0)
-		expect(footers.some((line) => line.includes(WORDS.keeps_running))).toBe(true)
-		expect(footers.join('\n')).not.toContain(`${ESCAPE}[2m`)
+		expect(footer_row).toBe(lines.length)
+		expect(footer.some(({ sgr }) => attributes_of(sgr).is_dim)).toBe(false)
 	})
 })
 
 // joshuafolkken/kit#8381: a tick that throws never ends the board; the failure is told and drawn.
 const REASON = 'snapshot half written'
 
-function drawn_of(frames: ReadonlyArray<string>): Array<string> {
-	return frames.filter((frame) => frame.startsWith(REFRESH_START))
-}
+// The redraws a test waits for: the first, the failing one whose warning is drawn, and the one after it.
+const REDRAWS_THROUGH = 3
 
-// The frames drawn that a test waits for: the first, the failure's warning and the one after it.
-const DRAWN_THROUGH = 3
-
-// The harness's ports with the tick after the first drawn frame throwing once, as it lays the frame
-// out, and every wait let through with the clock moved until a third frame is drawn
-// (joshuafolkken/kit#8796: a frame's write reaches the terminal only at the wait after it, joined with
-// what the spin draws back over it).
-function failing_second(): ReturnType<typeof harness> {
+// The harness's ports with the second redraw's tick throwing once, as it lays the frame out, and every
+// wait let through with the clock moved until the third redraw is drawn; the screen as each redraw
+// began, read off the writes made before it.
+function failing_second(): ReturnType<typeof harness> & { begun: Array<Array<string>> } {
 	const board = harness(LOCAL, [plan_titled('a')])
 	const { link, sleep } = board.ports
 	const failing = { has_failed: false }
+	const begun: Array<Array<string>> = []
 
 	return {
 		...board,
+		begun,
 		ports: {
 			...board.ports,
+			enter_stage: (stage) => {
+				if (stage === 'redraw') begun.push(lines_of(terminal_of(board.frames)))
+			},
 			link: (text, url) => {
-				if (failing.has_failed || drawn_of(board.frames).length !== 1) return link(text, url)
+				if (failing.has_failed || begun.length !== 2) return link(text, url)
 				failing.has_failed = true
 				throw new Error(`${REASON}\nat somewhere`)
 			},
 			sleep: async (ms) => {
 				board.clock.now_ms += ms
-				if (drawn_of(board.frames).length >= DRAWN_THROUGH) await sleep(ms)
+				if (begun.length >= REDRAWS_THROUGH) await sleep(ms)
 			},
 		},
 	}
@@ -192,11 +193,11 @@ function failing_second(): ReturnType<typeof harness> {
 
 describe('run_board_live.watch failed tick', () => {
 	it('tells the failure and draws the last frame again with it said, its first line only', async () => {
-		const { ports, frames } = failing_second()
+		const { ports, begun } = failing_second()
 		const failed = vi.fn<(cause: unknown) => void>()
 
 		await expect(run_board_live.watch(ports, undefined, failed)).rejects.toBe(STOPPED)
-		const [, warning] = drawn_of(frames)
+		const warning = (begun[REDRAWS_THROUGH - 1] ?? []).join('\n')
 
 		expect(failed).toHaveBeenCalledExactlyOnceWith(
 			expect.objectContaining({ message: expect.stringContaining(REASON) }),
@@ -207,14 +208,15 @@ describe('run_board_live.watch failed tick', () => {
 	})
 
 	it('goes on to the next tick, which draws without the failure', async () => {
-		const { ports, frames } = failing_second()
+		const { ports, frames, begun } = failing_second()
 
 		await expect(run_board_live.watch(ports, undefined, vi.fn())).rejects.toBe(STOPPED)
-		const drawn = drawn_of(frames)
+		const [, first] = begun
+		const last = lines_of(terminal_of(frames))
 
-		expect(drawn.length).toBeGreaterThan(2)
-		expect(drawn.at(-1)).not.toContain(REASON)
-		expect(drawn.at(-1)?.split('\n')).toHaveLength(drawn[0]?.split('\n').length ?? 0)
+		expect(begun).toHaveLength(REDRAWS_THROUGH)
+		expect(last.join('\n')).not.toContain(REASON)
+		expect(last).toHaveLength(first?.length ?? 0)
 	})
 })
 

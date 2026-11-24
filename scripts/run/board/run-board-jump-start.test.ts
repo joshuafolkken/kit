@@ -58,7 +58,7 @@ describe('run_board_jump_start.jump_state — the typing cue', () => {
 		const jump = must(jump_state({}, frame_of()).jump)
 		const jumped_ms = NOW + jump.run.letters * TICK_MS
 
-		expect(run_board_jump_screen.jump_bytes(jump, jumped_ms, undefined)).not.toBe('')
+		expect(run_board_jump_screen.wash_at(jump, jumped_ms).size).toBeGreaterThan(0)
 	})
 
 	it('ac-075efb73 starts the same jump whatever row types, a notice row or a body row', () => {
@@ -130,10 +130,10 @@ describe('run_board_jump_start.jump_of — the fire trails', () => {
 	it('fills the blank trail rows out with cells, so the head burns on a real board', () => {
 		const draw = trail_draw(['header', '', THROUGHPUT_RULE, ROW_TEXT])
 		const jumped_ms = NOW + draw.run.letters * TICK_MS
-		const written = run_board_jump_screen.jump_bytes(draw, jumped_ms, undefined)
+		const wash = run_board_jump_screen.wash_at(draw, jumped_ms)
 
 		expect(draw.screen.rows[1]).toHaveLength(draw.screen.columns)
-		expect(written).toMatch(/\[2;1H.*█/u)
+		expect(wash.get('2;1')?.text).toBe('█')
 	})
 })
 
@@ -192,11 +192,11 @@ describe('run_board_jump_start.jump_of — the whole terminal', () => {
 		const size = { columns: 40, rows: 9 }
 		const draw = started(frame_of({ drawn: { lines: LINES, spots: [], size } }))
 		const jumped_ms = NOW + draw.run.letters * TICK_MS
-		const written = run_board_jump_screen.jump_bytes(draw, jumped_ms, undefined)
+		const wash = run_board_jump_screen.wash_at(draw, jumped_ms)
 
 		// The header's line end, and the last cell of the terminal's last row, past the board.
-		expect(written).toContain('\u{1B}[1;40H')
-		expect(written).toContain('\u{1B}[9;40H')
+		expect(wash.has('1;40')).toBe(true)
+		expect(wash.has('9;40')).toBe(true)
 	})
 })
 

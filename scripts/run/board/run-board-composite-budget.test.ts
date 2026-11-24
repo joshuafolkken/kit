@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import type { BoardLayout } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import { run_board_render_stress_fixture as stress } from './run-board-render-stress-fixture'
-import { run_board_spin } from './run-board-spin'
 import type { BoardPorts, BoardState, DrawKind } from './run-board-state'
 import { run_board_strip } from './run-board-strip'
 import type { Theme } from './run-board-theme'
@@ -52,8 +52,9 @@ const EFFECTS = {
 // matrix and bttf are held to the second they draw in; wargames, several times lighter, to a fifth of
 // it — the measured seconds are recorded on joshuafolkken/kit#8825.
 const BUDGET_MS: Record<string, number> = { wargames: 200, matrix: SECOND_MS, bttf: SECOND_MS }
-// The writes the second makes today; a frame loop that writes once a frame lowers these.
-const WRITES: Record<string, number> = { wargames: 76, matrix: 140, bttf: 75 }
+// The writes the second makes: one a frame that changed a cell (joshuafolkken/kit#8826), down from 76,
+// 140 and 75 when every effect wrote on its own.
+const WRITES: Record<string, number> = { wargames: 31, matrix: 33, bttf: 21 }
 
 interface Recorder {
 	draws: Record<DrawKind, number>
@@ -132,7 +133,7 @@ async function second_of(theme: Theme): Promise<{ state: BoardState; recorder: R
 	Object.assign(recorder, { draws: no_draws(), writes: 0, clock: START + SECOND_MS })
 	const state = striped(ports.time_draw('tick', () => redraw_at(lanes, ports, stress.layout(true))))
 
-	await run_board_spin.spin_to_second(state, ports)
+	await run_board_frame_fixture.spin_to_second(state, ports)
 
 	return { state, recorder }
 }

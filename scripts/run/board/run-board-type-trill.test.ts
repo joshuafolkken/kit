@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import type { BoardRow } from './run-board-layout'
 import type { CueName } from './run-board-sound-cues'
 import { run_board_sound_typing, type TypingSound } from './run-board-sound-typing'
-import { run_board_spin } from './run-board-spin'
 import type { BoardState } from './run-board-state'
 import type { Theme } from './run-board-theme'
 import { run_board_tick } from './run-board-tick'
@@ -15,7 +15,7 @@ import { run_board_type_rows } from './run-board-type-rows'
 
 const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
-const { spin_to_second } = run_board_spin
+const { spin_to_second } = run_board_frame_fixture
 const SECOND = 1000
 // Past the time the header's now line takes to type through.
 const TYPED_MS = 10 * SECOND

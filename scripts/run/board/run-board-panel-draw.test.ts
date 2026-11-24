@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import { run_board_lamp_spots } from './run-board-lamp-spots'
 import { run_board_panel_draw, type PanelDraw, type PanelPainter } from './run-board-panel-draw'
 import { run_board_spin, type Turning } from './run-board-spin'
@@ -205,11 +206,13 @@ describe('run_board_spin.spin_to_second with a ticking painter', () => {
 			panel: draw_of(stepping(true)),
 		}
 
-		await run_board_spin.spin_to_second(turning, ports)
+		await run_board_frame_fixture.spin_to_second(turning, ports)
 
-		expect(steps).toStrictEqual(
-			Array.from({ length: 1000 / PANEL_TICK_MS }, (_, index) => index * PANEL_TICK_MS),
-		)
+		const due = Array.from({ length: 1000 / PANEL_TICK_MS }, (_, index) => index * PANEL_TICK_MS)
+
+		// A step the lamps' tick lands within one refresh before is drawn up to MIN_FRAME_MS late.
+		expect(steps).toHaveLength(due.length)
+		expect(due.every((due_ms) => run_board_frame_fixture.is_near(steps, due_ms))).toBe(true)
 	})
 })
 

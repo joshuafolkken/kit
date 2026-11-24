@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Cells } from './run-board-cells'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_panel_draw, type PanelPainter } from './run-board-panel-draw'
@@ -10,7 +12,8 @@ import { run_board_type_rows } from './run-board-type-rows'
 
 const { lamps_in } = run_board_lamp_spots
 const { LAMP_TICK_MS, is_lit } = run_board_lamps
-const { REDRAW_MS, spin_to_second, spun } = run_board_spin
+const { REDRAW_MS, spun } = run_board_spin
+const { cell_at, is_near, screens_of, spin_to_second, terminal_of } = run_board_frame_fixture
 const { is_typing } = run_board_type_rows
 const { LAMP, LAMP_MARK } = run_board_spot
 const { LAMP_PAINTER, RAIN_PAINTER } = run_board_panel_painters
@@ -138,14 +141,14 @@ describe('run_board_spin.spin_to_second with the idle rain', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const { ports, drawn } = lamp_ports(START)
 		const unseen = { seen: undefined, lines: [] }
-		const raining = turning_of(spun(LINES, '⠋', { size: WIDE }).lamps, {
-			typing: unseen,
-			painter: RAIN_PAINTER,
-		})
+		const { lamps } = spun(LINES, '⠋', { size: WIDE })
 
-		await spin_to_second(raining, ports)
+		await spin_to_second(turning_of(lamps, { typing: unseen, painter: RAIN_PAINTER }), ports)
+		const first = terminal_of(drawn.slice(0, 1))
 
-		expect(drawn[0]?.match(CELL)?.length).toBe(16)
+		// joshuafolkken/kit#8826: a rain cell left blank is not written over the blank screen.
+		expect(lamps).toHaveLength(16)
+		expect(lamps.some(({ row, column }) => cell_at(first, row, column).char !== ' ')).toBe(true)
 		expect(drawn.join('')).not.toContain(LAMP_MARK)
 	})
 })
@@ -160,22 +163,39 @@ function typing_of(text: string): Turning['typing'] {
 	}
 }
 
-// The lamp cells written at each moment of the second after the first write, by the moment.
+// The lamp cells a screen shows, each as its character and style.
+function lamp_cells(screen: Cells): Array<string> {
+	return TYPED_LAMPS.map((lamp) => JSON.stringify(cell_at(screen, lamp.row, lamp.column)))
+}
+
+// The lamp cells each frame after the first changed on screen, by the frame's moment; a frame that
+// changed none is left out.
 async function cells_by_moment(typing: Turning['typing']): Promise<Map<number, number>> {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { ports } = lamp_ports(START)
-	const cells = new Map<number, number>()
+	const writes: Array<{ at_ms: number; raw: string }> = []
 	const timed = {
 		...ports,
-		write_drawn: (text: string): void => {
-			cells.set(ports.now(), text.match(CELL)?.length ?? 0)
+		write_drawn: (raw: string): void => {
+			writes.push({ at_ms: ports.now(), raw })
 		},
 	}
 
 	await spin_to_second(turning_of(TYPED_LAMPS, { typing }), timed)
-	cells.delete(START)
+	const shown = screens_of(writes).map((screen) => lamp_cells(screen))
+	const counts = writes.map(({ at_ms }, index): [number, number] => [
+		at_ms,
+		shown[index]?.filter((cell, lamp) => cell !== shown[index - 1]?.[lamp]).length ?? 0,
+	])
 
-	return cells
+	return new Map(counts.filter(([at_ms, count]) => at_ms !== START && count > 0))
+}
+
+// The count a frame at `at_ms`, or held back by at most one refresh after it, changed.
+function count_near(cells: ReadonlyMap<number, number>, at_ms: number): number | undefined {
+	for (const [moment, count] of cells) if (is_near([moment], at_ms)) return count
+
+	return undefined
 }
 
 // The step boundaries after `from_ms` and before the next second.
@@ -204,8 +224,8 @@ describe('run_board_spin.spin_to_second with lamps while a row types', () => {
 		const cells = await cells_by_moment(typing_of('x'.repeat(100)))
 		const steps = steps_after(START)
 
-		expect([...cells.keys()]).toStrictEqual(steps)
-		expect(steps.map((at_ms) => cells.get(at_ms))).toStrictEqual(
+		expect(cells.size).toBe(steps.length)
+		expect(steps.map((at_ms) => count_near(cells, at_ms))).toStrictEqual(
 			steps.map((at_ms) => changed(at_ms, true, true)),
 		)
 	})
@@ -216,8 +236,8 @@ describe('run_board_spin.spin_to_second with lamps while a row types', () => {
 		const [calm_ms = 0, ...after] = steps_after(START).filter((at_ms) => !is_typing(typing, at_ms))
 
 		expect(after.length).toBeGreaterThan(0)
-		expect(cells.get(calm_ms) ?? 0).toBe(changed(calm_ms, false, true))
-		expect(after.map((at_ms) => cells.get(at_ms) ?? 0)).toStrictEqual(
+		expect(count_near(cells, calm_ms) ?? 0).toBe(changed(calm_ms, false, true))
+		expect(after.map((at_ms) => count_near(cells, at_ms) ?? 0)).toStrictEqual(
 			after.map((at_ms) => changed(at_ms, false, false)),
 		)
 	})
