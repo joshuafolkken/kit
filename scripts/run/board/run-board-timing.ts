@@ -150,15 +150,25 @@ function watch(ports: BoardPorts, probes: TimingProbes): Watching {
 	return { stalls: run_board_stall.watch(probes), heap }
 }
 
-// Times each draw into `draws`, by its kind.
+// Times each draw into `draws`, by its kind — its own time, less the sections timed inside it (a cue
+// sounded within the tick draw counts as `sound`, never in the tick too; joshuafolkken/kit#8825).
 function draw_timer(draws: Draws, now: () => number): DrawTimer {
+	const nested = { ms: 0 }
+
 	return function time<T>(kind: DrawKind, draw: () => T): T {
 		const start = now()
-		const result = draw()
+		const outer = nested.ms
 
-		draws[kind].push(now() - start)
+		nested.ms = 0
 
-		return result
+		try {
+			return draw()
+		} finally {
+			const elapsed = now() - start
+
+			draws[kind].push(elapsed - nested.ms)
+			nested.ms = outer + elapsed
+		}
 	}
 }
 
