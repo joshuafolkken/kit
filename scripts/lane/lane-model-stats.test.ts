@@ -60,6 +60,18 @@ describe('lane_model_stats.table', () => {
 			'| opus | environment | 1 | 0 |',
 		])
 	})
+})
+
+describe('lane_model_stats.table — repeated dispatches and the period', () => {
+	it('counts a routed lane re-dispatched on its stored label once, under route', () => {
+		const entries = [
+			dispatch({ issue: 1, model: 'sonnet', reason: 'route' }, 20),
+			dispatch({ issue: 1, model: 'sonnet', reason: 'label' }),
+			merge(1),
+		]
+
+		expect(rows_of(entries)).toStrictEqual(['| sonnet | route | 1 | 1 |'])
+	})
 
 	it('leaves out a dispatch from before the period but counts a merge from any time', () => {
 		const entries = [

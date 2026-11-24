@@ -5,8 +5,10 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 
 // Which model the period's lanes ran on and why (joshuafolkken/kit#8815): one row per implement model
 // and the reason the dispatch recorded for it, with the lanes dispatched on it and how many of them
-// merged, printed by `josh lane:stats`. A dispatch row written before the model was recorded counts
-// under `unrecorded`. A lane dispatched twice on the same model and reason counts once.
+// merged, printed by `josh lane:stats`. A dispatch row without a model (written before it was recorded,
+// or by a foreground `josh run` entry) counts under `unrecorded`. A lane dispatched again on the same
+// model counts once, under its first dispatch's reason: a routed lane's resume reads back the worker
+// label the route stored (joshuafolkken/kit#8760) and would otherwise count again under `label`.
 
 const COLUMNS = ['model', 'reason', 'dispatched lanes', 'merged'] as const
 const UNRECORDED = 'unrecorded'
@@ -14,6 +16,18 @@ const KEY_SEPARATOR = '\0'
 
 function key_of(entry: DispatchEntry): string {
 	return [entry.model ?? UNRECORDED, entry.reason ?? UNRECORDED].join(KEY_SEPARATOR)
+}
+
+function first_per_lane(dispatches: ReadonlyArray<DispatchEntry>): Array<DispatchEntry> {
+	const firsts = new Map<string, DispatchEntry>()
+
+	for (const entry of dispatches) {
+		const lane = [entry.issue, entry.model ?? UNRECORDED].join(KEY_SEPARATOR)
+
+		if (!firsts.has(lane)) firsts.set(lane, entry)
+	}
+
+	return [...firsts.values()]
 }
 
 function group(dispatches: ReadonlyArray<DispatchEntry>): Map<string, Set<number>> {
@@ -42,7 +56,9 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 		.filter((entry) => lane_stage_stats.is_dispatch(entry))
 	const merges = entries.filter((entry) => lane_stage_stats.is_merge(entry))
 	const merged = new Set(merges.map(({ issue }) => issue))
-	const groups = [...group(dispatches)].toSorted(([left], [right]) => left.localeCompare(right))
+	const groups = [...group(first_per_lane(dispatches))].toSorted(([left], [right]) =>
+		left.localeCompare(right),
+	)
 	const rows = groups.map(([key, issues]) => row_of(key, issues, merged))
 
 	return [lane_stats.to_row(COLUMNS), lane_stats.to_row(COLUMNS.map(() => '---')), ...rows].join(

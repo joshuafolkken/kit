@@ -2,6 +2,6 @@
 	"reason": "#8815 records the routed implement model and its reason on the lane ledger dispatch row and adds the lane:stats model table",
 	"date": "2026-11-24",
 	"growth": {
-		"scripts.code_lines": 61
+		"scripts.code_lines": 71
 	}
 }
