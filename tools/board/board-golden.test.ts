@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { run_board_fixture } from '#scripts/run/board/run-board-fixture'
 import { run_board_replay } from '#scripts/run/board/run-board-replay'
 import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
@@ -87,6 +90,21 @@ describe('board_golden.verdict', () => {
 		const text = await verdict(expected, expected.slice(0, 1))
 
 		expect(text).toContain('the golden has 2 beats, the replay 1')
+	})
+})
+
+describe('board_golden.write_golden', () => {
+	it('records beats that read_golden reads back', async () => {
+		const directory = `${await mkdtemp(path.join(tmpdir(), 'board-golden-'))}/`
+		const beats: Array<Beat> = [
+			{ text: '\u{1B}[1;1Ha', ms: 50 },
+			{ text: 'b', ms: 0 },
+		]
+
+		await write_golden('wargames', beats, directory)
+
+		expect(await read_golden('wargames', directory)).toStrictEqual(beats)
+		await rm(directory, { recursive: true })
 	})
 })
 

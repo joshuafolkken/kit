@@ -8,6 +8,8 @@ describe('board_compare_report.beats_of', () => {
 	it.each([
 		['raw terminal bytes', '\u{1B}[?1049h\u{1B}[2J'],
 		['a line without a wait', '{"text":"a"}\n'],
+		['a line holding a number', '1\n'],
+		['a line holding null', 'null\n'],
 		['nothing', ''],
 	])('reads no beats from %s', (_, lines) => {
 		expect(beats_of(lines)).toBeUndefined()

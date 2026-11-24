@@ -20,8 +20,8 @@ const UPDATE_HINT = `An intended look change: record the golden replays again in
 
 type GoldenTheme = (typeof THEMES)[number]
 
-function golden_path(theme: GoldenTheme): string {
-	return `${GOLDEN_DIRECTORY}${theme}.jsonl.gz`
+function golden_path(theme: GoldenTheme, directory: string): string {
+	return `${directory}${theme}.jsonl.gz`
 }
 
 // The `board:replay` arguments the golden is recorded with, the clock taken from the ports.
@@ -40,14 +40,22 @@ function replay_argv(theme: GoldenTheme): Array<string> {
 	]
 }
 
-async function read_golden(theme: GoldenTheme): Promise<Array<Beat> | undefined> {
-	const zipped = await readFile(golden_path(theme))
+// The directory defaults to `tools/board/golden/`; a test passes a temporary one.
+async function read_golden(
+	theme: GoldenTheme,
+	directory = GOLDEN_DIRECTORY,
+): Promise<Array<Beat> | undefined> {
+	const zipped = await readFile(golden_path(theme, directory))
 
 	return board_compare_report.beats_of(gunzipSync(zipped).toString('utf8'))
 }
 
-async function write_golden(theme: GoldenTheme, beats: ReadonlyArray<Beat>): Promise<void> {
-	await writeFile(golden_path(theme), gzipSync(run_board_replay.lines_of(beats)))
+async function write_golden(
+	theme: GoldenTheme,
+	beats: ReadonlyArray<Beat>,
+	directory = GOLDEN_DIRECTORY,
+): Promise<void> {
+	await writeFile(golden_path(theme, directory), gzipSync(run_board_replay.lines_of(beats)))
 }
 
 // The index of the beat on screen at `at_ms`: the last one written at or before it.

@@ -13,14 +13,18 @@ function is_beat(value: unknown): value is Beat {
 	)
 }
 
-function beat_of(line: string): Beat | undefined {
+function parsed(line: string): unknown {
 	try {
-		const value: unknown = JSON.parse(line)
-
-		return is_beat(value) ? value : undefined
+		return JSON.parse(line)
 	} catch {
 		return undefined
 	}
+}
+
+function beat_of(line: string): Beat | undefined {
+	const value = parsed(line)
+
+	return is_beat(value) ? value : undefined
 }
 
 // One beat per JSON line; undefined where any line is not one, as a demo without the beats form writes.
