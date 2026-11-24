@@ -15,7 +15,17 @@ const LINT_PROBE_TIMEOUT_MS = 60_000
 const ERROR = 2
 const OFF = 0
 const CONDITION_RULE = '@typescript-eslint/no-unnecessary-condition'
-const RETAINED_RULES = ['no-floating-promises', 'no-misused-promises']
+// joshuafolkken/kit#8886: `no-deprecated` replaces `sonarjs/deprecation`, the one deprecation check
+// tests had.
+const RETAINED_RULES = ['no-floating-promises', 'no-misused-promises', 'no-deprecated']
+const DROPPED_RULES = [
+	'sonarjs/deprecation',
+	'unicorn/no-nested-ternary',
+	'sonarjs/aws-restricted-ip-admin-access',
+	'sonarjs/no-useless-react-setstate',
+	'sonarjs/no-vue-mixins',
+	'sonarjs/no-angular-bypass-sanitization',
+]
 const SOURCE_FILE = 'probe.ts'
 const TEST_FILES = ['probe.test.ts', 'probe.e2e.ts']
 const SOURCE = [
@@ -99,7 +109,7 @@ async function diagnostics(linter: ESLint, file: string): Promise<Array<string |
 
 describe('typed test rule subset', () => {
 	it.each(TEST_FILES)(
-		'keeps only the two async safety rules for %s (ac-5d6e9e31)',
+		'keeps only the async safety and deprecation rules for %s (ac-5d6e9e31)',
 		async (file) => {
 			const config: Linter.Config = await create_linter().calculateConfigForFile(file)
 
@@ -126,6 +136,15 @@ describe('typed test rule subset', () => {
 			const config: Linter.Config = await create_linter().calculateConfigForFile(file)
 
 			expect(config.rules).not.toHaveProperty('import/no-unused-modules')
+		},
+	)
+
+	it.each([SOURCE_FILE, ...TEST_FILES])(
+		'resolves the duplicate and not-applicable rules to off for %s (#8886)',
+		async (file) => {
+			const config: Linter.Config = await create_linter().calculateConfigForFile(file)
+
+			for (const rule of DROPPED_RULES) expect(severity(config.rules?.[rule]), rule).toBe(OFF)
 		},
 	)
 })
