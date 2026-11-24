@@ -38,8 +38,11 @@ import { run_board_type_rows, type Typing } from './run-board-type-rows'
 // What a `run:board` redraw reads through and folds forward, shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
 
-// A redraw's whole frame (`tick`) or the spinners and typing written between redraws (`turn`).
-type DrawKind = 'tick' | 'turn'
+// A redraw's whole frame (`tick`) or the spinners and typing written between redraws (`turn`); then the
+// redraw stage's main-thread work outside its draw (joshuafolkken/kit#8825): a worker round received
+// (`receive`), the view stepped over it (`view`), the opening typed and the first frame revealed
+// (`reveal`), and a cue's sound prepared (`sound`).
+type DrawKind = 'tick' | 'turn' | 'receive' | 'view' | 'reveal' | 'sound'
 type DrawTimer = <T>(kind: DrawKind, draw: () => T) => T
 // The stage a live board's loop is in, which `--timing` names a main-thread stall by (joshuafolkken/kit#8148).
 // `turn` is the spinners turned between seconds.

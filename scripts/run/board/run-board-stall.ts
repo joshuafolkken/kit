@@ -1,12 +1,17 @@
 import { PerformanceObserver } from 'node:perf_hooks'
+import { lane_stats } from '#scripts/lane/lane-stats'
 import type { StallStage } from './run-board-state'
 
 // `josh run:board --timing` (joshuafolkken/kit#8148): the main thread's stalls on a live board. A probe
 // due every `PROBE_MS` that runs `STALL_MS` or more late found the thread held; the stall is named by
 // the loop's stage that held most of the probe's gap, and by the time a GC ran within that gap.
+// joshuafolkken/kit#8825: each stall is said with when it began, counted from when the watch started, and
+// every probe's lateness is kept as the loop's wake lag — how far past its time a timer due on it ran.
 
 const PROBE_MS = 50
 const STALL_MS = 200
+// A wake later than this is counted apart: it holds a typing beat back by a whole probe period.
+const LATE_MS = 50
 // How long a GC is kept to meet a stall its probe notices after it.
 const GC_KEEP_MS = 5000
 // The latest stalls a GC reported after their probe can still fall within.
@@ -24,6 +29,8 @@ interface Stall {
 	stage: StallStage
 	gc_ms: number
 	span: Span
+	// When the stall began, in ms from when the watch started.
+	at_ms: number
 }
 
 interface StageMark {
@@ -41,16 +48,21 @@ interface StallProbes {
 interface StallWatch {
 	enter: (stage: StallStage) => void
 	stalls: () => ReadonlyArray<Stall>
+	lags: () => ReadonlyArray<number>
+	rows: () => Array<[string, string]>
 	stop: () => void
 }
 
-// The marks are those since the last probe, the GCs those of the last `GC_KEEP_MS`.
+// The marks are those since the last probe, the GCs those of the last `GC_KEEP_MS`; `lags` every probe's
+// lateness, and `origin` when the watch started.
 interface Watching {
 	now: () => number
 	stage: StallStage
 	marks: Array<StageMark>
 	gcs: Array<Span>
 	stalls: Array<Stall>
+	lags: Array<number>
+	origin: number
 	last: number
 }
 
@@ -94,10 +106,13 @@ function probe(watching: Watching): void {
 	const span = { start: watching.last, end: now }
 	const ms = now - watching.last - PROBE_MS
 
+	watching.lags.push(Math.max(0, ms))
+
 	if (ms >= STALL_MS) {
 		const stage = dominant(watching, span)
+		const at_ms = span.start - watching.origin
 
-		watching.stalls.push({ ms, stage, gc_ms: gc_within(watching.gcs, span), span })
+		watching.stalls.push({ ms, stage, gc_ms: gc_within(watching.gcs, span), span, at_ms })
 	}
 
 	forget(watching, now)
@@ -126,8 +141,47 @@ function started(now: () => number): Watching {
 		marks: [{ stage: FIRST_STAGE, at: last }],
 		gcs: [],
 		stalls: [],
+		lags: [],
+		origin: last,
 		last,
 	}
+}
+
+// A loop, not `Math.max(...samples)`: a board left up for hours takes more samples than one call spreads.
+function longest(samples: ReadonlyArray<number>): number {
+	let max = 0
+
+	for (const ms of samples) max = Math.max(max, ms)
+
+	return max
+}
+
+function stall_row(stall: Stall, index: number): [string, string] {
+	const gc = stall.gc_ms > 0 ? `gc ${stall.gc_ms.toFixed(1)}` : 'no gc'
+	const at = `at ${Math.round(stall.at_ms).toString()}`
+
+	return [`stall ${String(index + 1)}`, `${stall.ms.toFixed(1)} ${stall.stage} · ${gc} · ${at}`]
+}
+
+// How many stalls, then the longest each with its stage, GC and start.
+function rows(stalls: ReadonlyArray<Stall>): Array<[string, string]> {
+	const listed = stalls.toSorted((first, second) => second.ms - first.ms).slice(0, LISTED_STALLS)
+	const count: [string, string] = ['stalls', `n ${String(stalls.length)} over ${String(STALL_MS)}`]
+
+	return [count, ...listed.map((stall, index) => stall_row(stall, index))]
+}
+
+// The wake lag's longest and median, and how many wakes ran later than `LATE_MS`; none before a probe.
+function lag_rows(lags: ReadonlyArray<number>): Array<[string, string]> {
+	const median = lane_stats.median(lags)
+
+	if (median === undefined) return []
+	const late = lags.filter((ms) => ms > LATE_MS).length
+	const counted = `n ${String(late)} over ${String(LATE_MS)} (n ${String(lags.length)})`
+
+	return [
+		['wake lag', `max ${longest(lags).toFixed(1)} · median ${median.toFixed(1)} · ${counted}`],
+	]
 }
 
 // Watches from here until `stop`.
@@ -145,25 +199,13 @@ function watch(probes: StallProbes): StallWatch {
 			entered(watching, stage)
 		},
 		stalls: () => watching.stalls,
+		lags: () => watching.lags,
+		rows: () => [...rows(watching.stalls), ...lag_rows(watching.lags)],
 		stop: () => {
 			stop_probe()
 			stop_gc()
 		},
 	}
-}
-
-function stall_row(stall: Stall, index: number): [string, string] {
-	const gc = stall.gc_ms > 0 ? `gc ${stall.gc_ms.toFixed(1)}` : 'no gc'
-
-	return [`stall ${String(index + 1)}`, `${stall.ms.toFixed(1)} ${stall.stage} · ${gc}`]
-}
-
-// How many stalls, then the longest each with its stage and GC.
-function rows(stalls: ReadonlyArray<Stall>): Array<[string, string]> {
-	const longest = stalls.toSorted((first, second) => second.ms - first.ms).slice(0, LISTED_STALLS)
-	const count: [string, string] = ['stalls', `n ${String(stalls.length)} over ${String(STALL_MS)}`]
-
-	return [count, ...longest.map((stall, index) => stall_row(stall, index))]
 }
 
 function every(ms: number, run: () => void): () => void {
@@ -196,7 +238,7 @@ const PROCESS_PROBES: StallProbes = {
 	observe_gc,
 }
 
-const run_board_stall = { PROBE_MS, PROCESS_PROBES, STALL_MS, rows, watch }
+const run_board_stall = { LATE_MS, PROBE_MS, PROCESS_PROBES, STALL_MS, longest, watch }
 
 export { run_board_stall }
 export type { Stall, StallProbes, StallWatch }

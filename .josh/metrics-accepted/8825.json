@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #8825 adds stall start times, wake lag and redraw-stage timing sections to run:board --timing",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 104
+	}
+}

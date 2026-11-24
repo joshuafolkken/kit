@@ -200,7 +200,10 @@ async function tick(
 	// Taken after the read, which a single frame may have waited on to confirm an idle lane.
 	const now_ms = ports.now()
 	const data = await data_of(state, gathered, { ports, now_ms, pace })
-	const next: BoardState = { ...run_board_data.view_for(state, data), ...data }
+	const next: BoardState = {
+		...drawn(ports, 'view', () => run_board_data.view_for(state, data)),
+		...data,
+	}
 
 	// joshuafolkken/kit#8126: `--timing` times the draw from the layout to the write.
 	return drawn(ports, 'tick', () => draw_over(next, display, ports, now_ms))

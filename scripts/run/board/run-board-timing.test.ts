@@ -99,7 +99,9 @@ describe('run_board_timing.timed draws', () => {
 	})
 
 	it('names no kind it never timed', () => {
-		expect(report({ tick: [1], turn: [] })).not.toContain('turn draw')
+		const draws = { tick: [1], turn: [], receive: [], view: [], reveal: [], sound: [] }
+
+		expect(report(draws)).not.toContain('turn draw')
 	})
 
 	it('times nothing without the flag, drawing straight through', () => {
@@ -209,7 +211,7 @@ function spin_ports(): {
 }
 
 describe('run_board_tick.tick timing', () => {
-	it('times a tick that draws a run, from its layout to its write, as a tick', async () => {
+	it('times the view stepped, then the run drawn from its layout to its write', async () => {
 		const { ports } = harness(LOCAL, [])
 		const kinds: Array<DrawKind> = []
 
@@ -218,7 +220,7 @@ describe('run_board_tick.tick timing', () => {
 			time_draw: recording(kinds),
 		})
 
-		expect(kinds).toStrictEqual(['tick'])
+		expect(kinds).toStrictEqual(['view', 'tick'])
 	})
 })
 
