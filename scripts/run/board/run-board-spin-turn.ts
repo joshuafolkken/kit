@@ -66,7 +66,7 @@ interface Turned {
 
 type SpinPorts = Pick<
 	BoardPorts,
-	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'typing_sound'
+	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'time_wake' | 'typing_sound'
 >
 
 // One spinner frame at every spot: the cursor moved there, the spot's colors, the frame, then a reset.

@@ -125,6 +125,9 @@ interface BoardPorts {
 	time_draw?: DrawTimer | undefined
 	// Marks the stage a live board's loop enters, for `--timing`'s stalls (`run-board-stall.ts`); none marks nothing.
 	enter_stage?: ((stage: StallStage) => void) | undefined
+	// Takes a spinner wake's due and actual time, for `--timing`'s wake lateness (joshuafolkken/kit#8902);
+	// none takes nothing.
+	time_wake?: ((due_ms: number, woke_ms: number) => void) | undefined
 }
 
 // `background` launches the GitHub reads and draws without them; `settled` waits for them before

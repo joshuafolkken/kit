@@ -20,6 +20,7 @@ const SCREEN_ENTER_PHASE = 'screen enter at'
 const CODE_LOAD_PHASE = 'code load'
 const SCREEN_ENTER = run_board_screen.screen_of('live').enter
 const HEADING = 'run:board timing (ms):'
+const SPIN_WAKE_ROW = 'spin wake lag'
 const DRAW_KINDS: ReadonlyArray<DrawKind> = ['tick', 'turn']
 const REDRAW_KINDS: ReadonlyArray<DrawKind> = ['receive', 'view', 'reveal', 'sound']
 
@@ -47,9 +48,11 @@ interface TimingReads {
 	probes?: TimingProbes | undefined
 }
 
+// The stalls, the heaps and how late each spinner wake ran past its due time (joshuafolkken/kit#8902).
 interface Watching {
 	stalls: StallWatch
 	heap: HeapWatch
+	wakes: Array<number>
 }
 
 interface TimingArgv {
@@ -138,7 +141,9 @@ function reporting(
 		watching.stalls.stop()
 		watching.heap.stop()
 		timing.receive = undefined
-		ports.write(report(draws, watching.stalls.rows(), watching.heap.rows()))
+		const wake_rows = run_board_stall.lag_rows(SPIN_WAKE_ROW, watching.wakes)
+
+		ports.write(report(draws, [...watching.stalls.rows(), ...wake_rows], watching.heap.rows()))
 	}
 }
 
@@ -147,7 +152,7 @@ function watch(ports: BoardPorts, probes: TimingProbes): Watching {
 	const timer = probes.heap ?? { main: run_board_heap.main, every: probes.every }
 	const heap = run_board_heap.watch({ ...timer, worker: ports.worker_heap })
 
-	return { stalls: run_board_stall.watch(probes), heap }
+	return { stalls: run_board_stall.watch(probes), heap, wakes: [] }
 }
 
 // Times each draw into `draws`, by its kind — its own time, less the sections timed inside it (a cue
@@ -188,13 +193,13 @@ function no_draws(): Draws {
 }
 
 // Each draw timed from here on — a worker round received among them, through `received` — the stalls
-// watched from when a live board takes its screen — `--once` never does — and the report said with them
-// after the screen is left.
+// and the spinners' wake lateness watched from when a live board takes its screen — `--once` never does —
+// and the report said with them after the screen is left.
 function draw_ports(
 	ports: BoardPorts,
 	now: () => number,
 	probes: TimingProbes,
-): Pick<BoardPorts, 'cue' | 'enter_stage' | 'on_exit' | 'time_draw'> {
+): Pick<BoardPorts, 'cue' | 'enter_stage' | 'on_exit' | 'time_draw' | 'time_wake'> {
 	const draws = no_draws()
 	const watched: { watching?: Watching } = {}
 	const time = draw_timer(draws, now)
@@ -213,6 +218,9 @@ function draw_ports(
 			ports.on_exit(reporting(ports, leave, draws, watching))
 		},
 		time_draw: time,
+		time_wake: (due_ms, woke_ms) => {
+			watched.watching?.wakes.push(Math.max(0, woke_ms - due_ms))
+		},
 	}
 }
 
@@ -291,6 +299,7 @@ const run_board_timing = {
 	FIRST_FRAME_PHASE,
 	FIRST_READ_PHASE,
 	SCREEN_ENTER_PHASE,
+	SPIN_WAKE_ROW,
 	TIMING_FLAG,
 	drawn,
 	received,

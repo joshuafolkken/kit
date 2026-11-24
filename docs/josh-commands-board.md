@@ -133,7 +133,8 @@ pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
 - `--frame` — one live-form frame in a state its flags fix, for reading what only a live board draws; no frame record, cue or screen control (`run-board-frame-preview.ts`). `--notice <row state>` (`running`, `merged`, …) with `--issue <n>` and `--repeat` (`×2`) sets the notice; `--mute` draws `🔇`; `--columns` / `--rows` the size (120×40); `--ansi` keeps SGR.
 - `--frame` — draws a theme’s animation area (the `bttf` flux capacitor) as a live board’s first turn does: over the plain text, or under `--ansi` as cursor writes after the frame.
 - `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat`, `--every` and `--frame` ignore it.
-- `--timing` — on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`) and the GC within it (`run-board-stall.ts`).
+- `--timing` — on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`), the GC within it and when it began (`at`, ms from the screen taken; `run-board-stall.ts`).
+- `--timing` — on a live board, `wake lag` is the stall probe’s lateness and `spin wake lag` each spinner wake’s past its due time: max, median and the wakes over 50 ms.
 
 <!-- /usage -->
 
