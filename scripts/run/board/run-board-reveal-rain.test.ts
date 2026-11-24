@@ -239,6 +239,7 @@ describe('run_board_intro.opening in the matrix theme', () => {
 	})
 
 	it('keeps the block reveal in the wargames theme', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
 		const { written, ports } = recorded(instant)
 		const opened = run_board_intro.opening(async () => 'read', ports, NO_KEYS, 'wargames')
 
