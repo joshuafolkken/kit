@@ -14,6 +14,12 @@ const HANDOFF_PROMPT = run_handoff_launch.prompt_of(
 	'File the CSV export.',
 	run_handoff_launch.scratch_directory('kickoff', 1),
 )
+const RETROSPECTIVE_HANDOFF_PROMPT = run_handoff_launch.prompt_of(
+	{ kind: 'workflow', keyword: 'retrospective', line: 'retrospective', brief_file: 'b' },
+	'Review the run.',
+	run_handoff_launch.scratch_directory('retrospective', 1),
+)
+const KICKOFF_HANDOFF = 'handoff:kickoff'
 const EARLIER_HANDOFF_PROMPT =
 	'kickoff new\n\nHanded over by a consultation session through `josh run:handoff`; the brief below is what was agreed there.'
 
@@ -34,9 +40,13 @@ describe('cost_audit_kind.kind_of — the kind is read off the opening prompt', 
 		['fullrun #3930', false, 'fullrun'],
 		['backlogrun', false, 'backlogrun'],
 		['kickoff #123', false, 'kickoff'],
-		[HANDOFF_PROMPT, false, 'handoff'],
-		[EARLIER_HANDOFF_PROMPT, false, 'handoff'],
-		[`${HANDOFF_PROMPT}\nTighten the /code-review round cap.`, false, 'handoff'],
+		// joshuafolkken/kit#8891: a hand-off child is split by the keyword its prompt opens with.
+		[HANDOFF_PROMPT, false, KICKOFF_HANDOFF],
+		[EARLIER_HANDOFF_PROMPT, false, KICKOFF_HANDOFF],
+		[`${HANDOFF_PROMPT}\nTighten the /code-review round cap.`, false, KICKOFF_HANDOFF],
+		[RETROSPECTIVE_HANDOFF_PROMPT, false, 'handoff:retrospective'],
+		['fullrun #5\n\nHanded over through `josh run:handoff`.', false, 'handoff:fullrun'],
+		['Handed over through `josh run:handoff`.', false, 'handoff'],
 		['Why is the CPU at 100%?', false, cost_audit_kind.CONVERSATION],
 		['', false, cost_audit_kind.CONVERSATION],
 	])('reads %j (delegated: %s) as %s', (prompt, is_delegated, kind) => {

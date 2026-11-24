@@ -26,6 +26,19 @@ const LANE_DIRECTORY = '/home/dev/.kit-lanes/12'
 
 writeFileSync(BRIEF_FILE, BRIEF_TEXT)
 
+const SONNET_MODEL = 'claude-sonnet-5-5'
+const SONNET = { name: 'sonnet', model: SONNET_MODEL, effort: 'low', when: 'Small work' }
+const ROUTED_JOSH = { handoff: { route: true }, worker: { default: 'sonnet', profiles: [SONNET] } }
+
+function routed_repository(): string {
+	const directory = make_directory('josh-run-handoff-route-')
+	const manifest = JSON.stringify({ name: 'app', josh: ROUTED_JOSH })
+
+	writeFileSync(path.join(directory, 'package.json'), manifest)
+
+	return directory
+}
+
 interface Fake {
 	ports: HandoffPorts
 	lines: Array<string>
@@ -141,6 +154,17 @@ describe('run_handoff_cli.run kickoff filing check', () => {
 		await expect(
 			run_handoff_cli.run(['kickoff', '5', BRIEF_FLAG, BRIEF_FILE], ports),
 		).resolves.toBe(0)
+	})
+})
+
+// joshuafolkken/kit#8891: the keyword reaches the launch, so `josh.handoff.route` can route kickoff.
+describe('run_handoff_cli.run — josh.handoff.route', () => {
+	it('starts kickoff on the weakest worker profile in a repository with the route on', async () => {
+		const { ports, requests } = fake({ cwd: routed_repository() })
+
+		await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE], ports)
+
+		expect(requests[0]?.profile).toMatchObject({ role: 'scheduler', model: SONNET_MODEL })
 	})
 })
 

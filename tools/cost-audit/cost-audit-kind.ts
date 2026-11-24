@@ -13,11 +13,13 @@
 // typed run's regression (joshuafolkken/kit#6898). Its free-text brief can name `/code-review`, so the
 // origin is read before the review rule.
 
+import { run_handoff_args } from '#scripts/run/handoff/run-handoff-args'
 import { run_handoff_launch } from '#scripts/run/handoff/run-handoff-launch'
 
 const RUN_KEYWORDS = ['fullrun', 'halfrun', 'prrun', 'backlogrun', 'kickoff'] as const
 
 const CONVERSATION = 'conversation'
+const HANDOFF = 'handoff'
 const RESUME = 'resume'
 const REVIEW = 'review'
 const SUBAGENT = 'subagent'
@@ -33,7 +35,7 @@ interface KindRule {
 
 const RULES: ReadonlyArray<KindRule> = [
 	{ kind: 'wake', matches: (prompt) => prompt.includes(WAKE_MARKER) },
-	{ kind: 'handoff', matches: (prompt) => prompt.includes(run_handoff_launch.ORIGIN_MARKER) },
+	{ kind: HANDOFF, matches: (prompt) => prompt.includes(run_handoff_launch.ORIGIN_MARKER) },
 	{ kind: REVIEW, matches: (prompt) => prompt.includes(REVIEW_MARKER) },
 	{ kind: SUBAGENT, matches: (_prompt, is_delegated) => is_delegated },
 	{ kind: RESUME, matches: (prompt) => prompt.trimStart().startsWith(RESUME_PREFIX) },
@@ -45,10 +47,21 @@ function run_keyword(prompt: string): string | undefined {
 	return RUN_KEYWORDS.find((keyword) => keyword === word)
 }
 
+// joshuafolkken/kit#8891: a hand-off child is split by the keyword its prompt opens with
+// (`handoff:kickoff`, `handoff:retrospective`, …), so the kickoff child's model switch reads on its own
+// row; a prompt whose first word is no workflow keyword stays `handoff`.
+function handoff_kind(prompt: string): string {
+	const word = WORD_PATTERN.exec(prompt)?.[1]
+	const keyword = run_handoff_args.WORKFLOW_KEYWORDS.find((one) => one === word)
+
+	return keyword === undefined ? HANDOFF : `${HANDOFF}:${keyword}`
+}
+
 function kind_of(prompt: string, is_delegated: boolean): string {
 	const rule = RULES.find((one) => one.matches(prompt, is_delegated))
+	const kind = rule?.kind ?? run_keyword(prompt) ?? CONVERSATION
 
-	return rule?.kind ?? run_keyword(prompt) ?? CONVERSATION
+	return kind === HANDOFF ? handoff_kind(prompt) : kind
 }
 
 const cost_audit_kind = { CONVERSATION, RESUME, REVIEW, SUBAGENT, kind_of }
