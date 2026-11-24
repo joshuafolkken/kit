@@ -25,6 +25,22 @@ describe('lane_ledger_schema_related — the deferred count', () => {
 	})
 })
 
+// joshuafolkken/kit#8893: a row lists the test files the cap deferred; an older one counts them alone.
+describe('lane_ledger_schema_related — the deferred files', () => {
+	it('reads a row with its deferred files back as written', () => {
+		const row = { ...ROW, deferred: 2, deferred_files: ['scripts/a.test.ts', 'scripts/b.test.ts'] }
+
+		expect(lane_ledger_schema.entry_schema.parse(row)).toEqual(row)
+	})
+
+	it('reads a row written before the deferred files, by its count alone', () => {
+		const parsed = lane_ledger_schema.entry_schema.parse({ ...ROW, deferred: 12 })
+
+		expect(parsed).toMatchObject({ deferred: 12 })
+		expect(parsed).not.toHaveProperty('deferred_files')
+	})
+})
+
 // joshuafolkken/kit#7980: a row names how its tests were chosen; an older one, read above, does not.
 describe('lane_ledger_schema_related — the selection method', () => {
 	it('reads a row with its selection method back as written', () => {

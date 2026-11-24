@@ -28,7 +28,7 @@ const PRESENT = [CODE, DIRECT_TEST, CHANGED_TEST, E2E_SPEC, ...OUTER_TESTS]
 // Sorted by code point already: `outer-` before `zz-direct` before `zzz-changed`.
 const ALL_TESTS = [...OUTER_TESTS, DIRECT_TEST, CHANGED_TEST]
 const DEFERRED = ALL_TESTS.length - MAX_TEST_FILES
-const NOTHING: Selection = { tests: [], deferred: 0, reach: [], method: 'import' }
+const NOTHING: Selection = { tests: [], deferred: [], reach: [], method: 'import' }
 
 function write_files(root: string): void {
 	for (const file of PRESENT) {
@@ -96,16 +96,17 @@ describe('test_related_select.capped_layers', () => {
 
 		expect(test_related_select.capped_layers(layers)).toEqual({
 			tests: ['b.test.ts', 'B.test.ts', 'd.test.ts', 'a.test.ts'],
-			deferred: 0,
+			deferred: [],
 		})
 	})
 
-	it('cuts at the cap and counts the rest as deferred', () => {
+	// joshuafolkken/kit#8893: the cut files themselves, so the ledger can list them.
+	it('cuts at the cap and lists the rest as deferred', () => {
 		const layers = [['c.test.ts'], ['b.test.ts', 'a.test.ts']]
 
 		expect(test_related_select.capped_layers(layers, 2)).toEqual({
 			tests: ['c.test.ts', 'a.test.ts'],
-			deferred: 1,
+			deferred: ['b.test.ts'],
 		})
 	})
 })
@@ -130,7 +131,8 @@ describe('test_related_select.select past the cap', () => {
 
 		expect(selection.tests).toHaveLength(MAX_TEST_FILES)
 		expect(selection.tests.slice(0, 2)).toEqual([DIRECT_TEST, OUTER_TESTS[0]])
-		expect(selection.deferred).toBe(DEFERRED)
+		expect(selection.deferred).toHaveLength(DEFERRED)
+		expect(new Set([...selection.tests, ...selection.deferred])).toEqual(new Set(ALL_TESTS))
 		expect(selection.reach).toEqual([{ file: CODE, count: ALL_TESTS.length }])
 	})
 
@@ -140,7 +142,7 @@ describe('test_related_select.select past the cap', () => {
 		const selection = await select_in(root, related_of(root, changed), changed, ALL_TESTS)
 
 		expect(selection.tests.slice(0, 3)).toEqual([CHANGED_TEST, DIRECT_TEST, OUTER_TESTS[0]])
-		expect(selection.deferred).toBe(DEFERRED)
+		expect(selection.deferred).toHaveLength(DEFERRED)
 	})
 
 	it('runs every test it selects where they fit under the cap, deferring none', async () => {
@@ -148,7 +150,7 @@ describe('test_related_select.select past the cap', () => {
 		const reached = OUTER_TESTS.slice(0, 2)
 		const selection = await select_in(root, related_of(root, [CODE]), [CODE], reached)
 
-		expect(selection).toMatchObject({ tests: [DIRECT_TEST, ...reached], deferred: 0 })
+		expect(selection).toMatchObject({ tests: [DIRECT_TEST, ...reached], deferred: [] })
 	})
 })
 
@@ -169,7 +171,7 @@ describe('test_related_select.select reaching every test', () => {
 		const rest = ALL_TESTS.filter((test) => test !== DIRECT_TEST)
 
 		expect(selection.tests).toEqual([DIRECT_TEST, ...rest].slice(0, MAX_TEST_FILES))
-		expect(selection.deferred).toBe(DEFERRED)
+		expect(selection.deferred).toHaveLength(DEFERRED)
 	})
 
 	it('runs every unit test with no graph, leaving out the e2e suite and a file gone', async () => {
@@ -179,7 +181,7 @@ describe('test_related_select.select reaching every test', () => {
 		expect(selection.tests).toHaveLength(MAX_TEST_FILES)
 		expect(selection.tests).not.toContain(E2E_SPEC)
 		expect(selection.tests).not.toContain(GONE_TEST)
-		expect(selection.deferred).toBe(DEFERRED)
+		expect(selection.deferred).toHaveLength(DEFERRED)
 		expect(selection.reach).toEqual([])
 	})
 
@@ -188,7 +190,7 @@ describe('test_related_select.select reaching every test', () => {
 
 		expect(await select_in(fixture.workspace, scope, [CODE], ALL_TESTS)).toEqual({
 			tests: [],
-			deferred: 0,
+			deferred: [],
 			reach: [],
 			method: 'import',
 		})
@@ -212,7 +214,7 @@ describe('test_related_select.select by declaration users', () => {
 		const symbol = { tests, reach: [{ file: CODE, count: 1 }], direct: tests, rings: [tests] }
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
-		expect(selection).toEqual({ tests, reach: symbol.reach, deferred: 0, method: 'symbol' })
+		expect(selection).toEqual({ tests, reach: symbol.reach, deferred: [], method: 'symbol' })
 	})
 
 	it('still defers what the users select past the cap', async () => {
@@ -221,7 +223,8 @@ describe('test_related_select.select by declaration users', () => {
 		const symbol = { tests: ALL_TESTS, reach, direct: [], rings: [ALL_TESTS] }
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
-		expect(selection).toMatchObject({ deferred: DEFERRED, method: 'symbol' })
+		expect(selection.deferred).toHaveLength(DEFERRED)
+		expect(selection.method).toBe('symbol')
 	})
 
 	it('reads the import layers for a scope fallen to the whole suite', async () => {
@@ -297,7 +300,7 @@ describe('test_related_select.select by declaration users, cut by rank', () => {
 
 		expect(selection.tests[0]).toBe(DIRECT_TEST)
 		expect(selection.tests.slice(1)).toEqual(OUTER_TESTS.slice(0, MAX_TEST_FILES - 1))
-		expect(selection.deferred).toBe(DEFERRED)
+		expect(selection.deferred).toHaveLength(DEFERRED)
 	})
 
 	it('selects the same tests in path order within a rank, whatever their order', async () => {
@@ -334,7 +337,7 @@ describe('test_related_select.select by declaration users, cut by ring', () => {
 		const selection = await select_by_users(root, related_of(root, [CODE]), symbol)
 
 		expect(selection.tests[0]).toBe(DIRECT_TEST)
-		expect(selection.deferred).toBe(DEFERRED)
+		expect(selection.deferred).toHaveLength(DEFERRED)
 	})
 })
 
