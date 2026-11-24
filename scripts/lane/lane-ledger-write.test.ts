@@ -79,7 +79,7 @@ describe('lane_ledger_write — the stage and dispatch entries', () => {
 	it('records a dispatch naming the issue', async () => {
 		const target = ledger('dispatch')
 
-		await lane_ledger_write.record_dispatch(7, target)
+		await lane_ledger_write.record_dispatch({ issue: 7 }, target)
 
 		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'dispatch', issue: 7 }])
 	})

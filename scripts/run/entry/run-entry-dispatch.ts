@@ -12,7 +12,7 @@ async function record_missing(issue: number): Promise<void> {
 		.read_entries(path)
 		.some((entry) => entry.kind === lane_ledger.KIND.DISPATCH && entry.issue === issue)
 
-	if (!is_recorded) await lane_ledger_write.record_dispatch(issue, path)
+	if (!is_recorded) await lane_ledger_write.record_dispatch({ issue }, path)
 }
 
 const run_entry_dispatch = { record_missing }
