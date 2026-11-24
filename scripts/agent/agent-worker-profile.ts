@@ -36,8 +36,13 @@ interface Unset {
 }
 
 type SettingsResult = Rejected | Unset | { kind: 'settings'; settings: WorkerSettings }
+// What chose the profile (joshuafolkken/kit#8815): the Issue's `worker:<name>` label, `route` reading
+// the Issue body, or the configured default.
+type WorkerReason = 'label' | 'route' | 'default'
 type WorkerResult =
-	Rejected | Unset | { kind: 'worker'; worker: WorkerProfile; settings: WorkerSettings }
+	| Rejected
+	| Unset
+	| { kind: 'worker'; worker: WorkerProfile; settings: WorkerSettings; reason: WorkerReason }
 type ProfileCheck = Rejected | { kind: 'profile'; worker: WorkerProfile }
 
 const UNSET: Unset = { kind: 'unset' }
@@ -130,19 +135,24 @@ function for_labels(settings: WorkerSettings, labels: ReadonlyArray<string>): Wo
 	const worker = profile_named(settings, name)
 	if (worker === undefined) return rejected(`has no profile for the label ${LABEL_PREFIX}${name}`)
 
-	return { kind: 'worker', worker, settings }
+	return { kind: 'worker', worker, settings, reason: names.length > 0 ? 'label' : 'default' }
 }
 
 // joshuafolkken/kit#8760: with `route` on, an Issue no `worker:` label names runs on the weakest
 // profile when its body declares light work (`agent-worker-route.ts`), else on the default. A body
 // that cannot be read keeps the default. `route: false` is the one-step revert to the default for all.
+// The reason is `route` wherever the body was read, so a heavy Issue's default is the route's choice.
 function routed(settings: WorkerSettings, body: string | undefined): WorkerResult {
 	const [weakest] = settings.profiles
-	const is_light = body !== undefined && agent_worker_route.route(body).is_light
+	if (body === undefined || weakest === undefined) return for_labels(settings, [])
 
-	if (!is_light || weakest === undefined) return for_labels(settings, [])
+	if (agent_worker_route.route(body).is_light) {
+		return { kind: 'worker', worker: weakest, settings, reason: 'route' }
+	}
 
-	return { kind: 'worker', worker: weakest, settings }
+	const kept = for_labels(settings, [])
+
+	return kept.kind === 'worker' ? { ...kept, reason: 'route' } : kept
 }
 
 async function for_issue(
@@ -185,5 +195,5 @@ function next(settings: WorkerSettings, worker: WorkerProfile): WorkerProfile | 
 
 const agent_worker_profile = { LABEL_PREFIX, for_labels, next, read, resolve }
 
-export type { SettingsResult, WorkerProfile, WorkerResult, WorkerSettings }
+export type { SettingsResult, WorkerProfile, WorkerReason, WorkerResult, WorkerSettings }
 export { agent_worker_profile }

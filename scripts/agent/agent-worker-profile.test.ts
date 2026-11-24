@@ -129,36 +129,39 @@ describe("agent_worker_profile.read — kit's own setting (joshuafolkken/kit#876
 	})
 })
 
+// The chosen profile and, after it, what chose it (joshuafolkken/kit#8815).
+async function routed_choice(
+	route: boolean,
+	labels: ReadonlyArray<string>,
+	body?: string,
+): Promise<string> {
+	write_worker({ ...WORKER, route })
+	const result = await agent_worker_profile.resolve(
+		fixture.directory,
+		async () => await labels,
+		async () => await body,
+	)
+
+	return result.kind === 'worker' ? `${result.worker.name} by ${result.reason}` : result.kind
+}
+
 describe('agent_worker_profile.resolve — josh.worker.route', () => {
-	async function routed_name(
-		route: boolean,
-		labels: ReadonlyArray<string>,
-		body?: string,
-	): Promise<string> {
-		write_worker({ ...WORKER, route })
-		const result = await agent_worker_profile.resolve(
-			fixture.directory,
-			async () => await labels,
-			async () => await body,
-		)
-
-		return result.kind === 'worker' ? result.worker.name : result.kind
-	}
-
 	it('runs a light unlabelled Issue on the weakest profile', async () => {
-		expect(await routed_name(true, [], LIGHT_BODY)).toBe(HAIKU_NAME)
+		expect(await routed_choice(true, [], LIGHT_BODY)).toBe(`${HAIKU_NAME} by route`)
 	})
 
-	it.each<[string, boolean, ReadonlyArray<string>, string | undefined]>([
-		['the switch off', false, [], LIGHT_BODY],
-		['a heavy body', true, [], '## 背景\n\n- 互換性: 破壊的変更'],
-		['a body read that failed', true, [], undefined],
-	])('keeps the default with %s', async (_name, route, labels, body) => {
-		expect(await routed_name(route, labels, body)).toBe(SONNET_NAME)
+	it.each<[string, boolean, string | undefined, string]>([
+		['the switch off', false, LIGHT_BODY, 'default'],
+		['a heavy body', true, '## 背景\n\n- 互換性: 破壊的変更', 'route'],
+		['a body read that failed', true, undefined, 'default'],
+	])('keeps the default with %s', async (_name, route, body, reason) => {
+		expect(await routed_choice(route, [], body)).toBe(`${SONNET_NAME} by ${reason}`)
 	})
 
 	it("keeps a person's worker label over the rule", async () => {
-		expect(await routed_name(true, [`worker:${OPUS_NAME}`], LIGHT_BODY)).toBe(OPUS_NAME)
+		expect(await routed_choice(true, [`worker:${OPUS_NAME}`], LIGHT_BODY)).toBe(
+			`${OPUS_NAME} by label`,
+		)
 	})
 })
 
@@ -169,6 +172,14 @@ describe('agent_worker_profile.resolve — the profile an Issue runs on', () => 
 
 	it('falls back to the default without a worker label', async () => {
 		expect(await resolved_name(['enhancement'])).toBe(SONNET_NAME)
+	})
+
+	// joshuafolkken/kit#8815: a label naming the default is still the label's choice.
+	it.each([
+		[['enhancement'], 'default'],
+		[[`worker:${SONNET_NAME}`], 'label'],
+	])('says what chose the profile for %j', async (labels, reason) => {
+		expect(await resolved(labels)).toMatchObject({ kind: 'worker', reason })
 	})
 
 	it.each([

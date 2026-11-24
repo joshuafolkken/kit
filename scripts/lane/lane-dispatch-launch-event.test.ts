@@ -104,7 +104,9 @@ describe('lane_dispatch.dispatch_child — the dispatch the implementation is ti
 		launch.mockReturnValue({ kind: 'launched', pid: PID })
 		await lane_dispatch.dispatch_child(ISSUE)
 
-		expect(record).toHaveBeenCalledExactlyOnceWith(Number(ISSUE))
+		expect(record).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({ issue: Number(ISSUE), reason: 'environment' }),
+		)
 	})
 
 	it('records no dispatch when the launch started no child', async () => {
