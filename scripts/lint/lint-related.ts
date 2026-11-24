@@ -38,7 +38,7 @@ function timing_of(targets: string): LintRunTiming {
 
 // A fallback to the whole project is a superset of the changed files, so it vouches for them too —
 // which is why the record below is written from either arm rather than only from the narrow one.
-async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
+async function lint_pair_exit_code(scope: ChangedFileScope): Promise<number> {
 	if (scope.mode === 'all') {
 		return await lint_parallel.run_lint_parallel_checks({
 			warm_daemon: false,
@@ -59,6 +59,12 @@ async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
 			},
 		},
 	)
+}
+
+// The import cycles are the whole tree's even on a narrowed run: a changed file's new import can close
+// a cycle through unchanged ones.
+async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
+	return await lint_parallel.with_import_cycles(lint_pair_exit_code(scope))
 }
 
 // The document checks over the same scope the lint just ran: the resolved file list when narrowed,

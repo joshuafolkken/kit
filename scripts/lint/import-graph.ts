@@ -57,6 +57,8 @@ interface ImportGraph {
 		files: ReadonlyArray<string>,
 		universe: ReadonlyArray<string>,
 	) => ReadonlySet<string>
+	// Each file of `universe` with its direct runtime dependencies; absent on fakes that check no cycle.
+	runtime_edges?: (universe: ReadonlyArray<string>) => Map<string, ReadonlyArray<Dependency>>
 	strings: (file: string) => ReadonlyArray<string>
 }
 
@@ -222,23 +224,15 @@ function ambient_of(resolver: Resolver, root: string, config: ProjectConfig): Ar
 	return [...declarations, ...types]
 }
 
-// Every file the imports reach, the starting file excluded: its own content is the cache's key
-// already, and a file that imports itself through a cycle is still only that one key.
-function is_unvisited(
-	dependency: Dependency,
-	start: string,
-	reached: Map<string, Dependency>,
-): boolean {
-	return dependency.file !== start && !reached.has(dependency.file)
-}
-
-// Dependencies joined to what is reached, and those inside the project queued to be followed.
+// Dependencies joined to what is reached, and those inside the project queued to be followed. Every
+// file the imports reach, the starting file excluded: its own content is the cache's key already, and
+// a file that imports itself through a cycle is still only that one key.
 function join(
 	dependencies: ReadonlyArray<Dependency>,
 	start: string,
 	reached: Map<string, Dependency>,
 ): Array<string> {
-	const next = dependencies.filter((dependency) => is_unvisited(dependency, start, reached))
+	const next = dependencies.filter(({ file }) => file !== start && !reached.has(file))
 
 	for (const dependency of next) reached.set(dependency.file, dependency)
 
@@ -300,21 +294,30 @@ function append(map: Map<string, Array<string>>, key: string, value: string): vo
 	else known.push(value)
 }
 
+// Each file of `universe` with its direct dependencies along `edges`, read through the store.
+function forward_edges(
+	context: GraphContext,
+	universe: ReadonlyArray<string>,
+	edges: Edges,
+): Map<string, ReadonlyArray<Dependency>> {
+	const missing = import_graph_store.seed(context.store, edges.name, universe)
+	const forward = new Map(universe.map((file) => [file, edges.of(context, file)]))
+
+	import_graph_store.keep(context.store, edges.name, missing)
+
+	return forward
+}
+
 function reverse_edges(
 	context: GraphContext,
 	universe: ReadonlyArray<string>,
 	edges: Edges,
 ): Map<string, Array<string>> {
 	const reverse = new Map<string, Array<string>>()
-	const missing = import_graph_store.seed(context.store, edges.name, universe)
 
-	for (const file of universe) {
-		for (const dependency of edges.of(context, file)) {
-			append(reverse, dependency.file, file)
-		}
+	for (const [file, dependencies] of forward_edges(context, universe, edges)) {
+		for (const dependency of dependencies) append(reverse, dependency.file, file)
 	}
-
-	import_graph_store.keep(context.store, edges.name, missing)
 
 	return reverse
 }
@@ -371,6 +374,8 @@ function graph_of(context: GraphContext): ImportGraph {
 			importers(context, files, universe, { name: 'all', of: direct_dependencies }),
 		runtime_importers: (files, universe) =>
 			importers(context, files, universe, { name: 'runtime', of: runtime_dependencies }),
+		runtime_edges: (universe) =>
+			forward_edges(context, universe, { name: 'runtime', of: runtime_dependencies }),
 		strings: (file) => type_only_imports.strings(context.typescript, file),
 	}
 }

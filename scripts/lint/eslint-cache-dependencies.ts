@@ -17,8 +17,8 @@ import { import_graph, type ImportGraph } from './import-graph'
 // unguarded run wrote, or one from before this — is dropped as well, because nothing says what it
 // read.
 //
-// The drop clears a stale red as well as a stale green: an import rule's report — `import/no-cycle`,
-// `import-x/named` — is about another file too, and once that file changes the entry is linted
+// The drop clears a stale red as well as a stale green: an import rule's report — `import-x/named` on
+// hand-authored JavaScript — is about another file too, and once that file changes the entry is linted
 // afresh. Only imports are followed, so a rule that reads the files importing this one — a
 // reverse-dependency rule such as `import/no-unused-modules`, a no-op under ESLint 10 — would go
 // stale here. This is the one place cache staleness is decided; it replaced the cross-file re-read that
