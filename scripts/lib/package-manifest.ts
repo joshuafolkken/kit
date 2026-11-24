@@ -5,6 +5,7 @@ import { ancestor_directories } from './ancestor-directories'
 import { json_value } from './json-value'
 import { file_reader } from './read-file'
 
+// TEMP #8885 measurement: revert follows.
 // The one place a `package.json` is named and read. Readers across `scripts/` had each spelled the
 // file name and written their own read-then-parse; they now ask here, and choose only how a manifest
 // that cannot be read answers.
