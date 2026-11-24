@@ -29,10 +29,13 @@ function enter_samples(): Array<number> {
 
 // The typed-end WAV's path; `undefined` when it cannot be written.
 function enter_wav(directory?: string): string | undefined {
-	return run_board_sound_wav.cached_samples(
-		NAME,
-		run_board_sound_dtmf.pcm(enter_samples()),
-		run_board_sound_dtmf.SAMPLE_RATE,
+	return run_board_sound_wav.resolved_samples(
+		{
+			name: NAME,
+			key: '',
+			sample_rate: run_board_sound_dtmf.SAMPLE_RATE,
+			render: () => run_board_sound_dtmf.pcm(enter_samples()),
+		},
 		directory,
 	)
 }
