@@ -41,9 +41,9 @@ interface RunInput {
 	branch?: ReadonlyArray<string> | undefined
 	// The name the run is recorded under when it is not the scope's own — `touched` for a `--touched` run.
 	kind?: string
-	// How many test files the cap deferred to CI (`test-related-select.ts`, joshuafolkken/kit#7976);
-	// absent where the run kept the whole suite.
-	deferred?: number
+	// The test files the cap deferred to CI, root-relative (`test-related-select.ts`,
+	// joshuafolkken/kit#7976, joshuafolkken/kit#8893); absent where the run kept the whole suite.
+	deferred?: ReadonlyArray<string>
 	// Every changed code file the selection read, each with the test files it reaches (joshuafolkken/kit#7735).
 	reach?: ReadonlyArray<ReachedCount> | undefined
 	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
@@ -196,17 +196,22 @@ function stage_record(stages: StageTimes = {}): StageTimes {
 	return record
 }
 
-// How many test files the cap deferred to CI, and the hub of the run's own change that put it there
-// (joshuafolkken/kit#5699) — the one the run's summary line names (`test_related_cap.hub_of`).
+// How many test files the cap deferred to CI, which ones where it cut any (joshuafolkken/kit#8893), and
+// the hub of the run's own change that put it there (joshuafolkken/kit#5699) — the one the run's
+// summary line names (`test_related_cap.hub_of`).
 function deferred_record(
 	input: Pick<RunInput, 'deferred' | 'reach'>,
 	own: ReadonlyArray<string>,
-): Pick<TestRelatedRecord, 'deferred' | 'over_cap_hub'> {
+): Pick<TestRelatedRecord, 'deferred' | 'deferred_files' | 'over_cap_hub'> {
 	const { deferred, reach = [] } = input
 	if (deferred === undefined) return {}
 	const hub = test_related_cap.hub_of({ deferred, reach }, own)
 
-	return hub === undefined ? { deferred } : { deferred, over_cap_hub: hub }
+	return {
+		deferred: deferred.length,
+		...(deferred.length > 0 && { deferred_files: [...deferred] }),
+		...(hub !== undefined && { over_cap_hub: hub }),
+	}
 }
 
 // The changed file that added the most test files and that number — the run's closing line names it

@@ -15,7 +15,44 @@ const LINT_PROBE_TIMEOUT_MS = 60_000
 const ERROR = 2
 const OFF = 0
 const CONDITION_RULE = '@typescript-eslint/no-unnecessary-condition'
-const RETAINED_RULES = ['no-floating-promises', 'no-misused-promises']
+// joshuafolkken/kit#8886: `no-deprecated` replaces `sonarjs/deprecation`, the one deprecation check
+// tests had.
+const RETAINED_RULES = ['no-floating-promises', 'no-misused-promises', 'no-deprecated']
+// Listed in full, not derived from the rule files, so deleting any `off` line fails the suite.
+const DROPPED_AWS_RULES = [
+	'apigateway-public-api',
+	'ec2-rds-dms-public',
+	'ec2-unencrypted-ebs-volume',
+	'efs-unencrypted',
+	'iam-all-privileges',
+	'iam-privilege-escalation',
+	'iam-public-access',
+	'opensearchservice-domain',
+	'rds-unencrypted-databases',
+	'restricted-ip-admin-access',
+	's3-bucket-granted-access',
+	's3-bucket-insecure-http',
+	's3-bucket-public-access',
+	's3-bucket-versioning',
+	'sagemaker-unencrypted-notebook',
+	'sns-unencrypted-topics',
+	'sqs-unencrypted-queue',
+].map((name) => `sonarjs/aws-${name}`)
+const DROPPED_RULES = [
+	'sonarjs/deprecation',
+	'unicorn/no-nested-ternary',
+	...DROPPED_AWS_RULES,
+	'sonarjs/jsx-no-leaked-render',
+	'sonarjs/no-angular-bypass-sanitization',
+	'sonarjs/no-debounce-throttle-in-render',
+	'sonarjs/no-hook-setter-in-body',
+	'sonarjs/no-mutate-reactive-state-in-updated-hook',
+	'sonarjs/no-uniq-key',
+	'sonarjs/no-useless-react-setstate',
+	'sonarjs/no-vue-class-component',
+	'sonarjs/no-vue-mixins',
+	'sonarjs/prefer-read-only-props',
+]
 const SOURCE_FILE = 'probe.ts'
 const TEST_FILES = ['probe.test.ts', 'probe.e2e.ts']
 const SOURCE = [
@@ -99,7 +136,7 @@ async function diagnostics(linter: ESLint, file: string): Promise<Array<string |
 
 describe('typed test rule subset', () => {
 	it.each(TEST_FILES)(
-		'keeps only the two async safety rules for %s (ac-5d6e9e31)',
+		'keeps only the async safety and deprecation rules for %s (ac-5d6e9e31)',
 		async (file) => {
 			const config: Linter.Config = await create_linter().calculateConfigForFile(file)
 
@@ -126,6 +163,15 @@ describe('typed test rule subset', () => {
 			const config: Linter.Config = await create_linter().calculateConfigForFile(file)
 
 			expect(config.rules).not.toHaveProperty('import/no-unused-modules')
+		},
+	)
+
+	it.each([SOURCE_FILE, ...TEST_FILES])(
+		'resolves the duplicate and not-applicable rules to off for %s (#8886)',
+		async (file) => {
+			const config: Linter.Config = await create_linter().calculateConfigForFile(file)
+
+			for (const rule of DROPPED_RULES) expect(severity(config.rules?.[rule]), rule).toBe(OFF)
 		},
 	)
 })

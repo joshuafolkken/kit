@@ -177,6 +177,6 @@ describe('test_related_select.select with a registry file reaching past the cap'
 			in_process,
 			logic,
 		])
-		expect(selection.deferred).toBe(1 + REGISTRY_TESTS.length)
+		expect(selection.deferred).toHaveLength(1 + REGISTRY_TESTS.length)
 	})
 })

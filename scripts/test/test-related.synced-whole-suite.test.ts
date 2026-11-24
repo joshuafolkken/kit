@@ -60,6 +60,13 @@ const NAMING_WORKERS = path.join('tools', 'test', 'vitest-config-workers.ts')
 const UNIT_GUARD = path.join('scripts', 'test', 'test-unit-guard.ts')
 const WHOLE_SUITE = ['run']
 const NOT_A_REPOSITORY = new Error('not a git repository')
+// A selection the cap cut one test file from.
+const CAPPED_SELECTION = {
+	tests: [FIXED_SOURCE],
+	deferred: [`${FIXED_SOURCE}.deferred.test.ts`],
+	reach: [],
+	method: 'import',
+} as const
 
 function vitest_arguments(): ReadonlyArray<string> {
 	return mocked_run.mock.calls[0]?.[1] ?? []
@@ -176,9 +183,7 @@ describe('test_related.run_related_tests — a main checkout’s gate', () => {
 		mocked_moved.mockResolvedValue({
 			parts: { changed: [pure_files_entries.PURE_FILES_PATH], synced: [] },
 		})
-		const selection = { tests: [FIXED_SOURCE], deferred: 1, reach: [], method: 'import' } as const
-
-		vi.mocked(test_related_select.select).mockResolvedValueOnce(selection)
+		vi.mocked(test_related_select.select).mockResolvedValueOnce(CAPPED_SELECTION)
 
 		await test_related.run_related_tests([])
 

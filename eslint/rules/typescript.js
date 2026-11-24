@@ -32,6 +32,8 @@ export const typescript_rules = {
 	'@typescript-eslint/no-floating-promises': 'error',
 	// 誤ったPromiseの使い方を禁止
 	'@typescript-eslint/no-misused-promises': 'error',
+	// 非推奨 API の使用を禁止（sonarjs/deprecation の代わり。joshuafolkken/kit#8886）
+	'@typescript-eslint/no-deprecated': 'error',
 	// switch文のフォールスルーを禁止
 	'@typescript-eslint/switch-exhaustiveness-check': 'error',
 	// 厳格なboolean式

@@ -54,6 +54,9 @@ export const unicorn_rules = {
 	],
 	// より良いエラーメッセージ
 	'unicorn/error-message': 'error',
+	// joshuafolkken/kit#8886: every line it reports, core `no-nested-ternary` and
+	// `sonarjs/no-nested-conditional` report too, so it only repeats their findings.
+	'unicorn/no-nested-ternary': 'off',
 	// ファイル名のケース統一（unicorn 65 で既定 true になった checkDirectories を無効化し、
 	// ディレクトリ名は検査しない。ディレクトリ構造は SvelteKit とプロジェクト規約が決める）
 	'unicorn/filename-case': ['error', { case: 'kebabCase', checkDirectories: false }],

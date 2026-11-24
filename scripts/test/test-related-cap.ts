@@ -67,7 +67,7 @@ function hub_of(
 	selection: Pick<Selection, 'deferred' | 'reach'>,
 	own: ReadonlyArray<string>,
 ): string | undefined {
-	if (selection.deferred === 0) return undefined
+	if (selection.deferred.length === 0) return undefined
 
 	return over_cap(selection.reach.filter((reached) => own.includes(reached.file)))
 		.toSorted((first, second) => second.count - first.count)
@@ -78,13 +78,13 @@ function hub_of(
 // were deferred to CI, and the hub.
 function deferred_line(selection: Selection, own: ReadonlyArray<string>): string | undefined {
 	const { deferred, tests } = selection
-	if (deferred === 0) return undefined
+	if (deferred.length === 0) return undefined
 	const { COMMAND_LABEL } = related_scope
 	const cap = String(test_pinned_logic.MAX_TEST_FILES)
 	const hub = hub_of(selection, own)
 	const hub_part = hub === undefined ? '' : `, hub ${hub}`
 
-	return `${COMMAND_LABEL}: ${String(tests.length)} test files run, ${String(deferred)} deferred to CI past the cap (${cap} test files)${hub_part}`
+	return `${COMMAND_LABEL}: ${String(tests.length)} test files run, ${String(deferred.length)} deferred to CI past the cap (${cap} test files)${hub_part}`
 }
 
 function report_deferred(selection: Selection, own: ReadonlyArray<string>): void {
