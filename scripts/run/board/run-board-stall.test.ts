@@ -93,6 +93,12 @@ function left_after_stall(): { frame: string | undefined; stops: Array<string> }
 	return { frame: frames.at(-1), stops: fake.stops }
 }
 
+// Fires the probe `late_ms` past its due time.
+function fire_late(fake: FakeProbes, late_ms: number): void {
+	fake.clock.now_ms += PROBE_MS + late_ms
+	fake.fire()
+}
+
 // A stage mark that keeps every stage entered.
 function marker(stages: Array<StallStage>): (stage: StallStage) => void {
 	return (stage) => {
@@ -159,6 +165,44 @@ describe('run_board_stall.watch stage and threshold', () => {
 	})
 })
 
+// joshuafolkken/kit#8825: each stall says when it began, and every probe's lateness is kept as wake lag.
+describe('run_board_stall.watch start and wake lag', () => {
+	const SHORT_LAG_MS = 20
+	const LONG_LAG_MS = 100
+
+	it('says a stall began when its gap opened, counted from the watch start', () => {
+		const fake = fake_probes()
+		const watch = run_board_stall.watch(fake.probes)
+
+		fire_late(fake, 0)
+		fire_late(fake, STALL_MS)
+
+		expect(watch.stalls()).toStrictEqual([expect.objectContaining({ at_ms: PROBE_MS })])
+		expect(watch.rows()[1]?.[1]).toMatch(/ · at 50$/u)
+	})
+
+	it('says the wake lag max, median and the wakes later than LATE_MS', () => {
+		const fake = fake_probes()
+		const watch = run_board_stall.watch(fake.probes)
+
+		fire_late(fake, 0)
+		fire_late(fake, LONG_LAG_MS)
+		fire_late(fake, SHORT_LAG_MS)
+
+		expect(watch.lags()).toStrictEqual([0, LONG_LAG_MS, SHORT_LAG_MS])
+		expect(watch.rows()).toStrictEqual([
+			['stalls', `n 0 over ${String(STALL_MS)}`],
+			['wake lag', `max 100.0 · median 20.0 · n 1 over ${String(run_board_stall.LATE_MS)} (n 3)`],
+		])
+	})
+
+	it('says no wake lag before the first probe', () => {
+		const { probes } = fake_probes()
+
+		expect(run_board_stall.watch(probes).rows()).toStrictEqual([['stalls', 'n 0 over 200']])
+	})
+})
+
 describe('run_board_stall.watch stop', () => {
 	it('stops its probe and its GC observer', () => {
 		const { probes, stops } = fake_probes()
@@ -176,7 +220,7 @@ describe('run_board_timing.timed stalls', () => {
 		// The rows are padded to the longest name the report says, the heaps' among them.
 		expect(frame).toMatch(new RegExp(`stalls +n 1 over ${String(STALL_MS)}`, 'u'))
 		expect(frame).toMatch(
-			new RegExp(String.raw`stall 1 +${STALL_LENGTH.toFixed(1)} turn · gc 30\.0`, 'u'),
+			new RegExp(String.raw`stall 1 +${STALL_LENGTH.toFixed(1)} turn · gc 30\.0 · at 0`, 'u'),
 		)
 		expect(stops).toStrictEqual(['probe', 'gc'])
 	})

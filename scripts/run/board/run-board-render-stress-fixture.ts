@@ -2,7 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
-import type { BoardRow, QueuedEntry, RowReason } from './run-board-layout'
+import type { BoardLayout, BoardRow, QueuedEntry, RowReason } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -44,18 +44,22 @@ function waiting_on(number: number, reason: RowReason): BoardRow {
 	return { ...row(number, 'waiting'), reason }
 }
 
-function running(number: number): BoardRow {
+type Track = NonNullable<ItemStatus['track']>
+
+function running(number: number, track: Track = ['implement']): BoardRow {
 	const status = {
 		state: 'running' as const,
 		started_ms: NOW - RUN_MINUTES * MINUTE,
-		track: ['implement' as const],
+		track,
 		phase_ms: NOW - PHASE_MINUTES * MINUTE,
 	}
 
 	return row(number, 'running', status)
 }
 
-function active(): Array<BoardRow> {
+// The live lanes, the first one's phase failed when `is_failed` — the 💥 a redraw over the board
+// without it replays as a deja vu (joshuafolkken/kit#8825).
+function active(is_failed: boolean): Array<BoardRow> {
 	const stopped = {
 		state: 'stopped' as const,
 		started_ms: NOW - STOPPED_MINUTES * MINUTE,
@@ -64,7 +68,7 @@ function active(): Array<BoardRow> {
 	const merged = { state: 'merged' as const, started_ms: STARTED, ended_ms: NOW - MINUTE }
 
 	return [
-		running(RUNNING),
+		running(RUNNING, is_failed ? ['implement', 'failed'] : ['implement']),
 		running(HELD),
 		row(STOPPED, 'stopped', stopped),
 		row(DONE, 'merged', merged),
@@ -90,10 +94,19 @@ const hold: BudgetWait = {
 	reason: 'pressure',
 }
 
-function board(): BoardHeader {
-	const layout = { ...EMPTY_LAYOUT, active: active(), queued: queued() }
+// The stress board's rows: its live lanes, one of them failed when `is_failed`, and its long-running
+// waits.
+function layout(is_failed = false): BoardLayout {
+	return { ...EMPTY_LAYOUT, active: active(is_failed), queued: queued() }
+}
 
-	return header({ layout, budget_waits: [hold], usages: board_usage(new Map()), spinner: '⠋' })
+function board(): BoardHeader {
+	return header({
+		layout: layout(),
+		budget_waits: [hold],
+		usages: board_usage(new Map()),
+		spinner: '⠋',
+	})
 }
 
 function notes(): Array<BoardNote> {
@@ -119,6 +132,7 @@ const run_board_render_stress_fixture = {
 	RUNNING,
 	STOPPED,
 	WIDE_REASON,
+	layout,
 	lines_on,
 }
 

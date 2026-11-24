@@ -22,6 +22,7 @@ import {
 	type DataPost,
 } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
+import { run_board_timing } from './run-board-timing'
 import { run_board_worker_entry, type WorkerLaunch } from './run-board-worker-entry'
 import { run_board_worker_limits } from './run-board-worker-limits'
 
@@ -336,7 +337,7 @@ function listen(thread: Thread, worker: GatherWorker, now: () => number): void {
 
 	worker.on('message', (value) => {
 		launch_timing.mark(WORKER_PHASE, now() - spawned_ms)
-		if (is_post(value)) receive(thread, value)
+		if (is_post(value)) run_board_timing.received(receive, thread, value)
 		else if (is_failed(value)) said_failed(thread, value.failed, now)
 	})
 	worker.on('error', (error) => {
