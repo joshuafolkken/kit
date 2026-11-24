@@ -57,7 +57,8 @@ function block_ceiling(size: number): number {
 // a stale entry (a file that no longer exists or that an entry now reads) and on an un-budgeted
 // unreached file, so the definition cannot rot as documents move on or off the execution path.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
-	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 4096 },
+	// The gate's golden replay check (joshuafolkken/kit#8766) crossed the 4096 block.
+	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 8192 },
 	// The `DEMO_BEATS` / `DEMO_SEED` replay form (joshuafolkken/kit#8750) crossed the 8192 block.
 	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 12_288 },
 	{ path: '.claude/skills/board-theme/theme-split.md', bytes: 4096 },

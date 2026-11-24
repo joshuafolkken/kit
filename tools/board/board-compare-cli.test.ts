@@ -2,7 +2,7 @@ import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
 import { describe, expect, it } from 'vitest'
 import { board_compare_cli, type ComparePorts } from './board-compare-cli'
 
-const { beats_of, board_argv, options_of, run } = board_compare_cli
+const { board_argv, options_of, run } = board_compare_cli
 const ARGV = ['demo.mjs', '--theme', 'bttf', '--columns', '8', '--rows', '2']
 const DIVERGED_EXIT_CODE = 1
 const FAILURE_EXIT_CODE = 2
@@ -112,23 +112,6 @@ describe('board_compare_cli arguments', () => {
 			'120',
 			'--rows',
 			'40',
-		])
-	})
-})
-
-describe('board_compare_cli.beats_of', () => {
-	it.each([
-		['raw terminal bytes', '\u{1B}[?1049h\u{1B}[2J'],
-		['a line without a wait', '{"text":"a"}\n'],
-		['nothing', ''],
-	])('reads no beats from %s', (_, lines) => {
-		expect(beats_of(lines)).toBeUndefined()
-	})
-
-	it('reads one beat per JSON line', () => {
-		expect(beats_of('{"text":"a","ms":1}\n{"text":"b","ms":2}\n')).toStrictEqual([
-			{ text: 'a', ms: 1 },
-			{ text: 'b', ms: 2 },
 		])
 	})
 })

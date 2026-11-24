@@ -1,0 +1,8 @@
+{
+	"reason": "golden replay check: the new board-golden module, its tests and the docs on recording golden replays",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 97,
+		"ai_cost.on_demand_bytes": 130
+	}
+}

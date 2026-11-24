@@ -5,8 +5,9 @@ import { parseArgs, promisify } from 'node:util'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_board_replay } from '#scripts/run/board/run-board-replay'
 import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
-import { board_compare_diff, type Divergence, type Mode } from './board-compare-diff'
-import { board_compare_screen, type Size } from './board-compare-screen'
+import type { Mode } from './board-compare-diff'
+import { board_compare_report } from './board-compare-report'
+import type { Size } from './board-compare-screen'
 
 // `josh board:compare` (joshuafolkken/kit#8754): a theme demo and the live board replayed under one seed,
 // both beat streams drawn through a terminal emulator and compared screen by screen at each moment
@@ -54,6 +55,8 @@ interface ComparePorts {
 	readonly board_beats: (argv: ReadonlyArray<string>) => Promise<Array<Beat> | undefined>
 	readonly write: (text: string) => void
 }
+
+const { beats_of, compared, report } = board_compare_report
 
 type Parsed = ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>
 
@@ -114,29 +117,6 @@ function board_argv(options: CompareOptions): Array<string> {
 	]
 }
 
-function report(divergence: Divergence | undefined): string {
-	if (divergence === undefined) return 'board:compare — 0 differences\n'
-	const head = `board:compare — diverged at ${String(divergence.at_ms)} ms: ${String(divergence.count)} differences`
-	const samples = divergence.samples.map(
-		(sample) => `  ${sample.where}: expected ${sample.expected} · actual ${sample.actual}`,
-	)
-
-	return `${[head, ...samples].join('\n')}\n`
-}
-
-async function compared(
-	options: CompareOptions,
-	expected: Array<Beat>,
-	actual: Array<Beat>,
-): Promise<Divergence | undefined> {
-	const [left, right] = await Promise.all([
-		board_compare_screen.shots_of(expected, options.size),
-		board_compare_screen.shots_of(actual, options.size),
-	])
-
-	return board_compare_diff.first_divergence(left, right, options.mode)
-}
-
 // The report for two beat streams, or the refusal when the demo wrote no beats.
 async function verdict(
 	options: CompareOptions,
@@ -146,7 +126,7 @@ async function verdict(
 	const expected = await ports.demo_beats(options)
 
 	if (expected === undefined) return { text: `${NO_BEATS}\n`, code: FAILURE_EXIT_CODE }
-	const divergence = await compared(options, expected, actual)
+	const divergence = await compared(expected, actual, options.size, options.mode)
 
 	return { text: report(divergence), code: divergence === undefined ? 0 : DIVERGED_EXIT_CODE }
 }
@@ -179,34 +159,6 @@ async function run(argv: ReadonlyArray<string>, ports: ComparePorts): Promise<nu
 	}
 }
 
-function is_beat(value: unknown): value is Beat {
-	if (typeof value !== 'object' || value === null) return false
-
-	return (
-		typeof Reflect.get(value, 'text') === 'string' && typeof Reflect.get(value, 'ms') === 'number'
-	)
-}
-
-function beat_of(line: string): Beat | undefined {
-	try {
-		const value: unknown = JSON.parse(line)
-
-		return is_beat(value) ? value : undefined
-	} catch {
-		return undefined
-	}
-}
-
-// One beat per JSON line; undefined where any line is not one, as a demo without the beats form writes.
-function beats_of(lines: string): Array<Beat> | undefined {
-	const beats = lines
-		.split('\n')
-		.filter((line) => line !== '')
-		.map((line) => beat_of(line))
-
-	return beats.length > 0 && beats.every((beat) => beat !== undefined) ? beats : undefined
-}
-
 async function demo_beats(options: CompareOptions): Promise<Array<Beat> | undefined> {
 	const environment = {
 		...process.env,
@@ -236,7 +188,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run(process.argv.slice(ARGV_OFFSET), { demo_beats, board_beats, write })
 }
 
-const board_compare_cli = { beats_of, board_argv, options_of, run }
+const board_compare_cli = { board_argv, options_of, run }
 
 export { board_compare_cli }
 export type { CompareOptions, ComparePorts }

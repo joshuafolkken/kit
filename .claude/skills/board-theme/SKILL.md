@@ -62,6 +62,8 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
   the waiting mark, gauges) — numbers without the assignment caused #8354's two misses (#8390).
 - **Write in the body and the acceptance criteria that the new effect leaves the existing themes'
   look unchanged** (#8376).
+- A look approved or changed → record its golden replay in that PR: `docs/josh-commands-board.md` →
+  "`josh board:compare`".
 - Demo-backed: a seam child, then parallel effect children ([split](theme-split.md)).
 
 ## 6. After the first merge
