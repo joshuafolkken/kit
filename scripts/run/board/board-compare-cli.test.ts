@@ -62,6 +62,21 @@ describe('board_compare_cli.run refusals', () => {
 		expect(await run(ARGV, ports_of([], undefined))).toBe(FAILURE_EXIT_CODE)
 	})
 
+	it.each([
+		['the demo', 'demo_beats'],
+		['the replay', 'board_beats'],
+	] as const)('prints the error and exits 2 where %s fails', async (_, port) => {
+		const ports = {
+			...ports_of([], []),
+			[port]: async () => {
+				throw new Error('Command failed: exit 1')
+			},
+		}
+
+		expect(await run(ARGV, ports)).toBe(FAILURE_EXIT_CODE)
+		expect(ports.out.join('')).toBe('board:compare — Command failed: exit 1\n')
+	})
+
 	it('names the beats form and exits 2 where the demo writes no beat lines', async () => {
 		const ports = { ...ports_of([], []), demo_beats: async () => undefined }
 

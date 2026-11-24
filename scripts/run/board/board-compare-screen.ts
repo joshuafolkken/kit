@@ -68,7 +68,14 @@ function read(terminal: Emulator, size: Size): Array<Array<Cell>> {
 // One shot per beat: its write time and the screen its bytes leave. The emulator runs each write's
 // callback in order once its bytes are parsed, so each read sees its own beat's screen.
 async function shots_of(beats: ReadonlyArray<Beat>, size: Size): Promise<Array<Shot>> {
-	const terminal = new TERMINAL({ cols: size.columns, rows: size.rows, allowProposedApi: true })
+	// `convertEol`: a bare `\n` starts its row at column 0, as the demos' and the board's line breaks do
+	// on the tty, whose output processing adds the carriage return.
+	const terminal = new TERMINAL({
+		cols: size.columns,
+		rows: size.rows,
+		allowProposedApi: true,
+		convertEol: true,
+	})
 	const shots: Array<Shot> = []
 	let at_ms = 0
 

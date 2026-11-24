@@ -151,7 +151,7 @@ async function verdict(
 	return { text: report(divergence), code: divergence === undefined ? 0 : DIVERGED_EXIT_CODE }
 }
 
-async function run(argv: ReadonlyArray<string>, ports: ComparePorts): Promise<number> {
+async function compared_run(argv: ReadonlyArray<string>, ports: ComparePorts): Promise<number> {
 	const options = options_of(argv)
 	const actual = options && (await ports.board_beats(board_argv(options)))
 
@@ -166,6 +166,17 @@ async function run(argv: ReadonlyArray<string>, ports: ComparePorts): Promise<nu
 	ports.write(text)
 
 	return code
+}
+
+// A demo or replay that fails (a non-zero exit, a missing script) is a refusal, not a divergence.
+async function run(argv: ReadonlyArray<string>, ports: ComparePorts): Promise<number> {
+	try {
+		return await compared_run(argv, ports)
+	} catch (error) {
+		ports.write(`board:compare — ${error instanceof Error ? error.message : String(error)}\n`)
+
+		return FAILURE_EXIT_CODE
+	}
 }
 
 function is_beat(value: unknown): value is Beat {

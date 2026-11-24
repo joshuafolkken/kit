@@ -22,6 +22,15 @@ describe('board_compare_screen.shots_of', () => {
 		])
 	})
 
+	it('starts the row after a bare line break at column 0, as the tty does', async () => {
+		const [shot] = await board_compare_screen.shots_of([{ text: 'a\nb', ms: 0 }], SIZE)
+
+		expect(shot?.cells.map((row) => row.map((cell) => cell.char).join(''))).toStrictEqual([
+			'a   ',
+			'b   ',
+		])
+	})
+
 	it('reads the colors and attributes of a cell', async () => {
 		const [shot] = await board_compare_screen.shots_of([{ text: `${ESC}1;4;31;42mx`, ms: 0 }], SIZE)
 

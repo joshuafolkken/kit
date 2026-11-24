@@ -1,7 +1,8 @@
 {
-	"reason": "New josh board:compare command (terminal-emulator screen diff, beat pairing, CLI) and its tests, #8754",
+	"reason": "Generated catalog row marks board:compare **kit only** (it imports the devDependency @xterm/headless), #8754",
 	"date": "2026-11-24",
 	"growth": {
-		"scripts.code_lines": 357
+		"scripts.code_lines": 370,
+		"prose.excess_bold": 1
 	}
 }

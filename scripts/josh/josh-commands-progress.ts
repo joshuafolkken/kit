@@ -305,6 +305,9 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			['files', 'network', 'processes'],
 		],
 		is_read_only: true,
+		// Kit-only: it imports the kit devDependency `@xterm/headless`, and the theme demos it
+		// compares live in kit's own skills.
+		is_kit_only: true,
 		usage: {
 			examples: [
 				{ arguments: `<demo.mjs> ${BTTF_THEME}`, note: 'cell by cell' },
