@@ -200,7 +200,18 @@ describe('run_board_reveal_rain.beats_of — a later beat writes only what chang
 		expect(later).toStrictEqual([synced(''), synced('')])
 	})
 
-	// joshuafolkken/kit#8897: reading it per cell stalled the matrix reveal.
+	it('leaves on the terminal, after every beat, the screen that beat draws written whole', () => {
+		const size = { columns: 6, rows: 3 }
+		const beats = beats_with_screens(`${GREEN}漢字${OFF}ab\ncd\n漢x`, size)
+		const applied = screens(beats.map(([text]) => text))
+
+		expect(beats.length).toBeGreaterThan(2)
+		expect(applied).toStrictEqual(beats.map(([, rows]) => rows))
+	})
+})
+
+// joshuafolkken/kit#8897: reading it per cell stalled the matrix reveal.
+describe("run_board_reveal_rain.beats_of — stdout's color depth", () => {
 	it("reads stdout's color depth once per beat, not once per drop", () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const drawn = run_board_labels.painted(run_board_header_trace.SHADES.head, GLYPH)
@@ -212,13 +223,17 @@ describe('run_board_reveal_rain.beats_of — a later beat writes only what chang
 		depth.mockRestore()
 	})
 
-	it('leaves on the terminal, after every beat, the screen that beat draws written whole', () => {
-		const size = { columns: 6, rows: 3 }
-		const beats = beats_with_screens(`${GREEN}漢字${OFF}ab\ncd\n漢x`, size)
-		const applied = screens(beats.map(([text]) => text))
+	it("reads stdout's color depth once per beat when each beat rewrites its changed runs", () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const depth = vi.spyOn(WriteStream.prototype, 'getColorDepth')
+		const dropped = [DROP, DROP, DROP, DROP]
+		const passed = [BEHIND, BEHIND, BEHIND, BEHIND]
+		const read = queued([...dropped, ...passed, ...dropped, ...passed])
+		const beats = [...beats_of('abcd', () => HALF, { read })]
 
-		expect(beats.length).toBeGreaterThan(2)
-		expect(applied).toStrictEqual(beats.map(([, rows]) => rows))
+		expect(beats[1]?.text).toContain(`${ESC}[1;1H`)
+		expect(depth).toHaveBeenCalledTimes(beats.length)
+		depth.mockRestore()
 	})
 })
 
