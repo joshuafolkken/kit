@@ -158,6 +158,33 @@ How kit uses it:
 
 Leave it out: every lane worker runs on `JOSH_WORKER_MODEL` / `JOSH_WORKER_EFFORT` or kit's defaults, kit reads no `worker:` label, and no worker escalates.
 
+## `josh.handoff`
+
+Picks the model the [`josh run:handoff`](./josh-commands-board.md) `kickoff` child (filing and planning) runs on.
+
+| Setting              | Value                                                                | Default |
+| -------------------- | -------------------------------------------------------------------- | ------- |
+| `josh.handoff.route` | `true` runs the `kickoff` child on the weakest `josh.worker` profile | `false` |
+
+How kit uses it:
+
+- The profile: with `route: true`, the `kickoff` child runs on the model and effort of the first profile in `josh.worker.profiles`. It keeps the scheduler role, so it still reads `CLAUDE.md`. With `josh.worker` unset, or a first profile on another provider, it runs on the scheduler profile.
+- Unchanged: the `retrospective` child, the `fullrun` / `halfrun` / `prrun` children, the `josh backlogrun` parent, `josh backlog:drive` and the wake session keep their role profiles.
+- Environment variables: `JOSH_SCHEDULER_MODEL` or `JOSH_SCHEDULER_EFFORT`, when set, win over the route.
+- The revert switch: `route: false` returns the `kickoff` child to the scheduler profile in one step.
+- Reading the cost: [`josh cost:audit`](./josh-commands-session.md) splits the hand-off rows by keyword (`handoff:kickoff`, `handoff:retrospective`, …); compare the `handoff:kickoff` row over the same period before and after the switch.
+- Reading the quality: over the Issues the `kickoff` child filed in the same two periods, count those whose plan was recorded more than once (`josh issue:plan`), those split again after filing (a `josh lane:plan` `split`, an `epic --promote`) and those sent back with `needs-decision`. More of any of them after the switch → set `route: false`.
+
+```json
+{
+	"josh": {
+		"handoff": { "route": true }
+	}
+}
+```
+
+Leave it out: the `kickoff` child runs on `JOSH_SCHEDULER_MODEL` / `JOSH_SCHEDULER_EFFORT` or kit's defaults.
+
 ## Written by kit
 
 `josh.workflow` is not a setting you write. `josh start` records `"workflow": "github"` there, and every later `josh init` and `josh sync` reads it to give a `basic` project `.claude/settings.json` ([`JOSH_WORKFLOW`](./environment-variables.md)).

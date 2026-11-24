@@ -12,7 +12,11 @@ vi.mock('./format-steps', () => ({ format_steps: { run_scoped: vi.fn(async () =>
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('./lint-parallel', () => ({
-	lint_parallel: { run_lint_checks: vi.fn(), run_lint_parallel_checks: vi.fn() },
+	lint_parallel: {
+		run_lint_checks: vi.fn(),
+		run_lint_parallel_checks: vi.fn(),
+		with_import_cycles: vi.fn(async (lint: Promise<number>) => await lint),
+	},
 }))
 // Mocked so no case reads or writes this checkout's real records.
 vi.mock('#scripts/gate/scoped-green', () => ({

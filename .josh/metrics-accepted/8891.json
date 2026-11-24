@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 72
+	},
+	"reason": "#8891 adds the run:handoff kickoff route (run-handoff-route.ts) and the josh.handoff schema",
+	"date": "2026-11-24"
+}

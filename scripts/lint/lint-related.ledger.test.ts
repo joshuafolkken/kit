@@ -18,7 +18,12 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [SOURCE] },
 }))
 vi.mock('./format-steps', () => ({ format_steps: { run_scoped: vi.fn() } }))
-vi.mock('./lint-parallel', () => ({ lint_parallel: { run_lint_checks: vi.fn() } }))
+vi.mock('./lint-parallel', () => ({
+	lint_parallel: {
+		run_lint_checks: vi.fn(),
+		with_import_cycles: vi.fn(async (lint: Promise<number>) => await lint),
+	},
+}))
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))

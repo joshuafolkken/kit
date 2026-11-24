@@ -26,8 +26,8 @@ export const import_rules = {
 	// 名前付きエクスポートを優先
 	'import/prefer-default-export': 'off',
 	'import/no-default-export': 'error',
-	// Skip dependencies outside the project without limiting internal cycle depth (#6405).
-	'import/no-cycle': ['error', { ignoreExternal: true }],
+	// joshuafolkken/kit#8887: import cycles are found once over the import graph by `josh lint`
+	// (`scripts/lint/import-cycles.ts`), not again from every linted file.
 	// CommonJSを禁止
 	'import/no-commonjs': 'error',
 	// AMD形式を禁止

@@ -12,6 +12,7 @@ import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import type { LaunchRequest } from '#scripts/run/detached-launch'
 import { run_headless } from '#scripts/run/run-headless'
 import type { WorkflowHandoff, WorkflowKeyword } from './run-handoff-args'
+import { run_handoff_route } from './run-handoff-route'
 
 // The child `josh run:handoff` starts: the role its keyword runs as, the prompt, the argv and the log.
 //
@@ -30,6 +31,8 @@ interface HandoffChild {
 	role: AgentRole
 	provider: AgentProvider
 	cwd: string
+	// The keyword the child runs; a caller that builds its own child (`backlog-drive-unit.ts`) names none.
+	keyword?: WorkflowKeyword
 }
 
 // `kickoff` files and plans, as the scheduler does; the runs that implement are the worker's.
@@ -84,7 +87,15 @@ function argv_of(
 
 	if (resolved.kind === 'rejected') return resolved
 
-	return agent_argv.with_profile_in(child.prompt, resolved.profile, child.cwd)
+	const { keyword, cwd } = child
+	const profile = run_handoff_route.profile_of({
+		keyword,
+		resolved: resolved.profile,
+		environment: chosen,
+		cwd,
+	})
+
+	return agent_argv.with_profile_in(child.prompt, profile, cwd)
 }
 
 function log_path(git_directory: string, keyword: WorkflowKeyword, now: number): string {

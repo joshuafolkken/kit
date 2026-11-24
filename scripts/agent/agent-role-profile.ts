@@ -99,6 +99,13 @@ const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> =
 
 const LEGACY_WORKER_KEYS = { model: 'JOSH_LANE_MODEL', effort: 'JOSH_LANE_EFFORT' }
 
+// The env keys a person names a role's model and effort with.
+function role_keys(role: AgentRole): ReadonlyArray<string> {
+	const keys = ENV_KEYS[role]
+
+	return [keys.model, keys.effort]
+}
+
 // Every env key a profile is read from. The unit suite blanks them so a lane's model and effort never
 // reach its fixtures (joshuafolkken/kit#5863); its test pins each to the pattern its config blanks.
 const PROFILE_KEYS: ReadonlyArray<string> = [
@@ -305,6 +312,7 @@ const agent_role_profile = {
 	resolve,
 	resolve_provider,
 	resolve_review,
+	role_keys,
 	validate,
 	warn_of_default,
 	with_phase,
