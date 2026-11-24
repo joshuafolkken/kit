@@ -1,13 +1,14 @@
-import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import type { KeyInput } from './run-board-keys'
 
 // joshuafolkken/kit#4172: the live board reads its keys in raw mode, names them on its footer, and
 // leaves raw mode with the alternate screen; a frame nobody types into reads no key and is unchanged.
 
 const { STOPPED, harness } = run_board_fixture
+const { lines_of, terminal_of } = run_board_frame_fixture
 const ESCAPE = '\u{1B}'
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const KEYS_LINE = ' u l p f q w d: fold · a: all · s: sound · Ctrl-C: quit'
@@ -36,7 +37,7 @@ describe('run_board_cli.run keys', () => {
 		const { ports, frames, leaves } = harness(undefined, [])
 
 		await expect(run_board_cli.run([], { ...ports, keys: keyboard(calls) })).rejects.toBe(STOPPED)
-		expect(stripVTControlCharacters(frames[1] ?? '').endsWith(KEYS_LINE)).toBe(true)
+		expect(lines_of(terminal_of(frames)).at(-1)?.endsWith(KEYS_LINE)).toBe(true)
 		expect(calls).toStrictEqual(['raw true', 'listen', 'raw false', 'close'])
 		expect(frames.at(-1)).toBe(LEAVE)
 		leaves[0]?.()

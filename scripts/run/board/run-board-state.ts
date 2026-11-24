@@ -67,6 +67,10 @@ interface BoardPorts {
 	// Writes text a theme already drew, past the theme `write` puts it through; none where no theme
 	// draws, so `write` takes it.
 	write_drawn?: ((text: string) => void) | undefined
+	// Settles once the terminal has taken every write (`run-board-write-port.ts`); none never waits.
+	drained?: (() => Promise<void>) | undefined
+	// The theme's restyle of text `write` would put through it; none where no theme draws.
+	restyle?: ((text: string) => string) | undefined
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
 	link: Link
 	// Whether stdout is a terminal — only a terminal gets the alternate screen and the spinner.

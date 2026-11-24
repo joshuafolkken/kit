@@ -23,20 +23,26 @@ function trace_bytes(spot: Spot, at_ms: number): string {
 	return `${CSI}${String(spot.row)};${String(spot.column)}H${run_board_header_trace.alert_at(at_ms)}`
 }
 
+// Every spot recolored where the field's light changed since `since`; all of them with no `since`.
+function traces_bytes(
+	spots: ReadonlyArray<Spot>,
+	at_ms: number,
+	since: number | undefined,
+): string {
+	const { is_lit } = run_board_header_trace
+
+	if (since !== undefined && is_lit(at_ms) === is_lit(since)) return ''
+
+	return spots.map((spot) => trace_bytes(spot, at_ms)).join('')
+}
+
 function write_traces(
 	spots: ReadonlyArray<Spot>,
 	ports: Pick<BoardPorts, 'write' | 'write_drawn'>,
 	at_ms: number,
 	since: number | undefined,
 ): void {
-	if (
-		since !== undefined &&
-		run_board_header_trace.is_lit(at_ms) === run_board_header_trace.is_lit(since)
-	) {
-		return
-	}
-
-	const bytes = spots.map((spot) => trace_bytes(spot, at_ms)).join('')
+	const bytes = traces_bytes(spots, at_ms, since)
 
 	if (bytes === '') return
 	const write = ports.write_drawn ?? ports.write
@@ -44,6 +50,6 @@ function write_traces(
 	write(run_board_screen.synced(bytes))
 }
 
-const run_board_trace_spot = { traces_in, write_traces }
+const run_board_trace_spot = { traces_bytes, traces_in, write_traces }
 
 export { run_board_trace_spot }

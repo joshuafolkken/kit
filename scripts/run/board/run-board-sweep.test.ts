@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import { run_board_labels } from './run-board-labels'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin } from './run-board-spin'
@@ -9,16 +10,15 @@ import { run_board_type_rows } from './run-board-type-rows'
 
 const { SWEEP_MS, sweep_bytes, sweep_index, sweep_of } = run_board_sweep
 const { SPOT, TICK } = run_board_spot
-const { REDRAW_MS, spin_to_second, spun } = run_board_spin
-const { SPINNER_INTERVAL_MS } = run_board_labels
+const { REDRAW_MS, spun } = run_board_spin
+const { cell_at, is_near, row_text, screens_of, spin_to_second } = run_board_frame_fixture
+const { spinner_of } = run_board_labels
 const START = Date.parse('2026-11-19T09:00:00.000Z')
 const WIDE = { rows: 24, columns: 80 }
 const CELLS = 20
 const ESCAPE = '\u{1B}'
 const DOT = '■'
 const SWEEP = { row: 4, left: 8 }
-// eslint-disable-next-line no-control-regex -- a sweep write is a cursor move then its cells
-const SWEEP_WRITE = /\u{1B}\[4;8H([ ■]{20})/u
 
 describe('run_board_sweep.sweep_index', () => {
 	it('moves one cell every 50 ms and starts again on the second', () => {
@@ -103,11 +103,24 @@ function clocked(now_ms: number): {
 	return { ports, writes }
 }
 
+// The sweep's dot cell on screen after each write that moved it.
 function dot_cells(writes: ReadonlyArray<{ text: string }>): Array<number> {
+	const dots = screens_of(writes).map((screen) =>
+		row_text(screen, SWEEP.row)
+			.slice(SWEEP.left - 1)
+			.indexOf(DOT),
+	)
+
+	return dots.filter((dot, index) => dot !== dots[index - 1])
+}
+
+// The moments the spinner at the top-left turned on screen, each with the frame it shows.
+function turns_of(writes: ReadonlyArray<{ at_ms: number; text: string }>): Array<[number, string]> {
+	const shown = screens_of(writes).map((screen) => cell_at(screen, 1, 1).char)
+
 	return writes
-		.map(({ text }) => SWEEP_WRITE.exec(text)?.[1])
-		.filter((cells) => cells !== undefined)
-		.map((cells) => cells.indexOf(DOT))
+		.map(({ at_ms }, index): [number, string] => [at_ms, shown[index] ?? ''])
+		.filter(([, char], index) => char !== shown[index - 1])
 }
 
 describe('run_board_spin.spin_to_second — the sweep (joshuafolkken/kit#8240)', () => {
@@ -140,9 +153,13 @@ describe('run_board_spin.spin_to_second — the sweep (joshuafolkken/kit#8240)',
 		await spin_to_second({ ...TURNING, sweep: SWEEP }, swept.ports)
 		await spin_to_second(TURNING, plain.ports)
 
-		const turned = swept.writes.filter(({ text }) => text.includes(`${ESCAPE}[1;1H`))
+		const turned = turns_of(swept.writes)
+		const turned_ms = turned.map(([at_ms]) => at_ms - START)
+		const boundaries = turns_of(plain.writes).map(([at_ms]) => at_ms - START)
 
-		expect(turned.map(({ at_ms }) => at_ms)).toStrictEqual(plain.writes.map(({ at_ms }) => at_ms))
-		expect(turned.every(({ at_ms }) => (at_ms - START) % SPINNER_INTERVAL_MS === 0)).toBe(true)
+		// joshuafolkken/kit#8826: a turn a sweep step just drew is held back by at most one refresh.
+		expect(turned).toHaveLength(boundaries.length)
+		expect(boundaries.every((due_ms) => is_near(turned_ms, due_ms))).toBe(true)
+		expect(turned.every(([at_ms, char]) => char === spinner_of(at_ms))).toBe(true)
 	})
 })

@@ -69,18 +69,19 @@ function spun(cell: PaintCell, t: number, noise: Noise): PaintCell {
 	return { ...cell, text, fg: WHITE, bg: undefined }
 }
 
+// joshuafolkken/kit#8826: the header's rows gathered in one pass over the board, not a scan a row.
+function header_rows_of(cells: ReadonlyArray<PaintCell>): Array<Array<PaintCell>> {
+	const rows = Array.from({ length: HEADER_ROWS }, (): Array<PaintCell> => [])
+
+	for (const cell of cells) rows[cell.y]?.push(cell)
+
+	return rows
+}
+
 // The board `t` ticks from the jump with its header's clocks rolling, as it is before `ROLL_AT`.
 function rolled_clocks(cells: ReadonlyArray<PaintCell>, t: number, noise: Noise): Array<PaintCell> {
 	if (t < ROLL_AT) return [...cells]
-	const spinning = new Set(
-		Array.from({ length: HEADER_ROWS }, (_, y) =>
-			spinning_of(
-				cells.filter((cell) => cell.y === y),
-				y,
-				t,
-			),
-		).flat(),
-	)
+	const spinning = new Set(header_rows_of(cells).flatMap((row, y) => spinning_of(row, y, t)))
 
 	return cells.map((cell) => (spinning.has(cell) ? spun(cell, t, noise) : cell))
 }

@@ -1,9 +1,7 @@
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_lamps } from './run-board-lamps'
-import { run_board_screen } from './run-board-screen'
 import { run_board_spot } from './run-board-spot'
-import type { BoardPorts } from './run-board-state'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
@@ -31,8 +29,6 @@ interface RuleCell {
 
 // What a rule cell shows at a moment: the rule or the code.
 type CellLook = 'rule' | 'code'
-
-type CodePorts = Pick<BoardPorts, 'write' | 'write_drawn'>
 
 // What opens a section rule stays drawn as it is.
 function line_cells(line: string, row: number, columns: number): Array<RuleCell> {
@@ -133,21 +129,6 @@ function code_bytes(
 		.join('')
 }
 
-// The rule cells that changed since the last write, written outside the theme's restyling, as the lamps are.
-function write_codes(
-	coded: { typing: Typing; cells: ReadonlyArray<RuleCell> },
-	ports: CodePorts,
-	at_ms: number,
-	since_ms: number | undefined,
-): void {
-	const bytes = code_bytes(coded.typing, coded.cells, at_ms, since_ms)
-
-	if (bytes === '') return
-	const write = ports.write_drawn ?? ports.write
-
-	write(run_board_screen.synced(bytes))
-}
-
 const run_board_codes = {
 	CHANGE_MS,
 	CODE,
@@ -158,7 +139,6 @@ const run_board_codes = {
 	locked_at,
 	rule_cells,
 	SCATTER_STEPS,
-	write_codes,
 }
 
 export { run_board_codes }

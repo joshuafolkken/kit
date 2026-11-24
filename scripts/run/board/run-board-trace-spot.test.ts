@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_spin } from './run-board-spin'
 import { run_board_spot } from './run-board-spot'
@@ -120,7 +121,10 @@ describe('run_board_spin TRACE integration', () => {
 			},
 		}
 
-		await run_board_spin.spin_to_second({ ...frame, typing: run_board_type_rows.NO_TYPING }, ports)
+		await run_board_frame_fixture.spin_to_second(
+			{ ...frame, typing: run_board_type_rows.NO_TYPING },
+			ports,
+		)
 
 		expect(writes.map(({ ms }) => ms)).toStrictEqual([0, 350, 560, 910])
 		expect(writes.map(({ text }) => text.includes(RED))).toStrictEqual([true, false, true, false])

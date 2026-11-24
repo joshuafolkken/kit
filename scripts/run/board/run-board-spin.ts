@@ -1,13 +1,12 @@
-import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_change_flash } from './run-board-change-flash'
 import { run_board_codes, type RuleCell } from './run-board-codes'
-import { run_board_colon } from './run-board-colon'
 import type { TerminalSize } from './run-board-fit'
-import { run_board_header_trace } from './run-board-header-trace'
-import { run_board_jump_screen } from './run-board-jump-screen'
-import { run_board_labels } from './run-board-labels'
+import { run_board_frame_loop, type FrameScreen } from './run-board-frame-loop'
 import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
+import { run_board_layer, type Layer } from './run-board-layer'
+import { run_board_layer_effects } from './run-board-layer-effects'
+import { run_board_layer_spin } from './run-board-layer-spin'
 import { run_board_notice_turn } from './run-board-notice-turn'
 import {
 	run_board_panel_draw as panel_draw,
@@ -15,18 +14,12 @@ import {
 	type PanelMoment,
 } from './run-board-panel-draw'
 import { run_board_spin_place } from './run-board-spin-place'
-import {
-	run_board_spin_turn,
-	type SpinPorts,
-	type Turned,
-	type Turning,
-} from './run-board-spin-turn'
+import { run_board_spin_turn, type SpinPorts, type Turning } from './run-board-spin-turn'
 import { run_board_spot, type Spot } from './run-board-spot'
 import { run_board_strip, type StripCell } from './run-board-strip'
-import { run_board_sweep, type Sweep } from './run-board-sweep'
-import { run_board_theme_defs } from './run-board-theme-defs'
+import type { Sweep } from './run-board-sweep'
 import { run_board_trace_spot } from './run-board-trace-spot'
-import type { KeyedLine } from './run-board-type-rows'
+import { run_board_type_rows, type KeyedLine } from './run-board-type-rows'
 
 // The spinners of a live `run:board` frame turned between redraws. The frame
 // is redrawn once a second, on the second, and between redraws only the spinners' own cells are written
@@ -39,14 +32,8 @@ import type { KeyedLine } from './run-board-type-rows'
 
 const { COLON, SPOT } = run_board_spot
 const { can_type, keyed_of, marks_in, starts_of, sweep_in } = run_board_spin_place
-const { SWEEP_MS, sweep_index } = run_board_sweep
-const { blinking, coded, colons_of, lamp_moment, painting, traces_of, write_turn } =
-	run_board_spin_turn
+const { blinking, colons_of, traces_of } = run_board_spin_turn
 const REDRAW_MS = MS_PER_SECOND
-const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
-// joshuafolkken/kit#8349: the rows type at the wargames intro's pace; joshuafolkken/kit#8360 picks it
-// per theme.
-const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
 
 // The frame's lines as written, its spinners' spots, its keyed rows on screen, without their keys, the
 // sweep where the frame has room for one and its lamps (`run-board-lamp-spots.ts`).
@@ -60,15 +47,6 @@ interface Spun {
 	traces: Array<Spot>
 	rules: Array<RuleCell>
 	strips: Array<StripCell>
-}
-
-// The spinner's frame, the sweep's cell, whether the colons are lit and the lamps' moment, compared turn
-// to turn.
-interface Moment {
-	frame: string
-	cell: number
-	is_lit: boolean
-	lamps: PanelMoment
 }
 
 // The terminal a frame is spun for and the idle rain's moment its lamps are drawn at; none, an unbounded
@@ -124,11 +102,6 @@ function colons_in(lines: ReadonlyArray<string>, size?: TerminalSize): Array<Spo
 	return marks_in(lines, COLON, starts_of(lines, columns), bounds)
 }
 
-// The first multiple of `interval_ms` after `now_ms`.
-function boundary_after(now_ms: number, interval_ms: number): number {
-	return now_ms - (now_ms % interval_ms) + interval_ms
-}
-
 function is_falling(turning: Turning): boolean {
 	return turning.sweep !== undefined || turning.drop !== undefined
 }
@@ -138,99 +111,6 @@ function has_effects(turning: Turning): boolean {
 	const is_blinking = blinking(turning).length > 0 || traces_of(turning).length > 0
 
 	return is_moving || is_blinking || run_board_notice_turn.is_placed(turning.notice_trace)
-}
-
-// The next step the sweep moves, the drops fall or the jump's frame changes on.
-function sweep_boundary(turning: Turning, now_ms: number): number {
-	const sweep_ms = is_falling(turning) ? boundary_after(now_ms, SWEEP_MS) : Infinity
-	const { FRAME_MS } = run_board_jump_screen
-	const jump_ms = turning.jump === undefined ? Infinity : boundary_after(now_ms, FRAME_MS)
-
-	return Math.min(sweep_ms, jump_ms)
-}
-
-// The next step the TRACE field blinks, the colons turn, the notice's trace changes or a flashing
-// cell's color steps on.
-function blink_boundary(turning: Turning, now_ms: number): number {
-	const trace_ms =
-		traces_of(turning).length > 0 ? run_board_header_trace.boundary_after(now_ms) : Infinity
-	const notice_ms = run_board_notice_turn.wake_after(turning.notice_trace, now_ms)
-	const colon_ms = run_board_colon.colon_boundary(colons_of(turning), now_ms)
-	const flash_ms = run_board_change_flash.wake_after(turning.flash, now_ms)
-
-	return Math.min(trace_ms, notice_ms, colon_ms, flash_ms)
-}
-
-// The next moment the spinner turns, the sweep moves, the rules' code steps or, while a row types, its
-// next letter is due — whichever comes first, so none paces the others — but never past `until_ms`.
-function next_turn(now_ms: number, until_ms: number, turning: Turning): number {
-	const turn_ms = boundary_after(now_ms, SPINNER_INTERVAL_MS)
-	const letter_ms = turning.typing.lines.length > 0 ? boundary_after(now_ms, LETTER_MS) : Infinity
-	const { typing, cells } = coded(turning)
-	const is_coding = run_board_codes.is_coding(typing, cells, now_ms)
-	const code_ms = is_coding ? boundary_after(now_ms, run_board_codes.CODE_MS) : Infinity
-	const effect_ms = Math.min(sweep_boundary(turning, now_ms), blink_boundary(turning, now_ms))
-	const panel_ms = panel_draw.tick_after(painting(turning), now_ms)
-
-	return Math.min(turn_ms, letter_ms, code_ms, effect_ms, panel_ms, until_ms)
-}
-
-function moment_of(turning: Turning, at_ms: number): Moment {
-	return {
-		frame: spinner_of(at_ms),
-		cell: sweep_index(at_ms),
-		is_lit: run_board_colon.is_lit(at_ms),
-		lamps: lamp_moment(turning, at_ms),
-	}
-}
-
-function turned_since(last: Moment, at: Moment): Turned {
-	return {
-		is_turned: at.frame !== last.frame,
-		is_swept: at.cell !== last.cell,
-		is_blinked: at.is_lit !== last.is_lit,
-		since: last.lamps,
-	}
-}
-
-// The sweep and every lamp written where the frame has them, so they show on the second before the first
-// wake.
-function start_sweep(turning: Turning, ports: SpinPorts): void {
-	if (!has_effects(turning)) return
-
-	write_turn(turning, ports, ports.now(), { is_turned: false, is_swept: true, since: undefined })
-}
-
-// Sleeps from `now_ms` until `due_ms`, handing the wake's due and actual time to the ports that time
-// wakes (joshuafolkken/kit#8902); the time it woke at.
-async function sleep_until(ports: SpinPorts, now_ms: number, due_ms: number): Promise<number> {
-	await ports.sleep(due_ms - now_ms)
-	const woke_ms = ports.now()
-
-	ports.time_wake?.(due_ms, woke_ms)
-
-	return woke_ms
-}
-
-// joshuafolkken/kit#8123: a wake for a letter or the sweep between frame boundaries writes no spinner,
-// so each frame is written once, on its boundary; the sweep is written likewise once per cell. The
-// frame drew its colons lit, so a frame finished past the half second darkens them on the first wake.
-async function turn_until(turning: Turning, ports: SpinPorts, until_ms: number): Promise<void> {
-	let last = { ...moment_of(turning, ports.now()), is_lit: true }
-
-	start_sweep(turning, ports)
-	await poll.poll_until(() => ports.now() >= until_ms, {
-		attempts: Infinity,
-		interval_ms: 0,
-		sleeper: async () => {
-			const now_ms = ports.now()
-			const at_ms = await sleep_until(ports, now_ms, next_turn(now_ms, until_ms, turning))
-			const at = moment_of(turning, at_ms)
-
-			if (at_ms < until_ms) write_turn(turning, ports, at_ms, turned_since(last, at))
-			last = at
-		},
-	})
 }
 
 // A frame with no spinner, sweep, typing row, blinking lamp, flashing cell or clock colon writes
@@ -244,15 +124,44 @@ function is_still(turning: Turning): boolean {
 	return is_bare && turning.typing.lines.length === 0 && is_dark
 }
 
-// Waits for the next second, turning the spinners, moving the sweep and typing the rows until then; a
-// still frame just waits.
-async function spin_to_second(turning: Turning, ports: SpinPorts): Promise<void> {
-	const now_ms = ports.now()
-	const second_ms = boundary_after(now_ms, REDRAW_MS)
+// The frame's layers in the order they are drawn, the redraw at the bottom; the spinners and the rows
+// typing restyled by the theme, the rest drawn past it.
+function layers_of(turning: Turning, ports: SpinPorts, screen: FrameScreen): Array<Layer> {
+	const restyle = ports.restyle ?? String
 
-	await (is_still(turning)
-		? sleep_until(ports, now_ms, second_ms)
-		: turn_until(turning, ports, second_ms))
+	return [
+		run_board_frame_loop.base_layer(screen),
+		...run_board_layer_effects.under(turning),
+		run_board_layer_spin.spin_layer(turning, restyle),
+		run_board_layer_spin.typing_layer(turning, restyle),
+		...run_board_layer_effects.over(turning),
+	]
+}
+
+// Draws the redraw on `screen`, then turns the spinners, moves the sweep and types the rows until the
+// next second; a still frame just waits. The trill sounds while a row is still typing, off once every
+// row is typed through (joshuafolkken/kit#8250).
+async function spin_to_second(
+	turning: Turning,
+	ports: SpinPorts,
+	screen: FrameScreen,
+): Promise<void> {
+	const { typing } = turning
+
+	await run_board_frame_loop.run(
+		{
+			layers: layers_of(turning, ports, screen),
+			until_ms: run_board_layer.boundary_after(ports.now(), REDRAW_MS),
+			is_still: is_still(turning),
+			after_frame: (at_ms) =>
+				ports.typing_sound?.set(
+					run_board_type_rows.is_typing(typing, at_ms),
+					run_board_type_rows.left_ms(typing, at_ms),
+				),
+		},
+		ports,
+		screen,
+	)
 }
 
 const run_board_spin = {

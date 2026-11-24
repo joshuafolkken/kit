@@ -1,33 +1,22 @@
-import { run_board_change_flash, type Flash } from './run-board-change-flash'
-import { run_board_codes, type RuleCell } from './run-board-codes'
-import { run_board_colon } from './run-board-colon'
+import type { Flash } from './run-board-change-flash'
+import type { RuleCell } from './run-board-codes'
 import type { DropScreen } from './run-board-drop-screen'
-import { run_board_jump_screen, type JumpDraw } from './run-board-jump-screen'
+import type { JumpDraw } from './run-board-jump-screen'
 import { run_board_labels } from './run-board-labels'
 import type { Lamp } from './run-board-lamp-spots'
-import { run_board_notice_turn, type NoticeTurn } from './run-board-notice-turn'
-import {
-	run_board_panel_draw as panel_draw,
-	type PanelDraw,
-	type PanelMoment,
-} from './run-board-panel-draw'
-import { run_board_rain_drop } from './run-board-rain-drop'
-import { run_board_screen } from './run-board-screen'
+import type { NoticeTurn } from './run-board-notice-turn'
+import type { PanelDraw, PanelMoment } from './run-board-panel-draw'
 import type { Spot } from './run-board-spot'
 import type { BoardPorts } from './run-board-state'
-import { run_board_strip, type StripCell } from './run-board-strip'
-import { run_board_sweep, type Sweep } from './run-board-sweep'
-import { run_board_timing } from './run-board-timing'
-import { run_board_trace_spot } from './run-board-trace-spot'
+import type { StripCell } from './run-board-strip'
+import type { Sweep } from './run-board-sweep'
 import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
-// One turn of a live `run:board` frame between redraws — what is written at one wake: the spinners'
-// frame, the sweep's cell, the colons, the drops, the flash, the notice, the lamps, the rules' code, the
-// strips and the TRACE field. When the wakes come is `run-board-spin.ts`'s.
+// What a live `run:board` frame turns between redraws: the spinners, the sweep, the colons, the drops,
+// the flash, the notice, the lamps, the rules' code, the strips and the TRACE field, and the moments
+// they share. How each is drawn is its layer's (`run-board-layer-spin.ts`, `run-board-layer-effects.ts`).
 
-const { sweep_bytes } = run_board_sweep
-const { colon_bytes } = run_board_colon
-const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
+const { SPINNER_INTERVAL_MS } = run_board_labels
 const CSI = '\u{1B}['
 const RESET = `${CSI}0m`
 
@@ -55,18 +44,18 @@ interface Turning {
 	arrive_ms?: number | undefined
 }
 
-// What changed since the last turn was written: the spinner's frame, the sweep's cell, the colons'
-// half second, and the moment the lamps were last written at — none to write every lamp.
-interface Turned {
-	is_turned: boolean
-	is_swept: boolean
-	is_blinked?: boolean | undefined
-	since: PanelMoment | undefined
-}
-
 type SpinPorts = Pick<
 	BoardPorts,
-	'now' | 'sleep' | 'write' | 'write_drawn' | 'time_draw' | 'time_wake' | 'typing_sound'
+	| 'now'
+	| 'sleep'
+	| 'write'
+	| 'write_drawn'
+	| 'time_draw'
+	| 'time_wake'
+	| 'typing_sound'
+	| 'size'
+	| 'drained'
+	| 'restyle'
 >
 
 // One spinner frame at every spot: the cursor moved there, the spot's colors, the frame, then a reset.
@@ -105,50 +94,6 @@ function coded(turning: Turning): { typing: Typing; cells: ReadonlyArray<RuleCel
 	}
 }
 
-// The spinners turned when their frame changed, held while the bttf jump lights their places
-// (joshuafolkken/kit#8782).
-function spun_bytes(turning: Turning, at_ms: number, turned: Turned): string {
-	if (!turned.is_turned || run_board_jump_screen.is_lit(turning.jump, at_ms)) return ''
-
-	return spin_bytes(turning.spots, spinner_of(at_ms))
-}
-
-// The spinners turned, the sweep when its cell changed, then the rows typing written over them, in
-// one synchronized write (joshuafolkken/kit#8125).
-function turn_bytes(turning: Turning, at_ms: number, turned: Turned): string {
-	const spin = spun_bytes(turning, at_ms, turned)
-	const { sweep } = turning
-	const swept = sweep !== undefined && turned.is_swept ? sweep_bytes(sweep, at_ms) : ''
-	const blinked = turned.is_blinked === true ? colon_bytes(colons_of(turning), at_ms) : ''
-
-	return run_board_screen.synced(
-		`${spin}${swept}${blinked}${run_board_type_rows.type_bytes(turning.typing, at_ms)}`,
-	)
-}
-
-// The drops' cells that changed since the last turn, written past the theme like the lamps: the
-// screen holds each cell as the theme drew it, so a cell put back keeps a rule's own paint
-// (joshuafolkken/kit#8367); the bttf jump's cells likewise (joshuafolkken/kit#8677).
-function write_drop(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
-	const since_ms = turned.since?.ms
-	const bytes =
-		run_board_rain_drop.drop_bytes(turning.drop, at_ms, since_ms) +
-		run_board_jump_screen.jump_bytes(turning.jump, at_ms, since_ms)
-
-	if (bytes === '') return
-	const write = ports.write_drawn ?? ports.write
-
-	write(run_board_screen.synced(bytes))
-}
-
-// joshuafolkken/kit#8657: the header notice traced over the drops and the flash, past the theme like
-// the flash — at every turn, so a drop that crossed it is written over.
-function write_notice(turning: Turning, ports: SpinPorts, at_ms: number): void {
-	const bytes = run_board_notice_turn.notice_bytes(turning.notice_trace, at_ms)
-
-	if (bytes !== '') ports.write_drawn?.(run_board_screen.synced(bytes))
-}
-
 // The lamps' moment at `at_ms`: they burst on a step a row is still typing at the start of — the
 // header's now line or a section's new row — and blink apart from the step after the last is typed
 // through, so they change only on the spinner's step (joshuafolkken/kit#8237); the idle rain pours on the
@@ -161,29 +106,6 @@ function lamp_moment(turning: Turning, at_ms: number): PanelMoment {
 	return { ms: at_ms, is_burst, jump: turning.jump?.run, arrive_ms: turning.arrive_ms }
 }
 
-// The drops, then the turn built and written over them — a typing row drawn above the rain
-// (joshuafolkken/kit#8370) — timed as a turn where `--timing` times draws, then the lamps that changed;
-// the trill sounds on while a row is still typing, off once every row is typed through
-// (joshuafolkken/kit#8250).
-function write_turn(turning: Turning, ports: SpinPorts, at_ms: number, turned: Turned): void {
-	run_board_timing.drawn(ports, 'turn', () => {
-		write_drop(turning, ports, at_ms, turned)
-		ports.write(turn_bytes(turning, at_ms, turned))
-		run_board_change_flash.write(ports, turning.flash, at_ms, turned.since)
-		write_notice(turning, ports, at_ms)
-		panel_draw.write_panel(painting(turning), ports, lamp_moment(turning, at_ms), turned.since)
-		run_board_codes.write_codes(coded(turning), ports, at_ms, turned.since?.ms)
-		const striped = { ...coded(turning), strips: turning.strips ?? [] }
-
-		run_board_strip.write_strips(striped, ports, at_ms, turned.since?.ms)
-		run_board_trace_spot.write_traces(traces_of(turning), ports, at_ms, turned.since?.ms)
-	})
-	ports.typing_sound?.set(
-		run_board_type_rows.is_typing(turning.typing, at_ms),
-		run_board_type_rows.left_ms(turning.typing, at_ms),
-	)
-}
-
 const run_board_spin_turn = {
 	blinking,
 	coded,
@@ -192,8 +114,7 @@ const run_board_spin_turn = {
 	painting,
 	spin_bytes,
 	traces_of,
-	write_turn,
 }
 
 export { run_board_spin_turn }
-export type { SpinPorts, Turned, Turning }
+export type { SpinPorts, Turning }

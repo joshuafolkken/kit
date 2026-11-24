@@ -1,0 +1,7 @@
+{
+	"reason": "Planned growth: #8826 adds the cell back buffer, ANSI-to-cell conversion, cell diff, SGR reducer, layer interface and single frame loop (Issue estimates ~1100 lines incl. tests)",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 858
+	}
+}

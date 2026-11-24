@@ -205,6 +205,7 @@ function themed<P extends Pick<BoardPorts, 'icons' | 'theme' | 'write' | 'write_
 	return {
 		...ports,
 		theme,
+		restyle: (text: string) => restyle(theme, text, ports.icons),
 		write: (frame: string) => {
 			ports.write(restyle(theme, frame, ports.icons))
 		},

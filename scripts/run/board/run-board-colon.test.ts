@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_colon } from './run-board-colon'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
+import type { FrameScreen } from './run-board-frame-loop'
 import { run_board_labels } from './run-board-labels'
 import { run_board_spin } from './run-board-spin'
-import { run_board_spin_turn } from './run-board-spin-turn'
 import { run_board_spot } from './run-board-spot'
 import { run_board_type_rows } from './run-board-type-rows'
 
@@ -11,8 +12,8 @@ import { run_board_type_rows } from './run-board-type-rows'
 // the redraw's second and the letters keep their own pace.
 
 const { COLON_MS, colon_boundary, colon_bytes, dark_style, is_lit } = run_board_colon
-const { REDRAW_MS, colons_in, spin_to_second, spun } = run_board_spin
-const { spin_bytes } = run_board_spin_turn
+const { REDRAW_MS, colons_in, spun } = run_board_spin
+const { cell_at, screens_of, settled, spin_to_second, terminal_of } = run_board_frame_fixture
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
 const ESCAPE = '\u{1B}'
 const DIM = `${ESCAPE}[2m`
@@ -24,6 +25,16 @@ const SPOTS = [{ row: 1, column: 1, style: '' }]
 
 function sync_free(text: string): string {
 	return text.replaceAll(`${ESCAPE}[?2026h`, '').replaceAll(`${ESCAPE}[?2026l`, '')
+}
+
+// The redraw's lit colons on the terminal, as a frame on the second leaves them.
+function lit(): FrameScreen {
+	return settled(colon_bytes(COLONS, START))
+}
+
+// The colon's cell once `writes` are on a blank screen.
+function colon_shown(writes: Parameters<typeof terminal_of>[0]): ReturnType<typeof cell_at> {
+	return cell_at(terminal_of(writes), 2, 6)
 }
 
 // A clock each sleep moves forward and the non-empty writes it saw.
@@ -110,23 +121,23 @@ describe('run_board_spin.spin_to_second colons', () => {
 		const { ports, writes } = colon_ports(START)
 		const typing = run_board_type_rows.NO_TYPING
 
-		await spin_to_second({ spots: [], typing, colons: COLONS }, ports)
+		await spin_to_second({ spots: [], typing, colons: COLONS }, ports, lit())
 
-		expect(writes).toStrictEqual([
-			{ at_ms: START + COLON_MS, text: colon_bytes(COLONS, START + COLON_MS) },
-		])
+		expect(writes.map(({ at_ms }) => at_ms)).toStrictEqual([START + COLON_MS])
+		expect(colon_shown(writes)).toStrictEqual(colon_shown([colon_bytes(COLONS, START + COLON_MS)]))
 		expect(ports.now()).toBe(START + REDRAW_MS)
 	})
 
-	it('darkens the lit colons of a frame finished past the half second on the first wake', async () => {
-		const { ports, writes } = colon_ports(START + COLON_MS + 100)
+	// joshuafolkken/kit#8826: the first frame draws the colons as they are at its moment.
+	it('darkens the lit colons of a frame finished past the half second on the first frame', async () => {
+		const at_ms = START + COLON_MS + 100
+		const { ports, writes } = colon_ports(at_ms)
 		const typing = run_board_type_rows.NO_TYPING
 
-		await spin_to_second({ spots: [], typing, colons: COLONS }, ports)
+		await spin_to_second({ spots: [], typing, colons: COLONS }, ports, lit())
 
-		const wake_ms = START + 8 * SPINNER_INTERVAL_MS
-
-		expect(writes).toStrictEqual([{ at_ms: wake_ms, text: colon_bytes(COLONS, wake_ms) }])
+		expect(writes.map((write) => write.at_ms)).toStrictEqual([at_ms])
+		expect(colon_shown(writes)).toStrictEqual(colon_shown([colon_bytes(COLONS, at_ms)]))
 	})
 
 	it('turns the spinner every 80 ms to the second as it did with no colon', async () => {
@@ -135,17 +146,17 @@ describe('run_board_spin.spin_to_second colons', () => {
 		await spin_to_second(
 			{ spots: SPOTS, typing: run_board_type_rows.NO_TYPING, colons: COLONS },
 			ports,
+			lit(),
 		)
 
-		const turns = Math.ceil(REDRAW_MS / SPINNER_INTERVAL_MS) - 1
-		const spins = writes.filter(({ at_ms, text }) =>
-			text.startsWith(spin_bytes(SPOTS, spinner_of(at_ms))),
-		)
+		const turns = Math.ceil(REDRAW_MS / SPINNER_INTERVAL_MS)
+		const spun_chars = screens_of(writes).map((screen) => cell_at(screen, 1, 1).char)
 
 		expect(SPINNER_INTERVAL_MS).toBe(80)
-		expect(spins.map(({ at_ms }) => at_ms - START)).toStrictEqual(
-			Array.from({ length: turns }, (_, index) => (index + 1) * SPINNER_INTERVAL_MS),
-		)
+		expect(
+			writes.filter(({ text }) => !text.includes(':')).map(({ at_ms }) => at_ms - START),
+		).toStrictEqual(Array.from({ length: turns }, (_, index) => index * SPINNER_INTERVAL_MS))
+		expect(spun_chars).toStrictEqual(writes.map(({ at_ms }) => spinner_of(at_ms)))
 		expect(writes.filter(({ text }) => text.includes(':'))).toHaveLength(1)
 	})
 })
