@@ -1,3 +1,4 @@
+import { WriteStream } from 'node:tty'
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
@@ -209,6 +210,33 @@ describe('run_board_reveal_rain.beats_of — a later beat writes only what chang
 	})
 })
 
+// joshuafolkken/kit#8897: reading it per cell stalled the matrix reveal.
+describe("run_board_reveal_rain.beats_of — stdout's color depth", () => {
+	it("reads stdout's color depth once per beat, not once per drop", () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const drawn = run_board_labels.painted(run_board_header_trace.SHADES.head, GLYPH)
+		const depth = vi.spyOn(WriteStream.prototype, 'getColorDepth')
+		const beats = [...beats_of('abcd', () => HALF, { read: () => DROP })]
+
+		expect(beats[0]?.text).toContain(drawn.repeat(4))
+		expect(depth).toHaveBeenCalledTimes(beats.length)
+		depth.mockRestore()
+	})
+
+	it("reads stdout's color depth once per beat when each beat rewrites its changed runs", () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const depth = vi.spyOn(WriteStream.prototype, 'getColorDepth')
+		const dropped = [DROP, DROP, DROP, DROP]
+		const passed = [BEHIND, BEHIND, BEHIND, BEHIND]
+		const read = queued([...dropped, ...passed, ...dropped, ...passed])
+		const beats = [...beats_of('abcd', () => HALF, { read })]
+
+		expect(beats[1]?.text).toContain(`${ESC}[1;1H`)
+		expect(depth).toHaveBeenCalledTimes(beats.length)
+		depth.mockRestore()
+	})
+})
+
 describe('run_board_intro.opening in the matrix theme', () => {
 	it('matrix reveals its first frame with rain', async () => {
 		const { written, ports } = recorded(instant)
@@ -226,6 +254,7 @@ describe('run_board_intro.opening in the matrix theme', () => {
 	})
 
 	it('keeps the block reveal in the wargames theme', async () => {
+		vi.stubEnv('FORCE_COLOR', '0')
 		const { written, ports } = recorded(instant)
 		const opened = run_board_intro.opening(async () => 'read', ports, NO_KEYS, 'wargames')
 

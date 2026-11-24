@@ -1,0 +1,7 @@
+{
+	"reason": "run-board-paint.ts adds a per-beat painter that reads the color depth once (fixes the matrix opening stall), and run-board-sound-wav.ts adds per-process WAV path resolution; both are new behavior, not duplication",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 71
+	}
+}
