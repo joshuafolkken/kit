@@ -20,7 +20,11 @@ vi.mock('./format-steps', () => ({ format_steps: { run_scoped: vi.fn(async () =>
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('./lint-parallel', () => ({
-	lint_parallel: { run_lint_checks: vi.fn(), run_lint_parallel_checks: vi.fn() },
+	lint_parallel: {
+		run_lint_checks: vi.fn(),
+		run_lint_parallel_checks: vi.fn(),
+		with_import_cycles: vi.fn(async (lint: Promise<number>) => await lint),
+	},
 }))
 // **Mocked rather than exercised, because the real one writes the record this checkout's own run
 // relies on** (joshuafolkken/kit#1511) — the second-writer trap joshuafolkken/kit#1437 closed for the
@@ -213,6 +217,17 @@ describe('lint_related.run_related_lint', () => {
 		mocked_scoped.mockResolvedValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: lint`)
+	})
+})
+
+// joshuafolkken/kit#8887: its green stands in for the gate's lint, which reads the import cycles.
+describe('lint_related.run_related_lint — the import cycles', () => {
+	it('fails the lint on an import cycle the linters passed', async () => {
+		vi.mocked(lint_parallel.with_import_cycles).mockResolvedValueOnce(FAILED)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(lint_parallel.with_import_cycles).toHaveBeenCalledOnce()
 		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: lint`)
 	})
 })

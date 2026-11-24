@@ -13,8 +13,8 @@ import { create_base_config } from './base.js'
 // Asserted by linting a real import on disk through `create_base_config`, because the claim is that
 // the import is *followed*: a settings-shape assertion passes just as well for a resolver the
 // plugin never loads, which is exactly the defect. The cycles the resolver once fed `import/no-cycle`
-// are read by `josh import-cycles` over the TypeScript import graph since joshuafolkken/kit#8887
-// (`scripts/lint/import-cycles.test.ts`).
+// are read by the import cycle check `josh lint` runs over the TypeScript import graph since
+// joshuafolkken/kit#8887 (`scripts/lint/import-cycles.ts`).
 const LINT_PROBE_TIMEOUT_MS = 60_000
 
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
@@ -96,7 +96,7 @@ async function rule_config(entry: string): Promise<unknown> {
 
 describe('create_base_config — the import resolver (issue #3599)', () => {
 	// joshuafolkken/kit#8887: walked again from every linted file, the rule was a fifth of the lint.
-	it('leaves import cycles to josh import-cycles', async () => {
+	it('leaves import cycles to the import cycle check of josh lint', async () => {
 		const config = await rule_config(TYPESCRIPT_ENTRY)
 
 		expect(config).not.toHaveProperty(['rules', NO_CYCLE_RULE])

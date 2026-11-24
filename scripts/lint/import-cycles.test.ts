@@ -1,7 +1,10 @@
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
+import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
+import { test_pinned_reach } from '#scripts/test/test-pinned-reach'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { import_cycles } from './import-cycles'
 import { import_graph } from './import-graph'
 
@@ -147,12 +150,14 @@ async function cycles_in(files: Record<string, string>): Promise<Array<Array<str
 		.map((cycle) => cycle.map((file) => path.relative(root, file)))
 }
 
+const CYCLE_FILES = {
+	'left.ts': "import { right } from './right'\n\nexport const left = right\n",
+	'right.ts': "import { left } from './left'\n\nexport const right = (): number => left\n",
+}
+
 describe('import_cycles over a real import graph', () => {
 	it('finds a cycle a value import closes', async () => {
-		const cycles = await cycles_in({
-			'left.ts': "import { right } from './right'\n\nexport const left = right\n",
-			'right.ts': "import { left } from './left'\n\nexport const right = (): number => left\n",
-		})
+		const cycles = await cycles_in(CYCLE_FILES)
 
 		expect(cycles).toEqual([['left.ts', 'right.ts']])
 	})
@@ -199,5 +204,62 @@ describe('import_cycles over a real import graph — aliases and depth', () => {
 		})
 
 		expect(cycles).toEqual([['deep-a.ts', 'deep-b.ts', 'deep-c.ts', 'deep-d.ts']])
+	})
+})
+
+const NO_ESLINT = 'no ESLint configuration was found'
+
+// `run` lists the work tree from the working directory, so the universe is the written project's files.
+function run_in(files: Record<string, string>): ReturnType<typeof import_cycles.run> {
+	const root = write_project(files)
+	const universe = Object.keys(files).map((name) => path.join(root, name))
+
+	vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(undefined)
+	vi.spyOn(test_pinned_reach, 'code_universe').mockResolvedValue(universe)
+
+	return import_cycles.run(root)
+}
+
+describe('import_cycles.run', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('fails and names the files of a cycle in the tree', async () => {
+		const result = await run_in(CYCLE_FILES)
+
+		expect(result.exit_code).toBe(FAIL_EXIT_CODE)
+		expect(result.output).toContain('  left.ts → right.ts\n  right.ts → left.ts\n')
+	})
+
+	it('passes a tree with no cycle', async () => {
+		const result = await run_in({ 'only.ts': 'export const only = 1\n' })
+
+		expect(result.exit_code).toBe(0)
+		expect(result.output).toMatch(
+			/^josh import-cycles: no import cycle across 1 files in \d+ ms\n$/u,
+		)
+	})
+
+	it('skips where eslint is skipped, with its reason', async () => {
+		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(NO_ESLINT)
+
+		const result = await import_cycles.run(ROOT)
+
+		expect(result).toEqual({
+			output: `${project_checks.skip_notice('import-cycles', NO_ESLINT)}\n`,
+			exit_code: 0,
+			elapsed_ms: 0,
+		})
+	})
+
+	it('skips where the import graph cannot be built', async () => {
+		vi.spyOn(project_checks, 'eslint_skip_reason').mockReturnValue(undefined)
+		vi.spyOn(import_graph, 'create').mockResolvedValue(undefined)
+
+		const result = await import_cycles.run(ROOT)
+
+		expect(result.exit_code).toBe(0)
+		expect(result.output).toContain('no typescript or tsconfig.json at the root')
 	})
 })

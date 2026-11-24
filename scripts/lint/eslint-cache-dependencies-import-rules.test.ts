@@ -16,7 +16,8 @@ const LINT_PROBE_TIMEOUT_MS = 60_000
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
 
 // The plugin's second name: its own preset's rules, which the base config keeps for a `.js` file.
-// Import cycles left ESLint for `josh import-cycles`, which reads no cache (joshuafolkken/kit#8887).
+// Import cycles left ESLint for the import cycle check `josh lint` runs (`import-cycles.ts`), which
+// reads no ESLint cache (joshuafolkken/kit#8887).
 const NAMED_RULE = 'import-x/named'
 // Clean under every other rule of the base config, so the import rule is the only thing a run can
 // report and a withdrawn report leaves a green one.

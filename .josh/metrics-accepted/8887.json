@@ -2,6 +2,6 @@
 	"reason": "#8887 adds the once-per-run whole-graph import cycle check (import-cycles.ts, runtime_edges) replacing per-file import/no-cycle",
 	"date": "2026-11-24",
 	"growth": {
-		"scripts.code_lines": 151
+		"scripts.code_lines": 155
 	}
 }

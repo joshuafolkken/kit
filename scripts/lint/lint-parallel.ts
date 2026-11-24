@@ -336,16 +336,20 @@ async function run_import_cycles(shard: LintShard | undefined): Promise<Buffered
 }
 
 // The cycle check runs in this process while eslint runs in its own, and prints after the linters.
-async function run_lint_command(command_arguments: ReadonlyArray<string>): Promise<number> {
-	const shard = lint_shard.shard_of(command_arguments)
-	const [exit_code, cycles] = await Promise.all([
-		run_scoped_lint(command_arguments, shard),
-		run_import_cycles(shard),
-	])
+// `josh lint` and `josh lint:related` both go through it, since a `lint:related` green stands in for
+// the gate's lint (`check-related-reuse.ts`).
+async function with_import_cycles(lint: Promise<number>, shard?: LintShard): Promise<number> {
+	const [exit_code, cycles] = await Promise.all([lint, run_import_cycles(shard)])
 
 	write_output(cycles)
 
 	return buffered_process.is_process_failed(cycles) ? FAIL_EXIT_CODE : exit_code
+}
+
+async function run_lint_command(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const shard = lint_shard.shard_of(command_arguments)
+
+	return await with_import_cycles(run_scoped_lint(command_arguments, shard), shard)
 }
 
 const lint_parallel = {
@@ -353,6 +357,7 @@ const lint_parallel = {
 	run_lint_checks,
 	run_lint_command,
 	run_lint_parallel_checks,
+	with_import_cycles,
 }
 
 export type { LintRunTiming }

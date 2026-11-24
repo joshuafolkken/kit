@@ -111,4 +111,14 @@ describe('josh lint — the whole-tree import cycle check', () => {
 		expect(await lint_parallel.run_lint_command([])).toBe(1)
 		expect(stdout).toHaveBeenCalledWith(FOUND_CYCLE.output)
 	})
+
+	// `josh lint:related` hands its linters' exit code in with no shard, since its green stands in for
+	// the gate's lint.
+	it('fails a green lint handed in with no shard when a cycle is found', async () => {
+		mocked_cycles.mockResolvedValue(FOUND_CYCLE)
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await lint_parallel.with_import_cycles(Promise.resolve(0))).toBe(1)
+		expect(mocked_cycles).toHaveBeenCalledExactlyOnceWith(process.cwd())
+	})
 })
