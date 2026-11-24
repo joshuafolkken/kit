@@ -702,7 +702,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/run/board/run-board-settle.test.ts',
 	'scripts/run/board/run-board-setup.test.ts',
 	'scripts/run/board/run-board-span.test.ts',
-	'scripts/run/board/run-board-spin.test.ts',
 	'scripts/run/board/run-board-standing-waits.test.ts',
 	'scripts/run/board/run-board-state.test.ts',
 	'scripts/run/board/run-board-status-closed.test.ts',

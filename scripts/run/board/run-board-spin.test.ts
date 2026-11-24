@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { WriteStream } from 'node:tty'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_change_flash } from './run-board-change-flash'
 import { run_board_frame_fixture } from './run-board-frame-fixture'
 import { run_board_labels } from './run-board-labels'
@@ -13,7 +14,7 @@ import { run_board_type_rows, type Typing, type TypingLine } from './run-board-t
 // redraws — a cursor move and one frame each, on the package's interval, until the next second.
 
 const { REDRAW_MS, SPOT, spun } = run_board_spin
-const { cell_at, is_near, row_text, screens_of, spin_to_second, terminal_of } =
+const { cell_at, is_near, row_text, screens_of, spin_ports, spin_to_second, terminal_of } =
 	run_board_frame_fixture
 const { SPINNER_INTERVAL_MS, spinner_of } = run_board_labels
 const { NO_TYPING, type_bytes } = run_board_type_rows
@@ -23,43 +24,12 @@ const ESCAPE = '\u{1B}'
 const GREEN = `${ESCAPE}[32m`
 const START = Date.parse('2026-10-08T09:00:00.000Z')
 const WIDE = { rows: 24, columns: 80 }
+const { RGB_COLOR_DEPTH: RGB_DEPTH } = run_board_labels
 // eslint-disable-next-line no-control-regex -- a turn is made of control characters
 const TURN = /^(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.)+(?:\u{1B}\[0m)?$/u
 
 const SYNC_ON = `${ESCAPE}[?2026h`
 const SYNC_OFF = `${ESCAPE}[?2026l`
-
-// A write's bytes inside its synchronized output (joshuafolkken/kit#8125); a write outside it is kept
-// whole, so it matches none of the turns it should have been.
-function unsynced(text: string): string {
-	if (!text.startsWith(SYNC_ON) || !text.endsWith(SYNC_OFF)) return text
-
-	return text.slice(SYNC_ON.length, -SYNC_OFF.length)
-}
-
-// A clock that each sleep moves forward, and every write and sleep it saw, each write's `text` the
-// bytes inside its synchronized output and `raw` the write as it was.
-function spin_ports(now_ms: number): {
-	ports: Parameters<typeof spin_to_second>[1]
-	writes: Array<{ at_ms: number; text: string; raw: string }>
-	sleeps: Array<number>
-} {
-	const clock = { now_ms }
-	const writes: Array<{ at_ms: number; text: string; raw: string }> = []
-	const sleeps: Array<number> = []
-	const ports = {
-		now: () => clock.now_ms,
-		write: (raw: string) => {
-			writes.push({ at_ms: clock.now_ms, text: unsynced(raw), raw })
-		},
-		sleep: async (ms: number) => {
-			sleeps.push(ms)
-			clock.now_ms += ms
-		},
-	}
-
-	return { ports, writes, sleeps }
-}
 
 function places(spots: ReadonlyArray<Spot>): Array<[number, number]> {
 	return spots.map(({ row, column }) => [row, column])
@@ -147,7 +117,14 @@ function flash_ticks(): Array<number> {
 	return Array.from({ length: FADE_TICKS }, (_, index) => (index + 1) * TICK_MS)
 }
 
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
 it('ac-57779c96 cools and restores a flash on its own ticks even without spinner spots', async () => {
+	// joshuafolkken/kit#8826: a frame writes only changed cells, and below 24-bit color the fade holds one
+	// named color, so the tick-by-tick writes this pins need the 24-bit fade whatever the worker's env.
+	vi.spyOn(WriteStream.prototype, 'getColorDepth').mockReturnValue(RGB_DEPTH)
 	const { ports, writes } = spin_ports(START)
 	const line = { key: 'a', row: 1, index: 0, prefix_columns: 0, text: 'a' }
 	const base = run_board_change_flash.next(undefined, [line], START)
@@ -158,10 +135,9 @@ it('ac-57779c96 cools and restores a flash on its own ticks even without spinner
 		{ ...ports, write_drawn: ports.write },
 	)
 	const at = writes.map(({ at_ms }) => at_ms - START)
-	const last_tick = Math.max(...flash_ticks())
 
 	expect(flash_ticks().every((tick) => at.includes(tick))).toBe(true)
-	expect(at.at(-1)).toBe(last_tick)
+	expect(at.at(-1)).toBe(Math.max(...flash_ticks()))
 	expect(cell_at(terminal_of(writes), 1, 1)).toStrictEqual({ char: 'b', sgr: '' })
 })
 

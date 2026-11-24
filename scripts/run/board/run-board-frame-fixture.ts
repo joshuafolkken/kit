@@ -221,6 +221,44 @@ function is_synced_once(write: string): boolean {
 	)
 }
 
+// A write's bytes inside its synchronized output (joshuafolkken/kit#8125); a write outside it is kept
+// whole, so it matches none of the turns it should have been.
+function unsynced(text: string): string {
+	if (!text.startsWith(SYNC_START) || !text.endsWith(SYNC_END)) return text
+
+	return text.slice(SYNC_START.length, -SYNC_END.length)
+}
+
+// A write a test saw: when, the bytes inside its synchronized output, and the write as it was.
+interface SpinWrite {
+	at_ms: number
+	text: string
+	raw: string
+}
+
+// A clock that each sleep moves forward, and every write and sleep it saw.
+function spin_ports(now_ms: number): {
+	ports: SpinPorts
+	writes: Array<SpinWrite>
+	sleeps: Array<number>
+} {
+	const clock = { now_ms }
+	const writes: Array<SpinWrite> = []
+	const sleeps: Array<number> = []
+	const ports: SpinPorts = {
+		now: () => clock.now_ms,
+		write: (raw: string) => {
+			writes.push({ at_ms: clock.now_ms, text: unsynced(raw), raw })
+		},
+		sleep: async (ms: number) => {
+			sleeps.push(ms)
+			clock.now_ms += ms
+		},
+	}
+
+	return { ports, writes, sleeps }
+}
+
 const run_board_frame_fixture = {
 	attributes_of,
 	is_synced_once,
@@ -232,6 +270,7 @@ const run_board_frame_fixture = {
 	rule_cells,
 	screens_of,
 	settled,
+	spin_ports,
 	spin_to_second,
 	stage_log,
 	terminal_of,
