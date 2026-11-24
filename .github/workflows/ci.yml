@@ -424,10 +424,17 @@ jobs:
       # outright: the default branch's tip on a pull request, and the commit before the push on the
       # default branch itself. A name that does not resolve fails the step rather than comparing
       # with nothing.
+      #
+      # **`JOSH_ESLINT_CONCURRENCY` gives the lint legs two eslint workers** (joshuafolkken/kit#8885).
+      # A change to a module most of the tree imports drops some 1,400 cache entries per leg, and one
+      # worker took 170–277 s to lint them again on this 4-core runner. Each worker builds its own
+      # typed program (about 6 GiB), so two is what the 16 GiB runner holds; the other groups run no
+      # eslint and ignore it.
       - name: Run verification gate
         run: pnpm josh gate --verbose --no-unit "--static-group=${STATIC_GROUP}"
         env:
           JOSH_METRICS_BASE: HEAD^1
+          JOSH_ESLINT_CONCURRENCY: 2
           STATIC_GROUP: ${{ matrix.group }}
 
       # joshuafolkken/kit#4449: a main push that reuses this run skips the job above, so it saves no

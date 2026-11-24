@@ -163,6 +163,24 @@ describe('CI whole-tree resource settings', () => {
 			}),
 		)
 	})
+
+	// joshuafolkken/kit#8885: kit's CI lint legs name two eslint workers through the environment.
+	it('hands eslint the workers JOSH_ESLINT_CONCURRENCY names', async () => {
+		vi.stubEnv('CI', 'true')
+		vi.stubEnv('JOSH_ESLINT_CONCURRENCY', '2')
+		mock_exit_codes(0, 0)
+
+		await lint_parallel.run_lint_command(CHANGED_ARGUMENTS)
+
+		expect(mocked_execa.mock.calls.at(-1)?.[1]).toEqual([
+			'exec',
+			'eslint',
+			WHOLE_TREE,
+			...ESLINT_CACHE_FLAGS,
+			'--concurrency',
+			'2',
+		])
+	})
 })
 
 // joshuafolkken/kit#5116: the gate times `lint` as one step, so only this line says which of the two
