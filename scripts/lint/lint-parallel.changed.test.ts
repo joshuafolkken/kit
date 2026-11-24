@@ -27,6 +27,9 @@ vi.mock('./eslint-cache-dependencies', () => ({
 		})),
 	},
 }))
+vi.mock('./import-cycles', () => ({
+	import_cycles: { run: vi.fn(async () => ({ output: '', exit_code: 0, elapsed_ms: 0 })) },
+}))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)

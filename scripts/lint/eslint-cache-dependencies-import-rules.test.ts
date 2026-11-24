@@ -15,15 +15,11 @@ const LINT_PROBE_TIMEOUT_MS = 60_000
 
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
 
-const NO_CYCLE_RULE = 'import/no-cycle'
 // The plugin's second name: its own preset's rules, which the base config keeps for a `.js` file.
+// Import cycles left ESLint for `josh import-cycles`, which reads no cache (joshuafolkken/kit#8887).
 const NAMED_RULE = 'import-x/named'
 // Clean under every other rule of the base config, so the import rule is the only thing a run can
 // report and a withdrawn report leaves a green one.
-const CYCLIC_A = "import { BETA } from './b'\n\nexport const ALPHA = BETA + 1\n"
-const ACYCLIC_A = 'export const ALPHA = 1\n'
-const EDITED_SIDE = 'a.ts'
-const UNTOUCHED_SIDE = 'b.ts'
 const IMPORTER = 'importer.js'
 const EXPORTER = 'exporter.js'
 const WITHOUT_EXPORT = 'export const OTHER = 1\n'
@@ -31,8 +27,6 @@ const WITH_EXPORT = `${WITHOUT_EXPORT}\nexport const DELTA = 2\n`
 const FIXTURE_FILES: Array<[string, string]> = [
 	['package.json', JSON.stringify({ type: 'module' })],
 	['tsconfig.json', JSON.stringify({ compilerOptions: { module: 'nodenext' } })],
-	[EDITED_SIDE, CYCLIC_A],
-	[UNTOUCHED_SIDE, "import { ALPHA } from './a'\n\nexport const BETA = ALPHA + 1\n"],
 	[IMPORTER, "import { DELTA } from './exporter.js'\n\nexport const EPSILON = DELTA + 1\n"],
 	[EXPORTER, WITHOUT_EXPORT],
 ]
@@ -85,21 +79,9 @@ async function files_reported(rule: string): Promise<Array<string>> {
 		.map((result) => path.basename(result.filePath))
 }
 
-describe('eslint_cache_dependencies.guard — a cycle closed by editing one side', () => {
-	it('reports the cycle on both sides while it is there, and again from the cache', async () => {
-		await expect(files_reported(NO_CYCLE_RULE)).resolves.toEqual([EDITED_SIDE, UNTOUCHED_SIDE])
-		await expect(files_reported(NO_CYCLE_RULE)).resolves.toEqual([EDITED_SIDE, UNTOUCHED_SIDE])
-	})
-
-	it('drops the report the cache held for the untouched side', async () => {
-		writeFileSync(path.join(root, EDITED_SIDE), ACYCLIC_A)
-
-		await expect(files_reported(NO_CYCLE_RULE)).resolves.toEqual([])
-	})
-})
-
 describe('eslint_cache_dependencies.guard — a name the imported file did not export yet', () => {
-	it('reports it while the export is missing', async () => {
+	it('reports it while the export is missing, and again from the cache', async () => {
+		await expect(files_reported(NAMED_RULE)).resolves.toEqual([IMPORTER])
 		await expect(files_reported(NAMED_RULE)).resolves.toEqual([IMPORTER])
 	})
 

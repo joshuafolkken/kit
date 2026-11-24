@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { ESLint } from 'eslint'
@@ -8,19 +8,13 @@ import { create_base_config } from './base.js'
 
 // joshuafolkken/kit#3599: the TypeScript resolver sat under `import/resolver`, a key
 // eslint-plugin-import-x never reads, so every import fell back to the plugin's default node
-// resolver, which does not follow an extensionless `.ts` specifier. And `import-x/extensions` was
-// never set, so a `.ts` file that did resolve — through a package `imports` alias, say — was still
-// skipped as not being a module the plugin reads. A rule that cannot follow an import reports
-// nothing about it: `import/no-cycle` was green over cycles it never saw.
+// resolver. A rule that cannot follow an import reports nothing about it.
 //
-// The first two cycle cases below pin one half each — the relative one goes red without the
-// resolver, the alias one without the extension list. The third pins where the resolver reads its
-// tsconfig: this suite runs with the repository as `process.cwd()`, whose tsconfig declares no
-// `$lib`, so the `paths` cycle is only followed when the fixture's own tsconfig is the one read.
-//
-// Asserted by linting a real cycle on disk through `create_base_config`, because the claim is that
+// Asserted by linting a real import on disk through `create_base_config`, because the claim is that
 // the import is *followed*: a settings-shape assertion passes just as well for a resolver the
-// plugin never loads, which is exactly the defect.
+// plugin never loads, which is exactly the defect. The cycles the resolver once fed `import/no-cycle`
+// are read by `josh import-cycles` over the TypeScript import graph since joshuafolkken/kit#8887
+// (`scripts/lint/import-cycles.test.ts`).
 const LINT_PROBE_TIMEOUT_MS = 60_000
 
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
@@ -42,48 +36,24 @@ const EXPORT_READING_RULES: Array<[string, number]> = [
 ]
 const JAVASCRIPT_ENTRY = 'j.js'
 const JAVASCRIPT_ENTRY_SOURCE = "import { missing } from './k.js'\n\nexport const j = missing\n"
-const RELATIVE_ENTRY = 'a.ts'
-const ALIAS_ENTRY = 'lib/c.ts'
-const ACYCLIC_ENTRY = 'lib/e.ts'
-const PATHS_ENTRY = 'lib/g.ts'
-const DEEP_ENTRY = 'deep-a.ts'
-const DEEP_ENTRY_SOURCE = "import { b } from './deep-b'\n\nexport const a = b\n"
-const RELATIVE_ENTRY_SOURCE = "import { b } from './b'\n\nexport const a = b\n"
-const ALIAS_ENTRY_SOURCE = "import { d } from '#lib/d'\n\nexport const c = d\n"
-const ACYCLIC_ENTRY_SOURCE = "import { f } from '#lib/f'\n\nexport const e = f\n"
-const PATHS_ENTRY_SOURCE = "import { h } from '$lib/h'\n\nexport const g = h\n"
+const TYPESCRIPT_ENTRY = 'a.ts'
 
 const FIXTURE_FILES: Record<string, string> = {
-	'package.json': JSON.stringify({ type: 'module', imports: { '#lib/*': './lib/*.ts' } }),
-	'tsconfig.json': JSON.stringify({
-		compilerOptions: { module: 'nodenext', paths: { '$lib/*': ['./lib/*'] } },
-	}),
-	[RELATIVE_ENTRY]: RELATIVE_ENTRY_SOURCE,
-	'b.ts': "import { a } from './a'\n\nexport const b = a\n",
-	[ALIAS_ENTRY]: ALIAS_ENTRY_SOURCE,
-	'lib/d.ts': "import { c } from '#lib/c'\n\nexport const d = c\n",
-	[ACYCLIC_ENTRY]: ACYCLIC_ENTRY_SOURCE,
-	'lib/f.ts': 'export const f = 1\n',
-	[PATHS_ENTRY]: PATHS_ENTRY_SOURCE,
-	'lib/h.ts': "import { g } from '$lib/g'\n\nexport const h = g\n",
+	'package.json': JSON.stringify({ type: 'module' }),
+	'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'nodenext' } }),
+	[TYPESCRIPT_ENTRY]: 'export const a = 1\n',
 	[JAVASCRIPT_ENTRY]: JAVASCRIPT_ENTRY_SOURCE,
 	'k.js': 'export const k = 1\n',
-	[DEEP_ENTRY]: DEEP_ENTRY_SOURCE,
-	'deep-b.ts': "import { c } from './deep-c'\n\nexport const b = c\n",
-	'deep-c.ts': "import { d } from './deep-d'\n\nexport const c = d\n",
-	'deep-d.ts': "import { a } from './deep-a'\n\nexport const d = a\n",
 }
 
 function write_fixture(root: string): void {
-	mkdirSync(path.join(root, 'lib'))
-
 	for (const [name, source] of Object.entries(FIXTURE_FILES)) {
 		writeFileSync(path.join(root, name), source)
 	}
 }
 
-// The probes are syntactic — `no-cycle` reads the import graph, not types — so the typed parser is
-// switched off rather than handed a tsconfig project to build for three-line files.
+// The probes are syntactic — the import rules read the import graph, not types — so the typed parser
+// is switched off rather than handed a tsconfig project to build for three-line files.
 function create_linter(root: string): ESLint {
 	return new ESLint({
 		cwd: root,
@@ -118,43 +88,18 @@ async function rule_messages(rule: string, entry: string, source: string): Promi
 	return messages.filter((message) => message.ruleId === rule).map((message) => message.message)
 }
 
-async function cycle_messages(entry: string, source: string): Promise<Array<string>> {
-	return await rule_messages(NO_CYCLE_RULE, entry, source)
-}
-
 async function rule_config(entry: string): Promise<unknown> {
 	const config: unknown = await linter.calculateConfigForFile(path.join(root, entry))
 
 	return config
 }
 
-describe('create_base_config — the import resolver follows TypeScript (issue #3599)', () => {
-	it('reports a cycle through an extensionless .ts import', async () => {
-		await expect(cycle_messages(RELATIVE_ENTRY, RELATIVE_ENTRY_SOURCE)).resolves.toHaveLength(1)
-	})
+describe('create_base_config — the import resolver (issue #3599)', () => {
+	// joshuafolkken/kit#8887: walked again from every linted file, the rule was a fifth of the lint.
+	it('leaves import cycles to josh import-cycles', async () => {
+		const config = await rule_config(TYPESCRIPT_ENTRY)
 
-	it('reports a cycle through a package imports alias', async () => {
-		await expect(cycle_messages(ALIAS_ENTRY, ALIAS_ENTRY_SOURCE)).resolves.toHaveLength(1)
-	})
-
-	it('reports a cycle through a tsconfig paths alias of tsconfig_root_dir', async () => {
-		await expect(cycle_messages(PATHS_ENTRY, PATHS_ENTRY_SOURCE)).resolves.toHaveLength(1)
-	})
-
-	it('stays quiet on an alias import that closes no cycle', async () => {
-		await expect(cycle_messages(ACYCLIC_ENTRY, ACYCLIC_ENTRY_SOURCE)).resolves.toEqual([])
-	})
-
-	it('keeps internal cycle detection beyond direct imports (ac-f1d67bc1)', async () => {
-		await expect(cycle_messages(DEEP_ENTRY, DEEP_ENTRY_SOURCE)).resolves.toHaveLength(1)
-	})
-
-	it('skips external traversal without limiting cycle depth (ac-ecf45c29)', async () => {
-		const config = await rule_config(RELATIVE_ENTRY)
-
-		expect(config).toHaveProperty(['rules', NO_CYCLE_RULE, 0], RULE_SEVERITY_ERROR)
-		expect(config).toHaveProperty(['rules', NO_CYCLE_RULE, 1, 'ignoreExternal'], true)
-		expect(config).not.toHaveProperty(['rules', NO_CYCLE_RULE, 1, 'maxDepth'])
+		expect(config).not.toHaveProperty(['rules', NO_CYCLE_RULE])
 	})
 
 	// The compiler does not check a hand-authored module, so the lint is the only thing between a
@@ -171,7 +116,7 @@ describe('create_base_config — the import resolver follows TypeScript (issue #
 // checks, and only there.
 describe('create_base_config — the export-reading import rules (issue #3599)', () => {
 	it.each(EXPORT_READING_RULES)('switches %s off for a TypeScript file', async (rule) => {
-		const config = await rule_config(RELATIVE_ENTRY)
+		const config = await rule_config(TYPESCRIPT_ENTRY)
 
 		expect(config).toHaveProperty(['rules', rule, 0], RULE_SEVERITY_OFF)
 	})

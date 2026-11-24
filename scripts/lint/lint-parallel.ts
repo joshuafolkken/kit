@@ -17,6 +17,7 @@ import { eslint_cache_dependencies, type CacheDrop } from './eslint-cache-depend
 import { eslint_concurrency } from './eslint-concurrency'
 import { eslint_daemon, type DaemonCall, type DaemonState } from './eslint-daemon'
 import { eslint_heap } from './eslint-heap'
+import { import_cycles } from './import-cycles'
 import { lint_gate_scope } from './lint-gate-scope'
 import { lint_shard, type LintShard } from './lint-shard'
 import { lint_timing } from './lint-timing'
@@ -313,14 +314,38 @@ async function run_changed_lint_checks(shard: LintShard | undefined): Promise<nu
 	return await run_timed_lint_checks(narrowed.prettier, narrowed.eslint, narrowed.eslint_cache_file)
 }
 
-async function run_lint_command(command_arguments: ReadonlyArray<string>): Promise<number> {
-	const shard = lint_shard.shard_of(command_arguments)
-
+async function run_scoped_lint(
+	command_arguments: ReadonlyArray<string>,
+	shard: LintShard | undefined,
+): Promise<number> {
 	if (command_arguments.includes(lint_gate_scope.CHANGED_FLAG)) {
 		return await run_changed_lint_checks(shard)
 	}
 
 	return await run_lint_checks(prettier_args_of(shard), eslint_args_of(shard), ESLINT_CACHE_FILE)
+}
+
+const NO_OUTPUT: BufferedProcessResult = { output: '', exit_code: 0, elapsed_ms: 0 }
+
+// The import cycles are the whole tree's whatever files the run lints: a changed file's new import can
+// close a cycle through unchanged ones. So they are read once, beside the shard that checks formatting.
+async function run_import_cycles(shard: LintShard | undefined): Promise<BufferedProcessResult> {
+	if (!lint_shard.checks_formatting(shard)) return NO_OUTPUT
+
+	return await import_cycles.run(process.cwd())
+}
+
+// The cycle check runs in this process while eslint runs in its own, and prints after the linters.
+async function run_lint_command(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const shard = lint_shard.shard_of(command_arguments)
+	const [exit_code, cycles] = await Promise.all([
+		run_scoped_lint(command_arguments, shard),
+		run_import_cycles(shard),
+	])
+
+	write_output(cycles)
+
+	return buffered_process.is_process_failed(cycles) ? FAIL_EXIT_CODE : exit_code
 }
 
 const lint_parallel = {
