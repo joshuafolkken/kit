@@ -14,6 +14,7 @@ import {
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { eslint_cache_dependencies, type CacheDrop } from './eslint-cache-dependencies'
+import { eslint_concurrency } from './eslint-concurrency'
 import { eslint_daemon, type DaemonCall, type DaemonState } from './eslint-daemon'
 import { eslint_heap } from './eslint-heap'
 import { lint_gate_scope } from './lint-gate-scope'
@@ -25,7 +26,13 @@ import { lint_timing } from './lint-timing'
 // A copy here would keep writing the old location the day that constant
 // moves, with every test still green.
 function eslint_args_of(shard: LintShard | undefined): ReadonlyArray<string> {
-	return ['exec', 'eslint', ...lint_shard.eslint_targets(shard), ...ESLINT_CACHE_FLAGS]
+	return [
+		'exec',
+		'eslint',
+		...lint_shard.eslint_targets(shard),
+		...ESLINT_CACHE_FLAGS,
+		...eslint_concurrency.from_environment(),
+	]
 }
 
 const ESLINT_ARGS = eslint_args_of(undefined)
