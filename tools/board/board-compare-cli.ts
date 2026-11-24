@@ -2,11 +2,11 @@
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
+import { run_board_cli } from '#scripts/run/board/run-board-cli'
+import { run_board_replay } from '#scripts/run/board/run-board-replay'
+import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
 import { board_compare_diff, type Divergence, type Mode } from './board-compare-diff'
 import { board_compare_screen, type Size } from './board-compare-screen'
-import { run_board_cli } from './run-board-cli'
-import { run_board_replay } from './run-board-replay'
-import type { Beat } from './run-board-reveal-blocks'
 
 // `josh board:compare` (joshuafolkken/kit#8754): a theme demo and the live board replayed under one seed,
 // both beat streams drawn through a terminal emulator and compared screen by screen at each moment

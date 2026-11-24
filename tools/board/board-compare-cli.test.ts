@@ -1,6 +1,6 @@
+import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
 import { describe, expect, it } from 'vitest'
 import { board_compare_cli, type ComparePorts } from './board-compare-cli'
-import type { Beat } from './run-board-reveal-blocks'
 
 const { beats_of, board_argv, options_of, run } = board_compare_cli
 const ARGV = ['demo.mjs', '--theme', 'bttf', '--columns', '8', '--rows', '2']

@@ -1,7 +1,7 @@
+import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
 import { describe, expect, it } from 'vitest'
 import { board_compare_diff, type Mode } from './board-compare-diff'
 import { board_compare_screen } from './board-compare-screen'
-import type { Beat } from './run-board-reveal-blocks'
 
 const SIZE = { columns: 12, rows: 4 }
 const TICK_MS = 50

@@ -293,7 +293,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'board:compare': {
-		script: 'scripts/run/board/board-compare-cli.ts',
+		script: 'tools/board/board-compare-cli.ts',
 		// It replays the board as `board:replay` does, so its imports and `.env` load the same way.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
