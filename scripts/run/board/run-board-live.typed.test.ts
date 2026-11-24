@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { run_board_live } from './run-board-live'
 import { run_board_sound_enter } from './run-board-sound-enter'
 import { run_board_sound_player } from './run-board-sound-player'
@@ -11,6 +12,7 @@ import { run_board_theme_defs } from './run-board-theme-defs'
 
 const LEFT_MS = 300
 const ENTER_FILE = 'sounds/enter.wav'
+const create_directory = temporary_directory()
 
 interface Heard {
 	typing_sound: TypingSound
@@ -87,11 +89,11 @@ describe('run_board_live.trill_of typed end', () => {
 describe('run_board_live.typed_end_of', () => {
 	it('plays the bttf ENTER WAV once', () => {
 		const start = vi.spyOn(run_board_sound_player, 'start').mockImplementation(() => undefined)
-		const write = vi.spyOn(run_board_sound_wav, 'cached_samples').mockReturnValue(ENTER_FILE)
+		const write = vi.spyOn(run_board_sound_wav, 'resolved_samples').mockReturnValue(ENTER_FILE)
 
 		run_board_live.typed_end_of('bttf')()
 
-		expect(write.mock.calls[0]?.[0]).toBe(run_board_sound_enter.NAME)
+		expect(write.mock.calls[0]?.[0].name).toBe(run_board_sound_enter.NAME)
 		expect(start.mock.calls.map((call) => call[0])).toStrictEqual([ENTER_FILE])
 		start.mockRestore()
 		write.mockRestore()
@@ -101,7 +103,7 @@ describe('run_board_live.typed_end_of', () => {
 	it('rings no bell where no player starts', () => {
 		const start = vi.spyOn(run_board_sound_player, 'start').mockImplementation(() => undefined)
 
-		vi.spyOn(run_board_sound_wav, 'cached_samples').mockReturnValue(ENTER_FILE)
+		vi.spyOn(run_board_sound_wav, 'resolved_samples').mockReturnValue(ENTER_FILE)
 		const out = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		run_board_live.typed_end_of('bttf')()
@@ -118,5 +120,43 @@ describe('run_board_live.typed_end_of', () => {
 
 		expect(start).not.toHaveBeenCalled()
 		start.mockRestore()
+	})
+})
+
+interface FreshTypedEnd {
+	typed_end: () => void
+	pcm: MockInstance
+	start: MockInstance
+}
+
+// A fresh process's bttf typed end, its WAV written to a temporary directory and no player started.
+async function fresh_typed_end(): Promise<FreshTypedEnd> {
+	vi.resetModules()
+	const { run_board_live: live } = await import('./run-board-live')
+	const { run_board_sound_dtmf: dtmf } = await import('./run-board-sound-dtmf')
+	const { run_board_sound_player: player } = await import('./run-board-sound-player')
+	const { usage_state_path } = await import('#scripts/usage/usage-state-path')
+
+	vi.spyOn(usage_state_path, 'sounds').mockReturnValue(create_directory('josh-typed-end-'))
+
+	return {
+		typed_end: live.typed_end_of('bttf'),
+		pcm: vi.spyOn(dtmf, 'pcm'),
+		start: vi.spyOn(player, 'start').mockImplementation(() => undefined),
+	}
+}
+
+// joshuafolkken/kit#8897: a process synthesizes the ENTER WAV on its first typed end only.
+describe('run_board_live.typed_end_of resolution', () => {
+	it('ac-981052aa synthesizes the bttf ENTER WAV once over two typed ends', async () => {
+		const { typed_end, pcm, start } = await fresh_typed_end()
+
+		typed_end()
+		typed_end()
+
+		expect(pcm).toHaveBeenCalledOnce()
+		expect(start).toHaveBeenCalledTimes(2)
+		expect(start.mock.calls[1]?.[0]).toBe(start.mock.calls[0]?.[0])
+		vi.restoreAllMocks()
 	})
 })

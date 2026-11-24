@@ -1,3 +1,4 @@
+import { WriteStream } from 'node:tty'
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
@@ -197,6 +198,18 @@ describe('run_board_reveal_rain.beats_of — a later beat writes only what chang
 		const [, ...later] = scripted([...behind, ...behind, ...behind], 3)
 
 		expect(later).toStrictEqual([synced(''), synced('')])
+	})
+
+	// joshuafolkken/kit#8897: reading it per cell stalled the matrix reveal.
+	it("reads stdout's color depth once per beat, not once per drop", () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const drawn = run_board_labels.painted(run_board_header_trace.SHADES.head, GLYPH)
+		const depth = vi.spyOn(WriteStream.prototype, 'getColorDepth')
+		const beats = [...beats_of('abcd', () => HALF, { read: () => DROP })]
+
+		expect(beats[0]?.text).toContain(drawn.repeat(4))
+		expect(depth).toHaveBeenCalledTimes(beats.length)
+		depth.mockRestore()
 	})
 
 	it('leaves on the terminal, after every beat, the screen that beat draws written whole', () => {

@@ -24,6 +24,18 @@ const U16_BYTES = 2
 const U32_BYTES = 4
 const DIGEST_LENGTH = 12
 const source: { digest: string | undefined } = { digest: undefined }
+// joshuafolkken/kit#8897: each sampled sound's path, resolved once per process, keyed by its
+// directory, name, key and rate.
+const resolved_paths = new Map<string, string>()
+
+// A sound rendered to samples on demand: its name, what tells its renderings apart (a pace, say),
+// the rate it is rendered at and the rendering itself.
+interface SampledSound {
+	name: string
+	key: string
+	sample_rate: number
+	render: () => Int16Array
+}
 
 // In source runs these are separate modules; a distributed build contains both in this module's
 // bundle. Hash the actual implementation, so changing synthesis needs no manually bumped version.
@@ -149,6 +161,25 @@ function cached_samples(
 	)
 }
 
+// The sound's WAV path (`cached_samples`), its samples rendered, built into a WAV and hashed on the
+// first call only: later calls with the same directory, name, key and rate reuse the path. A path that
+// could not be written is not kept, so the next call tries again.
+function resolved_samples(
+	sound: SampledSound,
+	directory = usage_state_path.sounds(),
+): string | undefined {
+	const memo_key = JSON.stringify([directory, sound.name, sound.key, sound.sample_rate])
+	const known = resolved_paths.get(memo_key)
+
+	if (known !== undefined) return known
+
+	const target = cached_samples(sound.name, sound.render(), sound.sample_rate, directory)
+
+	if (target !== undefined) resolved_paths.set(memo_key, target)
+
+	return target
+}
+
 // The sample rate a WAV file's fmt chunk records, read from its header alone, so a raw-PCM player
 // plays each file at its own rate (joshuafolkken/kit#8365); throws when the file cannot be read.
 function rate_of(file: string): number {
@@ -170,7 +201,8 @@ const run_board_sound_wav = {
 	cached_samples,
 	cached_wav,
 	rate_of,
+	resolved_samples,
 	wav_of,
 }
 
-export { run_board_sound_wav }
+export { run_board_sound_wav, type SampledSound }

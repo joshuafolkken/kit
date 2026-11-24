@@ -3,6 +3,7 @@ import { run_board_drop_screen } from './run-board-drop-screen'
 import type { TerminalSize } from './run-board-fit'
 import { run_board_header_trace } from './run-board-header-trace'
 import { run_board_labels } from './run-board-labels'
+import { run_board_paint, type Painter } from './run-board-paint'
 import { run_board_rain, type RainCell, type Random, type Scene } from './run-board-rain'
 import type { Beat } from './run-board-reveal-blocks'
 import { run_board_screen } from './run-board-screen'
@@ -48,6 +49,7 @@ interface DrawnRow {
 	columns: ReadonlyArray<Column>
 	cells: ReadonlyArray<RainCell>
 	keys: Array<string>
+	paint: Painter
 }
 
 interface Run {
@@ -140,8 +142,8 @@ function hidden(text: string, is_shown: boolean): Drawn {
 	return { text: `${closed(is_shown)}${text}`, is_shown: false }
 }
 
-function rain_text(cell: Exclude<RainCell, { kind: 'behind' }>): string {
-	return cell.kind === 'drop' ? run_board_labels.painted(cell.paint, cell.glyph) : ' '
+function rain_text(cell: Exclude<RainCell, { kind: 'behind' }>, paint: Painter): string {
+	return cell.kind === 'drop' ? paint(cell.paint, cell.glyph) : ' '
 }
 
 // Whether all of a character's columns the rain has passed: the next one too for a wide character.
@@ -165,20 +167,26 @@ function passed(column: Column, next: RainCell | undefined, is_shown: boolean): 
 // One column of a frame of the rain, after a column that left the frame's colors on or off.
 function frame_column(
 	column: Column,
-	cells: { cell: RainCell; next: RainCell | undefined },
+	cells: { cell: RainCell; next: RainCell | undefined; paint: Painter },
 	is_shown: boolean,
 ): Drawn {
-	const { cell, next } = cells
-	if (cell.kind !== 'behind') return hidden(rain_text(cell), is_shown)
+	const { cell, next, paint } = cells
+	if (cell.kind !== 'behind') return hidden(rain_text(cell, paint), is_shown)
 
 	return passed(column, next, is_shown)
 }
 
-// A row of the frame under a row of the rain, its colors and links closed at its end.
-function row_of(columns: ReadonlyArray<Column>, cells: ReadonlyArray<RainCell>): string {
+// A row of the frame under a row of the rain, its colors and links closed at its end; `paint` colors
+// the rain's glyphs, one per frame (joshuafolkken/kit#8897).
+function row_of(
+	columns: ReadonlyArray<Column>,
+	cells: ReadonlyArray<RainCell>,
+	paint: Painter = run_board_paint.painter(),
+): string {
 	let is_shown = false
 	const texts = columns.map((column, x) => {
-		const drawn = frame_column(column, { cell: cells[x] ?? BEHIND, next: cells[x + 1] }, is_shown)
+		const at = { cell: cells[x] ?? BEHIND, next: cells[x + 1], paint }
+		const drawn = frame_column(column, at, is_shown)
 
 		is_shown = drawn.is_shown
 
@@ -203,10 +211,14 @@ function cursor_to(y: number, x: number): string {
 }
 
 // What each column of a row draws on its own, so two frames compare by what the terminal shows.
-function keys_of(columns: ReadonlyArray<Column>, cells: ReadonlyArray<RainCell>): Array<string> {
+function keys_of(
+	columns: ReadonlyArray<Column>,
+	cells: ReadonlyArray<RainCell>,
+	paint: Painter,
+): Array<string> {
 	return columns.map(
 		(column, x) =>
-			frame_column(column, { cell: cells[x] ?? BEHIND, next: cells[x + 1] }, false).text,
+			frame_column(column, { cell: cells[x] ?? BEHIND, next: cells[x + 1], paint }, false).text,
 	)
 }
 
@@ -245,7 +257,7 @@ function runs_of(changed: ReadonlyArray<boolean>): Array<Run> {
 // A run of a row written where it starts, its colors and links closed at its end.
 function run_text(row: DrawnRow, run: Run, y: number): string {
 	const { start, end } = run
-	const text = row_of(row.columns.slice(start, end), row.cells.slice(start, end + 1))
+	const text = row_of(row.columns.slice(start, end), row.cells.slice(start, end + 1), row.paint)
 
 	return `${cursor_to(y, start)}${text}`
 }
@@ -258,16 +270,18 @@ function row_changes(row: DrawnRow, before: ReadonlyArray<string>, y: number): s
 }
 
 // The grid's rows under the rain, each with the rain's cells as the frame reads them and what its
-// columns draw.
+// columns draw, the glyphs colored by one `painter` for the whole frame.
 function drawn_rows_of(
 	grid: ReadonlyArray<ReadonlyArray<Column>>,
 	cells: ReadonlyArray<ReadonlyArray<RainCell>>,
 	read: (cell: RainCell) => RainCell,
 ): Array<DrawnRow> {
+	const paint = run_board_paint.painter()
+
 	return grid.map((columns, y) => {
 		const read_cells = (cells[y] ?? []).map((cell) => read(cell))
 
-		return { columns, cells: read_cells, keys: keys_of(columns, read_cells) }
+		return { columns, cells: read_cells, keys: keys_of(columns, read_cells, paint), paint }
 	})
 }
 
@@ -279,7 +293,9 @@ function beat_text(
 	before?: ReadonlyArray<ReadonlyArray<string>>,
 ): string {
 	if (before === undefined) {
-		return `${CURSOR_HOME}${rows.map((row) => row_of(row.columns, row.cells)).join(NEXT_LINE)}`
+		const lines = rows.map((row) => row_of(row.columns, row.cells, row.paint))
+
+		return `${CURSOR_HOME}${lines.join(NEXT_LINE)}`
 	}
 
 	return rows.map((row, y) => row_changes(row, before[y] ?? [], y)).join('')

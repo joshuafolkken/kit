@@ -1,11 +1,10 @@
-import { WriteStream } from 'node:tty'
-import { styleText } from 'node:util'
 import { figure_format } from '#scripts/lib/figure-format'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import cli_spinners from 'cli-spinners'
 import { run_board_length } from './run-board-length'
 import type { BoardNote } from './run-board-notes'
+import { run_board_paint, type Paint, type Shade, type TextColor } from './run-board-paint'
 import type { Phase } from './run-board-phase'
 import type { ItemState } from './run-board-status'
 
@@ -24,10 +23,7 @@ const BAR_LEFT_COLOR: TextColor = 'dim'
 // The spinner a running run and a running row turn, at the package's own interval.
 const SPINNER_FRAMES = cli_spinners.dots.frames
 const SPINNER_INTERVAL_MS = cli_spinners.dots.interval
-// The color depth from which a terminal draws a 24-bit color, and the escapes that draw one.
-const RGB_COLOR_DEPTH = 24
-const ESC = '\u{1B}'
-const DEFAULT_FOREGROUND = `${ESC}[39m`
+const { RGB_COLOR_DEPTH, painted } = run_board_paint
 
 // The words the board draws, English whatever the session language: one set of words reads the same
 // on every board. The board draws most of what it says as a symbol; the words left are the ones a
@@ -123,18 +119,6 @@ const WORDS = {
 } as const
 
 type Words = typeof WORDS
-
-type TextColor = Parameters<typeof styleText>[0]
-
-// A color that does not depend on the terminal's palette: `rgb` as the
-// `38;2;R;G;B` escape takes it, drawn where the output has 24-bit color, and `named` — the palette's own
-// — where it does not.
-interface Shade {
-	rgb: string
-	named: TextColor
-}
-
-type Paint = TextColor | Shade
 
 // Every row icon is an emoji a terminal draws two columns wide by default (Emoji_Presentation), so the
 // number after it lines up whichever state a row is in: 🅿 and ☑ are text symbols a terminal such as
@@ -337,29 +321,6 @@ function day_minute_of(ms: number): string {
 	return `${day_of(ms)} ${minute_of(ms)}`
 }
 
-function is_shade(color: Paint): color is Shade {
-	return typeof color === 'object' && 'rgb' in color
-}
-
-// A shade in 24-bit color where stdout draws it, else its palette color. Whether stdout draws color at
-// all is `styleText`'s answer alone, so a shade draws no escape where its palette color would not.
-function shaded(shade: Shade, text: string): string {
-	const named = styleText(shade.named, text)
-
-	if (named === text || WriteStream.prototype.getColorDepth() < RGB_COLOR_DEPTH) return named
-
-	return `${ESC}[38;2;${shade.rgb}m${text}${DEFAULT_FOREGROUND}`
-}
-
-// A part of a gauge in its color; an empty part, or no color, draws no escape. `styleText` drops the
-// escape itself where stdout draws no color (a pipe, `NO_COLOR`), so a gauge never disagrees with the
-// rest of the board about it.
-function painted(color: Paint | undefined, text: string): string {
-	if (color === undefined || text === '') return text
-
-	return is_shade(color) ? shaded(color, text) : styleText(color, text)
-}
-
 // **The one progress bar the board draws** — the header's plan, the machine and every running row's
 // phase: `done` of `total` filled in proportion across `width` cells, the done part in `color`
 // (`undefined` leaves it the terminal's own).
@@ -419,4 +380,6 @@ const run_board_labels = {
 }
 
 export { run_board_labels }
-export type { Paint, TextColor, Words }
+export type { Words }
+
+export { type Paint, type TextColor } from './run-board-paint'
