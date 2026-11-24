@@ -246,4 +246,14 @@ describe('lane_dispatch_prepare.prepared — josh.worker.route on a labelled Iss
 		})
 		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
 	})
+
+	it('rewrites no non-default worker label an Issue already carries', async () => {
+		mock_labels([`worker:${HAIKU.name}`])
+		mock_body(LIGHT_BODY)
+
+		expect(await lane_dispatch_prepare.prepared(lane(), true)).toMatchObject({
+			profile: { model: HAIKU.model },
+		})
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
+	})
 })
