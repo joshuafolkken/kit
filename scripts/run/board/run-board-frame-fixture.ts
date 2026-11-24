@@ -217,7 +217,7 @@ function is_synced_once(write: string): boolean {
 		write.startsWith(SYNC_START) &&
 		write.endsWith(SYNC_END) &&
 		!write.includes(SYNC_START, 1) &&
-		write.indexOf(SYNC_END) === write.length - SYNC_END.length
+		!write.slice(0, -SYNC_END.length).includes(SYNC_END)
 	)
 }
 
