@@ -86,6 +86,7 @@ describe('agent_worker_profile.read — a josh.worker setting', () => {
 		['an effort outside low to max', with_sonnet({ effort: 'none' }), 'effort none is not one of'],
 		['an unsafe model', with_sonnet({ model: 'claude\nrm' }), 'is not a safe model'],
 		['a consultation model', with_sonnet({ model: 'claude-fable-5-1' }), 'is a consultation model'],
+		['a missing default', { profiles: WORKER.profiles }, 'josh.worker.default'],
 	])('rejects %s with the reason', (_label, worker, reason) => {
 		write_worker(worker)
 		const result = agent_worker_profile.read(fixture.directory)
@@ -143,6 +144,18 @@ describe('agent_worker_profile.resolve — the profile an Issue runs on', () => 
 
 		expect(await agent_worker_profile.resolve(fixture.directory, fetch_labels)).toEqual(UNSET)
 		expect(fetch_labels).not.toHaveBeenCalled()
+	})
+})
+
+describe('agent_worker_profile.resolve — a setting with keys it does not name (#8882)', () => {
+	it.each([
+		['the worker setting', { ...WORKER, route: 'next' }],
+		['a profile', { ...WORKER, profiles: [HAIKU, { ...SONNET, route: 'next' }, OPUS] }],
+	])('starts on the default when %s carries one', async (_label, worker) => {
+		write_worker(worker)
+		const result = await agent_worker_profile.resolve(fixture.directory, async () => [])
+
+		expect(result.kind === 'worker' ? result.worker.name : result.kind).toBe(SONNET_NAME)
 	})
 })
 
