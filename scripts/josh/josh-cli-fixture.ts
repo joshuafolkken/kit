@@ -25,6 +25,17 @@ const SOURCE_JOSH: JoshLauncher = {
 	leading_arguments: [...TSX_RUNNER.leading_arguments, JOSH_ENTRY],
 }
 
+// Kit's own `pnpm josh` (`package.json` → `scripts.josh`): the built dispatcher, rebuilt first when a
+// source edit left it stale, so it runs the same code as SOURCE_JOSH without compiling the whole
+// command graph through tsx on every spawn (joshuafolkken/kit#8884).
+const READY_JOSH: JoshLauncher = {
+	executable: process.execPath,
+	leading_arguments: [
+		'--disable-warning=ExperimentalWarning',
+		path.join(REPO_ROOT, 'tools', 'josh', 'josh-ready.ts'),
+	],
+}
+
 interface CliResult {
 	stdout: string
 	exit_code: number | undefined
@@ -52,7 +63,7 @@ function run_josh(cli_arguments: ReadonlyArray<string>, options: CliOptions = {}
 	return { stdout: result.stdout, exit_code: result.exitCode }
 }
 
-const josh_cli_fixture = { run_josh, REPO_ROOT, SOURCE_JOSH }
+const josh_cli_fixture = { run_josh, REPO_ROOT, SOURCE_JOSH, READY_JOSH }
 
 export type { CliResult, JoshLauncher }
 export { josh_cli_fixture }
