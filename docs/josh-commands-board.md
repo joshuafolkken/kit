@@ -334,7 +334,7 @@ pnpm josh run:handoff backlogrun <E> --only                         # josh backl
 
 <!-- /usage -->
 
-Consultation main (Fable / Astra): uses its provider's role profile (`kickoff` / `retrospective` scheduler, else worker). Background `kickoff`. Lane children cannot use `run:handoff`: exit 1 before launch; continue in the current session.
+Consultation main (Fable / Astra): its provider's role profile (`kickoff` / `retrospective` scheduler, else worker); [`josh.handoff.route`](./package-settings.md) puts `kickoff` on Sonnet. Background `kickoff`. Lane children: exit 1 before launch; continue in the current session.
 
 `run:handoff retrospective` starts the end-of-run unit on a generated brief and waits; the brief's close names the calling session as `--owner`, since the carry is that session's. It exits 0 only once the carry holds the unit's `run:carry --retrospective` mark, and exits 1 without starting when the mark is already there.
 

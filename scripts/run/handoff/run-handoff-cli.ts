@@ -249,9 +249,10 @@ async function launched(started: Started, ports: HandoffPorts): Promise<number> 
 
 function child_of(input: StartInput, scratch: string, cwd: string): HandoffChild {
 	const { handoff, provider, brief } = input
+	const { keyword } = handoff
 	const prompt = run_handoff_launch.prompt_of(handoff, brief, scratch)
 
-	return { prompt, role: run_handoff_launch.role_of(handoff.keyword), provider, cwd }
+	return { prompt, role: run_handoff_launch.role_of(keyword), provider, cwd, keyword }
 }
 
 // One start time names both the log and the scratch directory, so each child's pair reads together.

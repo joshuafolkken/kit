@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +18,8 @@ const KICKOFF = {
 } as const
 const WORKER = 'worker'
 const SCHEDULER_MODEL = 'claude-opus-5-5'
+const SONNET_MODEL = 'claude-sonnet-5-5'
+const KIT_ROOT = path.resolve(import.meta.dirname, '../../..')
 const LOG = '/repo/.git/handoff.log'
 const BRIEF = 'File the CSV export.'
 const SCRATCH = '.josh/tmp/handoff-kickoff-1'
@@ -121,6 +124,42 @@ describe('run_handoff_launch.argv_of', () => {
 
 		expect(built.kind).toBe('rejected')
 		expect(built.kind === 'rejected' && built.note).toContain(consultation_model)
+	})
+})
+
+// joshuafolkken/kit#8891: kit's own `josh.handoff.route` runs the kickoff child on Sonnet.
+describe('run_handoff_launch.argv_of — josh.handoff.route', () => {
+	it('hands kickoff in a repository with josh.handoff.route on to the weakest worker profile', () => {
+		const built = run_handoff_launch.argv_of(
+			child({ keyword: 'kickoff', cwd: KIT_ROOT }),
+			ENVIRONMENT,
+		)
+
+		expect(built).toMatchObject({
+			kind: 'argv',
+			profile: { role: 'scheduler', model: SONNET_MODEL },
+		})
+		expect(built.kind === 'argv' && built.argv.args).toEqual(
+			expect.arrayContaining(['--model', SONNET_MODEL]),
+		)
+	})
+
+	it('keeps the retrospective child on the scheduler model in that repository', () => {
+		const built = run_handoff_launch.argv_of(
+			child({ keyword: 'retrospective', cwd: KIT_ROOT }),
+			ENVIRONMENT,
+		)
+
+		expect(built).toMatchObject({ kind: 'argv', profile: { model: SCHEDULER_MODEL } })
+	})
+
+	it('keeps a fullrun child on the worker profile in that repository', () => {
+		const fullrun = child({ keyword: 'fullrun', role: WORKER, cwd: KIT_ROOT })
+
+		expect(run_handoff_launch.argv_of(fullrun, ENVIRONMENT)).toMatchObject({
+			kind: 'argv',
+			profile: { role: WORKER, model: SCHEDULER_MODEL },
+		})
 	})
 })
 

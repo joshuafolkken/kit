@@ -87,7 +87,13 @@ function parse(argv: ReadonlyArray<string>): HandoffArguments {
 	return workflow_of(keyword, rest)
 }
 
-const run_handoff_args = { BACKLOG_KEYWORD, KEYWORDS, RETROSPECTIVE_KEYWORD, parse }
+const run_handoff_args = {
+	BACKLOG_KEYWORD,
+	KEYWORDS,
+	RETROSPECTIVE_KEYWORD,
+	WORKFLOW_KEYWORDS,
+	parse,
+}
 
 export type { HandoffArguments, WorkflowHandoff, WorkflowKeyword }
 export { run_handoff_args }

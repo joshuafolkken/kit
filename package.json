@@ -28,6 +28,9 @@
 	},
 	"josh": {
 		"progress_interval_minutes": 15,
+		"handoff": {
+			"route": true
+		},
 		"worker": {
 			"default": "opus",
 			"route": true,

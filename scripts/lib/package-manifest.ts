@@ -51,9 +51,12 @@ const WORKER_SCHEMA = z
 	.refine((worker) => worker.profiles.some((profile) => profile.name === worker.default), {
 		message: 'default must name one of the profiles',
 	})
+// joshuafolkken/kit#8891: `route` starts the `run:handoff` kickoff child on the weakest worker profile.
+const HANDOFF_SCHEMA = z.object({ route: z.boolean().default(false) })
 const josh_schemas = {
 	format: z.object({ josh: z.object({ format: FORMAT_SCHEMA.optional() }).optional() }),
 	gate_steps: z.object({ josh: z.object({ gate: GATE_SCHEMA.optional() }).optional() }),
+	handoff: z.object({ josh: z.object({ handoff: HANDOFF_SCHEMA.optional() }).optional() }),
 	lane_setup: z.object({ josh: z.object({ lane: LANE_SCHEMA.optional() }).optional() }),
 	progress_interval_minutes: z.object({
 		josh: z.object({ progress_interval_minutes: z.number().positive() }).optional(),
