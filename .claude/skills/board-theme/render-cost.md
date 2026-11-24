@@ -1,9 +1,12 @@
 # Carry the render cost from the demo into the theme
 
-Read from `SKILL.md` → "5. File the Issue once the user decides" and "6. After the first merge". A
-light demo is no evidence: it plays on one still frame in its own loop, while the real board redraws
-every second, runs every effect at once, reads the workers and prepares the sound on the same thread.
-Write no limit here; the limits are the budget test's and the baseline's.
+Read from `SKILL.md` → "5. File the Issue once the user decides" and "6. After the first merge",
+and from [split](theme-split.md).
+
+- A light demo is no evidence: it plays on one still frame in its own loop, while the real board
+  redraws every second, runs every effect at once, reads the workers and prepares the sound on the
+  same thread.
+- Write no limit here; the limits are the budget test's and the baseline's.
 
 ## When filing
 

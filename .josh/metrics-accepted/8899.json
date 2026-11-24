@@ -2,7 +2,7 @@
 	"reason": "two budget-list entries for the new render-cost.md (document byte budget and issue-citation ratchet)",
 	"date": "2026-11-24",
 	"growth": {
-		"ai_cost.on_demand_bytes": 1813,
+		"ai_cost.on_demand_bytes": 1840,
 		"scripts.code_lines": 2
 	}
 }
