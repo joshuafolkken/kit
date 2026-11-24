@@ -77,7 +77,7 @@ const PROJECT_FIELDS = {
 	private: true,
 	type: 'module',
 	packageManager: kit_package_manager(),
-	scripts: { josh: launch_command(josh_cli_fixture.SOURCE_JOSH) },
+	scripts: { josh: launch_command(josh_cli_fixture.READY_JOSH) },
 }
 
 // A file the fixture writes: its path relative to the project root, and its content.
@@ -204,7 +204,7 @@ async function assemble_environment(
 	const root =
 		kind === 'lane' ? await add_lane(primary, path.join(workspace, LANE_DIRECTORY)) : primary
 
-	return { kind, root, primary, launcher: josh_cli_fixture.SOURCE_JOSH, workspace }
+	return { kind, root, primary, launcher: josh_cli_fixture.READY_JOSH, workspace }
 }
 
 async function open_environment(

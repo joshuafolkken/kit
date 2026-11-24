@@ -133,6 +133,7 @@ describe('lane_dispatch_prepare.prepared — the josh.worker profile', () => {
 		expect(outcome).toMatchObject({
 			kind: 'prepared',
 			profile: { model: HAIKU.model, effort: 'low' },
+			reason: 'label',
 		})
 	})
 
@@ -255,5 +256,30 @@ describe('lane_dispatch_prepare.prepared — josh.worker.route on a labelled Iss
 			profile: { model: HAIKU.model },
 		})
 		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8815: the reason rides to the lane ledger's dispatch row.
+describe('lane_dispatch_prepare.prepared — why the child runs on its model', () => {
+	it('names the configured default without a worker label', async () => {
+		write_worker_setting()
+		mock_labels(['enhancement'])
+		const outcome = await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(outcome).toMatchObject({ kind: 'prepared', reason: 'default' })
+	})
+
+	it('names the environment without the setting', async () => {
+		const outcome = await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(outcome).toMatchObject({ kind: 'prepared', reason: 'environment' })
+	})
+
+	it('names the route where josh.worker.route read the Issue body', async () => {
+		set_up_route()
+		mock_body(LIGHT_BODY)
+		const outcome = await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(outcome).toMatchObject({ kind: 'prepared', reason: 'route' })
 	})
 })
