@@ -1,0 +1,7 @@
+{
+	"reason": "#8893 records the deferred test file list on the ledger row: the deferred_files schema field, its writer, and tests for the cut, uncut and old-row cases",
+	"date": "2026-11-24",
+	"growth": {
+		"scripts.code_lines": 33
+	}
+}

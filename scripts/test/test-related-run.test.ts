@@ -108,7 +108,11 @@ describe('test_related_run.run_and_vouch — capped run', () => {
 		const reuse = { excluded: [REUSED], reused: 1, missed: 1, reason: 'fixture', elapsed_ms: 0 }
 
 		vi.mocked(test_related_reuse.carried).mockResolvedValue([])
-		await test_related_run.run_and_vouch({ ...input(), deferred: 2, reuse }, [], TREE)
+		await test_related_run.run_and_vouch(
+			{ ...input(), deferred: ['src/a.test.ts', 'src/b.test.ts'], reuse },
+			[],
+			TREE,
+		)
 		expect(test_related_reuse.blobs).toHaveBeenCalledWith(process.cwd(), [TEST, REUSED])
 	})
 })

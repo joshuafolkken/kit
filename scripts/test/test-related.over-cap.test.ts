@@ -45,6 +45,9 @@ const REPOSITORY_ROOT = process.cwd()
 const CHANGED_SOURCE = path.join('scripts', 'test', 'test-related-cap.ts')
 const SELECTED_TEST = path.join('scripts', 'test', 'test-related-cap.test.ts')
 const DEFERRED = 5
+const DEFERRED_FILES = Array.from({ length: DEFERRED }, (_, index) =>
+	path.join('src', `deferred-${String(index)}.test.ts`),
+)
 const OVER_CAP = test_pinned_logic.MAX_TEST_FILES + DEFERRED
 
 function written_output(): string {
@@ -80,7 +83,7 @@ beforeEach(() => {
 	vi.mocked(test_unit_guard.is_running).mockReturnValue(true)
 	vi.mocked(test_related_select.select).mockResolvedValue({
 		tests: [SELECTED_TEST],
-		deferred: DEFERRED,
+		deferred: DEFERRED_FILES,
 		reach: [{ file: CHANGED_SOURCE, count: OVER_CAP }],
 		method: 'import',
 	})
@@ -95,7 +98,7 @@ describe('test_related.run_related_tests — a change past the cap', () => {
 		expect(written_output()).toContain(
 			`${String(DEFERRED)} deferred to CI past the cap (150 test files), hub ${CHANGED_SOURCE}`,
 		)
-		expect(record.mock.calls[0]?.[0].deferred).toBe(DEFERRED)
+		expect(record.mock.calls[0]?.[0].deferred).toEqual(DEFERRED_FILES)
 	})
 
 	it('hands vitest the selected test files alone', async () => {
