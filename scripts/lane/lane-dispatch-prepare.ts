@@ -41,14 +41,20 @@ async function issue_body(issue: string): Promise<string | undefined> {
 	return body.kind === 'read' ? body.text : undefined
 }
 
+type Resolved = Extract<WorkerResult, { kind: 'worker' }>
+
+// Whether routing chose a profile other than the default: an unlabelled Issue already reads as the
+// default, and a stored default would pin it there past a failed body read.
+function is_routed_away(worker: Resolved): boolean {
+	return worker.settings.route && worker.worker.name !== worker.settings.default
+}
+
 // joshuafolkken/kit#8760: a routed profile is stored as the Issue's `worker:<name>` label, the one
 // place the cut relaunch's ship cap and the escalation read the profile from. `undefined` where the
-// Issue already carries a label or `route` is off; a refusal where the label cannot be written.
-async function stored(
-	lane: LaneInfo,
-	worker: Extract<WorkerResult, { kind: 'worker' }>,
-): Promise<ProfileResult | undefined> {
-	if (!worker.settings.route) return undefined
+// Issue already carries a label or routing kept the default; a refusal where the label cannot be
+// written.
+async function stored(lane: LaneInfo, worker: Resolved): Promise<ProfileResult | undefined> {
+	if (!is_routed_away(worker)) return undefined
 
 	const labels = await git_gh_issue_write.read_label_names(lane.issue)
 	const is_unlabelled = !labels?.some((name) => name.startsWith(agent_worker_profile.LABEL_PREFIX))

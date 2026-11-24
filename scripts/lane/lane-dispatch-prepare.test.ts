@@ -213,6 +213,26 @@ describe('lane_dispatch_prepare.prepared — josh.worker.route (joshuafolkken/ki
 	})
 })
 
+describe('lane_dispatch_prepare.prepared — josh.worker.route keeping the default', () => {
+	beforeEach(set_up_route)
+
+	it('writes no label where the Issue body cannot be read, so a later dispatch routes again', async () => {
+		mock_body(undefined)
+
+		await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
+	})
+
+	it('writes no label where the body routes the Issue to the default', async () => {
+		mock_body('## 背景\n\n- 種別: 振る舞い変更')
+
+		await lane_dispatch_prepare.prepared(lane(), true)
+
+		expect(git_gh_issue_write.issue_apply_label).not.toHaveBeenCalled()
+	})
+})
+
 describe('lane_dispatch_prepare.prepared — josh.worker.route on a labelled Issue', () => {
 	beforeEach(set_up_route)
 
