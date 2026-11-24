@@ -18,13 +18,40 @@ const CONDITION_RULE = '@typescript-eslint/no-unnecessary-condition'
 // joshuafolkken/kit#8886: `no-deprecated` replaces `sonarjs/deprecation`, the one deprecation check
 // tests had.
 const RETAINED_RULES = ['no-floating-promises', 'no-misused-promises', 'no-deprecated']
+// Listed in full, not derived from the rule files, so deleting any `off` line fails the suite.
+const DROPPED_AWS_RULES = [
+	'apigateway-public-api',
+	'ec2-rds-dms-public',
+	'ec2-unencrypted-ebs-volume',
+	'efs-unencrypted',
+	'iam-all-privileges',
+	'iam-privilege-escalation',
+	'iam-public-access',
+	'opensearchservice-domain',
+	'rds-unencrypted-databases',
+	'restricted-ip-admin-access',
+	's3-bucket-granted-access',
+	's3-bucket-insecure-http',
+	's3-bucket-public-access',
+	's3-bucket-versioning',
+	'sagemaker-unencrypted-notebook',
+	'sns-unencrypted-topics',
+	'sqs-unencrypted-queue',
+].map((name) => `sonarjs/aws-${name}`)
 const DROPPED_RULES = [
 	'sonarjs/deprecation',
 	'unicorn/no-nested-ternary',
-	'sonarjs/aws-restricted-ip-admin-access',
-	'sonarjs/no-useless-react-setstate',
-	'sonarjs/no-vue-mixins',
+	...DROPPED_AWS_RULES,
+	'sonarjs/jsx-no-leaked-render',
 	'sonarjs/no-angular-bypass-sanitization',
+	'sonarjs/no-debounce-throttle-in-render',
+	'sonarjs/no-hook-setter-in-body',
+	'sonarjs/no-mutate-reactive-state-in-updated-hook',
+	'sonarjs/no-uniq-key',
+	'sonarjs/no-useless-react-setstate',
+	'sonarjs/no-vue-class-component',
+	'sonarjs/no-vue-mixins',
+	'sonarjs/prefer-read-only-props',
 ]
 const SOURCE_FILE = 'probe.ts'
 const TEST_FILES = ['probe.test.ts', 'probe.e2e.ts']
