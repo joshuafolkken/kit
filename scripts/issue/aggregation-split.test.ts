@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aggregation_split } from './aggregation-split'
+import { issue_template_section } from './issue-template-section'
 
 const AGGREGATION = '- [ ] トランスクリプトからフィルタの形を集計し Issue にコメントで記録する'
 const IMPLEMENTATION = '- [ ] `issue:lint` が拒否する'
@@ -59,6 +60,7 @@ describe('aggregation_split.problems', () => {
 		expect(problem).toContain('--route split')
 		expect(problem).toContain('prior Issue')
 		expect(problem).toContain('an aggregation or a measurement')
+		expect(problem).toContain(issue_template_section.pointer('declarations'))
 	})
 
 	it.each(PASSED)('passes $name', ({ files, criterion }) => {
