@@ -173,7 +173,7 @@ async function reconcile_epic(epic: number): Promise<void> {
 	)
 }
 
-// A prerequisite outside the epic gains its row, declaration and relation from `epic --add --before`.
+// A prerequisite no epic tracks gains its row, declaration and relation from `epic --add --before`.
 // One the epic already tracks does not: `epic --add` reads it as a move and drops every order it
 // already had, where this only adds one — so the relation is recorded directly and
 // `epic --reconcile` copies it into the declaration beside the others, once a dry plan shows the

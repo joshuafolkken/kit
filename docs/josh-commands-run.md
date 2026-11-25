@@ -145,7 +145,7 @@ failed step keeps the hold. A rerun whose tracking epic already lists every chil
 again and goes on to the audit.
 
 `--prerequisite <P>` is `run:pause <issue> --for <P>` with the placement: the relation's own
-`epic --add`'s insertion, called in process with `--before <issue>` (no `--order-reason` read), places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
+`epic --add`'s insertion, called in process with `--before <issue>` (no `--order-reason` read), places `<P>` in the epic tracking `<issue>` (a `<P>` another epic already tracks stays there: only the relation is written); with none, `epic "<title>" <P>
 <issue> --ordered` (its `--order-reason` cites `<P>`) is created and the relation recorded inside it. The audit, the
 `needs-decision` park and the `--title` refusal are as above.
 
