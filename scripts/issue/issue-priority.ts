@@ -1,5 +1,6 @@
 import { issue_body_keys } from './issue-body-keys'
 import { has_label_name, PRIORITY_CRITICAL_LABEL, PRIORITY_HIGH_LABEL } from './issue-labels'
+import { issue_template_section } from './issue-template-section'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#4383: the priority `josh issue:file` applies, read from the body's one priority
@@ -65,17 +66,20 @@ const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 	high: PRIORITY_HIGH_LABEL,
 	normal: undefined,
 }
-const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`${issue_body_keys.line('priority', 'critical')}（条件 <1-3>）\`, \`${issue_body_keys.line('priority', 'high')}（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent one names its condition, a high one its basis (\`issue-template.md\`)`
+// The criteria a priority refusal points at, and the table that gives each background line its shape.
+const PRIORITY_POINTER = issue_template_section.pointer('priority')
+const DECLARATIONS_POINTER = issue_template_section.pointer('declarations')
+const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`${issue_body_keys.line('priority', 'critical')}（条件 <1-3>）\`, \`${issue_body_keys.line('priority', 'high')}（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent one names its condition, a high one its basis (${PRIORITY_POINTER})`
 
-const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (\`issue-template.md\`)`
+const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (${DECLARATIONS_POINTER})`
 
-const CAUSE_PROBLEM = `state a cause's lost minutes under \`${BACKGROUND_HEADING}\` as \`${CAUSE_PREFIX} <分> 分\` (\`issue-template.md\`)`
+const CAUSE_PROBLEM = `state a cause's lost minutes under \`${BACKGROUND_HEADING}\` as \`${CAUSE_PREFIX} <分> 分\` (${DECLARATIONS_POINTER})`
 
-const SECURITY_PROBLEM = `state a security finding under \`${BACKGROUND_HEADING}\` as \`${SECURITY_PREFIX} <迂回される gate・ガード・権限>\` (\`issue-template.md\`)`
+const SECURITY_PROBLEM = `state a security finding under \`${BACKGROUND_HEADING}\` as \`${SECURITY_PREFIX} <迂回される gate・ガード・権限>\` (${DECLARATIONS_POINTER})`
 
-const PARK_PROBLEM = `state a caused park under \`${BACKGROUND_HEADING}\` as \`${PARK_PREFIX} #<N>\` — the Issue the defect parked or whose run it stopped (\`issue-template.md\`)`
+const PARK_PROBLEM = `state a caused park under \`${BACKGROUND_HEADING}\` as \`${PARK_PREFIX} #<N>\` — the Issue the defect parked or whose run it stopped (${DECLARATIONS_POINTER})`
 
-const LAST_PROBLEM = `\`${LAST_LINE}\` queues this Issue last, and an urgent or high priority runs it first — keep one of the two (\`issue-template.md\`)`
+const LAST_PROBLEM = `\`${LAST_LINE}\` queues this Issue last, and an urgent or high priority runs it first — keep one of the two (${PRIORITY_POINTER})`
 
 const HIGH_DECLARATION = '高（セキュリティ … / 原因の park … / 原因の損失 …）'
 
@@ -264,7 +268,7 @@ function floor_problem(body: string, level: PriorityLevel): string | undefined {
 
 	if (LEVELS.indexOf(level) >= LEVELS.indexOf(floor)) return undefined
 
-	return `${floor_reason(body)} ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`${DECLARATION_PREFIX} ${HIGH_DECLARATION}\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
+	return `${floor_reason(body)} ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`${DECLARATION_PREFIX} ${HIGH_DECLARATION}\`, or drop the declaration to file at the floor (${PRIORITY_POINTER})`
 }
 
 // Whether the body declares `LAST_LINE`; any other value is no declaration.

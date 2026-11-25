@@ -1,0 +1,7 @@
+{
+	"reason": "Three refusal modules import issue_template_section and the priority module names its two section pointers once (#8832)",
+	"date": "2026-11-25",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

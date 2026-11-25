@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PRIORITY_CRITICAL_LABEL, PRIORITY_HIGH_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
+import { issue_template_section, type PointedSection } from './issue-template-section'
 
 // joshuafolkken/kit#4383: the priority issue:file applies from the body's declaration and its floor.
 
@@ -135,7 +136,10 @@ describe('issue_priority.is_last', () => {
 
 describe('issue_priority.order_problem', () => {
 	it.each([[URGENT_CONDITION_2], [HIGH_WITH_DEADLINE]])('refuses last beside %j', (declaration) => {
-		expect(issue_priority.order_problem(body(declaration, `${LAST_LINE}\n`))).toContain(LAST_LINE)
+		const problem = issue_priority.order_problem(body(declaration, `${LAST_LINE}\n`))
+
+		expect(problem).toContain(LAST_LINE)
+		expect(problem).toContain(issue_template_section.pointer('priority'))
 	})
 
 	it.each([
@@ -357,4 +361,20 @@ describe('issue_priority.with_label', () => {
 
 		expect(issue_priority.with_label(typed, body(HIGH_WITH_DEADLINE))).toStrictEqual(typed)
 	})
+})
+
+// joshuafolkken/kit#8832: each refusal names the one issue-template.md section that answers it.
+const POINTED_REFUSALS: ReadonlyArray<[string, string, PointedSection]> = [
+	['- 優先度: 緊急', '', 'priority'],
+	['', `${MALFORMED_LANE}\n`, 'declarations'],
+	['', '- 原因の損失: 長い 分\n', 'declarations'],
+	['', '- セキュリティ:\n', 'declarations'],
+	['', `${PARK_PREFIX}\n`, 'declarations'],
+	[NORMAL_DECLARATION, PARK_LINE, 'priority'],
+]
+
+it.each(POINTED_REFUSALS)('points %j / %j at the %s section', (declaration, extra, key) => {
+	const pointer = issue_template_section.pointer(key)
+
+	expect(issue_priority.problem(body(declaration, extra), [])).toContain(pointer)
 })
