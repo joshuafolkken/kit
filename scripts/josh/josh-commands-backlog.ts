@@ -122,7 +122,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--blocked-by <M>'],
 					description:
-						'records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.',
+						'records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does, except an `#M` another epic tracks, which gets the relation only (an issue belongs to one epic); it stands in for the run label or goes with it.',
 				},
 				{
 					names: ['--unblock <M>'],

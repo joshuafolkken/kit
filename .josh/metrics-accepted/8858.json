@@ -1,0 +1,7 @@
+{
+	"reason": "Fix #8858: shared blocked-by recorder now keeps a blocker from another epic out of the epic and names the next command; growth is the new branch (+22 lines) with its tests",
+	"date": "2026-11-25",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

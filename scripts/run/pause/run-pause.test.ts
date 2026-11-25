@@ -257,7 +257,7 @@ describe('run_pause.pause — the blocked-by step past the first answer it reads
 		expect(state.blockers).toStrictEqual([11])
 	})
 
-	it('inserts through `epic --add` when only another epic tracks the prerequisite', async () => {
+	it('writes only the relation when only another epic tracks the prerequisite', async () => {
 		state.epics = [
 			{ number: 7, body: '- [ ] #10' },
 			{ number: 8, body: '- [ ] #11' },
@@ -265,8 +265,9 @@ describe('run_pause.pause — the blocked-by step past the first answer it reads
 
 		await run_pause.pause(REQUEST)
 
-		expect(add_children).toHaveBeenCalledOnce()
+		expect(add_children).not.toHaveBeenCalled()
 		expect(reconcile_epic).not.toHaveBeenCalled()
+		expect(state.blockers).toStrictEqual([11])
 	})
 })
 
