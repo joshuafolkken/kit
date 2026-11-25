@@ -69,8 +69,7 @@ interface EpicChildOutcome {
 	parked: boolean
 }
 
-// The plan a `backlogrun` begins from. `startup` is the single decision it starts from, so the plan a
-// person reads and the order the loop runs cannot drift into two places.
+// The plan a `backlogrun` begins from, as `startup` builds it from the named list.
 interface Startup {
 	kind: 'plan'
 	steps: ReadonlyArray<PlanStep>

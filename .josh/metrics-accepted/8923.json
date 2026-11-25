@@ -2,7 +2,7 @@
 	"reason": "#8923 bare --only idle watch: the offer reads --idle and the docs describe bare --only",
 	"date": "2026-11-25",
 	"growth": {
-		"scripts.code_lines": 23,
+		"scripts.code_lines": 25,
 		"ai_cost.on_demand_bytes": 208
 	}
 }
