@@ -10,8 +10,10 @@ import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_plan_probe } from '#scripts/lane/lane-plan-probe'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
-import { backlog_budget } from './backlog-budget'
+import { backlog_budget, type BacklogAnswer } from './backlog-budget'
+import { backlog_budget_cli } from './backlog-budget-cli'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
@@ -39,26 +41,39 @@ interface NamedPass {
 
 const NO_RETRIES = 0
 
-function max_of(forwarded: ReadonlyArray<string>): number | undefined {
-	const index = forwarded.indexOf('--max')
+function value_of(forwarded: ReadonlyArray<string>, flag: string): string | undefined {
+	const index = forwarded.indexOf(flag)
 
-	return index === -1 ? undefined : Number(forwarded[index + 1])
+	return index === -1 ? undefined : forwarded[index + 1]
+}
+
+function max_of(forwarded: ReadonlyArray<string>): number | undefined {
+	const value = value_of(forwarded, '--max')
+
+	return value === undefined ? undefined : Number(value)
+}
+
+// The idle watch `--idle <n>` asked for, read the way `backlog:budget` reads it: omitted is the
+// default, `0` turns it off.
+function idle_of(forwarded: ReadonlyArray<string>): number | undefined {
+	return backlog_budget_cli.to_idle_ms(cli_flags.to_count(value_of(forwarded, '--idle')))
 }
 
 function budget_offer(
 	carry: RunCarry,
 	state: DriveState,
 	forwarded: ReadonlyArray<string>,
+	answer: BacklogAnswer = 'candidates',
 ): OfferRead {
 	const budget = backlog_budget.decide({
-		answer: 'candidates',
+		answer,
 		merged: carry.merged,
 		running: state.in_flight.length,
 		started_at_ms: Date.parse(carry.started_at),
 		active_at_ms: Date.parse(state.active),
 		now_ms: Date.now(),
 		max_issues: max_of(forwarded),
-		idle_budget_ms: backlog_budget.DEFAULT_IDLE_MS,
+		idle_budget_ms: idle_of(forwarded),
 	})
 
 	return {
@@ -148,11 +163,25 @@ async function only_end(carry: RunCarry, named: OfferRead): Promise<OfferRead> {
 	}
 }
 
+// A bare `--only` with nothing left to run watches for what `run:add` puts in, under the idle watch an
+// empty pool gets (`exhausted`), and never offers the pool (joshuafolkken/kit#8923).
+function only_idle(
+	carry: RunCarry,
+	state: DriveState,
+	context: NamedContext,
+): OfferRead | undefined {
+	return context.is_only ? budget_offer(carry, state, context.forwarded, 'exhausted') : undefined
+}
+
 async function not_run(
 	carry: RunCarry,
+	state: DriveState,
 	named: OfferRead | undefined,
+	context: NamedContext,
 ): Promise<OfferRead | undefined> {
-	return named?.is_finish === true ? await only_end(carry, named) : named
+	const ended = named ?? only_idle(carry, state, context)
+
+	return ended?.is_finish === true ? await only_end(carry, ended) : ended
 }
 
 // What `numbers` declare — recorded plan, else plan comment, else body, the scope `lane:plan` and
@@ -231,7 +260,11 @@ async function offer_of(
 	context: NamedContext,
 ): Promise<NamedPass> {
 	const named = backlog_drive_named.offer(carry, waiting, context.is_only)
-	if (named?.verdict !== 'run') return { offer: await not_run(carry, named), passed: [] }
+
+	if (named?.verdict !== 'run') {
+		return { offer: await not_run(carry, state, named, context), passed: [] }
+	}
+
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
 	const [issue] = named.issues

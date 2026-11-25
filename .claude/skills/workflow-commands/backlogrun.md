@@ -4,7 +4,8 @@
 whatever `pnpm josh backlog:next` offers — the whole opted-in backlog, every issue carrying `auto-ok`
 plus every child of an epic whose root carries it, ordered by dependency and grouped into waves. With
 `#N1 #N2 …` it runs those named items in the order they were typed, one at a time, and **then** drains
-that same backlog. **`--only` stops it after the named list**, draining nothing.
+that same backlog. **`--only` stops it after the named list**, draining nothing; a bare `--only`
+names none and waits under the idle watch for what `run:add` puts in.
 
 **The loop's current position is computed, not carried in the conversation.** `pnpm josh run:step <N>`
 reads it from the event stream, the carry record and the issue state, and prints the next single
@@ -39,7 +40,8 @@ reference is read as a section").
    `needs-decision` issue decidable from its body in one pass: `backlogrun-steps.md` → "The plan,
    beside the first child".
 5. **Named issues run first, in order** — each as a delegated `fullrun`, one at a time, then the pool;
-   `--only` stops after the list.
+   `--only` stops after the list; a bare `--only` runs only `run:add` additions until the idle watch
+   ends it.
    - Once per session: `backlogrun-steps.md` → "What runs once per session, not once per issue" and
      `backlogrun-child.md` → "`josh latest` runs once per session, not once per child"
      (`latest-gate.md` whole on `required`).
