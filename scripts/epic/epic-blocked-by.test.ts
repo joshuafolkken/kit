@@ -138,6 +138,16 @@ describe('epic_blocked_by.record — a prerequisite in another epic', () => {
 		expect(state.calls).toStrictEqual(['relation'])
 	})
 
+	it('writes nothing when a cut-short listing may hide the epic tracking the prerequisite', async () => {
+		vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({
+			cutoff: 'row_limit',
+			epics: [{ number: EPIC, body: ISSUE_TRACKED }],
+		})
+
+		await expect(epic_blocked_by.record(REQUEST)).rejects.toThrow(UNSEEN)
+		expect(state.calls).toStrictEqual([])
+	})
+
 	it('names the next command and writes nothing when `epic --add` fails', async () => {
 		epics_of(ISSUE_TRACKED)
 		add_children.mockResolvedValue(1)

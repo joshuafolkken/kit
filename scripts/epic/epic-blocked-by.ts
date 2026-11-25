@@ -105,15 +105,26 @@ async function tracking_with(
 	}
 }
 
+function is_unseen_prerequisite(tracking: Tracking, fetched: FetchedEpics): boolean {
+	const is_tracked = tracking.is_prerequisite_child || tracking.is_foreign_prerequisite
+
+	return !is_tracked && !epic_bundle_gaps.is_membership_established(fetched.cutoff)
+}
+
 async function tracking_epic(request: BlockedByRequest): Promise<Tracking | undefined> {
 	const { epic, fetched } = await tracked_in(request.issue)
 	if (epic === undefined) return undefined
 
-	return {
+	const tracking = {
 		epic,
 		is_prerequisite_child: is_listed_by(fetched.epics, request.prerequisite, epic),
 		is_foreign_prerequisite: is_foreign_child(fetched.epics, request.prerequisite, epic),
 	}
+
+	// A listing cut short may hide the epic that tracks the prerequisite, so adding it is no safe answer.
+	if (is_unseen_prerequisite(tracking, fetched)) throw new Error(UNSEEN_EPIC)
+
+	return tracking
 }
 
 // Every epic listing `#issue`, not the one `build_epic_index` keeps: removing a relation drops its
