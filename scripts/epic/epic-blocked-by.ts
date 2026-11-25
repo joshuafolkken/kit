@@ -4,6 +4,7 @@ import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_reconcile } from '#scripts/epic/epic-reconcile'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `#issue` blocked by `#prerequisite`, recorded so the epic tracking `#issue` declares it too — the
@@ -38,6 +39,18 @@ interface Tracking {
 	epic: number
 	// Whether the same epic already tracks the prerequisite as a row of its own.
 	is_prerequisite_child: boolean
+	// Whether another epic tracks the prerequisite: an issue belongs to one epic, so it is not added here.
+	is_foreign_prerequisite: boolean
+}
+
+function is_foreign_child(
+	epics: ReadonlyArray<{ number: number; body: string }>,
+	child: string,
+	epic: number,
+): boolean {
+	const listing = epic_index.build_tracking_index(epics).get(Number(child)) ?? []
+
+	return listing.some((number) => number !== epic)
 }
 
 // Every epic listing the child, not the one `build_epic_index` keeps: a child a second epic also
@@ -96,7 +109,11 @@ async function tracking_epic(request: BlockedByRequest): Promise<Tracking | unde
 	const { epic, fetched } = await tracked_in(request.issue)
 	if (epic === undefined) return undefined
 
-	return { epic, is_prerequisite_child: is_listed_by(fetched.epics, request.prerequisite, epic) }
+	return {
+		epic,
+		is_prerequisite_child: is_listed_by(fetched.epics, request.prerequisite, epic),
+		is_foreign_prerequisite: is_foreign_child(fetched.epics, request.prerequisite, epic),
+	}
 }
 
 // Every epic listing `#issue`, not the one `build_epic_index` keeps: removing a relation drops its
@@ -110,6 +127,14 @@ async function listing_epics(issue: string): Promise<ReadonlyArray<number>> {
 	return epic_index.build_tracking_index(fetched.epics).get(Number(issue)) ?? []
 }
 
+// The one command that records the order by hand when `epic --add --before` cannot place it.
+function next_command(epic: number, request: BlockedByRequest): string {
+	const blocker = issue_cite.plain_for('program', request.prerequisite)
+	const order = `${blocker} -> ${issue_cite.plain_for('program', request.issue)}`
+
+	return `pnpm josh epic --add ${String(epic)} ${request.prerequisite} --chain "${order}" --order-reason "${order}: <kind> — <reason>"`
+}
+
 async function add_to_epic(epic: number, request: BlockedByRequest): Promise<void> {
 	const code = await epic_add.add_children({
 		epic_number: epic,
@@ -118,7 +143,9 @@ async function add_to_epic(epic: number, request: BlockedByRequest): Promise<voi
 	})
 
 	if (code !== SUCCESS_EXIT_CODE) {
-		throw new Error(`\`epic --add\` into ${session_cite.issue(epic)} failed`)
+		throw new Error(
+			`\`epic --add\` into ${session_cite.issue(epic)} failed, so nothing was recorded; next: ${next_command(epic, request)}`,
+		)
 	}
 }
 
@@ -174,16 +201,20 @@ async function settle_recorded(request: BlockedByRequest): Promise<string> {
 	return ALREADY
 }
 
+// A prerequisite another epic tracks stays there: only the native relation is written (joshuafolkken/kit#8858).
+function is_epic_record(tracking: Tracking, request: BlockedByRequest): boolean {
+	if (tracking.is_prerequisite_child) return true
+
+	return request.is_relation_only !== true && !tracking.is_foreign_prerequisite
+}
+
 // What was done — `already`, `recorded` or `recorded in epic #E` — or a throw naming the failure.
 async function record(request: BlockedByRequest): Promise<string> {
 	if (await is_blocked(request)) return await settle_recorded(request)
 
 	const tracking = await tracking_epic(request)
 
-	if (
-		tracking !== undefined &&
-		(request.is_relation_only !== true || tracking.is_prerequisite_child)
-	) {
+	if (tracking !== undefined && is_epic_record(tracking, request)) {
 		return await record_in_epic(tracking, request)
 	}
 
