@@ -16,7 +16,6 @@ import {
 } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
-import { backlog_named } from './backlog-named'
 import { backlog_plan } from './backlog-plan'
 import { backlog_plan_cap_fixture as cap_fixture } from './backlog-plan-cap-fixture'
 import { backlog_plan_cli } from './backlog-plan-cli'
@@ -227,7 +226,7 @@ describe('the named issues a backlogrun runs before the pool', () => {
 })
 
 // joshuafolkken/kit#1984: `--only` runs the named list and stops, so the plan shows the named section
-// alone and item-less `--only` is refused before anything starts.
+// alone.
 describe('the --only plan', () => {
 	it('renders the named section alone, without the pool', async () => {
 		stub_backlog()
@@ -238,9 +237,12 @@ describe('the --only plan', () => {
 		expect(stdout()).not.toContain(backlog_plan.READY_HEADING)
 	})
 
-	it('refuses --only with no named issues before anything starts', async () => {
-		expect(await backlog_plan_cli.run(['--only'])).toBe(FAILURE_EXIT_CODE)
-		expect(stderr()).toContain(backlog_named.NOTHING_TO_RUN)
+	// joshuafolkken/kit#8923 — a bare `--only` is a plan, not a refusal, and still shows no pool.
+	it('plans --only with no named issues without the pool', async () => {
+		stub_backlog()
+
+		expect(await backlog_plan_cli.run(['--only'])).not.toBe(FAILURE_EXIT_CODE)
+		expect(stdout()).not.toContain(backlog_plan.READY_HEADING)
 	})
 
 	// `--only` before the `#N` block breaks the leading block in the run grammar, so the plan refuses it

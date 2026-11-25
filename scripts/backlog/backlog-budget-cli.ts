@@ -192,6 +192,7 @@ const backlog_budget_cli = {
 	read_arguments,
 	run,
 	to_answer,
+	to_idle_ms,
 	to_time_ms,
 }
 

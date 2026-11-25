@@ -22,7 +22,8 @@ import { run_add_withdrawn } from './run-add-withdrawn'
 // It refuses unless a `backlogrun` holds the carry record here: an issue labelled with no run to take
 // it would be picked up by whichever run starts next, which is not what was asked. A run that named
 // issues reads its list off the record — with `--only` or without, since a named run drains the pool
-// only after that list — so the queued issues are written there too; a pool run reads the labels alone.
+// only after that list — so the queued issues are written there too, and a bare `--only`, which names
+// none, runs only what is written there (joshuafolkken/kit#8923); a pool run reads the labels alone.
 // An epic root carries no label, so every run records it. Each added issue is announced as an `add`
 // event, which wakes a `run:progress --wait` parked on a full house so the parent offers it the next
 // freed lane.
@@ -112,7 +113,9 @@ function record(
 		throw new Error('The backlogrun record disappeared; nothing was queued.')
 	}
 
-	const is_named = run_invocation.issue_numbers(read.carry.invocation) !== undefined
+	const { invocation } = read.carry
+	const is_named =
+		run_invocation.issue_numbers(invocation) !== undefined || run_invocation.has_only(invocation)
 	const recorded = is_named ? additions : additions.filter((addition) => roots.has(addition.issue))
 	const retries = is_retry ? additions.map((addition) => addition.issue) : []
 

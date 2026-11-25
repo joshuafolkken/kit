@@ -63,11 +63,17 @@ function held_after(
 
 // **An `--only` run ends once nothing it named is left and nothing is in flight**
 // (joshuafolkken/kit#4746): the stop's reason is read when it is offered, so one offered while a lane
-// still ran would name that lane's issue unmerged even after it merged.
-function only_end(state: DriveState): OfferRead {
-	return state.in_flight.length > 0
-		? { verdict: 'wait', issues: [], retries: NO_RETRIES, cause: ONLY_WAIT }
-		: { verdict: 'stop', issues: [], retries: NO_RETRIES, reason: 'only', is_finish: true }
+// still ran would name that lane's issue unmerged even after it merged. A bare `--only` declared none:
+// it runs only what `run:add` puts in, so it is idle rather than ended (`undefined`), and the caller
+// holds it in the idle watch instead of the pool (joshuafolkken/kit#8923).
+function only_end(carry: RunCarry, state: DriveState): OfferRead | undefined {
+	if (state.in_flight.length > 0) {
+		return { verdict: 'wait', issues: [], retries: NO_RETRIES, cause: ONLY_WAIT }
+	}
+
+	if (run_invocation.issue_numbers(carry.invocation) === undefined) return undefined
+
+	return { verdict: 'stop', issues: [], retries: NO_RETRIES, reason: 'only', is_finish: true }
 }
 
 // The wait on a named issue in flight: the board names it (`named:<N>`), and `lane:stats` counts the
@@ -93,7 +99,7 @@ function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead 
 			: { verdict: 'run', issues: [issue], retries: NO_RETRIES }
 	}
 
-	return is_only ? only_end(state) : undefined
+	return is_only ? only_end(carry, state) : undefined
 }
 
 function is_done(result: MergeResult): boolean {

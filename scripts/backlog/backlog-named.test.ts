@@ -68,17 +68,10 @@ describe('the startup decision without --only', () => {
 })
 
 describe('the startup decision under --only', () => {
-	// `--only` with no named issues has nothing to run, so it is refused before anything starts.
-	it('refuses --only with no named issues', () => {
-		expect(backlog_named.startup([], true)).toStrictEqual({
-			kind: 'refused',
-			reason: backlog_named.NOTHING_TO_RUN,
-		})
-	})
-
-	// joshuafolkken/kit#6817 — the suggested command runs as pasted into a terminal.
-	it('suggests the terminal-runnable command', () => {
-		expect(backlog_named.NOTHING_TO_RUN).toContain('`pnpm josh backlogrun N1 N2 … --only`')
+	// joshuafolkken/kit#8923 — a bare `--only` starts with the empty plan: no backlog step, so the
+	// opted-in pool never runs, and only what `run:add` puts in is offered.
+	it('is the empty plan, without the backlog, when --only names nothing', () => {
+		expect(backlog_named.startup([], true)).toStrictEqual({ kind: 'plan', steps: [] })
 	})
 
 	it('is the named-only plan when --only names issues', () => {

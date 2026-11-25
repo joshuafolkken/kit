@@ -20,12 +20,6 @@ const END_KIND = 'end'
 const NEXT_INDEX_OFFSET = 1
 const NOT_FOUND = -1
 
-// `backlogrun --only` with no named issues has nothing to run — the flag says "run the named list and
-// stop", and an empty named list makes that the empty run. Refused before anything starts rather than
-// begun and found empty, the same way a budget-only invocation is still a valid bare `backlogrun`.
-const NOTHING_TO_RUN =
-	'`--only` runs the named issues and stops, but none were named, so there is nothing to run. Name the issues (`pnpm josh backlogrun N1 N2 … --only`), or drop `--only` to drain the opted-in backlog.'
-
 // One named item: a single issue (`is_epic: false`) or an epic (`is_epic: true`). The parser only sees
 // `#N`, so which one it is is decided by the caller from GitHub state; the pure functions here carry
 // the flag rather than re-derive it, so the plan and the loop agree on how each item runs.
@@ -75,10 +69,11 @@ interface EpicChildOutcome {
 	parked: boolean
 }
 
-// The plan, or the refusal that stops it before it starts. `startup` is the single decision a
-// `backlogrun` begins from, so the refusal and the order cannot drift into two places.
-type Startup =
-	{ kind: 'plan'; steps: ReadonlyArray<PlanStep> } | { kind: 'refused'; reason: string }
+// The plan a `backlogrun` begins from, as `startup` builds it from the named list.
+interface Startup {
+	kind: 'plan'
+	steps: ReadonlyArray<PlanStep>
+}
 
 const BACKLOG_STEP: BacklogStep = { kind: BACKLOG_KIND }
 
@@ -96,12 +91,10 @@ function plan(named: ReadonlyArray<NamedItem>, is_only = false): ReadonlyArray<P
 	return is_only ? steps : [...steps, BACKLOG_STEP]
 }
 
-// The plan a `backlogrun` starts from, or the refusal that keeps it from starting. Only `--only` with
-// no named items is refused; everything else is a plan, a bare `backlogrun` (the backlog alone)
-// included.
+// The plan a `backlogrun` starts from. Every invocation is a plan: a bare `backlogrun` is the backlog
+// alone, and a bare `--only` is the empty plan — it runs only what `run:add` puts in, under the
+// driver's idle watch (joshuafolkken/kit#8923).
 function startup(named: ReadonlyArray<NamedItem>, is_only = false): Startup {
-	if (is_only && named.length === 0) return { kind: 'refused', reason: NOTHING_TO_RUN }
-
 	return { kind: 'plan', steps: plan(named, is_only) }
 }
 
@@ -137,7 +130,6 @@ function epic_item_outcome(
 }
 
 const backlog_named = {
-	NOTHING_TO_RUN,
 	after_failure,
 	epic_item_outcome,
 	plan,

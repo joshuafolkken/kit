@@ -127,12 +127,16 @@ async function carry_target(opened: JoshEnvironment): Promise<string> {
 async function run_only_driver(opened: JoshEnvironment): Promise<void> {
 	const target = await carry_target(opened)
 
-	run_carry.begin_carry(target, 'backlogrun --only', run_carry.owner_of(process.pid))
+	// A bare `--only` waits for `run:add` under the idle watch; `--idle 0` turns the watch off so the
+	// run ends at once (joshuafolkken/kit#8923).
+	run_carry.begin_carry(target, 'backlogrun --only --idle 0', run_carry.owner_of(process.pid))
 	const result = await josh_harness.run(opened, [
 		'backlog:drive',
 		'--owner',
 		String(process.pid),
 		'--only',
+		'--idle',
+		'0',
 	])
 
 	expect(result.exit_code, `${result.stdout}\n${result.stderr}`).toBe(0)
