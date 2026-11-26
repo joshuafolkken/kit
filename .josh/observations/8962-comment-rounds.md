@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/run/wake/run-wake.ts:155 | 2026-11-26 | #8962 | fixed | state-reasoning
+- rf:comments | low | scripts/run/wake/run-wake.ts:158 | 2026-11-26 | #8962 | fixed | stale-comment
+- rf:none | none | - | 2026-11-26 | #8962

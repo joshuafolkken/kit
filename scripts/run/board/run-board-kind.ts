@@ -1,4 +1,5 @@
 import {
+	AREA_LABEL_PREFIX,
 	BREAKING_CHANGE_LABEL,
 	BUG_LABEL,
 	BUGFIX_LABEL,
@@ -43,7 +44,27 @@ function priority_of(labels: ReadonlyArray<string> | undefined): BoardPriority |
 	return PRIORITIES.find(([, name]) => has_label_name(labels, name))?.[0]
 }
 
-const run_board_kind = { KIND_ORDER, kind_of, priority_of }
+// The area a row is drawn with (joshuafolkken/kit#8960): the word after `area:` of the first such label,
+// so a new area needs no code; none where the issue carries no area.
+function area_of(labels: ReadonlyArray<string> | undefined): string | undefined {
+	const label = labels?.find((name) => name.toLowerCase().startsWith(AREA_LABEL_PREFIX))
+	const area = label?.slice(AREA_LABEL_PREFIX.length)
 
-export type { BoardPriority }
+	return area === '' ? undefined : area
+}
+
+// What a row draws from its labels before its title: its release kind, priority and area.
+interface RowMarks {
+	kind: FiledKind | undefined
+	priority: BoardPriority | undefined
+	area: string | undefined
+}
+
+function marks_of(labels: ReadonlyArray<string> | undefined): RowMarks {
+	return { kind: kind_of(labels), priority: priority_of(labels), area: area_of(labels) }
+}
+
+const run_board_kind = { area_of, KIND_ORDER, kind_of, marks_of, priority_of }
+
+export type { BoardPriority, RowMarks }
 export { run_board_kind }

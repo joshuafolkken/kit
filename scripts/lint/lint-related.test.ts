@@ -326,11 +326,12 @@ describe('lint_related.run_related_lint — what it is told to narrow by', () =>
 		expect(eslint_arguments()).not.toContain('--fix')
 	})
 
-	it('names an argument it could not use instead of silently checking everything', async () => {
-		await lint_related.run_related_lint([path.join('scripts', MISSING_FILE)])
+	it('refuses file arguments it cannot use instead of checking the whole tree', async () => {
+		const exit_code = await lint_related.run_related_lint([`${MISSING_FILE} ${MISSING_FILE}`])
 
-		expect(written_output()).toContain(MISSING_FILE)
-		expect(mocked_whole_tree).toHaveBeenCalledOnce()
+		expect(exit_code).toBe(1)
+		expect(written_output()).toContain('did not split')
+		expect(mocked_whole_tree).not.toHaveBeenCalled()
 	})
 })
 

@@ -178,13 +178,17 @@ function trace_band(frame: NixieDraw): void {
 	for (const row of frame.grid) band_row(row, at)
 }
 
+function is_aftershock(notice: Channel): boolean {
+	return is_afterglow(notice, NOTICE_END)
+}
+
 // The afterglow, second part: aftershocks. Until the NOTICE ends a row still tears now and then,
 // less and less often, and with each bar of the notice's trace a band of bright digits crosses the
 // whole screen.
 function aftershocks(frame: NixieDraw): void {
 	const { grid, state } = frame
 
-	if (!is_afterglow(state.notice, NOTICE_END)) return
+	if (!is_aftershock(state.notice)) return
 	const power = 1 - state.notice.cooled / NOTICE_END
 
 	for (let y = 0; y < grid.length; y++) slip_row(frame, y, AFTERSHOCK_ODDS * power, AFTERSHOCK_SLIP)
@@ -197,6 +201,7 @@ const run_board_theme_nixie_notice = {
 	bolt_char,
 	discharge,
 	dissolve,
+	is_aftershock,
 	next_y,
 	resettle,
 }

@@ -212,8 +212,9 @@ function rebased(messages: ReadonlyArray<TimelineMessage>, shift: number): Array
 }
 
 // The demo's event `key` (joshuafolkken/kit#8917 demo mode) started on `tick`: its sample texts with
-// their icons — the second progress text's `OK`, as the demo shows it — the lane's own row text for a
-// ROW, moved so its first message starts on `tick`.
+// their icons, the lane's own row text for a ROW, moved so its first message starts on `tick`. A
+// PROGRESS is its first text alone: the demo's scene types a second one after it, which plays the
+// effect again, and a key of demo mode plays it once.
 function demo_timeline(key: DemoKey, row_text: string, tick: number): ThemeTimeline {
 	const event = run_board_theme_host_sample.demo_events(row_text)[key]
 	const starts = [...event.notice, ...event.progress, ...event.row].map(({ start }) => start)
@@ -221,7 +222,7 @@ function demo_timeline(key: DemoKey, row_text: string, tick: number): ThemeTimel
 
 	return {
 		notice: rebased(event.notice, shift),
-		progress: rebased(event.progress, shift),
+		progress: rebased(event.progress.slice(0, 1), shift),
 		row: rebased(event.row, shift),
 	}
 }

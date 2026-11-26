@@ -1,0 +1,8 @@
+{
+	"reason": "New feature: the run:board demo-mode selector footer and each theme's playing condition (#8969); the skill gains one pointer line",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 211,
+		"ai_cost.on_demand_bytes": 296
+	}
+}
