@@ -74,15 +74,20 @@ function lineage(rows: ProcessTable, pid: number): Set<number> {
 	return seen
 }
 
-// No match outside this wait's lineage; an unanswered `ps` reads as still running.
+// Another `josh wait` (or the shell that launched it) carries the waited-for pattern in its own
+// command line, so a wait left over from an earlier call would hold this one pending.
+const OTHER_WAIT = /\bjosh(?:\.\w+)? wait\b/u
+
+// No match outside this wait's lineage and other waits; an unanswered `ps` reads as still running.
 function is_gone_in(rows: ProcessTable | undefined, pattern: string): boolean {
 	if (rows === undefined) return false
 	const own = lineage(rows, process.pid)
+	const waits = new Set(rows.filter((row) => OTHER_WAIT.test(row.command)).map((row) => row.pid))
 
 	return lane_process_table
 		.probes_of(rows)
 		.matching(pattern)
-		.every((pid) => own.has(pid))
+		.every((pid) => own.has(pid) || waits.has(pid))
 }
 
 function pid_probe(value: string): Probe | undefined {
