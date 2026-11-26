@@ -474,6 +474,7 @@ async function check(issue: string): Promise<PreflightDecision> {
 
 const run_preflight = {
 	CLEAN_VERDICT,
+	RECLAIM_VERDICT,
 	RESUME_ADVICE,
 	MERGED_PR,
 	STASH_LABEL_PREFIX,

@@ -128,6 +128,17 @@ describe('a stop before commit on a tree test:e2e has not answered green on', ()
 		},
 	)
 
+	// joshuafolkken/kit#8932: a round left with its tests owed is not marked, so the refusal names the
+	// re-claim the next round opens it with.
+	it('names the next round’s re-claim in the refusal', async () => {
+		vi.mocked(test_e2e_stamp.is_current_tree).mockResolvedValue(false)
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		await run_hold_cli.run([ISSUE, HALFRUN_STOP_FLAG])
+
+		expect(errors.mock.calls.join('\n')).toContain(`pnpm josh run:hold ${ISSUE} --halfrun-round`)
+	})
+
 	it('does not ask a prrun stop, which has CI behind its pull request', async () => {
 		vi.mocked(test_e2e_stamp.is_current_tree).mockResolvedValue(false)
 		run_hold.create_hold(TARGET, ISSUE)
