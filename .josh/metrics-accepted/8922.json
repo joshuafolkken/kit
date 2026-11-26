@@ -1,0 +1,7 @@
+{
+	"reason": "Root runs read through the checkout's live hold: new run-hold-live reader and held-session lane seeding in run:board (#8922)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 90
+	}
+}

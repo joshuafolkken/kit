@@ -116,6 +116,59 @@ describe('run_board_usage_lanes.lanes_for after a lookup cut short', () => {
 	})
 })
 
+// joshuafolkken/kit#8922: a run in the root checkout sits under no lane directory; its hold names it.
+const RUN = '8922'
+const SESSION = 10
+const TOOL = 11
+const WORKER = 12
+const SIBLING = 20
+const GONE = 99
+// The run's session (10) runs a tool (11), which runs a worker (12); 20 is a person's session.
+const TREE = new Map([
+	[SESSION, 0],
+	[TOOL, SESSION],
+	[WORKER, TOOL],
+	[SIBLING, 0],
+])
+const ROOT_DIRECTORIES = new Map(
+	[SESSION, TOOL, SIBLING].map((pid) => [pid, `${OUTSIDE}/packages`] as const),
+)
+
+function held_lookup(hold: { issue: string; pid: number } | undefined): LaneLookup {
+	return { ...lookup_of(ROOT_DIRECTORIES), held: () => hold }
+}
+
+describe('run_board_usage_lanes.lanes_for with a run holding the checkout', () => {
+	it('counts the hold’s session and its descendants in the run’s lane, not a sibling session', async () => {
+		const read = await lanes_for(undefined, TREE, held_lookup({ issue: RUN, pid: SESSION }))
+
+		expect(read.lanes).toStrictEqual(
+			new Map([
+				[SESSION, RUN],
+				[TOOL, RUN],
+				[WORKER, RUN],
+				[SIBLING, undefined],
+			]),
+		)
+		expect(read.held).toStrictEqual(new Set([SESSION, TOOL, WORKER]))
+	})
+
+	it('counts nothing through a hold whose session is no longer listed', async () => {
+		const read = await lanes_for(undefined, TREE, held_lookup({ issue: RUN, pid: GONE }))
+
+		expect(new Set(read.lanes.values())).toStrictEqual(new Set([undefined]))
+		expect(read.held).toStrictEqual(new Set())
+	})
+
+	it('drops the held processes from the lane once the hold is released', async () => {
+		const first = await lanes_for(undefined, TREE, held_lookup({ issue: RUN, pid: SESSION }))
+		const second = await lanes_for(first, TREE, held_lookup(undefined))
+
+		expect(new Set(second.lanes.values())).toStrictEqual(new Set([undefined]))
+		expect(second.held).toStrictEqual(new Set())
+	})
+})
+
 // Under sustained load every lookup may be cut short; asking every process again would never finish.
 describe('run_board_usage_lanes.lanes_for after a lookup cut short partway', () => {
 	it('keeps what it did answer, and asks again for the rest alone', async () => {

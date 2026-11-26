@@ -21,6 +21,8 @@ interface UsageMark {
 	lanes: ReadonlyMap<number, string | undefined>
 	// The processes an `lsof` cut short was asked about, asked again on the next sample.
 	unread: ReadonlySet<number>
+	// The processes in a lane through the checkout's live hold alone — a root run's tree.
+	held?: ReadonlySet<number> | undefined
 	// Each process's command, which names the app it belongs to.
 	names: ReadonlyMap<number, string>
 	// Each process's parent: the ancestry the processes section groups by, and the way to the ancestor
