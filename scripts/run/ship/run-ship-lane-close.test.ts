@@ -1,6 +1,9 @@
-import type { CloseOutcome } from '#scripts/lane/lane-close'
-import type { LaneInfo } from '#scripts/lane/lane-registry'
-import { describe, expect, it, vi } from 'vitest'
+import { issue_merged } from '#scripts/issue/issue-merged'
+import { lane_close, type CloseOutcome } from '#scripts/lane/lane-close'
+import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_spent } from '#scripts/lane/lane-spent'
+import { run_tidy_stashes } from '#scripts/run/tidy/run-tidy-stashes'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_lane_close, type LaneCloseProbes } from './run-ship-lane-close'
 
 // joshuafolkken/kit#9038: a merged lane child's lane was left open on every launch path but one.
@@ -25,11 +28,13 @@ const CLOSED: CloseOutcome = {
 	residents: [],
 }
 const DROPPED = { target: 'stash "On main: parked #9038"', verdict: { kind: 'clean' } as const }
+const INSIDE_LANE = '/lanes/9038/scripts'
+const REPORTED = [['lane #9038 closed'], [`dropped ${DROPPED.target}`]]
 
 function probes_of(overrides: Partial<LaneCloseProbes> = {}): LaneCloseProbes {
 	return {
 		find_lane: vi.fn(async () => LANE),
-		cwd: () => '/lanes/9038/scripts',
+		cwd: () => INSIDE_LANE,
 		kept_reason: async () => undefined,
 		main_root: async () => MAIN_ROOT,
 		chdir: vi.fn(),
@@ -59,10 +64,7 @@ describe('run_ship_lane_close.close_merged — a spent lane', () => {
 
 		await run_ship_lane_close.close_merged(ISSUE, probes)
 
-		expect(vi.mocked(probes.print).mock.calls).toStrictEqual([
-			['lane #9038 closed'],
-			[`dropped ${DROPPED.target}`],
-		])
+		expect(vi.mocked(probes.print).mock.calls).toStrictEqual(REPORTED)
 	})
 
 	it('names what an incomplete close left behind', async () => {
@@ -111,5 +113,37 @@ describe('run_ship_lane_close.close_merged — a lane it leaves open', () => {
 
 		await expect(run_ship_lane_close.close_merged(ISSUE, probes)).resolves.toBeUndefined()
 		expect(probes.print).toHaveBeenCalledExactlyOnceWith('lane #9038 not closed: busy')
+	})
+})
+
+// The live probes `close_merged` uses when none are passed, each reaching the module it names.
+function stub_live(): void {
+	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([LANE])
+	vi.spyOn(lane_registry, 'main_repository_root').mockResolvedValue(MAIN_ROOT)
+	vi.spyOn(lane_spent, 'merged_kept_reason').mockResolvedValue(undefined)
+	vi.spyOn(lane_close, 'close_lane').mockResolvedValue(CLOSED)
+	vi.spyOn(run_tidy_stashes, 'tidy_issue_stashes').mockResolvedValue([DROPPED])
+	vi.spyOn(process, 'cwd').mockReturnValue(INSIDE_LANE)
+	vi.spyOn(process, 'chdir').mockReturnValue()
+	vi.spyOn(console, 'info').mockReturnValue()
+}
+
+describe('run_ship_lane_close.close_merged — the live probes', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('steps out to the main checkout, closes the lane and tidies its stashes', async () => {
+		stub_live()
+		await run_ship_lane_close.close_merged(ISSUE)
+
+		expect(lane_spent.merged_kept_reason).toHaveBeenCalledWith(LANE)
+		expect(process.chdir).toHaveBeenCalledWith(MAIN_ROOT)
+		expect(lane_close.close_lane).toHaveBeenCalledWith(ISSUE)
+		expect(run_tidy_stashes.tidy_issue_stashes).toHaveBeenCalledWith(
+			ISSUE,
+			issue_merged.read_merged,
+		)
+		expect(vi.mocked(console.info).mock.calls).toStrictEqual(REPORTED)
 	})
 })

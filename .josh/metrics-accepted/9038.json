@@ -2,6 +2,6 @@
 	"reason": "#9038 adds the post-merge lane close owner (run-ship-lane-close.ts), merged_kept_reason and per-issue stash tidy",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 103
+		"scripts.code_lines": 121
 	}
 }

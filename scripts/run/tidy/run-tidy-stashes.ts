@@ -16,6 +16,8 @@ import type { IsMerged } from './run-tidy-lanes'
 const READ_CONCURRENCY = 8
 const GONE_REASON = 'already dropped by another run'
 const BUSY_REASON = 'another run held the stash sweep lock'
+const LEDGER_REASON =
+	'it holds observation ledger lines — `pnpm josh run:tidy` carries them and drops it'
 
 // An older entry may hold its lines at an old single-file path, so the lines of every ledger path it
 // touches are carried to the current ledger. The reads are independent, and the
@@ -33,12 +35,17 @@ async function added_ledger_lines(
 	return added.flat()
 }
 
+async function ledger_paths_of(hash: string): Promise<Array<string>> {
+	const changed = await git_stash.changed_paths(hash)
+
+	return changed.filter((file_path) => observation_ledger.is_ledger_path(file_path))
+}
+
 // How many ledger lines went into the running work tree's ledger before the drop. The duplicate check
 // reads every issue's file, and the lines land in the file this tree writes, so
 // the run's own commit takes them to the default branch.
 async function carry_ledger(hash: string): Promise<number> {
-	const changed = await git_stash.changed_paths(hash)
-	const ledger_paths = changed.filter((file_path) => observation_ledger.is_ledger_path(file_path))
+	const ledger_paths = await ledger_paths_of(hash)
 
 	if (ledger_paths.length === 0) return 0
 
@@ -154,13 +161,31 @@ async function tidy_stashes(is_merged: IsMerged): Promise<Array<Outcome>> {
 	return await tidy_listed(await git_stash.list_by_hash(), is_merged)
 }
 
+async function holds_ledger_lines(entry: StashEntry): Promise<boolean> {
+	const ledger_paths = await ledger_paths_of(entry.selector)
+
+	return ledger_paths.length > 0
+}
+
+function ledger_kept(entry: StashEntry): Outcome {
+	return { target: `stash "${entry.subject}"`, verdict: run_tidy.keep(LEDGER_REASON) }
+}
+
 // The same sweep narrowed to the entries naming one issue — what a lane closed right after its merge
 // leaves behind. An entry naming another issue too still goes only once every issue it names merged.
+// No commit follows this sweep, so an entry holding ledger lines is left for `run:tidy`, whose run
+// commits the carried lines; carrying them here would leave them uncommitted in the main checkout.
 async function tidy_issue_stashes(issue: string, is_merged: IsMerged): Promise<Array<Outcome>> {
 	const entries = await git_stash.list_by_hash()
 	const named = entries.filter((entry) => stash_orphans.issues_named(entry.subject).includes(issue))
+	const holds = await bounded_pool.bounded_map(named, READ_CONCURRENCY, holds_ledger_lines)
+	const kept = named.filter((_entry, index) => holds[index] === true)
+	const outcomes = await tidy_listed(
+		named.filter((_entry, index) => holds[index] !== true),
+		is_merged,
+	)
 
-	return await tidy_listed(named, is_merged)
+	return [...outcomes, ...kept.map((entry) => ledger_kept(entry))]
 }
 
 const run_tidy_stashes = { tidy_issue_stashes, tidy_stashes }

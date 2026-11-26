@@ -110,6 +110,21 @@ describe('run_tidy_stashes.tidy_issue_stashes', () => {
 		expect(outcomes).toStrictEqual([MIXED_KEPT])
 		expect(git_stash.drop_by_hash).not.toHaveBeenCalled()
 	})
+
+	it('keeps an entry holding ledger lines and writes no ledger line', async () => {
+		vi.mocked(git_stash.changed_paths).mockResolvedValue([LEDGER_FILE])
+
+		const outcomes = await run_tidy_stashes.tidy_issue_stashes('2583', is_merged)
+
+		expect(outcomes).toStrictEqual([
+			{
+				target: `stash "${MERGED_ENTRY.subject}"`,
+				verdict: { kind: 'keep', reason: expect.stringContaining('run:tidy') },
+			},
+		])
+		expect(git_stash.drop_by_hash).not.toHaveBeenCalled()
+		expect(existsSync(LEDGER)).toBe(false)
+	})
 })
 
 describe('run_tidy_stashes.tidy_stashes — the ledger carry and failures', () => {
