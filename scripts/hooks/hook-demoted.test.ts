@@ -48,7 +48,10 @@ describe('hook_demoted.read_rules / write_rules', () => {
 
 			expect(hook_demoted.read_rules(malformed).size).toBe(0)
 			expect(trace).toHaveBeenCalledOnce()
-			expect(trace).toHaveBeenCalledWith('hook_demoted.read_rules', expect.anything())
+			expect(trace).toHaveBeenCalledWith(
+				'hook_demoted.read_rules',
+				expect.objectContaining({ message: `malformed demoted-rules file: ${malformed}` }),
+			)
 		},
 	)
 
