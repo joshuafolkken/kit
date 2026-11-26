@@ -5,6 +5,9 @@ import { describe, expect, it, vi, type Mock } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type GatherState } from './run-board-gather'
 import { run_board_gather_thread } from './run-board-gather-thread'
+import type { MachineGauges } from './run-board-machine'
+import type { Quotas } from './run-board-quota-read'
+import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_saved_state, type Saved, type SavedStore } from './run-board-saved-state'
 import type { BoardGather } from './run-board-state'
 
@@ -25,6 +28,21 @@ const POST = run_board_gather_thread.post_of(
 const GATHER: BoardGather = { ...POST.read, data: POST.data, display: POST.display }
 const RUN_STARTED_MS = START
 const SAVED: Saved = { run_started_ms: RUN_STARTED_MS, saved_ms: START, gather: GATHER }
+
+const GAUGES: MachineGauges = {
+	cpu_percent: 40,
+	memory_percent: 50,
+	swap_mb_per_s: 0,
+	memory_pressure: 1,
+}
+const FRESH_GAUGES: MachineGauges = { ...GAUGES, cpu_percent: 60 }
+const QUOTAS: Quotas = { claude: undefined, codex: undefined }
+const SAMPLED: BoardGather = {
+	...GATHER,
+	gauges: GAUGES,
+	usages: run_board_render_fixture.board_usage(new Map()),
+	quotas: QUOTAS,
+}
 
 const create_directory = temporary_directory()
 
@@ -145,5 +163,48 @@ describe('run_board_saved_state.saver', () => {
 		saver(store, () => START)({ failed: 'read failed' })
 
 		expect(store.save).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8957: a new worker's early post lands before its machine samples, so a board quit
+// within SAVE_EVERY_MS of opening must not leave the next one a round without them.
+describe('run_board_saved_state.saver samples', () => {
+	it('keeps the saved samples a new worker’s early post has not read yet', () => {
+		const store = memory_store({ ...SAVED, gather: SAMPLED })
+
+		saver(store, () => START)(POST)
+
+		expect(store.save).toHaveBeenCalledWith({ ...SAVED, gather: SAMPLED })
+	})
+
+	it('takes no samples from a round saved on another run', () => {
+		const store = memory_store({ ...SAVED, run_started_ms: START - 1, gather: SAMPLED })
+
+		saver(store, () => START)(POST)
+
+		expect(store.save).toHaveBeenCalledWith(SAVED)
+	})
+
+	it('saves the samples a post read over the saved ones', () => {
+		const store = memory_store({ ...SAVED, gather: SAMPLED })
+
+		saver(store, () => START)({ ...POST, read: { ...POST.read, gauges: FRESH_GAUGES } })
+
+		expect(store.save.mock.calls[0]?.[0].gather.gauges).toStrictEqual(FRESH_GAUGES)
+	})
+
+	it('fills no sample a later post failed to read once this worker has read it', () => {
+		const store = memory_store({ ...SAVED, gather: SAMPLED })
+		let now_ms = START
+		const save = saver(store, () => now_ms)
+
+		save({ ...POST, read: { ...POST.read, gauges: FRESH_GAUGES } })
+		now_ms += SAVE_EVERY_MS
+		save(POST)
+
+		expect(store.save.mock.calls[1]?.[0].gather).toMatchObject({
+			gauges: undefined,
+			usages: SAMPLED.usages,
+		})
 	})
 })
