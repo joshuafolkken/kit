@@ -13,6 +13,7 @@ import { lane_breakdown_pinned } from './lane-breakdown-pinned'
 import { lane_breakdown_related } from './lane-breakdown-related'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import { lane_elapsed_time } from './lane-elapsed-time'
+import { lane_implement_split } from './lane-implement-split'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 
@@ -52,6 +53,8 @@ interface Report {
 	plan_outside?: PlanOutside | undefined
 	// Each `run:chain` stage's runs and minutes, printed under the implementation (joshuafolkken/kit#7736).
 	chain?: ReadonlyArray<string>
+	// The implementation's net time by what it waited on, printed under it (joshuafolkken/kit#8998).
+	split?: ReadonlyArray<string>
 }
 
 // A stage's line, the laps printed under it, and the call groups printed under it in the bullets
@@ -140,11 +143,14 @@ function implement_calls(detail: ImplementDetail): Array<string> {
 	)
 }
 
+// The implementation's call groups, its split by what it waited on, then its `run:chain` stages.
+function implement_lines(report: Report): Array<string> {
+	return [...implement_calls(report.detail), ...(report.split ?? []), ...(report.chain ?? [])]
+}
+
 // The call groups printed under a stage, none for a stage other than the start to plan and the implement.
 function calls_of(name: string, report: Report): Array<string> {
-	if (name === lane_breakdown.IMPLEMENT_STAGE) {
-		return [...implement_calls(report.detail), ...(report.chain ?? [])]
-	}
+	if (name === lane_breakdown.IMPLEMENT_STAGE) return implement_lines(report)
 
 	if (name !== lane_breakdown.PLAN_STAGE) return []
 
@@ -246,6 +252,7 @@ function report_of(
 		plan_calls: lane_breakdown_implement.plan_calls(calls, breakdown),
 		plan_outside: lane_breakdown_implement.plan_outside(calls, breakdown),
 		chain: lane_breakdown_chain.lines_of(entries, issue),
+		split: lane_implement_split.lines_of(issue, breakdown, entries),
 	}
 }
 

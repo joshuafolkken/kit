@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { lane_breakdown } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
+import { lane_implement_split } from './lane-implement-split'
 import type { ShipLapEntry, StageEntry, TestPinnedEntry, TestRelatedEntry } from './lane-ledger'
 
 // joshuafolkken/kit#4995: the breakdown reads as one bullet per stage on the lane's Issue and as one
@@ -11,6 +12,7 @@ import type { ShipLapEntry, StageEntry, TestPinnedEntry, TestRelatedEntry } from
 const MINUTE_MS = 60_000
 const ISSUE = 4970
 const AT = '2026-10-28T01:00:00.000Z'
+const SPLIT_LINE = 'split › gate wait 2.0 min'
 
 const REPORT: Report = {
 	breakdown: {
@@ -53,6 +55,14 @@ describe('lane_breakdown_text.comment', () => {
 			`- ${PLAN_TEXT}`,
 			`- ${EXCLUDED_TEXT}`,
 		])
+	})
+
+	it('prints the implementation split under it, before its run:chain stages (#8998)', () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
+		const report = { ...REPORT, split: [SPLIT_LINE], chain: ['run:chain › x'] }
+		const lines = lane_breakdown_text.comment(ISSUE, 62, report).split('\n')
+
+		expect(lines.slice(3, 5)).toStrictEqual([`  - ${SPLIT_LINE}`, '  - run:chain › x'])
 	})
 })
 
@@ -222,6 +232,19 @@ describe('lane_breakdown_text.report_of', () => {
 
 		expect(report.discarded).toBe('background test:pinned probes discarded 1, 2.0 min')
 		read.mockRestore()
+	})
+
+	it("reads the lane's implementation split off the ledger (#8998)", () => {
+		const read = vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([])
+		const lines = [SPLIT_LINE]
+		const lines_of = vi.spyOn(lane_implement_split, 'lines_of').mockReturnValue(lines)
+
+		const report = lane_breakdown_text.report_of(ISSUE, REPORT.breakdown, [])
+
+		expect(report.split).toBe(lines)
+		expect(lines_of).toHaveBeenCalledWith(ISSUE, REPORT.breakdown, [])
+		read.mockRestore()
+		lines_of.mockRestore()
 	})
 })
 
