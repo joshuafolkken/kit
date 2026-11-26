@@ -1,5 +1,7 @@
 import {
 	ALREADY_DONE_LABEL,
+	AREA_BOARD_LABEL,
+	AREA_THEME_LABEL,
 	AUTO_OK_LABEL,
 	BREAKING_CHANGE_LABEL,
 	BUG_LABEL,
@@ -72,6 +74,12 @@ const FILING_ROUTE_LABELS: ReadonlyArray<LabelDefinition> = [
 		color: 'd93f0b',
 		description: 'Filed Tier A during implementation — an upstream defect or a prerequisite',
 	},
+]
+
+// The areas `run:board` draws before a row's title (joshuafolkken/kit#8960).
+const AREA_LABELS: ReadonlyArray<LabelDefinition> = [
+	{ name: AREA_BOARD_LABEL, color: '006b75', description: 'Area: the run:board display' },
+	{ name: AREA_THEME_LABEL, color: 'd876e3', description: 'Area: a run:board theme' },
 ]
 
 // What `josh start` provisions on a new repository so the first `kickoff` finds every label a run
@@ -172,6 +180,7 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 	},
 	{ name: BUG_LABEL, color: 'd73a4a', description: "Something isn't working" },
 	...FILING_ROUTE_LABELS,
+	...AREA_LABELS,
 ]
 
 // The release classifications `pr-classification.yml` requires exactly one of

@@ -17,6 +17,9 @@ const OTHER_PID = 424_242
 const SHELL_PID = 900_001
 const LAUNCHER_PID = 900_002
 const DIRECTORY_PREFIX = 'josh-wait-'
+const PATTERN = 'run:chain 8283'
+const READY_ENTRY = '--disable-warning=ExperimentalWarning tools/josh/josh-ready.ts'
+const WAIT_COMMAND = `wait --process ${PATTERN}`
 
 function row(pid: number, parent: number, command: string): ProcessRow {
 	return { pid, parent, command, time: '0:00', rss_kb: 1, stat: 'S', start: '' }
@@ -26,8 +29,8 @@ function row(pid: number, parent: number, command: string): ProcessRow {
 function own_rows(): Array<ProcessRow> {
 	return [
 		row(LAUNCHER_PID, 1, 'claude -p'),
-		row(SHELL_PID, LAUNCHER_PID, 'zsh -c pnpm josh wait --process run:chain 8283'),
-		row(process.pid, SHELL_PID, 'node josh wait --process run:chain 8283'),
+		row(SHELL_PID, LAUNCHER_PID, `zsh -c pnpm ${WAIT_COMMAND}`),
+		row(process.pid, SHELL_PID, `node ${WAIT_COMMAND}`),
 	]
 }
 
@@ -100,9 +103,24 @@ describe('run_wait_cli.run', () => {
 	})
 })
 
-describe('run_wait_cli.is_gone_in', () => {
-	const PATTERN = 'run:chain 8283'
+describe('run_wait_cli.is_gone_in with a leftover wait', () => {
+	const leftover = [
+		row(OTHER_PID, 1, `zsh -c pnpm ${WAIT_COMMAND}`),
+		row(OTHER_PID + 1, OTHER_PID, `node ${READY_ENTRY} ${WAIT_COMMAND}`),
+	]
 
+	it('does not let it hold a finished target pending', () => {
+		expect(run_wait_cli.is_gone_in([...own_rows(), ...leftover], PATTERN)).toBe(true)
+	})
+
+	it('still reads a running target as running beside it', () => {
+		const running = row(OTHER_PID + 2, 1, 'node josh run:chain 8283 --join --worker')
+
+		expect(run_wait_cli.is_gone_in([...own_rows(), ...leftover, running], PATTERN)).toBe(false)
+	})
+})
+
+describe('run_wait_cli.is_gone_in', () => {
 	it('reads only its own lineage as matching: gone', () => {
 		expect(run_wait_cli.is_gone_in(own_rows(), PATTERN)).toBe(true)
 	})
