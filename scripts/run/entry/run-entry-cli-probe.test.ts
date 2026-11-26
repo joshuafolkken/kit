@@ -58,6 +58,9 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 	},
 }))
 vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: fit_mock } }))
+vi.mock('./run-entry-branch', () => ({
+	run_entry_branch: { switch_to_issue_branch: async () => undefined },
+}))
 vi.mock('./run-entry-lane-plan', () => ({
 	run_entry_lane_plan: { run_at_entry: plan_at_entry_mock },
 }))
