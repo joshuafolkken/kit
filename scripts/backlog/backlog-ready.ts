@@ -101,8 +101,8 @@ async function drive_limit_room(): Promise<number> {
 }
 
 // **A `--only` run has no pool to drain**. `backlog:next` lists the opted-in
-// pool, and a `--only` run's work is its named list — issues and epics that run in order through their
-// own step, never through the pick-up ask — so a ready pool issue is neither a stall nor an ask it owes.
+// pool, and a `--only` run's work is its named list — issues and epics the named offer launches
+// (`backlog-drive-named.ts`), never through the pick-up ask — so a ready pool issue is neither a stall nor an ask it owes.
 // Without a `--only` record the pool is the run's, whole.
 function drains_pool(carry: RunCarry | undefined): boolean {
 	return carry === undefined || !run_invocation.has_only(carry.invocation)

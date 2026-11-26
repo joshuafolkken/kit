@@ -98,7 +98,6 @@
 	"scripts/backlog/backlog-empty-start.test.ts": 296,
 	"scripts/backlog/backlog-manufacturing-rule.test.ts": 76,
 	"scripts/backlog/backlog-measure-close.test.ts": 63,
-	"scripts/backlog/backlog-named.test.ts": 31,
 	"scripts/backlog/backlog-next-main.test.ts": 366,
 	"scripts/backlog/backlog-next-not-before.test.ts": 219,
 	"scripts/backlog/backlog-next-rank.test.ts": 320,

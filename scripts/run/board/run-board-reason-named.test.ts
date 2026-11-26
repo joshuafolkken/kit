@@ -7,9 +7,8 @@ import type { BoardPlan, RowReason } from './run-board-layout'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import type { ItemStatus } from './run-board-status'
 
-// joshuafolkken/kit#4206: `backlogrun 4199 4198 4201 4200 --only` held 4201 and 4200 behind a running
-// 4198, and their queued rows said `next free lane` or nothing at all. joshuafolkken/kit#4288: each
-// leads with 📋 and the issue it starts after.
+// joshuafolkken/kit#8953: the named issues run side by side, so no queued row waits on the one typed
+// before it — a named row draws no 📋 mark, only the pool's own reasons.
 
 const REPO = 'joshuafolkken/kit'
 const FIRST = 4199
@@ -50,10 +49,6 @@ function plan_of(children: Array<EpicChild>): BoardPlan {
 	}
 }
 
-function named(holder: number): RowReason {
-	return { icon: WAIT_ICONS.named, issues: [String(holder)] }
-}
-
 function reasons(extra: Partial<ReasonRead> = {}): Array<RowReason | undefined> {
 	const children = ROWS.map((number) => child(number))
 	const reason_of = run_board_reason.reader({
@@ -70,37 +65,23 @@ function reasons(extra: Partial<ReasonRead> = {}): Array<RowReason | undefined> 
 	return children.map((item) => reason_of(item, []))
 }
 
-describe('run_board_reason.reader — a row the declared order keeps waiting', () => {
-	it('names the declared issue each queued row starts after', () => {
-		expect(reasons()).toStrictEqual([named(RUNNING), named(THIRD), undefined])
+describe('run_board_reason.reader — named rows in a parallel named run', () => {
+	it('draws no declared-order mark while a lane is free', () => {
+		expect(reasons()).toStrictEqual([undefined, undefined, undefined])
 	})
 
-	it('says the declared order before a full pool, which only an added row waits on', () => {
+	it('names the full pool on every row, named or added', () => {
+		const full: RowReason = { icon: WAIT_ICONS.lane, value: '1/1' }
+
 		expect(reasons({ free_lanes: NO_LANE_LEFT, lane_limit: 1, occupied_count: 1 })).toStrictEqual([
-			named(RUNNING),
-			named(THIRD),
-			{ icon: WAIT_ICONS.lane, value: '1/1' },
+			full,
+			full,
+			full,
 		])
 	})
 
-	// joshuafolkken/kit#4279: `backlogrun #4263 #4262 --only` left 4262's row blank before 4263 started.
-	it('names the declared order before its first issue starts', () => {
-		expect(reasons({ statuses: new Map() })).toStrictEqual([
-			named(RUNNING),
-			named(THIRD),
-			undefined,
-		])
-	})
-
-	// joshuafolkken/kit#6836: the board's scope now draws the added issues, still without the 📋 mark.
-	it('leaves a prioritized added row without the declared-order mark', () => {
-		const carry = { ...CARRY, added: [{ issue: ADDED, is_priority: true }] }
-
-		expect(reasons({ carry, statuses: new Map() })).toStrictEqual([
-			named(RUNNING),
-			named(THIRD),
-			undefined,
-		])
+	it('draws no declared-order mark before the first named issue starts', () => {
+		expect(reasons({ statuses: new Map() })).toStrictEqual([undefined, undefined, undefined])
 	})
 
 	it('leaves a run that names no issues as it was', () => {

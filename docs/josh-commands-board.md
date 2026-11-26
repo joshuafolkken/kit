@@ -218,7 +218,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` (in UTC) withholds it; the board shows local time.
 - `📅 <n>/<K>` / `📅 <PR>` — the body's `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met: the lane ledger has recorded `n` of the `K` merges it waits on after `<PR>` merged, or `<PR>` has not merged (or its merge is unread).
   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
-- `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
+- `📋 <N>` — old logs only: a named run's declared issue `<N>` was ahead of it. No longer shown, since the named issues run side by side.
 - `✋` — neither `run:lane` nor `run:solo`, due, and nothing blocks it; `backlog:next` holds it alone for its judgment and offers the triaged rows.
 - `🔒 <N>` — running or parked `run:solo` issue `<N>`: nothing starts until it merges, closes or loses the label; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, the parked half `epic_solo_parked`'s.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and waits …".

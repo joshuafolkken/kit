@@ -187,8 +187,8 @@ describe('what a waiting child is waiting on', () => {
 	})
 })
 
-// joshuafolkken/kit#1984: `backlogrun #N1 #N2 …` runs the named issues in order before the pool, so
-// the plan leads with them. A bare `backlogrun` names none and the section is absent.
+// joshuafolkken/kit#1984: `backlogrun #N1 #N2 …` runs the named issues before the pool (side by side,
+// the typed order their lane priority), so the plan leads with them. A bare `backlogrun` names none and the section is absent.
 describe('the named issues a backlogrun runs before the pool', () => {
 	it('leads the plan with the named issues, in the order they were typed', async () => {
 		stub_backlog()

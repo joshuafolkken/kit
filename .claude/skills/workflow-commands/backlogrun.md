@@ -3,8 +3,8 @@
 **`backlogrun` names either nothing, or the issues and epics to run first.** With no argument it runs
 whatever `pnpm josh backlog:next` offers — the whole opted-in backlog, every issue carrying `auto-ok`
 plus every child of an epic whose root carries it, ordered by dependency and grouped into waves. With
-`#N1 #N2 …` it runs those named items in the order they were typed, one at a time, and **then** drains
-that same backlog. **`--only` stops it after the named list**, draining nothing; a bare `--only`
+`#N1 #N2 …` it runs those named items **in parallel across the free lanes** — the typed order is only
+their priority — and the same backlog fills the lanes they leave free. **`--only` stops it after the named list**, draining nothing; a bare `--only`
 names none and waits under the idle watch for what `run:add` puts in.
 
 **The loop's current position is computed, not carried in the conversation.** `pnpm josh run:step <N>`
@@ -13,8 +13,8 @@ action — a runnable command, or the one point a person has to judge — follow
 governs it. With no `<N>` it answers for the parent itself, from the carry record alone.
 
 **A named item may be a single issue or an epic.** A single-issue item is one `fullrun`; **a named epic runs its children in
-dependency order across the free lanes, and the run does not advance to the next named item until
-every one of that epic's children has been processed — merged or parked.** `pnpm josh backlogrun <E> --only`
+dependency order across the free lanes, and is done once every child has been processed — merged or
+parked.** While it waits on its children, the named items after it run. `pnpm josh backlogrun <E> --only`
 therefore runs exactly one epic's children and stops.
 
 ## Explicit invocation required (MANDATORY)
@@ -39,7 +39,8 @@ reference is read as a section").
 4. **Report the plan beside the first child** — `pnpm josh backlog:plan`, then resolve every
    `needs-decision` issue decidable from its body in one pass: `backlogrun-steps.md` → "The plan,
    beside the first child".
-5. **Named issues run first, in order** — each as a delegated `fullrun`, one at a time, then the pool;
+5. **Named issues run first, in parallel** — each as a `fullrun` on a free lane, typed order as priority;
+   the pool fills the remaining lanes;
    `--only` stops after the list; a bare `--only` runs only `run:add` additions until the idle watch
    ends it.
    - Once per session: `backlogrun-steps.md` → "What runs once per session, not once per issue" and

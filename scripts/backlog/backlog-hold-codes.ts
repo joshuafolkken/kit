@@ -15,8 +15,10 @@ const WATCH_VERDICT = 'watch'
 // The hand-back reason of a window that closed after a `watch` offer: the backlog had drained
 // (joshuafolkken/kit#7510), told apart from a window that closed mid-work.
 const DRAINED_REASON = 'drained'
-// The `wait` details of a named run (`backlog-drive-named.ts`, joshuafolkken/kit#8863): a named
-// issue in flight holds the free lanes (`named:<N>`), and an `--only` run waits on its last one to close (`only`).
+// The `wait` details of a named run (`backlog-drive-named.ts`, joshuafolkken/kit#8863): an `--only`
+// run waits on its last named issue to close (`only`). `named:<N>` — a named issue in flight holding
+// the free lanes — is no longer emitted, since the named issues run side by side
+// (joshuafolkken/kit#8953); it is kept to read old logs.
 const NAMED_WAIT = 'named'
 const ONLY_WAIT = 'only'
 
