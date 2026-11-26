@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { ESLINT_CACHE_FILE, ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import type { BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { temporary_directory } from '#tools/test/temporary-directory'
+import { ESLint } from 'eslint'
 import { execa } from 'execa'
 import { describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
@@ -60,7 +61,50 @@ writeFileSync(path.join(project, 'tsconfig.json'), JSON.stringify(TSCONFIG))
 writeFileSync(path.join(project, CALLER), CALLER_SOURCE)
 writeFileSync(path.join(project, REFERENCED), TYPED_VALUE)
 
-// A process of its own per run: the type program a process builds is kept for its lifetime. An
+// The ESLint API spelling of `ESLINT_CACHE_FLAGS` and `UNCACHED_FLAGS`.
+const CACHED_OPTIONS: ESLint.Options = {
+	cache: true,
+	cacheStrategy: 'content',
+	cacheLocation: ESLINT_CACHE_FILE,
+}
+const UNCACHED_OPTIONS: ESLint.Options = { cache: false }
+
+function has_clear_caches(parser: unknown): parser is { clearCaches: () => void } {
+	return typeof parser === 'object' && parser !== null && 'clearCaches' in parser
+}
+
+// typescript-eslint's `parser` export carries no cache clear; the parser package it loads does, and
+// is resolved from typescript-eslint so the clear reaches the instance the config parses with.
+function clear_type_programs(): void {
+	const require_from_plugin = createRequire(
+		createRequire(import.meta.url).resolve('typescript-eslint'),
+	)
+	const parser: unknown = require_from_plugin('@typescript-eslint/parser')
+
+	if (!has_clear_caches(parser)) throw new Error('@typescript-eslint/parser exposes no clearCaches')
+
+	parser.clearCaches()
+}
+
+// In this process, as the CLI lints: typescript-eslint keeps the type program it built for the
+// process's lifetime, so each run clears it first and reads the files as they are now. One run at a
+// time, since a clear would pull the program from under a run beside it.
+async function lint_in_process(options: ESLint.Options): Promise<BufferedProcessResult> {
+	clear_type_programs()
+
+	const eslint = new ESLint({ ...options, cwd: project, overrideConfigFile: config_file })
+	const results = await eslint.lintFiles([CALLER])
+	const formatter = await eslint.loadFormatter('stylish')
+	const output = await formatter.format(results)
+
+	return {
+		output,
+		exit_code: results.some(({ errorCount }) => errorCount > 0) ? 1 : 0,
+		elapsed_ms: 0,
+	}
+}
+
+// The CLI itself, in a process of its own, for the case that holds the in-process run to it. An
 // uncached run (`UNCACHED_FLAGS` names no `--cache`) reads and writes no cache file, so it starts
 // beside a cached one.
 async function run_eslint(cache_flags: ReadonlyArray<string>): Promise<BufferedProcessResult> {
@@ -80,7 +124,7 @@ async function run_eslint(cache_flags: ReadonlyArray<string>): Promise<BufferedP
 async function run_guarded(): Promise<BufferedProcessResult> {
 	return await eslint_cache_dependencies.guard(
 		ESLINT_CACHE_FILE,
-		async () => await run_eslint(ESLINT_CACHE_FLAGS),
+		async () => await lint_in_process(CACHED_OPTIONS),
 		project,
 	)
 }
@@ -106,15 +150,14 @@ describe('eslint_cache_dependencies.guard — only the imported file changed', (
 	it('is the stale green an unguarded cached run answers', async () => {
 		writeFileSync(path.join(project, REFERENCED), ANY_VALUE)
 
-		const [cached, uncached] = await Promise.all([
-			run_eslint(ESLINT_CACHE_FLAGS),
-			run_eslint(UNCACHED_FLAGS),
-		])
+		const cached = await lint_in_process(CACHED_OPTIONS)
+		const uncached = await lint_in_process(UNCACHED_OPTIONS)
 
 		expect(cached.exit_code).toBe(0)
 		expect(uncached.output).toContain(UNSAFE_ASSIGNMENT_RULE)
 	})
 
+	// The uncached run here is the CLI's, so the guarded in-process run answers as the CLI does.
 	it('answers red as the uncached run does', async () => {
 		const [uncached, guarded] = await Promise.all([run_eslint(UNCACHED_FLAGS), run_guarded()])
 
