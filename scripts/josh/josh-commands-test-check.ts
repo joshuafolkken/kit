@@ -53,7 +53,7 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 			"Revert each changed hunk outside tests and fixtures only they reach, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on",
 		category: 'Development',
 		reference: [
-			'[--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--reasoned]',
+			'[--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--continue-cut] [--reasoned]',
 			'developer',
 			['git', 'processes'],
 		],

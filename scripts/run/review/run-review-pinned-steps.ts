@@ -117,7 +117,7 @@ function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): La
 }
 
 // **A pre-detach that stopped at its first unpinned hunk goes on probing the rest here**
-// (joshuafolkken/kit#5327): every hunk, with no reason, on the stamp `launch` writes, so the next
+// (joshuafolkken/kit#5327): the rest of its range (#8975), no reason, on the stamp `launch` writes, so the next
 // pre-detach joins it (`run-review-pinned-join.ts`) and `clear` discards it as it does that one.
 // A `reason` goes on the record only, never on the probe's argv.
 function launch_remaining(
