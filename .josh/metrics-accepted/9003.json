@@ -1,0 +1,7 @@
+{
+	"reason": "A starting backlog driver clears the hand-back mark (started), so a full pool's running driver is not recorded as driverless",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}

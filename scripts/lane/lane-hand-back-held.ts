@@ -9,8 +9,8 @@ import { lane_ledger_write } from './lane-ledger-write'
 // lane once its merge wait starts (`run-ship-steps.ts`) and calls this: the mark's reason becomes a `held` line, which `lane:stats` and `run:board` read
 // as any driver's hold, and the next driver's first ledger line ends it.
 //
-// **No mark, no hold**: a running driver clears the mark on every line it writes, so a full pool under
-// a running driver is still not counted as held. A hold already open is left to stand rather than split.
+// **No mark, no hold**: a driver clears the mark when it starts and on every line it writes, so a full
+// pool under a running driver — whose passes write no line — is still not counted as held. A hold already open is left to stand rather than split.
 //
 // The reason carries `driverless:` before the mark's: a driver's own `hand-back:` hold answers an offer,
 // this one answers none, and `lane-gap-stats.ts` must not end a park at it.
