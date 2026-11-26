@@ -211,6 +211,51 @@ describe('run_board_github.gather_github with an untitled lane', () => {
 	})
 })
 
+// joshuafolkken/kit#9024: an issue `run:add` hands the run is read for at once, not after the interval.
+function add_gather(added_ms: number, now_ms: number): Gather {
+	const at = new Date(added_ms).toISOString()
+	const events: Array<RunEvent> = [{ pos: 0, at, kind: 'add', text: 'queued #9' }]
+	const local: LocalRead = { ...LOCAL, events }
+
+	return { ports: harness(local, [plan_titled('a')]).ports, local, now_ms, pace: 'settled' }
+}
+
+describe('run_board_github.gather_github after run:add', () => {
+	it('reads the plan inside the retry interval for an ADD after the last read', async () => {
+		const state = await gather_github(READ_STATE, add_gather(START + 1, START + 2))
+
+		expect(state.attempted_ms).toBe(START + 2)
+	})
+
+	it('waits the interval for an ADD before the last read', async () => {
+		const state = await gather_github(READ_STATE, add_gather(START - 1, START + 2))
+
+		expect(state.attempted_ms).toBe(START)
+	})
+
+	it('waits the interval when the run holds no ADD', async () => {
+		const state = await gather_github(READ_STATE, lane_gather(TITLED, START - 1, START + 2))
+
+		expect(state.attempted_ms).toBe(START)
+	})
+
+	it('reads again once a read in flight when the ADD landed has landed', async () => {
+		const gather = add_gather(START + 2, START + 3)
+		const background: Gather = {
+			...gather,
+			pace: 'background',
+			ports: { ...gather.ports, read_plan: never },
+		}
+		const first = await gather_github(READ_STATE, { ...background, now_ms: START + 1 })
+		const waiting = await gather_github(first, background)
+		const landed = { ...waiting, plan_fetch: undefined }
+		const again = await gather_github(landed, gather)
+
+		expect(waiting.attempted_ms).toBe(START + 1)
+		expect(again.attempted_ms).toBe(START + 3)
+	})
+})
+
 // joshuafolkken/kit#3969, #4269: a lane an earlier run left behind was drawn 🛑 as this run's child.
 // Whose lane it is is now its record's, whatever this run's span says of its issue.
 const LEFTOVER = 3936

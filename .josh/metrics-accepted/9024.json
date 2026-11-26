@@ -1,0 +1,7 @@
+{
+	"reason": "run:add now makes the board's plan read due at once (has_new_add + is_read_early, and its tests)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}
