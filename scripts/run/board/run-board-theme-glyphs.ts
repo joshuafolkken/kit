@@ -17,7 +17,9 @@ const { EMOJI, SYMBOLS } = run_board_theme_glyph_table
 // dots on a themed board, each frame the glyph its place in the dots' cycle falls on, so one cycle of
 // the dots is one pass through the glyphs; the theme host turns its own spinner over it.
 const { BASE_LOOK } = run_board_theme_defs
-const UNKNOWN: Glyph = ['?', 'info']
+// joshuafolkken/kit#8974: an emoji the table misses is drawn as blanks of its width, not `?`, so a
+// name from a roster never reads as a question.
+const UNKNOWN: Glyph = ['', 'info']
 const VARIATION_SELECTOR = '\u{FE0F}'
 const ESC = '\u{1B}'
 // A color escape after its ESC; the codes that open a foreground color and that end one; the codes
@@ -42,7 +44,10 @@ const TURNS = new Map(spinner_turns(BASE_LOOK.spinner))
 const SPINNER: ReadonlySet<string> = new Set(run_board_labels.SPINNER_FRAMES)
 const SINGLE_CLASS = [...SYMBOLS.keys(), ...run_board_labels.SPINNER_FRAMES].join('')
 const PICTOGRAPHIC = String.raw`\p{Extended_Pictographic}`
-const GLYPH = new RegExp(`${PICTOGRAPHIC}${VARIATION_SELECTOR}?|[${SINGLE_CLASS}]`, 'gu')
+// One emoji: a pictograph with its variation selector and skin tone, joined by ZWJ to more of them.
+const PART = String.raw`${PICTOGRAPHIC}${VARIATION_SELECTOR}?[\u{1F3FB}-\u{1F3FF}]?`
+const EMOJI_SEQUENCE = String.raw`${PART}(?:\u{200D}${PART})*`
+const GLYPH = new RegExp(`${EMOJI_SEQUENCE}|[${SINGLE_CLASS}]`, 'gu')
 
 // What a line's glyphs are drawn with: its theme, none for a board in no theme, and its icons.
 interface GlyphLook {
@@ -97,11 +102,12 @@ function toned_text(text: string, tone: Tone, open: Open, idle: Paint | undefine
 }
 
 // An emoji, with its variation selector, as its text in its tone's color padded to the width it took;
-// one the table misses as `?`, so no emoji is drawn but as `emoji`.
+// one the table misses as blanks of its width, so no emoji is drawn but as `emoji`.
 function text_of(glyph: string, open: Open, look: GlyphLook): string {
 	const entry = entry_of(glyph, look)
 
 	if (entry === undefined) return glyph
+	if (entry === UNKNOWN) return ' '.repeat(run_board_fit.width_of(glyph))
 	const text = drawn_text(entry, look.icons)
 	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
 

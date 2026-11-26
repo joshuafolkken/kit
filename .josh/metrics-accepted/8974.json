@@ -1,0 +1,7 @@
+{
+	"reason": "Blank fallback and ZWJ/skin-tone emoji sequence regex add 3 code lines (#8974)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
