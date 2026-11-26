@@ -31,8 +31,14 @@ vi.mock('#scripts/gh/git-gh-exec', () => ({
 				return '{"base":{"sha":"base"},"head":{"sha":"head"}}'
 			}
 
-			return '{"files":[{"filename":".github/workflows/ci.yml"}]}'
+			return '{}'
 		}),
+	},
+}))
+vi.mock('#scripts/git/git-spawn', () => ({
+	git_spawn: {
+		read_remote: vi.fn(async () => ''),
+		read: vi.fn(async () => '.github/workflows/ci.yml\0'),
 	},
 }))
 vi.mock('./git-followup-merged', () => ({
