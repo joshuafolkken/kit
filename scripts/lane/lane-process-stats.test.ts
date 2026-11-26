@@ -101,6 +101,15 @@ describe('lane_process_stats.table over the cores', () => {
 
 		expect(lane_process_stats.table(entries, WINDOW)).not.toContain('load > cores')
 	})
+
+	it('leaves out an over-core sample whose process reading failed rather than read it as zero CPU', () => {
+		const failed = { ...over_sample(CORES + 2, []), processes: undefined }
+		const entries = [over_sample(13, [{ command: TEST_RELATED, cores: 2 }]), failed]
+
+		expect(lane_process_stats.table(entries, WINDOW)).toContain(
+			'| load > cores | 13.0 | 10.0 | 2.0 | 8.0 | 1 |',
+		)
+	})
 })
 
 // joshuafolkken/kit#7244: the footprint, compressed pages included, beside the resident peak.

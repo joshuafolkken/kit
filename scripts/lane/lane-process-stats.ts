@@ -139,20 +139,26 @@ function kind_table(samples: ReadonlyArray<LoadEntry>, columns: ReadonlyArray<st
 type OverSample = LoadEntry & {
 	cores: NonNullable<LoadEntry['cores']>
 	reserved: NonNullable<LoadEntry['reserved']>
+	processes: NonNullable<LoadEntry['processes']>
+}
+
+function has_readings(sample: LoadEntry): boolean {
+	return sample.processes !== undefined && sample.reserved !== undefined
 }
 
 // A sample whose one-minute load passed the core count it recorded; one written before the core count
-// was recorded, or with no reservation reading, is never counted (joshuafolkken/kit#9000).
+// was recorded, or with no process or reservation reading (a `ps` that timed out), is never counted, so
+// a missing reading never reads as zero CPU (joshuafolkken/kit#9000).
 function is_over_cores(sample: LoadEntry): sample is OverSample {
-	return sample.cores !== undefined && sample.reserved !== undefined && sample.load > sample.cores
+	return has_readings(sample) && sample.cores !== undefined && sample.load > sample.cores
 }
 
 function sum(values: ReadonlyArray<number>): number {
 	return values.reduce((total, value) => total + value, 0)
 }
 
-function cpu_cores(sample: LoadEntry): number {
-	return sum(cores(sample.processes ?? []))
+function cpu_cores(sample: OverSample): number {
+	return sum(cores(sample.processes))
 }
 
 function reserved_cores(sample: OverSample): number {
