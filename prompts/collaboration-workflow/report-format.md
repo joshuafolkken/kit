@@ -17,7 +17,7 @@
 
 ### 作業前サマリはいつ・どう出すか
 
-- **いつ**: 実装コードを書く前に、Issue ごとに 1 回出す。`fullrun` / `halfrun` / `prrun` / `backlogrun` で必須、`kickoff` は対象外。確認のための停止ではない — 出したらそのまま実装に進む
+- **いつ**: 実装コードを書く前に、Issue ごとに 1 回出す。`fullrun` / `halfrun` / `prrun` / `backlogrun` で必須、`kickoff` は対象外。起票せずの作業 → `principles.md` → "consult-vs-execute"。確認のための停止ではない — 出したらそのまま実装に進む
 - **材料**: `pnpm josh plan:scaffold <N> [<path>...]` 1 回で集める（骨組み・`lines`・`test:declared`・`cases`・`plan:consumers`）。骨組みで埋めるのはテスト名（`docs/josh-commands-run.md` → "`josh run:prep`"）
 - **概要**: `Now` / `Change` / `Check` を各 1 文、セッション言語で、プログラマでない人にも追える文で書く。各行に具体的な主語を書き、主語のない文は不可（下記「具体的な主語を必ず書く」）。ファイルパス・関数名や型名・CLI のオプションフラグは書かない — 禁じるのは内部識別子だけである
 - **技術詳細**: すべての変更をそのテストとともに `<変更内容> — Test: <Unit|E2E> — <file path> — <検証する挙動>` の形で並べる

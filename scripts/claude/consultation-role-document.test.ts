@@ -39,3 +39,24 @@ describe('consultation main-session responsibilities', () => {
 		expect(text).toContain('it touches GitHub, never the tree')
 	})
 })
+
+// joshuafolkken/kit#8943: no-filing work defers tests, the gate and the review to the finish.
+describe('no-filing finish', () => {
+	it.each([
+		'テスト・`pnpm josh gate`・コミット前レビューは仕上げに回す',
+		'依頼に「テストと gate も」→ その場で実行する',
+		'締めで「テストと gate は未実行」と毎回明記する',
+		'後回しにした分をすべて実行する',
+		'「テスト未作成・gate 未実行」と実装済みの変更ファイルを書く',
+	])('defines the deferral in consult-vs-execute: %s', (requirement) => {
+		expect(read_unwrapped(PRINCIPLES)).toContain(requirement)
+	})
+
+	it.each([
+		'.claude/agents/producer.md',
+		'.claude/skills/board-theme/SKILL.md',
+		'prompts/collaboration-workflow/report-format.md',
+	])('%s defers to the shared no-filing finish', (document) => {
+		expect(read_unwrapped(document)).toContain('"consult-vs-execute"')
+	})
+})

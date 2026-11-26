@@ -1,0 +1,9 @@
+{
+	"reason": "#8943 adds the no-filing deferral rule to consult-vs-execute, producer and the consultation scope line",
+	"date": "2026-11-26",
+	"growth": {
+		"rules.lines": 3,
+		"ai_cost.resident_bytes": 8,
+		"ai_cost.on_demand_bytes": 609
+	}
+}
