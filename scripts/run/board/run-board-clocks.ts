@@ -1,14 +1,16 @@
+import { figure_format } from '#scripts/lib/figure-format'
 import { run_board_labels } from './run-board-labels'
 import { run_board_spot } from './run-board-spot'
 
 // The header's clock column (`run-board-header.ts`, joshuafolkken/kit#8478): when the run should finish
 // over the time now over when it started. An ended run's finish is when it ended; a finish not known —
 // no plan read, a stopped run, nothing measured — is `--:--`. The clocks take no color of their own, so
-// a theme draws them in its own. All three carry their `MM-DD` once one falls on another day than the
-// others, so the rows stay one width and a finish tomorrow never reads as one past. The icons stay emoji
+// a theme draws them in its own. A finish or start a day or more from now reads its `MM-DD` instead of
+// its time (joshuafolkken/kit#8928), so every row stays five columns. The icons stay emoji
 // here; a theme's glyph table draws them in the icons it was asked for (joshuafolkken/kit#8505).
 
 const { HEADER_ICONS, day_minute_of, minute_of } = run_board_labels
+const { day_of } = figure_format
 const NOW_ICON = '🕒'
 const START_ICON = '🚀'
 const UNKNOWN_TIME = '--:--'
@@ -34,21 +36,21 @@ function colons_of(header: ClockHeader, time: string): string {
 	return is_blinking ? time.split(':').join(COLON) : time
 }
 
-function is_one_day(times: ReadonlyArray<number>): boolean {
-	return new Set(times.map((ms) => new Date(ms).toDateString())).size <= 1
+const DAY_MS = 86_400_000
+
+// joshuafolkken/kit#8928: a clock reads `HH:MM`, or `MM-DD` — the same five columns — once it is a day
+// or more from now. The time now is always `HH:MM`.
+function clock_text(ms: number, now_ms: number): string {
+	return Math.abs(ms - now_ms) >= DAY_MS ? day_of(ms) : minute_of(ms)
 }
 
 // The finish (`finish_ms`, `undefined` where none is estimated), now and the start, each after its icon.
 function clocks_of(header: ClockHeader, finish_ms: number | undefined): Array<string> {
 	const times = [header.ended_ms ?? finish_ms, header.now_ms, header.started_ms]
-	const format = is_one_day(times.filter((ms) => ms !== undefined)) ? minute_of : day_minute_of
-	const width = format(header.now_ms).length
 	const icons = [HEADER_ICONS.estimate, NOW_ICON, START_ICON]
 
 	return icons.map((icon, row) => {
-		const ms = times[row]
-
-		const time = ms === undefined ? UNKNOWN_TIME.padStart(width) : format(ms)
+		const time = times[row] === undefined ? UNKNOWN_TIME : clock_text(times[row], header.now_ms)
 
 		return `${icon} ${colons_of(header, time)}`
 	})

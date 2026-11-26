@@ -13,8 +13,9 @@ const GAP = 2
 const FLUX_WIDTH = (GEOMETRY.picture[0] ?? '').length
 const FIGURE_WIDTH = FLUX_WIDTH + GAP + LED_COLUMNS
 // A header clock: the demo's base dates it (`11-24 23:03`), the live header does not (`09:07`), and
-// a destination with no estimate yet reads `--:--`.
-const CLOCK = /(?:\d\d-\d\d )?(?:\d\d|--):(?:\d\d|--)/u
+// a destination with no estimate yet reads `--:--`; a start or finish a day or more from now reads its
+// date alone (`11-25`, joshuafolkken/kit#8928).
+const CLOCK = /\d\d-\d\d(?: \d\d:\d\d)?|(?:\d\d|--):(?:\d\d|--)/u
 const TIMED = /\d\d:\d\d/u
 const CLOCK_ROWS = 3
 const NO_CLOCK = '11-24 00:00'
