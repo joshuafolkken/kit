@@ -67,7 +67,12 @@ describe('run_wake.decide — a launch goes only where there is work', () => {
 	})
 
 	it('never turns a pending wake into idle, because no launch is being asked for', () => {
-		const pending = input({ woke_at: NOW.toISOString(), attempts: 1, has_work: false })
+		const pending = input({
+			read: IN_FLIGHT,
+			woke_at: NOW.toISOString(),
+			attempts: 1,
+			has_work: false,
+		})
 
 		expect(run_wake.decide(pending)).toStrictEqual({ kind: 'pending' })
 	})
