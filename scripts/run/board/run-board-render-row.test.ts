@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_faint } from './run-board-faint'
 import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
@@ -82,6 +83,39 @@ describe('run_board_render_row.row_line', () => {
 
 		expect(text).toContain(String(QUEUED.number))
 		expect(lines).toContain(text)
+	})
+})
+
+// joshuafolkken/kit#8960: a row's area is drawn faint before its title, which gives up its columns.
+describe('run_board_render_row.row_line -- area tag', () => {
+	const board = header({ layout: LAYOUT })
+	const tagged: BoardRow = { ...DONE, area: 'board' }
+	const long = 'An area row whose long title runs past the title column and is cut at its end'
+
+	it('draws the area and a blank between the kind and the title', () => {
+		expect(drawn(tagged, board)).toContain(`  board ${DONE.title ?? ''}`)
+	})
+
+	it('draws the area faint where the stream has color', () => {
+		const { text } = run_board_render_row.row_line(ROW_INDENT, tagged, frame_of(board))
+
+		expect(text).toContain(`${run_board_faint.faint('board')} `)
+	})
+
+	it('leaves a row with no area as it was drawn before', () => {
+		expect(drawn(DONE, board)).toContain(` ${DONE.title ?? ''}`)
+		expect(drawn(DONE, board)).not.toContain('board')
+	})
+
+	it('cuts a long title by the tag’s columns, so the row keeps its width', () => {
+		const frame = { ...frame_of(board), title_limit: 30 }
+		const plain = { ...DONE, title: long }
+		const area = { ...plain, area: 'theme' }
+
+		expect(run_board_render_row.title_width(area, frame)).toBe(
+			run_board_render_row.title_width(plain, frame),
+		)
+		expect(drawn(area, board)).toContain('theme An area row')
 	})
 })
 

@@ -54,8 +54,7 @@ function blocker_row(blocker: DecisionBlocker, plan: BoardPlan): BoardRow {
 	const row: BoardRow = {
 		number: blocker.number,
 		title: blocker.title,
-		kind: run_board_kind.kind_of(blocker.labels),
-		priority: run_board_kind.priority_of(blocker.labels),
+		...run_board_kind.marks_of(blocker.labels),
 		state: 'human',
 		status: undefined,
 		waits: [],

@@ -4,6 +4,7 @@ import { epic_issue } from '#scripts/epic/epic-issue'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { issue_area_label } from './issue-area-label'
 import { issue_backlinks } from './issue-backlinks'
 import { issue_classification } from './issue-classification'
 import { FILING_ROUTE_LABELS } from './issue-label-definitions'
@@ -182,13 +183,15 @@ function is_undeclared_classification(label: string, body: string): boolean {
 // the body declares (`issue_classification.labels_for`, which merges case-insensitively), then any
 // extra `--label`, then `auto-ok` when the filing is judged in (`issue-auto-ok.ts`) and no `--label`
 // already named it, `not-before` while the body's start time is ahead (`issue-not-before-label.ts`), and
-// the filed priority's label (the declaration, else its floor) unless a `--label` typed one (`issue-priority.ts`).
+// the filed priority's label (the declaration, else its floor) unless a `--label` typed one (`issue-priority.ts`),
+// and the area the body's paths name unless a `--label` typed one (`issue-area-label.ts`).
 // One request applies them all, so no label is a separate step to forget.
 function labels_of(args: FileArguments, body: string, is_auto_ok = false): ReadonlyArray<string> {
 	const extra = args.labels.filter((label) => !is_undeclared_classification(label, body))
 	const declared = [...(args.route === undefined ? [] : [args.route]), ...extra]
-	const labels = issue_priority.with_label(
-		issue_not_before_label.with_label(issue_classification.labels_for(body, declared), body),
+	const classified = issue_classification.labels_for(body, declared)
+	const labels = issue_area_label.with_label(
+		issue_priority.with_label(issue_not_before_label.with_label(classified, body), body),
 		body,
 	)
 
