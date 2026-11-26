@@ -3,6 +3,7 @@ import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_handoff_lanes } from '#scripts/run/handoff-lanes/run-handoff-lanes'
 import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -175,6 +176,32 @@ describe('run_parent_cut_hook.parent_cut_reason — the hand-off passes by name'
 		const payload = fresh_payload('pnpm josh run:handoff-lanes && pnpm josh lane:open 9000')
 
 		expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBe(
+			run_parent_cut_hook.PARENT_CUT_REASON,
+		)
+	})
+})
+
+describe('run_parent_cut_hook.parent_cut_reason — the hand-off names are single-sourced', () => {
+	const over = state(carry(), 'over')
+
+	it('passes every command the hand-off procedure runs or names', async () => {
+		for (const name of run_handoff_lanes.HANDOFF_COMMANDS) {
+			const payload = fresh_payload(`pnpm josh ${name}`)
+
+			// eslint-disable-next-line no-await-in-loop -- each name is one call against the same state
+			expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBeUndefined()
+		}
+	})
+
+	it('refuses a call that is no command, such as a read of a doc', async () => {
+		const parent = JSON.parse(fresh_payload()) as Record<string, unknown>
+		const read = JSON.stringify({
+			...parent,
+			tool_name: 'Read',
+			tool_input: { file_path: '/doc.md' },
+		})
+
+		expect(await run_parent_cut_hook.parent_cut_reason(read, over)).toBe(
 			run_parent_cut_hook.PARENT_CUT_REASON,
 		)
 	})

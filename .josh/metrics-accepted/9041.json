@@ -2,6 +2,6 @@
 	"reason": "the hand-off command allowlist replaces the quiet window; +2 code lines net",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 2
+		"scripts.code_lines": 6
 	}
 }
