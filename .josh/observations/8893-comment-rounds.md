@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/test/test-related-record.ts:160 | 2026-11-24 | #8893 | deferred:#8868 | edge-input
+- rf:none | none | - | 2026-11-24 | #8893

@@ -1,0 +1,4 @@
+- rf:assumptions | medium | tools/test/unit-durations.json:1 | 2026-11-24 | #8884 | - | other
+- rf:project-conventions | low | scripts/josh/josh-cli-fixture.ts:33 | 2026-11-24 | #8884 | - | other
+- rf:tests | low | tools/test/josh-harness.test.ts:93 | 2026-11-24 | #8884 | - | other
+- rf:assumptions | medium | tools/test/unit-durations.json:1 | 2026-11-24 | #8884

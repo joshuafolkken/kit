@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/run/board/run-board-records.ts:43 | 2026-11-18 | #8038 | - | swallowed-failure

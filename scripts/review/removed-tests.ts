@@ -1,5 +1,6 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { report_format_reference } from '#scripts/report/report-format-reference'
+import { removed_test_files, type RemovedFile } from './removed-test-files'
 import type { Rename } from './renamed-tests'
 import { tally } from './tally'
 import { test_titles } from './test-titles'
@@ -36,15 +37,21 @@ const ROW_PATTERN = new RegExp(
 )
 // A retirement names the Issue that decided it first — an Issue or a plan comment on one — then why.
 const RETIREMENT_PATTERN = /^(?:[\w.-]+\/[\w.-]+)?#\d+\s+\S/u
-const ROW_FORMAT = `under ${DISPOSITION_HEADING}, one line per removed test: \`- \`<test>\` — ${REPLACED}: <the test that guards the behavior now>\` or \`- \`<test>\` — ${RETIRED}: #<Issue that retired the behavior> <reason>\``
+const ROW_FORMAT = `under ${DISPOSITION_HEADING}, one line per removed test: \`- \`<test>\` — ${REPLACED}: <the test that guards the behavior now>\` or \`- \`<test>\` — ${RETIRED}: #<Issue that retired the behavior> <reason>\`; a test file the change deleted whole takes one line naming the file in place of <test>`
 
-// The removed titles, and those of them renamed with the title each now has.
+// The removed titles, those of them renamed with the title each now has, and the test files the change
+// deleted whole, each disposed of by one row naming it.
 interface Removal {
 	removed: ReadonlyArray<string>
 	renamed: ReadonlyArray<Rename>
+	files?: ReadonlyArray<RemovedFile> | undefined
 }
 
-const NONE: Removal = { removed: [], renamed: [] }
+// What a row is written from besides the titles: the renames it is filled with, and the deleted files
+// whose titles it is gathered under.
+type RowContext = Omit<Removal, 'removed'>
+
+const NONE: Removal = { removed: [], renamed: [], files: [] }
 
 function unique(titles: ReadonlyArray<string>): ReadonlyArray<string> {
 	return [...new Set(titles)]
@@ -75,12 +82,18 @@ function disposed_title(line: string): string | undefined {
 	return groups['title']
 }
 
-function undisposed(removed_titles: ReadonlyArray<string>, pr_body = ''): ReadonlyArray<string> {
-	const disposed = new Set(
+// A row naming a deleted test file disposes of every title that file held (`removed_test_files`).
+function undisposed(
+	removed_titles: ReadonlyArray<string>,
+	pr_body = '',
+	files: ReadonlyArray<RemovedFile> = [],
+): ReadonlyArray<string> {
+	const names = new Set(
 		markdown_section
 			.section_lines(pr_body, DISPOSITION_HEADING)
 			.map((line) => disposed_title(line)),
 	)
+	const disposed = removed_test_files.disposed_by(names, files)
 
 	return removed_titles.filter((title) => !disposed.has(title))
 }
@@ -93,29 +106,41 @@ function row_of(title: string, renamed: ReadonlyArray<Rename>): string {
 	return `- \`${title}\` — ${REPLACED}: \`${rename.to}\``
 }
 
-function pending_rows(
+// The titles of a deleted test file go under one row naming the file.
+function pending_names(
 	titles: ReadonlyArray<string>,
-	renamed: ReadonlyArray<Rename> = [],
+	context: RowContext = NONE,
 ): ReadonlyArray<string> {
-	return titles.map((title) => row_of(title, renamed))
+	const renamed = new Set(context.renamed.map((rename) => rename.from))
+
+	return removed_test_files.pending_names(titles, context.files ?? [], renamed)
 }
 
-function has_row(lines: ReadonlyArray<string>, title: string): boolean {
-	return lines.some((line) => line.trim().startsWith(`- \`${title}\` `))
+function pending_rows(
+	titles: ReadonlyArray<string>,
+	context: RowContext = NONE,
+): ReadonlyArray<string> {
+	return pending_names(titles, context).map((name) => row_of(name, context.renamed))
+}
+
+function has_row(lines: ReadonlyArray<string>, name: string): boolean {
+	return lines.some((line) => line.trim().startsWith(`- \`${name}\` `))
 }
 
 // The pending rows a body still lacks, put under its disposition heading — added at the end when the
 // body has none — so a run fills them in before `josh ship` rather than meeting them at its preflight
-// (joshuafolkken/kit#4563). A title with any row already, pending or filled, is left as it is; a
-// renamed title's row is written filled.
+// (joshuafolkken/kit#4563). A title or deleted file with any row already, pending or filled, is left
+// as it is; a renamed title's row is written filled.
 function with_pending_rows(
 	body: string,
 	titles: ReadonlyArray<string>,
-	renamed: ReadonlyArray<Rename> = [],
+	context: RowContext = NONE,
 ): string {
 	const lines = markdown_section.section_lines(body, DISPOSITION_HEADING)
-	const missing = titles.filter((title) => !has_row(lines, title))
-	const rows = pending_rows(missing, renamed).join('\n')
+	const rows = pending_names(titles, context)
+		.filter((name) => !has_row(lines, name))
+		.map((name) => row_of(name, context.renamed))
+		.join('\n')
 
 	if (rows === '') return body
 	if (!HEADING_LINE.test(body)) return `${body.trimEnd()}\n\n${DISPOSITION_HEADING}\n\n${rows}\n`
@@ -130,20 +155,17 @@ function brief_block(removal: Removal = NONE): ReadonlyArray<string> {
 	return [
 		'',
 		`${BRIEF_HEADING} — these tests existed at the base and are gone from the change. For each, find the test that guards its behavior now, or the Issue that retired the behavior; a removed test with neither is a finding (missing test). A row already written as ${REPLACED} is a rename the check matched by its body — not a finding, and its row is checked by \`josh ship\`. The pull request body must dispose of each ${ROW_FORMAT}, or \`josh followup\` refuses the merge:`,
-		...pending_rows(removal.removed, removal.renamed),
+		...pending_rows(removal.removed, removal),
 	]
 }
 
-function refusal_message(
-	titles: ReadonlyArray<string>,
-	renamed: ReadonlyArray<Rename> = [],
-): string {
+function refusal_message(titles: ReadonlyArray<string>, context: RowContext = NONE): string {
 	return [
 		`Merge refused: this change removes ${String(titles.length)} test(s) the pull request body does not account for.`,
 		`Put these rows into the body's ${DISPOSITION_HEADING} section, replacing each pending ending with the test that replaced it or the Issue that retired its behavior; a row already written as ${REPLACED} is a rename, matched by its body:`,
 		DISPOSITION_HEADING,
 		'',
-		...pending_rows(titles, renamed),
+		...pending_rows(titles, context),
 		`Write ${ROW_FORMAT} — format: ${report_format_reference.pointer(report_format_reference.REMOVED_TESTS_HEADING)}`,
 		'Write it into the `--body-file` before `josh ship`, or update an open PR with `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<path>`, then re-run.',
 	].join('\n')
@@ -153,6 +175,7 @@ const removed_tests = {
 	brief_block,
 	DISPOSITION_HEADING,
 	NONE,
+	pending_names,
 	refusal_message,
 	removed,
 	ROW_FORMAT,
@@ -160,5 +183,5 @@ const removed_tests = {
 	with_pending_rows,
 }
 
-export type { Removal }
+export type { Removal, RowContext }
 export { removed_tests }

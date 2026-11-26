@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/run/board/run-board-pause.ts:162 | 2026-11-18 | #7851
+- rf:bug-risks | medium | scripts/run/board/run-board-pause.ts:162 | 2026-11-18 | #7851 | false-positive

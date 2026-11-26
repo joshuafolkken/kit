@@ -1,0 +1,2 @@
+- rf:project-conventions | low | scripts/run/board/run-board-theme-glyphs.ts:80 | 2026-11-21 | #8478 | - | other
+- rf:comments | low | scripts/run/board/run-board-render-tail.ts:170 | 2026-11-21 | #8478 | - | stale-comment

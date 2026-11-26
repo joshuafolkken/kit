@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/review/review-lane-handover.ts:19 | 2026-11-17 | #7730

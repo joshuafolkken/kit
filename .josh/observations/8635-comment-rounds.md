@@ -1,0 +1,3 @@
+- rf:comments | low | .claude/skills/workflow-commands/split-assessment.md:8 | 2026-11-22 | #8635 | false-positive | stale-docs
+- rf:comments | low | docs/maintainers/split-assessment-rationale.md:32 | 2026-11-22 | #8635 | false-positive | stale-docs
+- rf:comments | low | .claude/skills/workflow-commands/split-assessment.md:8 | 2026-11-22 | #8635 | - | stale-docs

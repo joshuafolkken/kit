@@ -1,0 +1,4 @@
+- rf:tests | low | tools/retrospective/retrospective.test.ts:102 | 2026-11-23 | #8770 | - | untested-branch
+- rf:performance | low | scripts/issue/defect-report-cli.ts:48 | 2026-11-23 | #8770 | - | other
+- rf:tests | low | tools/retrospective/retrospective.test.ts:104 | 2026-11-23 | #8770
+- rf:performance | low | scripts/issue/defect-report-cli.ts:48 | 2026-11-23 | #8770

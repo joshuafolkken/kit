@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/run/board/run-board-cli-theme.test.ts:306 | 2026-11-21 | #8513 | - | untested-branch
+- rf:comments | low | docs/josh-commands-board.md:— the board doc says the throughput rule keeps its width with the alert, but `tailed` grows the rule to RULE_LEAD plus the tail where the rule run is too short (the new cli-theme test comment admits this); no failure scenario | 2026-11-21 | #8513 | - | stale-docs

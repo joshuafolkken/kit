@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/lane/lane-model-stats.ts:54 | 2026-11-24 | #8815 | - | edge-input

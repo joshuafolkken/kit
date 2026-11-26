@@ -1,0 +1,7 @@
+- rf:bug-risks | low | scripts/josh/josh-commands-ship.ts:114 | 2026-11-17 | #7727
+- rf:project-conventions | low | scripts/review/acceptance-map.ts:212 | 2026-11-17 | #7727
+- rf:assumptions | low | scripts/review/acceptance-map-check.ts:139 | 2026-11-17 | #7727
+- rf:bug-risks | low | scripts/josh/josh-commands-ship.ts:114 | 2026-11-17 | #7727
+- rf:project-conventions | low | scripts/review/acceptance-map.ts:212 | 2026-11-17 | #7727
+- rf:assumptions | low | scripts/review/acceptance-map-check.ts:139 | 2026-11-17 | #7727
+- rf:tests | low | scripts/run/review/run-chain-cli.test.ts:77 | 2026-11-17 | #7727

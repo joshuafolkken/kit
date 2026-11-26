@@ -49,7 +49,7 @@ async function write_rows(
 	changes: TitleChanges,
 ): Promise<void> {
 	const filled = acceptance_map.with_test_rows(
-		removed_tests.with_pending_rows(body, removed, changes.renamed),
+		removed_tests.with_pending_rows(body, removed, changes),
 		changes.added,
 	)
 
@@ -62,10 +62,15 @@ function where(draft: string | undefined): string {
 		: `Pending rows for them are in the ship body draft ${draft}`
 }
 
-function notice(titles: ReadonlyArray<string>, draft: string | undefined): string {
+// A test file the change deleted whole is listed once, by its path, as its row is written.
+function notice(
+	titles: ReadonlyArray<string>,
+	draft: string | undefined,
+	changes: TitleChanges,
+): string {
 	return [
 		`Removed tests — this change removes ${String(titles.length)} test(s) the ship body does not dispose of yet. ${where(draft)}; replace each ending, ${removed_tests.ROW_FORMAT}, or the \`josh ship\` preflight refuses:`,
-		...titles.map((title) => `  - ${title}`),
+		...removed_tests.pending_names(titles, changes).map((name) => `  - ${name}`),
 	].join('\n')
 }
 
@@ -75,10 +80,10 @@ async function surface(): Promise<void> {
 	if (is_unchanged(changes)) return
 	const draft = await draft_of_branch()
 	const body = await body_of(draft)
-	const titles = removed_tests.undisposed(changes.removed, body)
+	const titles = removed_tests.undisposed(changes.removed, body, changes.files)
 
 	if (draft !== undefined) await write_rows(draft, body, titles, changes)
-	if (titles.length > 0) console.info(notice(titles, draft))
+	if (titles.length > 0) console.info(notice(titles, draft, changes))
 }
 
 const run_ship_removed_rows = { surface }

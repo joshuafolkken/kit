@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/lane/lane-pause-cli.ts:107 | 2026-11-23 | #8829 | - | state-reasoning
+- rf:comments | low | scripts/lane/lane-lifecycle-operations-fixture.ts:14 | 2026-11-23 | #8829 | - | stale-comment

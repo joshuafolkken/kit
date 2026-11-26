@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/run/board/run-board-intro.ts:300 | 2026-11-23 | #8787 | - | state-reasoning
+- rf:tests | low | scripts/run/board/run-board-intro.ts:110 | 2026-11-23 | #8787 | - | untested-branch
+- rf:tests | low | scripts/run/board/run-board-intro.ts:145 | 2026-11-23 | #8787 | - | untested-branch
