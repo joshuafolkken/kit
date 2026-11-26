@@ -240,9 +240,12 @@ describe(TEXTUAL, () => {
 	})
 
 	// joshuafolkken/kit#8154: every section heading reads `V -- NAME`.
-	it.each(['💻', '📈', '⛽', '🧵', '📌', '🏠'])('draws the heading icon %s as its rule', (icon) => {
-		expect(textual(icon)).toBe('--')
-	})
+	it.each(['💻', '📈', '⛽', '🧵', '📌', '🏠', '⌛', '🪢'])(
+		'draws the heading icon %s as its rule',
+		(icon) => {
+			expect(textual(icon)).toBe('--')
+		},
+	)
 })
 
 describe('run_board_theme_glyphs.textual in color', () => {

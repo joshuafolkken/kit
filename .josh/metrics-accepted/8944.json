@@ -1,0 +1,7 @@
+{
+	"reason": "Heading-only icons module and its test (+8 code lines) keep run-board-labels.ts at its line limit",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}

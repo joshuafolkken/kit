@@ -7,8 +7,8 @@ import { session_language } from '#scripts/josh/session-language'
 interface PlanWords {
 	title: string
 	nothing: string
-	// The named-issue prefix of a `backlogrun #N1 #N2 …`: these run one at a time, in the order they
-	// were typed, before anything in the pool below is picked up.
+	// The named-issue prefix of a `backlogrun #N1 #N2 …`: these run in parallel on the free lanes, the
+	// typed order as their priority, and the pool below fills the lanes they leave free.
 	named_heading: string
 	// `--only` runs the named list and stops, so its heading says the pool is not drained.
 	only_named_heading: string
@@ -28,9 +28,10 @@ interface PlanWords {
 const ENGLISH_PLAN_WORDS: PlanWords = {
 	title: 'Backlog plan',
 	nothing: '(none)',
-	named_heading: 'Named issues — run in order first, one at a time, then the backlog:',
+	named_heading:
+		'Named issues — run in parallel on free lanes, typed order first; the backlog fills the rest:',
 	only_named_heading:
-		'Named issues — run in order, one at a time, then stop (`--only`; the opted-in backlog is not run):',
+		'Named issues — run in parallel on free lanes, typed order first, then stop (`--only`; the opted-in backlog is not run):',
 	ready_heading: 'Ready now — the first wave; these may run in parallel:',
 	waiting_heading: 'Waiting — each names what it is waiting on:',
 	human_heading: 'Waiting on a person — resolve these before the run starts:',
@@ -43,9 +44,10 @@ const ENGLISH_PLAN_WORDS: PlanWords = {
 const JAPANESE_PLAN_WORDS: PlanWords = {
 	title: 'バックログ計画',
 	nothing: '（なし）',
-	named_heading: '指名した Issue — 指名順に 1 件ずつ先に流し、その後バックログへ:',
+	named_heading:
+		'指名した Issue — 空きレーンで並行に流す（指名順が優先順）。残りのレーンはバックログで埋める:',
 	only_named_heading:
-		'指名した Issue — 指名順に 1 件ずつ流して止まる（`--only`。opt-in 済みのバックログは流さない）:',
+		'指名した Issue — 空きレーンで並行に流して止まる（指名順が優先順。`--only`。opt-in 済みのバックログは流さない）:',
 	ready_heading: '今すぐ着手可 — 最初の組。並行に流せる:',
 	waiting_heading: '待ち — 各行が待っている相手を示す:',
 	human_heading: '人の対応待ち — ランの開始前に解消する:',
