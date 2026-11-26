@@ -66,7 +66,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wopr|trace|flux|codec|nixie|skynet|magi] [--icons emoji|letters|shapes] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wopr|trace|flux|codec|nixie|skynet|magi] [--icons emoji|letters|shapes] [--sound on|off] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -87,6 +87,10 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: TRACE_THEME, note: 'the trace program’s rain and its TRACE gauge' },
 				{ arguments: '--theme metalgear', note: 'an alias: the codec board' },
 				{ arguments: '--icons letters', note: 'every icon as two-letter capitals' },
+				{
+					arguments: '--sound off',
+					note: 'a silent board for this launch, the saved switch untouched',
+				},
 				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
 				{ arguments: '--frame --mute', note: 'one live frame, muted, at a fixed size' },
 			],
@@ -143,6 +147,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: [THEME_FLAG],
 					description:
 						'drops an icon drawn beside the label that says what it marks (`CPU`, `QUEUED`), keeping one before a value (`CP 67%`): in a column’s rule its place is the rule, a heading reads `V -- NAME`, a row label moves into its place. One helper marks them (`run-board-label-pair.ts`); no theme and `--chat` draw as before.',
+				},
+				{
+					names: ['--sound <on|off>'],
+					description:
+						"sets this launch's sound over the saved switch (`s`, below): `off` starts no sound, not even after `s`; `on` starts on. Neither reads nor writes `board.json`'s `sound`; without it the saved switch decides. A value other than `on` / `off`, or none, is refused with the usage. A pty with no screen (a measurement, a recording) launches with `--sound off`.",
 				},
 				{
 					names: ['--frame'],
