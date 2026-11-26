@@ -79,7 +79,7 @@ async function classify(
 ): Promise<Plan | undefined> {
 	const context = await launch_timing.timed(
 		'plan: context',
-		async () => await backlog_next.context_of(opted_in, exclude, open),
+		async () => await backlog_next.context_of(opted_in, exclude, report, open),
 	)
 
 	if (context === undefined) return undefined

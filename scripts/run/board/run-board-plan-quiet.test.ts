@@ -42,8 +42,8 @@ describe('run_board_plan.read_plan — the live ports', () => {
 	})
 
 	// joshuafolkken/kit#9007: the board draws only the cells it changed, so a notice the resolution passes
-	// to its port — the defect rate above its baseline or unmeasured, an epic notice, a refusal, an
-	// oversize row — must write nothing.
+	// to its port — a context read failure, the defect rate above its baseline or unmeasured, an epic
+	// notice, a refusal — must write nothing.
 	it('hands the classification a report port that writes nothing', async () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)

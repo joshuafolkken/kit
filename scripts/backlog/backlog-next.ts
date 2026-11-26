@@ -312,9 +312,11 @@ async function answer_pool(context: PoolContext): Promise<number> {
 // already reported. The three reads take nothing from one another, so they run side by side
 // (joshuafolkken/kit#8220); the failures are still checked tracking first, so a double failure says what
 // it said before. `open` is a whole open listing a plan read already holds, which answers the epics.
+// The failures go to `report`, as `resolve`'s notices do (joshuafolkken/kit#9007).
 async function context_of(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
+	report: Report,
 	open?: OpenListing,
 ): Promise<PoolContext | undefined> {
 	const [tracking, repo, measurements] = await Promise.all([
@@ -324,13 +326,13 @@ async function context_of(
 	])
 
 	if (tracking.kind !== 'read') {
-		console.error(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
+		report(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
 
 		return undefined
 	}
 
 	if (repo === undefined) {
-		console.error(REPO_UNREADABLE_MESSAGE)
+		report(REPO_UNREADABLE_MESSAGE)
 
 		return undefined
 	}
@@ -350,7 +352,7 @@ async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promis
 		return backlog_next_report.report_none()
 	}
 
-	const context = await context_of(opted_in, exclude)
+	const context = await context_of(opted_in, exclude, console.error)
 
 	if (context === undefined) return FAILURE_EXIT_CODE
 

@@ -148,7 +148,8 @@ describe('backlog_plan_read.classify timing', () => {
 		})
 		expect(launch_timing.phases().map(({ name }) => name)).toStrictEqual(STEPS)
 		expect(backlog_gate_scope.gate_scope).toHaveBeenCalledOnce()
-		// joshuafolkken/kit#9007: the caller's notice port reaches the resolution.
+		// joshuafolkken/kit#9007: the caller's notice port reaches the context read and the resolution.
+		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], report, undefined)
 		expect(backlog_next.resolve).toHaveBeenCalledWith(expect.anything(), report)
 	})
 
@@ -195,7 +196,7 @@ describe('backlog_plan_read.read_plan', () => {
 		const read = await backlog_plan_read.read_plan(report)
 
 		expect(issue_list_recent_mock).toHaveBeenCalledOnce()
-		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], read?.listing)
+		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], report, read?.listing)
 		expect(read?.listing.rows.map((row) => row.number)).toStrictEqual([1, 2])
 		expect(read?.plan.result).toStrictEqual(stub.result)
 	})
