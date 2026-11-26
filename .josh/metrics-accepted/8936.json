@@ -2,7 +2,7 @@
 	"reason": "Per-frame motion check over every theme, size and scene (#8936): new harness and tests, plus one mandatory skill step",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 253,
+		"scripts.code_lines": 291,
 		"ai_cost.on_demand_bytes": 188
 	}
 }
