@@ -43,6 +43,12 @@ import { file_reader } from '#scripts/lib/read-file'
 //
 // One marker #872 listed is deliberately absent from this list: the bare `✘ [ERROR]` wrangler
 // prints to the console. It is in the healthy log three times over, each an ordinary 404.
+//
+// The crash is wrangler's defect, not ours, and this retry only absorbs it. It is tracked in
+// joshuafolkken/kit#9047, upstream as cloudflare/workers-sdk#15451 and #15317, both closed as fixed
+// by cloudflare/workers-sdk#15252 and #14906. Remove this check once every consumer's wrangler
+// includes that fix and its E2E then passes 30 runs in a row with no retry — the `Retry E2E tests`
+// step's conclusion is `skipped` in `gh api repos/<owner>/<repo>/actions/runs/<id>/jobs`.
 const CRASH_SIGNATURES: ReadonlyArray<string> = [
 	'Error in ProxyController',
 	'Network connection lost.',
