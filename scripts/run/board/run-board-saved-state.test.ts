@@ -192,4 +192,19 @@ describe('run_board_saved_state.saver samples', () => {
 
 		expect(store.save.mock.calls[0]?.[0].gather.gauges).toStrictEqual(FRESH_GAUGES)
 	})
+
+	it('fills no sample a later post failed to read once this worker has read it', () => {
+		const store = memory_store({ ...SAVED, gather: SAMPLED })
+		let now_ms = START
+		const save = saver(store, () => now_ms)
+
+		save({ ...POST, read: { ...POST.read, gauges: FRESH_GAUGES } })
+		now_ms += SAVE_EVERY_MS
+		save(POST)
+
+		expect(store.save.mock.calls[1]?.[0].gather).toMatchObject({
+			gauges: undefined,
+			usages: SAMPLED.usages,
+		})
+	})
 })

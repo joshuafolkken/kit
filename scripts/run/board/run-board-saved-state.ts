@@ -23,6 +23,7 @@ const SAVE_EVERY_MS = SAVE_EVERY_SECONDS * MS_PER_SECOND
 
 // The machine samples a round lands after its lane read, so an early post has none of them yet.
 type Sample = 'gauges' | 'usages' | 'quotas'
+const SAMPLES: ReadonlyArray<Sample> = ['gauges', 'usages', 'quotas']
 
 interface Saved {
 	run_started_ms: number
@@ -78,23 +79,49 @@ function file_store(
 	}
 }
 
-function samples_of(gather: BoardGather, last: BoardGather): Pick<BoardGather, Sample> {
+// A sample this worker has read once is never filled again: a later post without it is a failed read
+// (a `ps` timeout leaves no usages, `run-board-usage-board.ts`), which the live board draws as none.
+function sample_of<K extends Sample>(
+	key: K,
+	gather: BoardGather,
+	last: BoardGather,
+	read: ReadonlySet<Sample>,
+): BoardGather[K] {
+	if (gather[key] !== undefined || read.has(key)) return gather[key]
+
+	return last[key]
+}
+
+function samples_of(
+	gather: BoardGather,
+	last: BoardGather,
+	read: ReadonlySet<Sample>,
+): Pick<BoardGather, Sample> {
 	return {
-		gauges: gather.gauges ?? last.gauges,
-		usages: gather.usages ?? last.usages,
-		quotas: gather.quotas ?? last.quotas,
+		gauges: sample_of('gauges', gather, last, read),
+		usages: sample_of('usages', gather, last, read),
+		quotas: sample_of('quotas', gather, last, read),
 	}
 }
 
-// The round a post carries, its samples not yet in (a new worker's early post) taken from the round
-// last saved on the same run, so a board quit within `SAVE_EVERY_MS` of opening leaves the next one
-// a complete round to draw (joshuafolkken/kit#8957).
-function gather_of(post: GatherPost, kept: Saved | undefined, run_started_ms: number): BoardGather {
+function note_read(post: GatherPost, read: Set<Sample>): void {
+	for (const key of SAMPLES) if (post.read[key] !== undefined) read.add(key)
+}
+
+// The round a post carries, its samples this worker has not read yet (a new worker's early post) taken
+// from the round last saved on the same run, so a board quit within `SAVE_EVERY_MS` of opening leaves
+// the next one a complete round to draw (joshuafolkken/kit#8957).
+function gather_of(
+	post: GatherPost,
+	kept: Saved | undefined,
+	run_started_ms: number,
+	read: ReadonlySet<Sample>,
+): BoardGather {
 	const gather = { ...post.read, data: post.data, display: post.display }
 
 	if (kept?.run_started_ms !== run_started_ms) return gather
 
-	return { ...gather, ...samples_of(gather, kept.gather) }
+	return { ...gather, ...samples_of(gather, kept.gather, read) }
 }
 
 // What the worker calls with each post it hands over: a round with the run's data saved at most every
@@ -102,15 +129,17 @@ function gather_of(post: GatherPost, kept: Saved | undefined, run_started_ms: nu
 function saver(store: SavedStore, now: () => number): (post: GatherPost | FailedPost) => void {
 	let saved_ms = -Infinity
 	let kept = store.load()
+	const read = new Set<Sample>()
 
 	return (post) => {
 		if ('failed' in post) return
 		const run_started_ms = post.data?.run_started_ms
 		const now_ms = now()
 
+		note_read(post, read)
 		if (run_started_ms === undefined || now_ms - saved_ms < SAVE_EVERY_MS) return
 		saved_ms = now_ms
-		kept = { run_started_ms, saved_ms: now_ms, gather: gather_of(post, kept, run_started_ms) }
+		kept = { run_started_ms, saved_ms: now_ms, gather: gather_of(post, kept, run_started_ms, read) }
 		store.save(kept)
 	}
 }
