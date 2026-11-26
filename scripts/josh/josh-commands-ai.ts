@@ -10,6 +10,7 @@ import { SHIP_COMMANDS } from './josh-commands-ship'
 
 const DIR = '--dir <path>'
 const PATH_DIR = '--path <dir>'
+const PERIOD_DAYS = '--period <days>'
 const BARE = { arguments: '' }
 // `lane:pause` and `lane:resume` take the same target.
 const LANE_SIGNAL_EXAMPLES = [
@@ -161,7 +162,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			],
 			flags: [
 				{
-					names: ['--period <days>'],
+					names: [PERIOD_DAYS],
 					description: 'the length of each period, a positive whole number of days (default 7).',
 				},
 				{
@@ -611,13 +612,18 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print a merged lane's net time by stage, longest first, the implementation split by its tool calls",
 		category: 'AI tools',
-		reference: ['<issue> [--timeline]', 'maintainer', ['none']],
+		reference: ['<issue> [--timeline] | --period <days>', 'maintainer', ['none']],
 		usage: {
 			flags: [
 				{
 					names: ['--timeline'],
 					description:
 						'prints the lane in time order instead, one line a stage, wait or event, the stage lines adding up to the net time.',
+				},
+				{
+					names: [PERIOD_DAYS],
+					description:
+						"instead of an issue: each split segment's median and run count over lanes merged in <days> days.",
 				},
 			],
 			examples: [
@@ -626,6 +632,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 					note: 'the breakdown the overrun investigation comments on the lane',
 				},
 				{ arguments: '4970 --timeline', note: 'when each stage ran and where the lane waited' },
+				{ arguments: '--period 14', note: 'the split medians over two weeks' },
 			],
 		},
 	},
