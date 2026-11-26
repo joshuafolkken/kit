@@ -85,16 +85,35 @@ function take_over(target: string, issue: string, mark: HoldMark): boolean {
 	return run_hold.create_hold(target, issue, mark)
 }
 
+// **An interrupted round is #N's own unmarked record gone stale** (joshuafolkken/kit#8932): a round
+// stopped before its `--halfrun-stop` — by a person, or refused it over a test left for later — leaves
+// its running record behind with its session ended. Nothing else can pick it up over the uncommitted
+// diff, and the board stops drawing the runs that carry on without it. A live one stays `held` and is
+// never taken, and neither is a `fullrun` or `prrun` record: re-opening it as a round would drop the
+// mark the implementation-cut guard and the board read it by.
+function is_halfrun_record(hold: RunHold): boolean {
+	return !run_hold.is_stop_marked(hold) && hold.is_fullrun !== true && hold.is_prrun !== true
+}
+
+function is_interrupted_record(read: HoldRead, issue: string): boolean {
+	return read.kind === 'stale' && read.hold.issue === issue && is_halfrun_record(read.hold)
+}
+
+function is_round_record(read: HoldRead, issue: string): boolean {
+	return is_stop_record(read, issue) || is_interrupted_record(read, issue)
+}
+
 // **A fix round re-opens the stop** (`run:hold <N> --halfrun-round`, joshuafolkken/kit#7494): the person
 // came back with fixes, so the stopped record is replaced by a running `halfrun`'s owned by the round's
 // session — `run:board` draws the round and `tree:status` names its process — until the round's own
-// `--halfrun-stop` marks it again. `MARKED` here is the record written; only #N's own stop qualifies.
+// `--halfrun-stop` marks it again. `MARKED` here is the record written; only #N's own stop or
+// interrupted round qualifies.
 function reopen_at(target: string, issue: string): StopMark {
 	const read = run_hold.read_hold(target)
 
 	if (read.kind === 'unreadable') return UNREADABLE
 
-	if (!is_stop_record(read, issue)) return FOREIGN
+	if (!is_round_record(read, issue)) return FOREIGN
 
 	run_hold.release_hold(target)
 
@@ -123,7 +142,20 @@ async function reopen(target: string, issue: string): Promise<StopMark> {
 }
 
 function no_stop_message(issue: string): string {
-	return `run:hold: this tree holds no stopped \`halfrun\` of ${session_cite.issue(issue)} — a fix round re-opens only that record.`
+	return `run:hold: this tree holds no stopped \`halfrun\` of ${session_cite.issue(issue)}, nor an interrupted round of it whose session ended — a fix round re-opens only those records.`
+}
+
+function round_command(issue: string): string {
+	return `pnpm josh run:hold ${issue} --halfrun-round`
+}
+
+// The way on over a record a round re-opens, for the reports that meet it — `tree:status` and a
+// refused claim (`run:entry`); none for any other record, nor for a `halfrun new`'s unnumbered one,
+// which has no issue to re-claim it under.
+function round_hint(read: HoldRead, issue: string): string | undefined {
+	if (issue === run_hold.UNNUMBERED_ISSUE || !is_round_record(read, issue)) return undefined
+
+	return `A run of ${session_cite.issue(issue)} carrying on here re-claims it with \`${round_command(issue)}\`; another issue's run waits until the tree is clean.`
 }
 
 // `false` leaves the record untouched, so the ordinary claim that follows decides the tree.
@@ -181,6 +213,8 @@ const run_halfrun_resume = {
 	no_stop_message,
 	reopen,
 	reopen_at,
+	round_command,
+	round_hint,
 	take_over,
 }
 

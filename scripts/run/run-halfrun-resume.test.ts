@@ -149,6 +149,38 @@ describe('run_halfrun_resume.reopen_at — a fix round runs on its stopped halfr
 	})
 })
 
+// joshuafolkken/kit#8932: a round stopped before its `--halfrun-stop` leaves #N's unmarked record to go
+// stale; the next round re-claims it, and the board draws that round running again.
+const EXPIRED = new Date(Date.now() - run_hold.HOLD_MAX_AGE_MS * 2)
+
+describe('run_halfrun_resume.reopen_at — an interrupted round is re-claimed', () => {
+	it('re-opens its own stale unmarked record as running, drawn running', () => {
+		run_hold.create_hold(TARGET, ISSUE, { now: EXPIRED })
+
+		expect(run_halfrun_resume.round_hint(run_hold.read_hold(TARGET), ISSUE)).toContain(
+			run_halfrun_resume.round_command(ISSUE),
+		)
+		expect(run_halfrun_resume.reopen_at(TARGET, ISSUE)).toBe(run_halfrun_resume.MARKED)
+		expect(hold_record()).toStrictEqual(RUNNING_RECORD)
+		expect(single_run()).toBe(`halfrun #${ISSUE}`)
+	})
+
+	it.each([
+		['a live unmarked record of the issue', ISSUE, new Date(), {}],
+		["another issue's stale record", OTHER_ISSUE, EXPIRED, {}],
+		["the issue's stale fullrun record", ISSUE, EXPIRED, run_hold.FULLRUN_MARK],
+		["the issue's stale prrun record", ISSUE, EXPIRED, { is_prrun: true }],
+	])('leaves %s untouched, with no hint', (_name, holder, now, mark) => {
+		run_hold.create_hold(TARGET, holder, { now, ...mark })
+
+		const before = hold_record()
+
+		expect(run_halfrun_resume.round_hint(run_hold.read_hold(TARGET), ISSUE)).toBeUndefined()
+		expect(run_halfrun_resume.reopen_at(TARGET, ISSUE)).toBe(run_halfrun_resume.FOREIGN)
+		expect(hold_record()).toStrictEqual(before)
+	})
+})
+
 // Adopts #ISSUE's marked stop over a human-review lane whose work-tree guard answers `note`.
 async function adopt_review_lane(note: string | undefined): Promise<ReturnType<typeof vi.spyOn>> {
 	run_hold.create_halfrun_stop_hold(TARGET, ISSUE)

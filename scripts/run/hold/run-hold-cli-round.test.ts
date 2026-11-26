@@ -2,6 +2,7 @@ import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { lane_state } from '#scripts/lane/lane-state'
+import { run_preflight } from '#scripts/run/run-preflight'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
@@ -22,11 +23,22 @@ vi.mock('#scripts/lane/lane-state', () => ({
 vi.mock('#scripts/lane/lane-transition-guards', () => ({
 	lane_transition_guards: { rejection: vi.fn().mockResolvedValue(undefined) },
 }))
+// joshuafolkken/kit#8932: a refused claim's advice is the subject here, not the check that composes it.
+vi.mock('#scripts/run/run-preflight', () => ({
+	run_preflight: { CLEAN_VERDICT: 'clean', RECLAIM_VERDICT: 'reclaim', check: vi.fn() },
+}))
 
 const scratch = make_directory('run-hold-cli-round-test-')
 const WORKTREE = path.join(scratch, '.git')
 const TARGET = run_hold.hold_path(WORKTREE)
 const ISSUE = '7494'
+const OTHER_ISSUE = '7493'
+const EXPIRED_AT = new Date(Date.now() - run_hold.HOLD_MAX_AGE_MS * 2)
+const RECLAIM_DECISION = {
+	advice: 'Stash with -u, switch back, then ask again',
+	reason: 'Uncommitted changes are still in the tree',
+	verdict: 'reclaim',
+} as const
 const ROUND_FLAG = '--halfrun-round'
 const ROUND_COMMAND = `run:hold ${ROUND_FLAG}`
 const out: Array<string> = []
@@ -78,5 +90,35 @@ describe(ROUND_COMMAND, () => {
 		expect(out).toEqual([run_hold_cli.BUSY_VERDICT])
 		expect(run_hold.read_hold(TARGET)).toStrictEqual(before)
 		expect(lane_state.record_change).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#8932: a round stopped before its `--halfrun-stop` leaves its own record unmarked.
+	it('re-opens an interrupted round whose record went stale', async () => {
+		run_hold.create_hold(TARGET, ISSUE, { now: EXPIRED_AT })
+
+		expect(await run_hold_cli.run([ISSUE, ROUND_FLAG])).toBe(0)
+		expect(run_hold.read_hold(TARGET)).toMatchObject({ kind: 'held', hold: { issue: ISSUE } })
+	})
+})
+
+// joshuafolkken/kit#8932: the reclaim over an interrupted round of the issue names the round's
+// re-claim after the preflight's own advice, which stays for a tree the round does not own.
+describe('a refused claim over an interrupted round', () => {
+	it.each([
+		[ISSUE, [RECLAIM_DECISION.advice, ROUND_FLAG]],
+		[OTHER_ISSUE, [RECLAIM_DECISION.advice]],
+	])('answers the claim for #%s with %s', async (claimant, expected) => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		run_hold.create_hold(TARGET, ISSUE, { now: EXPIRED_AT })
+		vi.mocked(run_preflight.check).mockResolvedValue(RECLAIM_DECISION)
+
+		await run_hold_cli.run([claimant])
+
+		const printed = errors.mock.calls.join('\n')
+
+		expect(out).toEqual([RECLAIM_DECISION.verdict])
+		expect(expected.every((part) => printed.includes(part))).toBe(true)
+		expect(printed.includes(ROUND_FLAG)).toBe(claimant === ISSUE)
 	})
 })
