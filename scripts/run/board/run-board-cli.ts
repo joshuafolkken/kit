@@ -228,11 +228,19 @@ function drawn_ports(ports: BoardPorts | undefined, is_live: boolean, look: Boar
 	return run_board_sound_option.sounded(drawn, look.is_sound_on)
 }
 
+// What a board with nothing held releases.
+function no_release(): void {
+	// nothing was held
+}
+
 // Where the leave of the screen is registered. A board on the process's own ports holds what other
 // writers say meanwhile and says it once the screen is left (joshuafolkken/kit#9008).
-function leaving(exits: ExitGuard | undefined, live: BoardPorts): BoardPorts['on_exit'] {
+function leaving(
+	exits: ExitGuard | undefined,
+	live: BoardPorts,
+	release: () => void,
+): BoardPorts['on_exit'] {
 	if (exits === undefined) return live.on_exit
-	const release = run_board_output_hold.hold()
 
 	return (leave) => {
 		exits.on_exit(() => {
@@ -251,15 +259,23 @@ async function watch(
 	is_timing: boolean,
 ): Promise<void> {
 	const exits = ports === undefined ? run_board_exit_record.start() : undefined
+	const release = exits === undefined ? no_release : run_board_output_hold.hold()
 
-	// A terminal that stops reading must not hold the signal handlers (joshuafolkken/kit#9027).
-	if (exits !== undefined) run_board_write_port.unblock(process.stdout)
-	const live = drawn_ports(ports, true, look)
-	const board = run_board_timing.timed({ ...live, on_exit: leaving(exits, live) }, is_timing)
+	try {
+		// A terminal that stops reading must not hold the signal handlers (joshuafolkken/kit#9027).
+		if (exits !== undefined) run_board_write_port.unblock(process.stdout)
+		const live = drawn_ports(ports, true, look)
+		const board = run_board_timing.timed(
+			{ ...live, on_exit: leaving(exits, live, release) },
+			is_timing,
+		)
 
-	await run_board_exit_record.guarded(exits, async () => {
-		await run_board_live.watch(board, look.theme, exits?.failed)
-	})
+		await run_board_exit_record.guarded(exits, async () => {
+			await run_board_live.watch(board, look.theme, exits?.failed)
+		})
+	} finally {
+		release()
+	}
 }
 
 async function draw_still(
@@ -390,6 +406,6 @@ async function run(given: ReadonlyArray<string>, ports?: BoardPorts): Promise<nu
 	return SUCCESS_EXIT_CODE
 }
 
-const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, live_ports, run }
+const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, leaving, live_ports, run }
 
 export { run_board_cli }
