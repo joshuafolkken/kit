@@ -54,6 +54,14 @@ describe('lane_breakdown_text.comment', () => {
 			`- ${EXCLUDED_TEXT}`,
 		])
 	})
+
+	it('prints the implementation split under it, before its run:chain stages (#8998)', () => {
+		vi.stubEnv(session_language.ENV_KEY, 'en')
+		const report = { ...REPORT, split: ['split › gate wait 2.0 min'], chain: ['run:chain › x'] }
+		const lines = lane_breakdown_text.comment(ISSUE, 62, report).split('\n')
+
+		expect(lines.slice(3, 5)).toStrictEqual(['  - split › gate wait 2.0 min', '  - run:chain › x'])
+	})
 })
 
 // joshuafolkken/kit#6006: the yield wait split into the holder's remaining time and the gap.
