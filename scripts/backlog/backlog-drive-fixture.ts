@@ -73,6 +73,8 @@ interface Script {
 	memory_held?: ReadonlyArray<boolean>
 	// The usage-limit answers in order, the last repeating; unset reads as no limit in force.
 	usage_limited?: ReadonlyArray<boolean>
+	// The `main:sync` hold answers in order, the last repeating; unset reads as a clean checkout.
+	sync_held?: ReadonlyArray<boolean>
 	// Whether the retrospective unit exited 0; unset reads as a unit that did.
 	retrospective?: boolean
 	// When `run:add` handed the run an issue, in ms from the start; unset reads as never.
@@ -365,6 +367,7 @@ function harness(script: Script): Harness {
 			...dispatch_ports(script, calls, offers),
 			...room_ports(script),
 			...memory_port(script),
+			sync_held: queued(script.sync_held),
 			...report_ports(holds, idles, pauses),
 			retrospective: retrospective_port(script, calls),
 		},

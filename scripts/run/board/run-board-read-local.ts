@@ -55,7 +55,7 @@ async function span_events_here(
 	}
 }
 
-type RootFields = Pick<LocalRead, 'root' | 'ended_roots'>
+type RootFields = Pick<LocalRead, 'singles' | 'ended_roots'>
 type SpanFields = Pick<
 	LocalRead,
 	'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name' | 'stopped_single'
@@ -78,17 +78,18 @@ function span_fields(span: BoardSpan, root: RootFields): SpanFields & RootFields
 	return { ...times, scheduler_provider: span.scheduler_provider === 'openai' ? 'codex' : 'claude' }
 }
 
-// The root checkout's single run beside the span, and its runs a merge ended inside it.
+// The single runs beside the span, and the root checkout's runs a merge ended inside it.
 async function roots_here(
 	span: BoardSpan,
-	root: BoardSpan | undefined,
+	singles: ReadonlyArray<BoardSpan> | undefined,
 	events: ReadonlyArray<RunEvent>,
 ): Promise<RootFields> {
 	const ended_roots = await run_board_single.ended_here(span)
+	const runs = (singles ?? [])
+		.map((single) => run_board_single.root_of(single, events))
+		.filter((run) => run !== undefined)
 
-	return root === undefined
-		? { ended_roots }
-		: { root: run_board_single.root_of(root, events), ended_roots }
+	return runs.length === 0 ? { ended_roots } : { singles: runs, ended_roots }
 }
 
 const run_board_read_local = {

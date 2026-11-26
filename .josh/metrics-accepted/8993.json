@@ -1,0 +1,7 @@
+{
+	"reason": "run:board now reads every worktree's single run and names each row's command (#8993)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 50
+	}
+}

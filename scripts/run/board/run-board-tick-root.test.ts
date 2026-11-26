@@ -33,16 +33,24 @@ const CARRIED: LocalRead = {
 	free_lanes: LANE_LIMIT - 1,
 }
 
-const ROOTED: LocalRead = {
-	...CARRIED,
-	root: {
-		command: 'fullrun',
-		issue: ROOT,
+// A single run of `command` on `issue`, launched and in its implement phase.
+function implementing(command: string, issue: number): NonNullable<LocalRead['singles']>[number] {
+	return {
+		command,
+		issue,
 		events: [
-			event(KIND.CHILD_LAUNCH, `#${String(ROOT)} fullrun`),
-			event(KIND.LANE_PHASE, `#${String(ROOT)} implement`),
+			event(KIND.CHILD_LAUNCH, `#${String(issue)} ${command}`),
+			event(KIND.LANE_PHASE, `#${String(issue)} implement`),
 		],
-	},
+	}
+}
+
+const ROOTED: LocalRead = { ...CARRIED, singles: [implementing('fullrun', ROOT)] }
+const OTHER = 7522
+// joshuafolkken/kit#8993: a root checkout's single run and a lane worktree's, both read.
+const TWO_SINGLES: LocalRead = {
+	...CARRIED,
+	singles: [implementing('fullrun', ROOT), implementing('halfrun', OTHER)],
 }
 
 async function frame_of(local: LocalRead): Promise<Array<string>> {
@@ -63,14 +71,15 @@ function index_of(lines: ReadonlyArray<string>, text: string): number {
 }
 
 describe('run_board_tick.tick — a root single run beside a backlogrun', () => {
-	it('draws the 🏠 rule and the run’s row with its phase above the lanes rule', async () => {
+	it('draws the 🏠 runs rule and the run’s row with its command and phase above the lanes rule', async () => {
 		const lines = await frame_of(ROOTED)
-		const home = index_of(lines, '🏠 fullrun')
+		const home = index_of(lines, '🏠 runs')
 		const lanes = index_of(lines, `${LANES_ICON} lanes`)
 
 		expect(home).toBeGreaterThan(-1)
 		expect(lanes).toBeGreaterThan(home)
 		expect(lines[home + 1]).toContain(String(ROOT))
+		expect(lines[home + 1]).toContain('fullrun')
 		expect(lines[home + 1]).toContain(PHASE_ICONS.implement)
 	})
 
@@ -111,23 +120,46 @@ describe('run_board_tick.tick — the root single run’s legend and absence', (
 	})
 })
 
+describe('run_board_tick.tick — several single runs beside a backlogrun', () => {
+	it('draws one 🏠 runs rule with a row per run, each naming its command', async () => {
+		const lines = await frame_of(TWO_SINGLES)
+		const home = index_of(lines, '🏠 runs')
+		const rows = lines.slice(home + 1, index_of(lines, `${LANES_ICON} lanes`))
+
+		expect(lines.filter((line) => line.includes('🏠'))).toHaveLength(1)
+		expect(rows.find((row) => row.includes(String(ROOT)))).toContain('fullrun')
+		expect(rows.find((row) => row.includes(String(OTHER)))).toContain('halfrun')
+	})
+
+	it('counts the single runs in neither the lanes nor the header’s running children', async () => {
+		const lines = await frame_of(TWO_SINGLES)
+		const plain = await frame_of(CARRIED)
+
+		expect(lines.some((line) => line.includes(`${LANES_ICON} lanes 1/${String(LANE_LIMIT)}`))).toBe(
+			true,
+		)
+		expect(header(lines)).toStrictEqual(header(plain))
+	})
+})
+
 // joshuafolkken/kit#7710: a `halfrun` or `prrun` a stop ended keeps its 🏠 row, led by ✅, with no phase
 // and its time fixed at the stop, counted as no lane.
 function stopped_root(command: string): LocalRead {
 	const stopped = { command, issue: ROOT, started_ms: START, ended_ms: START + RUN_MS }
 	const launch = event(KIND.CHILD_LAUNCH, `#${String(ROOT)} ${command}`)
 
-	return { ...CARRIED, root: { command, issue: ROOT, events: [launch], stopped } }
+	return { ...CARRIED, singles: [{ command, issue: ROOT, events: [launch], stopped }] }
 }
 
 describe('run_board_tick.tick — a root single run a stop ended', () => {
 	it.each(['halfrun', 'prrun'])(
-		'keeps the 🏠 %s row, led by ✅ with its fixed time',
+		'keeps the 🏠 runs row of %s, led by ✅ with its fixed time',
 		async (name) => {
 			const lines = await frame_of(stopped_root(name))
-			const row = lines[index_of(lines, `🏠 ${name}`) + 1] ?? ''
+			const row = lines[index_of(lines, '🏠 runs') + 1] ?? ''
 
 			expect(row.trimStart().startsWith(`${STATE_ICONS.merged} `)).toBe(true)
+			expect(row).toContain(name)
 			expect(row).toContain(String(ROOT))
 			expect(row).toContain('25′00″')
 			expect(row).not.toContain(STATE_ICONS.stopped)
@@ -159,9 +191,9 @@ describe('run_board_tick.tick — a single run’s own board a stop ended', () =
 		},
 	}
 
-	it('draws its row under 🏠 halfrun, led by ✅ with its fixed time', async () => {
+	it('draws its row under 🏠 runs, led by ✅ with its fixed time', async () => {
 		const lines = await frame_of(STOPPED_SINGLE)
-		const home = index_of(lines, '🏠 halfrun')
+		const home = index_of(lines, '🏠 runs')
 		const row = lines[home + 1] ?? ''
 
 		expect(home).toBeGreaterThan(-1)

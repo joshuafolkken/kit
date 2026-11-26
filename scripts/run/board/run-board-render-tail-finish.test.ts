@@ -85,7 +85,7 @@ describe('run_board_render_tail.tail_of finish on a 🏠 row', () => {
 
 	// A stopped run's board with `name`'s running 🏠 row.
 	function root_header(name: string, lane_totals: ReadonlyArray<number>): BoardHeader {
-		const layout = { ...EMPTY_LAYOUT, root: { name, row: ROOT } }
+		const layout = { ...EMPTY_LAYOUT, singles: [{ name, row: ROOT }] }
 
 		return header({ activity: STOPPED, layout, lane_totals })
 	}
