@@ -142,8 +142,8 @@ describe('run_board_render.render — the headings’ priorities', () => {
 	it('names the queued priorities beside the queued heading’s count, none in the header', () => {
 		const lines = board_lines()
 
-		expect(lines.join('\n')).toContain('⏳ queued 3 (🚨 1 🔺 1) ─')
-		expect(lines[0]).not.toContain('⏳')
+		expect(lines.join('\n')).toContain('⌛ queued 3 (🚨 1 🔺 1) ─')
+		expect(lines[0]).not.toContain('⌛')
 	})
 
 	it('counts an epic’s children in the queued heading’s priorities', () => {
@@ -151,13 +151,13 @@ describe('run_board_render.render — the headings’ priorities', () => {
 		const epic = { kind: 'epic', epic: DONE, title: 'Epic', rows } as const
 		const layout = { ...EMPTY_LAYOUT, queued: [epic] }
 
-		expect(lines_of(header({ layout })).join('\n')).toContain('⏳ queued 2 (🔺 1) ─')
+		expect(lines_of(header({ layout })).join('\n')).toContain('⌛ queued 2 (🔺 1) ─')
 	})
 
 	it('names the waiting priorities beside the waiting heading’s count', () => {
 		const layout = { ...EMPTY_LAYOUT, unreached: [row(HIGH, 'high'), row(NORMAL)] }
 
-		expect(lines_of(header({ layout })).join('\n')).toContain('🔗 waiting 2 (🔺 1) ─')
+		expect(lines_of(header({ layout })).join('\n')).toContain('🪢 waiting 2 (🔺 1) ─')
 	})
 
 	it.each(['wopr', 'trace'] as const)(
@@ -178,7 +178,7 @@ describe('run_board_render.render — the headings’ priorities', () => {
 		const layout = queued([row(NORMAL)])
 		const text = lines_of(header({ layout })).join('\n')
 
-		expect(text).toContain('⏳ queued 1 ─')
+		expect(text).toContain('⌛ queued 1 ─')
 		expect(text).not.toContain('(🔺')
 	})
 })
@@ -192,7 +192,7 @@ describe('run_board_render.render — a folded heading’s priorities', () => {
 			.map((line) => stripVTControlCharacters(line))
 			.join('\n')
 
-		expect(text).toContain('▸ ⏳ queued ── 1 (🔺 1) ──')
-		expect(text).toContain('▸ 🔗 waiting ── 1 (🚨 1) ──')
+		expect(text).toContain('▸ ⌛ queued ── 1 (🔺 1) ──')
+		expect(text).toContain('▸ 🪢 waiting ── 1 (🚨 1) ──')
 	})
 })

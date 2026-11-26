@@ -22,6 +22,8 @@ const EMOJI_ROWS = String.raw`
 🧵,--,info
 📌,--,info
 🏠,--,info
+⌛,--,info
+🪢,--,info
 🚨,P1,alert
 🔺,P2,caution
 ✨,FT,info,**
