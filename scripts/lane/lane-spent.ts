@@ -69,6 +69,12 @@ async function read_issue_state(issue: string): Promise<string | undefined> {
 	return json === undefined ? undefined : issue_state.parse_issue_state(json)?.state
 }
 
+// Whether the issue reads as closed — an unreadable state is not closed, so a lane whose issue
+// could not be read keeps its claim warning rather than being called leftover.
+async function is_issue_closed(issue: string): Promise<boolean> {
+	return (await read_issue_state(issue)) === CLOSED_STATE
+}
+
 async function read_unpushed_commits(branch: string): Promise<number | undefined> {
 	try {
 		return await git_command.commit_count_unpushed(branch)
@@ -203,7 +209,14 @@ function idle_lanes(
 	return issues_traced(traced_of(lanes, probes), PROCESS_NONE)
 }
 
-const lane_spent = { idle_lanes, kept_reason, lanes_in_use, read_unpushed_commits, sort_lanes }
+const lane_spent = {
+	idle_lanes,
+	kept_reason,
+	lanes_in_use,
+	is_issue_closed,
+	read_unpushed_commits,
+	sort_lanes,
+}
 
 export type { KeptLane, LaneUse, SpentProbes, SpentSort }
 export { lane_spent }

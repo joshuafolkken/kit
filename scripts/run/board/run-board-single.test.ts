@@ -317,9 +317,37 @@ describe('run_board_read.read_local beside a carried run', () => {
 
 		expect(local?.run_name).toBeUndefined()
 		expect(local?.carry).toStrictEqual(CARRY)
-		expect(local?.root).toMatchObject({ command: FULLRUN, issue: ISSUE })
+		expect(local?.singles?.[0]).toMatchObject({ command: FULLRUN, issue: ISSUE })
 	})
+})
 
+// joshuafolkken/kit#8993: every lane worktree's single run is read beside the carried run, not the first.
+describe('run_board_read.read_local beside a carried run — lane worktrees', () => {
+	it('reads the single run each of two lane worktrees holds beside a carried run', async () => {
+		const other = ISSUE + 1
+
+		arrange({ kind: 'carried', carry: CARRY }, undefined)
+		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
+		vi.spyOn(run_board_records, 'read_records').mockReturnValue([
+			lane_record(String(ISSUE)),
+			lane_record(String(other)),
+		])
+		vi.spyOn(git_directory, 'own_git_directory').mockReturnValue(LANE_GIT_DIRECTORY)
+		vi.spyOn(run_hold, 'read_hold')
+			.mockReturnValueOnce(FREE)
+			.mockReturnValueOnce(held({ is_fullrun: true, is_single_in_lane: true }))
+			.mockReturnValueOnce(held({ issue: String(other), is_single_in_lane: true }))
+
+		const local = await run_board_read.read_local()
+
+		expect(local?.singles?.map(({ command, issue }) => ({ command, issue }))).toStrictEqual([
+			{ command: FULLRUN, issue: ISSUE },
+			{ command: 'halfrun', issue: other },
+		])
+	})
+})
+
+describe('run_board_read.read_local — the checkout’s git directory', () => {
 	it('asks git again on the next read after a failed resolve', async () => {
 		const failure = 'git timed out'
 

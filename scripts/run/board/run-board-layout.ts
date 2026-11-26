@@ -290,15 +290,15 @@ function rows_of(layout: BoardLayout): Array<BoardRow> {
 	return [...layout.active, ...queued_rows(layout), ...layout.people, ...layout.unreached]
 }
 
-// Every row the frame draws — the root checkout's single run's, the counted ones and the earlier run's
-// lanes — what the legend reads.
+// The single runs' rows beside the run, in the order `🏠 runs` draws them.
+function single_rows(layout: Pick<BoardLayout, 'singles'>): Array<BoardRow> {
+	return (layout.singles ?? []).map((single) => single.row)
+}
+
+// Every row the frame draws — the single runs', the counted ones and the earlier run's lanes — what
+// the legend reads.
 function drawn_rows(layout: BoardLayout): Array<BoardRow> {
-	return [
-		layout.root?.row ?? [],
-		rows_of(layout),
-		layout.blockers ?? [],
-		layout.earlier ?? [],
-	].flat()
+	return [single_rows(layout), rows_of(layout), layout.blockers ?? [], layout.earlier ?? []].flat()
 }
 
 // Every row waiting on a person: the touched children parked on a decision, the untouched children a
@@ -310,12 +310,12 @@ function people_of(layout: BoardLayout): Array<BoardRow> {
 	return [...asked, ...layout.people, ...(layout.blockers ?? [])]
 }
 
-// The root checkout's single run's row, the run's own rows `apart` does not name, then the earlier
-// run's lanes still holding a place.
+// The single runs' rows, the run's own rows `apart` does not name, then the earlier run's lanes still
+// holding a place.
 function lane_rows(layout: BoardLayout, apart: ReadonlyArray<BoardRow>): Array<BoardRow> {
 	const own = layout.active.filter((row) => !apart.includes(row))
 
-	return [layout.root?.row ?? [], own, layout.earlier ?? []].flat()
+	return [single_rows(layout), own, layout.earlier ?? []].flat()
 }
 
 // The lanes section's rows: those neither finished nor waiting on a person's decision.
@@ -351,6 +351,7 @@ const run_board_layout = {
 	numbers_of,
 	queued_rows,
 	rows_of,
+	single_rows,
 	waiting_children,
 }
 
@@ -366,4 +367,5 @@ export {
 	type ReasonOf,
 	type RowRead,
 	type RowReason,
+	type SingleRow,
 } from './run-board-layout-types'
