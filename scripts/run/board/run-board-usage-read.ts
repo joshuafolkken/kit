@@ -4,6 +4,7 @@ import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { process_directories } from '#scripts/lane/process-directories'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { run_hold_live, type LiveHold } from '#scripts/run/hold/run-hold-live'
 import { execa } from 'execa'
 import type { ProcessReading, UsageMark } from './run-board-usage'
 import { run_board_usage_lanes, type DirectoryRead, type LaneLookup } from './run-board-usage-lanes'
@@ -161,6 +162,11 @@ async function darwin_directories(pids: ReadonlyArray<number>): Promise<Director
 const PLATFORM_DIRECTORIES: Readonly<Partial<Record<NodeJS.Platform, LaneLookup['directories']>>> =
 	{ darwin: darwin_directories }
 
+// The run holding the checkout the board runs in (joshuafolkken/kit#8922).
+function held_here(): LiveHold | undefined {
+	return run_hold_live.live_hold(process.cwd())
+}
+
 async function board_lane_root(): Promise<string> {
 	return lane_paths.lane_root(await lane_registry.main_repository_root())
 }
@@ -189,7 +195,15 @@ async function read_usage(
 		const { list, rusage, top } = setup
 		const root = await setup.root
 
-		return await sample(before, { list, rusage, top, directories, now: Date.now, root })
+		return await sample(before, {
+			list,
+			rusage,
+			top,
+			directories,
+			held: held_here,
+			now: Date.now,
+			root,
+		})
 	} catch {
 		return undefined
 	}

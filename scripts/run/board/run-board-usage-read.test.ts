@@ -1,5 +1,6 @@
 import { lane_process_table } from '#scripts/lane/lane-process-table'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { run_hold_live } from '#scripts/run/hold/run-hold-live'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_usage_read, type UsagePorts } from './run-board-usage-read'
 import type { RusageReader } from './run-board-usage-rusage'
@@ -187,5 +188,18 @@ describe('run_board_usage_read.usage_reader', () => {
 		await expect(read(undefined, NO_TABLE)).resolves.toBeUndefined()
 
 		expect(root).toHaveBeenCalledTimes(1)
+	})
+
+	// joshuafolkken/kit#8922: a run in the board's own checkout is read by its hold.
+	it('counts the session holding the board’s checkout in its run’s lane', async () => {
+		const gone = 999_999
+		const table = vi.fn(async () => lane_process_table.parse(`${gone} 1 0:01 4 S ${START} claude`))
+
+		vi.spyOn(lane_registry, 'main_repository_root').mockResolvedValue('/nonexistent/repository')
+		const live = vi.spyOn(run_hold_live, 'live_hold').mockReturnValue({ issue: '8922', pid: gone })
+		const mark = await usage_reader('darwin')(undefined, table)
+
+		expect(live).toHaveBeenCalledWith(process.cwd())
+		expect(mark?.lanes.get(gone)).toBe('8922')
 	})
 })

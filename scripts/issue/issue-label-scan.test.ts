@@ -5,9 +5,9 @@ import { issue_label_scan } from './issue-label-scan-fixture'
 import { ALL_LABELS } from './issue-labels'
 
 // joshuafolkken/kit#4103: a label kit applies or reads is one `josh start` provisions only if it is
-// in `ALL_LABELS` — `issue-labels.test.ts` holds `ALL_LABELS` to `REPOSITORY_LABELS`. These scans
-// hold the code to `ALL_LABELS`: `deferred` was defined and read, yet missing from it, so no
-// repository `josh start` set up had it.
+// in `ALL_LABELS` — `issue-label-definitions.test.ts` holds `ALL_LABELS` to `REPOSITORY_LABELS`.
+// These scans hold the code to `ALL_LABELS`: `deferred` was defined and read, yet missing from it,
+// so no repository `josh start` set up had it.
 
 const { applied_label_names, label_constant_values } = issue_label_scan
 

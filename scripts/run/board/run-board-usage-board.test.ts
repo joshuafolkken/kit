@@ -76,6 +76,34 @@ describe('run_board_usage_board.board_usage_of', () => {
 	})
 })
 
+// joshuafolkken/kit#8922: a root run is in no lane directory; its hold puts its tree in its issue's lane.
+describe('run_board_usage_board.board_usage_of — a root run counted through its hold', () => {
+	const HELD = 40
+	const HELD_LANE = 8922
+
+	function held_mark(at_ms: number): UsageMark {
+		const base = mark(at_ms, 0)
+		const reading = { cpu_ms: 0, memory_bytes: 100, compressed_bytes: 10 }
+
+		return {
+			...base,
+			processes: new Map([...base.processes, [HELD, reading]]),
+			lanes: new Map([...base.lanes, [HELD, String(HELD_LANE)]]),
+			names: new Map([...base.names, [HELD, 'claude']]),
+			held: new Set([HELD]),
+		}
+	}
+
+	it('counts the held processes in an open lane, not under leftover', () => {
+		const { processes } = board_usage_of(held_mark(0), held_mark(SECOND_MS), LOCAL_READ)
+
+		expect(processes.backlogrun.lanes.count).toBe(2)
+		expect(processes.leftover.entries.map((entry) => entry.name)).toStrictEqual([
+			`vitest #${String(CLOSED_LANE)} ↻`,
+		])
+	})
+})
+
 describe('run_board_usage_board.read_usages', () => {
 	it('keeps the last reading, and with it a paused lane, when a reading fails', async () => {
 		const { gathering, read_usage, read_table } = harness(LOCAL, [])

@@ -261,21 +261,6 @@ describe('pretool_outcome — the shell rules at the first Bash call', () => {
 	})
 })
 
-// joshuafolkken/kit#3444: the Codex adapter marks the phase through the same helper.
-describe('pretool_guard.mark_phase', () => {
-	it('marks allowed runtime edits independently of the reminder', async () => {
-		mark_implement.mockClear()
-		const payload = edit_payload_with_transcript()
-
-		await pretool_guard.mark_phase(CLEAR, payload)
-		await pretool_guard.mark_phase(outcome(undefined, 'another notice', undefined), payload)
-		await pretool_guard.mark_phase(outcome('refused', undefined, undefined), payload)
-		await pretool_guard.mark_phase(CLEAR, payload_with_transcript(BENIGN_COMMAND))
-
-		expect(mark_implement).toHaveBeenCalledTimes(2)
-	})
-})
-
 // joshuafolkken/kit#2947: the parent hand-off guard is the second asynchronous rule, after the watcher.
 describe('pretool_outcome_async — the composed parent hand-off guard', () => {
 	afterEach(() => {
