@@ -20,7 +20,7 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_report } from './lane-report'
 import { lane_residents } from './lane-residents'
 import { lane_seed_policy } from './lane-seed'
-import type { KeptLane } from './lane-spent'
+import { lane_spent, type KeptLane } from './lane-spent'
 import { lane_stray } from './lane-stray'
 
 // `josh lane:open` / `lane:close` / `lane:list` / `lane:prune` — the lane's whole lifecycle.
@@ -245,9 +245,25 @@ function live_lane_issues(lanes: ReadonlyArray<LaneInfo>): Array<number> {
 	return lanes.filter((lane) => !lane.is_stranded).map((lane) => Number(lane.issue))
 }
 
+// The unlabelled lanes whose issue is closed — read only for those, since a labelled issue is open.
+async function closed_lane_issues(
+	issues: ReadonlyArray<number>,
+	holders: ReadonlyArray<number>,
+): Promise<Array<number>> {
+	const unlabelled = issues.filter((issue) => !holders.includes(issue))
+	const closed = await Promise.all(
+		unlabelled.map(async (issue) => await lane_spent.is_issue_closed(String(issue))),
+	)
+
+	return unlabelled.filter((_issue, index) => closed[index])
+}
+
 // The lane/label difference, printed to standard error beside the listing. Wrapped so a GitHub read
 // that fails skips only this section — `lane:list`'s job is to list the lanes it already read.
-function report_occupancy(lanes: ReadonlyArray<LaneInfo>, in_progress: InProgress): void {
+async function report_occupancy(
+	lanes: ReadonlyArray<LaneInfo>,
+	in_progress: InProgress,
+): Promise<void> {
 	if (in_progress.holders === undefined) {
 		console.error(OCCUPANCY_UNREADABLE)
 
@@ -255,10 +271,9 @@ function report_occupancy(lanes: ReadonlyArray<LaneInfo>, in_progress: InProgres
 	}
 
 	const holders = in_progress.holders.map((issue) => issue.number)
-	const report = lane_occupancy.classify(holders, {
-		kind: 'lanes',
-		issues: live_lane_issues(lanes),
-	})
+	const issues = live_lane_issues(lanes)
+	const closed = await closed_lane_issues(issues, holders)
+	const report = lane_occupancy.classify(holders, { kind: 'lanes', issues, closed })
 	const described = lane_occupancy.describe(report)
 
 	if (described !== undefined) console.error(described)
@@ -271,7 +286,7 @@ async function list_command(rest: ReadonlyArray<string>): Promise<number> {
 	const in_progress = await read_in_progress()
 	const code = report_lanes(lanes, citer_of(in_progress))
 
-	report_occupancy(lanes, in_progress)
+	await report_occupancy(lanes, in_progress)
 
 	return code
 }
