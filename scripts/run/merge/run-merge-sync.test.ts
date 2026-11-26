@@ -9,6 +9,7 @@ import { run_merge_sync_held } from './run-merge-sync-held'
 
 const CHILD = '7697'
 const REFUSAL = 'error: Your local changes to the following files would be overwritten by merge'
+const TRANSIENT = 'fatal: unable to access the remote: Could not resolve host'
 const HOLDER = '7686'
 const SYNC = 'main:sync'
 
@@ -111,17 +112,15 @@ describe('run_merge_sync.sync_main — a main:sync that keeps failing (joshuafol
 		stub_tree({ kind: 'free' })
 	})
 
-	it('holds instead of throwing when the primary checkout has uncommitted changes', async () => {
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
-
+	it('holds instead of throwing when git refuses over uncommitted changes', async () => {
 		await expect(run_merge_sync.sync_main(CHILD)).resolves.toBeUndefined()
 		expect(hold).toHaveBeenCalledWith(CHILD)
 	})
 
-	it('still fails the run on a clean checkout, carrying the refusal', async () => {
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
+	it('still fails the run on any other failure, carrying its stderr', async () => {
+		spies.josh_run.mockResolvedValue({ code: 1, out: '', err: TRANSIENT })
 
-		await expect(run_merge_sync.sync_main(CHILD)).rejects.toThrow(`main:sync failed: ${REFUSAL}`)
+		await expect(run_merge_sync.sync_main(CHILD)).rejects.toThrow(`main:sync failed: ${TRANSIENT}`)
 		expect(hold).not.toHaveBeenCalled()
 	})
 })

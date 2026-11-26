@@ -272,7 +272,6 @@ describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafo
 		spies = stub_lane_close()
 		vi.spyOn(poll, 'sleep').mockResolvedValue()
 		vi.spyOn(git_stash, 'has_work').mockResolvedValue(false)
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
 	})
 
 	it('retries a transient sync failure and carries on with the merged lane', async () => {

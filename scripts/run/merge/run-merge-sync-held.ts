@@ -9,7 +9,6 @@ import { json_value } from '#scripts/lib/json-value'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
 
 // A merge whose `main:sync` a person's uncommitted work in the primary checkout refused
@@ -21,6 +20,7 @@ import { z } from 'zod'
 
 const MARKER_NAME = 'main-sync-held.json'
 const SYNC = 'main:sync'
+const LOCAL_CHANGES_REFUSAL = /would be overwritten by (?:checkout|merge)/u
 const marker_schema = z.object({ child: z.string(), at: z.string() })
 
 type Marker = z.infer<typeof marker_schema>
@@ -68,11 +68,18 @@ async function hold(child: string): Promise<void> {
 	if (stamp_file.create_stamp(target, { child, at: new Date().toISOString() })) await notify(text)
 }
 
+// **Only git's own local-changes refusal holds** — "would be overwritten by checkout / merge", for
+// tracked and untracked files alike. A dirty tree alone is no such refusal: a ledger line `main:sync`
+// carries over leaves it dirty, and a transient failure on it still ends the run.
+function is_refusal(error_output: string): boolean {
+	return LOCAL_CHANGES_REFUSAL.test(error_output)
+}
+
 // Whether the hold is over: another run holds the checkout, so no sync is owed here
-// (`run-merge-sync.ts`), or the tree is clean and the sync goes through.
+// (`run-merge-sync.ts`), or the sync goes through. **The sync is retried on every read**, never gated on
+// a clean tree: a tree left dirty only by what the sync carries over would otherwise hold forever.
 async function is_released(child: string): Promise<boolean> {
 	if ((await lane_transition_guards.rejection('merge', child)) !== undefined) return true
-	if (await run_hold.is_tree_dirty()) return false
 
 	const result = await josh_command.josh_run([SYNC])
 
@@ -93,6 +100,6 @@ async function is_held(): Promise<boolean> {
 	return false
 }
 
-const run_merge_sync_held = { MARKER_NAME, hold, is_held }
+const run_merge_sync_held = { MARKER_NAME, hold, is_held, is_refusal }
 
 export { run_merge_sync_held }

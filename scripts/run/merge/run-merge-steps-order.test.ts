@@ -87,6 +87,8 @@ beforeEach(() => {
 })
 
 describe('run_merge_steps.do_merged — a main:sync that keeps failing', () => {
+	const sync_error = { text: '' }
+
 	beforeEach(() => {
 		stub_carry(CARRY)
 		vi.spyOn(poll, 'sleep').mockResolvedValue()
@@ -95,12 +97,12 @@ describe('run_merge_steps.do_merged — a main:sync that keeps failing', () => {
 			await Promise.resolve()
 			steps.push(command)
 
-			return { code: command === SYNC ? 1 : 0, out: '' }
+			return command === SYNC ? { code: 1, out: '', err: sync_error.text } : { code: 0, out: '' }
 		})
 	})
 
-	it('neither counts nor records a child whose sync failed on a clean checkout', async () => {
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
+	it('neither counts nor records a child whose sync failed', async () => {
+		sync_error.text = 'fatal: cannot lock ref'
 
 		await expect(run_merge_steps.do_merged(CONTEXT, record)).rejects.toThrow(/main:sync/u)
 
@@ -108,8 +110,9 @@ describe('run_merge_steps.do_merged — a main:sync that keeps failing', () => {
 		expect(steps).not.toContain(RECORD)
 	})
 
-	it('still counts and records a child whose sync a dirty checkout refused (joshuafolkken/kit#9034)', async () => {
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
+	it('still counts and records a child whose sync git refused over local changes (joshuafolkken/kit#9034)', async () => {
+		sync_error.text =
+			'error: Your local changes to the following files would be overwritten by checkout'
 
 		await run_merge_steps.do_merged(CONTEXT, record)
 

@@ -4,7 +4,6 @@ import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_merge_sync_held } from './run-merge-sync-held'
 
 // The primary checkout's return to the default branch after a merge (`run-merge-steps.ts` →
@@ -45,13 +44,16 @@ async function retry_sync(): Promise<string | undefined> {
 
 // **A sync a person's uncommitted work refuses holds rather than fails** (joshuafolkken/kit#9034): the
 // merge already landed, so it is still counted and recorded, and `backlog:drive` holds launches on the
-// marker until the tree is clean or another run holds it (`run-merge-sync-held.ts`). A clean tree's
-// failure is no such hold and still ends the run.
+// marker until the sync goes through or another run holds the checkout (`run-merge-sync-held.ts`).
+// Any other failure is no such hold and still ends the run.
 async function synced(child: string): Promise<void> {
 	const error_output = await retry_sync()
 
 	if (error_output === undefined) return
-	if (!(await run_hold.is_tree_dirty())) throw new Error(`main:sync failed: ${error_output}`)
+
+	if (!run_merge_sync_held.is_refusal(error_output)) {
+		throw new Error(`main:sync failed: ${error_output}`)
+	}
 
 	await run_merge_sync_held.hold(child)
 }

@@ -5,13 +5,13 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_hold } from '#scripts/run/hold/run-hold'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { run_merge_sync_held } from './run-merge-sync-held'
 
 const CHILD = '9034'
 const HOLDER = 'checkout-not-held-by-another-run: #7686 holds it'
+const REFUSAL = 'error: The following untracked working tree files would be overwritten by merge'
 
 const make_directory = temporary_directory()
 const marker_of = { path: '' }
@@ -49,6 +49,22 @@ describe('run_merge_sync_held.hold (joshuafolkken/kit#9034)', () => {
 	})
 })
 
+describe('run_merge_sync_held.is_refusal (joshuafolkken/kit#9034)', () => {
+	it.each([
+		'error: Your local changes to the following files would be overwritten by checkout',
+		'error: Your local changes to the following files would be overwritten by merge',
+		REFUSAL,
+	])('reads git’s local-changes refusal: %s', (text) => {
+		expect(run_merge_sync_held.is_refusal(text)).toBe(true)
+	})
+
+	it('reads any other failure as no refusal', () => {
+		expect(run_merge_sync_held.is_refusal('fatal: Not possible to fast-forward, aborting')).toBe(
+			false,
+		)
+	})
+})
+
 describe('run_merge_sync_held.is_held (joshuafolkken/kit#9034)', () => {
 	let josh_run: MockInstance<typeof josh_command.josh_run>
 
@@ -65,26 +81,17 @@ describe('run_merge_sync_held.is_held (joshuafolkken/kit#9034)', () => {
 		await expect(run_merge_sync_held.is_held()).resolves.toBe(false)
 	})
 
-	it('keeps holding while the primary checkout is still dirty', async () => {
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
+	it('keeps holding while the checkout still refuses the sync', async () => {
+		josh_run.mockResolvedValue({ code: 1, out: '', err: REFUSAL })
 
 		await expect(run_merge_sync_held.is_held()).resolves.toBe(true)
 		expect(existsSync(marker())).toBe(true)
 	})
 
-	it('syncs and clears the marker once the checkout is clean', async () => {
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
-
+	it('syncs and clears the marker once the sync goes through, dirty tree or not', async () => {
 		await expect(run_merge_sync_held.is_held()).resolves.toBe(false)
 		expect(josh_run).toHaveBeenCalledWith(['main:sync'])
 		expect(existsSync(marker())).toBe(false)
-	})
-
-	it('keeps holding when the clean checkout still refuses the sync', async () => {
-		vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(false)
-		josh_run.mockResolvedValue({ code: 1, out: '' })
-
-		await expect(run_merge_sync_held.is_held()).resolves.toBe(true)
 	})
 
 	it('clears the marker without syncing once another run holds the checkout', async () => {
