@@ -1,4 +1,5 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import type { ClosedAnswer } from './run-board-closed'
 import { run_board_closed_pace } from './run-board-closed-pace'
@@ -61,15 +62,28 @@ function has_untitled_lane(state: BoardData, gather: Gather): boolean {
 	)
 }
 
+// An issue `run:add` handed the run after the last plan read was asked is not in that read's listing,
+// so it is read for at once. A read in flight when it was added is asked again once it lands, since its
+// `attempted_ms` is older than the `ADD`.
+function has_new_add(state: BoardData, gather: Gather): boolean {
+	const asked_ms = state.attempted_ms ?? Infinity
+
+	return gather.local.events.some(
+		(event) => event.kind === run_event_stream.EVENT_KIND.ADD && Date.parse(event.at) > asked_ms,
+	)
+}
+
+function is_read_early(state: BoardData, gather: Gather): boolean {
+	return has_untitled_lane(state, gather) || has_new_add(state, gather)
+}
+
 // An ended run's plan is read until it lands once, then held; a read in flight is not launched again.
-// A lane with no title is read for at once rather than after the interval.
+// A lane with no title, or an issue just added, is read for at once rather than after the interval.
 function is_plan_due(state: BoardData, gather: Gather): boolean {
 	if (state.plan_fetch !== undefined) return false
 	if (gather.local.ended_ms !== undefined && state.fetched_ms !== undefined) return false
 
-	return (
-		is_due(state.attempted_ms, PLAN_RETRY_MS, gather.now_ms) || has_untitled_lane(state, gather)
-	)
+	return is_due(state.attempted_ms, PLAN_RETRY_MS, gather.now_ms) || is_read_early(state, gather)
 }
 
 function launch_plan(state: BoardData, gather: Gather): BoardData {
