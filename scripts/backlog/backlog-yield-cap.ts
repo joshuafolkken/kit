@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_yield } from '#scripts/lane/lane-yield'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -79,13 +80,17 @@ function japanese_lines(issue: string): ReadonlyArray<string> {
 	]
 }
 
+// The marker's next action, one for both languages: the drive's own re-offer, so `run:board` reads the
+// park as a stop waiting on the drive rather than on a person (joshuafolkken/kit#9029).
+const RETRY_NEXT = `parent: wait; the drive re-offers it after ${String(WINDOW_MINUTES)} minutes`
+
 // A mechanical stop's comment, as `run:merge` writes for one: why, and the next action.
 function body_of(issue: string): string {
 	const lines = session_language.is_japanese(session_language.resolve_session_lang().lang)
 		? japanese_lines
 		: english_lines
 
-	return lines(issue).join('\n')
+	return issue_outcome.body_of({ body: lines(issue).join('\n'), summary: RETRY_NEXT })
 }
 
 async function is_capped(issue: string, outcome: string, ports: YieldCapPorts): Promise<boolean> {
@@ -119,6 +124,7 @@ const PORTS: Omit<YieldCapPorts, 'now'> = { yields, park }
 
 const backlog_yield_cap = {
 	PORTS,
+	RETRY_NEXT,
 	TRIP_CAUSE,
 	WINDOW_MS,
 	YIELD_CAP,
