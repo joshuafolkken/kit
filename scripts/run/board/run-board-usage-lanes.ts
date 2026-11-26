@@ -91,12 +91,13 @@ function ancestor_lane(
 	return ancestor === undefined ? undefined : known.get(ancestor)
 }
 
-// The hold's session put in its run's lane, where that session is still listed.
+// The hold's session put in its run's lane, where that session is still listed in no lane of its own:
+// one working in a lane's directory keeps that lane.
 function seeded(
 	known: ReadonlyMap<number, string | undefined>,
 	hold: LiveHold | undefined,
 ): ReadonlyMap<number, string | undefined> {
-	if (hold === undefined || !known.has(hold.pid)) return known
+	if (hold === undefined || !known.has(hold.pid) || known.get(hold.pid) !== undefined) return known
 
 	return new Map([...known, [hold.pid, hold.issue]])
 }

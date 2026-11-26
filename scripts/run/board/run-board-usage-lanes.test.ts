@@ -169,6 +169,27 @@ describe('run_board_usage_lanes.lanes_for with a run holding the checkout', () =
 	})
 })
 
+describe('run_board_usage_lanes.lanes_for with a hold beside a lane of its own', () => {
+	it('keeps the lanes a reading with no held set remembered', async () => {
+		const before = { lanes: new Map([[SESSION, RUN]]), unread: new Set<number>() }
+		const read = await lanes_for(before, TREE, held_lookup(undefined))
+
+		expect(read.lanes.get(WORKER)).toBe(RUN)
+	})
+
+	it('keeps a held session working in a lane’s directory in that lane', async () => {
+		const lookup = {
+			...lookup_of(new Map([[SESSION, LANE]])),
+			held: () => ({ issue: RUN, pid: SESSION }),
+		}
+		const read = await lanes_for(undefined, TREE, lookup)
+
+		expect(read.lanes.get(SESSION)).toBe('4346')
+		expect(read.lanes.get(WORKER)).toBe('4346')
+		expect(read.held).toStrictEqual(new Set())
+	})
+})
+
 // Under sustained load every lookup may be cut short; asking every process again would never finish.
 describe('run_board_usage_lanes.lanes_for after a lookup cut short partway', () => {
 	it('keeps what it did answer, and asks again for the rest alone', async () => {
