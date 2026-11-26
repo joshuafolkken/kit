@@ -57,10 +57,16 @@ async function label(issue: string): Promise<boolean> {
 	return false
 }
 
+// The removal's counterpart of `label`'s queued retry: `run-label-main.ts --unmark` strips the label
+// unless a run of the issue holds this tree again.
+function unmark_retry(issue: string): void {
+	background(LABEL_SCRIPT, [issue, '--unmark'], `josh-run-unmark-retry-${issue}-`)
+}
+
 function sweep(): void {
 	background(SWEEP_SCRIPT, [], 'josh-run-sweep-')
 }
 
-const run_maintenance = { label, sweep }
+const run_maintenance = { label, sweep, unmark_retry }
 
 export { run_maintenance }

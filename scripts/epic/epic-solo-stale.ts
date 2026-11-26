@@ -14,6 +14,11 @@ import type { BusyRead } from './epic-busy'
 // `needs-decision` lifted by a person — therefore held the whole backlog: every candidate went to
 // `waiting`, no lane was running to release it, and `backlog:offer` booked the run `exhausted`.
 //
+// **Only causes outside the run machinery are left to this inference.** A release whose removal
+// failed queues its own retry (`run-label.ts` → `unmark`, joshuafolkken/kit#9042), and `run:merge`
+// strips a self-parked child's label (#3017). What remains is a session that ended abnormally before
+// its release, or a label a person put back by hand — causes no release ever sees.
+//
 // **What decides it is the child's process, not its lane.** The lane of a child that parked itself
 // stays open after the child has ended, so an open lane is no evidence of a run; the process pattern
 // `lane:await` and `run:liveness` read is. A matching process keeps the holder, whatever its lane.
