@@ -13,6 +13,7 @@ const {
 	DRAINED_REASON,
 	DRIVERLESS_PREFIX,
 	HAND_BACK_PREFIX,
+	MAIN_DIRTY_REASON,
 	MEMORY_REASON,
 	NAMED_WAIT,
 	OFFER_PREFIX,
@@ -60,6 +61,8 @@ const CAUSE_TEXT: Readonly<Record<WaitCause, string>> = {
 const CAUSE_JOINER = ' or '
 
 const MEMORY_TEXT = 'memory pressure is high; lanes resume when it eases'
+const MAIN_DIRTY_TEXT =
+	'the primary checkout has uncommitted changes; lanes resume once it is committed, stashed or held by a run'
 const USAGE_LIMIT_TEXT = 'the usage limit is reached; lanes resume when it resets'
 // A `usage-limit` hold an authentication failure caused (joshuafolkken/kit#8014): the recheck may clear
 // it, and only a person's re-login ends one that keeps failing — the remedies Claude's own error names.
@@ -120,6 +123,7 @@ function prefixed_text(code: string): string | undefined {
 
 function whole_text(code: string, cause: HoldCause | undefined): string | undefined {
 	if (code === MEMORY_REASON) return MEMORY_TEXT
+	if (code === MAIN_DIRTY_REASON) return MAIN_DIRTY_TEXT
 	if (code !== USAGE_LIMIT_REASON) return undefined
 
 	return cause === 'auth' ? AUTH_FAILURE_TEXT : USAGE_LIMIT_TEXT

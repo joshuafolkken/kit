@@ -1,0 +1,7 @@
+{
+	"reason": "Holding launches on a dirty primary checkout's main:sync adds the marker module, the drive's launch-hold port and their wiring (#9034)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 125
+	}
+}

@@ -9,6 +9,7 @@ describe('backlog_hold_codes — the ledger hold codes', () => {
 			DRAINED_REASON: 'drained',
 			DRIVERLESS_PREFIX: 'driverless:',
 			HAND_BACK_PREFIX: 'hand-back',
+			MAIN_DIRTY_REASON: 'main-dirty',
 			MEMORY_REASON: 'memory',
 			NAMED_WAIT: 'named',
 			OFFER_PREFIX: 'offer',

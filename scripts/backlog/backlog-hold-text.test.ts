@@ -73,6 +73,10 @@ describe('backlog_hold_text.text_of — offer holds', () => {
 describe('backlog_hold_text.text_of — whole-code holds', () => {
 	it.each([
 		['memory', 'memory pressure is high; lanes resume when it eases'],
+		[
+			'main-dirty',
+			'the primary checkout has uncommitted changes; lanes resume once it is committed, stashed or held by a run',
+		],
 		[USAGE_LIMIT_CODE, USAGE_LIMIT],
 	])(AS_SENTENCE, (code, text) => {
 		expect(text_of(code)).toBe(text)
