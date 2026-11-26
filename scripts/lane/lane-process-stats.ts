@@ -136,9 +136,14 @@ function kind_table(samples: ReadonlyArray<LoadEntry>, columns: ReadonlyArray<st
 	)
 }
 
+type OverSample = LoadEntry & {
+	cores: NonNullable<LoadEntry['cores']>
+	reserved: NonNullable<LoadEntry['reserved']>
+}
+
 // A sample whose one-minute load passed the core count it recorded; one written before the core count
 // was recorded, or with no reservation reading, is never counted (joshuafolkken/kit#9000).
-function is_over_cores(sample: LoadEntry): boolean {
+function is_over_cores(sample: LoadEntry): sample is OverSample {
 	return sample.cores !== undefined && sample.reserved !== undefined && sample.load > sample.cores
 }
 
@@ -150,11 +155,11 @@ function cpu_cores(sample: LoadEntry): number {
 	return sum(cores(sample.processes ?? []))
 }
 
-function reserved_cores(sample: LoadEntry): number {
-	return sum((sample.reserved ?? []).map((reserved) => reserved.cores))
+function reserved_cores(sample: OverSample): number {
+	return sum(sample.reserved.map((reserved) => reserved.cores))
 }
 
-function overload_row(samples: ReadonlyArray<LoadEntry>): Array<string> {
+function overload_row(samples: ReadonlyArray<OverSample>): Array<string> {
 	const gaps = samples.map((sample) => cpu_cores(sample) - reserved_cores(sample))
 
 	return [
@@ -167,15 +172,15 @@ function overload_row(samples: ReadonlyArray<LoadEntry>): Array<string> {
 	]
 }
 
-function command_cores(sample: LoadEntry, command: string): number {
-	const held = (sample.reserved ?? []).filter((reserved) => reserved.command === command)
+function command_cores(sample: OverSample, command: string): number {
+	const held = sample.reserved.filter((reserved) => reserved.command === command)
 
 	return sum(held.map((reserved) => reserved.cores))
 }
 
 // Each command's reserved cores averaged over every over-core sample, a sample it held none in reading 0.
-function reserved_rows(samples: ReadonlyArray<LoadEntry>): Array<Array<string>> {
-	const reserved = samples.flatMap((sample) => sample.reserved ?? [])
+function reserved_rows(samples: ReadonlyArray<OverSample>): Array<Array<string>> {
+	const reserved = samples.flatMap((sample) => sample.reserved)
 	const commands = [...new Set(reserved.map((entry) => entry.command))]
 	const held = commands.map((command) => ({
 		command,
@@ -192,7 +197,7 @@ function reserved_rows(samples: ReadonlyArray<LoadEntry>): Array<Array<string>> 
 // reads as work outside the budget or a claim using more than it reserved. The CPU sums only a sample's
 // heaviest kinds, so `cpu − reserved` is a floor. A period with no such sample prints nothing.
 function overload_tables(samples: ReadonlyArray<LoadEntry>): Array<string> {
-	const over = samples.filter((sample) => is_over_cores(sample))
+	const over = samples.filter(is_over_cores)
 
 	if (over.length === 0) return []
 
