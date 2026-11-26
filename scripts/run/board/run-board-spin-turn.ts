@@ -37,6 +37,7 @@ type SpinPorts = Pick<
 	| 'restyle'
 	| 'theme_run'
 	| 'theme'
+	| 'repaint'
 >
 
 // One spinner frame at every spot: the cursor moved there, the spot's colors, the frame, then a reset.

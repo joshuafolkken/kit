@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { run_board_cells } from './run-board-cells'
 import { run_board_frame_loop, type FramePorts, type FrameRun } from './run-board-frame-loop'
 import { run_board_layer, type Layer } from './run-board-layer'
+import { run_board_repaint, type Repaint } from './run-board-repaint'
 
 // joshuafolkken/kit#8826: one frame loop composes every layer and writes only what changed, in one
 // synchronized write, at the first moment a layer changes.
 
-const { MIN_FRAME_MS, THIN_AFTER_MS, base_layer, revealed, run, screen_of } = run_board_frame_loop
+const { CHECK_MS, MIN_FRAME_MS, THIN_AFTER_MS, base_layer, revealed, run, screen_of } =
+	run_board_frame_loop
 const { boundary_after } = run_board_layer
 const { char_id, put } = run_board_cells
+const { current_of, repaint_of, request } = run_board_repaint
 const ESC = '\u{1B}'
 const SYNC_ON = `${ESC}[?2026h`
 const SYNC_OFF = `${ESC}[?2026l`
@@ -24,6 +27,8 @@ const STALL_MS = 300
 const SLOW_MS = THIN_AFTER_MS + 10
 // Slower than a refresh, within a theme tick.
 const BUSY_MS = 30
+// A moment between two of the frame loop's checks on whether the second is still current.
+const ASK_MS = 120
 
 interface Fake {
 	ports: FramePorts
@@ -75,6 +80,20 @@ function run_of(layers: ReadonlyArray<Layer>, until_ms = START + SECOND_MS): Fra
 
 function offsets(fake: Fake): Array<number> {
 	return fake.writes.map(({ at_ms }) => at_ms - START)
+}
+
+// A fake whose clock asks a redraw of the repaint once it reaches `ask_ms` into the second.
+function asking_at(ask_ms: number): { fake: Fake; repaint: Repaint } {
+	const fake = fake_of()
+	const repaint = repaint_of()
+	const { sleep } = fake.ports
+
+	fake.ports.sleep = async (ms) => {
+		await sleep(ms)
+		if (fake.clock.now_ms - START >= ask_ms) request(repaint)
+	}
+
+	return { fake, repaint }
 }
 
 describe('run_board_frame_loop.run — writes', () => {
@@ -193,6 +212,38 @@ describe('run_board_frame_loop.run — wakes', () => {
 		await run(run_of([spinner()]), fake.ports, screen_of())
 
 		expect(offsets(fake).slice(0, 3)).toStrictEqual([0, SPIN_MS + STALL_MS, SPIN_MS * 5])
+	})
+})
+
+// joshuafolkken/kit#8939: a redraw asked — a fold, the sound switch, a demo-mode switch — ends the
+// second at the next check, still or spinning.
+describe('run_board_frame_loop.run — wakes on a redraw asked', () => {
+	it.each([true, false])(
+		'ends the second within a check of a redraw asked (still: %s)',
+		async (is_still) => {
+			const { fake, repaint } = asking_at(ASK_MS)
+
+			await run(
+				{ ...run_of(is_still ? [] : [spinner()]), is_still, is_current: current_of(repaint) },
+				fake.ports,
+				screen_of(),
+			)
+
+			expect(fake.clock.now_ms - START).toBeGreaterThanOrEqual(ASK_MS)
+			expect(fake.clock.now_ms - START).toBeLessThanOrEqual(ASK_MS + CHECK_MS)
+		},
+	)
+
+	it('runs to the second while no redraw is asked', async () => {
+		const fake = fake_of()
+
+		await run(
+			{ ...run_of([]), is_still: true, is_current: current_of(repaint_of()) },
+			fake.ports,
+			screen_of(),
+		)
+
+		expect(fake.clock.now_ms).toBe(START + SECOND_MS)
 	})
 })
 

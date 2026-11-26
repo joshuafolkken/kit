@@ -1,4 +1,5 @@
 import type { KeyTaker } from './run-board-keys'
+import { run_board_repaint, type Repaint } from './run-board-repaint'
 import type { EventKind } from './run-board-sound-typing'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import { run_board_theme_events, type BoardEvent, type Lasts } from './run-board-theme-events'
@@ -74,8 +75,9 @@ interface ThemeRun {
 	event_starts?: Partial<Record<EventKind, number>>
 	part_sounded?: PlayingPart
 	// Counts the switches of what the board shows — demo mode entered or left, a work picked — so the
-	// second drawing the old look ends and the board is redrawn in the new one at once.
-	shown?: number
+	// second drawing the old look ends and the board is redrawn in the new one at once; the board's own
+	// repaint, which its keys ask too (`run-board-repaint.ts`).
+	repaint: Repaint
 }
 
 // The opening's sound in a theme value.
@@ -107,6 +109,7 @@ function run_of(
 		release: undefined,
 		opening_sound,
 		sound_ms: undefined,
+		repaint: run_board_repaint.repaint_of(),
 	}
 }
 
@@ -207,7 +210,7 @@ function take_keys(
 
 // What the board shows switched: the second drawing the old look is over (`run-board-spin.ts`).
 function switched(run: ThemeRun): void {
-	run.shown = (run.shown ?? 0) + 1
+	run_board_repaint.request(run.repaint)
 }
 
 // Demo mode entered: the current theme's idle board, nothing playing.

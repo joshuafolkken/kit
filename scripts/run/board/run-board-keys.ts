@@ -17,11 +17,13 @@ type Trill = Pick<TypingSound, 'set'>
 
 // The board's cue and the typing trill the sound switch gates; none plays without them. `claim` is
 // asked first of every chunk the folds would take, and takes it where it answers true (a themed board's
-// hidden demo key, `run-board-theme-keys.ts`).
+// hidden demo key, `run-board-theme-keys.ts`). `redraw` asks the board to show a fold or the sound switch
+// at once, not on the next second (joshuafolkken/kit#8939).
 interface KeySounds {
 	cue?: Cue | undefined
 	trill?: Trill | undefined
 	claim?: ((chunk: string) => boolean) | undefined
+	redraw?: (() => void) | undefined
 }
 
 // The keyboard as the board uses it; `interrupt` is what Ctrl-C does once raw mode reads it as a key,
@@ -65,8 +67,11 @@ function same(left: ReadonlySet<SectionKey>, right: ReadonlySet<SectionKey>): bo
 	return left.size === right.size && [...left].every((section) => right.has(section))
 }
 
-// A key saves only what it changed.
-function folding(input: KeyInput): {
+// A key saves only what it changed, and asks a redraw only then.
+function folding(
+	input: KeyInput,
+	redraw: (() => void) | undefined,
+): {
 	fold: (chunk: string) => void
 	folded: () => ReadonlySet<SectionKey>
 } {
@@ -75,8 +80,12 @@ function folding(input: KeyInput): {
 	return {
 		fold: (chunk) => {
 			const next = folded_by(folded, chunk)
-			if (!same(next, folded)) input.store?.save(next)
+			const is_changed = !same(next, folded)
+
 			folded = next
+			if (!is_changed) return
+			input.store?.save(next)
+			redraw?.()
 		},
 		folded: () => folded,
 	}
@@ -96,6 +105,7 @@ function sounding(
 	input: KeyInput,
 	cue: Cue | undefined,
 	trill: Trill | undefined,
+	redraw: (() => void) | undefined,
 ): { flip: () => void; sound: () => boolean } {
 	let is_on = input.store?.load_sound?.() ?? true
 
@@ -104,21 +114,23 @@ function sounding(
 			is_on = saved(input, !is_on)
 			if (is_on) cue?.(SWITCHED_ON_CUE)
 			else trill?.set(false)
+			redraw?.()
 		},
 		sound: () => is_on,
 	}
 }
 
-// Each key in the chunk: `s` flips the sound, every other key goes to the folds.
+// Each key in the chunk: `s` flips the sound and redraws the header's switch, every other key goes to the
+// folds.
 function pressing(
 	input: KeyInput,
-	cue: Cue | undefined,
-	trill: Trill | undefined,
+	sounds: KeySounds,
 ): Omit<KeyReading, 'intercept' | 'stop'> & {
 	press: (chunk: string) => void
 } {
-	const { fold, folded } = folding(input)
-	const { flip, sound } = sounding(input, cue, trill)
+	const { cue, trill, redraw } = sounds
+	const { fold, folded } = folding(input, redraw)
+	const { flip, sound } = sounding(input, cue, trill, redraw)
 
 	return {
 		folded,
@@ -146,7 +158,7 @@ function claimed(
 function read_keys(input: KeyInput | undefined, sounds: KeySounds = {}): KeyReading {
 	if (input?.is_tty !== true) return { folded: undefined }
 
-	const { press, ...reading } = pressing(input, sounds.cue, sounds.trill)
+	const { press, ...reading } = pressing(input, sounds)
 	const take = claimed(press, sounds.claim)
 	const held: { taker: KeyTaker | undefined } = { taker: undefined }
 
