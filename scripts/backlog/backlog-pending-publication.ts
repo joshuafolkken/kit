@@ -2,14 +2,12 @@ import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { open_issue_schema } from '#scripts/git/git-schemas'
-import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	issue_publication_state,
 	type PublicationStep,
 } from '#scripts/issue/issue-publication-state'
-import { z } from 'zod'
+import { backlog_plan_read } from './backlog-plan-read'
 import { backlog_pool } from './backlog-pool'
 
 // `josh backlog:plan --pending-publication` — the prepared issues that hold an open issue back
@@ -38,9 +36,6 @@ interface TrackedRead {
 	is_capped: boolean
 }
 
-// The relations listing names no `createdAt`, which nothing here reads; the default lets its rows
-// reach `backlog_pool.to_children` as the open rows they are.
-const relations_schema = open_issue_schema.extend({ createdAt: z.string().default('') })
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const UNREADABLE_MESSAGE =
@@ -124,14 +119,11 @@ async function read_tracked(): Promise<TrackedRead | undefined> {
 }
 
 async function read_children(repo: string): Promise<OpenRead | undefined> {
-	const { json, is_capped } = await git_gh_command.issue_list_open_relations(
-		auto_ok_cli.LISTING_LIMIT,
-	)
-	const read = json === undefined ? undefined : read_json_listing(json, relations_schema)
+	const listing = await backlog_plan_read.read_open_relations()
 
-	if (read?.kind !== 'read') return undefined
+	if (listing === undefined) return undefined
 
-	return { children: backlog_pool.to_children(read.rows, repo), is_capped }
+	return { children: backlog_pool.to_children(listing.rows, repo), is_capped: listing.is_capped }
 }
 
 function print(read: OpenRead, epics: TrackedRead, repo: string): void {
