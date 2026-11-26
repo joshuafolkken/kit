@@ -3,6 +3,7 @@ import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_dispatch_dependency } from '#scripts/lane/lane-dispatch-dependency'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type LoopPorts } from './backlog-drive'
@@ -39,6 +40,7 @@ const DECLARED = new Map([[3, new Set(['scripts/lane/lane-overrun.ts'])]])
 // A launch reads the GitHub core allowance: unread here, so no case calls `gh api`.
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	vi.spyOn(lane_dispatch_dependency, 'unfinished').mockResolvedValue([])
 })
 
 afterEach(() => {

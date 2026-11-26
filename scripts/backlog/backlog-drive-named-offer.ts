@@ -15,6 +15,7 @@ import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { backlog_budget, type BacklogAnswer } from './backlog-budget'
 import { backlog_budget_cli } from './backlog-budget-cli'
 import type { DriveState, OfferRead } from './backlog-drive'
+import { backlog_drive_blocked } from './backlog-drive-blocked'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
@@ -37,6 +38,11 @@ interface NamedRead {
 interface NamedPass {
 	offer: OfferRead | undefined
 	passed: ReadonlyArray<string>
+}
+
+interface Launched {
+	issue: string | undefined
+	offered: OfferRead | undefined
 }
 
 const NO_RETRIES = 0
@@ -224,25 +230,27 @@ async function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Promi
 
 // A named launch waits for the reset while the GitHub core allowance is below the floor, before it reads
 // the issue's state (joshuafolkken/kit#6729). Only a launch reads the allowance: a wait or the run's end
-// starts nothing.
+// starts nothing. An added issue whose blockers are unfinished waits (`backlog-drive-blocked.ts`).
 async function launch(
-	issue: string | undefined,
+	carry: RunCarry,
 	named: OfferRead,
 	state: DriveState,
 	owner: string,
-): Promise<OfferRead | undefined> {
-	if (issue === undefined) return undefined
-
+): Promise<Launched> {
+	const [issue] = named.issues
+	if (issue === undefined) return { issue, offered: undefined }
 	const held = await backlog_drive_rate_limit.held(state)
+	const offered = held ?? (await classify(issue, named, state, owner))
 
-	return held ?? (await classify(issue, named, state, owner))
+	return { issue, offered: await backlog_drive_blocked.gate(carry, issue, offered) }
 }
 
 // An epic `run:add` put in that waits on its children holds nothing up, like an added issue in flight
 // (joshuafolkken/kit#6883): its children are what runs, so the offer passes it as in flight and the
 // issues behind it, or the pool, fill the free lanes (joshuafolkken/kit#6840). The pool counts it
 // running, so with no lane of the run's own in flight it does not read the drain while the epic is
-// open. A failed read still waits (`retries`), so the epic's retry count reaches its hand-back.
+// open. A failed read still waits (`retries`), so the epic's retry count reaches its hand-back. An added
+// issue whose blockers are unfinished is passed the same way (`backlog-drive-blocked.ts`).
 function is_passed(
 	carry: RunCarry,
 	issue: string | undefined,
@@ -267,8 +275,7 @@ async function offer_of(
 
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
-	const [issue] = named.issues
-	const offered = await launch(issue, named, state, context.owner)
+	const { issue, offered } = await launch(carry, named, state, context.owner)
 	if (!is_passed(carry, issue, offered)) return { offer: offered, passed: [] }
 	const past = await offer_of(
 		carry,
@@ -292,7 +299,7 @@ function held_alone(state: DriveState, waiting: DriveState): OfferRead | undefin
 // The named offer, and the state the pool's offer reads when it names nothing: a named issue the yield
 // still holds is excluded there too, so the pool does not relaunch it into the same yield
 // (joshuafolkken/kit#4926, joshuafolkken/kit#6883). It is excluded, not counted running: no lane holds it.
-// An added epic the offer passed is counted running there (`is_passed`).
+// An added epic, or a blocked added issue, the offer passed is counted running there (`is_passed`).
 // joshuafolkken/kit#6865: each offer first retries the mechanical parks whose stop has cleared.
 async function read(carry: RunCarry, state: DriveState, context: NamedContext): Promise<NamedRead> {
 	await backlog_drive_stalled_retry.sweep()
