@@ -2,7 +2,7 @@
 	"reason": "#8941 adds the bug escape-reason filing lint (escape-reason-lint.ts) and its template rows",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 34,
+		"scripts.code_lines": 42,
 		"rules.lines": 3,
 		"ai_cost.on_demand_bytes": 742
 	}

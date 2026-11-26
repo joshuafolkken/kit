@@ -1,5 +1,6 @@
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { describe, expect, it } from 'vitest'
+import { escape_reason_lint } from './escape-reason-lint'
 import { expected_effect_lint } from './expected-effect-lint'
 import { issue_lint } from './issue-lint'
 import { issue_spill } from './issue-spill'
@@ -18,11 +19,14 @@ const SPLIT_ROUTE = 'route:split'
 // A slow rate projecting 2 files / 110 lines over the size bar (joshuafolkken/kit#7074).
 const SLOW: ImplementRate = { median: 10, lanes: 4 }
 const OVER_BUDGET = 'over the 18-minute size bar'
+const NON_BUG = '- 種別: 非不具合'
+const ESCAPE_KEY = '- 検出漏れの理由:'
+const CAUSE = '- 原因: #5000'
 
 const BODY = [
 	'## 背景',
 	'',
-	'- 種別: 非不具合',
+	NON_BUG,
 	'- 目的: 機能追加',
 	'- 規模見積もり: 約 4 ファイル / 100 行（テスト除く）',
 	'',
@@ -129,6 +133,31 @@ describe('issue_spill.follow_up_body', () => {
 
 	it('titles the follow-up after the original', () => {
 		expect(issue_spill.follow_up_title(SUBJECT)).toBe('Follow up #5999: Add a thing')
+	})
+})
+
+// joshuafolkken/kit#8941: a bug follow-up is filed through the escape-reason lint, so one spilt from a
+// bug filed before that rule names an escape reason of its own, and one spilt from a later bug keeps
+// the original's.
+describe('issue_spill.follow_up_body escape reason', () => {
+	const bug = BODY.replace(NON_BUG, () => `- 種別: 不具合\n${CAUSE}`)
+	const named = `${ESCAPE_KEY} 一覧に無い場合を回さなかった`
+
+	it('names an escape reason for a bug filed before the rule', () => {
+		const body = issue_spill.follow_up_body({ ...SUBJECT, body: bug }, [ESTIMATE])
+
+		expect(escape_reason_lint.problem(body)).toBeUndefined()
+	})
+
+	it("keeps the original's escape reason as its only one", () => {
+		const original = bug.replace(CAUSE, () => `${CAUSE}\n${named}`)
+		const body = issue_spill.follow_up_body({ ...SUBJECT, body: original }, [ESTIMATE])
+
+		expect(body.split('\n').filter((line) => line.startsWith(ESCAPE_KEY))).toStrictEqual([named])
+	})
+
+	it('adds no escape reason to a non-bug follow-up', () => {
+		expect(issue_spill.follow_up_body(SUBJECT, [ESTIMATE])).not.toContain(ESCAPE_KEY)
 	})
 })
 

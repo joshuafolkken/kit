@@ -22,6 +22,12 @@ describe('escape_reason_lint.problem (joshuafolkken/kit#8941)', () => {
 		).toBeDefined()
 	})
 
+	it('refuses an escape reason written outside the background section', () => {
+		expect(
+			escape_reason_lint.problem(`${BUG}\n## 補足\n\n- 検出漏れの理由: 一覧に無かった\n`),
+		).toBeDefined()
+	})
+
 	it.each(['テストが手書きの一覧だけを回した', '<details> の中を読むテストが無かった'])(
 		'admits a bug body that names its escape reason (%j)',
 		(reason) => {
