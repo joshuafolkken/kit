@@ -11,8 +11,9 @@ import { lane_close } from './lane-close'
 import { lane_install } from './lane-install'
 import { lane_open, type OpenOutcome } from './lane-open'
 import { lane_paths } from './lane-paths'
-import { lane_reap_settle } from './lane-reap-settle'
+import { lane_reap_settle, type SettleProbes } from './lane-reap-settle'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_residents } from './lane-residents'
 import { process_directories } from './process-directories'
 import { process_lane_marks } from './process-lane-marks'
 
@@ -169,6 +170,24 @@ function stub_what_the_fixture_cannot_do(): void {
 	vi.spyOn(process_lane_marks, 'list_all').mockReturnValue(new Map())
 }
 
+// Refuses one listing and runs the real settle on the real residents reading, minus its grace and kill
+// waits: a refused listing reads `undefined` every time, so no pid reaches `kill` or `reason_of` and
+// only those waits are spent.
+function refuse_listing(source: typeof process_directories | typeof process_lane_marks): void {
+	const { settle } = lane_reap_settle
+	const probes: SettleProbes = {
+		residents: (lane) => lane_residents.residents(lane),
+		kill: () => false,
+		wait: async () => await undefined,
+		reason_of: () => 'unread',
+	}
+
+	vi.spyOn(source, 'list_all').mockReturnValue(undefined)
+	vi.spyOn(lane_reap_settle, 'settle').mockImplementation(
+		async (lane) => await settle(lane, probes),
+	)
+}
+
 async function build_repository(root: string): Promise<void> {
 	const workspace_directory = path.dirname(root)
 
@@ -318,9 +337,8 @@ describe('closing with an unreadable process listing', () => {
 		'keeps the close incomplete when the %s listing is refused',
 		async (listing) => {
 			const { first, second } = lanes()
-			const source = listing === 'directories' ? process_directories : process_lane_marks
 
-			vi.spyOn(source, 'list_all').mockReturnValue(undefined)
+			refuse_listing(listing === 'directories' ? process_directories : process_lane_marks)
 
 			const outcome = await lane_close.close_lane(FIRST_ISSUE)
 			const remaining = await lane_registry.list_lanes()
