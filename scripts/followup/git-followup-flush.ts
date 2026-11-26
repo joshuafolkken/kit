@@ -46,7 +46,7 @@ async function push_or_undo_commit(): Promise<void> {
 }
 
 // Only the ledger paths are staged — whatever else the tree holds is the run's to commit, not this
-// step's — and `-A` takes a migration's deletion of an old path with it.
+// step's — and `-A` takes a deleted ledger file with it.
 async function commit_and_push(
 	paths: ReadonlyArray<string>,
 	issue_number: string | undefined,
@@ -70,14 +70,7 @@ async function commit_ledger_step(
 
 	await assert_grammar()
 
-	// Read again: the grammar check migrated any old-path ledger, which changes what is to be staged.
-	const paths = observation_ledger
-		.ledger_paths(await git_command.status())
-		.filter((file_path) => !observation_ledger.is_migration_claim(file_path))
-
-	// A live run's migration claim alone is pending, not a line: with no path, `git add -A --` would
-	// stage the whole tree.
-	if (paths.length === 0) return
+	const paths = observation_ledger.ledger_paths(status_output)
 
 	await commit_and_push(paths, issue_number)
 	console.info(

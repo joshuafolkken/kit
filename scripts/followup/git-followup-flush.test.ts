@@ -1,10 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
-import {
-	LEGACY_OBSERVATION_LEDGER_PATHS,
-	MIGRATION_CLAIM_SUFFIX,
-	observation_ledger,
-} from '#scripts/observations/observation-ledger'
+import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_followup_flush } from './git-followup-flush'
@@ -27,7 +23,6 @@ const LEDGER_FILE = observation_ledger.ledger_file(2919)
 const DIRTY_LEDGER = `?? ${LEDGER_FILE}`
 const OTHER_CHANGE = ' M scripts/git/git-command.ts'
 const BROKEN_LINE = { line: '- k:broken', reason: 'expected 5 fields' }
-const LIVE_CLAIM = `${LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? ''}.4242${MIGRATION_CLAIM_SUFFIX}`
 
 const mocked_status = vi.mocked(git_command.status)
 
@@ -97,16 +92,16 @@ describe('commit_ledger_step — nothing to commit', () => {
 		expect(mocked_status).not.toHaveBeenCalled()
 		expect(git_command.commit).not.toHaveBeenCalled()
 	})
+})
 
-	// A pathless `git add -A --` stages the whole tree, so a claim alone must stage nothing.
-	it('stages nothing when a live migration claim is the only pending ledger path', async () => {
-		mocked_status.mockResolvedValue(`?? ${LIVE_CLAIM}`)
-
+// joshuafolkken/kit#9049: with the migration gone the grammar check moves nothing, so the status read
+// once before it names what is staged.
+describe('commit_ledger_step — the status is read once', () => {
+	it('stages the paths of the one status read', async () => {
 		await git_followup_flush.commit_ledger_step(true, ISSUE)
 
-		expect(git_spawn.read).not.toHaveBeenCalled()
-		expect(git_command.commit).not.toHaveBeenCalled()
-		expect(git_command.push).not.toHaveBeenCalled()
+		expect(mocked_status).toHaveBeenCalledOnce()
+		expect(git_spawn.read).toHaveBeenCalledWith(['add', '-A', '--', LEDGER_FILE])
 	})
 })
 

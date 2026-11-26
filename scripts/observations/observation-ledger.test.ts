@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
+	LEDGER_EXCLUSION_PATHSPEC,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	observation_ledger,
 	OBSERVATION_LEDGER_DIRECTORY,
 } from './observation-ledger'
+import { LEGACY_OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger-legacy'
 
 const ISSUE = 2919
 const LEDGER_FILE = observation_ledger.ledger_file(ISSUE)
@@ -74,35 +75,39 @@ describe('observation_ledger.ledger_paths', () => {
 	})
 })
 
-describe('observation_ledger.is_migration_claim', () => {
-	it('recognizes a claim on either old path', () => {
-		for (const legacy of LEGACY_OBSERVATION_LEDGER_PATHS) {
-			expect(observation_ledger.is_migration_claim(`${legacy}.123.migrating`)).toBe(true)
-		}
-	})
-
-	it('recognizes a claim inside the old directory', () => {
-		const claim = `${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/2919.md.123.migrating`
-
-		expect(observation_ledger.is_migration_claim(claim)).toBe(true)
-	})
-
-	it('does not take an ordinary file of the old directory for a claim', () => {
-		const file = `${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/2919.md`
-
-		expect(observation_ledger.is_migration_claim(file)).toBe(false)
-	})
-})
-
-// joshuafolkken/kit#3341: the ledger left `docs/`, and the old directory is a migration source.
+// joshuafolkken/kit#3341: the ledger left `docs/`.
 describe('observation_ledger — the ledger outside docs/', () => {
 	it('keeps the ledger directory outside docs/', () => {
 		expect(OBSERVATION_LEDGER_DIRECTORY.startsWith('docs/')).toBe(false)
 	})
+})
 
-	it('still recognizes a file in the old directory as the ledger', () => {
-		const status = `?? ${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/2919.md`
+// joshuafolkken/kit#9049: with the migration gone, only the two old single files stay recognized —
+// kept out of an ordinary commit — while a migration claim and the old directory are ordinary paths.
+describe('observation_ledger.is_ledger_path — after the migration was removed', () => {
+	it('still recognizes both old single-file ledgers', () => {
+		for (const legacy of LEGACY_OBSERVATION_LEDGER_PATHS) {
+			expect(observation_ledger.is_ledger_path(legacy)).toBe(true)
+		}
+	})
 
-		expect(observation_ledger.has_pending_append(status)).toBe(true)
+	it('no longer recognizes a migration claim on an old path', () => {
+		expect(observation_ledger.is_ledger_path(`${SINGLE_FILE_LEDGER}.123.migrating`)).toBe(false)
+	})
+
+	it('no longer recognizes a file in the old directory', () => {
+		expect(
+			observation_ledger.is_ledger_path(`${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/2919.md`),
+		).toBe(false)
+	})
+})
+
+describe('LEDGER_EXCLUSION_PATHSPEC', () => {
+	it('excludes the directory and both old single files, and nothing else', () => {
+		expect(LEDGER_EXCLUSION_PATHSPEC).toEqual([
+			':/',
+			`:(top,exclude)${OBSERVATION_LEDGER_DIRECTORY}`,
+			...LEGACY_OBSERVATION_LEDGER_PATHS.map((legacy) => `:(top,exclude)${legacy}`),
+		])
 	})
 })

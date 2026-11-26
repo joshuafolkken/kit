@@ -2,11 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
-import {
-	LEGACY_LEDGER_FILE,
-	LEGACY_OBSERVATION_LEDGER_PATHS,
-	OBSERVATION_LEDGER_DIRECTORY,
-} from './observation-ledger'
+import { LEGACY_OBSERVATION_LEDGER_PATHS, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import { observation_ledger_home } from './observation-ledger-home'
 
 const make_directory = temporary_directory('suite')
@@ -26,24 +22,24 @@ describe('observation_ledger_home.append', () => {
 		expect(readFileSync(target, 'utf8')).toBe(`${LINE}\n${OTHER_LINE}\n`)
 	})
 
-	// joshuafolkken/kit#2724, joshuafolkken/kit#2919: a consumer's single-file ledger moves into the
-	// directory on its first append, because the append's target is resolved through the directory.
-	it('moves the old ledger into the directory before an append lands beside it', async () => {
+	// joshuafolkken/kit#9049: the single-file migration is gone, so resolving, appending and reading
+	// use the directory alone and leave an old ledger where it is.
+	it('reads and writes only the directory, leaving an old ledger untouched', async () => {
 		const root = path.join(scratch, 'consumer')
-		const legacy = path.join(root, LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? '')
+		const legacy_paths = LEGACY_OBSERVATION_LEDGER_PATHS.map((legacy) => path.join(root, legacy))
 
-		mkdirSync(path.dirname(legacy), { recursive: true })
-		writeFileSync(legacy, `${LINE}\n`)
+		for (const legacy of legacy_paths) {
+			mkdirSync(path.dirname(legacy), { recursive: true })
+			writeFileSync(legacy, `${LINE}\n`)
+		}
 
 		const target = observation_ledger_home.issue_path(ISSUE, root)
 
+		expect(target).toBe(path.join(root, OBSERVATION_LEDGER_DIRECTORY, `${String(ISSUE)}.md`))
 		await observation_ledger_home.append(target, [OTHER_LINE])
 
-		expect(readFileSync(target, 'utf8')).toBe(`${OTHER_LINE}\n`)
-		expect(
-			readFileSync(path.join(root, OBSERVATION_LEDGER_DIRECTORY, LEGACY_LEDGER_FILE), 'utf8'),
-		).toBe(`${LINE}\n`)
-		expect(existsSync(legacy)).toBe(false)
+		expect(await observation_ledger_home.read(root)).toBe(`${OTHER_LINE}\n`)
+		for (const legacy of legacy_paths) expect(readFileSync(legacy, 'utf8')).toBe(`${LINE}\n`)
 	})
 
 	it('writes nothing, not even the file, for no lines', async () => {

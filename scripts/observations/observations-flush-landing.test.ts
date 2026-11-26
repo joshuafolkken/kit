@@ -52,9 +52,8 @@ vi.mock('#scripts/gh/git-pr-checks', () => ({
 	},
 }))
 vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
-// The ledger preparation migrates and reads real files; unmocked from the repository root it would move
-// this checkout's own ledger (joshuafolkken/kit#2724) and make these tests depend on its lines
-// (joshuafolkken/kit#4069).
+// The ledger preparation reads real files; unmocked from the repository root it would make these
+// tests depend on this checkout's own ledger lines (joshuafolkken/kit#4069).
 vi.mock('./observation-ledger-prepare', () => ({
 	observation_ledger_prepare: { prepare: vi.fn(async () => []) },
 }))

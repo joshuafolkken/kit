@@ -1061,7 +1061,6 @@
 	"scripts/observations/observation-ledger-home-append.test.ts": 148,
 	"scripts/observations/observation-ledger-home.test.ts": 147,
 	"scripts/observations/observation-ledger-line.test.ts": 16,
-	"scripts/observations/observation-ledger-migrate.test.ts": 45,
 	"scripts/observations/observation-ledger-prepare.test.ts": 177,
 	"scripts/observations/observation-ledger.test.ts": 32,
 	"scripts/observations/observation-record-cli.test.ts": 167,
