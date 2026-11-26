@@ -77,7 +77,7 @@ describe('run_board_render.render — a board of long values, by section', () =>
 // follows the row's number column, the first number on the line — and its reason whole.
 function reasoned_at(columns: number): { is_floored: boolean; is_whole: boolean } {
 	const line = line_of(lines_on(columns), REASONED)
-	const floored = new RegExp(`^\\D*${String(REASONED)} +${WIDE_REASON.slice(0, 1)}`, 'u')
+	const floored = new RegExp(String.raw`^\D*${String(REASONED)} +${WIDE_REASON.slice(0, 1)}`, 'u')
 
 	return { is_floored: floored.test(line), is_whole: line.includes(WIDE_REASON) }
 }
