@@ -127,14 +127,17 @@ function take_tree(target: string, request: ClaimRequest, read: HoldRead): numbe
 // `busy` is, so it prints the reason and advice the check composed and exits zero. Only an unreadable
 // tree is `unknown`, and that reaches `report_unknown` through `answer`'s directory read.
 function report_preflight(decision: PreflightDecision, hint: string | undefined): number {
-	console.error(`${decision.reason}\n${hint ?? decision.advice}`)
+	const advice = hint === undefined ? decision.advice : `${decision.advice}\n${hint}`
+
+	console.error(`${decision.reason}\n${advice}`)
 	console.info(decision.verdict)
 
 	return SUCCESS_EXIT_CODE
 }
 
-// The tree's record, when it is one #N's fix round re-opens, names the re-claim in place of the stash
-// the preflight advises — stashing would take the round's own work away (joshuafolkken/kit#8932).
+// The tree's record, when it is one #N's fix round re-opens, adds the re-claim after the advice the
+// preflight composed — a dirty tree's run of #N keeps its work, any other tree keeps its own advice
+// (joshuafolkken/kit#8932).
 function round_hint_here(
 	target: string,
 	issue: string,

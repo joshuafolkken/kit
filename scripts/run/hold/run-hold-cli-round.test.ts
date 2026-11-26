@@ -102,11 +102,11 @@ describe(ROUND_COMMAND, () => {
 })
 
 // joshuafolkken/kit#8932: the reclaim over an interrupted round of the issue names the round's
-// re-claim, not the stash that would take the round's own work away.
+// re-claim after the preflight's own advice, which stays for a tree the round does not own.
 describe('a refused claim over an interrupted round', () => {
 	it.each([
-		[ISSUE, ROUND_FLAG],
-		[OTHER_ISSUE, RECLAIM_DECISION.advice],
+		[ISSUE, [RECLAIM_DECISION.advice, ROUND_FLAG]],
+		[OTHER_ISSUE, [RECLAIM_DECISION.advice]],
 	])('answers the claim for #%s with %s', async (claimant, expected) => {
 		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -115,7 +115,10 @@ describe('a refused claim over an interrupted round', () => {
 
 		await run_hold_cli.run([claimant])
 
+		const printed = errors.mock.calls.join('\n')
+
 		expect(out).toEqual([RECLAIM_DECISION.verdict])
-		expect(errors.mock.calls.join('\n')).toContain(expected)
+		expect(expected.every((part) => printed.includes(part))).toBe(true)
+		expect(printed.includes(ROUND_FLAG)).toBe(claimant === ISSUE)
 	})
 })
