@@ -72,7 +72,7 @@ function refusals_of(
 	growth: SizeRatios,
 ): ReadonlyArray<string> {
 	const problems = [
-		issue_lint_cli.summary_problem(filing.body),
+		...issue_lint_cli.filing_problems(filing.body),
 		...issue_lint_cli.problems(filing.body, issue_file.labels_of(filing.args, filing.body)),
 		size_estimate.guide_problem(filing.body, filing.args.route, { rate, growth }),
 		issue_sample_required.problem(filing.body),

@@ -37,6 +37,7 @@ const BODY_WITHOUT_SUMMARY = [
 	'',
 	'- 種別: 不具合',
 	'- 原因: #4201',
+	'- 検出漏れの理由: テストが一覧に無い場合を回さなかった',
 	CLEAR_ESTIMATE,
 	JUDGEMENT_NEEDED,
 	'',
