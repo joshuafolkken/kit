@@ -1,0 +1,7 @@
+{
+	"reason": "#9031: the named scope reads the opted-in listing bodies through a shared listed() helper (+3 lines)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
