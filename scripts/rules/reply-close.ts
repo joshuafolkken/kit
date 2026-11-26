@@ -14,14 +14,13 @@ const NOTHING_LEFT: ReadonlyArray<string> = [
 	'このセッションのやり残しはない',
 	'nothing left in this session',
 ]
-const JA_CLOSE = '`次の一手: <次にすべきこと>` か `このセッションのやり残しはない`'
-const EN_CLOSE = '`Next: <what to do next>` or `Nothing left in this session`'
+const JA_NEXT = '`次の一手: <次にすべきこと>`'
+const EN_NEXT = '`Next: <what to do next>`'
+const JA_CLOSE = `${JA_NEXT} か \`このセッションのやり残しはない\``
+const EN_CLOSE = `${EN_NEXT} or \`Nothing left in this session\``
 // A line with no letter or digit — blank, or left blank by the code, links and paths `reply_prose`
 // takes out — separates paragraphs, so a close followed by bare URLs still ends the reply.
 const CONTENT_PATTERN = /[\p{L}\p{N}]/u
-
-const JA_NEXT = '`次の一手: <次にすべきこと>`'
-const EN_NEXT = '`Next: <what to do next>`'
 
 const SECTION = 'concise-reply'
 // The constant opening `rule-value.ts` credits a Stop refusal to this row by.

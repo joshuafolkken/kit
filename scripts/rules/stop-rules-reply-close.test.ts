@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { concise_reply } from './concise-reply'
 import { reply_close } from './reply-close'
+import { rule_value_fixture } from './rule-value-fixture'
 import { stop_decision } from './stop-decision'
 import { stop_rules } from './stop-rules'
 import { stop_rules_fixture } from './stop-rules-fixture'
 
 const { prose_context: context } = stop_rules_fixture
+const { reading_for, session, stop_line } = rule_value_fixture
 
 const OPEN_REPLY = 'The gate passed and the pull request is open.'
 const NOTHING_LEFT_REPLY = `${OPEN_REPLY}\n\nNothing left in this session.`
@@ -94,5 +96,12 @@ describe('stop_rules.stop_outcome — nothing-left close while work is pending',
 		const expected = `${stop_rules.build_language_reason('ja')}${reply_close.pending_note('ja')}`
 
 		expect(stop_rules.stop_outcome(drifted).reason).toBe(expected)
+	})
+
+	it('credits the pending refusal to the reply-close row', () => {
+		const stop = stop_line(reply_close.build_pending_reason('en'))
+		const reading = reading_for('reply-close', [[`${session('ls')}\n${stop}`]])
+
+		expect(reading.refusals).toBe(1)
 	})
 })
