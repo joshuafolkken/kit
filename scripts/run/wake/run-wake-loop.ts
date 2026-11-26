@@ -146,10 +146,15 @@ function continue_step(wake: RunWake, decision: WakeDecision, ports: LoopPorts):
 	return { kind: 'continue', wake }
 }
 
+function counted_claim(wake: RunWake, claimed: boolean | undefined): RunWake {
+	return claimed === true ? run_wake.count_claim(wake) : wake
+}
+
 async function step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): Promise<StepOutcome> {
 	if (decision.kind === 'stop') return stopped(decision.reason)
 	if (decision.kind === 'failed') return stopped(FAILED_REASON, wake_failure_note(wake))
-	if (decision.kind === 'wake') return await wake_step(wake, ports)
+
+	if (decision.kind === 'wake') return await wake_step(counted_claim(wake, decision.claimed), ports)
 
 	return continue_step(wake, decision, ports)
 }

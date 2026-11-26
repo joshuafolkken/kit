@@ -58,7 +58,7 @@ const FRESH_WOKE_AT = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS / 2).toISO
 function overdue(attempts: number): WakeDecisionInput {
 	const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
 
-	return input({ kind: 'carried', carry: carry({ is_handed_off: true }) }, woke_at, attempts)
+	return input(IN_FLIGHT, woke_at, attempts)
 }
 
 describe('run_wake.decide — whether to wake is the record’s answer', () => {
@@ -107,13 +107,16 @@ describe('run_wake.decide — the grace window after a wake', () => {
 
 	// A session that handed the record back is done; a lingering `claude -p` must not hold the driver.
 	it('wakes at once inside the grace window once the session has handed back', () => {
-		expect(run_wake.decide(input(HANDED_OFF, FRESH_WOKE_AT))).toStrictEqual({ kind: 'wake' })
+		expect(run_wake.decide(input(HANDED_OFF, FRESH_WOKE_AT))).toStrictEqual({
+			kind: 'wake',
+			claimed: true,
+		})
 	})
 
-	it('still gives up on exhausted attempts and idles without work once handed back', () => {
+	it('wakes a handed-back claim past the attempt cap and idles without work', () => {
 		const spent = input(HANDED_OFF, FRESH_WOKE_AT, run_wake.MAX_WAKE_ATTEMPTS)
 
-		expect(run_wake.decide(spent)).toStrictEqual({ kind: 'failed' })
+		expect(run_wake.decide(spent)).toStrictEqual({ kind: 'wake', claimed: true })
 		expect(run_wake.decide({ ...input(HANDED_OFF, FRESH_WOKE_AT), has_work: false })).toStrictEqual(
 			{ kind: 'idle' },
 		)
@@ -129,8 +132,7 @@ describe('run_wake.decide — the grace window after a wake', () => {
 	})
 
 	it('treats a wake stamp it cannot parse as overdue rather than as fresh', () => {
-		const spent = run_wake.MAX_WAKE_ATTEMPTS
-		const stale = input({ kind: 'carried', carry: carry({ is_handed_off: true }) }, 'x', spent)
+		const stale = input(IN_FLIGHT, 'x', run_wake.MAX_WAKE_ATTEMPTS)
 
 		expect(run_wake.decide(stale)).toStrictEqual({ kind: 'failed' })
 	})
@@ -151,13 +153,10 @@ describe('run_wake.decide — the session that cut is still running', () => {
 		})
 	})
 
-	it('relaunches a lost wake while the cutting process is still live', () => {
-		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
-		const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
+	it('relaunches a handed-back claim while the cutting process is still live', () => {
+		const handed_back = { ...overdue(1), read: HANDED_OFF, is_owner_live: true }
 
-		expect(run_wake.decide({ ...input(read, woke_at, 1), is_owner_live: true })).toStrictEqual({
-			kind: 'wake',
-		})
+		expect(run_wake.decide(handed_back)).toStrictEqual({ kind: 'wake', claimed: true })
 	})
 })
 
@@ -431,7 +430,6 @@ describe('run_wake.tidy_own_wake — what the loop finds on its way out', () => 
 		const absent = run_wake.tidy_own_wake(scratch.target)
 
 		run_wake.write_wake(scratch.target, SUCCESSOR)
-
 		expect(run_wake.tidy_own_wake(scratch.target)).not.toBe(absent)
 	})
 })

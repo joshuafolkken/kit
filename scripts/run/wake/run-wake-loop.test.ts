@@ -253,14 +253,17 @@ describe('run_wake_loop.run_loop — a failure that must not be silent', () => {
 
 		run_wake.write_wake(scratch.target, stale)
 
-		const stop = await run_wake_loop.run_loop(scratch.target, recorder([HANDED_OFF]).ports, 0)
+		const ports = { ...recorder([IN_FLIGHT]).ports, is_owner_live: () => false }
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
 
 		expect(stop.reason).toBe(FAILED)
 		expect(stop.note).toContain(INVOCATION)
 		// Named rather than killed: a merely slow session is still doing the run's work.
 		expect(stop.note).toContain('777')
 	})
+})
 
+describe('run_wake_loop.run_loop — a lost wake and a handed-back claim', () => {
 	// Ending the whole overnight run on one slow start is the expensive mistake, so a lost wake is
 	// retried first — and the retry must not inflate the published `woke == cuts` invariant.
 	it('retries a lost wake without counting it as a second cut served', async () => {
@@ -271,12 +274,33 @@ describe('run_wake_loop.run_loop — a failure that must not be silent', () => {
 			woke_at: new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString(),
 		})
 
+		const scripted = recorder([IN_FLIGHT, ENDED])
+		const ports = { ...scripted.ports, is_owner_live: () => false }
+
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(scripted.wakes).toStrictEqual([INVOCATION])
+		expect(run_wake.read_wake(scratch.target)?.woke).toBe(1)
+	})
+
+	// A session that claimed and handed back is a served cut, not a lost wake: counted, and the
+	// attempts it left behind do not stand against the next launch.
+	it('counts a handed-back claim as a cut served and resets the attempts', async () => {
+		run_wake.write_wake(scratch.target, {
+			...run_wake.fresh_wake(INVOCATION, NOW),
+			woke: 1,
+			attempts: run_wake.MAX_WAKE_ATTEMPTS,
+			woke_at: new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS / 2).toISOString(),
+		})
+
 		const scripted = recorder([HANDED_OFF, ENDED])
 
 		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
 
 		expect(scripted.wakes).toStrictEqual([INVOCATION])
-		expect(run_wake.read_wake(scratch.target)?.woke).toBe(1)
+		expect(run_wake.read_wake(scratch.target)?.woke).toBe(2)
+		// Only the launch's own attempt is left: the spent ones were reset by the claim.
+		expect(run_wake.read_wake(scratch.target)?.attempts).toBe(1)
 	})
 })
 
