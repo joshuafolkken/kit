@@ -29,10 +29,10 @@ const { notice_trace } = run_board_theme_host_flash
 const { COLOR } = run_board_theme_nixie_data
 const { nixie_ending } = run_board_theme_nixie_ending
 const { giant_meter } = run_board_theme_nixie_giant
-const { idle_current, idle_misread, idle_noise } = run_board_theme_nixie_idle
+const { idle_current, idle_misread, idle_noise, is_idle } = run_board_theme_nixie_idle
 const { mail } = run_board_theme_nixie_mail
 const { divergence_meter } = run_board_theme_nixie_meter
-const { aftershocks, discharge, dissolve, resettle } = run_board_theme_nixie_notice
+const { aftershocks, discharge, dissolve, is_aftershock, resettle } = run_board_theme_nixie_notice
 const { nixie_opening } = run_board_theme_nixie_opening
 const { ripple, world_line_shift } = run_board_theme_nixie_shift
 const { rolling_letters, sparks, spinning_digits } = run_board_theme_nixie_typing
@@ -111,6 +111,8 @@ function theme(api: ThemeApi): ThemeModule {
 		draw: (grid, state, tick) => {
 			steins_gate(api, grid, state, tick)
 		},
+		// Until the idle life is back (`run-board-theme-nixie-idle.ts`) and a notice's aftershocks end.
+		playing: (state) => !is_idle(state) || is_aftershock(state.notice),
 	}
 }
 

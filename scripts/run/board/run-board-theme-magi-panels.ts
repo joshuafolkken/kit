@@ -108,14 +108,28 @@ function idle_look(tick: number, index: number): PanelLook {
 	}
 }
 
+// The panels flash ALERT through a notice, and watch a new lane while it types and a moment after.
+function is_alert(state: ThemeState): boolean {
+	return active(state.notice, NOTICE_END)
+}
+
+function is_monitoring(state: ThemeState): boolean {
+	return active(state.row, EFFECT_TAIL)
+}
+
 function panel_look(state: ThemeState, tick: number, index: number): PanelLook {
 	const by_progress = progress_look(state, tick, index)
 
 	if (by_progress) return by_progress
-	if (active(state.notice, NOTICE_END)) return alert_look(state, tick)
-	if (active(state.row, EFFECT_TAIL)) return monitoring_look(tick, index)
+	if (is_alert(state)) return alert_look(state, tick)
+	if (is_monitoring(state)) return monitoring_look(tick, index)
 
 	return idle_look(tick, index)
+}
+
+// Whether an event plays: the panels are on a look of their own, none of them idle.
+function is_event(state: ThemeState): boolean {
+	return is_voting(state.progress) || is_alert(state) || is_monitoring(state)
 }
 
 // The links between the three: along the USAGE rule's row a dotted line runs in to MAGI from either
@@ -160,6 +174,7 @@ function magi_panels(kit: MagiKit, grid: Grid, state: ThemeState, tick: number):
 
 const run_board_theme_magi_panels = {
 	idle_look,
+	is_event,
 	magi_panels,
 	panel_look,
 	verdict_of,

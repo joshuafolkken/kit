@@ -27,7 +27,7 @@ const { crack_row, draw_codes, draw_defcon, draw_lamps, draw_sweep, progress_str
 const { screen_blobs } = run_board_theme_wopr_map
 const { darken, flash, notice_event } = run_board_theme_wopr_notice
 const { ending_of, opening_of } = run_board_theme_wopr_parts
-const { is_notice } = run_board_theme_wopr_phase
+const { is_notice, is_progress, is_row } = run_board_theme_wopr_phase
 const { wopr_of } = run_board_theme_wopr_place
 const { row_event, scan_over_codes } = run_board_theme_wopr_row
 
@@ -93,6 +93,8 @@ function theme(api: ThemeApi): ThemeModule {
 		draw: (grid, state, tick) => {
 			draw(wopr, grid, state, tick)
 		},
+		// The phases the drawings read (`run-board-theme-wopr-phase.ts`).
+		playing: (state) => is_notice(state) || is_row(state) || is_progress(state),
 		opening: opening_of(wopr),
 		ending: ending_of(wopr),
 	}

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_environment } from '#scripts/lane/lane-environment'
+import { run_board_demo_keys } from './run-board-demo-keys'
 import { run_board_keys, type KeyInput, type KeyReading } from './run-board-keys'
 import { run_board_live_sound } from './run-board-live-sound'
 import { run_board_repaint } from './run-board-repaint'
@@ -9,7 +10,6 @@ import type { BoardPorts } from './run-board-state'
 import type { Theme } from './run-board-theme-defs'
 import { run_board_theme_events } from './run-board-theme-events'
 import type { DemoKey } from './run-board-theme-host-sample'
-import type { PartName } from './run-board-theme-host-types'
 import {
 	run_board_theme_run,
 	type PlayingPart,
@@ -19,23 +19,14 @@ import {
 
 // The keys of a themed live board (joshuafolkken/kit#8917, Issue 4-3 and 4-4): any key skips the
 // opening to the board; Ctrl-C plays the ending, and any key during it — Ctrl-C too — leaves at once;
-// `/` toggles demo mode, which nothing on screen names. In demo mode `0`-`7` pick the work, `s` `a` `d`
+// `/` toggles demo mode, whose footer names the work picked and its keys in place of the legend
+// (`run-board-demo-footer.ts`). In demo mode `0`-`7` pick the work, `s` `a` `d`
 // `w` play IDLE, PROGRESS, ROW and NOTICE from the demo's sample texts, `q` and `e` the opening and the
 // ending, and every other key — the folds, the sound switch — is taken by it. Leaving it after a switch
 // keeps the new theme and saves it as `JOSH_BOARD_THEME` in `.env`, that line alone.
 
-const DEMO_KEY = '/'
+const { DEMO_KEY, EVENT_OF_KEY, PART_OF_KEY } = run_board_demo_keys
 const THEME_ENV = 'JOSH_BOARD_THEME'
-const EVENT_OF_KEY: ReadonlyMap<string, DemoKey> = new Map([
-	['s', 'i'],
-	['a', 'p'],
-	['d', 'r'],
-	['w', 'n'],
-])
-const PART_OF_KEY: ReadonlyMap<string, PartName> = new Map([
-	['q', 'opening'],
-	['e', 'ending'],
-])
 const DIGIT = /^\d$/u
 const NOTICE_EVENT: DemoKey = 'n'
 const NOTICE_CUE: CueName = 'alert'
@@ -66,7 +57,6 @@ function demo_value(run: ThemeRun, key: string): boolean {
 	run.value = value
 	run.part = undefined
 	if (run.demo !== undefined) run.demo.timeline = run_board_theme_run.IDLE
-	run_board_theme_run.switched(run)
 
 	return true
 }
@@ -89,7 +79,7 @@ function demo_part(run: ThemeRun, key: string, now_ms: number): boolean {
 	const name = PART_OF_KEY.get(key)
 
 	if (name === undefined) return false
-	play_part(run, name, now_ms)
+	play_part(run, name, now_ms, true)
 
 	return true
 }
@@ -134,12 +124,14 @@ function replaced(
 	} else run_board_live_sound.hush()
 }
 
-// A key in demo mode played: the sound of the effect it replaces ended, and the cue of the event it
-// starts sounded.
+// A key in demo mode played: the board redrawn at once, so its footer names what the key picked on the
+// frame it starts on — a work or what plays on it alike; the sound of the effect it replaces ended, and
+// the cue of the event it starts sounded.
 function pressed(run: ThemeRun, key: string, ports: ThemeKeyPorts): void {
 	const before = run.part
 
 	if (!press_demo(run, key, ports.now())) return
+	run_board_theme_run.switched(run)
 	replaced(run, before, ports.keys?.())
 	cued(run, key, ports)
 }

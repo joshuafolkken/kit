@@ -60,19 +60,24 @@ function speed_line(context: FluxContext, grid: Grid, speed: number, tick: numbe
 	put(grid, { y: area_end, x: px + SPEED_GAP }, text, paint(is_top ? WHITE : SPEED_COLOR) + BOLD)
 }
 
+// Whether an event plays: while its line types and until its speed has fallen back.
+function is_event(state: Moment['state']): boolean {
+	return (
+		active(state.progress, PROGRESS_FALL) ||
+		active(state.row, ROW_FALL) ||
+		active(state.notice, NOTICE_END)
+	)
+}
+
 // The speed, during an event only, on the panel's last row under the circuits (the rule keeps the
 // frame's own dashes); white every other tick at 88.
 function draw_speed(context: FluxContext, grid: Grid, moment: Moment): void {
 	const { state, motion, tick } = moment
-	const is_event =
-		active(state.progress, PROGRESS_FALL) ||
-		active(state.row, ROW_FALL) ||
-		active(state.notice, NOTICE_END)
 
-	if (!is_event) return
+	if (!is_event(state)) return
 	speed_line(context, grid, motion.speed_at(tick), tick)
 }
 
-const run_board_theme_flux_figure = { draw_figure, draw_speed, speed_line }
+const run_board_theme_flux_figure = { draw_figure, draw_speed, is_event, speed_line }
 
 export { run_board_theme_flux_figure }

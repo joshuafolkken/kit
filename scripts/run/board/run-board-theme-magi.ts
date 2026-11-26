@@ -35,7 +35,7 @@ const { BOOT_PLACES, BOOT_W, COLORS, NOTES, PALE, PANEL_NAMES, RED_ON, SIDE_W, r
 const { activity_limit, consensus, status } = run_board_theme_magi_gauges
 const { magi_ending } = run_board_theme_magi_ending
 const { magi_opening } = run_board_theme_magi_opening
-const { magi_panels } = run_board_theme_magi_panels
+const { is_event, magi_panels } = run_board_theme_magi_panels
 const { sync_display } = run_board_theme_magi_sync
 const { idle_pulse, red_text, red_wash } = run_board_theme_magi_wash
 
@@ -129,6 +129,7 @@ function theme(api: ThemeApi): ThemeModule {
 		draw: (grid, state, tick) => {
 			magi(kit, grid, state, tick)
 		},
+		playing: is_event,
 	}
 }
 
