@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { run_board_repaint } from './run-board-repaint'
 import { run_board_theme_layer_fixture } from './run-board-theme-layer-fixture'
 import { run_board_theme_run } from './run-board-theme-run'
 import type { TypingLine } from './run-board-type-rows'
@@ -39,6 +40,22 @@ describe('run_board_theme_run.run_of', () => {
 		expect(is_drawn(run_of('magi', () => undefined))).toBe(false)
 		expect(is_value('magi')).toBe(true)
 		expect(is_value('wargames')).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#8939: a demo-mode switch asks its redraw of the run's repaint, the one the keys ask.
+describe('run_board_theme_run.switched', () => {
+	it('asks a redraw of the run repaint on entering and leaving demo mode', () => {
+		const run = run_of('wopr', () => TICKING)
+		const is_current = run_board_repaint.current_of(run.repaint)
+
+		enter_demo(run)
+		expect(is_current?.()).toBe(false)
+
+		const is_left_current = run_board_repaint.current_of(run.repaint)
+
+		leave_demo(run)
+		expect(is_left_current?.()).toBe(false)
 	})
 })
 

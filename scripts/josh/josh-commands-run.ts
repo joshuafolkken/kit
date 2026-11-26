@@ -48,7 +48,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--halfrun-round'],
 					description:
-						"starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record as running, owned by this session; answers `busy` (exit 1) when the tree holds no such stop.",
+						"starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record, or an interrupted round of it whose session ended, as running, owned by this session; answers `busy` (exit 1) when the tree holds neither.",
 				},
 				{
 					names: ['--human-review-stop'],

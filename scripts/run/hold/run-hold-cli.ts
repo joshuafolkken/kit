@@ -126,23 +126,44 @@ function take_tree(target: string, request: ClaimRequest, read: HoldRead): numbe
 // A non-clean preflight verdict is not an error: it is an answer a loop branches on, exactly as
 // `busy` is, so it prints the reason and advice the check composed and exits zero. Only an unreadable
 // tree is `unknown`, and that reaches `report_unknown` through `answer`'s directory read.
-function report_preflight(decision: PreflightDecision): number {
-	console.error(`${decision.reason}\n${decision.advice}`)
+function report_preflight(decision: PreflightDecision, hint: string | undefined): number {
+	const advice = hint === undefined ? decision.advice : `${decision.advice}\n${hint}`
+
+	console.error(`${decision.reason}\n${advice}`)
 	console.info(decision.verdict)
 
 	return SUCCESS_EXIT_CODE
+}
+
+// The tree's record, when it is one #N's fix round re-opens, adds the re-claim after the advice the
+// preflight composed — a dirty tree's run of #N keeps its work, any other tree keeps its own advice
+// (joshuafolkken/kit#8932).
+function round_hint_here(
+	target: string,
+	issue: string,
+	decision: PreflightDecision,
+): string | undefined {
+	if (decision.verdict !== run_preflight.RECLAIM_VERDICT) return undefined
+
+	return run_halfrun_resume.round_hint(run_hold.read_hold(target), issue)
 }
 
 // **The tree is checked before it is claimed.** A numbered claim carries a child whose branch and
 // pull request the check reads; a non-`clean` verdict stops the claim and is returned as-is, so no
 // record is written over work a run left behind. Two claims skip it: the unnumbered `new` claim has
 // no child to preflight, and a lane claim is covered by `lane:open` instead.
-async function preflight_gate(issue: string, is_linked: boolean): Promise<number | undefined> {
+async function preflight_gate(
+	target: string,
+	issue: string,
+	is_linked: boolean,
+): Promise<number | undefined> {
 	if (is_linked || issue === run_hold.UNNUMBERED_ISSUE) return undefined
 
 	const decision = await run_preflight.check(issue)
 
-	if (decision.verdict !== run_preflight.CLEAN_VERDICT) return report_preflight(decision)
+	if (decision.verdict !== run_preflight.CLEAN_VERDICT) {
+		return report_preflight(decision, round_hint_here(target, issue, decision))
+	}
 
 	// A clean tree on the issue's own branch is a resume: the hold is taken, and the whole-gate rule is
 	// still said, because nobody verified what the earlier run committed.
@@ -156,7 +177,7 @@ async function preflight_gate(issue: string, is_linked: boolean): Promise<number
 async function claim(target: string, request: ClaimRequest, is_linked: boolean): Promise<number> {
 	const gate = await run_ship_lap.timed(
 		'preflight',
-		async () => await preflight_gate(request.issue, is_linked),
+		async () => await preflight_gate(target, request.issue, is_linked),
 	)
 
 	if (gate !== undefined) return gate
@@ -273,8 +294,10 @@ async function marked_stop(target: string, request: StopRequest): Promise<number
 async function e2e_refusal(request: StopRequest): Promise<number | undefined> {
 	if (request.kind === PRRUN_STOP_KIND || (await test_e2e_stamp.is_current_tree())) return undefined
 
+	// A round that leaves its tests for later is not a stop: its record stays a running one, and the
+	// next round re-opens it once its session ends (joshuafolkken/kit#8932).
 	return report(
-		'run:hold: `pnpm josh test:e2e` has not answered green on this tree — run it, then mark the stop again.',
+		`run:hold: \`pnpm josh test:e2e\` has not answered green on this tree — run it, then mark the stop again. A round left with its tests owed is not a stop: the next round re-claims it with \`${run_halfrun_resume.round_command(request.issue)}\`.`,
 		E2E_OWED_VERDICT,
 		FAILURE_EXIT_CODE,
 	)

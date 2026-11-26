@@ -3,6 +3,7 @@ import path from 'node:path'
 import { lane_environment } from '#scripts/lane/lane-environment'
 import { run_board_keys, type KeyInput, type KeyReading } from './run-board-keys'
 import { run_board_live_sound } from './run-board-live-sound'
+import { run_board_repaint } from './run-board-repaint'
 import type { CueName } from './run-board-sound-cues'
 import type { BoardPorts } from './run-board-state'
 import type { Theme } from './run-board-theme-defs'
@@ -293,6 +294,9 @@ function read_theme_keys<Ports extends ThemePorts>(
 		cue: ports.cue,
 		trill: ports.typing_sound,
 		claim: claim_of(run, holder, key_ports),
+		redraw: () => {
+			run_board_repaint.request(run.repaint)
+		},
 	})
 	skip_opening(run, holder)
 

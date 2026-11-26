@@ -28,6 +28,8 @@ vi.mock('#scripts/run/hold/run-hold', () => ({
 		stale_reason: (): string => NOTES.stale,
 		unreadable_message: (): string => NOTES.unreadable,
 		unknown_message: (): string => 'unknown directory',
+		is_stop_marked: (): boolean => false,
+		UNNUMBERED_ISSUE: 'new',
 	},
 }))
 
@@ -141,6 +143,19 @@ describe('tree_status_cli.run reports each hold state', () => {
 
 		expect(printed()).toContain('Stale run record held by holder 5852: stale record.')
 		expect(printed()).not.toContain('Replaced')
+	})
+
+	// joshuafolkken/kit#8932: an issue's stale record is an interrupted round its next run re-claims; a
+	// `halfrun new`'s unnumbered one has no issue to re-claim it under.
+	it.each([
+		[HOLD.issue, true],
+		['new', false],
+	])('names the round re-claim on a stale record of %s: %s', async (issue, is_named) => {
+		read_hold_mock.mockReturnValue({ kind: 'stale', hold: { ...HOLD, issue } })
+
+		await tree_status_cli.run([])
+
+		expect(printed().includes('--halfrun-round')).toBe(is_named)
 	})
 
 	it('answers unknown, non-zero, when the git directory cannot be read', async () => {

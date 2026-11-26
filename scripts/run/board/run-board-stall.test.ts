@@ -99,13 +99,15 @@ function fire_late(fake: FakeProbes, late_ms: number): void {
 	fake.fire()
 }
 
-// A sleep that moves `clock` on by what it sleeps once, then stops the loop the way an interrupt would.
+// A sleep that moves `clock` on by what it sleeps until the first second ends, then stops the loop the
+// way an interrupt would. Counted in time: a second waits in short checks for a redraw asked
+// (joshuafolkken/kit#8939).
 function clocked_stopper(clock: { now_ms: number }): (ms: number) => Promise<void> {
-	let slept = 0
+	const second_ms = 1000
+	const stop_at = clock.now_ms - (clock.now_ms % second_ms) + second_ms
 
 	return async (ms) => {
-		slept += 1
-		if (slept > 1) throw STOPPED
+		if (clock.now_ms >= stop_at) throw STOPPED
 		clock.now_ms += ms
 	}
 }

@@ -5,7 +5,8 @@ import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { session_cite } from '#scripts/issue/session-cite'
-import { run_hold, type HoldRead, type RunHold } from '#scripts/run/hold/run-hold'
+import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
+import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { tree_status, type TreeParts } from './tree-status'
 
 // `josh tree:status` — one call for the pre-check a session runs before acting on the working tree:
@@ -80,9 +81,14 @@ function change_count(status: string): number {
 }
 
 // The record is still on disk: the claim's own message narrates its replacement, which this read
-// never performs.
-function stale_note(hold: RunHold): string {
-	return `Stale run record held by ${run_hold.describe_holder(hold)}: ${run_hold.stale_reason(hold)}. ${STALE_NEXT}`
+// never performs. A record a fix round re-opens also names that round's re-claim, so a run of the
+// same issue carrying on over the dirty tree is drawn again (joshuafolkken/kit#8932).
+function stale_note(read: HoldRead & { kind: 'stale' }): string {
+	const { hold } = read
+	const hint = run_halfrun_resume.round_hint(read, hold.issue)
+	const note = `Stale run record held by ${run_hold.describe_holder(hold)}: ${run_hold.stale_reason(hold)}. ${STALE_NEXT}`
+
+	return hint === undefined ? note : `${note} ${hint}`
 }
 
 function hold_detail(hold: HoldRead | undefined): string {
@@ -90,7 +96,7 @@ function hold_detail(hold: HoldRead | undefined): string {
 	if (hold.kind === 'free') return FREE_NOTE
 	if (hold.kind === 'unreadable') return run_hold.unreadable_message()
 
-	return hold.kind === 'stale' ? stale_note(hold.hold) : run_hold.describe_holder(hold.hold)
+	return hold.kind === 'stale' ? stale_note(hold) : run_hold.describe_holder(hold.hold)
 }
 
 function to_parts(reads: TreeReads): TreeParts {
