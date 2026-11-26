@@ -2,6 +2,7 @@ import { cli_body } from '#scripts/josh/cli-body'
 import { aggregation_split } from './aggregation-split'
 import { behavior_change_lint } from './behavior-change-lint'
 import { enforcement_lint } from './enforcement-lint'
+import { escape_reason_lint } from './escape-reason-lint'
 import { expected_effect_lint } from './expected-effect-lint'
 import { figure_source_lint } from './figure-source-lint'
 import { issue_auto_ok } from './issue-auto-ok'
@@ -76,6 +77,14 @@ function summary_problem(body: string): string | undefined {
 	return template === undefined ? problem : `${problem}\n${template}`
 }
 
+// The refusals only filing makes — the leading summary and a bug's escape reason — kept out of
+// `problems` for the same reason as `summary_problem` (joshuafolkken/kit#8941).
+function filing_problems(body: string): ReadonlyArray<string> {
+	return [summary_problem(body), escape_reason_lint.problem(body)].filter(
+		(problem) => problem !== undefined,
+	)
+}
+
 // The body's warnings, printed by every command that lints a body whichever way its verdict goes; they
 // never change an exit code.
 function warn(body: string): void {
@@ -105,12 +114,11 @@ async function run(body_path: string | undefined): Promise<number> {
 	}
 
 	const body = cli_body.read_file_or_stdin(body_path)
-	const summary = summary_problem(body)
 
-	// A pre-filing check: it answers as `issue:file` will, the leading summary included.
-	return report(summary === undefined ? problems(body) : [summary, ...problems(body)], body)
+	// A pre-filing check: it answers as `issue:file` will, the filing-only refusals included.
+	return report([...filing_problems(body), ...problems(body)], body)
 }
 
-const issue_lint_cli = { problems, run, summary_problem, warn }
+const issue_lint_cli = { filing_problems, problems, run, summary_problem, warn }
 
 export { issue_lint_cli }

@@ -37,6 +37,7 @@ const BODY_WITHOUT_SUMMARY = [
 	'',
 	'- 種別: 不具合',
 	'- 原因: #4201',
+	'- 検出漏れの理由: テストが一覧に無い場合を回さなかった',
 	CLEAR_ESTIMATE,
 	JUDGEMENT_NEEDED,
 	'',
@@ -170,6 +171,16 @@ describe('issue_file_pass.labels_in_one_pass — the leading summary', () => {
 	it('admits the same body with the summary first', async () => {
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
 		expect(printed()).not.toContain(refusal)
+	})
+})
+
+// joshuafolkken/kit#8941: a bug body must name why the existing tests missed the defect.
+describe('issue_file_pass.labels_in_one_pass — the escape reason', () => {
+	it('refuses a bug body with no escape reason line', async () => {
+		const body = CLEAR_BODY.replace(/^- 検出漏れの理由: .*\n/mu, '')
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(body))).toBeUndefined()
+		expect(printed()).toContain('missing escape reason')
 	})
 })
 

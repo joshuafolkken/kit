@@ -56,6 +56,7 @@ const DECLARATIONS = [
 	issue_body_keys.line('purpose', 'bug_fix'),
 	issue_body_keys.line('judgement', 'not_needed'),
 	`${issue_body_keys.line('origin', 'unknown')}（found by the backlogrun health check, not traced yet）`,
+	`${issue_body_keys.prefix('escape_reason')} each lane's gate reads only its changed files, so none ran the whole-tree verification on \`main\``,
 	`${issue_body_keys.prefix('size')} ${issue_body_keys.size_value('1', '20')}`,
 ]
 const SYMPTOM = [
