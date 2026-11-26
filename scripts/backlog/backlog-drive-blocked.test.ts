@@ -5,6 +5,7 @@ import { lane_dispatch_dependency } from '#scripts/lane/lane-dispatch-dependency
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type OfferRead } from './backlog-drive'
+import { backlog_drive_named_gate } from './backlog-drive-named-gate'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 
 // joshuafolkken/kit#8965: an added issue whose blockers are unfinished waits at the offer, so the
@@ -53,6 +54,9 @@ async function offer_of(carry: RunCarry): Promise<OfferRead | undefined> {
 
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	vi.spyOn(backlog_drive_named_gate, 'admitted').mockImplementation(async (plain) =>
+		plain.map((issue) => issue.number),
+	)
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
 		kind: 'state',
 		state: { state: 'OPEN', labels: [], is_human_review: false },
@@ -78,7 +82,10 @@ test('offers the passed issue again once its blocker closes', async () => {
 	await offer_of(carry)
 	unfinished.mockResolvedValue([])
 
-	expect(await offer_of(carry)).toMatchObject({ verdict: 'run', issues: [String(BLOCKED)] })
+	expect(await offer_of(carry)).toMatchObject({
+		verdict: 'run',
+		issues: [String(BLOCKED), String(LATER)],
+	})
 })
 
 test('runs nothing when only blocked issues remain, so no dispatch repeats each tick', async () => {
@@ -94,14 +101,14 @@ test('leaves an unreadable blocker read to lane:dispatch', async () => {
 
 	const offer = await offer_of(carry_of([BLOCKED, LATER]))
 
-	expect(offer).toMatchObject({ verdict: 'run', issues: [String(BLOCKED)] })
+	expect(offer).toMatchObject({ verdict: 'run', issues: [String(BLOCKED), String(LATER)] })
 })
 
-test('keeps a declared issue in order without reading its blockers', async () => {
-	const unfinished = blocked_by_open()
+test('passes a declared issue with an unfinished blocker like an added one', async () => {
+	blocked_by_open()
+	const invocation = `backlogrun #${String(BLOCKED)} #${String(LATER)} --only`
 
-	const offer = await offer_of(carry_of([], `backlogrun #${String(BLOCKED)} --only`))
+	const offer = await offer_of(carry_of([], invocation))
 
-	expect(offer).toMatchObject({ verdict: 'run', issues: [String(BLOCKED)] })
-	expect(unfinished).not.toHaveBeenCalled()
+	expect(offer).toMatchObject({ verdict: 'run', issues: [String(LATER)] })
 })

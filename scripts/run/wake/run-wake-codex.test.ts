@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { backlog_drive } from '#scripts/backlog/backlog-drive'
+import { backlog_drive_named_fixture } from '#scripts/backlog/backlog-drive-named-fixture'
 import { backlog_drive_named_offer } from '#scripts/backlog/backlog-drive-named-offer'
 import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
@@ -273,6 +274,7 @@ async function select_after_resume(args: ReadonlyArray<string>): Promise<JoshRes
 function orchestration_driver(): MockInstance<typeof josh_command.josh_run> {
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	backlog_drive_named_fixture.admit_all()
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
 		kind: 'state',
 		state: { state: 'OPEN', labels: ['auto-ok', 'run:lane'], is_human_review: false },

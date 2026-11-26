@@ -1,4 +1,3 @@
-import { backlog_drive_named } from '#scripts/backlog/backlog-drive-named'
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_solo, type Labelled, type SoloQueue } from '#scripts/epic/epic-solo'
@@ -26,8 +25,7 @@ import type { ItemStatus } from './run-board-status'
 // `RowReason` its row only draws (joshuafolkken/kit#4288): an icon, the condition column's value and
 // what follows the title. A row whose lane is being opened leads with the stage that lane is at; any
 // other with what `backlog:next` would answer for it, read off the same rules — after the row a
-// planning run is for, which says so (`run-board-planning.ts`): the driver's declared order for a named
-// run's issue, `epic_triage` for an untriaged issue, `epic_solo` for a running `run:solo` issue, a
+// planning run is for, which says so (`run-board-planning.ts`): `epic_triage` for an untriaged issue, `epic_solo` for a running `run:solo` issue, a
 // waiting one and the rows behind it, `backlog_overlap` for a declared path a running issue holds,
 // the lane limit for a full pool. A start time the body declares and the clock has not reached
 // (`issue-not-before.ts`) comes before the pool's reasons, since the pickup never offers the row
@@ -234,16 +232,6 @@ function room_wait(read: ReasonRead): RowReason | undefined {
 	return read.is_memory_held === true ? no_memory_of(read.gauges) : undefined
 }
 
-// `📋 4198`: the declared issue a named run starts this one after — the driver's own reading
-// (`backlog-drive-named.ts`), asked before it offers anything.
-function named_of(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
-	if (read.carry === undefined) return undefined
-	const in_flight = pool.running.map(String)
-	const holder = backlog_drive_named.held_after(read.carry, in_flight, child.number)
-
-	return holder === undefined ? undefined : { icon: WAIT_ICONS.named, issues: [String(holder)] }
-}
-
 // `🔒 4374`: the running or parked `run:solo` issue nothing new starts beside until it merges, is
 // closed, or has `run:solo` removed.
 function held_solo_of(pool: Pool): RowReason | undefined {
@@ -275,16 +263,11 @@ function solo_wait(child: EpicChild, pool: Pool): RowReason | undefined {
 	return held_solo_of(pool) ?? solo_of(child, pool)
 }
 
-// A candidate nothing blocks, in the order the driver answers: the declared order, then what
+// A candidate nothing blocks, in the order the driver answers, which is what
 // `backlog:next` answers — a running `run:solo` issue, then a waiting `run:solo` issue's wait, then a path a running issue declares, then a pool with no lane
 // left, then a usage limit not yet reset, then a machine with no memory.
 function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
-	return (
-		named_of(child, read, pool) ??
-		solo_wait(child, pool) ??
-		overlap_of(child, read, pool) ??
-		room_wait(read)
-	)
+	return solo_wait(child, pool) ?? overlap_of(child, read, pool) ?? room_wait(read)
 }
 
 // `📅 3/10`: the merges the ledger recorded after the declared pull request merged, of those the body

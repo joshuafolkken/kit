@@ -20,29 +20,32 @@ const CARRY = {
 	outages: 0,
 }
 
-test('dispatches named issues in order and waits for the first one in flight', () => {
+// joshuafolkken/kit#8953: every named issue left is offered at once, in the typed order.
+test('offers every named issue left at once, in the typed order', () => {
 	const empty = backlog_drive.initial_state([], ACTIVE)
-	const running = backlog_drive.initial_state(['1'], ACTIVE)
 
 	expect(backlog_drive_named.offer(CARRY, empty, true)).toMatchObject({
 		verdict: 'run',
-		issues: ['1'],
+		issues: ['1', '2'],
 	})
-	expect(backlog_drive_named.offer(CARRY, running, true)?.verdict).toBe('wait')
 })
 
-// joshuafolkken/kit#8863: the wait on a named issue in flight carried no cause, so the board's seat line
-// read only `the backlog is waiting (wait)`.
-test('names the issue in flight as the cause of the wait on it', () => {
+test('offers the named issues not in flight, past one that is', () => {
+	const running = backlog_drive.initial_state(['1'], ACTIVE)
+
+	expect(backlog_drive_named.offer(CARRY, running, true)).toMatchObject({
+		verdict: 'run',
+		issues: ['2'],
+	})
+	expect(backlog_drive_named.pending_of(CARRY, ['1'])).toStrictEqual([2])
+})
+
+// joshuafolkken/kit#6883: with every named issue in flight, the pool fills the free lanes.
+test('names nothing when every named issue left is in flight, so the pool is asked', () => {
 	const carry = { ...CARRY, done: [1] }
 	const running = backlog_drive.initial_state(['2'], ACTIVE)
 
-	expect(backlog_drive_named.offer(carry, running, false)).toMatchObject({
-		verdict: 'wait',
-		cause: 'named:2',
-		waiting: [2],
-	})
-	expect(backlog_drive_named.offer(CARRY, running, true)?.cause).toBeUndefined()
+	expect(backlog_drive_named.offer(carry, running, false)).toBeUndefined()
 })
 
 test('gives the wait an --only run holds for its last named issue its own cause', () => {
@@ -70,54 +73,14 @@ test('ends an --only run with every named issue done only once nothing is in fli
 	})
 })
 
-// joshuafolkken/kit#3558: a `run:add`ed issue in flight at the head held the named epic behind it, so
-// a child filed into the epic waited for a parent session.
-test('offers the declared item past an added issue already in flight', () => {
-	const carry = { ...CARRY, added: [{ issue: 9, is_priority: true }] }
+// joshuafolkken/kit#8953: a declared issue and one `run:add` put in are offered alike, side by side.
+test('offers an added issue beside the declared ones, in the typed order', () => {
+	const carry = { ...CARRY, added: [{ issue: 9, is_priority: false }] }
 	const running = backlog_drive.initial_state(['9'], ACTIVE)
-	const declared = backlog_drive.initial_state(['1'], ACTIVE)
+	const empty = backlog_drive.initial_state([], ACTIVE)
 
-	expect(backlog_drive_named.offer(carry, running, true)).toMatchObject({
-		verdict: 'run',
-		issues: ['1'],
-	})
-	expect(backlog_drive_named.offer(carry, declared, true)?.verdict).toBe('run')
-	expect(backlog_drive_named.offer(CARRY, declared, true)?.verdict).toBe('wait')
-})
-
-// joshuafolkken/kit#6883: with only `run:add`ed issues in flight left, the named side held the free
-// lanes on `wait` and never asked the pool.
-test('names nothing when every issue left is an added one in flight, so the pool is asked', () => {
-	const carry = { ...CARRY, done: [1, 2], added: [{ issue: 9, is_priority: false }] }
-	const running = backlog_drive.initial_state(['9'], ACTIVE)
-
-	expect(backlog_drive_named.offer(carry, running, false)).toBeUndefined()
-	expect(backlog_drive_named.offer(carry, running, true)?.verdict).toBe('wait')
-	expect(backlog_drive_named.next_of(carry, ['9'])).toBeUndefined()
-})
-
-// joshuafolkken/kit#4206: the issue a held one starts after, as `run:board` names it on the queued row.
-test('names the declared issue just before one the declared order holds', () => {
-	const carry = {
-		...CARRY,
-		invocation: 'backlogrun #1 #2 #3 --only',
-		added: [{ issue: 9, is_priority: false }],
-	}
-
-	expect(backlog_drive_named.held_after(carry, ['1'], 2)).toBe(1)
-	expect(backlog_drive_named.held_after(carry, ['1'], 3)).toBe(2)
-	expect(backlog_drive_named.held_after(carry, ['1'], 9)).toBeUndefined()
-	expect(backlog_drive_named.held_after(carry, ['1'], 1)).toBeUndefined()
-})
-
-// joshuafolkken/kit#4279: before the first declared issue started, the one after it said nothing.
-test('holds the declared order before its first issue starts, and never an issue in flight', () => {
-	expect(backlog_drive_named.held_after(CARRY, [], 2)).toBe(1)
-	expect(backlog_drive_named.held_after(CARRY, [], 1)).toBeUndefined()
-	expect(backlog_drive_named.held_after(CARRY, ['2'], 2)).toBeUndefined()
-	const unnamed = { ...CARRY, invocation: 'backlogrun' }
-
-	expect(backlog_drive_named.held_after(unnamed, ['1'], 2)).toBeUndefined()
+	expect(backlog_drive_named.offer(carry, running, true)).toMatchObject({ issues: ['1', '2'] })
+	expect(backlog_drive_named.offer(carry, empty, true)).toMatchObject({ issues: ['1', '2', '9'] })
 })
 
 test('stops after all named issues when only mode is declared', () => {
@@ -173,8 +136,8 @@ test.each([run_event_stream.EVENT_KIND.MERGE, run_event_stream.EVENT_KIND.HUMAN_
 // An offer's `stop` passed through the merge is not the failure guard (joshuafolkken/kit#3781): the
 // failed child is settled like any other, and only the control `stop` leaves it unmarked.
 const FAILED_RESULTS: ReadonlyArray<[string, MergeResult, ReadonlyArray<number>]> = [
-	['an offered child', { outcome: 'failed', code: 0, token: 'none', is_offer: true }, [1, 2]],
-	['an offer stop', { outcome: 'failed', code: 0, token: 'stop', is_offer: true }, [1, 2]],
+	['an offered child', { outcome: 'failed', code: 0, token: 'none', is_offer: true }, [1]],
+	['an offer stop', { outcome: 'failed', code: 0, token: 'stop', is_offer: true }, [1]],
 	[
 		'no named issue after the control stop',
 		{ outcome: 'failed', code: 0, token: 'stop', is_offer: false },
@@ -218,6 +181,7 @@ test('a failed added issue skips none of the declared list', async () => {
 	expect(await done_after_failure('5', true)).toStrictEqual([5])
 })
 
-test('a failed declared issue skips the declared issues after it but not an added one', async () => {
-	expect(await done_after_failure('1', false)).toStrictEqual([1, 2])
+// joshuafolkken/kit#8953: the named issues run side by side, so a failed one skips none of the others.
+test('a failed declared issue skips none of the other named issues', async () => {
+	expect(await done_after_failure('1', false)).toStrictEqual([1])
 })

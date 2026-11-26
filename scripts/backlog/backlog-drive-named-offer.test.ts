@@ -11,6 +11,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type LoopPorts } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_fixture, type Harness } from './backlog-drive-fixture'
+import { backlog_drive_named_fixture } from './backlog-drive-named-fixture'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_offer } from './backlog-offer'
 
@@ -29,9 +30,11 @@ const CONTEXT = { is_only: false, forwarded: ['--max', '1'], owner: String(proce
 const CORE_LIMIT = 5000
 const RESET_MS = Date.parse('2026-11-08T12:00:00Z')
 
-// A launch reads the GitHub core allowance: unread here, so no case calls `gh api`.
+// A launch reads the GitHub core allowance, and the solo / overlap gate reads the repository: neither is
+// read here, so no case calls `gh api`.
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	backlog_drive_named_fixture.admit_all()
 })
 
 afterEach(() => {
@@ -73,7 +76,8 @@ test('offers a named epic child from the epic instead of launching the root', as
 	})
 	const epic = vi
 		.spyOn(backlog_drive_epic, 'offer')
-		.mockResolvedValue({ verdict: 'run', issues: ['7'], retries: 0 })
+		.mockResolvedValueOnce({ verdict: 'run', issues: ['7'], retries: 0 })
+		.mockResolvedValue({ verdict: 'wait', issues: [], retries: 0 })
 
 	const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
 
@@ -120,8 +124,8 @@ function begin_named(target: string, directory: string): RunCarry | undefined {
 	)
 }
 
-// The offer a named run's first issue answers while it carries `labels`, and what the carry then
-// records done.
+// The offer a named run answers while its first issue carries `labels` and the others none, and what
+// the carry then records done.
 async function offer_labelled(
 	labels: ReadonlyArray<string>,
 ): Promise<{ offer: unknown; done: unknown }> {
@@ -129,12 +133,13 @@ async function offer_labelled(
 	const target = run_carry.carry_path(directory)
 	const carry = begin_named(target, directory)
 
-	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+	vi.spyOn(issue_state_cli, 'read_issue').mockImplementation(async (issue) => ({
 		kind: 'state',
-		state: { state: 'OPEN', labels, is_human_review: false },
-	})
+		state: { state: 'OPEN', labels: issue === '1' ? labels : [], is_human_review: false },
+	}))
 	const state = backlog_drive.initial_state([], ACTIVE)
-	const { offer } = await backlog_drive_named_offer.read({ ...CARRY, ...carry }, state, CONTEXT)
+	const context = { ...CONTEXT, forwarded: ['--max', '3'] }
+	const { offer } = await backlog_drive_named_offer.read({ ...CARRY, ...carry }, state, context)
 	const read = run_carry.read_carry(target)
 
 	vi.restoreAllMocks()
@@ -143,17 +148,33 @@ async function offer_labelled(
 }
 
 // joshuafolkken/kit#4102: a mechanical park (`run:stalled`) is booked the same as a decision park.
-// joshuafolkken/kit#4746: and only it — the named issues after it were never started, so an `--only`
-// run that booked them done ended over issues still queued for a lane.
+// joshuafolkken/kit#4746: and only it — the other named issues were never started, so an `--only`
+// run that booked them done ended over issues still queued for a lane. joshuafolkken/kit#8953: they
+// run beside it.
 test.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL, NEEDS_HUMAN_MERGE_LABEL])(
-	'never dispatches a named issue parked with %s, and books it done alone',
+	'never dispatches a named issue parked with %s, books it done alone, and runs the rest',
 	async (label) => {
 		const { offer, done } = await offer_labelled([label])
 
-		expect(offer).toMatchObject({ verdict: 'wait', issues: [] })
+		expect(offer).toMatchObject({ verdict: 'run', issues: ['2', '3'] })
 		expect(done).toStrictEqual([1])
 	},
 )
+
+// joshuafolkken/kit#8953: the named issues offered side by side stop at the room `--max` leaves.
+test('offers no more named issues at once than the maximum leaves room for', async () => {
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: [], is_human_review: false },
+	})
+	const carry = { ...CARRY, invocation: 'backlogrun #1 #2 #3 --max 3', merged: 1 }
+	const state = backlog_drive.initial_state([], ACTIVE)
+	const context = { ...CONTEXT, forwarded: ['--max', '3'] }
+
+	const { offer } = await backlog_drive_named_offer.read(carry, state, context)
+
+	expect(offer).toMatchObject({ verdict: 'run', issues: ['1', '2'] })
+})
 
 test('offers the next named issue after the epic root is recorded done', async () => {
 	const state = backlog_drive.initial_state([], ACTIVE)
@@ -181,14 +202,16 @@ function named_ports(harness: Harness): LoopPorts {
 	return {
 		...harness.ports,
 		offer: async (state) => {
-			const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+			// Room for both named issues: `--max` caps how many start side by side.
+			const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+			const { offer } = await backlog_drive_named_offer.read(CARRY, state, context)
 
 			return offer
 		},
 	}
 }
 
-test('reads a named issue again after a failed state read, then launches it', async () => {
+test('reads a named issue again after a failed state read, then launches it beside the next', async () => {
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 	vi.spyOn(issue_state_cli, 'read_issue')
 		.mockResolvedValueOnce(UNREACHABLE)
@@ -200,8 +223,8 @@ test('reads a named issue again after a failed state read, then launches it', as
 	const second = await backlog_drive.run_pass(first.state, true, ports)
 
 	expect(first).toMatchObject({ kind: 'continue', state: { retries: 1, in_flight: [] } })
-	expect(second).toMatchObject({ kind: 'continue', state: { retries: 0, in_flight: ['1'] } })
-	expect(harness.calls).toEqual(['launch 1'])
+	expect(second).toMatchObject({ kind: 'continue', state: { retries: 0, in_flight: ['1', '2'] } })
+	expect(harness.calls).toEqual(['launch 1', 'launch 2'])
 	vi.restoreAllMocks()
 })
 

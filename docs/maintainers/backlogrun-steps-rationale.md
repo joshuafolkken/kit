@@ -183,7 +183,8 @@ The procedure states these rules without their issue numbers; the provenance is 
 - The two repairs that would bound the authorization the other way (dropping a run's own filings,
   requiring a person's `auto-ok` on a child) are prohibited, and the brake bounds it instead —
   joshuafolkken/kit#1675
-- Named issues run first, in the order typed, one at a time — joshuafolkken/kit#1984
+- Named issues run first, in the order typed — joshuafolkken/kit#1984; in parallel across the free
+  lanes, the typed order only their priority, a failure skipping nothing — joshuafolkken/kit#8953
 - `run:carry` answering `over` ends the conversation and the invocation is retyped in a fresh
   session — joshuafolkken/kit#2760
 - The decision pass orders and isolates with `blocked-by`, `run:solo` and `run:lane` —
