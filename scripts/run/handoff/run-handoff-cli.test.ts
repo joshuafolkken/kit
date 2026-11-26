@@ -2,10 +2,10 @@ import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
-import type { LaunchRequest } from '#scripts/run/detached-launch'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_handoff_cli, type HandoffPorts } from './run-handoff-cli'
+import { run_handoff_cli_fixture } from './run-handoff-cli-fixture'
 import { run_handoff_retrospective } from './run-handoff-retrospective'
 
 const make_directory = temporary_directory('suite')
@@ -17,10 +17,7 @@ const TEMPORARY = make_directory('josh-run-handoff-')
 const BRIEF_FILE = path.join(TEMPORARY, 'brief.md')
 const MISSING_BRIEF = path.join(TEMPORARY, 'missing.md')
 const BRIEF_FLAG = '--brief-file'
-const ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/5400'
-const FINAL = JSON.stringify({ type: 'result', result: `Filed ${ISSUE_URL}` })
-const CLAUDE_SESSION = { CLAUDE_CODE_SESSION_ID: 'session', HOME: '/home' }
-const PID = 42
+const { fake, ISSUE_URL, CLAUDE_SESSION, PID } = run_handoff_cli_fixture
 const BRIEF_TEXT = 'Agreed brief'
 const LANE_DIRECTORY = '/home/dev/.kit-lanes/12'
 
@@ -37,50 +34,6 @@ function routed_repository(): string {
 	writeFileSync(path.join(directory, 'package.json'), manifest)
 
 	return directory
-}
-
-interface Fake {
-	ports: HandoffPorts
-	lines: Array<string>
-	requests: Array<LaunchRequest>
-	directories: Array<string>
-	backlogrun: ReturnType<typeof vi.fn>
-}
-
-function fake(overrides: Partial<HandoffPorts> = {}): Fake {
-	const lines: Array<string> = []
-	const requests: Array<LaunchRequest> = []
-	const directories: Array<string> = []
-	const backlogrun = vi.fn(async () => 0)
-	const ports: HandoffPorts = {
-		make_directory: (target) => {
-			directories.push(target)
-		},
-		environment: CLAUDE_SESSION,
-		cwd: '/repo',
-		now: () => 1,
-		repository_directory: async () => '/repo/.git',
-		tree_hold: async () => ({ kind: 'free' }),
-		read_text: () => FINAL,
-		launch: (request) => {
-			requests.push(request)
-
-			return { kind: 'launched', pid: PID }
-		},
-		launch_attached: async (request) => {
-			requests.push(request)
-
-			return { kind: 'completed', pid: PID, exit_code: 0 }
-		},
-		backlogrun,
-		is_retrospective_done: () => true,
-		write: (line) => {
-			lines.push(line)
-		},
-		...overrides,
-	}
-
-	return { ports, lines, requests, directories, backlogrun }
 }
 
 const NO_REPOSITORY: string | undefined = undefined

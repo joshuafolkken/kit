@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_label } from './run-label'
 import { run_maintenance } from './run-maintenance'
 
-vi.mock('./run-maintenance', () => ({ run_maintenance: { label: vi.fn() } }))
+vi.mock('./run-maintenance', () => ({
+	run_maintenance: { label: vi.fn(), unmark_retry: vi.fn() },
+}))
 vi.mock('#scripts/followup/git-followup-label', () => ({
 	git_followup_label: { strip_in_progress: vi.fn() },
 }))
@@ -12,12 +14,14 @@ vi.mock('#scripts/followup/git-followup-label', () => ({
 const ISSUE = '3182'
 const add_label = vi.mocked(run_maintenance.label)
 const strip = vi.mocked(git_followup_label.strip_in_progress)
+const unmark_retry = vi.mocked(run_maintenance.unmark_retry)
 const warnings: Array<string> = []
 const clear_label = vi.spyOn(git_gh_command, 'issue_clear_label')
 const apply_label = vi.spyOn(git_gh_command, 'issue_apply_label')
 
 beforeEach(() => {
 	warnings.length = 0
+	unmark_retry.mockClear()
 	vi.spyOn(console, 'warn').mockImplementation((line: string) => {
 		warnings.push(line)
 	})
@@ -73,5 +77,20 @@ describe('run_label.unmark', () => {
 
 		expect(await run_label.unmark(ISSUE)).toBe(false)
 		expect(warnings.join('\n')).toContain('labels/in-progress')
+	})
+
+	// joshuafolkken/kit#9042: a self-parked child's refused removal left in-progress on with only a warning.
+	it('queues the detached removal retry when the removal fails', async () => {
+		strip.mockRejectedValue(new Error('removal refused'))
+
+		await run_label.unmark(ISSUE)
+
+		expect(unmark_retry).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('queues no retry when the removal succeeds', async () => {
+		await run_label.unmark(ISSUE)
+
+		expect(unmark_retry).not.toHaveBeenCalled()
 	})
 })

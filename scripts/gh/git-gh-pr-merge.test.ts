@@ -127,6 +127,22 @@ function arrange(merge: GhApiAnswer, detail: GhApiAnswer): void {
 	mocked_api.mockImplementation(gh_api_routes(routes))
 }
 
+// The read-back polls on the global timer; fake timers advance its interval instead of waiting it out.
+async function settle_timers(assertion: Promise<void>): Promise<void> {
+	await vi.runAllTimersAsync()
+	await assertion
+}
+
+function fake_timers(): void {
+	beforeEach(() => {
+		vi.useFakeTimers()
+	})
+
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+}
+
 function merge_request(): GhApiRequest {
 	return find_request(
 		mocked_api.mock.calls.map(([request]) => request),
@@ -168,6 +184,7 @@ describe('pr_merge — transient merge failures', () => {
 	beforeEach(() => {
 		forget_pr_numbers()
 	})
+	fake_timers()
 
 	it('retries a 502 only after reading back that the merge did not land', async () => {
 		const merge = vi
@@ -198,7 +215,9 @@ describe('pr_merge — transient merge failures', () => {
 	it('does not retry a 502 when its read-back remains unreadable', async () => {
 		arrange(fails_with(transient_merge_failure()), fails_with(new Error(DETAIL_READ_FAILURE)))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toThrow(MERGE_UNCONFIRMED_MESSAGE)
+		await settle_timers(
+			expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toThrow(MERGE_UNCONFIRMED_MESSAGE),
+		)
 		expect(merge_requests()).toHaveLength(1)
 	})
 })
@@ -218,6 +237,7 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 	beforeEach(() => {
 		forget_pr_numbers()
 	})
+	fake_timers()
 
 	it('returns normally when the request failed but the merge had already landed', async () => {
 		arrange(fails_with(gh_failure()), rest_pull({ merged: true }))
@@ -238,7 +258,7 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 	it('retries the read-back rather than giving up on its first failure', async () => {
 		arrange(fails_with(gh_failure()), fails_once_then(rest_pull({ merged: true })))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined()
+		await settle_timers(expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined())
 	})
 
 	// What could not be read is not an answer: reporting "not merged" here would send a run back to a
@@ -246,15 +266,19 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 	it('reports an unconfirmed merge when the pull request could not be read back', async () => {
 		arrange(fails_with(gh_failure()), fails_with(new Error(DETAIL_READ_FAILURE)))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toThrow(MERGE_UNCONFIRMED_MESSAGE)
+		await settle_timers(
+			expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toThrow(MERGE_UNCONFIRMED_MESSAGE),
+		)
 	})
 
 	it('carries the merge failure as the cause of an unconfirmed merge', async () => {
 		arrange(fails_with(gh_failure()), fails_with(new Error(DETAIL_READ_FAILURE)))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toHaveProperty(
-			'cause.message',
-			gh_failure().message,
+		await settle_timers(
+			expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toHaveProperty(
+				'cause.message',
+				gh_failure().message,
+			),
 		)
 	})
 })

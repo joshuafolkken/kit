@@ -41,6 +41,17 @@ describe('run maintenance', () => {
 		expect(launch).not.toHaveBeenCalled()
 	})
 
+	it('queues the detached unmark retry through the label worker (joshuafolkken/kit#9042)', () => {
+		run_maintenance.unmark_retry(ISSUE)
+
+		const [request] = launch.mock.calls[0] ?? []
+
+		expect(request?.argv.args).toEqual(expect.arrayContaining([ISSUE, '--unmark']))
+		expect(request?.argv.args.join(' ')).toContain('run-label-main.ts')
+		expect(request?.log_path).toContain(`josh-run-unmark-retry-${ISSUE}-`)
+		expect(execa).not.toHaveBeenCalled()
+	})
+
 	it('returns without waiting for the detached sweep (ac-cc91653f)', () => {
 		run_maintenance.sweep()
 
