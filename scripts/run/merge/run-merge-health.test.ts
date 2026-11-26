@@ -66,10 +66,10 @@ describe('run_merge_health.check', () => {
 })
 
 describe('run_merge_health.body_of', () => {
-	it('opens with the summary issue:file requires', async () => {
+	it('clears every refusal issue:file makes only at filing', async () => {
 		const { issue_lint_cli } = await import('#scripts/issue/issue-lint-cli')
 
-		expect(issue_lint_cli.summary_problem(run_merge_health.body_of(CHILD, RED.all))).toBeUndefined()
+		expect(issue_lint_cli.filing_problems(run_merge_health.body_of(CHILD, RED.all))).toEqual([])
 	})
 })
 

@@ -10,8 +10,8 @@ import { markdown_section } from './markdown-section'
 
 const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const ESCAPE_PREFIX = issue_body_keys.prefix('escape_reason')
-// A template placeholder (`<...>`) is guidance the filer replaces, not a reason.
-const PLACEHOLDER_PREFIX = '<'
+// A template placeholder (a whole `<...>` value) is guidance the filer replaces, not a reason.
+const PLACEHOLDER = /^<[^>]*>$/u
 
 function escape_lines(body: string): ReadonlyArray<string> {
 	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
@@ -25,7 +25,7 @@ function escape_lines(body: string): ReadonlyArray<string> {
 function is_reason(line: string): boolean {
 	const reason = line.slice(ESCAPE_PREFIX.length).trim()
 
-	return reason.length > 0 && !reason.startsWith(PLACEHOLDER_PREFIX)
+	return reason.length > 0 && !PLACEHOLDER.test(reason)
 }
 
 function names_reason(body: string): boolean {

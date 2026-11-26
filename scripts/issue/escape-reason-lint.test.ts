@@ -22,10 +22,17 @@ describe('escape_reason_lint.problem (joshuafolkken/kit#8941)', () => {
 		).toBeDefined()
 	})
 
-	it('admits a bug body that names its escape reason', () => {
-		expect(
-			escape_reason_lint.problem(`${BUG}- 検出漏れの理由: テストが手書きの一覧だけを回した\n`),
-		).toBeUndefined()
+	it.each(['テストが手書きの一覧だけを回した', '<details> の中を読むテストが無かった'])(
+		'admits a bug body that names its escape reason (%j)',
+		(reason) => {
+			expect(escape_reason_lint.problem(`${BUG}- 検出漏れの理由: ${reason}\n`)).toBeUndefined()
+		},
+	)
+
+	it('admits a bug body written in the English column', () => {
+		const body = '## Background\n\n- Type: defect\n- Origin: #1\n- Escape reason: no test ran it\n'
+
+		expect(escape_reason_lint.problem(body)).toBeUndefined()
 	})
 
 	it('leaves a non-bug body out', () => {
