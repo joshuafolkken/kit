@@ -16,7 +16,7 @@ import { run_board_type_rows } from './run-board-type-rows'
 
 // joshuafolkken/kit#8936: a theme's scene replayed through the real frame loop on a stress board, each
 // frame as the terminal took it — its writes, when, and how many cells they changed — for the motion
-// check (`run-board-motion-check.ts`).
+// check (`run-board-motion-check-fixture.ts`).
 
 type Scene = 'opening' | 'ending' | 'idle' | DemoKey
 

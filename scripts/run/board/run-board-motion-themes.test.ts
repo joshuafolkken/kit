@@ -14,7 +14,8 @@ const { motion_failures } = run_board_motion_check_fixture
 // Just under the one refresh the frame loop may hold a frame back by.
 const WRITE_MS = 15
 const TIMEOUT_MS = 60_000
-const CASES = [...THEMES, ''].flatMap((value) => MATRIX.map((board) => ({ value, board })))
+const VALUES: ReadonlyArray<ThemeValue> = [...THEMES, '']
+const CASES = VALUES.flatMap((value) => MATRIX.map((board) => ({ value, board })))
 
 function scenes_of(value: ThemeValue): ReadonlyArray<Scene> {
 	return value === '' ? ['idle'] : SCENES
