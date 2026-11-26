@@ -1,103 +1,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_fixture } from './run-board-frame-fixture'
-import { run_board_header_trace } from './run-board-header-trace'
 import type { KeyInput } from './run-board-keys'
-import { run_board_labels, type Paint } from './run-board-labels'
+import { run_board_labels } from './run-board-labels'
 import { run_board_live } from './run-board-live'
+import { run_board_paint } from './run-board-paint'
 import { run_board_screen } from './run-board-screen'
 import type { TypingSound } from './run-board-sound-typing'
-import { run_board_theme_defs, type LiveDefinition } from './run-board-theme-defs'
+import type { Theme } from './run-board-theme'
 
 // joshuafolkken/kit#8145: the live loop enters the alternate screen, hands its leave to the exit
 // handler, and leaves the screen once when the redraw stops — however many paths reach the leave.
 
 const { LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
-const { THEME_DEFS } = run_board_theme_defs
 const SCREEN = run_board_screen.screen_of('live')
-const NO_LIVE = {
-	sweep: false,
-	types_rows: false,
-	trill: false,
-	codes: false,
-	strip: false,
-	decode: false,
-	rain: false,
-	drop: false,
-}
 const ESCAPE = '\u{1B}'
 const { WORDS } = run_board_labels
 const { attributes_of, cell_at, is_synced_once, lines_of, rule_cells, terminal_of } =
 	run_board_frame_fixture
 const LEFT_MS = 300
-
-// joshuafolkken/kit#8745: the notice blinks three times and holds lit in the theme's look.
-function notice_of(lit: Paint, is_rain: boolean): Pick<LiveDefinition, 'notice_trace' | 'notice'> {
-	return { notice_trace: true, notice: { lit, is_rain } }
-}
+// joshuafolkken/kit#8917: a theme is drawn by its run only in 24-bit color.
+const RGB = { color_depth: () => run_board_paint.RGB_COLOR_DEPTH }
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-})
-
-// joshuafolkken/kit#8360: the live effects are the theme definition's, not whether a theme is given.
-describe('run_board_live.live_of', () => {
-	it('reads the rows typed, the trill and the rules code from the wargames definition', () => {
-		expect(run_board_live.live_of('wargames')).toStrictEqual({
-			...NO_LIVE,
-			sweep: true,
-			types_rows: true,
-			trill: true,
-			codes: true,
-			...notice_of(THEME_DEFS.wargames.paint, false),
-		})
-	})
-
-	// joshuafolkken/kit#8356: the matrix board's rows decode and its lamp panel runs the idle rain.
-	// joshuafolkken/kit#8367: a raindrop falls down the whole matrix board in place of the sweep.
-	// joshuafolkken/kit#8353: a changed character on the matrix board lands white and cools.
-	// joshuafolkken/kit#8657: a new header notice on the matrix board traces in.
-	it('reads the decoded rows, the idle rain and the board drop from the matrix definition', () => {
-		expect(run_board_live.live_of('matrix')).toStrictEqual({
-			...NO_LIVE,
-			types_rows: true,
-			trill: true,
-			decode: true,
-			rain: true,
-			drop: true,
-			flash: true,
-			...notice_of(run_board_header_trace.SHADES.bright, true),
-		})
-	})
-
-	it('chooses no live effect with no theme', () => {
-		expect(run_board_live.live_of(undefined)).toStrictEqual(NO_LIVE)
-	})
-
-	it('chooses no live effect for a theme the table has no row for', () => {
-		expect(run_board_live.live_of('wargames', {})).toStrictEqual(NO_LIVE)
-	})
-
-	it('chooses no live effect where the definition turns them off', () => {
-		expect(run_board_live.live_of('wargames', { wargames: { live: NO_LIVE } })).toStrictEqual(
-			NO_LIVE,
-		)
-	})
-})
-
-// joshuafolkken/kit#8683: the bttf board types its notices, operations and rows, with no sound and no
-// other live effect.
-describe('run_board_live.live_of bttf', () => {
-	it('reads only the rows typed from the bttf definition', () => {
-		// joshuafolkken/kit#8731: its trill sounds over every typing row.
-		// joshuafolkken/kit#8745: its notice blinks three times and holds lit in its body color.
-		expect(run_board_live.live_of('bttf')).toStrictEqual({
-			...NO_LIVE,
-			types_rows: true,
-			trill: true,
-			...notice_of(THEME_DEFS.bttf.paint, false),
-		})
-	})
 })
 
 describe('run_board_live.watch', () => {
@@ -191,6 +117,11 @@ function failing_second(): ReturnType<typeof harness> & { begun: Array<Array<str
 	}
 }
 
+// The lanes rule of a screen, whose tallies a theme words as its own.
+function lanes_of(lines: ReadonlyArray<string>): string | undefined {
+	return lines.find((line) => / lanes /iu.test(line))
+}
+
 describe('run_board_live.watch failed tick', () => {
 	it('tells the failure and draws the last frame again with it said, its first line only', async () => {
 		const { ports, begun } = failing_second()
@@ -218,10 +149,24 @@ describe('run_board_live.watch failed tick', () => {
 		expect(last.join('\n')).not.toContain(REASON)
 		expect(last).toHaveLength(first?.length ?? 0)
 	})
+
+	// joshuafolkken/kit#8917: a 24-bit board in no theme has a theme run showing none, so its warning
+	// is drawn in the look the second was drawn in, not the run's theme.
+	it('draws the warning in no theme on a 24-bit board shown in none', async () => {
+		const { ports, begun } = failing_second()
+
+		await expect(run_board_live.watch({ ...ports, ...RGB }, undefined, vi.fn())).rejects.toBe(
+			STOPPED,
+		)
+		const [, first = [], warning = []] = begun
+
+		expect(lanes_of(first)).toBeDefined()
+		expect(lanes_of(warning)).toBe(lanes_of(first))
+	})
 })
 
-// joshuafolkken/kit#8250: the trill reaches the draws only in a theme, and the board stops it as it
-// leaves.
+// joshuafolkken/kit#8250: the trill reaches the draws only on a themed board, and the board stops it as
+// it leaves.
 // The trill's switches, and the letters' ends each `on` was handed (joshuafolkken/kit#8523).
 function trill_heard(): {
 	switched: Array<string>
@@ -244,10 +189,6 @@ function trill_heard(): {
 			},
 		},
 	}
-}
-
-async function instant(): Promise<void> {
-	await Promise.resolve()
 }
 
 // A keyboard on a terminal whose sound switch starts as `is_on`; `type` hands it a key.
@@ -285,7 +226,9 @@ describe('run_board_live.watch trill', () => {
 		const { ports } = harness(LOCAL, [plan_titled('a')])
 		const { switched, typing_sound } = trill_heard()
 
-		await expect(run_board_live.watch({ ...ports, typing_sound }, 'wargames')).rejects.toBe(STOPPED)
+		await expect(run_board_live.watch({ ...ports, ...RGB, typing_sound }, 'wopr')).rejects.toBe(
+			STOPPED,
+		)
 		expect(switched.length).toBeGreaterThan(1)
 		expect(switched.at(-1)).toBe('stop')
 	})
@@ -293,8 +236,11 @@ describe('run_board_live.watch trill', () => {
 	it('hands the draws’ letters end through to the trill', () => {
 		const { ports } = harness(LOCAL, [])
 		const { ends, typing_sound } = trill_heard()
-		const live = run_board_live.live_of('wargames')
-		const trill = run_board_live.trill_of({ ...ports, typing_sound }, { folded: undefined }, live)
+		const trill = run_board_live.trill_of(
+			{ ...ports, typing_sound },
+			{ folded: undefined },
+			() => 'wopr',
+		)
 
 		trill?.set(true, LEFT_MS)
 		expect(ends).toStrictEqual([LEFT_MS])
@@ -310,16 +256,55 @@ describe('run_board_live.watch trill', () => {
 	})
 })
 
-// joshuafolkken/kit#8365: the matrix key click sounds through its intro and its decoding rows.
-describe('run_board_live.watch matrix trill', () => {
-	it('hands the matrix draws’ letters end through to the trill (ac-57e6668c)', () => {
+// joshuafolkken/kit#8917: no trill reaches the draws of a board in no theme.
+describe('run_board_live.trill_of', () => {
+	it('hands no trill to the draws of a board in no theme', () => {
 		const { ports } = harness(LOCAL, [])
-		const { ends, typing_sound } = trill_heard()
-		const live = run_board_live.live_of('matrix')
-		const trill = run_board_live.trill_of({ ...ports, typing_sound }, { folded: undefined }, live)
+		const { typing_sound } = trill_heard()
 
-		trill?.set(true, LEFT_MS)
-		expect(ends).toStrictEqual([LEFT_MS])
+		expect(
+			run_board_live.trill_of({ ...ports, typing_sound }, { folded: undefined }, undefined),
+		).toBeUndefined()
+	})
+
+	// Issue 4-4: demo mode's switch changes the theme shown, and the trill follows it.
+	it('sounds the trill in the voice of the theme shown, silent while none is', () => {
+		const shown: { theme: Theme | undefined } = { theme: 'wopr' }
+		const { switched, typing_sound } = trill_heard()
+		const revoice = vi.fn<(file: () => string | undefined) => void>()
+		const trill = run_board_live.trill_of(
+			{ typing_sound: { ...typing_sound, revoice } },
+			{ folded: undefined },
+			() => shown.theme,
+		)
+
+		for (const theme of ['wopr', 'trace', undefined] as const) {
+			shown.theme = theme
+			trill?.set(true, LEFT_MS)
+		}
+
+		expect(revoice).toHaveBeenCalledOnce()
+		expect(switched).toStrictEqual(['on', 'on', 'off'])
+	})
+})
+
+// Issue 4-4: `/` enters demo mode on a live board launched in no theme too, in 24-bit color, where it
+// takes the sound key; without 24-bit color there is no demo mode, and `s` switches the sound.
+describe('run_board_live.watch demo mode in no theme', () => {
+	it.each([
+		['enters demo mode in 24-bit color', RGB, false],
+		['has none without it', { color_depth: () => 0 }, true],
+	])('%s', async (_name, depth, is_switched) => {
+		const { ports } = harness(LOCAL, [plan_titled('a')])
+		const { input, type } = sound_keys(true)
+		const save_sound = vi.fn()
+		const keys = { ...input, store: input.store && { ...input.store, save_sound } }
+		const watching = run_board_live.watch({ ...ports, ...depth, keys }, undefined)
+
+		type('/')
+		type('s')
+		await expect(watching).rejects.toBe(STOPPED)
+		expect(save_sound.mock.calls.length > 0).toBe(is_switched)
 	})
 })
 
@@ -335,11 +320,11 @@ describe('run_board_live.watch trill and the sound switch', () => {
 		expect(switched).toStrictEqual(['off', 'stop'])
 	})
 
-	it('switches the matrix trill off as s switches the sound off (ac-57e6668c)', async () => {
+	it('switches the trace trill off as s switches the sound off (ac-57e6668c)', async () => {
 		const { ports } = harness(LOCAL, [plan_titled('a')])
 		const { switched, typing_sound } = trill_heard()
 		const { input, type } = sound_keys(true)
-		const watching = run_board_live.watch({ ...ports, typing_sound, keys: input }, 'matrix')
+		const watching = run_board_live.watch({ ...ports, ...RGB, typing_sound, keys: input }, 'trace')
 
 		type('s')
 		await expect(watching).rejects.toBe(STOPPED)
@@ -347,13 +332,13 @@ describe('run_board_live.watch trill and the sound switch', () => {
 		expect(switched).not.toContain('on')
 	})
 
-	it.each(['wargames', 'matrix'] as const)(
+	it.each(['wopr', 'trace'] as const)(
 		'sounds no %s trill while the sound is off',
 		async (theme) => {
 			const { ports } = harness(LOCAL, [plan_titled('a')])
 			const { switched, typing_sound } = trill_heard()
 			const { input } = sound_keys(false)
-			const sounding = { ...ports, typing_sound, keys: input, intro_sleep: instant }
+			const sounding = { ...ports, ...RGB, typing_sound, keys: input }
 
 			await expect(run_board_live.watch(sounding, theme)).rejects.toBe(STOPPED)
 			expect(switched).not.toContain('on')

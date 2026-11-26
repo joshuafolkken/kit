@@ -1,24 +1,40 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { gunzipSync, gzipSync } from 'node:zlib'
-import { run_board_replay } from '#scripts/run/board/run-board-replay'
-import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
+import { run_board_replay, type Beat } from '#scripts/run/board/run-board-replay'
+import { run_board_theme_defs, type Theme } from '#scripts/run/board/run-board-theme-defs'
 import { board_compare_report } from './board-compare-report'
 
 // The gate's look check (joshuafolkken/kit#8766): each theme's board replayed on a fixed clock and seed
 // is compared cell by cell with the replay recorded when its look was approved, so a change that moves
 // a drawn cell fails the unit tests. The golden is the `board:replay` beat lines, gzipped.
 
-const THEMES = ['wargames', 'matrix', 'bttf'] as const
-const SIZE = { columns: 100, rows: 30 }
+// Every theme the board draws, by its value (joshuafolkken/kit#8917) — a theme added to the definitions
+// is a golden recorded.
+const { THEMES } = run_board_theme_defs
+// joshuafolkken/kit#8917: the size the motion check replays at (`board:replay --motion`), where every
+// theme's panel has its room; each sleep between the theme's frames is a tick.
+const SIZE = { columns: 200, rows: 50 }
 const SEED = '1'
-const TICKS = '1'
+
+type GoldenTheme = Theme
+
+// The redraws each golden records: past its opening into a second of the idle board, so the golden
+// checks where the theme draws its name, panel and level, not the opening alone — the matrix board's
+// rain, which runs on through its idle, too large to record past its opening's start.
+const TICKS: Readonly<Record<GoldenTheme, number>> = {
+	wopr: 90,
+	trace: 40,
+	flux: 120,
+	codec: 140,
+	nixie: 100,
+	skynet: 60,
+	magi: 140,
+}
 const GOLDEN_DIRECTORY = fileURLToPath(new URL('golden/', import.meta.url))
 // Set to record the golden replays again instead of comparing with them.
 const UPDATE_VARIABLE = 'BOARD_GOLDEN_UPDATE'
 const UPDATE_HINT = `An intended look change: record the golden replays again in this PR — ${UPDATE_VARIABLE}=1 pnpm josh test:unit tools/board/board-golden.test.ts — and commit tools/board/golden/.`
-
-type GoldenTheme = (typeof THEMES)[number]
 
 function golden_path(theme: GoldenTheme, directory: string): string {
 	return `${directory}${theme}.jsonl.gz`
@@ -32,7 +48,7 @@ function replay_argv(theme: GoldenTheme): Array<string> {
 		'--seed',
 		SEED,
 		'--ticks',
-		TICKS,
+		String(TICKS[theme]),
 		'--columns',
 		String(SIZE.columns),
 		'--rows',

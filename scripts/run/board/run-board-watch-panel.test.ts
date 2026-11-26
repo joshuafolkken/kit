@@ -92,10 +92,10 @@ describe('the watch panel on the rendered board', () => {
 
 describe('composed in a theme', () => {
 	it.each([
-		['wargames', 'letters'],
-		['wargames', 'shapes'],
-		['matrix', 'letters'],
-		['matrix', 'emoji'],
+		['wopr', 'letters'],
+		['wopr', 'shapes'],
+		['trace', 'letters'],
+		['trace', 'emoji'],
 	] as const)('keeps the panel in its columns in the %s theme with %s icons', (theme, icons) => {
 		const lines = composed(HEADER, ROWS, RULE_WIDTH)
 		const themed = lines.map((line) => run_board_theme.restyle(theme, line, icons))

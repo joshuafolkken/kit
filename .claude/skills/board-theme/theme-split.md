@@ -2,14 +2,17 @@
 
 Read from `SKILL.md` → "5. File the Issue once the user decides" when the user has decided a demo
 and asks to file the theme. The demo's effects are functions that take the board and the tick and
-draw; that shape is the split.
+draw; that shape is the split. Each child moves the demo's functions in unchanged in shape and places
+them by kit's layout ([wiring](theme-wiring.md)).
 
 ## First: one seam child
 
 - One child builds every socket the effects plug into, and merges before any effect child starts:
-  - the theme's row in `THEME_DEFS` with every field (each `live` flag, `panel`, `typing`, …);
+  - the theme's row in `THEME_DEFS` with every field (`name`, `intro`, `typing`, `typed_end`,
+    `score`) and its alias row;
+  - the theme's module in the registry, with its parts and `lasts`;
   - the colors;
-  - the switches of the existing effects the theme keeps or turns off;
+  - the sound palette ([sound](theme-sound.md));
   - the signal each effect reads from the board;
   - the draw order — the order the demo's frame function calls its `draw_*` functions;
   - the shared timing constants the effects read (jump ticks, run-up length, lead times);

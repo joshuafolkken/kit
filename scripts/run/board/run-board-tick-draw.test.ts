@@ -122,9 +122,9 @@ describe('run_board_tick_draw.draw_display sound mark', () => {
 		const clock = minute_of(START)
 
 		expect(header_drawn({ is_on: true }).lines).toStrictEqual([
-			'⏸ josh-board  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -',
-			`  -           🕒 ${clock}  +      0″  🔊 —`,
-			`  kit         🚀 ${clock}`,
+			'⏸ josh-board     🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -',
+			`  -              🕒 ${clock}  +      0″  🔊 —`,
+			`  kit            🚀 ${clock}`,
 		])
 	})
 

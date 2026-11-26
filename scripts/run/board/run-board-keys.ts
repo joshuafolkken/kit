@@ -15,10 +15,13 @@ const SWITCHED_ON_CUE: CueName = 'launch'
 type Cue = (name: CueName) => void
 type Trill = Pick<TypingSound, 'set'>
 
-// The board's cue and the typing trill the sound switch gates; none plays without them.
+// The board's cue and the typing trill the sound switch gates; none plays without them. `claim` is
+// asked first of every chunk the folds would take, and takes it where it answers true (a themed board's
+// hidden demo key, `run-board-theme-keys.ts`).
 interface KeySounds {
 	cue?: Cue | undefined
 	trill?: Trill | undefined
+	claim?: ((chunk: string) => boolean) | undefined
 }
 
 // The keyboard as the board uses it; `interrupt` is what Ctrl-C does once raw mode reads it as a key,
@@ -33,15 +36,18 @@ interface KeyInput {
 	store?: (FoldStore & Partial<BoardStore>) | undefined
 }
 
+// What `intercept` hands each chunk of keys to; a taker that needs no key reads none.
+type KeyTaker = (chunk?: string) => void
+
 // The sections folded so far, read at every redraw — none where no key can be read — and what puts the
 // terminal back.
-// `intercept` hands every key, Ctrl-C aside, to `on_key` instead of the folds, until the returned
-// release is called.
+// `intercept` hands every chunk of keys, Ctrl-C aside, to `on_key` instead of the folds, until the
+// returned release is called.
 // `sound` is the switch `s` flips, and `cue` the board's cue played only while it is on.
 interface KeyReading {
 	folded: (() => ReadonlySet<SectionKey>) | undefined
 	stop?: (() => void) | undefined
-	intercept?: ((on_key: () => void) => () => void) | undefined
+	intercept?: ((on_key: KeyTaker) => () => void) | undefined
 	sound?: (() => boolean) | undefined
 	cue?: Cue | undefined
 }
@@ -127,17 +133,28 @@ function pressing(
 	}
 }
 
-function read_keys(input: KeyInput | undefined, { cue, trill }: KeySounds = {}): KeyReading {
+// A chunk the folds would take, unless `claim` takes it first.
+function claimed(
+	press: (chunk: string) => void,
+	claim: ((chunk: string) => boolean) | undefined,
+): (chunk: string) => void {
+	return (chunk) => {
+		if (claim?.(chunk) !== true) press(chunk)
+	}
+}
+
+function read_keys(input: KeyInput | undefined, sounds: KeySounds = {}): KeyReading {
 	if (input?.is_tty !== true) return { folded: undefined }
 
-	const { press, ...reading } = pressing(input, cue, trill)
-	const held: { taker: (() => void) | undefined } = { taker: undefined }
+	const { press, ...reading } = pressing(input, sounds.cue, sounds.trill)
+	const take = claimed(press, sounds.claim)
+	const held: { taker: KeyTaker | undefined } = { taker: undefined }
 
 	input.raw(true)
 	input.listen((chunk) => {
 		if (chunk.includes(CTRL_C)) input.interrupt()
-		else if (held.taker === undefined) press(chunk)
-		else held.taker()
+		else if (held.taker === undefined) take(chunk)
+		else held.taker(chunk)
 	})
 
 	return {
@@ -160,4 +177,4 @@ function read_keys(input: KeyInput | undefined, { cue, trill }: KeySounds = {}):
 const run_board_keys = { CTRL_C, read_keys }
 
 export { run_board_keys }
-export type { KeyInput, KeyReading }
+export type { KeyInput, KeyReading, KeyTaker }

@@ -182,7 +182,8 @@ function draw_over(
 	const { local } = state
 
 	if (display !== undefined) return draw_display(state, display, { ports, now_ms })
-	if (local === undefined) return draw_no_run(state, ports, now_ms)
+	// No run, no lamp panel: a themed board's theme has nothing to lay out by, so it draws in no theme.
+	if (local === undefined) return draw_no_run(state, ports.plain_ports ?? ports, now_ms)
 
 	const assembled = assemble_display(state, local, now_ms, layout_for(state, local, now_ms))
 

@@ -56,8 +56,8 @@ nothing else disappeared or moved; the layout holds at the captured viewport.
 
 The board is text, so read it: do not look for a screenshot command, and do not stop.
 
-1. List the states the change affects, of: a notice or none, repeat, mute, theme (default,
-   `wargames`, `matrix`), a narrow width.
+1. List the states the change affects, of: a notice or none, repeat, mute, theme (default, or a
+   `--theme` value: `wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`), a narrow width.
 2. Per state, run `pnpm josh run:board --frame` once with the flags that fix it (`--notice <row state>`
    such as `merged` or `stopped`,
    `--issue <n>`, `--repeat`, `--mute`, `--theme <name>`, `--columns <n>`) and read the output: layout,

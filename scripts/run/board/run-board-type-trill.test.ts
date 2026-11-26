@@ -147,53 +147,29 @@ afterEach(() => {
 	vi.useRealTimers()
 })
 
+// joshuafolkken/kit#8917: the redraw sounds the cue; the trill is the spin's, switched from its first
+// frame on, as the theme layer types the rows.
 describe('run_board_tick_draw.draw_display trill', () => {
-	it('switches the trill on as a row appears, with the cue on the same frame', () => {
+	it('sounds the cue as a row appears, leaving the trill to the spin', () => {
 		const heard: Heard = { cues: [], trill: [] }
 		const base = heard_over(planned(), [], START, { cues: [], trill: [] })
 
 		heard_over(base, running(), START + SECOND, heard)
-		expect(heard).toStrictEqual({ cues: ['launch'], trill: [true] })
-	})
-
-	it('switches the trill off once every row is typed through', () => {
-		const heard: Heard = { cues: [], trill: [] }
-		const base = heard_over(planned(), [], START, { cues: [], trill: [] })
-		const appeared = heard_over(base, running(), START + SECOND, { cues: [], trill: [] })
-
-		heard_over(appeared, running(), START + TYPED_MS, heard)
-		expect(heard.trill).toStrictEqual([false])
+		expect(heard).toStrictEqual({ cues: ['launch'], trill: [] })
 	})
 
 	// joshuafolkken/kit#8457
-	it('switches the trill on as the live plan lands on the saved one’s frame', () => {
-		const heard: Heard = { cues: [], trill: [] }
+	it('switches the trill on in the spin as the live plan lands on the saved one’s frame', async () => {
 		const saved = { ...planned(), fetched_ms: START - SECOND }
 		const base = heard_over(saved, [], START, { cues: [], trill: [] })
+		const landed = heard_over({ ...base, fetched_ms: START + SECOND }, [], START + SECOND, {
+			cues: [],
+			trill: [],
+		})
 
-		heard_over({ ...base, fetched_ms: START + SECOND }, [], START + SECOND, heard)
-		expect(heard.trill).toStrictEqual([true])
-	})
-})
+		const [first] = await turned_from(landed, START + SECOND)
 
-// joshuafolkken/kit#8365: on the matrix board a new row decodes rather than types, and the key click
-// sounds through the decode as the teletype sounds through a typed row.
-describe('run_board_tick_draw.draw_display matrix trill', () => {
-	beforeEach(() => {
-		vi.stubEnv('FORCE_COLOR', '3')
-	})
-
-	afterEach(() => {
-		vi.unstubAllEnvs()
-	})
-
-	it('switches the trill on as a row appears to decode (ac-57e6668c)', () => {
-		const heard: Heard = { cues: [], trill: [], theme: 'matrix' }
-		const base = heard_over(planned(), [], START, { cues: [], trill: [], theme: 'matrix' })
-		const appeared = heard_over(base, running(), START + SECOND, heard)
-
-		expect(appeared.typing.is_decoding).toBe(true)
-		expect(heard.trill).toStrictEqual([true])
+		expect(first).toBe(true)
 	})
 })
 
@@ -213,18 +189,6 @@ describe('run_board_spin.spin_to_second trill', () => {
 // joshuafolkken/kit#8523: the gather the board waits on between seconds draws nothing, so the trill
 // stops by itself as the letters type through rather than at the next redraw.
 describe('run_board_type_trill held gather', () => {
-	it('stops the trill a redraw switched on once its letters type through, with no redraw after', () => {
-		const { sound, kill } = sounding()
-		const base = heard_over(planned(), [], START, { cues: [], trill: [] })
-		const appeared = heard_over(base, running(), START + SECOND, { cues: [], trill: [], sound })
-		const left_ms = typed_through(appeared, START + SECOND) - (START + SECOND)
-
-		vi.advanceTimersByTime(left_ms - 1)
-		expect(kill).not.toHaveBeenCalled()
-		vi.advanceTimersByTime(1)
-		expect(kill).toHaveBeenCalledOnce()
-	})
-
 	it('stops the trill as a line typing past the second ends, while the gather holds the redraw', async () => {
 		const { sound, kill } = sounding()
 		const appeared = appeared_at(START + SECOND)

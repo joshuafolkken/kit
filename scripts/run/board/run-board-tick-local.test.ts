@@ -169,7 +169,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])
 
-		expect(lines[0]).toMatch(/^▶ josh-board {2}🎯 --:-- {2}- {2}--′--″ .*🧠/u)
+		expect(lines[0]).toMatch(/^▶ josh-board {5}🎯 --:-- {2}- {2}--′--″ .*🧠/u)
 		expect(lines[1]).toMatch(/🕒 \d{2}:\d{2} {2}\+ +(?:\d+′)?\d+″/u)
 		expect(lines[2]).toMatch(/🚀 \d{2}:\d{2} {2}\S {10}🔄 1 running$/u)
 		expect(lines[3]).toBe('')
@@ -190,7 +190,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 	it('marks the run ⏸ and draws no wait on the second line when no child runs', async () => {
 		const lines = await loading([{ ...DRAIN, pos: 1 }])
 
-		expect(lines[0]).toMatch(/^⏸ josh-board {2}🎯 --:-- {2}- {2}--′--″ .*🧠/u)
+		expect(lines[0]).toMatch(/^⏸ josh-board {5}🎯 --:-- {2}- {2}--′--″ .*🧠/u)
 		expect(lines[1]).toMatch(/^ {2}- +🕒/u)
 		expect(lines[1]).not.toContain('💓')
 		expect(lines[2]).toMatch(/🚀 \d{2}:\d{2} +(?:\d+′)?\d+″ {2}🔭 watching/u)

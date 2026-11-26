@@ -1,4 +1,4 @@
-import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
+import type { Beat } from '#scripts/run/board/run-board-replay'
 import { board_compare_diff, type Divergence, type Mode } from './board-compare-diff'
 import { board_compare_screen, type Size } from './board-compare-screen'
 

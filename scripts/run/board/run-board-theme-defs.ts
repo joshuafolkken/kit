@@ -1,251 +1,168 @@
-import { run_board_flux_panel } from './run-board-flux-panel'
-import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_header_trace } from './run-board-header-trace'
 import type { Paint } from './run-board-labels'
-import type { NoticeLook } from './run-board-notice-trace'
-import type { PanelPainter } from './run-board-panel-draw'
-import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_sound_click } from './run-board-sound-click'
+import { run_board_sound_codec } from './run-board-sound-codec'
 import { run_board_sound_enter } from './run-board-sound-enter'
 import { run_board_sound_keypad } from './run-board-sound-keypad'
+import { run_board_sound_nixie } from './run-board-sound-nixie'
+import { run_board_sound_palettes_film } from './run-board-sound-palettes-film'
+import { run_board_sound_palettes_more } from './run-board-sound-palettes-more'
+import { run_board_sound_score, type Palette, type Score } from './run-board-sound-score'
+import { run_board_sound_skynet } from './run-board-sound-skynet'
 import { run_board_sound_typing } from './run-board-sound-typing'
-import { run_board_theme_tones } from './run-board-theme-tones'
+import { run_board_theme_magi_data } from './run-board-theme-magi-data'
 
-// joshuafolkken/kit#8349: what each theme draws, one row per theme — a theme is added by adding its
-// row, and the theme names the CLI and the worker accept are this table's keys.
+// joshuafolkken/kit#8349: what each theme carries, one row per theme — a theme is added by adding its
+// row, and the theme values the CLI and the worker accept are this table's keys. joshuafolkken/kit#8917:
+// a theme is drawn by the theme host alone (`run-board-theme-registry.ts`), each value the board's name
+// after `josh-`; what a row still holds is the board's name and the voice its typing sounds in. A board
+// in a theme draws its base in one palette, `BASE_LOOK`, which the host reads back as roles
+// (`run-board-theme-roles.ts`) and paints in the theme's own colors.
 
-// joshuafolkken/kit#8441: lines typed before the theme's line in `paint`, each held with its cursor for
-// `hold_ms`, then erased and followed by `gap_ms`; where a theme has them, its line shows at once.
+// joshuafolkken/kit#8441: lines typed before the theme's line, each held for `hold_ms`, then followed by
+// `gap_ms` — the opening's sound counts their letters (`run-board-theme-sound.ts`).
 interface IntroLeads {
 	lines: ReadonlyArray<string>
 	hold_ms: number
 	gap_ms: number
-	paint: Paint
 }
 
+// The opening's line and the pause after each letter its sound is timed by.
 interface IntroDefinition {
-	// The line typed before the first frame — shown at once after the theme's leads where it has them —
-	// and the pauses after each letter and after the line.
 	line: string
 	letter_ms: number
-	hold_ms: number
 	leads?: IntroLeads
 }
 
-// The live board's effects (joshuafolkken/kit#8360): whether each row types as it appears, and whether
-// the trill sounds while it types, and whether the section rules run launch codes while it types where
-// the lamp panel shows (`run-board-codes.ts`; joshuafolkken/kit#8375), and whether a lamp strip fills
-// above each rule by typing progress where the rules run code (`run-board-strip.ts`; joshuafolkken/kit#8376)
-// — off in every theme for now, kept to switch back on (joshuafolkken/kit#8398) — and whether each row
-// decodes from code rather than types (`run-board-decode.ts`) and the lamp panel's cells run the idle rain
-// rather than blink (`run-board-idle-rain.ts`; joshuafolkken/kit#8356), and whether a drop falls down the
-// whole board every second in place of the sweep (`run-board-rain-drop.ts`; joshuafolkken/kit#8367), and
-// whether a changed character lands white and cools (`run-board-change-flash.ts`; joshuafolkken/kit#8353),
-// and whether a new header notice blinks in a bar three times and holds lit, in `notice`'s look
-// (`run-board-notice-trace.ts`; joshuafolkken/kit#8657, joshuafolkken/kit#8745). The trill sounds over
-// every typing row.
-interface LiveDefinition {
-	flash?: boolean
-	notice_trace?: boolean
-	notice?: NoticeLook
-	sweep: boolean
-	drop: boolean
-	types_rows: boolean
-	trill: boolean
-	codes: boolean
-	strip: boolean
-	decode: boolean
-	rain: boolean
-}
-
-// joshuafolkken/kit#8673: a rule's `─` kept on every line in the rule's dash paint, and dim text no
-// color is given in drawn in `dim` in place of the dim attribute.
-interface PlainLook {
-	dim: Paint
-}
-
 interface ThemeDefinition {
-	// The board's name the header and the no-run line draw in place of `josh-board`, in lower case: a
-	// theme that draws in `capitals` raises it (joshuafolkken/kit#8604).
+	// The board's name the header and the no-run line draw in place of `josh-board`.
 	name: string
-	// Whether the theme draws the frame's text in capitals; `false` draws it as written
-	// (joshuafolkken/kit#8609).
-	capitals: boolean
-	// The color the theme draws text no color is given in.
+	// The opening's sound: its line's letters, at `letter_ms` each (joshuafolkken/kit#8365).
+	intro: IntroDefinition
+	// The WAV a live board loops while letters type at `letter_ms`, `undefined` when it cannot be
+	// written (joshuafolkken/kit#8365).
+	typing: (letter_ms: number) => string | undefined
+	// joshuafolkken/kit#8697: the WAV a live board plays once a line types through, `undefined` when it
+	// has none or cannot be written.
+	typed_end: () => string | undefined
+	// joshuafolkken/kit#8917: the WAVs a themed board plays once as a NOTICE, a ROW, a PROGRESS or a part
+	// starts, each laid out on that event's own time line (`run-board-sound-score.ts`).
+	score: Score
+}
+
+// The look a themed board's base is drawn in: the green phosphor palette the confirmed demo's frame was
+// captured in, so each color names one role — the text, the rules' dashes and headings, the idle glyphs,
+// the alert field the throughput rule ends on (`run-board-header-defcon.ts` → `level_of`, 1 the worst)
+// and the spinner's glyphs.
+interface BaseLook {
 	paint: Paint
-	// Section dashes and heading text, and the theme's idle glyphs (joshuafolkken/kit#8390).
 	rule: { dash: Paint; text: Paint }
 	idle: Paint
-	// Where the theme has one, how it draws text no color is given in beyond `paint`; without one, a
-	// rule's `─` is drawn as `-` (`run-board-tint.ts` → `plain_drawn`).
-	plain?: PlainLook
-	// joshuafolkken/kit#8673: the header's three clock rows — the finish, now, the start — each in its
-	// own color where the theme gives them (`run-board-tint.ts`).
-	circuits?: readonly [Paint, Paint, Paint]
-	intro: IntroDefinition
-	// The alert field a screen's throughput rule ends on, drawn from the level every theme shares
-	// (`run-board-header-defcon.ts` → `level_of`), 1 the worst (joshuafolkken/kit#8358).
 	alert: (level: number) => string | undefined
-	// Whether a live board in the theme draws the lamp panel (`run-board-lamps.ts`;
-	// joshuafolkken/kit#8359).
-	lamps: boolean
-	// joshuafolkken/kit#8676: the painter that draws the animation area where the lamp panel shows
-	// (`run-board-panel-draw.ts`); a theme with none draws nothing there between redraws.
-	panel?: PanelPainter
-	// joshuafolkken/kit#8702: whether the lamp panel runs over the usage rule's row too, the rule cut two
-	// columns before the panel (`run-board-fold.ts` → `rule_lamped`), so the panel shows unbroken.
-	rule_lamped: boolean
-	// Glyphs spread over the board spinner's cycle, in order (joshuafolkken/kit#8366).
 	spinner: string
-	live: LiveDefinition
-	// The WAV a live board loops while letters type at `intro.letter_ms`, `undefined` when it cannot
-	// be written (joshuafolkken/kit#8365).
-	typing: (letter_ms: number) => string | undefined
-	// joshuafolkken/kit#8697: the WAV a live board plays once a line types through — the opening's line,
-	// or the trill's rows once its loop runs out — `undefined` when it has none or cannot be written.
-	typed_end: () => string | undefined
 }
 
-const CYAN: Paint = { rgb: '62;236;225', named: 'cyan' }
-const { IDLE_PAINT } = run_board_theme_tones
+const { SHADES } = run_board_header_trace
 
-const NO_LIVE: LiveDefinition = {
-	sweep: false,
-	drop: false,
-	types_rows: false,
-	trill: false,
-	codes: false,
-	strip: false,
-	decode: false,
-	rain: false,
-}
-
-// joshuafolkken/kit#8673: the time circuits' destination (the estimated finish), present and last
-// departed (the run's start), the body's grey, its dim at 55% and the rules' slate.
-const BTTF = {
-	destination: { rgb: '255;70;50', named: 'red' },
-	present: { rgb: '70;255;110', named: 'green' },
-	departed: { rgb: '255;190;40', named: 'yellow' },
-	body: { rgb: '190;198;206', named: 'white' },
-	dim: { rgb: '105;109;113', named: 'gray' },
-	rule: { rgb: '80;88;98', named: 'gray' },
-} as const satisfies Readonly<Record<string, Paint>>
-
-function no_alert(): undefined {
-	// A theme with no alert field draws none on the throughput rule.
+const BASE_LOOK: BaseLook = {
+	paint: SHADES.body,
+	rule: { dash: SHADES.dark, text: SHADES.mid },
+	idle: SHADES.mid,
+	alert: run_board_header_trace.field_of,
+	spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 }
 
 function no_sound(): undefined {
-	// A theme with no typing or typed-end sound writes no WAV.
+	// A theme with no typed-end sound writes no WAV.
+}
+
+const { CODEC, MAGI, NIXIE, SKYNET } = run_board_sound_palettes_more
+const { FLUX, TRACE, WOPR } = run_board_sound_palettes_film
+const { score_of } = run_board_sound_score
+
+// The teletype the wargames board types in.
+const TELETYPE: Omit<ThemeDefinition, 'name'> = {
+	intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50 },
+	typing: run_board_sound_typing.teletype_wav,
+	typed_end: run_board_sound_palettes_film.wopr_typed_wav,
+	score: score_of(WOPR),
+}
+
+// A work's own voices (joshuafolkken/kit#8917): its typing, its typed end and its score, the teletype's
+// opening line kept.
+function voiced(
+	sound: { typing_wav: ThemeDefinition['typing']; typed_wav: ThemeDefinition['typed_end'] },
+	palette: Palette,
+): Omit<ThemeDefinition, 'name'> {
+	return {
+		intro: TELETYPE.intro,
+		typing: sound.typing_wav,
+		typed_end: sound.typed_wav,
+		score: score_of(palette),
+	}
 }
 
 const THEME_DEFS = {
-	wargames: {
-		// The film's war-planning computer, WOPR.
-		name: 'josh-wopr',
-		capitals: true,
-		// The cyan of the film terminal's phosphor glyph core in 24-bit color, else the palette's own cyan.
-		paint: CYAN,
-		// The rules in the idle tone, behind the row typing (joshuafolkken/kit#8397).
-		rule: { dash: IDLE_PAINT, text: CYAN },
-		idle: IDLE_PAINT,
-		intro: { line: 'SHALL WE PLAY A GAME?', letter_ms: 50, hold_ms: 2000 },
-		alert: run_board_header_defcon.field_of,
-		lamps: true,
-		panel: run_board_panel_painters.LAMP_PAINTER,
-		rule_lamped: true,
-		spinner: '│╱─╲',
-		live: {
-			sweep: true,
-			drop: false,
-			types_rows: true,
-			trill: true,
-			codes: true,
-			strip: false,
-			decode: false,
-			rain: false,
-			notice_trace: true,
-			notice: { lit: CYAN, is_rain: false },
-		},
-		typing: run_board_sound_typing.teletype_wav,
-		typed_end: no_sound,
-	},
-	// joshuafolkken/kit#8354: the green phosphor body and the `TRACE` gauge; its opening types three
-	// lines and shows the last at once (joshuafolkken/kit#8441); its new rows decode and the idle rain
-	// runs where the lamps sit (joshuafolkken/kit#8356).
-	matrix: {
-		// The film's opening terminal line, `Trace program: running`.
+	// The film's war-planning computer, WOPR.
+	wopr: { name: 'josh-wopr', ...TELETYPE },
+	// The film's opening terminal line, `Trace program: running`; a key click every two letters.
+	trace: {
 		name: 'josh-trace',
-		// The text as written, as the film's terminal draws it (joshuafolkken/kit#8609).
-		capitals: false,
-		paint: run_board_header_trace.SHADES.body,
-		rule: { dash: run_board_header_trace.SHADES.dark, text: run_board_header_trace.SHADES.mid },
-		idle: run_board_header_trace.SHADES.mid,
 		intro: {
 			line: 'Knock, knock, Josh.',
 			letter_ms: 50,
-			hold_ms: 1300,
 			leads: {
 				lines: ['Wake up, Josh...', 'The board has you...', 'Follow the white rabbit.'],
 				hold_ms: 1100,
 				gap_ms: 300,
-				paint: run_board_header_trace.SHADES.bright,
 			},
 		},
-		alert: run_board_header_trace.field_of,
-		lamps: true,
-		panel: run_board_panel_painters.RAIN_PAINTER,
-		rule_lamped: true,
-		spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
-		live: {
-			sweep: false,
-			drop: true,
-			types_rows: true,
-			trill: true,
-			codes: false,
-			strip: false,
-			decode: true,
-			rain: true,
-			flash: true,
-			notice_trace: true,
-			notice: { lit: run_board_header_trace.SHADES.bright, is_rain: true },
-		},
-		// A key click every two letters while the intro types and new rows decode (joshuafolkken/kit#8365).
 		typing: run_board_sound_click.typing_wav,
 		typed_end: no_sound,
+		score: score_of(TRACE),
 	},
-	// joshuafolkken/kit#8673: the time machine's board — its header's clocks in the time circuits'
-	// red, green and amber, the rest a cool grey; no alert field.
-	bttf: {
+	// The time machine's board: the time-circuit keypad while a line types, its ENTER once typed through.
+	flux: {
 		name: 'josh-flux',
-		capitals: false,
-		paint: BTTF.body,
-		rule: { dash: BTTF.rule, text: BTTF.body },
-		idle: BTTF.dim,
-		plain: { dim: BTTF.dim },
-		circuits: [BTTF.destination, BTTF.present, BTTF.departed],
-		intro: { line: run_board_sound_keypad.LINE, letter_ms: 50, hold_ms: 2000 },
-		alert: no_alert,
-		// joshuafolkken/kit#8674: the flux capacitor, the lamp gauge and the speed readout at idle.
-		lamps: true,
-		panel: run_board_flux_panel.FLUX_PAINTER,
-		// The flux figure sits in the panel's area, which a lamped rule row would move.
-		rule_lamped: false,
-		spinner: '│╱─╲',
-		// joshuafolkken/kit#8683: its notices, operations and rows type as the other themes' do; the
-		// time-circuit keypad sounds while any row types, and the circuits' ENTER once each is typed
-		// through — every typing alike, each the cue of a time jump (joshuafolkken/kit#8731).
-		live: {
-			...NO_LIVE,
-			types_rows: true,
-			trill: true,
-			notice_trace: true,
-			notice: { lit: BTTF.body, is_rain: false },
-		},
+		intro: { line: run_board_sound_keypad.LINE, letter_ms: 50 },
 		typing: run_board_sound_keypad.typing_wav,
 		typed_end: run_board_sound_enter.enter_wav,
+		score: score_of(FLUX),
+	},
+	codec: { name: 'josh-codec', ...voiced(run_board_sound_codec, CODEC) },
+	nixie: { name: 'josh-nixie', ...voiced(run_board_sound_nixie, NIXIE) },
+	skynet: { name: 'josh-skynet', ...voiced(run_board_sound_skynet, SKYNET) },
+	// joshuafolkken/kit#8917: magi's opening types its own title, so its sound counts that title's letters.
+	magi: {
+		name: 'josh-magi',
+		...voiced(
+			{
+				typing_wav: run_board_sound_palettes_more.magi_typing_wav,
+				typed_wav: run_board_sound_palettes_more.magi_typed_wav,
+			},
+			MAGI,
+		),
+		intro: { line: run_board_theme_magi_data.MAGI_OPEN.title, letter_ms: TELETYPE.intro.letter_ms },
 	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
+
+type Theme = keyof typeof THEME_DEFS
+
+// Issue 4-2: the works' full titles and short names a theme is also launched by, each read as the value
+// it names; the board holds only the values.
+const THEME_ALIASES: ReadonlyMap<string, Theme> = new Map<string, Theme>([
+	['wargames', 'wopr'],
+	['matrix', 'trace'],
+	['bttf', 'flux'],
+	['backtothefuture', 'flux'],
+	['metalgear', 'codec'],
+	['mgs', 'codec'],
+	['steinsgate', 'nixie'],
+	['sg', 'nixie'],
+	['terminator', 'skynet'],
+	['evangelion', 'magi'],
+	['eva', 'magi'],
+])
 
 // A table's theme names, in its row order, as the non-empty list `z.enum` takes.
 function names_of<Name extends string>(
@@ -261,50 +178,13 @@ function names_of<Name extends string>(
 
 const THEMES = names_of(THEME_DEFS)
 
-type Theme = keyof typeof THEME_DEFS
-
-// The theme rows whose live effects a reader reads.
-type LiveDefs = Readonly<Partial<Record<string, Pick<ThemeDefinition, 'live'>>>>
-
-// The live effects a theme's definition chooses (joshuafolkken/kit#8360); a board in no theme has none.
-function live_of(theme: Theme | undefined, defs: LiveDefs = THEME_DEFS): LiveDefinition {
-	if (theme === undefined) return NO_LIVE
-
-	return defs[theme]?.live ?? NO_LIVE
-}
-
-// The painter a theme's definition hands the animation area (joshuafolkken/kit#8676); none in no theme.
-function panel_of(theme: Theme | undefined): PanelPainter | undefined {
-	if (theme === undefined) return undefined
-	const definition: ThemeDefinition = THEME_DEFS[theme]
-
-	return definition.panel
-}
-
-// Whether a theme's lamp panel runs over the usage rule's row (joshuafolkken/kit#8702); none in no theme.
-function is_rule_lamped(theme: Theme | undefined): boolean {
-	if (theme === undefined) return false
-	const definition: ThemeDefinition = THEME_DEFS[theme]
-
-	return definition.rule_lamped
-}
-
 const run_board_theme_defs = {
+	BASE_LOOK,
 	THEMES,
+	THEME_ALIASES,
 	THEME_DEFS,
-	is_rule_lamped,
-	live_of,
 	names_of,
-	panel_of,
 }
 
 export { run_board_theme_defs }
-export type {
-	IntroDefinition,
-	IntroLeads,
-	LiveDefinition,
-	LiveDefs,
-	PlainLook,
-	Theme,
-	ThemeDefinition,
-}
+export type { BaseLook, IntroDefinition, IntroLeads, Theme, ThemeDefinition }

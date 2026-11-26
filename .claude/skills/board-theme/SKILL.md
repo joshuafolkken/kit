@@ -5,7 +5,20 @@ description: Show a `run:board` look change as a JS demo or a printf; build them
 
 # Show and build run:board looks
 
-Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
+Kit-only. A theme is a row in `scripts/run/board/run-board-theme-defs.ts` (`THEME_DEFS`: board name,
+opening line, typing voice, typed end, sound score) and a module the theme host draws
+(`run-board-theme-registry.ts`, `run-board-theme-<value>-*.ts`).
+
+| Read | When |
+|---|---|
+| [What a theme carries](theme-rules.md) | Deciding a theme's items, events, places, timing, names |
+| [Sound](theme-sound.md) | Deciding and building its sounds |
+| [Demo template](demo-template.md) | Building the demo and the states it must try |
+| [Wiring](theme-wiring.md) | Moving a confirmed demo into kit and checking it |
+| [Split](theme-split.md), [render cost](render-cost.md) | Filing |
+
+The order: a throwaway JS demo confirms the look → its drawing moves into the theme's module unchanged
+in shape → the live board's demo mode and bases of the real board's shape check it.
 
 ## 0. Show the change
 
@@ -20,14 +33,21 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
 ## 1. Pick the subject
 
 - Candidates: #8384.
-- Echo the work through color and motion only; no logo, sound or asset file of the work in the
-  repository — the matrix typing sound was synthesized from measurements (#8365).
+- Decide every item of [what a theme carries](theme-rules.md) → "Checklist" before asking for approval.
+- Echo the work through color, motion and computed sound only; no logo, recorded sound or asset file
+  of the work in the repository (#8365, [sound](theme-sound.md)).
 
 ## 2. Measure the original
 
 - Reproduce first, then add one touch (`principles.md` → "reproduce-first").
-- Write down colors (hex), characters, speeds (ms) and the order of motion, stepping frame by frame
+- Write down colors (hex), characters, speeds and the order of motion, stepping frame by frame
   through video or frames the user supplies. Keep only the numbers.
+- You cannot play video: ask the user for screenshots of the moments to match. Given only a time, say
+  so, and answer what is known and unknown about that scene; add no guessed effect.
+- Copy the text, order, colors and layout an image shows as they are. Report what you filled in from
+  memory or invention.
+- A terminal draws no true curve: line characters are smooth but thin, blocks bold but square — let
+  the user compare both.
 
 ## 3. Build the demo
 
@@ -38,15 +58,22 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
   plays; the top two rows name the scene and list the keys; `Q` quits. Other axes: letter keys, a
   third row. `DEMO_STEPS=<n>` checks it headless.
 - Keep the board's paces (a letter every 50 ms, a spinner frame every 80 ms).
-- Sound: a WAV played from an HTML page (`scratch:run` spawns nothing).
+- Follow [demo template](demo-template.md) → "Demo rules" and try its "States to try" at the demo stage.
+- Sound: decide it by waveform values ([sound](theme-sound.md)); the demo plays none.
 
 ## 4. Show it
 
 - Every reply: the one command, no argument, alone in its code block, no trailing comment.
-- Write "behavior checked, look unchecked".
+- Write "behavior checked, look unchecked"; for sounds, "unchecked by ear". You see neither color nor
+  motion: check places on a text capture and say which parts you checked.
 - One change per reply, in two stages: the demo that matches the original item by item beside the
   measured numbers; once passed, three variant scenes each adding a touch. A rejected one may stay;
   note its name.
+- Take fixes as "the theme's number and the event's key". When an instruction reads two ways, say how
+  you read it and go on.
+- Report every change that affects the look, asked for or not. Report additions nobody asked for
+  apart and ask whether to keep them.
+- Before a change the user "may revert", keep a copy of the current version under another name.
 
 ## 5. File the Issue once the user decides
 
@@ -66,7 +93,8 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
   look unchanged** (#8376).
 - A look approved or changed → record its golden replay in that PR: `docs/josh-commands-board.md` →
   "`josh board:compare`".
-- Demo-backed: a seam child, then parallel effect children ([split](theme-split.md)).
+- Demo-backed: a seam child, then parallel effect children ([split](theme-split.md)); each moves
+  the demo's drawing in unchanged and places it by kit's layout ([wiring](theme-wiring.md)).
 
 ## 6. After the first merge
 
@@ -76,10 +104,22 @@ Kit-only; themes live in `scripts/run/board/run-board-theme-defs.ts`.
 - Comment the real board's `--timing` values on the Issue once every effect child has merged:
   [render cost](render-cost.md) → "After every effect child has merged".
 
+## Working rules
+
+- Gather the points the user finds by eye and hand them over as one piece of work, in one brief that
+  holds everything. Record on the Issue only the decisions that stay as the spec.
+- Keep investigation and implementation in separate pieces of work; finish the implementation first.
+- Never let two pieces of work touch the same file at once; files apart may go in parallel. The agent
+  that built a theme also takes its fixes.
+- While the look is being tuned, tests and the gate may wait with the user's explicit approval; the
+  finish runs them all.
+- Two defects of one shape → stop fixing one at a time; find that shape in every theme's code.
+- Read a request no wider than it is: fixing a value shown as `--` changes no effect.
+
 ## Examples
 
-- matrix: epic #8357; demo code in its children's comments, #8352–#8370.
-- wargames typing effect: epic #8377 (#8375, #8376); demo code:
+- trace: epic #8357; demo code in its children's comments, #8352–#8370.
+- wopr typing effect: epic #8377 (#8375, #8376); demo code:
   https://github.com/joshuafolkken/kit/issues/8376#issuecomment-7039783569
 - Demo-vs-implementation comparison:
   https://github.com/joshuafolkken/kit/issues/8354#issuecomment-7039850496

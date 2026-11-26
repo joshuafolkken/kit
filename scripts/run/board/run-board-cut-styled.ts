@@ -7,7 +7,7 @@ import { run_board_fit } from './run-board-fit'
 // column; the cut closes both after it.
 
 const ESC = '\u{1B}'
-const { LINK_CLOSE, is_escape } = run_board_escape
+const { is_escape } = run_board_escape
 const RESET = `${ESC}[0m`
 const SEGMENTER = new Intl.Segmenter()
 
@@ -137,8 +137,6 @@ function styled_pieces(line: string): Array<StyledPiece> {
 }
 
 const run_board_cut_styled = {
-	LINK_CLOSE,
-	RESET,
 	cut_styled,
 	pieces_of,
 	styled_pieces,

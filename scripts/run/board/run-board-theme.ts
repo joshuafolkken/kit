@@ -5,26 +5,27 @@ import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_option, type OptionSpec } from './run-board-option'
 import type { BoardPorts } from './run-board-state'
-import { run_board_theme_case } from './run-board-theme-case'
-import { run_board_theme_defs, type Theme, type ThemeDefinition } from './run-board-theme-defs'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 import { run_board_tint } from './run-board-tint'
 
-// joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
-// is given in the cyan glow of the film's terminal phosphor and every rule as a run of `-`, so each
-// character of a line shows; joshuafolkken/kit#7988: each icon as text of its width
-// (`run-board-theme-glyphs.ts`) and the text uppercase, as a text terminal draws it;
+// joshuafolkken/kit#7934: a theme for the board a person watches. A themed board's base is drawn in the
+// base look (`run-board-theme-defs.ts` → `BASE_LOOK`; joshuafolkken/kit#8917): the text no color is
+// given in its paint and every rule as a run of `-`, so each character of a line shows;
+// joshuafolkken/kit#7988: each icon as text of its width (`run-board-theme-glyphs.ts`);
 // joshuafolkken/kit#8150: that text in the color of the state its icon marks
-// (`run-board-theme-tones.ts`). It is put on the frame as it is written, once, so no render module
-// carries it; a color a render module gives (red, yellow, …) is kept, the cyan resumed after it.
+// (`run-board-theme-tones.ts`). The theme host reads that base back as roles and paints it in the
+// theme's own colors. It is put on the frame as it is written, once, so no render module carries it; a
+// color a render module gives (red, yellow, …) is kept, the base paint resumed after it.
 
 const THEME_ENV = 'JOSH_BOARD_THEME'
-const { THEMES, THEME_DEFS } = run_board_theme_defs
+const { BASE_LOOK, THEMES, THEME_ALIASES } = run_board_theme_defs
 const THEME_OPTION: OptionSpec<Theme> = {
 	flag: '--theme',
 	env: THEME_ENV,
 	noun: 'theme',
 	names: THEMES,
+	aliases: THEME_ALIASES,
 }
 const RULE = '─'
 const RULE_RUN = /─+/gu
@@ -96,7 +97,7 @@ function phosphor(look: Look): string {
 
 	if (inputs === memo.inputs) return memo.open
 	memo.inputs = inputs
-	memo.open = open_of(THEME_DEFS[look.theme].paint)
+	memo.open = open_of(BASE_LOOK.paint)
 	memo.lines.clear()
 
 	return memo.open
@@ -109,28 +110,21 @@ function dimmed(rule: Paint, text: string): string {
 	)
 }
 
-// The line's text as the theme writes it: rules as `-` where the theme has no plain look, icons as
-// text, capitals where it draws them; a plain look draws every uncolored rule run and dim text in its
-// own paints (joshuafolkken/kit#8673), else a heading's `-` take the rule paint.
-function written(definition: ThemeDefinition, look: Look, kept: string, is_rule: boolean): string {
-	const { plain, rule } = definition
-	const ruled = plain === undefined ? kept.split(RULE).join(DASH) : kept
-	const glyphs = run_board_theme_glyphs.textual(ruled, look)
-	const text = definition.capitals ? run_board_theme_case.capitals(glyphs) : glyphs
+// The line's text as the base look writes it: rules as `-`, icons as text, a heading's `-` in the rule
+// paint (joshuafolkken/kit#8917: every theme's base, the host painting it after).
+function written(look: Look, kept: string, is_rule: boolean): string {
+	const text = run_board_theme_glyphs.textual(kept.split(RULE).join(DASH), look)
 
-	if (plain !== undefined) return run_board_tint.plain_drawn({ ...plain, rule: rule.dash }, text)
-
-	return is_rule ? dimmed(rule.dash, text) : text
+	return is_rule ? dimmed(BASE_LOOK.rule.dash, text) : text
 }
 
 // joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
 function restyled_line(open: string, look: Look, line: string): string {
-	const definition: ThemeDefinition = THEME_DEFS[look.theme]
 	const kept = run_board_label_pair.dropped(line)
 	const is_rule = run_board_label_pair.heading_lead(stripVTControlCharacters(kept)) !== undefined
-	const text = written(definition, look, kept, is_rule)
+	const text = written(look, kept, is_rule)
 
-	return lit(is_rule ? open_of(definition.rule.text) : open, text)
+	return lit(is_rule ? open_of(BASE_LOOK.rule.text) : open, text)
 }
 
 // joshuafolkken/kit#8207: a line drawn before is taken from the cache — most lines of a redraw, and of

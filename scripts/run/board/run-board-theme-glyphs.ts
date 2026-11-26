@@ -13,11 +13,10 @@ import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
 const { EMOJI, SYMBOLS } = run_board_theme_glyph_table
 
-// The spinner steps through its theme's glyphs (`spinner` in the theme table: wargames' `│ ╱ ─ ╲`,
-// matrix's kana) instead of the braille dots, each frame the glyph its place in the dots' cycle
-// falls on, so one cycle of the dots is one pass through the glyphs.
-const { THEMES, THEME_DEFS } = run_board_theme_defs
-const TURN = THEME_DEFS.wargames.spinner
+// The spinner steps through the base look's glyphs (`BASE_LOOK.spinner`, kana) instead of the braille
+// dots on a themed board, each frame the glyph its place in the dots' cycle falls on, so one cycle of
+// the dots is one pass through the glyphs; the theme host turns its own spinner over it.
+const { BASE_LOOK } = run_board_theme_defs
 const UNKNOWN: Glyph = ['?', 'info']
 const VARIATION_SELECTOR = '\u{FE0F}'
 const ESC = '\u{1B}'
@@ -33,14 +32,13 @@ function turn_of(turn: string, index: number, count: number): string {
 	return turn[Math.floor((index * turn.length) / count)] ?? ''
 }
 
-function spinner_turns(theme: Theme): Array<[string, Glyph]> {
+function spinner_turns(turn: string): Array<[string, Glyph]> {
 	const frames = run_board_labels.SPINNER_FRAMES
-	const turn = THEME_DEFS[theme].spinner
 
 	return frames.map((frame, index) => [frame, [turn_of(turn, index, frames.length), 'info']])
 }
 
-const TURNS = new Map(THEMES.map((theme) => [theme, new Map(spinner_turns(theme))]))
+const TURNS = new Map(spinner_turns(BASE_LOOK.spinner))
 const SPINNER: ReadonlySet<string> = new Set(run_board_labels.SPINNER_FRAMES)
 const SINGLE_CLASS = [...SYMBOLS.keys(), ...run_board_labels.SPINNER_FRAMES].join('')
 const PICTOGRAPHIC = String.raw`\p{Extended_Pictographic}`
@@ -52,11 +50,11 @@ interface GlyphLook {
 	icons: Icons
 }
 
-const DEFAULT_LOOK: GlyphLook = { theme: 'wargames', icons: 'shapes' }
+const DEFAULT_LOOK: GlyphLook = { theme: 'wopr', icons: 'shapes' }
 
-// A spinner dot takes its theme's glyph; a board in no theme keeps the dots.
+// A spinner dot takes the base look's glyph; a board in no theme keeps the dots.
 function turn_entry(glyph: string, theme: Theme | undefined): Glyph | undefined {
-	return theme === undefined ? undefined : TURNS.get(theme)?.get(glyph)
+	return theme === undefined ? undefined : TURNS.get(glyph)
 }
 
 function icon_entry(glyph: string): Glyph {
@@ -75,9 +73,9 @@ function drawn_text([letters, , shape = letters]: Glyph, icons: Icons): string {
 	return icons === 'shapes' ? shape : letters
 }
 
-// The idle tone's paint: the theme's, else the tones' own dim.
+// The idle tone's paint: the base look's, else the tones' own dim.
 function idle_of(theme: Theme | undefined): Paint | undefined {
-	return theme === undefined ? undefined : THEME_DEFS[theme].idle
+	return theme === undefined ? undefined : BASE_LOOK.idle
 }
 
 // What a render module left open where a glyph is drawn: a foreground color, and the escapes of the
@@ -169,6 +167,6 @@ function textual(frame: string, look: GlyphLook = DEFAULT_LOOK): string {
 	return mapped(frame, (text, open) => glyphs_as_text(text, open, look))
 }
 
-const run_board_theme_glyphs = { EMOJI, SYMBOLS, TURN, mapped, textual }
+const run_board_theme_glyphs = { EMOJI, SYMBOLS, mapped, textual }
 
 export { run_board_theme_glyphs }

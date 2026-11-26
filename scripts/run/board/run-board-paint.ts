@@ -69,6 +69,7 @@ function painter(): Painter {
 
 const run_board_paint = {
 	RGB_COLOR_DEPTH,
+	color_depth,
 	painted,
 	painter,
 }

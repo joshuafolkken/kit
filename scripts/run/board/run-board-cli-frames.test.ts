@@ -169,7 +169,7 @@ describe('run_board_cli.run live board record', () => {
 describe('run_board_cli.run --once record keys', () => {
 	it.each([
 		['a terminal', once_key(undefined, true)],
-		['another theme', once_key('wargames', false)],
+		['another theme', once_key('wopr', false)],
 	])('reads past a record kept for %s', async (_name, key) => {
 		const store = memory_store()
 		const made = board(store)
@@ -185,8 +185,8 @@ describe('run_board_cli.run --once record keys', () => {
 		const store = memory_store()
 		const made = board(store)
 
-		store.save(once_key('wargames', false), { text: RECORDED, saved_ms: made.clock.now_ms })
-		await run_board_cli.run(['--once', '--theme', 'wargames'], made.ports)
+		store.save(once_key('wopr', false), { text: RECORDED, saved_ms: made.clock.now_ms })
+		await run_board_cli.run(['--once', '--theme', 'wopr'], made.ports)
 
 		expect(made.read_local).not.toHaveBeenCalled()
 		expect(made.frames).toStrictEqual([`${RECORDED}recorded 0s ago\n`])
@@ -196,10 +196,10 @@ describe('run_board_cli.run --once record keys', () => {
 		const store = memory_store()
 		const made = board(store)
 
-		store.save(once_key('wargames', false), { text: RECORDED, saved_ms: made.clock.now_ms })
-		await run_board_cli.run(['--once', '--theme', 'wargames', '--icons', 'letters'], made.ports)
+		store.save(once_key('wopr', false), { text: RECORDED, saved_ms: made.clock.now_ms })
+		await run_board_cli.run(['--once', '--theme', 'wopr', '--icons', 'letters'], made.ports)
 
 		expect(made.read_local).toHaveBeenCalled()
-		expect(store.load(once_key('wargames', false, 'letters'))?.text).toBe(made.frames[0])
+		expect(store.load(once_key('wopr', false, 'letters'))?.text).toBe(made.frames[0])
 	})
 })

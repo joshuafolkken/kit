@@ -72,7 +72,7 @@ function third(
 ): string {
 	return (
 		time_parts(
-			{ ...header_of(undefined, spinner), theme: 'wargames', ...overrides },
+			{ ...header_of(undefined, spinner), theme: 'wopr', ...overrides },
 			mark,
 			THIRD_NOW,
 			undefined,
@@ -80,41 +80,40 @@ function third(
 	)
 }
 
-// joshuafolkken/kit#8240, #8404: the third line's `″` is drawn as the sweep's placeholder on a terminal
-// in wargames for a run neither stopped nor ended; the spinner turns only while the run works.
-describe('run_board_header_time.time_parts — the sweep’s placeholder', () => {
-	it('marks the `″` with the placeholder while a running or setting-up run’s spinner turns', () => {
-		expect(third(SPOT, 'running')).toContain(TICK)
-		expect(third(SPOT, 'setup')).toContain(TICK)
+// joshuafolkken/kit#8917: the third line's `″` stays as it is in every theme — the sweep it once placed
+// is gone; the spinner turns only while the run works.
+describe('run_board_header_time.time_parts — the third line’s age', () => {
+	it('keeps the `″` while a running or setting-up run’s spinner turns', () => {
+		for (const mark of ['running', 'setup'] as const) {
+			expect(third(SPOT, mark)).not.toContain(TICK)
+			expect(third(SPOT, mark)).toContain(SECONDS_MARK)
+		}
+
 		expect(third(SPOT, 'running')).toContain(SPOT)
-		expect(third(SPOT, 'running')).not.toContain(SECONDS_MARK)
 	})
 
-	it('marks the `″` of a watching or waiting run, its spinner column left blank', () => {
+	it('keeps the `″` of a watching or waiting run, its spinner column left blank', () => {
 		for (const mark of ['idle', 'human'] as const) {
-			expect(third(SPOT, mark)).toContain(TICK)
+			expect(third(SPOT, mark)).toContain(SECONDS_MARK)
 			expect(third(SPOT, mark)).not.toContain(SPOT)
 			expect(third(SPOT, mark)).toMatch(/^ +\d/u)
 		}
 	})
 
-	it('marks the `″` of a waiting run while the network is down', () => {
+	it('keeps the `″` of a waiting run while the network is down', () => {
 		const outage = { from_ms: NOW_MS - OUTAGE_MS, down_ms: NOW_MS }
 		const activity = { last_event_ms: NOW_MS, outage, is_stopped: false }
 
-		expect(third(SPOT, 'idle', { activity })).toContain(TICK)
+		expect(third(SPOT, 'idle', { activity })).not.toContain(TICK)
 	})
 
 	it('leaves the `″` as it is with no spinner, or for a run that has stopped', () => {
-		expect(third(undefined, 'running')).not.toContain(TICK)
-		expect(third(undefined, 'idle')).not.toContain(TICK)
 		expect(third(undefined, 'running')).toContain(SECONDS_MARK)
-		expect(third(SPOT, 'stopped')).not.toContain(TICK)
 		expect(third(SPOT, 'stopped')).toContain(SECONDS_MARK)
 	})
 
-	// joshuafolkken/kit#8478: an ended run draws `—` in the third cell, so no `″` is left to sweep.
-	it('draws an ended run’s third cell as `—`, no placeholder', () => {
+	// joshuafolkken/kit#8478: an ended run draws `—` in the third cell.
+	it('draws an ended run’s third cell as `—`', () => {
 		expect(third(SPOT, 'idle', { ended_ms: NOW_MS }).trim()).toBe('—')
 	})
 })
@@ -169,14 +168,14 @@ describe('run_board_header_time.time_parts — the signed column', () => {
 })
 
 describe('run_board_header_time.time_parts — frames without a sweep', () => {
-	it.each([undefined, 'matrix'] as const)('leaves the seconds mark in theme %s', (theme) => {
+	it.each([undefined, 'trace'] as const)('leaves the seconds mark in theme %s', (theme) => {
 		for (const mark of ['running', 'setup', 'idle', 'human'] as const) {
 			expect(third(SPOT, mark, { theme })).not.toContain(TICK)
 			expect(third(SPOT, mark, { theme })).toContain(SECONDS_MARK)
 		}
 	})
 
-	it('leaves the seconds mark in once and chat frames in wargames', () => {
+	it('leaves the seconds mark in once and chat frames in wopr', () => {
 		expect(third(undefined, 'running', { form: 'screen' })).not.toContain(TICK)
 		expect(third(undefined, 'running', { form: 'chat' })).not.toContain(TICK)
 	})

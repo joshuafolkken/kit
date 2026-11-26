@@ -10,6 +10,29 @@ pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs
 
 `DEMO_STEPS=<n>` ends it after n frames: the check without a terminal. `DEMO_BEATS=1` and `DEMO_SEED=<n>` → the code's comments.
 
+## Demo rules
+
+- A demo of several themes: digits pick the theme (0 no theme, then `THEME_DEFS` order), letters the
+  event (`s` IDLE, `a` PROGRESS, `d` ROW, `w` NOTICE, `q` OPENING, `e` ENDING); it starts on IDLE.
+  Events loop with two seconds of normal display between; OPENING and ENDING play once, then IDLE.
+- Each version is its own file; never change an earlier one. Keep each demo with its base as a pair;
+  give the version the user confirms a copy that plays alone.
+- One file per theme lets themes be fixed in parallel.
+- The `--once` frame is a still frame, not the live board's shape. Also take bases in the live shape:
+  rules with folding marks, emoji on and off. A theme that draws in capitals capitalizes in the demo.
+- Find places from structure (rule headings, gauges, free rows, layout constants), never from a
+  line's text (`startsWith('-- ')`, a regular expression) or a fixed row number.
+- A missing row is no row: never fall back to row 0 or a negative row (no `lane_rows[0] ?? 0`).
+- Find times by place, never by their text's shape (a date in the clock).
+- Turn the terminal's line wrap off and crop to the terminal's size.
+- Keep three checks without a terminal: every frame built, a text capture at a given moment, and the
+  bytes per write. Measure a lengthened NOTICE whole.
+
+## States to try
+
+Try each at the demo stage: no lane, folded sections, the run stopped, no finish estimate (clocks
+`--:--`), clocks with no date, a narrow terminal.
+
 ```js
 // Template for a `run:board` theme demo: a real board frame, a typed message, and scenes a number key picks.
 // Copy it to .josh/tmp/scratch/<theme>-theme-demo.mjs, then add effects and scenes.
@@ -42,7 +65,7 @@ const CHOSEN = rgb('255;200;60')
 // taken afresh for each proposal:
 // `FORCE_COLOR=3 pnpm josh run:board --once --theme <theme> > .josh/tmp/scratch/<theme>-frame.ans`.
 const FRAME = readFileSync(new URL(import.meta.url.replace(/-theme-demo\.mjs$/u, '-frame.ans')), 'utf8')
-// Where the frame's message line sits — its row, its first column and the column after it (the matrix
+// Where the frame's message line sits — its row, its first column and the column after it (the trace
 // frame's); read them off the frame. The typed messages replace that span only.
 const MESSAGE_Y = 2
 const MESSAGE_X = 45
@@ -76,8 +99,9 @@ const NORMAL_FROM = 230
 const IS_BEATS = process.env.DEMO_BEATS === '1'
 const beat = { text: '' }
 
-// The random source effects draw from: mulberry32, the formula `scripts/run/board/run-board-seeded.ts`
-// gives `run-board-replay.ts --seed`, so one seed draws one sequence in both.
+// The random source effects draw from: mulberry32, the formula `scripts/run/board/run-board-seeded-fixture.ts`
+// holds, so one seed draws one sequence in both. The replayed board (`run-board-replay.ts`) takes
+// `--seed` and ignores it: its theme host draws its randomness from the moment and the place.
 function seeded(seed) {
 	let state = seed >>> 0
 	return () => {

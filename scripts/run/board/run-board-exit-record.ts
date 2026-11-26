@@ -268,6 +268,7 @@ async function guarded(exits: ExitGuard | undefined, body: () => Promise<void>):
 }
 
 const run_board_exit_record = {
+	SIGHUP_EXIT_CODE,
 	SIGINT_EXIT_CODE,
 	SIGTERM_EXIT_CODE,
 	file_store,

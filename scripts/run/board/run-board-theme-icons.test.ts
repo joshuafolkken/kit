@@ -8,7 +8,7 @@ import { run_board_theme_tones } from './run-board-theme-tones'
 
 const [DOT = ''] = run_board_labels.SPINNER_FRAMES
 const LINE = `🔄 run ── 🔗 ${DOT}`
-const THEMED_SHAPES = '>> RUN -- <- │'
+const THEMED_SHAPES = '>> run -- <- ｦ'
 
 interface Combination {
 	theme: Theme | undefined
@@ -21,10 +21,10 @@ const COMBINATIONS: ReadonlyArray<Combination> = [
 	{ theme: undefined, icons: 'emoji', drawn: LINE },
 	{ theme: undefined, icons: 'letters', drawn: `RN run ── LK ${DOT}` },
 	{ theme: undefined, icons: 'shapes', drawn: `>> run ── <- ${DOT}` },
-	{ theme: 'wargames', icons: undefined, drawn: THEMED_SHAPES },
-	{ theme: 'wargames', icons: 'emoji', drawn: '🔄 RUN -- 🔗 │' },
-	{ theme: 'wargames', icons: 'letters', drawn: 'RN RUN -- LK │' },
-	{ theme: 'wargames', icons: 'shapes', drawn: THEMED_SHAPES },
+	{ theme: 'wopr', icons: undefined, drawn: THEMED_SHAPES },
+	{ theme: 'wopr', icons: 'emoji', drawn: '🔄 run -- 🔗 ｦ' },
+	{ theme: 'wopr', icons: 'letters', drawn: 'RN run -- LK ｦ' },
+	{ theme: 'wopr', icons: 'shapes', drawn: THEMED_SHAPES },
 ]
 
 afterEach(() => {
@@ -49,9 +49,7 @@ describe('run_board_theme.restyle in its icons', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		for (const icons of ['letters', 'shapes', 'letters'] as const) {
-			expect(run_board_theme.restyle('wargames', '🔄', icons)).toBe(
-				icons === 'letters' ? 'RN' : '>>',
-			)
+			expect(run_board_theme.restyle('wopr', '🔄', icons)).toBe(icons === 'letters' ? 'RN' : '>>')
 		}
 	})
 })

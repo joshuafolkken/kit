@@ -9,9 +9,9 @@ import type { Theme } from './run-board-theme-defs'
 // marks alone, so it is drawn as before.
 
 const MARK = '\u{2060}'
-// joshuafolkken/kit#8224: a zero-width mark before a row's title, the one place the WarGames reveal
-// tells a title from the words before it (`run-board-reveal-blocks.ts`); a frame kept for the theme
-// carries it to the theme, which drops it as it draws, and every other frame drops it here.
+// joshuafolkken/kit#8224: a zero-width mark before a row's title. Its one reader, the WarGames reveal's
+// `run-board-reveal-blocks.ts`, was removed by joshuafolkken/kit#8917, so nothing reads it now; a frame
+// kept for the theme still carries it, and every other frame drops it here.
 const TITLE_MARK = '\u{2063}'
 const RULE = '─'
 const BLANK = ' '

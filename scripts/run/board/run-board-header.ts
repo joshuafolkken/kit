@@ -28,8 +28,7 @@ import { run_board_render_title } from './run-board-render-title'
 import { run_board_row_key } from './run-board-row-key'
 import type { SeatRead } from './run-board-seat'
 import { run_board_setup } from './run-board-setup'
-import { run_board_theme_defs, type Theme, type ThemeDefinition } from './run-board-theme-defs'
-import { run_board_tint } from './run-board-tint'
+import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
 
@@ -53,7 +52,6 @@ const { cell_of } = run_board_render_slot
 const { title_of } = run_board_render_title
 const { now_text, time_parts } = run_board_header_time
 const { clocks_of } = run_board_clocks
-const { circuit_cells } = run_board_tint
 const notice_of = run_board_header_notice.part_of
 // The columns a failed read's reason is cut to, so the header keeps its line.
 const REASON_LIMIT = 40
@@ -61,6 +59,9 @@ const UNKNOWN = '-'
 // The age of a saved plan (joshuafolkken/kit#8219); a theme draws it as its glyph table says.
 const SAVED_ICON = '🕘'
 const { GAP } = run_board_machine
+// The names column's fewest columns (joshuafolkken/kit#8917): the confirmed demo's, its name drawn in 14
+// columns from the second, so the clocks start on one column whatever the board's name or theme.
+const NAMES_WIDTH = 15
 
 // Who reads the frame: a person on a screen, or a chat a session answers a progress question in, which
 // draws what the screen does but for the machine, its memory alone — a CPU or swap figure read once
@@ -237,6 +238,18 @@ function left_of(header: BoardHeader): number | undefined {
 	return is_moving && header.ended_ms === undefined ? run_board_estimate.left_ms(header) : undefined
 }
 
+// When the run should finish, as the header's first clock reads it; undefined where none is estimated.
+function finish_of(header: BoardHeader): number | undefined {
+	const left = left_of(header)
+
+	return left === undefined ? undefined : header.now_ms + left
+}
+
+// joshuafolkken/kit#8917: the header's three clocks always dated, for a theme's own time readouts.
+function dated_clocks(header: BoardHeader): Array<string> {
+	return run_board_clocks.dated_of(header, finish_of(header))
+}
+
 // A figure only the plan knows, drawn faint while the plan is a saved one.
 function planned(header: BoardHeader, part: string | undefined): string | undefined {
 	if (part === undefined || header.plan_saved_ms === undefined) return part
@@ -290,15 +303,13 @@ function screen_theme(header: BoardHeader): BoardHeader['theme'] {
 }
 
 // The alert level a themed screen draws at the right end of the throughput rule (joshuafolkken/kit#8513),
-// drawn as the theme's row says.
+// drawn as the base look's field (joshuafolkken/kit#8917), which the theme host draws its own level over.
 function alert_part(header: BoardHeader): string | undefined {
 	const theme = screen_theme(header)
 
 	if (theme === undefined) return undefined
 
-	const definition: ThemeDefinition = run_board_theme_defs.THEME_DEFS[theme]
-
-	return definition.alert(run_board_header_defcon.level_of(header))
+	return run_board_theme_defs.BASE_LOOK.alert(run_board_header_defcon.level_of(header))
 }
 
 // The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):
@@ -344,9 +355,10 @@ function machine_part(header: BoardHeader): string {
 	return run_board_machine.line_of(machine_of(header)) ?? MACHINE_UNKNOWN
 }
 
-// The lines' cells of one column, the narrower padded to the wider as the terminal counts them.
-function column_of(cells: ReadonlyArray<string>): Array<string> {
-	const width = Math.max(...cells.map((cell) => run_board_fit.width_of(cell)))
+// The lines' cells of one column, the narrower padded to the wider as the terminal counts them, the
+// column at least `least` columns wide.
+function column_of(cells: ReadonlyArray<string>, least = 0): Array<string> {
+	const width = Math.max(least, ...cells.map((cell) => run_board_fit.width_of(cell)))
 
 	return cells.map((cell) => cell_of(cell, width))
 }
@@ -369,13 +381,13 @@ function header_lines(header: BoardHeader): Array<string> {
 	const mark = mark_of(header, counts.running)
 	const now = now_line(counts, header)
 	const left = left_of(header)
-	const finish = left === undefined ? undefined : header.now_ms + left
+	const finish = finish_of(header)
 	const theme = screen_theme(header)
 	const columns = [
-		column_of(run_board_header_names.names_of(mark, { ...header, theme })),
+		column_of(run_board_header_names.names_of(mark, { ...header, theme }), NAMES_WIDTH),
 		column_of(planned_first(header, clocks_of(header, finish))),
 		planned_first(header, time_parts(header, mark, now, left)),
-	].map((cells) => circuit_cells(theme, cells))
+	]
 
 	columns.push([
 		machine_part(header),
@@ -414,6 +426,7 @@ function now_icon(header: BoardHeader): string | undefined {
 const run_board_header = {
 	alert_part,
 	counts_of,
+	dated_clocks,
 	estimate_legend,
 	header_lines,
 	is_plan_read,
@@ -423,7 +436,6 @@ const run_board_header = {
 	now_legend,
 	queued_tail,
 	run_mark_of,
-	screen_theme,
 	warning_of,
 }
 

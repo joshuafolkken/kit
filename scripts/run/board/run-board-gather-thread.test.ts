@@ -102,7 +102,7 @@ function faked(now: () => number = () => FAILED_MS): {
 describe('run_board_gather_thread.worker_gatherer over spawner', () => {
 	it('passes the loader options, the record setup and its link environment to the Worker', async () => {
 		const worker = fake_worker()
-		const setup: RecordSetup = run_board_gather_record.setup_of('wargames', 'shapes')
+		const setup: RecordSetup = run_board_gather_record.setup_of('wopr', 'shapes')
 		const worker_data: WorkerSeed = { seed: undefined, setup }
 
 		worker_spawn.mockImplementationOnce(function create_worker() {

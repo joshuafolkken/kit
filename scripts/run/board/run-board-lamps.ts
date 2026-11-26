@@ -3,35 +3,21 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_labels, type Paint, type TextColor } from './run-board-labels'
 import { run_board_spot } from './run-board-spot'
 
-// The WOPR lamp panel of `run:board --theme wargames` (joshuafolkken/kit#8236): from two columns past the
-// throughput rows' NOW, a `■` every other column up to the section's rule, on seven rows — the `24h` and
-// `7d` rows, the blank line under them, the usage section's rule (joshuafolkken/kit#8702), its first two
-// provider rows (joshuafolkken/kit#8277) and GitHub's row (joshuafolkken/kit#8695) — lit yellow, yellow,
-// yellow, red, red, yellow, red from the top, out on every row at half yellow, dimmed (named `yellow` dimmed where the terminal has no 24-bit color; joshuafolkken/kit#8305).
-// Lamps blink four to a group, each group on its own period and phase, about four in ten lit; whether
-// one is lit is read off the moment, its group and its place alone.
+// The lamp panel of a themed `run:board` (joshuafolkken/kit#8236): from two columns past the throughput
+// rows' NOW, a `■` every other column up to the section's rule, on seven rows — the `24h` and `7d` rows,
+// the blank line under them, the usage section's rule (joshuafolkken/kit#8702), its first two provider
+// rows (joshuafolkken/kit#8277) and GitHub's row (joshuafolkken/kit#8695) — drawn out at half yellow,
+// dimmed (named `yellow` dimmed where the terminal has no 24-bit color; joshuafolkken/kit#8305). The
+// theme host lays its panel and area out by these lamps (`run-board-theme-layout.ts`; joshuafolkken/kit#8917).
 
 const { LAMP, LAMP_MARK, LAMP_START } = run_board_spot
-const { GAUGE_SHADES, SPINNER_INTERVAL_MS, painted } = run_board_labels
-// The lamps change on the spinner's step.
-const LAMP_TICK_MS = SPINNER_INTERVAL_MS
+const { GAUGE_SHADES, painted } = run_board_labels
 const GROUP_SIZE = 4
-// A group's period in steps, within the range joshuafolkken/kit#8236 set.
-const LEAST_PERIOD_STEPS = 3
-const PERIOD_SPAN_STEPS = 16
-const PERCENT = 100
-const LIT_PERCENT = 40
 const FEWEST_LAMPS = 8
 // A lamp and the blank after it.
 const LAMP_PITCH = 2
 // Each row's lamps are their own groups, numbered apart from the other row's.
 const GROUPS_PER_ROW = 1000
-const PERIOD_SALT = 1
-const PHASE_SALT = 2
-// The Park–Miller generator's multiplier and prime modulus, stepped once per value and twice more after.
-const MIX_MULTIPLIER = 48_271
-const MIX_MODULUS = 2_147_483_647
-const MIX_SEED = 1
 // An out lamp is yellow at half of each channel, on every row.
 const OUT_DIVISOR = 2
 type Shade = Exclude<Paint, TextColor>
@@ -45,34 +31,6 @@ const SHADES: ReadonlyArray<Shade> = [yellow, yellow, yellow, red, red, yellow, 
 interface PanelSpan {
 	start: number
 	end: number
-}
-
-function mix_step(state: number, value: number): number {
-	return ((state + value) * MIX_MULTIPLIER) % MIX_MODULUS
-}
-
-// The values mixed into one number in `0`..`MIX_MODULUS`, the same for the same values.
-function mixed(values: ReadonlyArray<number>): number {
-	let state = MIX_SEED
-
-	for (const value of [...values, 0, 0]) state = mix_step(state, value)
-
-	return state
-}
-
-// The step a group's pattern is on at `now_ms`; in a burst every group changes on every step.
-function epoch_of(now_ms: number, group: number, is_burst: boolean): number {
-	const step = Math.floor(now_ms / LAMP_TICK_MS)
-
-	if (is_burst) return step
-	const period = LEAST_PERIOD_STEPS + (mixed([group, PERIOD_SALT]) % PERIOD_SPAN_STEPS)
-	const phase = mixed([group, PHASE_SALT]) % period
-
-	return Math.floor((step + phase) / period)
-}
-
-function is_lit(now_ms: number, group: number, lamp: number, is_burst: boolean): boolean {
-	return mixed([group, epoch_of(now_ms, group, is_burst), lamp]) % PERCENT < LIT_PERCENT
 }
 
 // The lamps a `width`-column panel holds, one every other column; none where fewer than eight fit.
@@ -110,16 +68,6 @@ function lamp_text(row: number, is_on: boolean, text = LAMP_MARK): string {
 	if (is_on || shade === undefined) return painted(shade, text)
 
 	return out_text(text)
-}
-
-// How a lamp outside the panel is lit: in the panel's yellow or red, or out as the panel's are
-// (joshuafolkken/kit#8376).
-type LampLook = 'yellow' | 'red' | 'out'
-
-function look_text(look: LampLook): string {
-	if (look === 'out') return out_text(LAMP_MARK)
-
-	return painted(look === 'red' ? red : yellow, LAMP_MARK)
 }
 
 // Lamps are drawn only where stdout draws color — a `■` with none would never go out.
@@ -182,15 +130,11 @@ function place_of(row: number, index: number): { group: number; lamp: number } {
 }
 
 const run_board_lamps = {
-	LAMP_TICK_MS,
 	PANEL_ROWS,
 	count_of,
 	expanded,
 	is_colored,
-	is_lit,
 	lamp_text,
-	look_text,
-	mixed,
 	place_of,
 	rule_started,
 	start_column,
@@ -198,4 +142,4 @@ const run_board_lamps = {
 }
 
 export { run_board_lamps }
-export type { LampLook, PanelSpan }
+export type { PanelSpan }

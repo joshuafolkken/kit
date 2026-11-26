@@ -1,0 +1,3880 @@
+{
+	"hashes": [0, 0.5008470041211694, 0.22021827124990523, 0.12279060995206237, 0.9787220696453005],
+	"layout": {
+		"H": 60,
+		"W": 199,
+		"EDGE": 114,
+		"PX": 68,
+		"PW": 46,
+		"AREA_TOP": 4,
+		"AREA_END": 11,
+		"COLUMN_X": 45,
+		"PINS_X": 101,
+		"NOTICE": {
+			"y": 1,
+			"x": 45,
+			"end": 99
+		},
+		"PROGRESS": {
+			"y": 2,
+			"x": 48,
+			"end": 99
+		},
+		"ROW": {
+			"y": 16,
+			"x": 5,
+			"end": 138
+		},
+		"ROW_TEXT": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″",
+		"LANE_ROWS": [14, 15, 16],
+		"GAP_ROWS": [3, 12, 17, 20, 29, 45, 55],
+		"ISSUE_X": 55,
+		"NEW_LANE": "8826",
+		"DEFCON": {
+			"y": 4,
+			"x": 96,
+			"w": 18
+		},
+		"HEAD_LEFT": {
+			"x": 0,
+			"w": 44
+		},
+		"HEAD_RIGHT": {
+			"x": 101,
+			"w": 13
+		},
+		"HEAD_TOP": {
+			"x": 45,
+			"w": 54
+		},
+		"LAST_TEXT_ROW": 59,
+		"SIGN_X": 33,
+		"HEAD_COLONS": [
+			{
+				"y": 0,
+				"x": 28
+			},
+			{
+				"y": 1,
+				"x": 28
+			},
+			{
+				"y": 2,
+				"x": 28
+			}
+		],
+		"SCREEN_CX": 57,
+		"SCREEN_CY": 30
+	},
+	"frames": {
+		"8i0": "08944417b8f2be23",
+		"8i9": "e41b5c85452c1cc2",
+		"8i10": "8333d5ba7bc612e5",
+		"8i11": "cd187eeb48b07113",
+		"8i25": "c08fc8d6f7a006d8",
+		"8i50": "9971d5278d983655",
+		"8i89": "89800af41e14e407",
+		"8i90": "0190efdd66a3fcc6",
+		"8i91": "1300de5ecec6b100",
+		"8i95": "41a6e32e51993aa2",
+		"8i120": "d18bce05eb8dc646",
+		"8i150": "a95358dc25f3e9c5",
+		"8i189": "c093a76f7c5da646",
+		"8i230": "f44916a65b687bc4",
+		"8i5010": "70f670d1084272f7",
+		"8p0": "7cd33ce035b75e49",
+		"8p9": "b86fafa54fe6b8df",
+		"8p10": "d8673c31a9265b14",
+		"8p11": "2794a4873b216558",
+		"8p25": "87f11f1bffc48437",
+		"8p50": "4822d9e599745da7",
+		"8p89": "6eb46c46c656c5c6",
+		"8p90": "7e81c723f648949e",
+		"8p91": "8f60210ef5e07daa",
+		"8p95": "cfa1ff39dd322d3f",
+		"8p120": "3f14888f6b1dad8a",
+		"8p150": "6d910c93aeb891b6",
+		"8p189": "7d56b4f2e3379213",
+		"8p230": "8369f870c51c0320",
+		"8p5010": "07bb93c81d15ff93",
+		"8r0": "2a424a9315b4b22c",
+		"8r9": "00de82137b0d46d4",
+		"8r10": "52c8b84c63e3b28e",
+		"8r11": "a45c36103437aaf5",
+		"8r25": "f3594732b63bd517",
+		"8r50": "2ad34f3cea2fe664",
+		"8r89": "c09146116d7d5bfe",
+		"8r90": "8746b89812e43dc2",
+		"8r91": "944659bda6ddee57",
+		"8r95": "1a61812696cae13e",
+		"8r120": "7dc3843f7680cb1b",
+		"8r150": "55ef181b2d9049cd",
+		"8r189": "a957af8b7551da11",
+		"8r230": "f05b1cf316272e33",
+		"8r5010": "05644d0cb2bef610",
+		"8n0": "2b5a4c7ff7fe515a",
+		"8n9": "ba8164b860f5d72b",
+		"8n10": "55cf1c469a49a4b3",
+		"8n11": "8c61a546bdc55c12",
+		"8n25": "55b92b6057791f7e",
+		"8n50": "d294ef954cf7d97d",
+		"8n89": "538b54938aeff555",
+		"8n90": "d37de76cc1447ac3",
+		"8n91": "81cadf9fe629aeb0",
+		"8n95": "5001ef0f42eefdec",
+		"8n120": "43ffd989f9a18522",
+		"8n150": "accd50e095fa5196",
+		"8n189": "22a549f51f65bd5f",
+		"8n230": "67e8f337f2883c5b",
+		"8n5010": "acffc35a15d74fdb",
+		"8o0": "0746c726711e2d0e",
+		"8o10": "b99500f18b8095ac",
+		"8o27": "b352f2a1d2846443",
+		"8o28": "aae936ce0419c147",
+		"8o30": "4e8e4107e5380ace",
+		"8o41": "c531667e8cf1a231",
+		"8o45": "8160b92197f10cf8",
+		"8o60": "ae511e1f9a85a039",
+		"8o67": "2449e7ccfc5777ea",
+		"8x0": "08944417b8f2be23",
+		"8x10": "121a03ecbadc22a2",
+		"8x27": "e6bc3bd86563d282",
+		"8x28": "9f6cdbd7432bb6b8",
+		"8x30": "aac1cfeb7d6be299",
+		"8x41": "c201973afccd4177",
+		"8x45": "d280239e87356cf1",
+		"8x60": "d517ea4a2bb99610",
+		"8x67": "f56388c8e1f2181b",
+		"9i0": "ed93e54433ad9284",
+		"9i9": "4bf4c81f664c5417",
+		"9i10": "0ab4d9f7dddc3e75",
+		"9i11": "e8b6d766cd633b73",
+		"9i25": "aaa673e1844146b4",
+		"9i50": "fe452937c69d0d77",
+		"9i89": "e5a3faa8148f362c",
+		"9i90": "05de4915861d502d",
+		"9i91": "0623524217953b66",
+		"9i95": "78c5fe565cbc8896",
+		"9i120": "3595934b6cc21d1c",
+		"9i150": "636501b2cc19d50d",
+		"9i189": "2838b3b4cf61e373",
+		"9i230": "090520a06b6399d6",
+		"9i5010": "550ec152a633d597",
+		"9p0": "c2a4cdbb8a9f944e",
+		"9p9": "6439d37981d36e56",
+		"9p10": "4709191d136ca283",
+		"9p11": "d8e34c2bb4167e74",
+		"9p25": "c7ad1bcc5510fa79",
+		"9p50": "5ec505a845665fe7",
+		"9p89": "96178740d80468ca",
+		"9p90": "fd3e89d66d809ab8",
+		"9p91": "978fa693859ea3c5",
+		"9p95": "3ac7655647738dc7",
+		"9p120": "95ef83653b49513c",
+		"9p150": "67cb14f89f86f889",
+		"9p189": "ae522fcff05dbd1f",
+		"9p230": "fb40c927abcecf4c",
+		"9p5010": "db06ede8dfe611ba",
+		"9r0": "5d1c67540e5e64cd",
+		"9r9": "e499871ac9fef40c",
+		"9r10": "0de87b953e2cc2b4",
+		"9r11": "0630f8fb013817c1",
+		"9r25": "a572ee001f593cbe",
+		"9r50": "cfc9702ce1e3e4e8",
+		"9r89": "44783c70ad3d53c6",
+		"9r90": "8a9d547e08ae18ea",
+		"9r91": "6d5aa0db92ae6cb8",
+		"9r95": "0a0f9bb9562997d7",
+		"9r120": "e8f0bb38fa49cc36",
+		"9r150": "98e1dd09725d0ed9",
+		"9r189": "c503050724de94f8",
+		"9r230": "6bbcb10796d08bb0",
+		"9r5010": "903dbe8301c1a860",
+		"9n0": "7d982219e2929b1b",
+		"9n9": "8840749c6d9b63dd",
+		"9n10": "933788008ef2790b",
+		"9n11": "d28629c966c02285",
+		"9n25": "8f975e23c025a372",
+		"9n50": "111426f69288e556",
+		"9n89": "13c66c42e0cae925",
+		"9n90": "b5b9e3d8dbd7284c",
+		"9n91": "45b51160b7e269f1",
+		"9n95": "9c62b23eacb6e3d2",
+		"9n120": "4717aa963bc2a34f",
+		"9n150": "ccb8b0c680cddc20",
+		"9n189": "0d46313200d4766b",
+		"9n230": "17429e80e43eff8d",
+		"9n5010": "6bd61c17761e1324",
+		"9o0": "20ef7286814c57c4",
+		"9o10": "335e003347340ed1",
+		"9o27": "a679bf92154a15ab",
+		"9o28": "885b27f9fab110ec",
+		"9o30": "be4b4319f4a98b0f",
+		"9o41": "b9564fb0345dc741",
+		"9o45": "fa37f1915ff509fc",
+		"9o60": "fab6834d4b67a993",
+		"9o67": "07d77b6a977d0c91",
+		"9x0": "ed93e54433ad9284",
+		"9x10": "54971297b882a4c9",
+		"9x27": "89bb7716d6f0063a",
+		"9x28": "5f5cb9af6b1f7766",
+		"9x30": "a679bf92154a15ab",
+		"9x41": "a679bf92154a15ab",
+		"9x45": "a679bf92154a15ab",
+		"9x60": "a679bf92154a15ab",
+		"9x67": "a679bf92154a15ab"
+	},
+	"states": {
+		"a0": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 282
+		},
+		"a9": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 282
+		},
+		"a10": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 1,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 1,
+				"total": 47,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 1,
+			"done": 0,
+			"total": 282
+		},
+		"a11": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 2,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 2,
+				"total": 47,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 2,
+			"done": 0,
+			"total": 282
+		},
+		"a50": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 41,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 41,
+				"total": 47,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 41,
+			"done": 0,
+			"total": 282
+		},
+		"a89": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 33,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 282
+		},
+		"a90": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 1,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 34,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 1,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 282
+		},
+		"a109": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 20,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 53,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 20,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 282
+		},
+		"a110": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 21,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 54,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 21,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 282
+		},
+		"a130": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 41,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 74,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 41,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 282
+		},
+		"a150": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 61,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 94,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 61,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 282
+		},
+		"a189": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 100,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 133,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": true,
+				"length": 25,
+				"total": 37,
+				"cooled": 0,
+				"start": 165,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"latest": "notice",
+			"since": 0,
+			"last_start": 165,
+			"busy_ticks": 105,
+			"done": 1,
+			"total": 282
+		},
+		"a230": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 141,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 174,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": false,
+				"length": 37,
+				"total": 37,
+				"cooled": 29,
+				"start": 165,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 29,
+			"last_start": 165,
+			"busy_ticks": 117,
+			"done": 2,
+			"total": 282
+		},
+		"a400": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 311,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 344,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": false,
+				"length": 37,
+				"total": 37,
+				"cooled": 199,
+				"start": 165,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": false,
+				"length": 131,
+				"total": 131,
+				"cooled": 35,
+				"start": 235,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": false,
+			"latest": "row",
+			"since": 35,
+			"last_start": 235,
+			"busy_ticks": 248,
+			"done": 3,
+			"total": 282
+		},
+		"a5010": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 4921,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 4954,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": false,
+				"length": 34,
+				"total": 34,
+				"cooled": 4567,
+				"start": 410,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": false,
+				"length": 131,
+				"total": 131,
+				"cooled": 4645,
+				"start": 235,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 4567,
+			"last_start": 410,
+			"busy_ticks": 282,
+			"done": 4,
+			"total": 282
+		},
+		"n0": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 80
+		},
+		"n9": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 80
+		},
+		"n10": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 1,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 1,
+				"total": 47,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 1,
+			"done": 0,
+			"total": 80
+		},
+		"n11": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 2,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 2,
+				"total": 47,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 2,
+			"done": 0,
+			"total": 80
+		},
+		"n50": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 41,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": true,
+				"length": 41,
+				"total": 47,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 41,
+			"done": 0,
+			"total": 80
+		},
+		"n89": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 0,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 33,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n90": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 1,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 34,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 1,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n109": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 20,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 53,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 20,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n110": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 21,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 54,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 21,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n130": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 41,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 74,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 41,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n150": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 61,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 94,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 61,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n189": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 100,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 133,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 100,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n230": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 141,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 174,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 141,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n400": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 311,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 344,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 311,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"n5010": {
+			"notice": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 80,
+				"total": 80,
+				"cooled": 4921,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": 0,
+				"is_typing": false,
+				"length": 47,
+				"total": 47,
+				"cooled": 4954,
+				"start": 10,
+				"text": "12:41 !! alert · #8897 Gate red — lint 2 errors"
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "notice",
+			"since": 4921,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 1,
+			"total": 80
+		},
+		"p0": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 71
+		},
+		"p9": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 71
+		},
+		"p10": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": true,
+				"length": 1,
+				"total": 37,
+				"cooled": 0,
+				"start": 10,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 1,
+			"done": 0,
+			"total": 71
+		},
+		"p11": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": true,
+				"length": 2,
+				"total": 37,
+				"cooled": 0,
+				"start": 10,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 2,
+			"done": 0,
+			"total": 71
+		},
+		"p50": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": false,
+				"length": 37,
+				"total": 37,
+				"cooled": 4,
+				"start": 10,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 4,
+			"last_start": 10,
+			"busy_ticks": 37,
+			"done": 1,
+			"total": 71
+		},
+		"p89": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": false,
+				"length": 37,
+				"total": 37,
+				"cooled": 43,
+				"start": 10,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 43,
+			"last_start": 10,
+			"busy_ticks": 37,
+			"done": 1,
+			"total": 71
+		},
+		"p90": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": false,
+				"length": 37,
+				"total": 37,
+				"cooled": 44,
+				"start": 10,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 44,
+			"last_start": 10,
+			"busy_ticks": 37,
+			"done": 1,
+			"total": 71
+		},
+		"p109": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 0,
+				"is_typing": false,
+				"length": 37,
+				"total": 37,
+				"cooled": 63,
+				"start": 10,
+				"text": "#8897 · Bash pnpm josh gate --changed",
+				"icon": "> "
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 63,
+			"last_start": 10,
+			"busy_ticks": 37,
+			"done": 1,
+			"total": 71
+		},
+		"p110": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": true,
+				"length": 1,
+				"total": 34,
+				"cooled": 0,
+				"start": 110,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 110,
+			"busy_ticks": 38,
+			"done": 1,
+			"total": 71
+		},
+		"p130": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": true,
+				"length": 21,
+				"total": 34,
+				"cooled": 0,
+				"start": 110,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 110,
+			"busy_ticks": 58,
+			"done": 1,
+			"total": 71
+		},
+		"p150": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": false,
+				"length": 34,
+				"total": 34,
+				"cooled": 7,
+				"start": 110,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 7,
+			"last_start": 110,
+			"busy_ticks": 71,
+			"done": 2,
+			"total": 71
+		},
+		"p189": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": false,
+				"length": 34,
+				"total": 34,
+				"cooled": 46,
+				"start": 110,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 46,
+			"last_start": 110,
+			"busy_ticks": 71,
+			"done": 2,
+			"total": 71
+		},
+		"p230": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": false,
+				"length": 34,
+				"total": 34,
+				"cooled": 87,
+				"start": 110,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 87,
+			"last_start": 110,
+			"busy_ticks": 71,
+			"done": 2,
+			"total": 71
+		},
+		"p400": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": false,
+				"length": 34,
+				"total": 34,
+				"cooled": 257,
+				"start": 110,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 257,
+			"last_start": 110,
+			"busy_ticks": 71,
+			"done": 2,
+			"total": 71
+		},
+		"p5010": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": 1,
+				"is_typing": false,
+				"length": 34,
+				"total": 34,
+				"cooled": 4867,
+				"start": 110,
+				"text": "#8897 · Review passed — committing",
+				"icon": "OK"
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"latest": "progress",
+			"since": 4867,
+			"last_start": 110,
+			"busy_ticks": 71,
+			"done": 2,
+			"total": 71
+		},
+		"r0": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 131
+		},
+		"r9": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 131
+		},
+		"r10": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 1,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 1,
+			"done": 0,
+			"total": 131
+		},
+		"r11": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 2,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 2,
+			"done": 0,
+			"total": 131
+		},
+		"r50": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 41,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 41,
+			"done": 0,
+			"total": 131
+		},
+		"r89": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 80,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 80,
+			"done": 0,
+			"total": 131
+		},
+		"r90": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 81,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 81,
+			"done": 0,
+			"total": 131
+		},
+		"r109": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 100,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 100,
+			"done": 0,
+			"total": 131
+		},
+		"r110": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 101,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 101,
+			"done": 0,
+			"total": 131
+		},
+		"r130": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": true,
+				"length": 121,
+				"total": 131,
+				"cooled": 0,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": true,
+			"since": 0,
+			"last_start": 10,
+			"busy_ticks": 121,
+			"done": 0,
+			"total": 131
+		},
+		"r150": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": false,
+				"length": 131,
+				"total": 131,
+				"cooled": 10,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": false,
+			"latest": "row",
+			"since": 10,
+			"last_start": 10,
+			"busy_ticks": 131,
+			"done": 1,
+			"total": 131
+		},
+		"r189": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": false,
+				"length": 131,
+				"total": 131,
+				"cooled": 49,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": false,
+			"latest": "row",
+			"since": 49,
+			"last_start": 10,
+			"busy_ticks": 131,
+			"done": 1,
+			"total": 131
+		},
+		"r230": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": false,
+				"length": 131,
+				"total": 131,
+				"cooled": 90,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": false,
+			"latest": "row",
+			"since": 90,
+			"last_start": 10,
+			"busy_ticks": 131,
+			"done": 1,
+			"total": 131
+		},
+		"r400": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": false,
+				"length": 131,
+				"total": 131,
+				"cooled": 260,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": false,
+			"latest": "row",
+			"since": 260,
+			"last_start": 10,
+			"busy_ticks": 131,
+			"done": 1,
+			"total": 131
+		},
+		"r5010": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": 0,
+				"is_typing": false,
+				"length": 131,
+				"total": 131,
+				"cooled": 4870,
+				"start": 10,
+				"text": "BD    3′31″   14′38″      0.1      0.5        0.3 8826 P2 ** Add a cell back buffer and one frame loop for r…  -> 19:39 +2′  >  26″"
+			},
+			"busy": false,
+			"latest": "row",
+			"since": 4870,
+			"last_start": 10,
+			"busy_ticks": 131,
+			"done": 1,
+			"total": 131
+		},
+		"i0": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i9": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i10": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i11": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i50": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i89": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i90": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i109": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i110": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i130": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i150": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i189": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i230": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i400": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		},
+		"i5010": {
+			"notice": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"notice_text": {
+				"name": "notice",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"progress": {
+				"name": "progress",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"row": {
+				"name": "row",
+				"index": -1,
+				"is_typing": false,
+				"length": 0,
+				"total": 0,
+				"cooled": 9999,
+				"start": -9999,
+				"text": ""
+			},
+			"busy": false,
+			"since": 9999,
+			"last_start": -9999,
+			"busy_ticks": 0,
+			"done": 0,
+			"total": 0
+		}
+	}
+}

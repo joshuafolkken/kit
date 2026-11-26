@@ -1,9 +1,6 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
-import type { Flash } from './run-board-change-flash'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
-import type { RuleCell } from './run-board-codes'
 import type { BoardDisplay } from './run-board-display'
-import type { DropScreen } from './run-board-drop-screen'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameStore } from './run-board-frame-store'
@@ -14,13 +11,10 @@ import type { WorkerHeap } from './run-board-heap'
 import type { Icons } from './run-board-icons'
 import { run_board_idle } from './run-board-idle'
 import type { IssueCount } from './run-board-issue-count'
-import type { JumpDraw } from './run-board-jump-screen'
 import type { KeyInput } from './run-board-keys'
 import type { Lamp } from './run-board-lamp-spots'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
-import type { NoticeTurn } from './run-board-notice-turn'
-import type { PanelDraw } from './run-board-panel-draw'
 import type { PinnedIssue } from './run-board-pinned-graphql'
 import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
@@ -29,11 +23,10 @@ import type { Pending } from './run-board-sound-repeat'
 import type { SoundSnapshot } from './run-board-sound-transition'
 import type { TypingSound } from './run-board-sound-typing'
 import type { Spot } from './run-board-spin'
-import type { StripCell } from './run-board-strip'
-import type { Sweep } from './run-board-sweep'
 import type { Thanks } from './run-board-thanks-csv'
 import type { Theme } from './run-board-theme-defs'
-import { run_board_type_rows, type Typing } from './run-board-type-rows'
+import type { ThemeRun } from './run-board-theme-run'
+import { run_board_type_rows, type KeyedLine, type Typing } from './run-board-type-rows'
 
 // What a `run:board` redraw reads through and folds forward, shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
@@ -82,6 +75,13 @@ interface BoardPorts {
 	is_live?: boolean | undefined
 	// The theme the frame is drawn in (`run-board-theme.ts`), whose alert display the header adds.
 	theme?: Theme | undefined
+	// joshuafolkken/kit#8917: the theme host's run a themed live board is drawn by (`run-board-theme-run.ts`)
+	// — its frame drawn in the role palette, each row whole, the theme layer typing and animating over
+	// it; none on a board in no theme or on a terminal without 24-bit color.
+	theme_run?: ThemeRun | undefined
+	// The same board in no theme, a themed second's frame drawn through where its theme cannot lay it out
+	// — no lamp panel on screen — so it shows the board's own look, never a base half themed.
+	plain_ports?: BoardPorts | undefined
 	// How the icons are drawn (`run-board-icons.ts`); unset, the theme's default.
 	icons?: Icons | undefined
 	// The terminal a live frame is kept within, read at every redraw so a resized pane is fitted on the
@@ -113,10 +113,9 @@ interface BoardPorts {
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
 	on_exit: (leave: () => void) => void
 	sleep: (ms: number) => Promise<void>
-	// The pauses of the line typed before a live board's first frame (`run-board-intro.ts`); none types no line.
-	intro_sleep?: ((ms: number) => Promise<void>) | undefined
-	// The clock the intro's beats are due by (`run-board-beat-pace.ts`); none waits each pause in full.
-	intro_now?: (() => number) | undefined
+	// joshuafolkken/kit#8917: the colors the board's terminal draws, which decide whether a theme run
+	// draws it (24-bit) — a replay draws 24-bit color; none reads stdout's (`run-board-paint.ts`).
+	color_depth?: (() => number) | undefined
 	// Sounds the cue a redraw picked (`run-board-sound-player.ts`), without waiting; the live board alone
 	// passes one, so `--once`, `--chat` and `--every` stay silent.
 	cue?: ((name: CueName) => void) | undefined
@@ -185,25 +184,13 @@ interface BoardData extends GatherRead {
 // What the frame keeps between redraws: its spinners, typing, sound and notice, and the total it
 // counts from.
 interface BoardView {
-	flash?: Flash | undefined
 	// The total the first frame counted, which later frames count their progress from.
 	baseline_total: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
-	// Where the last frame has room for the sweep under its third line's age (`run-board-sweep.ts`), if anywhere.
-	sweep?: Sweep | undefined
-	// Where the last frame drew its lamp panel's lamps, blinked between redraws (`run-board-lamp-spots.ts`).
+	// Where the last frame drew its lamp panel's lamps (`run-board-lamp-spots.ts`), the panel a theme
+	// draws its area in (`run-board-theme-layout.ts`).
 	lamps?: ReadonlyArray<Lamp> | undefined
-	// The theme's painter of the animation area those lamps place, and the area (`run-board-panel-draw.ts`).
-	panel?: PanelDraw | undefined
-	// The last frame's cells on screen where a drop falls down it between redraws (`run-board-rain-drop.ts`).
-	drop?: DropScreen | undefined
-	// Where the last frame drew its worst-level TRACE field, blinked between redraws (`run-board-trace-spot.ts`).
-	traces?: ReadonlyArray<Spot> | undefined
-	// Where the last frame drew its section rules' cells, running code while a row types (`run-board-codes.ts`).
-	rules?: ReadonlyArray<RuleCell> | undefined
-	// Where the last frame has a lamp strip above a section rule, filled as a row types (`run-board-strip.ts`).
-	strips?: ReadonlyArray<StripCell> | undefined
 	// Where the last frame drew its header clocks' colons, blinked between redraws (`run-board-colon.ts`).
 	colons?: ReadonlyArray<Spot> | undefined
 	// The rows the last frame drew and the ones typing, typed on between redraws (`run-board-type-rows.ts`).
@@ -214,15 +201,12 @@ interface BoardView {
 	sound_pending?: Pending | undefined
 	// The last notice picked, kept while the sound is off too (`run-board-header-notice.ts`).
 	notice?: Notice | undefined
-	// The header notice's trace and where the last frame drew it, traced between redraws
-	// (`run-board-notice-turn.ts`).
-	notice_trace?: NoticeTurn | undefined
-	// The bttf time jump the last frame drew, painted between redraws (`run-board-jump-screen.ts`).
-	jump?: JumpDraw | undefined
-	// When the latest typing the bttf jump has taken as its cue started (`run-board-jump-start.ts`).
-	cued_ms?: number | undefined
-	// When the bttf panel's arrival started, kept once the board first draws its area (`run-board-jump-start.ts`).
-	arrive_ms?: number | undefined
+	// joshuafolkken/kit#8917: the last frame's keyed rows on screen and its alert level
+	// (`run-board-header-defcon.ts`), which the theme layer lays out by and shows.
+	keyed?: ReadonlyArray<KeyedLine> | undefined
+	alert_level?: number | undefined
+	// The header's three clocks always dated, for a theme's own time readouts (`run-board-clocks.ts`).
+	dated_clocks?: ReadonlyArray<string> | undefined
 }
 
 type BoardState = BoardData & BoardView

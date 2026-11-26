@@ -1,13 +1,12 @@
 import { run_board_fit } from './run-board-fit'
 import { run_board_row_key } from './run-board-row-key'
 import { run_board_spot, type Spot } from './run-board-spot'
-import { run_board_sweep, type Sweep } from './run-board-sweep'
 import type { KeyedLine } from './run-board-type-rows'
 
 // Where a live `run:board` frame's placeholders land on screen (`run-board-spin.ts`): the row each line
-// starts on after the lines above it wrap, each placeholder's spot, the keyed rows and the sweep.
+// starts on after the lines above it wrap, each placeholder's spot and the keyed rows.
 
-const { TICK, spot_at } = run_board_spot
+const { spot_at } = run_board_spot
 
 interface ScreenBounds {
 	rows: number
@@ -87,22 +86,6 @@ function can_type(line: KeyedLine, rows: number, columns: number): boolean {
 	)
 }
 
-// The sweep under the line the `″` placeholder is drawn in, where the line below it has room for one.
-function sweep_in(
-	lines: ReadonlyArray<string>,
-	starts: ReadonlyArray<number>,
-	size: ScreenBounds,
-): Sweep | undefined {
-	const index = lines.findIndex((line) => line.includes(TICK))
-	const line = lines[index]
-
-	if (line === undefined) return undefined
-	const { column } = spot_at(line, line.indexOf(TICK), starts[index] ?? 1, size.columns)
-	const row_below = starts[index + 1] ?? Infinity
-
-	return run_board_sweep.sweep_of({ row_below, column, line_below: lines[index + 1] }, size)
-}
-
-const run_board_spin_place = { can_type, keyed_of, marks_in, starts_of, sweep_in }
+const run_board_spin_place = { can_type, keyed_of, marks_in, starts_of }
 
 export { run_board_spin_place }

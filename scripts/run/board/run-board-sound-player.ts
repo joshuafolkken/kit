@@ -97,11 +97,23 @@ function spawned(player: Player, file: string, ports: SoundPorts): Playing | und
 	}
 }
 
+// Every player this process started that has not exited, so the board can end them all as it leaves:
+// a detached player outlives the board otherwise (joshuafolkken/kit#8917).
+const PLAYING = new Set<Playing>()
+
 // A started candidate: one that fails to start goes on to `next`.
 function begin(child: Playing, next: () => void, handlers: StartHandlers): void {
+	PLAYING.add(child)
+	child.on('exit', () => PLAYING.delete(child))
 	child.on('error', next)
 	handlers.started(child)
 	child.unref()
+}
+
+// Every player still playing ended: one-shots, cues and loops alike.
+function stop_all(): void {
+	for (const child of PLAYING) child.kill()
+	PLAYING.clear()
 }
 
 function start_first(
@@ -247,6 +259,7 @@ const run_board_sound_player = {
 	play_cue,
 	loop,
 	start,
+	stop_all,
 }
 
 export type { Player, Playing, SoundPorts, SoundSpawner, StartHandlers }

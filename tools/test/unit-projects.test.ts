@@ -261,8 +261,9 @@ describe('the unit environment blanks the board theme', () => {
 
 		expect(environment[run_board_theme.THEME_ENV]).toBe('')
 		expect(run_board_theme.choose([], environment)?.theme).toBeUndefined()
+		// joshuafolkken/kit#8917: the alias is read as its value.
 		expect(run_board_theme.choose([], { [run_board_theme.THEME_ENV]: 'wargames' })?.theme).toBe(
-			'wargames',
+			'wopr',
 		)
 	})
 

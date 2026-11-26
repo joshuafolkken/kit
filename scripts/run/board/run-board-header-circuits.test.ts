@@ -63,16 +63,16 @@ function drawn(board: BoardHeader, theme?: Theme, icons?: Icons): Array<string> 
 describe('run_board_header.header_lines time circuits', () => {
 	it('draws a running run in three lines of four columns', () => {
 		expect(drawn(circuits())).toStrictEqual([
-			`▶ josh-board  🎯 ${minute_of(NOW + 15 * MINUTE)}  -  15′00″  ${GAUGES}`,
-			`  -           🕒 ${minute_of(NOW)}  +2°10′00″  —`,
-			`              🚀 ${minute_of(STARTED)}  ${SPINNER}          🔄 1 running`,
+			`▶ josh-board     🎯 ${minute_of(NOW + 15 * MINUTE)}  -  15′00″  ${GAUGES}`,
+			`  -              🕒 ${minute_of(NOW)}  +2°10′00″  —`,
+			`                 🚀 ${minute_of(STARTED)}  ${SPINNER}          🔄 1 running`,
 		])
 	})
 
 	it('draws an unknown finish --:-- over an unknown remainder', () => {
 		const [first] = drawn(circuits({ lane_totals: [] }))
 
-		expect(first).toBe(`▶ josh-board  🎯 --:--  -  --′--″  ${GAUGES}`)
+		expect(first).toBe(`▶ josh-board     🎯 --:--  -  --′--″  ${GAUGES}`)
 	})
 
 	it('draws an ended run’s end as its finish, nothing left and no spinner', () => {
@@ -87,10 +87,10 @@ describe('run_board_header.header_lines time circuits', () => {
 })
 
 describe('run_board_header.header_lines time circuits in a theme', () => {
-	// joshuafolkken/kit#8609: wargames draws the state in capitals, matrix as written.
+	// joshuafolkken/kit#8917: every theme's base draws the state as written.
 	it.each([
-		['wargames', 'RUNNING'],
-		['matrix', 'running'],
+		['wopr', 'running'],
+		['trace', 'running'],
 	] as const)('draws %s’s clocks ET / NW / T0', (theme, state) => {
 		const lines = drawn(circuits(), theme, 'letters')
 
@@ -103,8 +103,8 @@ describe('run_board_header.header_lines time circuits in a theme', () => {
 	})
 
 	it.each([
-		['wargames', 'RUNNING'],
-		['matrix', 'running'],
+		['wopr', 'running'],
+		['trace', 'running'],
 	] as const)('draws %s’s clocks -> / () / ^^ in shapes (#8505)', (theme, state) => {
 		const lines = drawn(circuits(), theme, 'shapes')
 

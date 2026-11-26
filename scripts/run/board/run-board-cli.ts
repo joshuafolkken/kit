@@ -22,7 +22,7 @@ import { run_board_sound_player } from './run-board-sound-player'
 import { run_board_sound_typing, type TypingSound } from './run-board-sound-typing'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
-import { run_board_theme_defs } from './run-board-theme-defs'
+import { run_board_theme_sound } from './run-board-theme-sound'
 import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
 import { run_board_write_port } from './run-board-write-port'
@@ -57,7 +57,7 @@ const EVERY_FLAG = '--every'
 const FRESH_FLAG = '--fresh'
 const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
-const { SIGINT_EXIT_CODE, SIGTERM_EXIT_CODE } = run_board_exit_record
+const { SIGHUP_EXIT_CODE, SIGINT_EXIT_CODE, SIGTERM_EXIT_CODE } = run_board_exit_record
 const { FRAME_FLAG, FRAME_USAGE } = run_board_frame_preview
 const USAGE = `Usage: josh run:board [--once | --chat [--fresh] | --every <minutes> | ${FRAME_USAGE}] [--theme ${run_board_theme.THEMES.join('|')}] [--icons emoji|letters|shapes] [--timing]`
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
@@ -69,6 +69,8 @@ function on_exit(leave: () => void): void {
 	process.once('exit', leave)
 	process.once('SIGINT', () => process.exit(SIGINT_EXIT_CODE))
 	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
+	// A closed terminal hangs the board up: it leaves through `exit` too, so its sounds end with it.
+	process.once('SIGHUP', () => process.exit(SIGHUP_EXIT_CODE))
 }
 
 // A live board's worker thread takes the GitHub, roster and snapshot reads with its own copy of these
@@ -107,10 +109,6 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	sleep: async (ms) => {
 		await sleep(ms)
 	},
-	intro_sleep: async (ms) => {
-		await sleep(ms)
-	},
-	intro_now: () => performance.now(),
 }
 
 // A live board's worker gathers, its heap readable for `--timing` (`run-board-heap.ts`); a single
@@ -135,14 +133,14 @@ function gather_ports(
 	return { gather, worker_heap: heap }
 }
 
-// The trill in the theme row's voice at its letter pace (joshuafolkken/kit#8365); a board in no theme
-// keeps the default, which no draw sounds (`run-board-live.ts` → `trill_of`).
+// The trill in the theme row's voice at its letter pace (joshuafolkken/kit#8365) — the four works the
+// demo added in the wargames teletype's (joshuafolkken/kit#8917); a board in no theme keeps the default,
+// which no draw sounds (`run-board-live.ts` → `trill_of`).
 function typing_sound_of(theme: Theme | undefined): TypingSound {
 	if (theme === undefined) return run_board_sound_typing.typing_sound()
-	const { typing, intro } = run_board_theme_defs.THEME_DEFS[theme]
 
 	return run_board_sound_typing.typing_sound(
-		run_board_sound_typing.voiced(() => typing(intro.letter_ms)),
+		run_board_sound_typing.voiced(run_board_theme_sound.voice_of(theme)),
 	)
 }
 

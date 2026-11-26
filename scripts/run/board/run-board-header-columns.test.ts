@@ -80,7 +80,7 @@ describe('run_board_header.header_lines — the time circuits', () => {
 	it('draws the finish and what is left, then the machine, over now and the run’s age', () => {
 		const [first, second] = header_of({ repo: KIT })
 
-		expect(first).toBe('⏸ josh-board  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -')
+		expect(first).toBe('⏸ josh-board     🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -')
 		expect(second).toMatch(/^ {2}- +🕒 \d{2}:\d{2} {2}\+2°10′00″/u)
 		expect(second).not.toContain('💓')
 	})
@@ -99,18 +99,18 @@ describe('run_board_header.header_lines — the time circuits once the run has e
 		const activity = { last_event_ms: ended_ms, is_stopped: true }
 		const lines = lines_of(header({ activity, ended_ms, repo: KIT }))
 
-		expect(lines[0]).toMatch(/^■ josh-board {2}🎯 \d{2}:\d{2} {2}- {6}0″ {2}💪/u)
+		expect(lines[0]).toMatch(/^■ josh-board {5}🎯 \d{2}:\d{2} {2}- {6}0″ {2}💪/u)
 		expect(lines[1]).toContain('+1°30′00″')
-		expect(lines[2]).toMatch(/^ {2}kit {9}🚀 \d{2}:\d{2} {10}—$/u)
+		expect(lines[2]).toMatch(/^ {2}kit {12}🚀 \d{2}:\d{2} {10}—$/u)
 		expect(lines.join('\n')).not.toContain('💓')
 	})
 })
 
 describe('run_board_header.header_lines — the name column', () => {
 	it.each([
-		['shorter than the board’s', KIT, /^ {2}kit {9}🚀 /u],
+		['shorter than the board’s', KIT, /^ {2}kit {12}🚀 /u],
 		['longer than the board’s', LONG, /^ {2}a-long-repository {2}🚀 /u],
-		['not read yet', undefined, /^ {14}🚀 /u],
+		['not read yet', undefined, /^ {17}🚀 /u],
 	])('keeps the times in one column with a repository name %s', (_case, repo, now) => {
 		const [first, second, third] = moving_of({ repo })
 
@@ -153,7 +153,7 @@ describe('run_board_header.header_lines — the board’s name and the kit versi
 	it('draws a single run’s name in the board’s place', () => {
 		const [first] = header_of({ run_name: SINGLE_NAME })
 
-		expect(first).toMatch(new RegExp(`^⏸ ${SINGLE_NAME} {2}🎯`, 'u'))
+		expect(first).toMatch(new RegExp(`^⏸ ${SINGLE_NAME} {8}🎯`, 'u'))
 	})
 
 	it('keeps the times in one column on all three lines past a version wider than the name', () => {

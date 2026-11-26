@@ -33,7 +33,7 @@ function toned(tone: Tone, text: string, idle: Paint = IDLE_PAINT): string {
 	return tone === 'running' ? styleText('bold', colored) : colored
 }
 
-const run_board_theme_tones = { IDLE_PAINT, TONES, TONE_PAINTS, toned }
+const run_board_theme_tones = { TONES, TONE_PAINTS, toned }
 
 export { run_board_theme_tones }
 export type { Tone }

@@ -136,6 +136,33 @@ describe('run_board_keys.read_keys intercept', () => {
 	})
 })
 
+// joshuafolkken/kit#8917: a themed board's demo mode reads the keys it takes, and claims its own key
+// before the folds see it.
+describe('run_board_keys.read_keys claim', () => {
+	it('hands the taker each chunk typed', () => {
+		const keys = fake_keys()
+		const taken: Array<string | undefined> = []
+		const reading = read_keys(keys.input)
+
+		reading.intercept?.((chunk) => {
+			taken.push(chunk)
+		})
+		keys.type('3w')
+
+		expect(taken).toStrictEqual(['3w'])
+	})
+
+	it('folds only the chunks the claim leaves', () => {
+		const keys = fake_keys()
+		const reading = read_keys(keys.input, { claim: (chunk) => chunk === '/' })
+
+		keys.type('/')
+		keys.type('q')
+
+		expect([...(reading.folded?.() ?? [])]).toStrictEqual(['queued'])
+	})
+})
+
 // joshuafolkken/kit#8355: the reveal released under the exit wipe leaves keys with the wipe.
 describe('run_board_keys.read_keys intercept release', () => {
 	it('leaves keys going to a later taker when an earlier intercept is released', () => {

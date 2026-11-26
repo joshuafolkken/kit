@@ -196,11 +196,11 @@ describe('run_board_cli.live_ports cue', () => {
 	// joshuafolkken/kit#8365: the trill sounds the theme row's voice at the row's letter pace.
 	it('voices the trill with the theme row typing at its letter pace', () => {
 		const voiced = vi.spyOn(run_board_sound_typing, 'voiced')
-		const typing = vi.spyOn(THEME_DEFS.matrix, 'typing').mockReturnValue('click.wav')
+		const typing = vi.spyOn(THEME_DEFS.trace, 'typing').mockReturnValue('click.wav')
 
-		run_board_cli.live_ports(true, { theme: 'matrix', icons: 'shapes' })
+		run_board_cli.live_ports(true, { theme: 'trace', icons: 'shapes' })
 		expect(voiced.mock.calls[0]?.[0]()).toBe('click.wav')
-		expect(typing).toHaveBeenCalledWith(THEME_DEFS.matrix.intro.letter_ms)
+		expect(typing).toHaveBeenCalledWith(THEME_DEFS.trace.intro.letter_ms)
 		vi.restoreAllMocks()
 	})
 

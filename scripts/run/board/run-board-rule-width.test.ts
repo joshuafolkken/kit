@@ -57,7 +57,7 @@ function rendered(
 		occupied_count: active.length,
 		lane_limit: LANE_COUNT,
 		usages: board_usage(new Map()),
-		theme: is_themed ? 'wargames' : undefined,
+		theme: is_themed ? 'wopr' : undefined,
 	})
 	const lines = run_board_render.render({
 		header: board,

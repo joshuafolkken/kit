@@ -1,4 +1,4 @@
-import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
+import type { Beat } from '#scripts/run/board/run-board-replay'
 import { describe, expect, it } from 'vitest'
 import { board_compare_cli, type ComparePorts } from './board-compare-cli'
 
