@@ -188,6 +188,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    Each `- 前提:` command runs as `lane:plan` runs it; one whose last line is not a number is refused, naming `lane:value cell` (also `issue:body`).
    A failed or unmet premise passes; `- 計測宣言:` is not run. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
+   Any `- 種別: 不具合` body is refused without a `- 検出漏れの理由: <why the existing tests missed it>` line under `## 背景` (`issue:lint` too; `issue:body` and `issue:kind` do not check it).
    A non-defect body citing merged or closed work in `## 概要` / `## 背景` is refused without `- 新しい目標:`.
    A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) is refused the same way.
    One projected past twice the implement stage budget at the measured rate is refused unless it declares `- 分割しない理由: <理由>`, whatever its route.
@@ -488,6 +489,8 @@ pnpm josh issue:lint .josh/tmp/issue-body.md
 The required headings are `## 背景`, `## 現象`, `## 期待結果` and `## 受け入れ条件`, plus the bug classification (source: `prompts/collaboration-workflow/issue-template.md`), led by `## 概要`. Run this before filing.
 
 Prints `ok` and the labels to apply when the headings and one `- 種別:` declaration are present; a missing or conflicting declaration exits 1, as does a `- 種別: 不具合` body without a well-formed `- 原因:` origin line ([`josh defect:origin`](#josh-defectorigin) lists candidates). [`josh issue:file`](#josh-issuefile) runs it as a filing step.
+
+A `- 種別: 不具合` body without a `- 検出漏れの理由:` line under `## 背景` also exits 1 — a filing-only check that `issue:body` and `issue:kind` skip.
 
 A `実施可能条件` or `実施可能日` heading exits 1 and shows the `## 背景` declaration line to write instead.
 
