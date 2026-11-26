@@ -269,3 +269,28 @@ describe('run_board_keys.read_keys trill', () => {
 		expect(switched).toStrictEqual([false])
 	})
 })
+
+// joshuafolkken/kit#8939: a fold or the sound switch shows at once, so each asks a redraw.
+function redrawn(...chunks: Array<string>): number {
+	const keys = fake_keys()
+	let count = 0
+
+	read_keys(keys.input, { redraw: () => (count += 1) })
+	for (const chunk of chunks) keys.type(chunk)
+
+	return count
+}
+
+describe('run_board_keys.read_keys redraw', () => {
+	it('asks a redraw for each chunk that changes the folds', () => {
+		expect(redrawn('w', 'w')).toBe(2)
+	})
+
+	it('asks none for a chunk that leaves the folds as they were', () => {
+		expect(redrawn('ww', 'x')).toBe(0)
+	})
+
+	it('asks a redraw for each flip of the sound', () => {
+		expect(redrawn('s', 's')).toBe(2)
+	})
+})

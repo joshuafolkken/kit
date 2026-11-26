@@ -3,6 +3,7 @@ import type { Cells } from './run-board-cells'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_fixture, type Stage } from './run-board-frame-fixture'
+import type { KeyInput } from './run-board-keys'
 import { run_board_live } from './run-board-live'
 import { run_board_screen } from './run-board-screen'
 import type { TypingSound } from './run-board-sound-typing'
@@ -110,6 +111,78 @@ describe('run_board_live.watch themed refresh', () => {
 
 		expect(written.length).toBeGreaterThan(0)
 		expect(written.every(({ write }) => is_synced_once(write))).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#8939: a key that changes the board is drawn within one frame-loop check.
+const PRESS_AFTER_MS = 3500
+const CHECK_MS = 50
+
+// A terminal whose keys the test types; no store, so a fold lives only in memory.
+function fold_keys(): { input: KeyInput; type: (chunk: string) => void } {
+	const held: { on_data: ((chunk: string) => void) | undefined } = { on_data: undefined }
+	const input: KeyInput = {
+		is_tty: true,
+		raw: () => undefined,
+		listen: (on_data) => {
+			held.on_data = on_data
+		},
+		close: () => undefined,
+		interrupt: () => undefined,
+	}
+
+	return { input, type: (chunk) => held.on_data?.(chunk) }
+}
+
+interface PressTimes {
+	pressed_ms: number
+	redraw_ms: number
+}
+
+// Notes the board's time at the first redraw begun once the key is typed.
+function redraw_timer(clock: { now_ms: number }, times: PressTimes): (stage: string) => void {
+	return function enter_stage(stage) {
+		if (stage !== 'redraw' || Number.isNaN(times.pressed_ms)) return
+		if (Number.isNaN(times.redraw_ms)) times.redraw_ms = clock.now_ms
+	}
+}
+
+// The clocked sleep that types 'w' once, the first time the board's clock passes PRESS_AFTER_MS.
+function pressing_sleep(
+	clock: { now_ms: number },
+	times: PressTimes,
+	type: (chunk: string) => void,
+): (ms: number) => Promise<void> {
+	const press_at = clock.now_ms + PRESS_AFTER_MS
+	const sleep = clocked(clock)
+
+	return async function pressing(ms) {
+		await sleep(ms)
+		if (!Number.isNaN(times.pressed_ms) || clock.now_ms < press_at) return
+		times.pressed_ms = clock.now_ms
+		type('w')
+	}
+}
+
+// How long after 'w' is typed the board starts its next redraw.
+async function fold_redraw_ms(force_color: string): Promise<number> {
+	vi.stubEnv('FORCE_COLOR', force_color)
+	const { ports, clock } = harness(LOCAL, [plan_titled('a')])
+	const { input, type } = fold_keys()
+	const times: PressTimes = { pressed_ms: NaN, redraw_ms: NaN }
+	const enter_stage = redraw_timer(clock, times)
+	const pressing = pressing_sleep(clock, times, type)
+
+	await expect(
+		run_board_live.watch({ ...ports, keys: input, enter_stage, sleep: pressing }, undefined),
+	).rejects.toBe(STOPPED)
+
+	return times.redraw_ms - times.pressed_ms
+}
+
+describe('run_board_live.watch redraws on a fold key', () => {
+	it.each(['3', '2'])('redraws within one check at FORCE_COLOR=%s', async (force_color) => {
+		expect(await fold_redraw_ms(force_color)).toBeLessThanOrEqual(CHECK_MS)
 	})
 })
 

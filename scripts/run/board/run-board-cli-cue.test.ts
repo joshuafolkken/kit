@@ -21,9 +21,10 @@ import { run_board_theme_defs } from './run-board-theme-defs'
 const { FIRST_ROUND, LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const { THEME_DEFS } = run_board_theme_defs
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
-// Enough waits for a few live frames, their spinners turned and their clocks' colons blinked between
-// them (joshuafolkken/kit#8476).
-const SLEEPS = 60
+// Enough board time for a few live frames, their spinners turned and their clocks' colons blinked
+// between them (joshuafolkken/kit#8476). Counted in time, not waits: a second waits in short checks for
+// a redraw asked (joshuafolkken/kit#8939).
+const STOP_AFTER_MS = 8000
 // The reads before the launch: the plan arrives on one of them, and a frame before it sounds nothing.
 const QUIET_READS = 3
 
@@ -34,7 +35,7 @@ function launching(cues: Array<CueName>): BoardPorts {
 	const { ports, clock } = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 	let launched: Promise<GatherRead> | undefined = undefined
 	let reads = 0
-	let sleeps = 0
+	const stop_at = clock.now_ms + STOP_AFTER_MS
 
 	return {
 		...ports,
@@ -48,8 +49,7 @@ function launching(cues: Array<CueName>): BoardPorts {
 			return is_quiet ? { ...read, local: LOCAL } : read
 		},
 		sleep: async (ms) => {
-			sleeps += 1
-			if (sleeps > SLEEPS) throw STOPPED
+			if (clock.now_ms > stop_at) throw STOPPED
 			clock.now_ms += ms
 			await Promise.resolve()
 		},

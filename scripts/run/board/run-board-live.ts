@@ -7,6 +7,7 @@ import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_live_sound, type Shown } from './run-board-live-sound'
 import { run_board_paint } from './run-board-paint'
+import { run_board_repaint } from './run-board-repaint'
 import { run_board_screen, type Joint, type Screen } from './run-board-screen'
 import type { TypingSound } from './run-board-sound-typing'
 import { run_board_spin } from './run-board-spin'
@@ -372,6 +373,25 @@ function board_depth(board: Pick<BoardPorts, 'color_depth'>): number {
 	return board.color_depth?.() ?? run_board_paint.color_depth()
 }
 
+// joshuafolkken/kit#8939: the board asks its redraws of one repaint, the theme run's where it has one.
+function repainted(ports: BoardPorts, run: ThemeRun | undefined): BoardPorts {
+	return { ...ports, repaint: run?.repaint ?? run_board_repaint.repaint_of() }
+}
+
+// The board's keys: the theme run's own where it has one; else the folds and the sound switch, each
+// asking a redraw.
+function keys_of(ports: BoardPorts, run: ThemeRun | undefined): KeyReading {
+	if (run !== undefined) return run_board_theme_keys.read_theme_keys(ports, run).keys
+
+	return run_board_keys.read_keys(ports.keys, {
+		cue: ports.cue,
+		trill: ports.typing_sound,
+		redraw: () => {
+			run_board_repaint.request(ports.repaint)
+		},
+	})
+}
+
 // The board as it opens: its theme run where one draws it, its themed ports and joint, and its keys.
 interface Opened {
 	run: ThemeRun | undefined
@@ -387,21 +407,10 @@ interface Opened {
 // Ctrl-C leaving at once.
 function opened(board: BoardPorts, theme: Theme | undefined): Opened {
 	const run = run_board_theme_registry.run_of(theme, board.is_tty ? board_depth(board) : 0)
-	const { ports, joint } = themed_joint(
-		board,
-		run === undefined ? undefined : (theme ?? BASE_THEME),
-	)
+	const joined = themed_joint(board, run === undefined ? undefined : (theme ?? BASE_THEME))
+	const ports = repainted(joined.ports, run)
 
-	if (run === undefined) {
-		const keys = run_board_keys.read_keys(ports.keys, {
-			cue: ports.cue,
-			trill: ports.typing_sound,
-		})
-
-		return { run, ports, joint, keys }
-	}
-
-	return { run, ports, joint, keys: run_board_theme_keys.read_theme_keys(ports, run).keys }
+	return { run, ports, joint: joined.joint, keys: keys_of(ports, run) }
 }
 
 // A signal leaves through `on_exit`; a failure outside the redraws leaves before its error is printed, so
