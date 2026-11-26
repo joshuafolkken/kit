@@ -1,0 +1,8 @@
+{
+	"reason": "Gate median drift from main: the check step rose from ~4-5s to ~14s in other lanes' solo gates (8941, 8946, 8979) before this branch; 8983's own gate (27.0s, check 13.6s, unit 1.3s) adds no time",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 72,
+		"ai_cost.on_demand_bytes": 51
+	}
+}

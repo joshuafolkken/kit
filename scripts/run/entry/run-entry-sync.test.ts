@@ -10,6 +10,9 @@ vi.mock('#scripts/git/git-command', () => ({ git_command: { branch: vi.fn(async 
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
+vi.mock('./run-entry-branch', () => ({
+	run_entry_branch: { switch_to_issue_branch: vi.fn(async () => undefined) },
+}))
 
 const { run_entry_sync } = await import('./run-entry-sync')
 

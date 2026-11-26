@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const is_linked_mock = vi.hoisted(() => vi.fn())
 const branch_mock = vi.hoisted(() => vi.fn())
+const switch_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { is_linked: is_linked_mock } }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch: branch_mock } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: vi.fn(() => false) },
+}))
+vi.mock('./run-entry-branch', () => ({
+	run_entry_branch: { switch_to_issue_branch: switch_mock },
 }))
 
 const { run_entry_sync } = await import('./run-entry-sync')
@@ -26,6 +30,7 @@ beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValueOnce(CLEAN).mockResolvedValueOnce(SYNCED)
 	is_linked_mock.mockReset().mockResolvedValue(false)
 	branch_mock.mockReset()
+	switch_mock.mockReset().mockResolvedValue(undefined)
 })
 
 // joshuafolkken/kit#7543: the hold taken on the issue's own branch to resume a returned pull request
@@ -48,4 +53,39 @@ describe('a primary checkout on the issue’s own branch is merged in place', ()
 			expect(sync_call()).toStrictEqual(['main:sync'])
 		},
 	)
+})
+
+// joshuafolkken/kit#8983: `fullrun new` stayed on `main` after `main:sync`, so `review:selfcheck` and
+// `preflight:check` both refused on the branch name.
+describe('the entry leaves a synchronized primary checkout on the issue’s branch', () => {
+	it('switches to the issue’s branch after `main:sync`', async () => {
+		branch_mock.mockResolvedValue('main')
+
+		expect(await run_entry_sync.sync({ ...ENTRY, is_adopt: true })).toBeUndefined()
+		expect(switch_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
+	})
+
+	it.each([
+		['already on the issue’s branch', `${ISSUE}-fix-it`, false],
+		['in a linked worktree', 'main', true],
+	])('keeps the branch when %s', async (_case, branch, is_linked) => {
+		branch_mock.mockResolvedValue(branch)
+		is_linked_mock.mockResolvedValue(is_linked)
+
+		await run_entry_sync.sync(ENTRY)
+
+		expect(switch_mock).not.toHaveBeenCalled()
+	})
+
+	it('keeps the branch when the restore stops the entry', async () => {
+		branch_mock.mockResolvedValue('main')
+		josh_run_mock
+			.mockReset()
+			.mockResolvedValueOnce({ code: 0, out: 'stashed' })
+			.mockResolvedValueOnce(SYNCED)
+			.mockResolvedValueOnce({ code: 1, out: 'conflicted' })
+
+		expect(await run_entry_sync.sync(ENTRY)).toBeDefined()
+		expect(switch_mock).not.toHaveBeenCalled()
+	})
 })
