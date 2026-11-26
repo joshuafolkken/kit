@@ -11,7 +11,7 @@ import type { ItemState } from './run-board-status'
 // The legend at the foot of `run:board`: the symbols the frame draws, named once, so a row carries
 // only what differs between rows. Drawn apart from the rows, which tell it the icons they draw.
 // joshuafolkken/kit#4047: each naming only what the frame draws, on one line. An icon the frame draws
-// beside its own word is not named — ⏳ under `⏳ queued`, 🙋 under `🙋 decision`, ✅ under `✅ done`
+// beside its own word is not named — ⌛ under `⌛ queued` (a queued row's own ⏳ is named by no key; joshuafolkken/kit#8944), 🙋 under `🙋 decision`, ✅ under `✅ done`
 // and 📌 on `📌 findings` — so the legend names only an icon drawn with no word beside it, what a
 // waiting row leads with among them.
 
