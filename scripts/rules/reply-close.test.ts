@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { concise_reply } from './concise-reply'
 import { reply_close } from './reply-close'
 
 const BODY = 'The gate passed and the pull request is open.'
@@ -60,6 +61,30 @@ describe('reply_close.is_open', () => {
 	})
 })
 
+// joshuafolkken/kit#9006: every decision pending on the user rides the close — the recommended one
+// on the line, the rest as a list in the same paragraph.
+describe('reply_close next-step close listing every pending decision', () => {
+	const NEXT_APPROVE = '次の一手: マージを承認する'
+	const PENDING = ['- 調査する #9100', '- wake ログの注記を確認する（起票の下書き）']
+	const LONG_ITEM = `- ${'判断'.repeat(60)}`
+	const LONG_ITEMS = [LONG_ITEM, LONG_ITEM, LONG_ITEM, LONG_ITEM]
+
+	it('passes a next-step line followed by a list of the remaining decisions', () => {
+		expect(reply_close.is_open(reply(NEXT_APPROVE, ...PENDING), '')).toBe(false)
+	})
+
+	it('passes a next-step line naming a single decision as before', () => {
+		expect(reply_close.is_open(reply(NEXT_APPROVE), '')).toBe(false)
+	})
+
+	it('passes a listed close whose list alone is over the prose limit', () => {
+		const message = reply(NEXT_APPROVE, ...LONG_ITEMS)
+
+		expect(reply_close.is_open(message, '')).toBe(false)
+		expect(concise_reply.is_over(message, '')).toBe(false)
+	})
+})
+
 describe('reply_close.build_reason', () => {
 	it('opens with the row reason and carries the section', () => {
 		const reason = reply_close.build_reason('en')
@@ -72,6 +97,15 @@ describe('reply_close.build_reason', () => {
 	it('names the close form of the session language', () => {
 		expect(reply_close.build_reason('ja')).toContain(JA_NEXT_FORM)
 		expect(reply_close.build_reason('en')).toContain(EN_NEXT_FORM)
+	})
+
+	// joshuafolkken/kit#9006: the section the refusal carries tells the rewrite to list every decision
+	// pending on the user, whatever the reply's topic.
+	it('carries the rule that the close lists every decision pending on the user', () => {
+		const reason = reply_close.build_reason('ja')
+
+		expect(reason).toContain('ユーザーの判断を待っている件がある')
+		expect(reason).toContain('返信の話題に関係なく全部を「次の一手:」に載せ')
 	})
 
 	it('omits the section when the principles file cannot be read', () => {
