@@ -7,6 +7,7 @@ import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { launch_timing } from '#scripts/lane/launch-timing'
+import type { Report } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
 import { backlog_next } from './backlog-next'
 import type { PlanContext } from './backlog-plan'
@@ -69,20 +70,22 @@ async function scope_of(context: PoolContext): Promise<GateScope> {
 // `run:board --timing` (joshuafolkken/kit#8218); timing only records, so the plan is the same.
 // The gate scope reads only the context, not the resolution, so the two run side by side
 // (joshuafolkken/kit#8220). `open` is the whole open listing the caller holds, which answers the epics.
+// `report` takes the resolution's notices (joshuafolkken/kit#9007).
 async function classify(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
+	report: Report,
 	open?: OpenListing,
 ): Promise<Plan | undefined> {
 	const context = await launch_timing.timed(
 		'plan: context',
-		async () => await backlog_next.context_of(opted_in, exclude, open),
+		async () => await backlog_next.context_of(opted_in, exclude, report, open),
 	)
 
 	if (context === undefined) return undefined
 
 	const [result, scope] = await Promise.all([
-		launch_timing.timed('plan: resolve', async () => await backlog_next.resolve(context)),
+		launch_timing.timed('plan: resolve', async () => await backlog_next.resolve(context, report)),
 		scope_of(context),
 	])
 
@@ -138,12 +141,15 @@ function context_of(plan: Plan, listing: OpenListing): PlanContext {
 // keeps its previous plan on `undefined` rather than drawing an empty one. The opted-in pool and the open
 // listing take nothing from each other, so they are read side by side, and the listing is handed to the
 // classification so the epics are not read a second time (joshuafolkken/kit#8220).
-async function read_plan(exclude: ReadonlyArray<number> = []): Promise<PlanRead | undefined> {
+async function read_plan(
+	report: Report,
+	exclude: ReadonlyArray<number> = [],
+): Promise<PlanRead | undefined> {
 	const [opted_in, listing] = await Promise.all([auto_ok_cli.fetch_opted_in(), fetch_open()])
 
 	if (listing === undefined || opted_in.kind !== 'read') return undefined
 
-	const plan = await classify(opted_in, exclude, listing)
+	const plan = await classify(opted_in, exclude, report, listing)
 
 	return plan === undefined ? undefined : { plan, listing }
 }

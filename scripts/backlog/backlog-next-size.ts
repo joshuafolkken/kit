@@ -7,6 +7,7 @@ import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import type { FileBudget } from '#scripts/lines/line-budget'
 import { split_assess } from '#scripts/split/split-assess'
+import type { Report } from './backlog-defect-priority'
 import type { PoolContext } from './backlog-gate-scope'
 
 // An offered Issue whose declared estimate is over the split guide, with no reason it stays one —
@@ -87,11 +88,12 @@ function cap_note_of(row: EpicChild, near: ReadonlyArray<FileBudget> = []): stri
 		: `${session_cite.issue(row.number, undefined, row.repo)} ${note}`
 }
 
-// One stderr line per offered row over its size, and one per row naming a file near its cap — a
+// One `report` line per offered row over its size, and one per row naming a file near its cap — a
 // standalone issue and an epic child alike; the stdout tokens stay bare numbers.
 async function warn_over_guide(
 	offered: ReadonlyArray<EpicChild>,
 	context: PoolContext,
+	report: Report,
 ): Promise<void> {
 	const bodies = offered.map((row) => row.body ?? '')
 	const near = await issue_cap_files.near_cap_by_body(bodies, process.cwd())
@@ -100,7 +102,7 @@ async function warn_over_guide(
 		cap_note_of(row, near[index]),
 	])
 
-	for (const note of notes) if (note !== undefined) console.error(note)
+	for (const note of notes) if (note !== undefined) report(note)
 }
 
 const backlog_next_size = { warn_over_guide }

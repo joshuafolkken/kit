@@ -19,7 +19,7 @@ import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { run_startup } from '#scripts/run/startup/run-startup'
 import { backlog_auto_triage } from './backlog-auto-triage'
-import { backlog_defect_priority } from './backlog-defect-priority'
+import { backlog_defect_priority, type Report } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
 import { backlog_interrupt } from './backlog-interrupt'
 import { backlog_next_offer } from './backlog-next-offer'
@@ -153,19 +153,22 @@ function views_from(
 	)
 }
 
-// The reads and the classification, with none of the printing `backlog:next` then does with them.
+// The reads and the classification, with none of the rendering `backlog:next` then does with them.
+// Its notices — the epic read's, a refusal, the defect-rate deferral — go to `report`: `console.error`
+// for `backlog:next` and `backlog:plan`, nowhere for `run:board`, whose screen they would overwrite
+// (joshuafolkken/kit#9007).
 //
 // `backlog:plan` renders this same pool as a plan a person reads before the run starts,
 // so the seam is cut here rather than a second read-and-classify path
 // being written beside it: the plan and the run cannot disagree about what may start, because there
-// is one answer and two renderings of it. `undefined` is the refusal — already reported.
-async function resolve(context: PoolContext): Promise<EpicNextResult | undefined> {
+// is one answer and two renderings of it. `undefined` is the refusal — already passed to `report`.
+async function resolve(context: PoolContext, report: Report): Promise<EpicNextResult | undefined> {
 	const { reads, notices, refusal } = await backlog_pool.read_epics(context)
 
-	for (const notice of notices) console.error(notice)
+	for (const notice of notices) report(notice)
 
 	if (refusal !== undefined) {
-		console.error(refusal)
+		report(refusal)
 
 		return undefined
 	}
@@ -178,6 +181,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 	const ordered = await backlog_defect_priority.prioritize(
 		combine(views_from(reads, context, untrusted), context, untrusted),
 		context.repo,
+		report,
 	)
 
 	return backlog_rank.rank_result(await backlog_resumable.read(ordered, context.repo), context.repo)
@@ -277,7 +281,7 @@ async function untriaged_of(
 async function answer_pool(context: PoolContext): Promise<number> {
 	const resolved = await run_startup.phase(
 		'candidate eligibility',
-		async () => await resolve(context),
+		async () => await resolve(context, console.error),
 		{
 			edge_of: result_edge,
 		},
@@ -308,9 +312,11 @@ async function answer_pool(context: PoolContext): Promise<number> {
 // already reported. The three reads take nothing from one another, so they run side by side
 // (joshuafolkken/kit#8220); the failures are still checked tracking first, so a double failure says what
 // it said before. `open` is a whole open listing a plan read already holds, which answers the epics.
+// The failures go to `report`, as `resolve`'s notices do (joshuafolkken/kit#9007).
 async function context_of(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
+	report: Report,
 	open?: OpenListing,
 ): Promise<PoolContext | undefined> {
 	const [tracking, repo, measurements] = await Promise.all([
@@ -320,13 +326,13 @@ async function context_of(
 	])
 
 	if (tracking.kind !== 'read') {
-		console.error(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
+		report(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
 
 		return undefined
 	}
 
 	if (repo === undefined) {
-		console.error(REPO_UNREADABLE_MESSAGE)
+		report(REPO_UNREADABLE_MESSAGE)
 
 		return undefined
 	}
@@ -346,7 +352,7 @@ async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promis
 		return backlog_next_report.report_none()
 	}
 
-	const context = await context_of(opted_in, exclude)
+	const context = await context_of(opted_in, exclude, console.error)
 
 	if (context === undefined) return FAILURE_EXIT_CODE
 

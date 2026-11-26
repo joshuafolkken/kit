@@ -79,7 +79,7 @@ async function classify(context: PoolContext | undefined): Promise<number> {
 		return 1
 	}
 
-	const result = await backlog_next.resolve(context)
+	const result = await backlog_next.resolve(context, console.error)
 
 	return await report(result === undefined ? undefined : { result, repo: context.repo })
 }
@@ -93,7 +93,7 @@ async function read_pass(exclude: ReadonlyArray<number>): Promise<number> {
 		return 1
 	}
 
-	return await classify(await backlog_next.context_of(opted_in, exclude))
+	return await classify(await backlog_next.context_of(opted_in, exclude, console.error))
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

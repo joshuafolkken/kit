@@ -41,6 +41,7 @@ function plan_stub(): Plan {
 }
 
 const OPTED_IN: PoolContext['opted_in'] = { kind: 'read', issues: [], cutoff: 'none' }
+const report = vi.fn<(line: string) => void>()
 
 function context_stub(): PoolContext {
 	return {
@@ -138,7 +139,7 @@ describe('backlog_plan_read.classify timing', () => {
 
 		stub_classification(stub.result)
 		vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: WAVE_LIMIT })
-		const plan = await backlog_plan_read.classify(OPTED_IN, [])
+		const plan = await backlog_plan_read.classify(OPTED_IN, [], report)
 
 		expect(plan).toStrictEqual({
 			...stub,
@@ -147,13 +148,16 @@ describe('backlog_plan_read.classify timing', () => {
 		})
 		expect(launch_timing.phases().map(({ name }) => name)).toStrictEqual(STEPS)
 		expect(backlog_gate_scope.gate_scope).toHaveBeenCalledOnce()
+		// joshuafolkken/kit#9007: the caller's notice port reaches the context read and the resolution.
+		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], report, undefined)
+		expect(backlog_next.resolve).toHaveBeenCalledWith(expect.anything(), report)
 	})
 
 	// joshuafolkken/kit#8220: the gate scope runs beside the resolution, never in place of its failure.
 	it('answers nothing when the resolution fails, though the gate scope ran beside it', async () => {
 		stub_classification(undefined)
 
-		await expect(backlog_plan_read.classify(OPTED_IN, [])).resolves.toBeUndefined()
+		await expect(backlog_plan_read.classify(OPTED_IN, [], report)).resolves.toBeUndefined()
 		expect(backlog_gate_scope.gate_scope).toHaveBeenCalledOnce()
 	})
 })
@@ -165,20 +169,20 @@ describe('backlog_plan_read.read_plan', () => {
 		fetch_opted_in_mock.mockResolvedValue({ kind: 'failed' })
 		stub_listing()
 
-		await expect(backlog_plan_read.read_plan()).resolves.toBeUndefined()
+		await expect(backlog_plan_read.read_plan(report)).resolves.toBeUndefined()
 	})
 
 	it('answers nothing when the listing read fails', async () => {
 		fetch_opted_in_mock.mockResolvedValue(OPTED_IN)
 		issue_list_recent_mock.mockResolvedValue({ json: undefined, is_capped: false })
 
-		await expect(backlog_plan_read.read_plan()).resolves.toBeUndefined()
+		await expect(backlog_plan_read.read_plan(report)).resolves.toBeUndefined()
 	})
 
 	it('starts the listing while the opted-in read is still pending', () => {
 		fetch_opted_in_mock.mockReturnValue(new Promise(() => undefined))
 		stub_listing()
-		void backlog_plan_read.read_plan()
+		void backlog_plan_read.read_plan(report)
 
 		expect(issue_list_recent_mock).toHaveBeenCalledOnce()
 	})
@@ -189,10 +193,10 @@ describe('backlog_plan_read.read_plan', () => {
 		fetch_opted_in_mock.mockResolvedValue(OPTED_IN)
 		stub_listing()
 		stub_classification(stub.result)
-		const read = await backlog_plan_read.read_plan()
+		const read = await backlog_plan_read.read_plan(report)
 
 		expect(issue_list_recent_mock).toHaveBeenCalledOnce()
-		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], read?.listing)
+		expect(backlog_next.context_of).toHaveBeenCalledWith(OPTED_IN, [], report, read?.listing)
 		expect(read?.listing.rows.map((row) => row.number)).toStrictEqual([1, 2])
 		expect(read?.plan.result).toStrictEqual(stub.result)
 	})
@@ -204,7 +208,7 @@ describe('backlog_plan_read.read_plan — a failed classification', () => {
 		stub_listing()
 		stub_classification(undefined)
 
-		await expect(backlog_plan_read.read_plan()).resolves.toBeUndefined()
+		await expect(backlog_plan_read.read_plan(report)).resolves.toBeUndefined()
 		expect(backlog_next.resolve).toHaveBeenCalledOnce()
 	})
 })

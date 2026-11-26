@@ -28,6 +28,15 @@ const read_context = vi.mocked(backlog_next.context_of)
 const settle = vi.mocked(backlog_auto_triage.untriaged_of)
 const fetch_pool = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 
+// The pass reads the context with standard error as its notice port (joshuafolkken/kit#9007).
+function expect_context_read(exclude: ReadonlyArray<number>): void {
+	expect(read_context).toHaveBeenCalledWith(
+		expect.objectContaining({ kind: 'read' }),
+		exclude,
+		error,
+	)
+}
+
 function child(number: number, labels: ReadonlyArray<string> = []): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels, blocked_by: [] }
 }
@@ -77,7 +86,7 @@ describe('the parent triage pass', () => {
 	it('passes excluded decisions to the shared pool classifier', async () => {
 		await backlog_triage_pass.run(['--exclude', String(PARKED)])
 
-		expect(read_context).toHaveBeenCalledWith(expect.objectContaining({ kind: 'read' }), [PARKED])
+		expect_context_read([PARKED])
 	})
 })
 
@@ -146,7 +155,7 @@ describe('stalled child triage', () => {
 		}))
 		await backlog_triage_pass.run(['--exclude', String(STALLED)])
 
-		expect(read_context).toHaveBeenCalledWith(expect.objectContaining({ kind: 'read' }), [STALLED])
+		expect_context_read([STALLED])
 		expect(info).toHaveBeenCalledExactlyOnceWith(`pnpm josh issue:read ${String(PARKED)}`)
 	})
 })
