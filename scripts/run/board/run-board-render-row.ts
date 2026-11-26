@@ -90,11 +90,16 @@ function title_lead(row: BoardRow, frame: RowFrame): string {
 	return `${area_tag(row)}${frame.filed.has(row.number) ? FILED_LEAD : ''}`
 }
 
+// A title cut to no column draws no area, title or blank — only ✚ where the run filed the row, which
+// no findings line names again (joshuafolkken/kit#8990).
+function untitled_text(row: BoardRow, frame: RowFrame): string {
+	return frame.filed.has(row.number) ? run_board_labels.FILED_RUN_MARK : ''
+}
+
 // The title led by `title_lead` and cut by as many columns, so every column after it stays where an
 // unled row has it.
 function title_text(row: BoardRow, frame: RowFrame): string {
-	// A title cut to no column draws nothing, not even its lead (joshuafolkken/kit#8990).
-	if (frame.title_limit <= 0) return ''
+	if (frame.title_limit <= 0) return untitled_text(row, frame)
 
 	const lead = title_lead(row, frame)
 	// `title_of` draws nothing at a limit of 0 or below, so a lead that fills the column keeps the mark.
