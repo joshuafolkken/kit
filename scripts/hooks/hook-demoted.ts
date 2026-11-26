@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
+import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
+import { file_reader } from '#scripts/lib/read-file'
 import { z } from 'zod'
 import type { HookContext } from './hook-context'
 import { hook_ledger } from './hook-ledger'
@@ -19,11 +20,22 @@ const NOTICE_HEADER =
 const INDENT = '\t'
 const rules_schema = z.object({ rules: z.array(z.string()) })
 
-// A missing or unreadable file demotes nothing.
+// A missing, unreadable or malformed file demotes nothing. A missing file is the ordinary case; the
+// other two silently undo every demotion, so they leave a trace (joshuafolkken/kit#9043).
 function read_rules(file = DEMOTED_FILE): ReadonlySet<string> {
 	try {
-		return new Set(json_value.parse_with(readFileSync(file, 'utf8'), rules_schema)?.rules)
-	} catch {
+		const text = file_reader.read_optional(file)
+
+		if (text === undefined) return new Set()
+
+		const parsed = json_value.parse_with(text, rules_schema)
+
+		if (parsed === undefined) throw new Error(`malformed demoted-rules file: ${file}`)
+
+		return new Set(parsed.rules)
+	} catch (error) {
+		error_text.trace_swallowed('hook_demoted.read_rules', error)
+
 		return new Set()
 	}
 }

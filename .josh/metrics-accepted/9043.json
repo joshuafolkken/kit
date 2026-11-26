@@ -1,0 +1,7 @@
+{
+	"reason": "trace_swallowed calls and the absent/malformed split for the Stop hook and demotion ledger catches (#9043)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}
