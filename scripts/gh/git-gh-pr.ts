@@ -283,16 +283,36 @@ async function has_merge_landed(
 // made by hand between the failure and the read leaves `followup` with exactly the same work to
 // finish. REST offers nothing that would tell the two apart without keeping the merge commit's SHA
 // across a request that never answered.
+async function put_confirmed(
+	branch_name: string,
+	pr_number: number,
+	head_sha: string,
+): Promise<unknown> {
+	try {
+		await put_merge(pr_number, head_sha)
+
+		return undefined
+	} catch (error) {
+		return (await has_merge_landed(branch_name, pr_number, error)) ? undefined : error
+	}
+}
+
+// **An in-progress merge that ends without landing released GitHub's lock, not the merge** (#8965):
+// the pull request is still open and mergeable, so the request is sent once more. Only once — a
+// second 405 waits out its own bound and then fails, so a merge that never lands still ends.
 async function merge_with_confirmation(
 	branch_name: string,
 	pr_number: number,
 	head_sha: string,
 ): Promise<void> {
-	try {
-		await put_merge(pr_number, head_sha)
-	} catch (error) {
-		if (!(await has_merge_landed(branch_name, pr_number, error))) throw error
-	}
+	const failure = await put_confirmed(branch_name, pr_number, head_sha)
+	if (failure === undefined) return
+
+	const final_failure = is_merge_in_progress(failure)
+		? await put_confirmed(branch_name, pr_number, head_sha)
+		: failure
+
+	if (final_failure !== undefined) throw final_failure
 }
 
 async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
