@@ -9,8 +9,8 @@ import type { LocalRead } from './run-board-read'
 import type { EndedRoot, RootRun } from './run-board-single'
 import { run_board_status, type ItemStatus } from './run-board-status'
 
-// The root checkout's single runs beside a carried run. A running one is drawn under 🏠 above the lanes
-// (joshuafolkken/kit#7524), its row read off its own span's events and kept out of `active`, so the
+// The single runs beside a carried run, the root checkout's and each lane worktree's
+// (joshuafolkken/kit#8993). A running one is drawn under `🏠 runs` above the lanes (joshuafolkken/kit#7524), its row read off its own span's events and kept out of `active`, so the
 // header counts no lane and no 🔄 for it. One a merge ended inside the run leaves 🏠 and is listed in
 // `✅ done` as a lane's finished row is, in its place by its end (joshuafolkken/kit#7525). A `halfrun` or
 // `prrun` a stop ended keeps its row, stopped at its stop: its next step is still to come
@@ -71,8 +71,11 @@ function is_single_row(row: BoardRow, layout: Pick<BoardLayout, 'singles'> | und
 }
 
 // The command a single run's row runs: a row beside the run names its own, a single run's own board
-// its `run_name`; `undefined` for a `backlogrun`'s row.
+// its `run_name`; `undefined` for a `backlogrun`'s row and an earlier run's lane (🧳), which this
+// board's run does not run.
 function single_name_of(row: BoardRow, run: SingleNamed): string | undefined {
+	if (row.is_earlier === true) return undefined
+
 	return single_of(row, run.layout)?.name ?? run.run_name
 }
 

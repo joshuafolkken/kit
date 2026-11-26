@@ -76,3 +76,25 @@ describe('run_board_root_layout.layout_of — a root single run a merge ended', 
 		expect(layout.singles).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#8993: a row names the single run command that runs it.
+describe('run_board_root_layout.single_name_of', () => {
+	it('names a single run’s own board’s command on its own row', () => {
+		expect(
+			run_board_root_layout.single_name_of(lane_row(ROOT, START), { run_name: 'halfrun' }),
+		).toBe('halfrun')
+	})
+
+	it('names a row beside the run by its single run’s command', () => {
+		const row = lane_row(ROOT, START)
+		const layout = { singles: [{ name: 'prrun', row }] }
+
+		expect(run_board_root_layout.single_name_of(row, { layout, run_name: 'fullrun' })).toBe('prrun')
+	})
+
+	it('names no command for an earlier run’s lane on a single run’s own board', () => {
+		const earlier = { ...lane_row(LANE, START), is_earlier: true }
+
+		expect(run_board_root_layout.single_name_of(earlier, { run_name: 'fullrun' })).toBeUndefined()
+	})
+})
