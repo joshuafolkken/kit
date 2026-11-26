@@ -1,0 +1,7 @@
+{
+	"reason": "the other-wait exclusion in is_gone_in adds 2 code lines",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}
