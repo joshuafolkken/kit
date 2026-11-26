@@ -244,6 +244,23 @@ describe('backlog_drive_hold.recorder — end', () => {
 	})
 })
 
+// joshuafolkken/kit#9003: a driver circling a full pool writes no ledger line, so its start clears the mark.
+describe('backlog_drive_hold.started', () => {
+	it('clears an earlier driver’s mark at a full-pool driver’s start, before any pass writes', async () => {
+		await backlog_drive_hold.started(full)
+
+		expect(writes).toStrictEqual(['clear'])
+	})
+
+	it('leaves the mark of its own full-pool hand-back while no next driver starts', async () => {
+		const holds = await backlog_drive_hold.started(full)
+
+		await holds.end(WINDOW_END)
+
+		expect(writes).toStrictEqual(['clear', ...FULL_HAND_BACK])
+	})
+})
+
 // Asks the offer `left` times, one after another.
 async function ask_each(ask: (read: DriveState) => Promise<unknown>, left: number): Promise<void> {
 	if (left === 0) return

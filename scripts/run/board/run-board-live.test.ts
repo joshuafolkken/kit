@@ -26,6 +26,23 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 })
 
+// joshuafolkken/kit#9027: a leave queued behind a frame's tail is dropped by `process.exit`.
+describe('run_board_live.watch settles', () => {
+	it('settles its writes once, before it writes the leave', async () => {
+		const { ports, frames, leaves } = harness(undefined, [])
+		const settled_at: Array<number> = []
+
+		ports.settle = () => {
+			settled_at.push(frames.length)
+		}
+
+		await expect(run_board_live.watch(ports, undefined)).rejects.toBe(STOPPED)
+		leaves[0]?.()
+		expect(settled_at).toHaveLength(1)
+		expect(frames.indexOf(SCREEN.leave)).toBeGreaterThanOrEqual(settled_at[0] ?? NaN)
+	})
+})
+
 describe('run_board_live.watch', () => {
 	// joshuafolkken/kit#8826: a redraw is the base the frame loop paints, so the rules are read off the
 	// screen its writes leave.

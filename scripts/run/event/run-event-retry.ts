@@ -2,6 +2,10 @@ import { run_event_scope } from './run-event-scope'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 
 const RETRY_PREFIX = 'retry #'
+// The drive's auto-retry cap per issue and the note its park is restated with on reaching it
+// (`backlog-drive-stalled-retry.ts`); here, off the drive's imports, so the board reads the note too.
+const RETRY_CAP = 2
+const CAP_NOTE = `auto-retry cap ${String(RETRY_CAP)} reached`
 
 function text_of(issue: number): string {
 	return `${RETRY_PREFIX}${String(issue)}`
@@ -31,4 +35,11 @@ function count_of(events: ReadonlyArray<RunEvent>, issue: number): number {
 	).length
 }
 
-export const run_event_retry = { count_of, current_attempts, is_retry, text_of }
+export const run_event_retry = {
+	CAP_NOTE,
+	RETRY_CAP,
+	count_of,
+	current_attempts,
+	is_retry,
+	text_of,
+}

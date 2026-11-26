@@ -35,7 +35,12 @@ interface PlanPorts {
 	) => Promise<Plan | undefined>
 }
 
-// The board leads a row withheld for a person with 🙋, so classifying says no ❗ notice over it.
+function drop_notice(): void {
+	// The board draws only the cells it changed, so a line written past it stays on screen (joshuafolkken/kit#9007).
+}
+
+// The board leads a row withheld for a person with 🙋, so classifying says no ❗ notice over it, and the
+// resolution's own notices are dropped rather than written over the frame.
 async function classify_quietly(
 	opted_in: OptedIn,
 	exclude: ReadonlyArray<number>,
@@ -43,7 +48,7 @@ async function classify_quietly(
 ): Promise<Plan | undefined> {
 	epic_classify.mute_notices()
 
-	return await backlog_plan_read.classify(opted_in, exclude, open)
+	return await backlog_plan_read.classify(opted_in, exclude, drop_notice, open)
 }
 
 // The live listing rejects with gh's reason, so the board's fetch carries it into `plan_error` and the

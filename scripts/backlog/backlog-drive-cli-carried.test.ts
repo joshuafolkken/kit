@@ -84,7 +84,7 @@ function arrange_driver(): void {
 		state: { state: 'OPEN', labels: ['in-progress'], is_human_review: false },
 	})
 	vi.spyOn(lane_sampler, 'start').mockReturnValue(vi.fn())
-	vi.spyOn(backlog_drive_hold, 'recorder').mockReturnValue({
+	vi.spyOn(backlog_drive_hold, 'started').mockResolvedValue({
 		hold: vi.fn(),
 		answering: <T>(offer: T): T => offer,
 		end: vi.fn(),
@@ -118,6 +118,13 @@ it('resumes only owned lanes after scoped carrying (ac-76017215, ac-205dc715, ac
 		expect.anything(),
 		expect.anything(),
 	)
+})
+
+// joshuafolkken/kit#9003: a full pool's passes write no ledger line, so the start clears the hand-back mark.
+it('starts the hold recorder, clearing the hand-back mark, before the drive loop', async () => {
+	await backlog_drive_cli.run(['--owner', String(process.pid)])
+
+	expect(backlog_drive_hold.started).toHaveBeenCalledBefore(vi.mocked(backlog_drive.run_loop))
 })
 
 it('resumes all carried paused lanes in an unscoped run (ac-b2a9e00b)', async () => {
