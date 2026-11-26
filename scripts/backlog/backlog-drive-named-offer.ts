@@ -249,7 +249,8 @@ async function launch(
 // (joshuafolkken/kit#6883): its children are what runs, so the offer passes it as in flight and the
 // issues behind it, or the pool, fill the free lanes (joshuafolkken/kit#6840). The pool counts it
 // running, so with no lane of the run's own in flight it does not read the drain while the epic is
-// open. A failed read still waits (`retries`), so the epic's retry count reaches its hand-back.
+// open. A failed read still waits (`retries`), so the epic's retry count reaches its hand-back. An added
+// issue whose blockers are unfinished is passed the same way (`backlog-drive-blocked.ts`).
 function is_passed(
 	carry: RunCarry,
 	issue: string | undefined,
@@ -298,7 +299,7 @@ function held_alone(state: DriveState, waiting: DriveState): OfferRead | undefin
 // The named offer, and the state the pool's offer reads when it names nothing: a named issue the yield
 // still holds is excluded there too, so the pool does not relaunch it into the same yield
 // (joshuafolkken/kit#4926, joshuafolkken/kit#6883). It is excluded, not counted running: no lane holds it.
-// An added epic the offer passed is counted running there (`is_passed`).
+// An added epic, or a blocked added issue, the offer passed is counted running there (`is_passed`).
 // joshuafolkken/kit#6865: each offer first retries the mechanical parks whose stop has cleared.
 async function read(carry: RunCarry, state: DriveState, context: NamedContext): Promise<NamedRead> {
 	await backlog_drive_stalled_retry.sweep()
