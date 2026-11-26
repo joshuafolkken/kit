@@ -11,6 +11,7 @@ import { run_board_length } from './run-board-length'
 import { run_board_now, type TimedLine } from './run-board-now'
 import type { Phase } from './run-board-phase'
 import { run_board_render_checks } from './run-board-render-checks'
+import { run_board_render_shed } from './run-board-render-shed'
 import { run_board_render_waits } from './run-board-render-waits'
 
 // The end of a running row (joshuafolkken/kit#3769, #4043, #4292): its finish in aligned columns
@@ -25,6 +26,8 @@ const { PHASE_ICONS, span_of } = run_board_labels
 const { is_live } = run_board_earlier
 const { fitted_span_of } = run_board_length
 const { check_of, held_of } = run_board_render_waits
+const { checks_part } = run_board_render_checks
+const { is_shed } = run_board_render_shed
 // A phase past twice its usual time is drawn as long, past three times as alarming.
 const LONG_FACTOR = 2
 const ALARM_FACTOR = 3
@@ -215,7 +218,7 @@ function finish_of(row: BoardRow, header: BoardHeader): Finish | undefined {
 // A running row's finish in two columns aligned across the frame (joshuafolkken/kit#7994): the stamp
 // left-aligned, the drift right-aligned, so the activity after it starts in one column; blanks of that
 // width where the row draws none; nothing where no running row draws one.
-function finish_part(row: BoardRow, header: BoardHeader): string {
+function aligned_finish(row: BoardRow, header: BoardHeader): string {
 	const stamp_width = column_width(row, header, (other) => finish_of(other, header)?.stamp)
 	const drift_width = column_width(row, header, (other) => finish_of(other, header)?.drift)
 	const finish = finish_of(row, header) ?? { stamp: '', drift: '' }
@@ -224,25 +227,36 @@ function finish_part(row: BoardRow, header: BoardHeader): string {
 	return stamp_width === 0 ? '' : `${finish.stamp.padEnd(stamp_width)}${drift}`
 }
 
+// The finish a row draws: aligned, or — on a row that gives up `shed` cells — its stamp alone, unaligned,
+// then none (`run-board-render-shed.ts`).
+function finish_part(row: BoardRow, header: BoardHeader, shed: number): string {
+	if (is_shed('finish', shed)) return ''
+
+	if (is_shed('drift', shed)) return finish_of(row, header)?.stamp ?? ''
+
+	return aligned_finish(row, header)
+}
+
 // What a running row draws after its finish — the check its held lane waits to run, its pull
 // request's checks in followup, or its newest activity.
-function end_of(row: BoardRow, header: BoardHeader): Array<string> {
+function end_of(row: BoardRow, header: BoardHeader, shed: number): Array<string> {
 	const held = held_of(row, header)
 
 	if (held !== undefined) return [check_of(held)]
 
 	const checks = checks_of(row, header)
 
-	if (checks !== undefined) return [run_board_render_checks.checks_part(checks, header.pull_link)]
+	if (checks !== undefined) return [checks_part(checks, header.pull_link, shed)]
 
 	return [activity_part(row, header)]
 }
 
-// A running row's finish while the run goes on, then its end; nothing for any other row.
-function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
+// A running row's finish while the run goes on, then its end, with `shed` of its cells given up;
+// nothing for any other row.
+function tail_of(row: BoardRow, header: BoardHeader, shed = 0): Array<string> {
 	if (!is_tailed(row)) return []
 
-	return [finish_part(row, header), ...end_of(row, header)]
+	return [finish_part(row, header, shed), ...end_of(row, header, shed)]
 }
 
 // The icon a row's end draws for its newest activity, so the legend names it — none where the row

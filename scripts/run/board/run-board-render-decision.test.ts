@@ -11,7 +11,8 @@ const { GAP } = run_board_render_row
 const ISSUE = 6253
 const COLUMNS = 65
 const ROWS = 100
-const TITLE = 'A long title that gives its room to the decision needed to resume'
+const TITLE_START = 'A long title'
+const TITLE = `${TITLE_START} that gives its room to the decision needed to resume`
 const QUESTION = '→ decide: Choose the account that should run the probe and confirm its credits'
 const WAITING = '→ decide #6113: Confirm the promotional credits (外部アカウント)'
 
@@ -60,12 +61,12 @@ describe('run board decision tails', () => {
 	)
 
 	it.each([true, false])(
-		'shortens the title before preserving the complete tail: waiting=%s (ac-aefea1f5)',
+		'gives up the title, to nothing, before the complete tail: waiting=%s (ac-aefea1f5)',
 		(is_waiting) => {
 			const line = line_of(is_waiting, 'screen')
 
-			expect(line).toContain('…')
-			expect(line).not.toContain(TITLE)
+			// joshuafolkken/kit#8990: the title floor is none, so not even the title's first word is left.
+			expect(line).not.toContain(TITLE_START)
 			expect(unfinished(line).endsWith(is_waiting ? WAITING : QUESTION)).toBe(true)
 		},
 	)
