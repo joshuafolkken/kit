@@ -18,8 +18,9 @@ describe('backlog_hold_text.text_of — hand-back holds', () => {
 		['hand-back:merge', 'the driver paused after a merge; the session restarts it'],
 		['hand-back:launch', 'a lane launch failed; the session restarts the driver'],
 		['hand-back:offer', 'the backlog offer failed; the session restarts the driver'],
-		[WINDOW, "the run's time window closed; the session restarts the driver"],
-		[DRAINED, 'the backlog had nothing to start; the session restarts the driver'],
+		// joshuafolkken/kit#9003: the supervisor, not a session, re-drives a window's end.
+		[WINDOW, "the run's time window closed; the supervisor restarts the driver"],
+		[DRAINED, 'the backlog had nothing to start; the supervisor restarts the driver'],
 		['hand-back:crash', 'the driver paused (crash); the session restarts it'],
 	])(AS_SENTENCE, (code, text) => {
 		expect(text_of(code)).toBe(text)

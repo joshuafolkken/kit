@@ -93,10 +93,12 @@ const UNREAD_MECHANISM_THEN_DEFECT: ReadonlyArray<EpicChild> = [
 	{ ...ROW, number: DEFECT, body: defect_rate.DEFECT_DECLARATION_LINE },
 ]
 
+const report = vi.fn<(line: string) => void>()
+
 // The numbers `prioritize` offers for one bundle of this repository's children.
 async function prioritized(children: ReadonlyArray<EpicChild>): Promise<Array<number>> {
 	const result = { ...EMPTY_RESULT, candidates: [{ repo: ROW.repo, children: [...children] }] }
-	const ordered = await backlog_defect_priority.prioritize(result, ROW.repo)
+	const ordered = await backlog_defect_priority.prioritize(result, ROW.repo, report)
 
 	return ordered.candidates[0]?.children.map((child) => child.number) ?? []
 }
@@ -111,6 +113,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(console, 'warn').mockImplementation(streams.error)
 	streams.reset()
+	report.mockClear()
 })
 
 describe('backlog:next while the defect rate is above its baseline', () => {
@@ -163,6 +166,25 @@ describe('backlog_defect_priority.prioritize (ac-1462bc0e)', () => {
 
 		expect(await prioritized(UNREAD_MECHANISM_THEN_DEFECT)).toEqual([MECHANISM, DEFECT])
 		expect(git_gh_command.issue_get_body).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#9007: `run:board` draws its own screen, so the notices go to the caller's port.
+describe('backlog_defect_priority.prioritize — the report port', () => {
+	it.each([
+		{ name: 'above the baseline', rate: { defect_rate: ABOVE_BASELINE }, note: ABOVE_NOTE },
+		{
+			name: 'unmeasured',
+			rate: { is_rate_unreadable: true },
+			note: backlog_defect_priority.UNMEASURED_MESSAGE,
+		},
+	])('passes the $name notice to report, not to standard error', async ({ rate, note }) => {
+		stub(rate)
+
+		await prioritized(UNREAD_MECHANISM_THEN_DEFECT)
+
+		expect(report).toHaveBeenCalledWith(expect.stringContaining(note))
+		expect(stderr()).toBe('')
 	})
 })
 

@@ -4,7 +4,10 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PoolContext } from './backlog-gate-scope'
+import { backlog_next } from './backlog-next'
 import { backlog_next_report } from './backlog-next-report'
+import { backlog_pool } from './backlog-pool'
 
 // The printing half of `backlog:next`. The end-to-end answers are pinned by `backlog-next.test.ts`;
 // these cover the pieces that suite reaches only through a whole stubbed backlog.
@@ -36,6 +39,31 @@ function run_result(children: ReadonlyArray<EpicChild>): EpicNextResult {
 
 	return { verdict: 'run', candidates, waiting: [], blocked_on_people: [], anomalies: [] }
 }
+
+const POOL: PoolContext = {
+	opted_in: { kind: 'read', issues: [], cutoff: 'none' },
+	tracking: { kind: 'read', index: new Map(), cutoff: 'none' },
+	repo: REPO,
+	exclude: [],
+	implement_rate: undefined,
+}
+
+// joshuafolkken/kit#9007: `run:board` passes a port that drops these, so none may reach standard error.
+describe('backlog_next.resolve — the report port', () => {
+	it('passes the epic read notices and the refusal to report, not to standard error', async () => {
+		const report = vi.fn<(line: string) => void>()
+
+		vi.spyOn(backlog_pool, 'read_epics').mockResolvedValue({
+			reads: [],
+			notices: ['a notice'],
+			refusal: 'a refusal',
+		})
+
+		await expect(backlog_next.resolve(POOL, report)).resolves.toBeUndefined()
+		expect(report.mock.calls).toStrictEqual([['a notice'], ['a refusal']])
+		expect(streams.stderr()).toBe('')
+	})
+})
 
 describe('backlog_next_report.report_none — nobody opted in', () => {
 	it('prints the none token on standard output and the reason on standard error', () => {

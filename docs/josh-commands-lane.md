@@ -403,11 +403,13 @@ Print a merged lane's net time by stage, longest first, the implementation split
 ```bash
 pnpm josh lane:breakdown 4970              # the breakdown the overrun investigation comments on the lane
 pnpm josh lane:breakdown 4970 --timeline   # when each stage ran and where the lane waited
+pnpm josh lane:breakdown --period 14       # the split medians over two weeks
 ```
 
 **Options:**
 
 - `--timeline` — prints the lane in time order instead, one line a stage, wait or event, the stage lines adding up to the net time.
+- `--period <days>` — instead of an issue: each split segment's median and run count over lanes merged in <days> days.
 
 <!-- /usage -->
 
@@ -449,6 +451,8 @@ The `start to plan` line ends with `(outside calls <minutes>)`: the time no time
 The label is the josh commands a Bash call chains, a `reserved-run` as what it wrapped (`reserved-run (eslint)`, `reserved-run (test:related)`), else its first 60 characters past a leading `cd`; a reviewer's pass (`round 1`, `interaction`, `round 2`), and its level when the prompt opens with one; any other subagent's type; any other tool's name.
 
 `editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
+
+`split › <segment>` lines split `implement` by what its ledger rows waited on (core budget, `test:pinned`, review, gate, other `run:chain` stages), the rest editing (`lane-implement-split.ts`).
 
 The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs, hub <file>` — `<N>` the widest run's count, the hub the most capped runs recorded, left off where none did — and none when no run capped a file (`lane-breakdown-related.ts`).
 

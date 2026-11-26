@@ -126,7 +126,10 @@ function board_name(grid: Grid, theme: ThemeModule): void {
 	const name = theme.board ?? BOARD_NAMES.get(theme.name) ?? 'josh'
 	const width = Math.max(name.length, name_room(grid[NAME_AT.y] ?? []))
 
-	put(grid, { y: NAME_AT.y, x: NAME_AT.x }, name.padEnd(width))
+	const [, style] = cell_at(grid, NAME_AT.y, NAME_AT.x)
+
+	put(grid, { y: NAME_AT.y, x: NAME_AT.x }, name, style)
+	put(grid, { y: NAME_AT.y, x: NAME_AT.x + name.length }, ' '.repeat(width - name.length))
 }
 
 function spinner_frame(glyphs: string, tick: number): string {
