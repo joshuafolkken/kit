@@ -80,7 +80,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/backlog/backlog-drive.test.ts',
 	'scripts/backlog/backlog-empty-start.test.ts',
 	'scripts/backlog/backlog-manufacturing-rule.test.ts',
-	'scripts/backlog/backlog-named.test.ts',
 	'scripts/backlog/backlog-occupied.test.ts',
 	'scripts/backlog/backlog-offer-exclude.test.ts',
 	'scripts/backlog/backlog-offer-timing.test.ts',
