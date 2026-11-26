@@ -1,0 +1,7 @@
+{
+	"reason": "the title fix and its new test file add 2 code lines",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}

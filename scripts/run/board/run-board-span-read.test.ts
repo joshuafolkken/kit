@@ -56,11 +56,12 @@ describe('run_board_span_read.span_here — no run', () => {
 describe('run_board_span_read.span_here — a single run', () => {
 	it('draws the single run this checkout holds and names no process', async () => {
 		arrange(NONE, STOPPED)
-		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(SINGLE)
+		vi.spyOn(run_board_single, 'spans_here').mockResolvedValue([SINGLE])
 
 		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({
 			...NO_SPAN,
 			span: SINGLE,
+			singles: [],
 		})
 	})
 
@@ -68,21 +69,48 @@ describe('run_board_span_read.span_here — a single run', () => {
 	// frame and is drawn as a row of its own.
 	it('keeps the carried run drawn and reads the held single run beside it', async () => {
 		arrange({ kind: 'carried', carry: CARRY }, undefined)
-		const span_here = vi.spyOn(run_board_single, 'span_here').mockResolvedValue(SINGLE)
+		const spans_here = vi.spyOn(run_board_single, 'spans_here').mockResolvedValue([SINGLE])
 		const here = await run_board_span_read.span_here(REPOSITORY, undefined)
 
-		expect(here).toMatchObject({ carry: CARRY, root: SINGLE })
+		expect(here).toMatchObject({ carry: CARRY, singles: [SINGLE] })
 		expect(here.span).not.toStrictEqual(SINGLE)
-		expect(span_here).toHaveBeenCalledWith(true)
+		expect(spans_here).toHaveBeenCalledWith(true)
 	})
 
 	it('draws the held single run where the carry record is unreadable', async () => {
 		arrange({ kind: 'unreadable' }, undefined)
-		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(SINGLE)
+		vi.spyOn(run_board_single, 'spans_here').mockResolvedValue([SINGLE])
 
 		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({
 			...NO_SPAN,
 			span: SINGLE,
+			singles: [],
+		})
+	})
+})
+
+// joshuafolkken/kit#8993: every checkout's single run is read, not only the root checkout's.
+describe('run_board_span_read.span_here — several single runs', () => {
+	const OTHER: BoardSpan = { ...SINGLE, invocation: 'halfrun #8993' }
+
+	it('draws the first single run and reads the rest beside it', async () => {
+		arrange(NONE, undefined)
+		vi.spyOn(run_board_single, 'spans_here').mockResolvedValue([SINGLE, OTHER])
+
+		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({
+			...NO_SPAN,
+			span: SINGLE,
+			singles: [OTHER],
+		})
+	})
+
+	it('reads every single run beside a carried run', async () => {
+		arrange({ kind: 'carried', carry: CARRY }, undefined)
+		vi.spyOn(run_board_single, 'spans_here').mockResolvedValue([SINGLE, OTHER])
+
+		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toMatchObject({
+			carry: CARRY,
+			singles: [SINGLE, OTHER],
 		})
 	})
 })
@@ -94,7 +122,7 @@ describe('run_board_span_read.span_here — a stopped single run', () => {
 		arrange(NONE, STOPPED)
 		const stopped = { ...SINGLE, ended_ms: Date.parse(STARTED_AT) }
 
-		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(stopped)
+		vi.spyOn(run_board_single, 'spans_here').mockResolvedValue([stopped])
 
 		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toMatchObject({
 			span: { invocation: STOPPED.invocation, ended_ms: Date.parse(ENDED_AT) },
@@ -106,11 +134,12 @@ describe('run_board_span_read.span_here — a stopped single run', () => {
 		arrange(NONE, STOPPED)
 		const stopped = { ...SINGLE, ended_ms: Date.parse(ENDED_AT) + 1 }
 
-		vi.spyOn(run_board_single, 'span_here').mockResolvedValue(stopped)
+		vi.spyOn(run_board_single, 'spans_here').mockResolvedValue([stopped])
 
 		await expect(run_board_span_read.span_here(REPOSITORY, undefined)).resolves.toStrictEqual({
 			...NO_SPAN,
 			span: stopped,
+			singles: [],
 		})
 	})
 })

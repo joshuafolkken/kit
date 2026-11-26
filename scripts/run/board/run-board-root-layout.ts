@@ -1,16 +1,29 @@
-import { run_board_layout, type BoardLayout, type BoardRow, type RowRead } from './run-board-layout'
+import {
+	run_board_layout,
+	type BoardLayout,
+	type BoardRow,
+	type RowRead,
+	type SingleRow,
+} from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { EndedRoot, RootRun } from './run-board-single'
 import { run_board_status, type ItemStatus } from './run-board-status'
 
-// The root checkout's single runs beside a carried run. A running one is drawn under 🏠 above the lanes
-// (joshuafolkken/kit#7524), its row read off its own span's events and kept out of `active`, so the
+// The single runs beside a carried run, the root checkout's and each lane worktree's
+// (joshuafolkken/kit#8993). A running one is drawn under `🏠 runs` above the lanes (joshuafolkken/kit#7524), its row read off its own span's events and kept out of `active`, so the
 // header counts no lane and no 🔄 for it. One a merge ended inside the run leaves 🏠 and is listed in
 // `✅ done` as a lane's finished row is, in its place by its end (joshuafolkken/kit#7525). A `halfrun` or
 // `prrun` a stop ended keeps its row, stopped at its stop: its next step is still to come
 // (joshuafolkken/kit#7710). Its row is built from the hold, not the events, which still read it running.
 
-type RootRead = Pick<LocalRead, 'root' | 'ended_roots' | 'lane_states' | 'stopped_single'>
+type RootRead = Pick<LocalRead, 'singles' | 'ended_roots' | 'lane_states' | 'stopped_single'>
+
+// What names a single run's row: the layout its rows beside the run sit in, and a single run's own
+// board's command.
+interface SingleNamed {
+	layout?: Pick<BoardLayout, 'singles'> | undefined
+	run_name?: string | undefined
+}
 
 function row_of(issue: number, status: ItemStatus, read: RowRead): BoardRow | undefined {
 	const [row] = run_board_layout.local_layout_of(new Map([[issue, status]]), { read }).active
@@ -35,13 +48,35 @@ function live_row(root: RootRun, local: RootRead, read: RowRead): BoardRow | und
 	return status === undefined ? undefined : row_of(root.issue, status, read)
 }
 
-function live_of(local: RootRead, read: RowRead): Pick<BoardLayout, 'root'> {
-	const { root } = local
+// Every live single run's row, named by its command, in the order the checkouts were read
+// (joshuafolkken/kit#8993); none where no single run reads a row.
+function live_of(local: RootRead, read: RowRead): Pick<BoardLayout, 'singles'> {
+	const singles = (local.singles ?? [])
+		.map((single) => ({ name: single.command, row: live_row(single, local, read) }))
+		.filter((single): single is SingleRow => single.row !== undefined)
 
-	if (root === undefined) return {}
-	const row = live_row(root, local, read)
+	return singles.length === 0 ? {} : { singles }
+}
 
-	return row === undefined ? {} : { root: { name: root.command, row } }
+// A row `🏠 runs` draws: a single run's beside the run, found by the row itself.
+function single_of(
+	row: BoardRow,
+	layout: Pick<BoardLayout, 'singles'> | undefined,
+): SingleRow | undefined {
+	return layout?.singles?.find((single) => single.row === row)
+}
+
+function is_single_row(row: BoardRow, layout: Pick<BoardLayout, 'singles'> | undefined): boolean {
+	return single_of(row, layout) !== undefined
+}
+
+// The command a single run's row runs: a row beside the run names its own, a single run's own board
+// its `run_name`; `undefined` for a `backlogrun`'s row and an earlier run's lane (🧳), which this
+// board's run does not run.
+function single_name_of(row: BoardRow, run: SingleNamed): string | undefined {
+	if (row.is_earlier === true) return undefined
+
+	return single_of(row, run.layout)?.name ?? run.run_name
 }
 
 // The ended runs' rows among the run's own, any row of the same issue replaced.
@@ -72,6 +107,7 @@ function layout_of(layout: BoardLayout, local: RootRead, read: RowRead): BoardLa
 	}
 }
 
-const run_board_root_layout = { layout_of }
+const run_board_root_layout = { is_single_row, layout_of, single_name_of }
 
 export { run_board_root_layout }
+export type { SingleNamed }

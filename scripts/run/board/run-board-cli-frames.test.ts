@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
+import { run_board_exit_record } from './run-board-exit-record'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
+import { run_board_live } from './run-board-live'
 import type { BoardPorts, StallStage } from './run-board-state'
+import { run_board_write_port } from './run-board-write-port'
 
 const { LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const { CHAT_KEY, FRESH_MS, memory_store, once_key } = run_board_frame_store
@@ -163,6 +166,30 @@ describe('run_board_cli.run live board record', () => {
 		expect(saves).toStrictEqual([])
 		expect(made.read_machine).toHaveBeenCalledTimes(redraws.length)
 		expect(made.read_local).toHaveBeenCalledTimes(LOCAL_READS)
+	})
+
+	// joshuafolkken/kit#9027: only the process's own stdout is unblocked; a test's ports are left as given.
+	it('leaves the process stdout blocking when it draws on given ports', async () => {
+		const unblock = vi.spyOn(run_board_write_port, 'unblock')
+
+		await watched(memory_store())
+
+		expect(unblock).not.toHaveBeenCalled()
+		unblock.mockRestore()
+	})
+
+	it('unblocks the process stdout when it draws on the process’s own ports', async () => {
+		const unblock = vi.spyOn(run_board_write_port, 'unblock').mockReturnValue()
+		const guard = { on_exit: vi.fn(), record: vi.fn(), failed: vi.fn(), release: vi.fn() }
+
+		vi.spyOn(run_board_exit_record, 'start').mockReturnValue(guard)
+		vi.spyOn(run_board_live, 'watch').mockRejectedValue(STOPPED)
+		vi.spyOn(run_board_cli.LIVE_PORTS, 'is_tty', 'get').mockReturnValue(true)
+
+		await expect(run_board_cli.run([])).rejects.toBe(STOPPED)
+
+		expect(unblock).toHaveBeenCalledExactlyOnceWith(process.stdout)
+		vi.restoreAllMocks()
 	})
 })
 

@@ -16,6 +16,7 @@ import { run_board_render_shed } from './run-board-render-shed'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title, type RowCut, type RowFit } from './run-board-render-title'
+import { run_board_root_layout } from './run-board-root-layout'
 import { run_board_row_key, type KeySection } from './run-board-row-key'
 import { run_board_row_yield } from './run-board-row-yield'
 
@@ -80,14 +81,26 @@ function row_title(row: BoardRow, header: BoardHeader): string | undefined {
 	return ELLIPSIS
 }
 
-// A row's area (joshuafolkken/kit#8960) and a blank, drawn faint in `lead_of`; none without one.
-function area_tag(row: BoardRow): string {
-	return row.area === undefined ? '' : `${row.area} `
+// A lane row's single run command (joshuafolkken/kit#8993), so each row under `🏠 runs` says what runs
+// it; none on a `backlogrun`'s lane or outside the lanes section.
+function command_of(row: BoardRow, frame: RowFrame): string | undefined {
+	if (frame.is_lane_row !== true) return undefined
+
+	return run_board_root_layout.single_name_of(row, frame.header)
 }
 
-// What leads a row's title: its area, then ✚ where the run filed it (joshuafolkken/kit#4099).
+// A row's command and area (joshuafolkken/kit#8960), each followed by a blank, drawn faint in
+// `lead_of`; none without either.
+function row_tag(row: BoardRow, frame: RowFrame): string {
+	return [command_of(row, frame), row.area]
+		.filter((part) => part !== undefined)
+		.map((part) => `${part} `)
+		.join('')
+}
+
+// What leads a row's title: its tag, then ✚ where the run filed it (joshuafolkken/kit#4099).
 function title_lead(row: BoardRow, frame: RowFrame): string {
-	return `${area_tag(row)}${frame.filed.has(row.number) ? FILED_LEAD : ''}`
+	return `${row_tag(row, frame)}${frame.filed.has(row.number) ? FILED_LEAD : ''}`
 }
 
 // A title cut to no column draws no area, title or blank — only ✚ where the run filed the row, which
@@ -108,11 +121,14 @@ function title_text(row: BoardRow, frame: RowFrame): string {
 	return `${lead}${title_of(row_title(row, frame.header), limit)}`
 }
 
-// The title with its area tag drawn faint, as the rest of the row is not.
-function area_faint(row: BoardRow, title: string): string {
-	const { area } = row
+// The title with its tag drawn faint, as the rest of the row is not; a title cut to no column draws no
+// tag to fade.
+function tag_faint(row: BoardRow, frame: RowFrame, title: string): string {
+	const tag = row_tag(row, frame).trimEnd()
 
-	return area === undefined ? title : `${faint(area)}${title.slice(area.length)}`
+	if (tag === '' || !title.startsWith(tag)) return title
+
+	return `${faint(tag)}${title.slice(tag.length)}`
 }
 
 // The columns a row's title takes cut to the frame's title column, its ✚ among them — what a section
@@ -192,7 +208,9 @@ function lead_of(row: BoardRow, frame: RowFrame, title: string): string {
 	const number = number_text(row, frame.cells, header.link)
 	const lead = `${icon_text(row, frame)} ${number} ${run_board_priority.cell_of(row)} ${kind}`
 
-	return title === '' ? lead : `${lead} ${run_board_label_pair.titled(area_faint(row, title))}`
+	return title === ''
+		? lead
+		: `${lead} ${run_board_label_pair.titled(tag_faint(row, frame, title))}`
 }
 
 // A row up to its tail — the columns that stay where they are on every row. A waiting row has no time

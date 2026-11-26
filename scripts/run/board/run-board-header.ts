@@ -312,10 +312,10 @@ function alert_part(header: BoardHeader): string | undefined {
 	return run_board_theme_defs.BASE_LOOK.alert(run_board_header_defcon.level_of(header))
 }
 
-// The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):
-// only their operations are the run's newest.
+// The children drawn as running, with the single runs beside them (joshuafolkken/kit#8482,
+// joshuafolkken/kit#8993): only their operations are the run's newest.
 function running_issues(layout: BoardLayout): ReadonlySet<number> {
-	const rows = layout.root === undefined ? layout.active : [...layout.active, layout.root.row]
+	const rows = [...layout.active, ...run_board_layout.single_rows(layout)]
 	const running = rows.filter((row) => row.state === 'running')
 
 	return new Set(running.map((row) => row.number))

@@ -62,6 +62,29 @@ describe('an unreadable lane listing stays unknown, never stopped', () => {
 	})
 })
 
+// joshuafolkken/kit#9035: no session can claim a closed issue, so its lane is leftover cleanup.
+describe('a lane whose issue is closed is leftover, not a claim risk', () => {
+	const report = lane_occupancy.classify([1], { kind: 'lanes', issues: [1, 2, 3], closed: [3] })
+	const described = lane_occupancy.describe(report)
+
+	it('keeps the claim warning for the open issue lane only', () => {
+		expect(report.lanes_without_label).toEqual([2])
+		expect(report.leftover_lanes).toEqual([3])
+	})
+
+	it('describes the closed issue lane as leftover with how to discard it', () => {
+		const line = described?.split('\n').find((entry) => entry.includes('#3'))
+
+		expect(line).toContain(lane_occupancy.LEFTOVER)
+		expect(line).toContain('lane:prune')
+		expect(line).not.toContain('could claim')
+	})
+
+	it('names no leftover lane when the closed set is omitted', () => {
+		expect(lane_occupancy.classify([], lanes(1)).leftover_lanes).toEqual([])
+	})
+})
+
 describe('describe reports the anomalies', () => {
 	it('names a stopped issue and an orphan lane', () => {
 		const report = lane_occupancy.classify([1], lanes(2))

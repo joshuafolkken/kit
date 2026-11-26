@@ -35,8 +35,7 @@ import { backlog_yield_cap } from './backlog-yield-cap'
 // label, stays for a person; one at the cap is restated once with `CAP_NOTE` and its cause, which its
 // board row shows.
 
-const RETRY_CAP = 2
-const CAP_NOTE = `auto-retry cap ${String(RETRY_CAP)} reached`
+const { CAP_NOTE, RETRY_CAP } = run_event_retry
 const RESUME_REFUSED = 'escalated one profile up, but run:add refused the resume'
 const { PARK } = run_event_stream.EVENT_KIND
 const last_sweep = { at: -Infinity }
