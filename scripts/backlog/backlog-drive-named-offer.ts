@@ -15,6 +15,7 @@ import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { backlog_budget, type BacklogAnswer } from './backlog-budget'
 import { backlog_budget_cli } from './backlog-budget-cli'
 import type { DriveState, OfferRead } from './backlog-drive'
+import { backlog_drive_blocked } from './backlog-drive-blocked'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
@@ -37,6 +38,11 @@ interface NamedRead {
 interface NamedPass {
 	offer: OfferRead | undefined
 	passed: ReadonlyArray<string>
+}
+
+interface Launched {
+	issue: string | undefined
+	offered: OfferRead | undefined
 }
 
 const NO_RETRIES = 0
@@ -224,18 +230,19 @@ async function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Promi
 
 // A named launch waits for the reset while the GitHub core allowance is below the floor, before it reads
 // the issue's state (joshuafolkken/kit#6729). Only a launch reads the allowance: a wait or the run's end
-// starts nothing.
+// starts nothing. An added issue whose blockers are unfinished waits (`backlog-drive-blocked.ts`).
 async function launch(
-	issue: string | undefined,
+	carry: RunCarry,
 	named: OfferRead,
 	state: DriveState,
 	owner: string,
-): Promise<OfferRead | undefined> {
-	if (issue === undefined) return undefined
-
+): Promise<Launched> {
+	const [issue] = named.issues
+	if (issue === undefined) return { issue, offered: undefined }
 	const held = await backlog_drive_rate_limit.held(state)
+	const offered = held ?? (await classify(issue, named, state, owner))
 
-	return held ?? (await classify(issue, named, state, owner))
+	return { issue, offered: await backlog_drive_blocked.gate(carry, issue, offered) }
 }
 
 // An epic `run:add` put in that waits on its children holds nothing up, like an added issue in flight
@@ -267,8 +274,7 @@ async function offer_of(
 
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
-	const [issue] = named.issues
-	const offered = await launch(issue, named, state, context.owner)
+	const { issue, offered } = await launch(carry, named, state, context.owner)
 	if (!is_passed(carry, issue, offered)) return { offer: offered, passed: [] }
 	const past = await offer_of(
 		carry,

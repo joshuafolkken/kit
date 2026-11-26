@@ -46,6 +46,24 @@ it('withholds a blocker added after selection and starts after its live state be
 	expect(read).toHaveBeenCalledWith(BLOCKER, REPO)
 })
 
+it('reads only the unfinished blockers, without recording or printing a wait', async () => {
+	const record = vi.spyOn(lane_state, 'record_change')
+
+	blockers.mockResolvedValue([
+		{ number: BLOCKER, repo: REPO },
+		{ number: BLOCKER + 1, repo: REPO },
+	])
+	read.mockImplementation(async (number) =>
+		child(number, number === BLOCKER + 1 ? 'CLOSED' : 'OPEN'),
+	)
+
+	const unfinished = await lane_dispatch_dependency.unfinished(String(ISSUE))
+
+	expect(unfinished.map((blocker) => blocker.number)).toStrictEqual([BLOCKER])
+	expect(record).not.toHaveBeenCalled()
+	expect(console.error).not.toHaveBeenCalled()
+})
+
 it.each([NATIVE_LISTING, 'blocker state'])(
 	'waits rather than launching on an unreadable %s',
 	async (stage) => {

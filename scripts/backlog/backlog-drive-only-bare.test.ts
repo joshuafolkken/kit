@@ -1,5 +1,6 @@
 import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_dispatch_dependency } from '#scripts/lane/lane-dispatch-dependency'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DriveState, OfferRead } from './backlog-drive'
@@ -51,6 +52,7 @@ async function bare_read(
 
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	vi.spyOn(lane_dispatch_dependency, 'unfinished').mockResolvedValue([])
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
 		kind: 'state',
 		state: { state: 'OPEN', labels: [], is_human_review: false },
