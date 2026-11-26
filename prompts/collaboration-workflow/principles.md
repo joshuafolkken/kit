@@ -92,9 +92,13 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
 - 明示されたワークフローキーワード（`kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun`）は `workflow-commands` skill の既存手順へ渡す。主セッションが実装する根拠には読み替えない。`kickoff` は起票・計画で停止し、実装系の実行は実装レーンへ引き渡す
 - キーワードの無い命令形（「〜して」）には調査（`investigation` 行で委譲）→ 計画 → 起票計画（`observation-filing.md` → "The filing plan"）を返し、実装も起票もしない。GitHub 未連携なら起票計画を除く（`scope_line`）
 - 「起票せずに〜して」「起票せずに〜を作って」→ 調査 → 計画 → 起票計画によらず実行する。調査は `investigator`、制作は `producer` サブエージェントに渡し、主セッション自身は編集しない。作業前サマリと自動判断のログは返信に出す。コミット・マージなど共有状態への書き込みは明示の指示があるときだけ（`operating-rules.md` → "git-rules"）。案内文は `scope_line`
+  - `producer` を渡す → `isolation: "worktree"` を付ける。編集先は `.claude/worktrees/<name>` だけ（`.claude/agents/producer.md`、外は `scripts/hooks/implementation-authority.ts` が拒否）
+  - worktree で `pnpm josh` を実行 → 依存は上位の `node_modules` から解決され、`run:board --theme <名前>` は稼働中のランを表示する（2026-11-26 実測）
   - 既定 → 実装と動作確認まで。テスト・`pnpm josh gate`・コミット前レビューは仕上げに回す（省略ではなく、コミットの前へ移す）。依頼に「テストと gate も」→ その場で実行する
   - 後回しにした返信 → 締めで「テストと gate は未実行」と毎回明記する
-  - コミットの指示か `fullrun new` など実装系キーワード → 後回しにした分をすべて実行する。`run:handoff` の brief には「テスト未作成・gate 未実行」と実装済みの変更ファイルを書く
+  - 成果の返信 → worktree のパスとブランチを書く。成果は worktree に未コミットで残す
+  - コミットの指示か `fullrun new` など実装系キーワード → 後回しにした分をすべて実行する。`run:handoff` の brief には worktree のパスと、「テスト未作成・gate 未実行」と実装済みの変更ファイルを書く。マージは「マージして」の指示でだけ（`operating-rules.md` → "git-rules"）
+  - メインのチェックアウトに既存の変更（未追跡を含む） → `producer` を渡す前に変更ファイルを返信で示し、退避（コミット・移動・破棄）は利用者に頼む。相談スコープの git 書き込みはフックが拒否する（`scripts/hooks/implementation-shell.ts`）
 - 判別できないときは相談として扱う。承認済みの起票・Issue 更新・レーン操作と、実装レーン内の Tier A 判断は再確認せず進める。実行が指示された後の判断点は `CLAUDE.md` → "Decision autonomy" の Tier で決まる
 - 相談スコープのシェルは、取り消せない操作（git・GitHub・依存・共有状態への書き込み）と runtime ファイルへの見える書き込みだけを実行前に拒否し、それ以外の呼び出しが変えた runtime ファイルは、コマンドがそのパスを名指すときだけ実行後に戻し、名指さないものは別セッションの編集かもしれないので名前だけ報告する（`scripts/hooks/bash-revert.ts`）。拒否は `scripts/hooks/implementation-shell.ts` が強制する
 
