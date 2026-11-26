@@ -48,6 +48,8 @@ const CHILD_REASON = 'a child is still working in it'
 const OPEN_REASON = 'its issue is still open'
 const UNREAD_ISSUE_REASON = 'its issue could not be read'
 const UNCOUNTED_REASON = 'its commits could not be counted'
+const DIRTY_REASON = 'it has uncommitted changes'
+const UNPUSHED_REASON = 'it has 2 commit(s) that are on no remote'
 const IN_FLIGHT_REASON =
 	'the running backlogrun has not collected it yet (`pnpm josh run:merge` does)'
 
@@ -92,14 +94,12 @@ describe('lane_spent.kept_reason', () => {
 	})
 
 	it('keeps a lane with uncommitted changes', async () => {
-		await expect(reason_with({ is_tree_dirty: async () => true })).resolves.toBe(
-			'it has uncommitted changes',
-		)
+		await expect(reason_with({ is_tree_dirty: async () => true })).resolves.toBe(DIRTY_REASON)
 	})
 
 	it('keeps a lane holding commits that are on no remote, with the count', async () => {
 		await expect(reason_with({ unpushed_commits: async () => UNPUSHED })).resolves.toBe(
-			'it has 2 commit(s) that are on no remote',
+			UNPUSHED_REASON,
 		)
 	})
 
@@ -180,6 +180,30 @@ describe('lane_spent.kept_reason through the live probes', () => {
 		live.issue_view_json.mockResolvedValue('{"state":"OPEN"}')
 
 		await expect(lane_spent.kept_reason(LANE)).resolves.toBe(OPEN_REASON)
+	})
+})
+
+// joshuafolkken/kit#9038: the supervisor of a merged ship reads as the lane's running child itself.
+describe('lane_spent.merged_kept_reason', () => {
+	it('answers spent while the process probe sees the lane alive', async () => {
+		const probes = probes_of({ process_trace: () => 'alive' })
+
+		await expect(lane_spent.merged_kept_reason(LANE, probes)).resolves.toBeUndefined()
+	})
+
+	it('still keeps a lane with uncommitted changes or unpushed commits', async () => {
+		const dirty = probes_of({ process_trace: () => 'alive', is_tree_dirty: async () => true })
+		const unpushed = probes_of({ unpushed_commits: async () => UNPUSHED })
+
+		await expect(lane_spent.merged_kept_reason(LANE, dirty)).resolves.toBe(DIRTY_REASON)
+		await expect(lane_spent.merged_kept_reason(LANE, unpushed)).resolves.toBe(UNPUSHED_REASON)
+	})
+
+	it('never reads the process probe through the live probes', async () => {
+		live.process_trace_default.mockReturnValue('alive')
+
+		await expect(lane_spent.merged_kept_reason(LANE)).resolves.toBeUndefined()
+		expect(live.process_trace_default).not.toHaveBeenCalled()
 	})
 })
 

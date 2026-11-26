@@ -164,6 +164,16 @@ async function kept_reason(
 	return reasons.find((reason) => reason !== undefined)
 }
 
+// Why the lane a merged ship ran from is kept. The child check is left out: the asking supervisor reads
+// as the lane's running ship, and a child still waiting on that ship has nothing left to do once it
+// merged — `close_lane` ends it. Every condition that guards work still applies.
+async function merged_kept_reason(
+	lane: LaneInfo,
+	probes: SpentProbes = LIVE_PROBES,
+): Promise<string | undefined> {
+	return await kept_reason(lane, { ...probes, process_trace: () => PROCESS_NONE })
+}
+
 // Every live lane as spent or kept. A stranded lane is neither: `lane:prune` closes it already.
 async function sort_lanes(
 	lanes: ReadonlyArray<LaneInfo>,
@@ -214,6 +224,7 @@ const lane_spent = {
 	kept_reason,
 	lanes_in_use,
 	is_issue_closed,
+	merged_kept_reason,
 	read_unpushed_commits,
 	sort_lanes,
 }

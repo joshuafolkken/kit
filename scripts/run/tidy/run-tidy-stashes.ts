@@ -139,8 +139,10 @@ function busy_outcomes(
 // Sequential drops under the repository-wide sweep lock: each resolves its position from its hash just
 // before it goes, which holds only while no other sweep is shifting the stack or appending the same
 // ledger lines. The GitHub reads stay outside the lock — they are the slow part and mutate nothing.
-async function tidy_stashes(is_merged: IsMerged): Promise<Array<Outcome>> {
-	const entries = await git_stash.list_by_hash()
+async function tidy_listed(
+	entries: ReadonlyArray<StashEntry>,
+	is_merged: IsMerged,
+): Promise<Array<Outcome>> {
 	const issues = [...new Set(entries.flatMap((entry) => stash_orphans.issues_named(entry.subject)))]
 	const merged = await merged_set(issues, is_merged)
 	const outcomes = await stash_sweep_lock.with_lock(async () => await tidy_entries(entries, merged))
@@ -148,6 +150,19 @@ async function tidy_stashes(is_merged: IsMerged): Promise<Array<Outcome>> {
 	return outcomes ?? busy_outcomes(entries, merged)
 }
 
-const run_tidy_stashes = { tidy_stashes }
+async function tidy_stashes(is_merged: IsMerged): Promise<Array<Outcome>> {
+	return await tidy_listed(await git_stash.list_by_hash(), is_merged)
+}
+
+// The same sweep narrowed to the entries naming one issue — what a lane closed right after its merge
+// leaves behind. An entry naming another issue too still goes only once every issue it names merged.
+async function tidy_issue_stashes(issue: string, is_merged: IsMerged): Promise<Array<Outcome>> {
+	const entries = await git_stash.list_by_hash()
+	const named = entries.filter((entry) => stash_orphans.issues_named(entry.subject).includes(issue))
+
+	return await tidy_listed(named, is_merged)
+}
+
+const run_tidy_stashes = { tidy_issue_stashes, tidy_stashes }
 
 export { run_tidy_stashes }
