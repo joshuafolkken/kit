@@ -14,7 +14,7 @@ const CLEAN_EXIT = 0
 const FAILED_EXIT = 1
 const ARGV_OFFSET = 2
 const USAGE = [
-	'Usage: josh test:pinned [--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--reasoned] [--help]',
+	'Usage: josh test:pinned [--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--continue-cut] [--reasoned] [--help]',
 	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
 	`  \`unchecked <n> — <reason>\` for the hunks past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)}),`,
@@ -23,11 +23,13 @@ const USAGE = [
 	'  --record also leaves the answer, under <token>, for `josh run:review --join`;',
 	'  --origin names what started the run on its lane ledger row (default manual),',
 	'  and --reasoned marks there a launch under an --unpinned-ok reason;',
-	'  hunks run fewest reached tests first, and --first-unpinned starts no probe once one is unpinned',
+	'  hunks run fewest reached tests first, and --first-unpinned starts no probe once one is unpinned;',
+	'  --continue-cut probes only the hunks a --first-unpinned run stopped before, within its cap',
 ].join('\n')
 
 const PARSE_ARGS_OPTIONS = {
 	help: { type: 'boolean', short: 'h', default: false },
+	'continue-cut': { type: 'boolean', default: false },
 	'first-unpinned': { type: 'boolean', default: false },
 	max: { type: 'string' },
 	origin: { type: 'string' },
@@ -41,6 +43,7 @@ interface PinnedOptions {
 	max_hunks: number
 	record_token: string | undefined
 	is_first_unpinned: boolean
+	is_continue_cut: boolean
 	is_reasoned: boolean
 	origin: PinnedOrigin
 }
@@ -66,6 +69,7 @@ function options_of(argv: ReadonlyArray<string>): PinnedOptions | undefined {
 			max_hunks,
 			record_token: values.record,
 			is_first_unpinned: values['first-unpinned'],
+			is_continue_cut: values['continue-cut'],
 			is_reasoned: values.reasoned,
 			origin,
 		}
@@ -83,10 +87,11 @@ function print_usage(argv: ReadonlyArray<string>): number {
 
 async function run_summary(options: PinnedOptions): Promise<PinnedSummary> {
 	const { max_hunks, is_first_unpinned, origin, is_reasoned } = options
+	const report = options.is_continue_cut
+		? await test_pinned.run_continued(max_hunks, origin)
+		: await test_pinned.run(max_hunks, is_first_unpinned, origin, is_reasoned)
 
-	return test_pinned_record.summary_of(
-		await test_pinned.run(max_hunks, is_first_unpinned, origin, is_reasoned),
-	)
+	return test_pinned_record.summary_of(report)
 }
 
 // `--record` leaves an answer however the run ends — a check that could not run included — so the

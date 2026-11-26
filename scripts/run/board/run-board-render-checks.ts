@@ -1,11 +1,13 @@
 import { styleText } from 'node:util'
 import type { CodeRabbitState, PrChecks } from '#scripts/run/event/run-event-checks'
 import type { TextColor } from './run-board-labels'
+import { run_board_render_shed } from './run-board-render-shed'
 
 // A followup row's pull request (joshuafolkken/kit#3770): its number, the CI checks counted by how
 // they stand and CodeRabbit's state — `PR 3765  ✓ 6  ⏳ 2  🐰 ⏳`. A count of none is left out, a
 // failure is red and a rate limit yellow, so what needs a person stands out of a row of green.
 
+const { is_shed } = run_board_render_shed
 const GAP = '  '
 const CHECK_ICONS = { pass: '✓', pending: '⏳', fail: '✗' } as const
 const CODERABBIT_ICON = '🐰'
@@ -42,14 +44,21 @@ function coderabbit_part(state: CodeRabbitState): Array<string> {
 	return mark === undefined ? [] : [tinted(`${CODERABBIT_ICON} ${mark}`, CODERABBIT_COLORS[state])]
 }
 
-// `link` makes the number a link to the pull request (joshuafolkken/kit#4625); `PR` stays plain.
-function checks_part(checks: PrChecks, link: (number: number) => string): string {
+function counts_of(checks: PrChecks): Array<string> {
 	return [
-		`PR ${link(checks.pr)}`,
 		...count_part(CHECK_ICONS.pass, checks.pass),
 		...count_part(CHECK_ICONS.pending, checks.pending),
 		...count_part(CHECK_ICONS.fail, checks.fail, 'red'),
-		...coderabbit_part(checks.coderabbit),
+	]
+}
+
+// `link` makes the number a link to the pull request (joshuafolkken/kit#4625); `PR` stays plain. A row
+// that gives up `shed` cells leaves out CodeRabbit's mark, then the counts (`run-board-render-shed.ts`).
+function checks_part(checks: PrChecks, link: (number: number) => string, shed = 0): string {
+	return [
+		`PR ${link(checks.pr)}`,
+		...(is_shed('counts', shed) ? [] : counts_of(checks)),
+		...(is_shed('review', shed) ? [] : coderabbit_part(checks.coderabbit)),
 	].join(GAP)
 }
 

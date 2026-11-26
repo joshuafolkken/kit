@@ -120,11 +120,14 @@ describe('run_board_render.render — a reason in a narrow pane', () => {
 		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW)
 	})
 
-	it('never cuts the title under what tells two rows apart', () => {
+	// joshuafolkken/kit#8990: the title has no floor; it is cut to nothing before the reason is cut.
+	it('cuts the title to nothing before it cuts the reason', () => {
 		const reason = { ...HELD, tail: 'scripts/run/board/run-board-render.ts' }
 		const line = line_of(waiting({ title: LONG_TITLE, reason }), NARROW)
 
-		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  scripts/run`)
+		expect(line).not.toContain(TITLE_START.slice(0, -1))
+		expect(line).toMatch(/3720 +scripts\/run\/board\/ru…$/u)
+		expect(run_board_fit.width_of(line)).toBe(NARROW)
 	})
 
 	it('leaves a title that already fits the pane whole', () => {
@@ -179,7 +182,7 @@ describe('run_board_render.render — why a parked row ended', () => {
 })
 
 // joshuafolkken/kit#4060: a parked row draws no usage and no finish time, so its reason follows its
-// time; a reason the floored title still runs past the pane with is cut to an ellipsis.
+// time; a reason that runs past the pane with its title cut to nothing is cut to an ellipsis.
 const ENDED = { started_ms: STARTED + MINUTE, ended_ms: NOW - MINUTE }
 const WORDY: RowReason = {
 	tail: `the sandbox approach breaks pnpm store access; ${'x'.repeat(NARROW)}`,
@@ -210,10 +213,11 @@ describe('run_board_render.render — a parked row’s reason, and a reason cut 
 		expect(parked_line()).toMatch(/\d″ {2}superseded 🎯 —$/u)
 	})
 
-	it('cuts a withdrawn row’s reason to an ellipsis once its title is at the floor', () => {
+	it('cuts a withdrawn row’s reason to an ellipsis once its title is cut to nothing', () => {
 		const line = line_of({ ...withdrawn, number: ISSUE }, NARROW * 2)
 
-		expect(line).toContain(` ${TITLE_START.slice(0, -1)}… `)
+		expect(line).not.toContain(TITLE_START.slice(0, -1))
+		expect(line).toContain('″  the sandbox')
 		expect(line.endsWith('…')).toBe(true)
 		expect(run_board_fit.width_of(line)).toBe(NARROW * 2)
 	})
@@ -221,7 +225,8 @@ describe('run_board_render.render — a parked row’s reason, and a reason cut 
 	it('cuts a waiting row’s reason by the same rule', () => {
 		const line = line_of(waiting({ title: LONG_TITLE, reason: WORDY }), NARROW)
 
-		expect(line).toContain(` ${TITLE_START.slice(0, -1)}…  the sandbox`)
+		expect(line).not.toContain(TITLE_START.slice(0, -1))
+		expect(line).toMatch(/3720 +the sandbox/u)
 		expect(line.endsWith('…')).toBe(true)
 		expect(run_board_fit.width_of(line)).toBe(NARROW)
 	})
@@ -252,11 +257,11 @@ describe('run_board_render.render — a stalled row’s cause and resume action'
 	})
 
 	it.each(['stopped', 'parked'] as const)(
-		'keeps a %s action whole past the title floor',
+		'keeps a %s action whole past a title cut to nothing',
 		(state) => {
 			const line = line_of({ ...stalled, state }, NARROW)
 
-			expect(line).toContain(` ${TITLE_START.slice(0, -1)}… `)
+			expect(line).not.toContain(TITLE_START.slice(0, -1))
 			expect(unfinished(line).endsWith(STALLED.tail ?? '')).toBe(true)
 			expect(run_board_fit.width_of(line)).toBeGreaterThan(NARROW)
 		},

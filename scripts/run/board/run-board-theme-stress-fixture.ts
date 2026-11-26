@@ -3,7 +3,8 @@ import { run_board_cells_ansi } from './run-board-cells-ansi'
 import type { TerminalSize } from './run-board-fit'
 import type { Lamp } from './run-board-lamp-spots'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
-import type { LayoutView } from './run-board-theme-layout'
+import { run_board_theme_layout, type LayoutView } from './run-board-theme-layout'
+import type { ThemeValue } from './run-board-theme-run'
 import type { KeyedLine } from './run-board-type-rows'
 
 // A live board of any size for the themes' stress test (joshuafolkken/kit#8917): the confirmed demo's
@@ -241,7 +242,49 @@ function stress_board(board: StressBoard): { cells: Cells; view: LayoutView; siz
 	return { cells, view: view_of(board, lines), size }
 }
 
-const run_board_theme_stress_fixture = { stress_board }
+const { MIN_PANEL_ROWS, MIN_PANEL_WIDTH } = run_board_theme_layout
+const THEMES: ReadonlyArray<ThemeValue> = [
+	'wopr',
+	'trace',
+	'flux',
+	'codec',
+	'nixie',
+	'skynet',
+	'magi',
+]
+const DEMO = { edge: 114, px: 68, panel_rows: 7 }
+// A live board at 200×50 lays its rules and panel out so (a real-data `board:replay`).
+const LIVE = { edge: 118, px: 69 }
+const NARROW_PX = 40
+const WIDE_PX = 74
+
+function minimum(px: number): { edge: number; px: number } {
+	return { edge: px + MIN_PANEL_WIDTH, px }
+}
+
+// The smallest panel at the demo's panel column.
+const SMALLEST: StressBoard = {
+	columns: 108,
+	rows: 30,
+	...minimum(DEMO.px),
+	lanes: 1,
+	panel_rows: MIN_PANEL_ROWS,
+}
+// The smallest panel, at a narrow board's and one further right; the demo's own board, a wide one;
+// terminals as wide as the board and wider, short and tall; no lane, one and three; panels of six (the
+// smallest), seven (the demo's), eight and nine rows; a live 200×50 board. The themes' stress test and
+// their motion check (joshuafolkken/kit#8936) both run every theme on it.
+const MATRIX: ReadonlyArray<StressBoard> = [
+	SMALLEST,
+	{ columns: 80, rows: 24, ...minimum(NARROW_PX), lanes: 0, panel_rows: MIN_PANEL_ROWS },
+	{ columns: 199, rows: 60, ...DEMO, lanes: 3 },
+	{ columns: 240, rows: 40, edge: 160, px: DEMO.px, lanes: 3, panel_rows: 8 },
+	{ columns: 130, rows: 24, ...minimum(DEMO.px), lanes: 0, panel_rows: 9 },
+	{ columns: 115, rows: 60, ...minimum(WIDE_PX), lanes: 1, panel_rows: 8 },
+	{ columns: 200, rows: 50, ...LIVE, lanes: 3, panel_rows: MIN_PANEL_ROWS },
+]
+
+const run_board_theme_stress_fixture = { MATRIX, SMALLEST, THEMES, stress_board }
 
 export { run_board_theme_stress_fixture }
 export type { LiveShape, StressBoard }

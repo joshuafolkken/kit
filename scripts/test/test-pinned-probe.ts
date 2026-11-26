@@ -212,7 +212,7 @@ async function timed_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<
 // halt starts no further hunk, so the lane answers fewer than it was dealt.
 async function verdicts_in(
 	tree: BaseTree,
-	probes: ReadonlyArray<Probe>,
+	probes: Iterable<Probe>,
 	lane: Lane,
 ): Promise<Array<RedProbe>> {
 	const verdicts: Array<RedProbe> = []
@@ -231,6 +231,12 @@ async function verdicts_in(
 	return verdicts
 }
 
+// How many test files the probe may run, which orders the pool's queue (joshuafolkken/kit#8997): a
+// recheck runs its own files, a fresh probe at most its file's reach, an uncounted reach none known.
+function probe_cost(probe: Probe): number {
+	return probe.recheck?.recheck.length ?? probe.reach ?? 0
+}
+
 async function pooled(
 	paths: ReadonlyArray<string>,
 	probes: ReadonlyArray<Probe>,
@@ -242,12 +248,13 @@ async function pooled(
 	return await test_pinned_pool.run_pool(
 		probes,
 		plan.lanes,
-		async (group) =>
+		async (queue) =>
 			await base_tree.with_tree(TREE_PREFIX, HEAD, async (tree) => {
 				await base_tree.copy_in(tree.tree, paths)
 
-				return await verdicts_in(tree, group, { ...lane, workers: plan.workers })
+				return await verdicts_in(tree, queue, { ...lane, workers: plan.workers })
 			}),
+		probe_cost,
 	)
 }
 
@@ -325,7 +332,7 @@ async function checked_on(
 	return { verdicts, staged: lane.staged }
 }
 
-const test_pinned_probe = { checked_on, selection_of }
+const test_pinned_probe = { checked_on, probe_cost, selection_of }
 
 export type { CheckOptions, Checked, Probe }
 export { test_pinned_probe }

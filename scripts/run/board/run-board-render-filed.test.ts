@@ -1,8 +1,11 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import type { BoardNote } from './run-board-notes'
+import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 
 // joshuafolkken/kit#4099: a row the run filed leads its title with ✚ in place of a findings line naming
@@ -67,6 +70,35 @@ describe('run_board_render.render rows the run filed', () => {
 
 		expect(unlisted.join('\n')).toContain(FILED_TITLE)
 		expect(unlisted.join('\n')).not.toContain('✚')
+	})
+})
+
+// joshuafolkken/kit#8990: a narrow pane cuts a lane row's title to nothing, never the mark.
+const NARROW = 40
+
+function running(number: number): BoardRow {
+	const status = {
+		state: 'running' as const,
+		started_ms: NOW - SPAN,
+		track: ['implement' as const],
+	}
+	const title = `Row ${String(number)} with a title long enough that a narrow pane cuts all of it`
+
+	return { number, title, kind: undefined, state: 'running', status, waits: [] }
+}
+
+describe('run_board_render.render a filed row on a narrow pane', () => {
+	it('keeps ✚ on a filed row whose title is cut to nothing, and draws none on an unfiled one', () => {
+		const board = listing([running(4039), running(4040)])
+		const lines = run_board_render
+			.render({ header: board, notes: [filed_as(4039)], size: { columns: NARROW, rows: 50 } })
+			.map((line) => stripVTControlCharacters(line))
+		const filed = line_of(lines, '4039')
+
+		expect(filed).not.toContain('Row 4039')
+		expect(filed).toMatch(/4039 +✚$/u)
+		expect(run_board_fit.width_of(filed)).toBeLessThanOrEqual(NARROW)
+		expect(line_of(lines, '4040')).not.toContain('✚')
 	})
 })
 

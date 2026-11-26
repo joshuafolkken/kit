@@ -15,8 +15,8 @@ const NARROW = 90
 const LONG_TITLE = 'A lane title long enough that the board cuts it on an ellipsis'
 const RULE_MARKS = ['── ', '▾ ', '▸ ']
 const PHASE_AGE = 8 * MINUTE
-// The least a narrowed lane title keeps (`run-board-render-title.ts` TITLE_FLOOR).
-const TITLE_FLOOR = 8
+// The start of the lane's title, which a pane as wide as `WIDE` draws whole before the cut.
+const LONG_TITLE_START = 'A lane'
 
 function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 	return {
@@ -68,10 +68,9 @@ function rules_of(lines: ReadonlyArray<string>): Array<string> {
 	return lines.filter((line) => RULE_MARKS.some((mark) => line.startsWith(mark)))
 }
 
-// The column the lane row's cut title ends in, its ellipsis included — found by what a title at its
-// floor keeps before the ellipsis.
+// The column the lane row's cut title ends in, its ellipsis included — found by the start of its title.
 function title_end(lines: ReadonlyArray<string>): number {
-	const lane = lines.find((line) => line.includes(LONG_TITLE.slice(0, TITLE_FLOOR - 1))) ?? ''
+	const lane = lines.find((line) => line.includes(LONG_TITLE_START)) ?? ''
 
 	return width_of(lane.slice(0, lane.indexOf('…') + 1))
 }

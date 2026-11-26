@@ -1,0 +1,7 @@
+{
+	"reason": "#8990 adds run-board-render-shed.ts: a lane row gives up its tail's cells past a title cut to nothing instead of wrapping",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 64
+	}
+}

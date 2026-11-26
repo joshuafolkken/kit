@@ -68,11 +68,12 @@ describe('run_review_pinned_steps.clear — a discarded check', () => {
 
 // joshuafolkken/kit#5327: the pre-detach's probe of the hunks past its first unpinned one.
 describe('run_review_pinned_steps.launch_remaining', () => {
-	it('probes every hunk with no reason, on the stamp the next pre-detach joins', () => {
+	// joshuafolkken/kit#8975: within the cut check's cap, not past it.
+	it('continues the cut check with no reason, on the stamp the next pre-detach joins', () => {
 		run_review_pinned_steps.launch_remaining(ROOT, 'tree')
 
 		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
-			['test:pinned', '--origin', PRE_DETACH, '--record', expect.any(String)],
+			['test:pinned', '--continue-cut', '--origin', PRE_DETACH, '--record', expect.any(String)],
 			run_review_pinned_steps.log_path(ROOT),
 			ROOT,
 		)

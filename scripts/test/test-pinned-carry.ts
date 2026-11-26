@@ -65,8 +65,38 @@ function ordered_of(cache: LoadedCache, pending: ReadonlySet<string>): Array<Hun
 	)
 }
 
+// What a run asks of the selection: its fresh-probe cap, and whether it continues a cut run.
+interface SelectScope {
+	max_hunks: number
+	is_continue_cut?: boolean | undefined
+}
+
+// A cut run's continuation (joshuafolkken/kit#8975) leaves the pending hunks — those the cut run left
+// past its cap — unchecked, so the cut run and its continuation together probe one uncut run's range.
+function split_of(
+	cache: LoadedCache,
+	ordered: ReadonlyArray<Hunk>,
+	pending: ReadonlySet<string>,
+	scope: SelectScope,
+): Selection {
+	if (scope.is_continue_cut !== true) return test_pinned_logic.split(ordered, scope.max_hunks)
+	const keyed = keyed_of(cache)
+	const deferred = new Set(ordered.filter((hunk) => pending.has(keyed.get(hunk) ?? '')))
+	const split = test_pinned_logic.split(
+		ordered.filter((hunk) => !deferred.has(hunk)),
+		scope.max_hunks,
+	)
+
+	return { checked: split.checked, unchecked: [...deferred, ...split.unchecked] }
+}
+
 // Held verdicts consume no fresh-probe slots; only matching current hunk keys can be prioritized.
-async function select(cache: LoadedCache, max_hunks: number): Promise<Selection> {
+// Without a test runner nothing is probed, so the cap is zero.
+async function select(
+	cache: LoadedCache,
+	scope: SelectScope,
+	has_runner = true,
+): Promise<Selection> {
 	const identifiers = keys_of(cache)
 	const pending = new Set(await pending_of(cache))
 	const known = await test_pinned_cache.known(
@@ -77,7 +107,8 @@ async function select(cache: LoadedCache, max_hunks: number): Promise<Selection>
 	const held = cache.hunks.filter((_hunk, index) => is_held(known[index]))
 	const held_set = new Set(held)
 	const ordered = ordered_of(cache, pending).filter((hunk) => !held_set.has(hunk))
-	const split = test_pinned_logic.split(ordered, max_hunks)
+	const max_hunks = has_runner ? scope.max_hunks : 0
+	const split = split_of(cache, ordered, pending, { ...scope, max_hunks })
 
 	return { checked: [...held, ...split.checked], unchecked: split.unchecked }
 }

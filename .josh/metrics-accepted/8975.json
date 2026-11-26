@@ -1,0 +1,7 @@
+{
+	"reason": "The --continue-cut flag adds the cut-range continuation scope (#8975): a SelectScope split and a run_continued entry point",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 45
+	}
+}
