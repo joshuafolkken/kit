@@ -73,10 +73,9 @@ vi.mock('./run-ship-detach', () => ({
 // The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
 // current, so no test ever fetches or merges into the checkout it runs in (joshuafolkken/kit#3234).
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
-vi.mock('#scripts/gh/git-gh-pr-read', () => ({
-	git_gh_pr_read: { pr_get_merge_state: vi.fn().mockResolvedValue(undefined) },
-}))
+vi.mock('#scripts/gh/git-gh-pr-read', () => ({ git_gh_pr_read: { pr_get_merge_state: vi.fn() } }))
 vi.mock('./run-ship-return', () => ({ run_ship_return: { hand_back: return_mock } }))
+vi.mock('./run-ship-lane-close', () => ({ run_ship_lane_close: { close_merged: vi.fn() } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_lane_child_mock },
 }))

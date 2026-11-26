@@ -15,12 +15,18 @@ vi.mock('./run-ship-detach', () => ({ run_ship_detach: detach_mock }))
 vi.mock('./run-ship-probe', () => ({
 	run_ship_probe: { repository_directory: repository_mock },
 }))
-vi.mock('./run-ship', () => ({ run_ship: { exit_code: () => 0 } }))
+const exit_code_mock = vi.hoisted(() => vi.fn((_sections: unknown) => 0))
+const close_merged_mock = vi.hoisted(() => vi.fn(async (_issue: string) => undefined))
+
+vi.mock('./run-ship', () => ({ run_ship: { exit_code: exit_code_mock } }))
+vi.mock('./run-ship-lane-close', () => ({
+	run_ship_lane_close: { close_merged: close_merged_mock },
+}))
 vi.mock('#scripts/run/run-step-section', () => ({
 	run_step_section: { print_once: print_once_mock },
 }))
 
-const ISSUE = 5626
+const ISSUE = '5626'
 const REPOSITORY = '/repo'
 const PRINT_FAILURE = 1
 const args = { number: ISSUE } as unknown as ShipArguments
@@ -30,6 +36,40 @@ beforeEach(() => {
 	detach_mock.is_supervised.mockReturnValue(true)
 	repository_mock.mockResolvedValue(REPOSITORY)
 	print_once_mock.mockReturnValue(0)
+	exit_code_mock.mockReturnValue(0)
+})
+
+// joshuafolkken/kit#9038: the supervisor closes the lane after the result, never before it.
+describe('run_ship_supervised.finish', () => {
+	it('records the result, then closes the lane of a supervised ship that merged', async () => {
+		await run_ship_supervised.finish(args, sections)
+
+		expect(close_merged_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
+		expect(detach_mock.mark_result.mock.invocationCallOrder[0]).toBeLessThan(
+			close_merged_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('leaves the lane of a failed ship open', async () => {
+		exit_code_mock.mockReturnValue(PRINT_FAILURE)
+
+		await run_ship_supervised.finish(args, sections)
+
+		expect(detach_mock.mark_result).toHaveBeenCalledExactlyOnceWith(
+			REPOSITORY,
+			ISSUE,
+			PRINT_FAILURE,
+		)
+		expect(close_merged_mock).not.toHaveBeenCalled()
+	})
+
+	it('closes nothing for a ship nobody detached', async () => {
+		detach_mock.is_supervised.mockReturnValue(false)
+
+		await run_ship_supervised.finish(args, sections)
+
+		expect(close_merged_mock).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_ship_supervised — the detached supervisor bookkeeping', () => {
