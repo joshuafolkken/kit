@@ -1,0 +1,7 @@
+{
+	"reason": "Measured gap-rewrite vs cursor-move cost helper; one regression test added",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 23
+	}
+}
