@@ -204,7 +204,9 @@ describe('run_board_render.render queued rule tail on a themed screen', () => {
 	})
 
 	it('changes the queued rule alone', () => {
-		const plain = wargames_lines({})
+		// Both live, so the usage gauge's column a live board measures every rule by is the same in each
+		// (joshuafolkken/kit#8957).
+		const plain = wargames_lines({ spinner: loading.spinner })
 		const tailed = wargames_lines(loading)
 		const changed = tailed.filter((line, index) => line !== plain[index])
 

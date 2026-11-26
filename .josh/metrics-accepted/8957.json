@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 110
+	},
+	"reason": "Saver keeps saved samples and rule width measures cells before usages land, with tests (#8957)",
+	"date": "2026-11-26"
+}

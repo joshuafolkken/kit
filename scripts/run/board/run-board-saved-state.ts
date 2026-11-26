@@ -21,6 +21,9 @@ const SAVED_PREFIX = 'josh-run-board-saved-'
 const SAVE_EVERY_SECONDS = 5
 const SAVE_EVERY_MS = SAVE_EVERY_SECONDS * MS_PER_SECOND
 
+// The machine samples a round lands after its lane read, so an early post has none of them yet.
+type Sample = 'gauges' | 'usages' | 'quotas'
+
 interface Saved {
 	run_started_ms: number
 	saved_ms: number
@@ -75,10 +78,30 @@ function file_store(
 	}
 }
 
+function samples_of(gather: BoardGather, last: BoardGather): Pick<BoardGather, Sample> {
+	return {
+		gauges: gather.gauges ?? last.gauges,
+		usages: gather.usages ?? last.usages,
+		quotas: gather.quotas ?? last.quotas,
+	}
+}
+
+// The round a post carries, its samples not yet in (a new worker's early post) taken from the round
+// last saved on the same run, so a board quit within `SAVE_EVERY_MS` of opening leaves the next one
+// a complete round to draw (joshuafolkken/kit#8957).
+function gather_of(post: GatherPost, kept: Saved | undefined, run_started_ms: number): BoardGather {
+	const gather = { ...post.read, data: post.data, display: post.display }
+
+	if (kept?.run_started_ms !== run_started_ms) return gather
+
+	return { ...gather, ...samples_of(gather, kept.gather) }
+}
+
 // What the worker calls with each post it hands over: a round with the run's data saved at most every
 // `SAVE_EVERY_MS`, a failed round never.
 function saver(store: SavedStore, now: () => number): (post: GatherPost | FailedPost) => void {
 	let saved_ms = -Infinity
+	let kept = store.load()
 
 	return (post) => {
 		if ('failed' in post) return
@@ -87,9 +110,8 @@ function saver(store: SavedStore, now: () => number): (post: GatherPost | Failed
 
 		if (run_started_ms === undefined || now_ms - saved_ms < SAVE_EVERY_MS) return
 		saved_ms = now_ms
-		const gather = { ...post.read, data: post.data, display: post.display }
-
-		store.save({ run_started_ms, saved_ms: now_ms, gather })
+		kept = { run_started_ms, saved_ms: now_ms, gather: gather_of(post, kept, run_started_ms) }
+		store.save(kept)
 	}
 }
 
