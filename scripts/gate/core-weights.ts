@@ -81,6 +81,12 @@ const CORE_WEIGHTS = {
 	e2e: 2,
 } as const
 
+// **`lint:related` holds the lint and the unused-members child at once** (joshuafolkken/kit#9000): the
+// child (`unused-members-check.ts`) builds one TypeScript program beside eslint, as `exports:unused`
+// does under the type check's weight. Live samples read the lint at 110% CPU and the child at 120–170%
+// while the run reserved the lint's 1.7 cores alone.
+const LINT_RELATED_CORES = tenth_rounded_up(CORE_WEIGHTS.lint + CORE_WEIGHTS.type_check)
+
 // joshuafolkken/kit#6331: whole-tree typed lint holds the root TypeScript program and every
 // module's import/export metadata, and ran out of V8's default heap — in CI and locally alike.
 // `eslint-heap.ts` launches eslint under this heap. It is a crash ceiling, not what eslint holds.
@@ -150,6 +156,7 @@ const core_weights = {
 	ESLINT_HEAP_MIB,
 	LEDGER_P90,
 	LEDGER_PEAK_MB,
+	LINT_RELATED_CORES,
 	MEASURED,
 	MEMORY_MB,
 	TOOL_MEMORY,
