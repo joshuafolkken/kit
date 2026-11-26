@@ -1,3 +1,4 @@
+import { run_board_demo_footer } from './run-board-demo-footer'
 import { run_board_demo_lanes } from './run-board-demo-lanes'
 import type { BoardDisplay } from './run-board-display'
 import type { SectionKey, TerminalSize } from './run-board-fit'
@@ -125,9 +126,14 @@ function folded_of(ports: DrawPorts): ReadonlySet<SectionKey> | undefined {
 	return new Set([...folded].filter((key) => key !== 'lanes'))
 }
 
-// The pane a live frame is kept within and the footer it ends on, read at every redraw.
+// The pane a live frame is kept within and the footer it ends on, read at every redraw; in demo mode it
+// ends on demo mode's own, pinned (`run-board-demo-footer.ts`).
 function bounds_of(ports: DrawPorts): FrameBounds {
-	return { size: ports.size?.(), footer: ports.footer, folded: folded_of(ports) }
+	const size = ports.size?.()
+	const bounds = { size, footer: ports.footer, folded: folded_of(ports) }
+	const pinned_footer = run_board_demo_footer.rows_of(ports.theme_run, size?.columns)
+
+	return pinned_footer === undefined ? bounds : { ...bounds, pinned_footer }
 }
 
 // A drawn frame, every note it was drawn from — shown or not (joshuafolkken/kit#8117) — and the pane it

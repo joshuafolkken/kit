@@ -42,7 +42,10 @@ places it.
 
 ## Demo mode (hidden, inside the live board)
 
-- `/` enters and leaves it; nothing on screen explains it.
+- `/` enters and leaves it. In demo mode the frame ends on the demo footer (the theme picked, what
+  plays, every key) in place of the legend and the footer: `scripts/run/board/run-board-demo-footer.ts`.
+- Adding a theme → its `playing` (`ThemeModule`, `run-board-theme-host-types.ts`); checked by
+  `scripts/run/board/run-board-theme-playing.test.ts`.
 - Keys: `0` to `7` pick a theme, `s` IDLE, `a` PROGRESS, `d` ROW, `w` NOTICE, `q` OPENING, `e` ENDING.
 - It enters on the current theme's IDLE. Leaving on another theme keeps it and saves it to `.env`
   (`JOSH_BOARD_THEME`).
