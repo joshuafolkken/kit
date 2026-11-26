@@ -23,6 +23,18 @@ const AFTER_CARRY: ReadonlyArray<ReadonlyArray<string>> = [
 	['run:report', '--handoff'],
 ]
 
+const LANE_OUTPUT_COMMAND = 'lane:output'
+const LANE_PRUNE_COMMAND = 'lane:prune'
+
+// Every `josh` command the procedure runs or names, so the parent-cut guard passes exactly these by name.
+const HANDOFF_COMMANDS: ReadonlyArray<string> = [
+	COMMAND,
+	CARRY_STEP[0] ?? '',
+	...AFTER_CARRY.map((argv) => argv[0] ?? ''),
+	LANE_OUTPUT_COMMAND,
+	LANE_PRUNE_COMMAND,
+]
+
 type StepRunner = (argv: ReadonlyArray<string>) => Promise<JoshResult>
 type LaneReader = () => Promise<ReadonlyArray<LaneInfo>>
 type Print = (text: string) => void
@@ -67,7 +79,7 @@ function blocked_fix(lane: LaneInfo, unreadable: ReadonlySet<LaneInfo>): string 
 	const reasons = [
 		...(unreadable.has(lane) ? [`is ${lane_report.lane_state(lane)}`] : []),
 		...(lane.output === undefined
-			? [`records no path: \`pnpm josh lane:output ${lane.issue} <path>\``]
+			? [`records no path: \`pnpm josh ${LANE_OUTPUT_COMMAND} ${lane.issue} <path>\``]
 			: []),
 	]
 
@@ -90,7 +102,7 @@ function print_stranded(lanes: ReadonlyArray<LaneInfo>, print: Print): void {
 	const stranded = lanes.filter((lane) => lane.is_stranded)
 
 	if (stranded.length > 0) {
-		print(`stranded: ${cites(stranded)} — close with \`pnpm josh lane:prune\``)
+		print(`stranded: ${cites(stranded)} — close with \`pnpm josh ${LANE_PRUNE_COMMAND}\``)
 	}
 }
 
@@ -178,7 +190,7 @@ async function read_lanes(): Promise<ReadonlyArray<LaneInfo>> {
 
 const DEFAULT_IO: Omit<HandoffIo, 'print'> = { run: josh_step, lanes: read_lanes }
 
-const run_handoff_lanes = { DEFAULT_IO, run }
+const run_handoff_lanes = { DEFAULT_IO, HANDOFF_COMMANDS, run }
 
 export type { HandoffIo }
 export { run_handoff_lanes }

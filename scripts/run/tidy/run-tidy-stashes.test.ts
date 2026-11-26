@@ -92,6 +92,41 @@ describe('run_tidy_stashes.tidy_stashes — which entries go', () => {
 	})
 })
 
+// joshuafolkken/kit#9038: the lane closed right after its merge drops its own issue's stashes only.
+describe('run_tidy_stashes.tidy_issue_stashes', () => {
+	it("drops the issue's merged entry and leaves another issue's merged entry", async () => {
+		const other_merged = { selector: 'e'.repeat(40), subject: 'On main: backlogrun: parked #2584' }
+
+		vi.mocked(git_stash.list_by_hash).mockResolvedValue([MERGED_ENTRY, other_merged])
+
+		await run_tidy_stashes.tidy_issue_stashes('2583', is_merged)
+
+		expect(git_stash.drop_by_hash).toHaveBeenCalledExactlyOnceWith(MERGED_ENTRY.selector)
+	})
+
+	it('keeps an entry of the issue that also names an unmerged issue', async () => {
+		const outcomes = await run_tidy_stashes.tidy_issue_stashes('2584', is_merged)
+
+		expect(outcomes).toStrictEqual([MIXED_KEPT])
+		expect(git_stash.drop_by_hash).not.toHaveBeenCalled()
+	})
+
+	it('keeps an entry holding ledger lines and writes no ledger line', async () => {
+		vi.mocked(git_stash.changed_paths).mockResolvedValue([LEDGER_FILE])
+
+		const outcomes = await run_tidy_stashes.tidy_issue_stashes('2583', is_merged)
+
+		expect(outcomes).toStrictEqual([
+			{
+				target: `stash "${MERGED_ENTRY.subject}"`,
+				verdict: { kind: 'keep', reason: expect.stringContaining('run:tidy') },
+			},
+		])
+		expect(git_stash.drop_by_hash).not.toHaveBeenCalled()
+		expect(existsSync(LEDGER)).toBe(false)
+	})
+})
+
 describe('run_tidy_stashes.tidy_stashes — the ledger carry and failures', () => {
 	it("carries new ledger lines into this tree's file, skipping one another file holds", async () => {
 		vi.mocked(git_stash.changed_paths).mockResolvedValue([LEDGER_FILE])

@@ -1,0 +1,7 @@
+{
+	"reason": "tools/test/poll-turns.ts (shared turn-counted poll wait for the broker test) and the start-point template copy replace real-time waits and per-case git builds; tests only, no production code",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}

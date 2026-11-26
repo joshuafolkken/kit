@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_cli } from './run-ship-cli'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_handover } from './run-ship-handover'
+import { run_ship_lane_close } from './run-ship-lane-close'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import { run_ship_relaunch } from './run-ship-relaunch'
@@ -39,6 +40,7 @@ function stub_supervisor(): void {
 	vi.spyOn(run_wake_takeover, 'await_takeover').mockResolvedValue('taken')
 	vi.spyOn(run_ship_detach, 'claim_identity').mockResolvedValue()
 	vi.spyOn(run_ship_detach, 'mark_result').mockResolvedValue()
+	vi.spyOn(run_ship_lane_close, 'close_merged').mockResolvedValue()
 }
 
 beforeEach(() => {
