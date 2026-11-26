@@ -5,12 +5,14 @@ import { run_board_pause } from './run-board-pause'
 
 // A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
 // that says why it waits, or draws a tail, keeps its line on a narrow pane, its title giving up the
-// columns the line runs over down to a floor and its reason the rest; past the floor it wraps.
+// columns the line runs over — down to nothing — and its reason the rest; a lane row past that gives up
+// its tail's cells (`run-board-render-shed.ts`).
 
 // The columns a terminal row gives its title: a longer one is cut to an ellipsis.
 const TITLE_LIMIT = 48
-// The least a title is cut to where a narrow pane keeps the row's reason: enough to tell rows apart.
-const TITLE_FLOOR = 8
+// The least a title is cut to where a narrow pane keeps the row's line: none, so the line keeps its
+// tail's cells before its title (joshuafolkken/kit#8990).
+const TITLE_FLOOR = 0
 const ELLIPSIS = '…'
 
 // What a row gives up to stay on one line: the columns its title is cut to, and the columns cut off
@@ -37,8 +39,11 @@ function keeps_tail(row: BoardRow): boolean {
 	return WHOLE_TAIL_STATES.has(row.state) || row.reason?.icon === run_board_labels.STATE_ICONS.human
 }
 
-// A title cut to the title column, so every time after it starts in one column.
+// A title cut to the title column, so every time after it starts in one column; nothing at a column of
+// none (joshuafolkken/kit#8990).
 function title_of(title = '', limit = TITLE_LIMIT): string {
+	if (limit <= 0) return ''
+
 	return title.length > limit ? `${title.slice(0, limit - 1)}${ELLIPSIS}` : title
 }
 
@@ -120,7 +125,7 @@ function drawn_width(row: BoardRow, fit: RowFit): number {
 }
 
 // The row's title once it has given up `overrun` columns, never under the floor nor past the columns it
-// drew in — a section's title column may be narrower than the floor (joshuafolkken/kit#8590).
+// drew in (joshuafolkken/kit#8590).
 function narrowed_limit(row: BoardRow, overrun: number, fit: RowFit): number {
 	const drawn = drawn_width(row, fit)
 

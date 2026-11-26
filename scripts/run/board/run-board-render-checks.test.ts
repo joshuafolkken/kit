@@ -15,6 +15,7 @@ const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const CHECKS: PrChecks = { pr: 3765, pass: 6, pending: 2, fail: 0, coderabbit: 'running' }
 const LIMITED: PrChecks = { ...CHECKS, coderabbit: 'rate-limited' }
 const DRAWN = 'PR 3765  ✓ 6  ⏳ 2  🐰 ⏳'
+const COUNTED = 'PR 3765  ✓ 6  ⏳ 2'
 const LEGEND_CODERABBIT = '🐰 CodeRabbit'
 const LEGEND_RATE_LIMITED = '🐰 CodeRabbit (⛔ rate-limited)'
 
@@ -50,13 +51,22 @@ describe('run_board_render_checks.checks_part', () => {
 
 	it('leaves out CodeRabbit where it has no check', () => {
 		expect(run_board_render_checks.checks_part({ ...CHECKS, coderabbit: 'none' }, String)).toBe(
-			'PR 3765  ✓ 6  ⏳ 2',
+			COUNTED,
 		)
 	})
 
 	// joshuafolkken/kit#4625: the number opens the pull request; `PR` stays plain.
 	it('links only the pull request’s number', () => {
 		expect(run_board_render_checks.checks_part(CHECKS, angled)).toBe('PR <3765>  ✓ 6  ⏳ 2  🐰 ⏳')
+	})
+
+	// joshuafolkken/kit#8990: CodeRabbit's mark is given up before the counts; `PR` stays.
+	it('gives up CodeRabbit’s mark at shed 3, then the counts at shed 4', () => {
+		const { checks_part } = run_board_render_checks
+
+		expect(checks_part(CHECKS, String, 2)).toBe(DRAWN)
+		expect(checks_part(CHECKS, String, 3)).toBe(COUNTED)
+		expect(checks_part(CHECKS, String, 4)).toBe('PR 3765')
 	})
 
 	it('draws a failure red and a rate limit yellow', () => {

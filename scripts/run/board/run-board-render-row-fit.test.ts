@@ -62,11 +62,6 @@ function column_of(line: string, marker: string): number {
 	return run_board_fit.width_of(line.slice(0, line.indexOf(marker)))
 }
 
-// A line from its title's cut on: what a row keeps whole however narrow its pane.
-function tail_of(line: string): string {
-	return line.slice(line.indexOf('…'))
-}
-
 describe('run_board_render.render — a running lane row on a narrow pane', () => {
 	it('narrows every running row’s title so its whole line stays within the pane', () => {
 		const lines = lane_lines(NARROW)
@@ -88,12 +83,12 @@ describe('run_board_render.render — a running lane row on a narrow pane', () =
 		expect(run_board_fit.width_of(held)).toBeLessThanOrEqual(NARROW)
 	})
 
-	it('wraps a row its floor cannot fit, keeping its whole tail', () => {
+	// joshuafolkken/kit#8990: the title is cut to nothing, then the tail gives up cells or is cut.
+	it('keeps a row its title cannot fit on one line, its title cut to nothing', () => {
 		const [tight = ''] = lane_lines(TIGHT, [wait])
-		const [wide = ''] = lane_lines(WIDE, [wait])
 
-		expect(run_board_fit.width_of(tight)).toBeGreaterThan(TIGHT)
-		expect(tail_of(tight)).toBe(tail_of(wide))
+		expect(run_board_fit.width_of(tight)).toBeLessThanOrEqual(TIGHT)
+		expect(tight).not.toContain(`Issue ${String(HELD)}`)
 	})
 
 	it('draws a frame with no pane, or a pane wide enough, as it was', () => {

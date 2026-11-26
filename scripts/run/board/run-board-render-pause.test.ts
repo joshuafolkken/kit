@@ -18,8 +18,12 @@ const URL = 'https://github.com/joshuafolkken/kit/issues/7387#issuecomment-68188
 const SUMMARY = 'Approval needed: defer impact study'
 const DECISION = 'needs-decision'
 const WIDTH = 120
-// A pane too narrow for the parked row's whole line.
+// A pane too narrow for the parked row's title, wide enough for its whole reason.
+const REASON_FIT = 80
+// A pane too narrow for the parked row's whole reason.
 const NARROW = 65
+// The start of the reason a cut at the row's end keeps.
+const SUMMARY_HEAD = 16
 const PLAN: BoardPlan = {
 	pause_reasons: new Map([[ISSUE, { summary: SUMMARY, url: URL, at_ms: NOW }]]),
 	waves: { waves: [], unreached: [] },
@@ -74,16 +78,16 @@ describe('run_board_render pause reasons', () => {
 		expect(visible.split('\n')).toHaveLength(1)
 	})
 
-	// joshuafolkken/kit#7849: a parked row cuts its title to the floor and keeps its whole reason.
-	it('keeps and links the whole pause reason on a narrow pane, cutting the title', () => {
+	// joshuafolkken/kit#7849: a parked row cuts its title and keeps its whole reason.
+	it('keeps and links the whole pause reason on a narrower pane, cutting the title', () => {
 		const status: ItemStatus = { state: 'parked', started_ms: STARTED }
-		const linked = line_of(status, NARROW)
+		const linked = line_of(status, REASON_FIT)
 		const visible = stripVTControlCharacters(linked)
 
 		expect(linked).toContain(osc8(SUMMARY, URL))
-		expect(visible).toBe(stripVTControlCharacters(line_of(status, NARROW, false)))
-		expect(visible).toContain('Overlap…')
-		expect(visible.split('\n')).toHaveLength(1)
+		expect(visible).toBe(stripVTControlCharacters(line_of(status, REASON_FIT, false)))
+		expect(visible).not.toContain('Overlap')
+		expect(run_board_fit.width_of(visible)).toBeLessThanOrEqual(REASON_FIT)
 	})
 
 	it('keeps decision classification while showing the linked short reason', () => {
@@ -97,6 +101,18 @@ describe('run_board_render pause reasons', () => {
 
 		expect(line_of(next)).not.toContain(URL)
 		expect(line_of(next)).toContain(run_board_pause.FALLBACK)
+	})
+})
+
+// joshuafolkken/kit#8990: past a title cut to nothing, the row is cut at its end, never wrapped.
+describe('run_board_render pause reasons on a pane too narrow for the whole reason', () => {
+	it('cuts a parked row at its end', () => {
+		const status: ItemStatus = { state: 'parked', started_ms: STARTED }
+		const visible = stripVTControlCharacters(line_of(status, NARROW))
+
+		expect(run_board_fit.width_of(visible)).toBeLessThanOrEqual(NARROW)
+		expect(visible).toContain(`${String(ISSUE)}        ${SUMMARY.slice(0, SUMMARY_HEAD)}`)
+		expect(visible).toMatch(/…$/u)
 	})
 })
 

@@ -12,6 +12,7 @@ import { run_board_render_found } from './run-board-render-found'
 import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
+import { run_board_render_shed } from './run-board-render-shed'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title, type RowCut, type RowFit } from './run-board-render-title'
@@ -28,6 +29,8 @@ const { number_text } = run_board_render_lanes
 const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
 const { ELLIPSIS, fitted, row_overrun, title_of } = run_board_render_title
 const { width_of } = run_board_fit
+const { shed_fitted } = run_board_render_shed
+const UNTITLED: RowCut = { title_limit: 0, reason_cut: 0 }
 const { padded } = run_board_fresh
 const { faint } = run_board_faint
 const { condition_of, tail_of, waits_of } = run_board_render_condition
@@ -63,6 +66,8 @@ interface RowFrame {
 	is_lane_row?: boolean | undefined
 	// A done row whose title gives up the columns draws what was filed during it whole.
 	is_end_kept?: boolean | undefined
+	// The cells a lane row's tail gives up past a title cut to nothing (`run-board-render-shed.ts`).
+	shed?: number | undefined
 	// The section whose key leads each row's text (`run-board-row-key.ts`); none where a section types
 	// no row.
 	section?: KeySection | undefined
@@ -88,8 +93,11 @@ function title_lead(row: BoardRow, frame: RowFrame): string {
 // The title led by `title_lead` and cut by as many columns, so every column after it stays where an
 // unled row has it.
 function title_text(row: BoardRow, frame: RowFrame): string {
+	// A title cut to no column draws nothing, not even its lead (joshuafolkken/kit#8990).
+	if (frame.title_limit <= 0) return ''
+
 	const lead = title_lead(row, frame)
-	// `title_of` cuts nothing at a limit of 0 or below, so a lead that fills the column keeps the mark.
+	// `title_of` draws nothing at a limit of 0 or below, so a lead that fills the column keeps the mark.
 	const limit = Math.max(1, frame.title_limit - lead.length)
 
 	return `${lead}${title_of(row_title(row, frame.header), limit)}`
@@ -196,7 +204,9 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 // What a row draws after its title: its tail, an earlier run's row's led by 🧳 — so an earlier run's row
 // draws one even where its tail is empty.
 function drawn_tail(row: BoardRow, frame: RowFrame): Array<string> {
-	return run_board_earlier.earlier_marked(row, run_board_render_tail.tail_of(row, frame.header))
+	const tail = run_board_render_tail.tail_of(row, frame.header, frame.shed)
+
+	return run_board_earlier.earlier_marked(row, tail)
 }
 
 // A row up to what was filed during it: its head, then what it draws after its title.
@@ -266,11 +276,30 @@ function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 	}
 }
 
+// A lane row drawn with its title cut to nothing and `shed` of its tail's cells given up.
+function shed_draw(
+	indent: string,
+	row: BoardRow,
+	frame: RowFrame,
+	fit: RowFit,
+): (shed: number) => string {
+	return (shed) => row_draw(indent, row, { ...frame, shed }, fit)(UNTITLED)
+}
+
+// A row's line fitted to the pane: its title cut first, then — a lane row's — its tail's cells.
+function line_of(indent: string, row: BoardRow, frame: RowFrame): string {
+	const fit = row_fit(indent, row, frame)
+	const text = fitted(row, frame.columns, row_draw(indent, row, frame, fit), fit)
+
+	if (frame.is_lane_row !== true) return text
+
+	return shed_fitted(text, frame.columns, shed_draw(indent, row, frame, fit))
+}
+
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
 // The row's text is led by its key where the frame keys its rows and its section names one.
 function row_line(indent: string, row: BoardRow, frame: RowFrame, stage?: YieldStage): PlanLine {
-	const fit = row_fit(indent, row, frame)
-	const text = fitted(row, frame.columns, row_draw(indent, row, frame, fit), fit)
+	const text = line_of(indent, row, frame)
 	const section = frame.header.is_keyed === true ? frame.section : undefined
 
 	return {
