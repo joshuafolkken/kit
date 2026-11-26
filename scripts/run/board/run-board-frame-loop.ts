@@ -146,7 +146,7 @@ async function sleep_until(ports: FramePorts, now_ms: number, due_ms: number): P
 	await ports.sleep(Math.max(0, due_ms - now_ms))
 	const woke_ms = ports.now()
 
-	ports.time_wake?.(due_ms, woke_ms)
+	ports.time_wake?.(Math.max(due_ms, now_ms), woke_ms)
 
 	return woke_ms
 }

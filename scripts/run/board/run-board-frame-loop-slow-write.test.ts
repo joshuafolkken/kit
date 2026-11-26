@@ -30,10 +30,16 @@ function every(step_ms: number, column: number): Layer {
 }
 
 // The moments frames are made at, each write taking `write_ms`.
-async function frame_times(write_ms: number): Promise<Array<number>> {
+async function frame_times(
+	write_ms: number,
+	wakes: Array<{ due_ms: number; woke_ms: number }> = [],
+): Promise<Array<number>> {
 	const clock = { now_ms: START }
 	const times: Array<number> = []
 	const ports: FramePorts = {
+		time_wake: (due_ms, woke_ms) => {
+			wakes.push({ due_ms, woke_ms })
+		},
 		now: () => clock.now_ms,
 		sleep: async (ms) => {
 			clock.now_ms += Math.max(0, ms)
@@ -64,5 +70,14 @@ describe('run_board_frame_loop.run on a terminal slow to take a write', () => {
 		)
 
 		expect(missed).toStrictEqual([])
+	})
+
+	it('hands the wake timing no due moment before the wake began', async () => {
+		const wakes: Array<{ due_ms: number; woke_ms: number }> = []
+
+		await frame_times(WRITE_MS, wakes)
+
+		expect(wakes.filter((wake) => wake.due_ms > wake.woke_ms)).toStrictEqual([])
+		expect(wakes.every((wake) => wake.woke_ms - wake.due_ms <= MIN_FRAME_MS)).toBe(true)
 	})
 })
