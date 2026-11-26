@@ -166,10 +166,12 @@ describe('run_halfrun_resume.reopen_at — an interrupted round is re-claimed', 
 	})
 
 	it.each([
-		['a live unmarked record of the issue', ISSUE, new Date()],
-		["another issue's stale record", OTHER_ISSUE, EXPIRED],
-	])('leaves %s untouched, with no hint', (_name, holder, now) => {
-		run_hold.create_hold(TARGET, holder, { now })
+		['a live unmarked record of the issue', ISSUE, new Date(), {}],
+		["another issue's stale record", OTHER_ISSUE, EXPIRED, {}],
+		["the issue's stale fullrun record", ISSUE, EXPIRED, run_hold.FULLRUN_MARK],
+		["the issue's stale prrun record", ISSUE, EXPIRED, { is_prrun: true }],
+	])('leaves %s untouched, with no hint', (_name, holder, now, mark) => {
+		run_hold.create_hold(TARGET, holder, { now, ...mark })
 
 		const before = hold_record()
 

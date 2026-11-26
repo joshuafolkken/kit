@@ -89,9 +89,14 @@ function take_over(target: string, issue: string, mark: HoldMark): boolean {
 // stopped before its `--halfrun-stop` — by a person, or refused it over a test left for later — leaves
 // its running record behind with its session ended. Nothing else can pick it up over the uncommitted
 // diff, and the board stops drawing the runs that carry on without it. A live one stays `held` and is
-// never taken.
+// never taken, and neither is a `fullrun` or `prrun` record: re-opening it as a round would drop the
+// mark the implementation-cut guard and the board read it by.
+function is_halfrun_record(hold: RunHold): boolean {
+	return !run_hold.is_stop_marked(hold) && hold.is_fullrun !== true && hold.is_prrun !== true
+}
+
 function is_interrupted_record(read: HoldRead, issue: string): boolean {
-	return read.kind === 'stale' && read.hold.issue === issue && !run_hold.is_stop_marked(read.hold)
+	return read.kind === 'stale' && read.hold.issue === issue && is_halfrun_record(read.hold)
 }
 
 function is_round_record(read: HoldRead, issue: string): boolean {
@@ -150,7 +155,7 @@ function round_command(issue: string): string {
 function round_hint(read: HoldRead, issue: string): string | undefined {
 	if (issue === run_hold.UNNUMBERED_ISSUE || !is_round_record(read, issue)) return undefined
 
-	return `A run of ${session_cite.issue(issue)} carrying on here re-claims it over the uncommitted changes with \`${round_command(issue)}\`; another issue's run waits until the tree is clean.`
+	return `A run of ${session_cite.issue(issue)} carrying on here re-claims it with \`${round_command(issue)}\`; another issue's run waits until the tree is clean.`
 }
 
 // `false` leaves the record untouched, so the ordinary claim that follows decides the tree.
