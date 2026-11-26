@@ -1,7 +1,0 @@
-{
-	"reason": "bounded-check: lane child's own checks run detached and return within one wait chunk (#8708)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 184
-	}
-}

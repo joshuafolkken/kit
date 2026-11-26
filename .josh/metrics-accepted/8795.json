@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting the theme checks into run-board-tick-theme.ts adds a new module's imports, port types and export object (+8 lines) to free 52 lines in run-board-tick-draw.ts for #8796/#8797",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

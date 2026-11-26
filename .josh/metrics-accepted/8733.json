@@ -1,7 +1,0 @@
-{
-	"reason": "#8733 adds the scratch:run resolve hook so scratch scripts can import scripts/ modules",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}

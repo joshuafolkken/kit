@@ -1,7 +1,0 @@
-{
-	"reason": "#8699 fills the bttf ENTER socket with its double beep (enter_samples), the feature the Issue adds",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

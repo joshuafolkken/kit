@@ -1,7 +1,0 @@
-{
-	"reason": "Wall-clock pacing for intro beats: new beat-pace module and fake-clock fixture (#8787)",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 85
-	}
-}

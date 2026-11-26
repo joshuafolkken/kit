@@ -1,7 +1,0 @@
-{
-	"reason": "New eslint-concurrency module (+17 code lines) passes JOSH_ESLINT_CONCURRENCY to eslint so CI lint legs use two workers",
-	"date": "2026-11-24",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

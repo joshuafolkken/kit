@@ -1,7 +1,0 @@
-{
-	"reason": "new bttf lane-swap effect: run-board-lane-swap.ts module plus frame-diff departures and jump-state wiring",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 145
-	}
-}

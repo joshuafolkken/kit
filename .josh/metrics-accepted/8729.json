@@ -1,7 +1,0 @@
-{
-	"reason": "Two-tier lane target by actual size (#8729): new target_minutes definition and its size lookup in the elapsed-time verdict",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "the orphaned-gate parent watch (#8845) is a new module the gate entry calls",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 109
-	}
-}

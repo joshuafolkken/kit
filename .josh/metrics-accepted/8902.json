@@ -1,7 +1,0 @@
-{
-	"reason": "spin wake lag measurement (AC2) and sleep_until scheduling (AC3) add +11 code lines",
-	"date": "2026-11-24",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

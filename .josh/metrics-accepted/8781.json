@@ -1,7 +1,0 @@
-{
-	"reason": "defect:origin gains the introducing-merge read, its mark and the reach ranking (#8781)",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 53
-	}
-}

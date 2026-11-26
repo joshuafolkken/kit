@@ -1,7 +1,0 @@
-{
-	"reason": "Lane #8826: gate stopped 4 relaunches in a row on gate 25.1s vs a 5.2s per-machine baseline taken from reused gates while the machine waited on the core budget (memory pressure); unit 1.1s comes from the new run:board cell/frame-loop tests this branch adds",
-	"date": "2026-11-24",
-	"growth": {
-		"scripts.code_lines": 888
-	}
-}

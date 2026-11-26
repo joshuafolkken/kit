@@ -1,7 +1,0 @@
-{
-	"reason": "#8744 adds the named-color palette and the arrival's theme-style write so the bttf arrival thaws to each cell's real color",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 45
-	}
-}

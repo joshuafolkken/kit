@@ -1,7 +1,0 @@
-{
-	"reason": "New bolts module replaces the one-line spark dots with the demo's zig-zag bolts (shape, life, colors), split out of jump-paint to keep it under 300 lines",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 127
-	}
-}

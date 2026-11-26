@@ -1,7 +1,0 @@
-{
-	"reason": "#8768 adds the hand-over-paused table row and routes adopt and hand-over through the table's events (record_owner), +33 code lines as planned",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}
