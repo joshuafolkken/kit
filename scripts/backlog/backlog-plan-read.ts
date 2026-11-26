@@ -7,6 +7,7 @@ import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { launch_timing } from '#scripts/lane/launch-timing'
+import { z } from 'zod'
 import type { Report } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
 import { backlog_next } from './backlog-next'
@@ -127,6 +128,20 @@ async function fetch_open(): Promise<OpenListing | undefined> {
 	return listing
 }
 
+// The open listing with each row's blocker relations, which `read_open`'s listing does not carry.
+// It names no `createdAt`, which no reader of it ranks by; the default lets its rows parse as the
+// open rows they are. `undefined` when it was not read.
+const relations_schema = open_issue_schema.extend({ createdAt: z.string().default('') })
+
+async function read_open_relations(): Promise<OpenListing | undefined> {
+	const { json, is_capped } = await git_gh_command.issue_list_open_relations(
+		auto_ok_cli.LISTING_LIMIT,
+	)
+	const read = json === undefined ? undefined : read_json_listing(json, relations_schema)
+
+	return read?.kind === 'read' ? { rows: read.rows, is_capped } : undefined
+}
+
 // A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is
 // switched off rather than fed a set that would silently report standing blockers as gone.
 function context_of(plan: Plan, listing: OpenListing): PlanContext {
@@ -154,7 +169,14 @@ async function read_plan(
 	return plan === undefined ? undefined : { plan, listing }
 }
 
-const backlog_plan_read = { classify, context_of, fetch_open, read_open, read_plan }
+const backlog_plan_read = {
+	classify,
+	context_of,
+	fetch_open,
+	read_open,
+	read_open_relations,
+	read_plan,
+}
 
 export { backlog_plan_read }
 export type { Plan, PlanRead }

@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 29
+	},
+	"reason": "Named board plans read the relations listing so queued rows carry their blockers (#8966)",
+	"date": "2026-11-26"
+}
