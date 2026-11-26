@@ -28,9 +28,12 @@ async function load(): Promise<LoadedCache> {
 	return await test_pinned_cache.load('main', test_pinned_logic.parse_hunks(diff))
 }
 
+const ONE = { max_hunks: 1 }
+const CONTINUED = { max_hunks: 1, is_continue_cut: true }
+
 async function leave_pending(): Promise<LoadedCache> {
 	const cache = await load()
-	const split = await test_pinned_carry.select(cache, 1)
+	const split = await test_pinned_carry.select(cache, ONE)
 
 	test_pinned_carry.record(cache, split.unchecked)
 
@@ -38,7 +41,7 @@ async function leave_pending(): Promise<LoadedCache> {
 }
 
 async function expect_first(cache: LoadedCache): Promise<void> {
-	const selected = await test_pinned_carry.select(cache, 1)
+	const selected = await test_pinned_carry.select(cache, ONE)
 
 	expect(selected.checked).toEqual([cache.hunks[0]])
 }
@@ -47,15 +50,44 @@ describe('test_pinned_carry', () => {
 	it('persists tree and hunk keys and prioritizes capped hunks without advancing on reads', async () => {
 		const cache = await leave_pending()
 		const text = await readFile(CARRY_FILE, 'utf8')
-		const selected = await test_pinned_carry.select(cache, 1)
+		const selected = await test_pinned_carry.select(cache, ONE)
 
 		expect(text).toContain(test_pinned_carry.keys(cache, cache.hunks).at(-1))
 		expect(text).toContain('"tree":')
 		expect(selected.checked).toEqual([cache.hunks[1]])
-		expect(await test_pinned_carry.select(cache, 1)).toEqual(selected)
+		expect(await test_pinned_carry.select(cache, ONE)).toEqual(selected)
 		expect(await readFile(CARRY_FILE, 'utf8')).toBe(text)
 	})
+})
 
+// joshuafolkken/kit#8975: the cut run and its continuation together cover one uncut run's range.
+describe('test_pinned_carry — a cut run continuation', () => {
+	it('keeps a cut run continuation within the range the cut run selected', async () => {
+		const cache = await leave_pending()
+		const selected = await test_pinned_carry.select(cache, CONTINUED)
+
+		expect(selected.checked).toEqual([cache.hunks[0]])
+		expect(selected.unchecked).toEqual(cache.hunks.slice(1))
+	})
+
+	it('probes nothing past the cap in a continuation when no hunk was left pending', async () => {
+		const cache = await load()
+		const selected = await test_pinned_carry.select(cache, CONTINUED)
+
+		expect(selected.checked).toEqual([cache.hunks[0]])
+		expect(selected.unchecked).toEqual(cache.hunks.slice(1))
+	})
+
+	it('selects nothing without a test runner, continued or not', async () => {
+		const cache = await leave_pending()
+		const selected = await test_pinned_carry.select(cache, CONTINUED, false)
+
+		expect(selected.checked).toEqual([])
+		expect(selected.unchecked).toHaveLength(cache.hunks.length)
+	})
+})
+
+describe('test_pinned_carry — a stale or corrupt carry', () => {
 	it('ignores pending keys after the tree changes', async () => {
 		await leave_pending()
 		await write('other.js', 'export const other = true\n')

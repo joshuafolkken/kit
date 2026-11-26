@@ -21,6 +21,7 @@ const TOKEN_KEY_LENGTH = 16
 const SITE_KEY_LENGTH = 16
 const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: '
 const FIRST_UNPINNED_FLAG = '--first-unpinned'
+const CONTINUE_CUT_FLAG = '--continue-cut'
 const REASONED_FLAG = '--reasoned'
 const LIST_PREFIX = 'josh-test-pinned-list-'
 const LIST_SUFFIX = '.log'
@@ -198,20 +199,33 @@ function clear(token: string, root: string = PROJECT_ROOT): void {
 // A recorded launch's `josh test:pinned` arguments, the token last. **With no `--unpinned-ok` reason it
 // stops at the first unpinned hunk** (joshuafolkken/kit#5153): the launcher stops on it whatever the
 // rest say. Under a reason every hunk is probed, since a reason accepts the list as the whole answer.
-// `origin` names the launcher on the run's ledger row (joshuafolkken/kit#5262). `is_whole` probes every
-// hunk with no reason: the background probe that goes on past a cut check's stop (joshuafolkken/kit#5327).
-// A reason's launch carries `--reasoned`, so its ledger row tells it from an `is_whole` one
-// (joshuafolkken/kit#7809).
+// `origin` names the launcher on the run's ledger row (joshuafolkken/kit#5262). `is_whole` probes the
+// rest with no reason: the background probe that goes on past a cut check's stop (joshuafolkken/kit#5327),
+// within the cut check's cap (`--continue-cut`, joshuafolkken/kit#8975). A reason's launch carries
+// `--reasoned`, so its ledger row tells it from an `is_whole` one (joshuafolkken/kit#7809).
+function cut_flags(reason: string | undefined, is_whole: boolean): Array<string> {
+	if (reason !== undefined) return []
+
+	return [is_whole ? CONTINUE_CUT_FLAG : FIRST_UNPINNED_FLAG]
+}
+
 function launch_argv(
 	token: string,
 	reason: string | undefined,
 	origin: PinnedOrigin,
 	is_whole = false,
 ): Array<string> {
-	const cut = reason === undefined && !is_whole ? [FIRST_UNPINNED_FLAG] : []
 	const reasoned = reason === undefined ? [] : [REASONED_FLAG]
 
-	return ['test:pinned', ...cut, ...reasoned, '--origin', origin, '--record', token]
+	return [
+		'test:pinned',
+		...cut_flags(reason, is_whole),
+		...reasoned,
+		'--origin',
+		origin,
+		'--record',
+		token,
+	]
 }
 
 const test_pinned_record = {

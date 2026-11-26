@@ -54,6 +54,7 @@ interface RunOptions {
 	max_hunks: number
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
+	is_continue_cut?: boolean
 	is_reasoned?: boolean
 	tree_hash?: string | undefined
 	rewired?: number
@@ -350,7 +351,7 @@ async function report_on(
 	)
 	const probes = await read_probes(base, targets)
 	const cache = await test_pinned_cache.load(base, probes.hunks, options.cache_file)
-	const { checked, unchecked } = await test_pinned_carry.select(cache, has_runner ? max_hunks : 0)
+	const { checked, unchecked } = await test_pinned_carry.select(cache, options, has_runner)
 	if (!options.is_cached_only) test_pinned_carry.record(cache, unchecked)
 	const outcome = await outcome_on(cache, paths, checked, { ...options, rewired: probes.rewired })
 
@@ -389,6 +390,11 @@ async function run(
 	return await report({ max_hunks, is_cached_only: false, is_first_unpinned, is_reasoned, origin })
 }
 
+// A cut run's continuation (`--continue-cut`, joshuafolkken/kit#8975): only the cut run's range.
+async function run_continued(max_hunks: number, origin?: PinnedOrigin): Promise<PinnedReport> {
+	return await report({ max_hunks, is_cached_only: false, is_continue_cut: true, origin })
+}
+
 // The unpinned hunks the cache already answers for this tree, probing nothing (joshuafolkken/kit#4936):
 // what a check still running — or one stopped mid-way — has reached for the hunks that did not move.
 async function cached(max_hunks: number): Promise<PinnedReport> {
@@ -403,6 +409,6 @@ async function held_report(max_hunks: number): Promise<PinnedReport | undefined>
 	return read.is_held === true ? read : undefined
 }
 
-const test_pinned = { cached, held_report, run }
+const test_pinned = { cached, held_report, run, run_continued }
 
 export { test_pinned }
