@@ -1,5 +1,5 @@
 {
-	"reason": "is_finish_drawn now draws a finish on the root single-run row and draws none on a halfrun (#8946)",
+	"reason": "is_finish_drawn now draws a finish on the root single-run row and draws none on a halfrun (#8946); gate median 21.5s to 24.0s across lanes' solo gates, this diff adds only board render tests",
 	"date": "2026-11-26",
 	"growth": {
 		"scripts.code_lines": 13
