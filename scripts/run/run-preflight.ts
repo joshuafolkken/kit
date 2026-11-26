@@ -1,17 +1,16 @@
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_command } from '#scripts/git/git-command'
-import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_state } from '#scripts/lane/lane-state'
 import { lane_state_record } from '#scripts/lane/lane-state-record'
 import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
-import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { shell_quote } from '#scripts/lib/shell-quote'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
+import { run_preflight_tree, type TreeState } from './run-preflight-tree'
 
 // The preflight check — what an interrupted run left in this working tree, and what the rule says to
 // do about it before the next child starts. `run:hold` runs it before it claims the tree, so this
@@ -47,12 +46,6 @@ const MERGED_PR = 'merged'
 const CLOSED_PR = 'closed'
 
 type PrState = typeof CLOSED_PR | typeof MERGED_PR | typeof NO_PR | typeof OPEN_PR
-
-interface TreeState {
-	branch: string
-	default_branch: string
-	is_dirty: boolean
-}
 
 interface ChildState {
 	branch_name: string | undefined
@@ -114,7 +107,7 @@ function is_issue_branch(branch: string, issue: string): boolean {
 }
 
 function is_off_default(tree: TreeState): boolean {
-	return tree.branch !== tree.default_branch
+	return tree.branch !== tree.default_branch && tree.is_bare !== true
 }
 
 // **The issue's own branch over a clean tree is where a resume belongs, not something to reclaim**
@@ -270,29 +263,6 @@ function to_pr_state(raw: string): PrState {
 	const state = read_pr_field(raw)
 
 	return (state === undefined ? undefined : GH_PR_STATES.get(state)) ?? NO_PR
-}
-
-// Dirty means work `stash:push` would set aside: a tree whose only change is the observation ledger
-// would otherwise be told to stash, get `clean`, and be told to stash again. Unreadable is dirty, as
-// in `run_hold.is_tree_dirty`.
-async function has_stashable_work(): Promise<boolean> {
-	try {
-		return await git_stash.has_stashable_changes()
-	} catch (error) {
-		error_text.trace_swallowed('run_preflight.has_stashable_work', error)
-
-		return true
-	}
-}
-
-async function read_tree_state(): Promise<TreeState> {
-	const [is_dirty, current, default_branch] = await Promise.all([
-		has_stashable_work(),
-		git_command.branch(),
-		git_command.get_default_branch(),
-	])
-
-	return { branch: current, default_branch, is_dirty }
 }
 
 // **An unreadable `gh` is not an absent pull request.** `pr_view` folds both into `''` and cannot tell
@@ -465,7 +435,7 @@ async function read_child_state(issue: string): Promise<ChildState> {
 async function check(issue: string): Promise<PreflightDecision> {
 	require_issue_number(issue)
 
-	const tree = await read_tree_state()
+	const tree = await run_preflight_tree.read_tree_state()
 
 	if (needs_reclaim(tree, issue)) return decide(tree, NO_CHILD_WORK, issue)
 
@@ -486,5 +456,7 @@ const run_preflight = {
 	to_pr_state,
 }
 
-export type { ChildState, PreflightDecision, PreflightVerdict, PrState, TreeState }
+export type { ChildState, PreflightDecision, PreflightVerdict, PrState }
 export { run_preflight }
+
+export { type TreeState } from './run-preflight-tree'

@@ -546,7 +546,9 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 
 After the budget and before the reads, the entry synchronizes the tree (skipped in a lane child): `stash:push "<command> [new] #<N>: pre-existing changes"`, `main:sync` (primary checkout) or `main:merge` (linked), then `stash:pop` after `stashed`. A failed step exits non-zero, keeps and names the stash, releases the hold and sends the `confirmation` Telegram.
 
-After `main:sync`, the entry creates or switches to the issue's branch `<N>-<slug>` (`josh git -y`'s `check_and_create_branch`), so `review:selfcheck` and `preflight:check` find the issue. A failure there only warns.
+After `main:sync` and a clean `stash:pop`, the entry switches to the issue's branch `<N>-<slug>` (`check_and_create_branch`), so `review:selfcheck` and `preflight:check` find the issue. A failure only warns.
+
+A stop after the switch leaves a branch with no commits; `run:hold`'s preflight reads it as the default branch.
 
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
