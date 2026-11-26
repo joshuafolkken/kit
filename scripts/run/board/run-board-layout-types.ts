@@ -91,6 +91,8 @@ interface BoardRow {
 	kind: FiledKind | undefined
 	// The priority label it carries (joshuafolkken/kit#4383), none for a normal one.
 	priority?: BoardPriority | undefined
+	// The area its `area:*` label names (joshuafolkken/kit#8960), drawn before its title; none without one.
+	area?: string | undefined
 	state: ItemState
 	status: ItemStatus | undefined
 	// The standing blockers this row still waits on, as the plan names them.
