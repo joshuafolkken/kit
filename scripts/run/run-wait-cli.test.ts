@@ -18,7 +18,8 @@ const SHELL_PID = 900_001
 const LAUNCHER_PID = 900_002
 const DIRECTORY_PREFIX = 'josh-wait-'
 const PATTERN = 'run:chain 8283'
-const WAIT_COMMAND = `josh wait --process ${PATTERN}`
+const READY_ENTRY = '--disable-warning=ExperimentalWarning tools/josh/josh-ready.ts'
+const WAIT_COMMAND = `wait --process ${PATTERN}`
 
 function row(pid: number, parent: number, command: string): ProcessRow {
 	return { pid, parent, command, time: '0:00', rss_kb: 1, stat: 'S', start: '' }
@@ -105,7 +106,7 @@ describe('run_wait_cli.run', () => {
 describe('run_wait_cli.is_gone_in with a leftover wait', () => {
 	const leftover = [
 		row(OTHER_PID, 1, `zsh -c pnpm ${WAIT_COMMAND}`),
-		row(OTHER_PID + 1, OTHER_PID, `node ${WAIT_COMMAND}`),
+		row(OTHER_PID + 1, OTHER_PID, `node ${READY_ENTRY} ${WAIT_COMMAND}`),
 	]
 
 	it('does not let it hold a finished target pending', () => {

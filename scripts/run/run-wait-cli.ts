@@ -13,7 +13,8 @@ import { run_ship_wait_cli } from './ship/run-ship-wait-cli'
 // chunk below the prompt-cache TTL, so a long wait costs one request per chunk.
 //
 // - `--pid <pid>` — done once the process is gone.
-// - `--process <pattern>` — done once no process but this wait's own lineage matches, as `pgrep -f`.
+// - `--process <pattern>` — done once no process but this wait's own lineage and other `josh wait`s
+//   matches, as `pgrep -f`; a wait left over from an earlier call carries the pattern too.
 // - `--file <path>` — done once the file exists.
 // - `--result <dir>` — a check `bounded-check.ts` left running: done once its exit code is written,
 //   and then its log and exit code are this wait's own (joshuafolkken/kit#8708).
@@ -76,7 +77,8 @@ function lineage(rows: ProcessTable, pid: number): Set<number> {
 
 // Another `josh wait` (or the shell that launched it) carries the waited-for pattern in its own
 // command line, so a wait left over from an earlier call would hold this one pending.
-const OTHER_WAIT = /\bjosh(?:\.\w+)? wait\b/u
+// The node line reads `…/josh-ready.ts wait --process <pattern>`, the shell's carries the same words.
+const OTHER_WAIT = /\bwait --(?:pid|process|file|result)\b/u
 
 // No match outside this wait's lineage and other waits; an unanswered `ps` reads as still running.
 function is_gone_in(rows: ProcessTable | undefined, pattern: string): boolean {
