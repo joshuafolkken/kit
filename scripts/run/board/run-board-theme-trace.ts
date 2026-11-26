@@ -26,13 +26,13 @@ const { BOLD, bg, fg } = run_board_theme_host_grid
 const { notice_trace, peak_flash } = run_board_theme_host_flash
 const { COLORS, SHADE } = run_board_theme_trace_data
 const { clock_fields, clock_flash, lay_clocks } = run_board_theme_trace_clock
-const { decode, notice_lock, type_glow } = run_board_theme_trace_decode
+const { decode, is_glowing, notice_lock, type_glow } = run_board_theme_trace_decode
 const { change_flash, deja_vu } = run_board_theme_trace_flash
 const { dark_dashes, trace_gauge } = run_board_theme_trace_gauge
 const { ending_of, opening_of } = run_board_theme_trace_intro
 const { draw_pour } = run_board_theme_trace_pour
 const { draw_idle } = run_board_theme_trace_rain
-const { draw_seconds, wash_area } = run_board_theme_trace_wash
+const { draw_seconds, is_pouring_at, wash_area } = run_board_theme_trace_wash
 
 const PEAK_INK = '0;40;10'
 
@@ -99,6 +99,8 @@ function theme(api: ThemeApi): ThemeModule {
 		draw: (grid, state, tick) => {
 			draw({ ...board, grid, s: state, tick })
 		},
+		// While an event's rain pours (`run-board-theme-trace-wash.ts`) or the typed line glows.
+		playing: (state) => is_pouring_at(state, state.tick) || is_glowing(state.progress),
 		opening: opening_of(api, fallen),
 		ending: ending_of(api, fallen),
 	}

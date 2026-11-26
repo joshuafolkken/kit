@@ -30,7 +30,7 @@ const { draw_circuits, header_clocks } = run_board_theme_flux_clocks
 const { context_of } = run_board_theme_flux_context
 const { COLORS, NOTES, SPEED_COLOR, text_of } = run_board_theme_flux_data
 const { big_display } = run_board_theme_flux_display
-const { draw_figure, draw_speed } = run_board_theme_flux_figure
+const { draw_figure, draw_speed, is_event } = run_board_theme_flux_figure
 const { idle_touches, under_event_touches } = run_board_theme_flux_idle
 const { draw_jump } = run_board_theme_flux_jump
 const { arrive_line, draw_progress, draw_row } = run_board_theme_flux_lines
@@ -76,6 +76,7 @@ function theme(api: ThemeApi): ThemeModule {
 		draw: (grid, state, tick) => {
 			draw(context, grid, state, tick)
 		},
+		playing: is_event,
 	}
 }
 

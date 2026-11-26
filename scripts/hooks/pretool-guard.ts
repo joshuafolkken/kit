@@ -177,7 +177,7 @@ async function mark_phase(
 	const is_allowed_edit =
 		outcome.reason === undefined && step_zero_notice.is_runtime_edit(raw_payload, context.cwd)
 
-	if (is_allowed_edit) await lane_phase.mark_implement(context.cwd, context.env)
+	if (is_allowed_edit) await lane_phase.mark_implement(context.cwd, context.env, context.ancestry)
 }
 
 // The watcher guard is the one composed rule that cannot answer synchronously — it reads the lane

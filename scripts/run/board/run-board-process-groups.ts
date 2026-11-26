@@ -94,7 +94,19 @@ function root_of(pid: number, mark: UsageMark, roots: ProcessRoots): Membership 
 	return { kind: root === roots.supervisor ? 'supervisor' : 'parent' }
 }
 
+// A process in a lane through the hold alone stays the backlogrun's when it is under one of its roots:
+// a child run outside a lane holds through the parent session (joshuafolkken/kit#8922).
+function held_root(pid: number, sources: GroupSources): Membership | undefined {
+	if (sources.mark.held?.has(pid) !== true) return undefined
+
+	return root_of(pid, sources.mark, sources.roots)
+}
+
 function membership_of(pid: number, sources: GroupSources): Membership {
+	const root = held_root(pid, sources)
+
+	if (root !== undefined) return root
+
 	const lane = sources.mark.lanes.get(pid)
 
 	if (lane === undefined) return root_of(pid, sources.mark, sources.roots) ?? { kind: 'app' }

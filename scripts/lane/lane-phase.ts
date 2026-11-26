@@ -5,7 +5,9 @@ import { run_event_resume } from '#scripts/run/event/run-event-resume'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_hold_live } from '#scripts/run/hold/run-hold-live'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
+import { lane_reap } from './lane-reap'
 
 const LOCK_WAIT_MS = 5000
 
@@ -16,8 +18,9 @@ const LOCK_WAIT_MS = 5000
 // is where a plan settles, so the issue's `plan` event is written here first, unless `run:entry` already
 // wrote it for a planned issue.
 //
-// **A dispatched lane child only.** A person's own session, or one carrying a mark leaked from a parent,
-// is not a lane the board draws a row for, so it writes nothing.
+// **A run only:** a dispatched lane child, or a run in the root checkout that holds the tree — an edit
+// under its hold's session (joshuafolkken/kit#8922). A person's own session, or one carrying a mark
+// leaked from a parent, is not a run the board draws a row for, so it writes nothing.
 const IMPLEMENT_SUFFIX = ' implement'
 
 function implement_text(issue: string): string {
@@ -63,13 +66,28 @@ async function mark_once(issue: string): Promise<void> {
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.LANE_PHASE, implement_text(issue))
 }
 
+// A dispatched lane child's issue, else the issue of the run whose live hold's session the editing
+// process runs under (`run-hold-live.ts`).
+function run_issue_of(
+	directory: string,
+	source: MarkerSource,
+	ancestry: () => ReadonlySet<number>,
+): string | undefined {
+	const issue = lane_child_marker.marked_issue(source)
+
+	if (issue !== undefined && lane_child_marker.is_child_of(directory, source)) return issue
+
+	return run_hold_live.held_by(directory, ancestry)
+}
+
 async function mark_implement(
 	directory: string,
 	source: MarkerSource = process.env,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
 ): Promise<void> {
-	const issue = lane_child_marker.marked_issue(source)
+	const issue = run_issue_of(directory, source, ancestry)
 
-	if (issue === undefined || !lane_child_marker.is_child_of(directory, source)) return
+	if (issue === undefined) return
 	// Serialize the read and both appends across parallel hook processes for this lane.
 	await repository_lock.with_lock(
 		async () => {

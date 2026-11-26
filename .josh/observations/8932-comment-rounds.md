@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/run/hold/run-hold-cli.ts:143 | 2026-11-26 | #8932 | - | state-reasoning
