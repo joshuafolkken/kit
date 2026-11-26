@@ -91,7 +91,10 @@ async function continued(answer: PinnedSummary): Promise<PinnedSummary> {
 async function rest_summary(reason: string | undefined): Promise<PinnedSummary> {
 	await run_review_pinned_remaining.start()
 
-	return (await run_review_pinned_remaining.read()) ?? (await own_summary(reason))
+	const rest = await run_review_pinned_remaining.read()
+
+	// A rest still cut (it stopped early or fell back) is no whole list a reason may accept.
+	return rest === undefined || rest.is_cut === true ? await own_summary(reason) : rest
 }
 
 async function summary(reason: string | undefined): Promise<PinnedSummary> {

@@ -15,6 +15,9 @@ vi.mock('#scripts/run/review/run-review-pinned-join', () => ({
 vi.mock('#scripts/run/review/run-review-pinned-remaining', () => ({
 	run_review_pinned_remaining: { start: start_mock, read: read_mock },
 }))
+vi.mock('#scripts/test/test-pinned', () => ({
+	test_pinned: { held_report: async () => undefined },
+}))
 vi.mock('#scripts/lib/buffered-process', () => ({
 	buffered_process: { run_buffered_process: run_mock },
 }))
@@ -59,6 +62,14 @@ describe('run_ship_pre_detach_pinned.pinned_check under a reason on a cut answer
 
 	it('runs its own check when the rest left no answer', async () => {
 		read_mock.mockResolvedValue(undefined)
+
+		await check()
+
+		expect(run_mock).toHaveBeenCalledOnce()
+	})
+
+	it('runs its own check when the rest answer is still cut', async () => {
+		read_mock.mockResolvedValue(CUT)
 
 		await check()
 

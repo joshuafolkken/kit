@@ -2,6 +2,6 @@
 	"reason": "the rest-join path in summary and its own test file; no whole re-check on a cut answer",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 5
+		"scripts.code_lines": 6
 	}
 }
