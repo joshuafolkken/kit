@@ -1,9 +1,0 @@
-{
-	"reason": "A test file deleted whole is disposed of by one row naming it (#8927): a new pure module removed-test-files.ts and the report-format.md row form, so a change removing hundreds of tests fits the PR body",
-	"date": "2026-11-26",
-	"growth": {
-		"scripts.code_lines": 78,
-		"rules.lines": 7,
-		"ai_cost.on_demand_bytes": 461
-	}
-}

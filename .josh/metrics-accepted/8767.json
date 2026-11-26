@@ -1,7 +1,0 @@
-{
-	"reason": "New lane transition table module and its test (#8767)",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 63
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "#8917 adds the seven theme modules' unit tests (draw, timing, sound) in place of the old per-effect ones, so the unit duration grows with the suite; it held at 2.1s across reruns of the gate",
-	"date": "2026-11-26",
-	"growth": {
-		"scripts.code_lines": 10381,
-		"ai_cost.on_demand_bytes": 18730
-	}
-}

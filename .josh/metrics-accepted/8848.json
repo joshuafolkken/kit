@@ -1,7 +1,0 @@
-{
-	"reason": "Two new modules fix the eslint_d 15.1 record: one fixed daemon launch environment with its record name, and the stop of daemons left under another environment (#8848)",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 116
-	}
-}

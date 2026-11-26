@@ -1,7 +1,0 @@
-{
-	"reason": "Diff-writing the matrix rain needs per-row change detection and run writing (joshuafolkken/kit#8790); the planned ~110 lines",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 112
-	}
-}

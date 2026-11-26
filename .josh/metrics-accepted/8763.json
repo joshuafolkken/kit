@@ -1,8 +1,0 @@
-{
-	"reason": "section pointer helper for issue-template.md refusals (+13 code lines); split-assessment wording pinned by split-assess-document-rule.test.ts lengthens one template placeholder paragraph",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 13,
-		"prose.long_paragraphs": 1
-	}
-}

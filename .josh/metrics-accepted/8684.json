@@ -1,7 +1,0 @@
-{
-	"reason": "Pin the unit test time zone to UTC (+2 lines: the zone constant and its env entry)",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

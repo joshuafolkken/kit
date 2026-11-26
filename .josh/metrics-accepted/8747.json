@@ -1,7 +1,0 @@
-{
-	"reason": "Native loops need a piped-stdin spawn option and a stop after the stdin EOF (#8747)",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

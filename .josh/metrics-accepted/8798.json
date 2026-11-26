@@ -1,9 +1,0 @@
-{
-	"reason": "#8798: the required --rationale-file lengthens a josh epic --promote command line inside an existing skill paragraph",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 21,
-		"ai_cost.on_demand_bytes": 257,
-		"prose.long_paragraphs": 1
-	}
-}

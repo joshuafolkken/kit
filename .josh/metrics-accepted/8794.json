@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting run-board-spin.ts into two modules adds the second module's imports and export, plus direct tests of the moved per-turn helpers",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 36
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "the theme-painted animation area (run-board-panel-draw.ts) and its two painters are new code the issue asks for; lamp/rain bytes moved, not duplicated",
-	"date": "2026-11-22",
-	"growth": {
-		"scripts.code_lines": 108
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "Filing-time origin candidates for bug bodies (#8774): new lookup entry and its issue:file display plus template/doc lines",
-	"date": "2026-11-23",
-	"growth": {
-		"scripts.code_lines": 30,
-		"ai_cost.on_demand_bytes": 186
-	}
-}
