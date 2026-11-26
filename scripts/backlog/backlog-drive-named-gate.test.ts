@@ -1,5 +1,6 @@
 import type { BusyRead } from '#scripts/epic/epic-busy'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_named_gate, type NamedPlain } from './backlog-drive-named-gate'
 import { backlog_drive_named_scope } from './backlog-drive-named-scope'
@@ -22,12 +23,22 @@ const RUNNING_ISSUE: OpenIssueData = {
 }
 const BUSY: BusyRead = { kind: 'busy', issues: [RUNNING_ISSUE] }
 const IDLE: BusyRead = { kind: 'idle' }
+const UNREADABLE: StateRead = { kind: 'unreadable' }
 
 function plain(number: number, labels: ReadonlyArray<string> = []): NamedPlain {
 	return { number, labels }
 }
 
+function child_labels(labels: ReadonlyArray<string>): void {
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels, is_human_review: false },
+	})
+}
+
+// The scope the gate reads, with every gathered epic child read as an open issue with no labels.
 function scope_of(read: BusyRead, declared: Declared = new Map()): void {
+	child_labels([])
 	vi.spyOn(backlog_drive_named_scope, 'read').mockResolvedValue({
 		read,
 		repo: REPO,
@@ -122,6 +133,26 @@ describe('backlog_drive_named_gate.admitted — epic children gathered this tick
 		await backlog_drive_named_gate.admitted([plain(PLAIN)], ['4'], [String(RUNNING)])
 
 		expect(read).toHaveBeenCalledWith([PLAIN], ['4', String(RUNNING)])
+	})
+})
+
+describe('backlog_drive_named_gate.admitted — the labels of the gathered epic children', () => {
+	it('withholds a plain issue beside a run:solo gathered epic child, with no lane busy', async () => {
+		scope_of(IDLE)
+		child_labels(['run:solo'])
+
+		expect(
+			await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [String(RUNNING)]),
+		).toStrictEqual([])
+	})
+
+	it('admits none when a gathered epic child is unreadable', async () => {
+		scope_of(IDLE)
+		vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue(UNREADABLE)
+
+		expect(
+			await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [String(RUNNING)]),
+		).toStrictEqual([])
 	})
 })
 
