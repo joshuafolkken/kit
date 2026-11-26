@@ -42,7 +42,7 @@ function segment_line(splits: ReadonlyArray<Split>, name: string): string {
 // The report: a head line naming the sample, then a line per segment; the median is over the runs
 // that spent time on the segment, the count says how many did.
 function text(splits: ReadonlyArray<Split>, days: number, merged: number): string {
-	const head = `Implement split, lanes merged in the last ${String(days)} days: ${String(splits.length)} of ${String(merged)} split (the rest have no ledger rows to split by)`
+	const head = `Implement split, lanes merged in the last ${String(days)} days: ${String(splits.length)} of ${String(merged)} split (the rest have no dispatch or split rows in the ledger)`
 	if (splits.length === 0) return head
 
 	return [head, ...lane_implement_split.PRINTED.map((name) => segment_line(splits, name))].join(

@@ -188,7 +188,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:tick` | `<issue> <ac-id>...` | automation | network | Tick selected acceptance checkboxes by their plan identifiers |
 | `josh lane:adopt` · `josh lad` | `<issue> \| --all` | developer | files, git, processes, network | Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched |
 | `josh lane:await` | `<issue> [<issue>...] [--owner <pid>]` | automation | files, processes | Block until any of the named in-flight lane children completes; prints which one finished |
-| `josh lane:breakdown` · `josh lbd` | `<issue> [--timeline]` | maintainer | none | Print a merged lane's net time by stage, longest first, the implementation split by its tool calls |
+| `josh lane:breakdown` · `josh lbd` | `<issue> [--timeline] \| --period <days>` | maintainer | none | Print a merged lane's net time by stage, longest first, the implementation split by its tool calls |
 | `josh lane:close` | `<issue>` | automation | files, git | Close a lane, leaving no work tree, branch or directory behind |
 | `josh lane:dispatch` | `<issue> <prompt>` | automation | processes | Start a lane’s child as a detached process that outlives this session |
 | `josh lane:fold` · `josh lfd` | `<issue> --into <issue> --reason <text>` | developer | files, git, processes, network | Hand a component issue over to the issue that wires it: withdraw its lane with the work stashed, tell the taker how to bring the stash in and to close it, and remove the taker’s blocked-by on it — a re-run finishes only the steps left |

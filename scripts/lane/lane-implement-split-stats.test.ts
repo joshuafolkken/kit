@@ -50,7 +50,7 @@ describe('lane_implement_split_stats.text', () => {
 			.split('\n')
 
 		expect(lines[0]).toBe(
-			'Implement split, lanes merged in the last 14 days: 3 of 5 split (the rest have no ledger rows to split by)',
+			'Implement split, lanes merged in the last 14 days: 3 of 5 split (the rest have no dispatch or split rows in the ledger)',
 		)
 		expect(lines).toContain('- editing (tests included): median 20.0 min, in 3 of 3 runs')
 		expect(lines).toContain('- gate wait: median 5.0 min, in 2 of 3 runs')
@@ -59,7 +59,7 @@ describe('lane_implement_split_stats.text', () => {
 
 	it('prints only the head line when no lane splits', () => {
 		expect(lane_implement_split_stats.text([], DAYS, 2)).toBe(
-			'Implement split, lanes merged in the last 14 days: 0 of 2 split (the rest have no ledger rows to split by)',
+			'Implement split, lanes merged in the last 14 days: 0 of 2 split (the rest have no dispatch or split rows in the ledger)',
 		)
 	})
 })

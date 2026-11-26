@@ -612,7 +612,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print a merged lane's net time by stage, longest first, the implementation split by its tool calls",
 		category: 'AI tools',
-		reference: ['<issue> [--timeline]', 'maintainer', ['none']],
+		reference: ['<issue> [--timeline] | --period <days>', 'maintainer', ['none']],
 		usage: {
 			flags: [
 				{
