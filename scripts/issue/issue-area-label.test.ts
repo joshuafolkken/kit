@@ -41,4 +41,10 @@ describe('issue_area_label.with_label', () => {
 			ENHANCEMENT_LABEL,
 		])
 	})
+
+	it('keeps an area named in another case, as `run:board` reads it', () => {
+		const named = [ENHANCEMENT_LABEL, 'Area:board']
+
+		expect(issue_area_label.with_label(named, THEME_BODY)).toBe(named)
+	})
 })

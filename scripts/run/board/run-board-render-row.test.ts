@@ -4,6 +4,7 @@ import { run_board_faint } from './run-board-faint'
 import { run_board_fit } from './run-board-fit'
 import type { BoardHeader } from './run-board-header'
 import { run_board_label_pair } from './run-board-label-pair'
+import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import { run_board_render } from './run-board-render'
 import { run_board_render_condition } from './run-board-render-condition'
@@ -116,6 +117,14 @@ describe('run_board_render_row.row_line -- area tag', () => {
 			run_board_render_row.title_width(plain, frame),
 		)
 		expect(drawn(area, board)).toContain('theme An area row')
+	})
+
+	it('cuts the title to its mark where the area and ✚ fill a narrowed title column', () => {
+		const lead = `board ${run_board_labels.FILED_RUN_MARK} `
+		const frame = { ...frame_of(board), title_limit: lead.length, filed: new Set([DONE.number]) }
+		const row = { ...tagged, title: long }
+
+		expect(run_board_render_row.title_width(row, frame)).toBe(lead.length + 1)
 	})
 })
 

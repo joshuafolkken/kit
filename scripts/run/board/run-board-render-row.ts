@@ -89,8 +89,10 @@ function title_lead(row: BoardRow, frame: RowFrame): string {
 // unled row has it.
 function title_text(row: BoardRow, frame: RowFrame): string {
 	const lead = title_lead(row, frame)
+	// `title_of` cuts nothing at a limit of 0 or below, so a lead that fills the column keeps the mark.
+	const limit = Math.max(1, frame.title_limit - lead.length)
 
-	return `${lead}${title_of(row_title(row, frame.header), frame.title_limit - lead.length)}`
+	return `${lead}${title_of(row_title(row, frame.header), limit)}`
 }
 
 // The title with its area tag drawn faint, as the rest of the row is not.

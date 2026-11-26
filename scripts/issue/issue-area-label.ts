@@ -22,7 +22,7 @@ function area_label_of(body: string): string | undefined {
 
 // The labels with the body's area added, unless a label already names an area.
 function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<string> {
-	if (labels.some((label) => label.startsWith(AREA_LABEL_PREFIX))) return labels
+	if (labels.some((label) => label.toLowerCase().startsWith(AREA_LABEL_PREFIX))) return labels
 
 	const area = area_label_of(body)
 
