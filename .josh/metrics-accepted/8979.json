@@ -1,0 +1,7 @@
+{
+	"reason": "refusal of unusable file arguments in lint:related (refusal_of + report_refused) with its tests; the growth is the fix itself",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 23
+	}
+}
