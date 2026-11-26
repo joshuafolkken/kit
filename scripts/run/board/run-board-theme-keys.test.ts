@@ -3,6 +3,7 @@ import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import type { KeyInput, KeyReading, KeyTaker } from './run-board-keys'
+import { run_board_repaint } from './run-board-repaint'
 import { run_board_theme_keys, type KeyHolder, type ThemeKeyPorts } from './run-board-theme-keys'
 import { run_board_theme_layer } from './run-board-theme-layer'
 import { run_board_theme_layer_fixture } from './run-board-theme-layer-fixture'
@@ -212,6 +213,35 @@ describe('run_board_theme_keys.claim_of', () => {
 		expect(run.part?.name).toBe('opening')
 		keys.press('ts')
 		expect(run.value).toBe('flux')
+	})
+})
+
+// joshuafolkken/kit#8969: the footer names what a key picked on the frame it starts on.
+describe('run_board_theme_keys.claim_of redrawing demo mode', () => {
+	it('asks a redraw at once for every demo key, a work or what plays alike', () => {
+		const { run, keys, claim } = demo([])
+
+		claim('/')
+		const stale = ['3', 's', 'a', 'd', 'w', 'q', 'e'].map((key) => {
+			const is_current = run_board_repaint.current_of(run.repaint)
+
+			keys.press(key)
+
+			return is_current?.()
+		})
+
+		expect(stale).toStrictEqual(Array.from({ length: stale.length }, () => false))
+	})
+
+	it('plays a PROGRESS once and a part through once', () => {
+		const { run, keys, claim } = demo([])
+
+		claim('/')
+		keys.press('a')
+		expect(run.demo?.timeline.progress).toHaveLength(1)
+		keys.press('e')
+
+		expect(run.part).toEqual({ name: 'ending', start_ms: NOW_MS, is_once: true })
 	})
 })
 

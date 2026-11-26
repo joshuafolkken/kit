@@ -1,7 +1,7 @@
 import { run_board_theme_host_flash } from './run-board-theme-host-flash'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
-import type { ThemeApi, ThemeModule } from './run-board-theme-host-types'
+import type { ThemeApi, ThemeModule, ThemeState } from './run-board-theme-host-types'
 import { run_board_theme_skynet_acquire } from './run-board-theme-skynet-acquire'
 import { run_board_theme_skynet_data, type SkynetDraw } from './run-board-theme-skynet-data'
 import { run_board_theme_skynet_hud } from './run-board-theme-skynet-hud'
@@ -21,7 +21,8 @@ const { put_level } = run_board_theme_host_grid
 const { LINGER, NOTICE_END, TRACE_ON, active } = run_board_theme_host_state
 const { acquisition } = run_board_theme_skynet_acquire
 const { INKS, WHITE_RGB, theme_colors, theme_notes } = run_board_theme_skynet_data
-const { idle_reticle, panel_hud, panel_listing, reticle_lane, target } = run_board_theme_skynet_hud
+const { idle_reticle, is_engaged, panel_hud, panel_listing, reticle_lane, target } =
+	run_board_theme_skynet_hud
 const { threat_header, threat_screen } = run_board_theme_skynet_threat
 const { crosshair, vignette } = run_board_theme_skynet_vision
 
@@ -39,16 +40,30 @@ function panel_area(draw: SkynetDraw, lane: string): void {
 	panel_hud(draw, lane)
 }
 
+// The threat screen is up through a notice, the acquisition while a lane types and a moment after.
+function is_threat(state: ThemeState): boolean {
+	return active(state.notice, NOTICE_END)
+}
+
+function is_acquiring(state: ThemeState): boolean {
+	return active(state.row, ROW_TAIL + LINGER)
+}
+
+// Whether an event plays: either screen up, or the panel's HUD engaged.
+function is_playing(state: ThemeState): boolean {
+	return is_threat(state) || is_acquiring(state) || is_engaged(state)
+}
+
 function terminator_area(draw: SkynetDraw, lane: string): void {
 	const { s } = draw
 
-	if (active(s.notice, NOTICE_END)) {
+	if (is_threat(s)) {
 		threat_screen(draw)
 
 		return
 	}
 
-	if (active(s.row, ROW_TAIL + LINGER)) {
+	if (is_acquiring(s)) {
 		acquisition(draw)
 
 		return
@@ -87,6 +102,7 @@ function theme(api: ThemeApi): ThemeModule {
 		draw: (grid, state, tick) => {
 			terminator({ api, grid, s: state, tick })
 		},
+		playing: is_playing,
 	}
 }
 

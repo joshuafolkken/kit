@@ -166,11 +166,13 @@ function idle_hud(draw: SkynetDraw, lane: string): void {
 	put(grid, { y, x: px + HUD.value_x }, ' --.-%', INKS.SOFT)
 }
 
+function is_engaged(state: ThemeState): boolean {
+	return state.busy || (state.done > 0 && state.since < HUD.linger + LINGER)
+}
+
 // The panel's HUD: engaged while anything types and a moment after; idle, it wakes to rescan.
 function panel_hud(draw: SkynetDraw, lane: string): void {
-	const { s } = draw
-
-	if (s.busy || (s.done > 0 && s.since < HUD.linger + LINGER)) {
+	if (is_engaged(draw.s)) {
 		engaged_hud(draw)
 
 		return
@@ -247,6 +249,7 @@ const run_board_theme_skynet_hud = {
 	blink_ink,
 	data_reading,
 	idle_reticle,
+	is_engaged,
 	match_gauge,
 	match_of,
 	mode_of,

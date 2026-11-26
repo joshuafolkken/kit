@@ -1,11 +1,13 @@
 import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
+import { run_board_demo_footer } from './run-board-demo-footer'
 import { run_board_display } from './run-board-display'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_labels } from './run-board-labels'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { CueName } from './run-board-sound-cues'
 import type { BoardState } from './run-board-state'
+import { run_board_theme_run } from './run-board-theme-run'
 import { run_board_tick } from './run-board-tick'
 import { run_board_tick_draw } from './run-board-tick-draw'
 
@@ -283,5 +285,19 @@ describe('run_board_tick_draw.bounds_of', () => {
 		const bare = { ...ports, size: undefined, footer: undefined, folded: undefined }
 
 		expect(bounds_of(bare)).toStrictEqual({ size: undefined, footer: undefined, folded: undefined })
+	})
+
+	it('pins demo mode’s footer, cut to the pane’s width, while the theme run is in demo mode', () => {
+		const { ports } = harness(LOCAL, [])
+		const theme_run = run_board_theme_run.run_of('', () => undefined)
+		const demo = { ...ports, size: () => SIZE, footer: FOOTER, theme_run }
+
+		expect(bounds_of(demo)).toStrictEqual({ size: SIZE, footer: FOOTER, folded: undefined })
+		run_board_theme_run.enter_demo(theme_run)
+
+		expect(bounds_of(demo).pinned_footer).toStrictEqual(
+			run_board_demo_footer.rows_of(theme_run, SIZE.columns),
+		)
+		expect(bounds_of(demo).pinned_footer?.[1]).toBe('  [0] none - [s] IDLE')
 	})
 })

@@ -9,6 +9,7 @@ import {
 	type TerminalSize,
 } from './run-board-fit'
 import { run_board_lamps, type PanelSpan } from './run-board-lamps'
+import { run_board_pinned_footer } from './run-board-pinned-footer'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_spot } from './run-board-spot'
 
@@ -37,10 +38,13 @@ const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: a
 
 // The live terminal a frame is kept within, the footer the frame ends on and gives way first, and the
 // sections a person folded; none for a frame that is not redrawn in place, which is drawn as it was.
+// `pinned_footer` is drawn in place of the legend and the footer and never gives way
+// (`run-board-pinned-footer.ts`).
 interface FrameBounds {
 	size?: TerminalSize | undefined
 	footer?: ReadonlyArray<string> | undefined
 	folded?: ReadonlySet<SectionKey> | undefined
+	pinned_footer?: ReadonlyArray<string> | undefined
 }
 
 interface Headed {
@@ -277,11 +281,10 @@ function lamped_parts(parts: FrameParts): FrameParts {
 
 // A live frame is kept within its terminal, folded as a person folded it; any other is drawn whole.
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
-	const { size, folded } = bounds
+	const { folded } = bounds
 	const ruled = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
-	const shown = lamped_parts(ruled)
 
-	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
+	return run_board_pinned_footer.fitted(lamped_parts(ruled), bounds)
 }
 
 const run_board_fold = { KEYS_LINE, SECTIONS, SOUND_KEY, bounded, fold_parts, toggled }
