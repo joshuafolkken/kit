@@ -161,6 +161,21 @@ test.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL, NEEDS_HUMAN_MERGE_LABEL])(
 	},
 )
 
+// joshuafolkken/kit#8953: the named issues offered side by side stop at the room `--max` leaves.
+test('offers no more named issues at once than the maximum leaves room for', async () => {
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: [], is_human_review: false },
+	})
+	const carry = { ...CARRY, invocation: 'backlogrun #1 #2 #3 --max 3', merged: 1 }
+	const state = backlog_drive.initial_state([], ACTIVE)
+	const context = { ...CONTEXT, forwarded: ['--max', '3'] }
+
+	const { offer } = await backlog_drive_named_offer.read(carry, state, context)
+
+	expect(offer).toMatchObject({ verdict: 'run', issues: ['1', '2'] })
+})
+
 test('offers the next named issue after the epic root is recorded done', async () => {
 	const state = backlog_drive.initial_state([], ACTIVE)
 	const read = vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
@@ -187,7 +202,9 @@ function named_ports(harness: Harness): LoopPorts {
 	return {
 		...harness.ports,
 		offer: async (state) => {
-			const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+			// Room for both named issues: `--max` caps how many start side by side.
+			const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+			const { offer } = await backlog_drive_named_offer.read(CARRY, state, context)
 
 			return offer
 		},

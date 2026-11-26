@@ -198,6 +198,21 @@ async function past_passed(
 	return await not_run(carry, state, named, context)
 }
 
+// The gathered issues the run's maximum still has room for: offered side by side, the named issues
+// would otherwise start past `--max` (joshuafolkken/kit#8953). The budget already answered `run`, so
+// the room is at least one.
+function capped(
+	offer: OfferRead,
+	carry: RunCarry,
+	state: DriveState,
+	forwarded: ReadonlyArray<string>,
+): OfferRead {
+	const max = max_of(forwarded)
+	if (max === undefined || offer.verdict !== 'run') return offer
+
+	return { ...offer, issues: offer.issues.slice(0, max - carry.merged - state.in_flight.length) }
+}
+
 async function offer_of(
 	carry: RunCarry,
 	state: DriveState,
@@ -213,7 +228,11 @@ async function offer_of(
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
 	const gathered = await backlog_drive_named_launch.gather(named.issues, state, context.owner)
-	if (gathered.offer !== undefined) return gathered
+
+	if (gathered.offer !== undefined) {
+		return { ...gathered, offer: capped(gathered.offer, carry, state, context.forwarded) }
+	}
+
 	const passed = { ...waiting, in_flight: [...waiting.in_flight, ...gathered.passed] }
 
 	return { offer: await past_passed(carry, state, passed, context), passed: gathered.passed }

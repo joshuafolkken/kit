@@ -40,7 +40,7 @@ named issue must wait for another, record `blocked-by`** — the typed order doe
 **A named issue that cannot finish parks and skips nothing**: the others run as they would have. One
 already closed or parked when offered is booked done. A `needs-human-review` named
 issue stops the whole run. **`--only` runs the named list and stops there, draining no pool** — a
-failure ends the run. A bare `--only` (no named issues) → `backlog-drive-named-offer.ts` → `only_idle`.
+failed named issue skips nothing; the run stops once every named issue is done. A bare `--only` (no named issues) → `backlog-drive-named-offer.ts` → `only_idle`.
 
 ## The session cut is inside the invocation
 

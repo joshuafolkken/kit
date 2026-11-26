@@ -1,0 +1,8 @@
+{
+	"reason": "#8953 review fixes: the named gate sees epic children gathered in the same tick, --max caps the parallel named offer, and the docs mark named:<N> as old-log only",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 5,
+		"prose.long_paragraphs": 1
+	}
+}

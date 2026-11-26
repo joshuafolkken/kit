@@ -85,7 +85,34 @@ describe('backlog_drive_named_launch.gather — the issues run together', () => 
 				{ number: 2, labels: [] },
 			],
 			[],
+			[],
 		)
+	})
+})
+
+describe('backlog_drive_named_launch.gather — an epic named with its child', () => {
+	beforeEach(() => {
+		states({ [EPIC]: issue_state('OPEN', ['epic']) })
+		vi.spyOn(backlog_drive_epic, 'offer').mockResolvedValue({
+			...WAIT,
+			verdict: 'run',
+			issues: ['5'],
+		})
+	})
+
+	it('launches an issue named after its own epic once', async () => {
+		expect(await gather([EPIC, '5'])).toStrictEqual({
+			offer: { verdict: 'run', issues: ['5'], retries: 0 },
+			passed: [],
+		})
+	})
+
+	it('hands the gate the epic children gathered this tick', async () => {
+		const admitted = vi.spyOn(backlog_drive_named_gate, 'admitted')
+
+		await gather([EPIC, '2'])
+
+		expect(admitted).toHaveBeenCalledWith([{ number: 2, labels: [] }], [], ['5'])
 	})
 })
 

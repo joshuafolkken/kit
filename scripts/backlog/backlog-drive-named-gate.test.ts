@@ -44,9 +44,9 @@ describe('backlog_drive_named_gate.admitted', () => {
 	it('admits every plain issue in the typed order when nothing holds them', async () => {
 		scope_of(IDLE)
 
-		expect(await backlog_drive_named_gate.admitted([plain(PLAIN), plain(OTHER)], [])).toStrictEqual(
-			[PLAIN, OTHER],
-		)
+		expect(
+			await backlog_drive_named_gate.admitted([plain(PLAIN), plain(OTHER)], [], []),
+		).toStrictEqual([PLAIN, OTHER])
 	})
 
 	it('withholds a run:solo issue while a lane is busy', async () => {
@@ -55,6 +55,7 @@ describe('backlog_drive_named_gate.admitted', () => {
 		const admitted = await backlog_drive_named_gate.admitted(
 			[plain(PLAIN, ['run:solo']), plain(OTHER)],
 			[String(RUNNING)],
+			[],
 		)
 
 		expect(admitted).not.toContain(PLAIN)
@@ -74,9 +75,53 @@ describe('backlog_drive_named_gate.admitted', () => {
 		const admitted = await backlog_drive_named_gate.admitted(
 			[plain(PLAIN), plain(OTHER)],
 			[String(RUNNING)],
+			[],
 		)
 
 		expect(admitted).toStrictEqual([OTHER])
+	})
+})
+
+describe('backlog_drive_named_gate.admitted — epic children gathered this tick', () => {
+	it('withholds a run:solo issue beside a gathered epic child, with no lane busy', async () => {
+		scope_of(IDLE)
+
+		const admitted = await backlog_drive_named_gate.admitted(
+			[plain(PLAIN, ['run:solo'])],
+			[],
+			[String(RUNNING)],
+		)
+
+		expect(admitted).toStrictEqual([])
+	})
+
+	it('withholds an issue declaring a path a gathered epic child declares', async () => {
+		const shared = new Set([SHARED_PATH])
+
+		scope_of(
+			IDLE,
+			new Map([
+				[RUNNING, shared],
+				[PLAIN, shared],
+			]),
+		)
+
+		const admitted = await backlog_drive_named_gate.admitted(
+			[plain(PLAIN), plain(OTHER)],
+			[],
+			[String(RUNNING)],
+		)
+
+		expect(admitted).toStrictEqual([OTHER])
+	})
+
+	it('reads the gathered children with the lanes in flight', async () => {
+		scope_of(IDLE)
+		const read = vi.spyOn(backlog_drive_named_scope, 'read')
+
+		await backlog_drive_named_gate.admitted([plain(PLAIN)], ['4'], [String(RUNNING)])
+
+		expect(read).toHaveBeenCalledWith([PLAIN], ['4', String(RUNNING)])
 	})
 })
 
@@ -84,13 +129,13 @@ describe('backlog_drive_named_gate.admitted — nothing to gate', () => {
 	it('admits none when the repository is unreadable', async () => {
 		vi.spyOn(backlog_drive_named_scope, 'read').mockResolvedValue(undefined)
 
-		expect(await backlog_drive_named_gate.admitted([plain(PLAIN)], [])).toStrictEqual([])
+		expect(await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [])).toStrictEqual([])
 	})
 
 	it('reads nothing for no plain issue', async () => {
 		const read = vi.spyOn(backlog_drive_named_scope, 'read')
 
-		expect(await backlog_drive_named_gate.admitted([], [])).toStrictEqual([])
+		expect(await backlog_drive_named_gate.admitted([], [], [])).toStrictEqual([])
 		expect(read).not.toHaveBeenCalled()
 	})
 })

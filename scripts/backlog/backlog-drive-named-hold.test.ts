@@ -55,7 +55,9 @@ function named_ports(harness: Harness): LoopPorts {
 	return {
 		...harness.ports,
 		offer: async (state) => {
-			const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+			// Room for both named issues: `--max` caps how many start side by side.
+			const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+			const { offer } = await backlog_drive_named_offer.read(CARRY, state, context)
 
 			return offer
 		},

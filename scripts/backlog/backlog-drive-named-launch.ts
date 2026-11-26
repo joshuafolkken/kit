@@ -100,6 +100,19 @@ function record(walked: Walk, issue: string, launched: Launched): boolean {
 	return true
 }
 
+// An issue an epic named before it already offered as its child is not launched again.
+async function step(
+	walked: Walk,
+	issue: string,
+	state: DriveState,
+	owner: string,
+): Promise<boolean> {
+	if (walked.runs.includes(issue)) return true
+	const seen = { ...state, in_flight: [...state.in_flight, ...walked.runs] }
+
+	return record(walked, issue, await launch(issue, seen, owner))
+}
+
 async function walk(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
@@ -108,18 +121,26 @@ async function walk(
 	const walked: Walk = { runs: [], plain: [], passed: [], stop: undefined }
 
 	for (const issue of issues) {
-		const seen = { ...state, in_flight: [...state.in_flight, ...walked.runs] }
 		// eslint-disable-next-line no-await-in-loop -- an epic's child offer reads the runs gathered before it
-		const launched = await launch(issue, seen, owner)
-
-		if (!record(walked, issue, launched)) break
+		if (!(await step(walked, issue, state, owner))) break
 	}
 
 	return walked
 }
 
+// The epic children gathered this tick: every run that is not a plain named issue.
+function children_of(walked: Walk): Array<string> {
+	const plain = new Set(walked.plain.map((issue) => String(issue.number)))
+
+	return walked.runs.filter((issue) => !plain.has(issue))
+}
+
 async function withheld_of(walked: Walk, in_flight: ReadonlyArray<string>): Promise<Array<string>> {
-	const admitted = await backlog_drive_named_gate.admitted(walked.plain, in_flight)
+	const admitted = await backlog_drive_named_gate.admitted(
+		walked.plain,
+		in_flight,
+		children_of(walked),
+	)
 	const withheld = walked.plain.filter((issue) => !admitted.includes(issue.number))
 
 	return withheld.map((issue) => String(issue.number))
