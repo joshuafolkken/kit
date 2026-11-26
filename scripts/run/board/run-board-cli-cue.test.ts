@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
+import type { BoardStore } from './run-board-fold-store'
 import { run_board_gather, type GatherRead } from './run-board-gather'
 import {
 	run_board_gather_thread,
@@ -91,7 +92,7 @@ describe('run_board_cli.run cue', () => {
 
 // joshuafolkken/kit#7953: a keyboard whose store keeps the sound off silences the live board's cues,
 // and `s` typed at once switches it on, playing launch then and every cue after.
-function silenced(cues: Array<CueName>, typed: string): BoardPorts {
+function keyed(cues: Array<CueName>, typed: string, store: BoardStore): BoardPorts {
 	const ports = launching(cues)
 
 	return {
@@ -104,14 +105,25 @@ function silenced(cues: Array<CueName>, typed: string): BoardPorts {
 			},
 			close: () => undefined,
 			interrupt: () => undefined,
-			store: {
-				load: () => new Set(),
-				save: () => undefined,
-				load_sound: () => false,
-				save_sound: () => undefined,
-			},
+			store,
 		},
 	}
+}
+
+// A store whose saved switch is `is_on`, each sound save recorded.
+function saved(is_on: boolean, saves: Array<boolean> = []): BoardStore {
+	return {
+		load: () => new Set(),
+		save: () => undefined,
+		load_sound: () => is_on,
+		save_sound: (saved_on) => {
+			saves.push(saved_on)
+		},
+	}
+}
+
+function silenced(cues: Array<CueName>, typed: string): BoardPorts {
+	return keyed(cues, typed, saved(false))
 }
 
 describe('run_board_cli.run sound switch', () => {
@@ -127,6 +139,53 @@ describe('run_board_cli.run sound switch', () => {
 
 		await expect(run_board_cli.run([], silenced(cues, 's'))).rejects.toBe(STOPPED)
 		expect(cues).toStrictEqual(['launch', 'launch'])
+	})
+})
+
+// joshuafolkken/kit#8915: `--sound` sets one launch's sound over the saved switch and never writes it;
+// `off` starts no player even once `s` flips the switch.
+describe('run_board_cli.run --sound', () => {
+	it.each(['', 's'])('starts no player under --sound off, typed %j', async (typed) => {
+		const cues: Array<CueName> = []
+		const saves: Array<boolean> = []
+		const started = vi.spyOn(run_board_sound_player, 'start').mockReturnValue(undefined)
+		const run = run_board_cli.run(['--sound', 'off'], keyed(cues, typed, saved(true, saves)))
+
+		await expect(run).rejects.toBe(STOPPED)
+		expect([cues, saves, started.mock.calls]).toStrictEqual([[], [], []])
+		vi.restoreAllMocks()
+	})
+
+	it.each(['', 's'])('sounds under --sound on over a saved off, typed %j', async (typed) => {
+		const cues: Array<CueName> = []
+		const saves: Array<boolean> = []
+		const run = run_board_cli.run(['--sound', 'on'], keyed(cues, typed, saved(false, saves)))
+
+		await expect(run).rejects.toBe(STOPPED)
+		expect(cues).toStrictEqual(typed === '' ? ['launch'] : [])
+		expect(saves).toStrictEqual([])
+	})
+
+	it('follows and saves the saved switch with no flag', async () => {
+		const cues: Array<CueName> = []
+		const saves: Array<boolean> = []
+
+		const ports = keyed(cues, 's', saved(true, saves))
+
+		await expect(run_board_cli.run([], ports)).rejects.toBe(STOPPED)
+		expect([cues, saves]).toStrictEqual([[], [false]])
+	})
+
+	it.each([[['--sound', 'loud']], [['--sound']]])('refuses %j with the usage', async (argv) => {
+		const written = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		await expect(run_board_cli.run(argv, launching([]))).resolves.toBe(1)
+		expect(written).toHaveBeenCalledWith(`${run_board_cli.USAGE}\n`)
+		vi.restoreAllMocks()
+	})
+
+	it('names the flag in the usage', () => {
+		expect(run_board_cli.USAGE).toContain('[--sound on|off]')
 	})
 })
 

@@ -1,0 +1,7 @@
+{
+	"reason": "the new run:board sound flag: option split and held sound store for one launch (#8915)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 44
+	}
+}

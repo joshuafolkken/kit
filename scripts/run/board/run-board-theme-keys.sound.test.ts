@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { KeyReading, KeyTaker } from './run-board-keys'
+import { run_board_live_sound } from './run-board-live-sound'
 import { run_board_sound_player } from './run-board-sound-player'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_theme_keys, type KeyHolder, type ThemeKeyPorts } from './run-board-theme-keys'
@@ -33,6 +34,8 @@ const player: Player = {
 }
 
 vi.spyOn(score, 'appear').mockReturnValue(APPEAR_WAV)
+// The board's trill heard, as a live board with its sound wired has one (joshuafolkken/kit#8915).
+run_board_live_sound.heard({ hush: () => undefined })
 
 function keys_of(): Keys {
 	const held: { taker: KeyTaker | undefined } = { taker: undefined }

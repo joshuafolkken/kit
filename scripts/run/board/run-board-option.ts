@@ -4,7 +4,8 @@
 
 interface OptionSpec<Name extends string> {
 	flag: string
-	env: string
+	// joshuafolkken/kit#8915: none where the flag alone sets it (`--sound`), so no variable is read.
+	env?: string | undefined
 	noun: string
 	names: ReadonlyArray<Name>
 	// joshuafolkken/kit#8917: the name another one given stands for — an alias read as the name it names
@@ -37,9 +38,9 @@ function from_flag(argv: ReadonlyArray<string>, flag: string): Named | undefined
 function from_environment(
 	argv: ReadonlyArray<string>,
 	environment: NodeJS.ProcessEnv,
-	variable: string,
+	variable: string | undefined,
 ): Named {
-	const name = environment[variable]
+	const name = variable === undefined ? undefined : environment[variable]
 
 	return { name: name === '' ? undefined : name, argv: [...argv] }
 }
@@ -71,7 +72,7 @@ function refusal<Name extends string>(
 	environment: NodeJS.ProcessEnv,
 	spec: OptionSpec<Name>,
 ): string {
-	if (argv.includes(spec.flag)) return ''
+	if (argv.includes(spec.flag) || spec.env === undefined) return ''
 	const given = environment[spec.env] ?? ''
 
 	return `${spec.env}=${given} names no ${spec.noun} (${spec.names.join(', ')})\n`

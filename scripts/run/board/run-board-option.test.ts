@@ -61,3 +61,22 @@ describe('run_board_option.refusal', () => {
 		expect(run_board_option.refusal(['--size', 'huge'], { BOARD_SIZE: 'huge' }, SPEC)).toBe('')
 	})
 })
+
+// joshuafolkken/kit#8915: a spec with no variable is set by its flag alone.
+describe('run_board_option.choose with no variable', () => {
+	const FLAG_ONLY: OptionSpec<'small' | 'large'> = { ...SPEC, env: undefined }
+
+	it('reads no environment, so only the flag names it', () => {
+		const environment = { BOARD_SIZE: 'large' }
+
+		expect(run_board_option.choose([], environment, FLAG_ONLY)).toStrictEqual({
+			name: undefined,
+			argv: [],
+		})
+		expect(run_board_option.choose(['--size', 'small'], environment, FLAG_ONLY)).toStrictEqual({
+			name: 'small',
+			argv: [],
+		})
+		expect(run_board_option.refusal([], environment, FLAG_ONLY)).toBe('')
+	})
+})
