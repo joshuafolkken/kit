@@ -34,7 +34,9 @@ async function mark(issue: string): Promise<boolean> {
 }
 
 // The removal is `followup`'s own — read first, removed only when present, under the stored
-// casing — so an issue that never carried the label is never written to.
+// casing — so an issue that never carried the label is never written to. A failed removal queues the
+// same detached retry a failed `mark` does (joshuafolkken/kit#9042), so a release whose write was
+// refused still ends with the label off; `false` still reports the refusal to the caller.
 async function unmark(issue: string): Promise<boolean> {
 	try {
 		await git_followup_label.strip_in_progress(issue)
@@ -42,6 +44,7 @@ async function unmark(issue: string): Promise<boolean> {
 		return true
 	} catch {
 		warn('remove', issue, UNMARK_RECOVERY)
+		run_maintenance.unmark_retry(issue)
 
 		return false
 	}
