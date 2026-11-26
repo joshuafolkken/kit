@@ -300,10 +300,22 @@ function is_close_exempt(context: StopContext): boolean {
 	return is_unattended(context) || needs_decision(context)
 }
 
+// A background task still running, or its notice undelivered, makes a nothing-left close false
+// (joshuafolkken/kit#9004).
+function is_work_pending(context: StopContext): boolean {
+	return (
+		context.background_pending ||
+		context.agent_pending ||
+		context.command_pending ||
+		context.notice_queued
+	)
+}
+
 function close_reason(context: StopContext): string | undefined {
 	if (is_close_exempt(context)) return undefined
+	const { message, prompt, session_lang } = context
 
-	return reply_close.reason_of(context.message, context.prompt, context.session_lang)
+	return reply_close.reason_of(message, prompt, session_lang, is_work_pending(context))
 }
 
 // The rules that read the reply's prose: its language, then its length, then its close. The
@@ -315,7 +327,7 @@ function prose_reason(context: StopContext): string | undefined {
 
 	return is_close_exempt(context)
 		? reason
-		: `${reason}${reply_close.note_of(message, prompt, session_lang)}`
+		: `${reason}${reply_close.note_of(message, prompt, session_lang, is_work_pending(context))}`
 }
 
 function needs_release(context: StopContext): boolean {

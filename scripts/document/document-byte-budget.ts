@@ -147,7 +147,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/overview.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/plan-comment.md', bytes: 4096 },
 	// #7854: concise-reply's hand-back and recommendation lines, durable-rules' guard line.
-	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 16_384 },
+	// #9004: concise-reply's close line names when the nothing-left close may be written.
+	{ path: 'prompts/collaboration-workflow/principles.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/proposal-request.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/report-format.md', bytes: 12_288 },
 	{ path: 'prompts/collaboration-workflow/residency.md', bytes: 8192 },
