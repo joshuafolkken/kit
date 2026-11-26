@@ -116,6 +116,13 @@ describe('run_parent_cut_hook.parent_cut_reason — who is refused', () => {
 		expect(await reason_once(record, 'over')).toBeUndefined()
 	})
 
+	it('reads its switch from JOSH_PARENT_CUT_GUARD', async () => {
+		vi.stubEnv('JOSH_PARENT_CUT_GUARD', 'off')
+
+		expect(run_parent_cut_hook.SWITCH_ENV_KEY).toBe('JOSH_PARENT_CUT_GUARD')
+		expect(await reason_once(carry(), 'over')).toBeUndefined()
+	})
+
 	it('lets a payload with no transcript through', async () => {
 		const reason = await run_parent_cut_hook.parent_cut_reason('{}', state(carry(), 'over'))
 
