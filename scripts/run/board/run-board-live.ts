@@ -76,8 +76,8 @@ interface Framings {
 	plain: Framing
 }
 
-// Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
-// ends on the line that says closing the screen leaves the run going — only a screen a person can
+// The frame loop writes only the cells that changed from what it drew last (#8826), the first frame
+// from the top of the alternate screen; it ends on the line that says closing the screen leaves the run going — only a screen a person can
 // close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
 // so a frame that fills the pane never scrolls the header off the top.
 // The keys are named under it where a person can type them. What the tick would write over its frame
