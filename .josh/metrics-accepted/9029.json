@@ -2,6 +2,6 @@
 	"reason": "The yield-cap park body gains its josh:outcome marker so run:board reads the drive's own retry (#9029)",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 3
+		"scripts.code_lines": 15
 	}
 }

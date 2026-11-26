@@ -3,6 +3,7 @@ import { backlog_yield_cap } from '#scripts/backlog/backlog-yield-cap'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { session_language } from '#scripts/josh/session-language'
+import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RowReason } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
@@ -116,6 +117,17 @@ describe('run_board_pause yield-cap park', () => {
 			})
 		},
 	)
+
+	it('gives the row to the restated park event once the drive reached its auto-retry cap', () => {
+		const park = { ...stalled(), body: backlog_yield_cap.body_of(String(ISSUE)) }
+		const read = { pause_reasons: new Map([[ISSUE, run_board_pause.from_comments([park])]]) }
+		const reason = `${run_event_retry.CAP_NOTE} — ${backlog_yield_cap.TRIP_CAUSE}`
+
+		expect(run_board_pause.reason_of(ISSUE, read, { state: 'parked', reason })).toBeUndefined()
+		expect(run_board_pause.reason_of(ISSUE, read, { state: 'parked' })?.tail).toBe(
+			backlog_yield_cap.RETRY_NEXT,
+		)
+	})
 })
 
 describe('run_board_pause run:stalled next action and backfills', () => {
