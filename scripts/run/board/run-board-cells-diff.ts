@@ -87,13 +87,18 @@ function is_second(cells: Cells, index: number): boolean {
 	return cells.chars[index] === CONTINUATION && index % cells.columns > 0
 }
 
+// The cell at `index`'s style and character, written where the cursor is.
+function write_plain(back: Cells, writer: Writer, index: number): void {
+	style_to(writer, back.styles[index] ?? DEFAULT_STYLE)
+	writer.out.push(char_text(back.chars[index] ?? CONTINUATION))
+}
+
 // The cell at `index` written, with its wide character's second cell; the next index to look at.
 function write_cell(back: Cells, writer: Writer, index: number): number {
 	const next = index + (is_second(back, index + 1) ? WIDE : 1)
 
 	move_to(back, writer, index)
-	style_to(writer, back.styles[index] ?? DEFAULT_STYLE)
-	writer.out.push(char_text(back.chars[index] ?? CONTINUATION))
+	write_plain(back, writer, index)
 	// joshuafolkken/kit#8826: past a row's last column the terminal's cursor is not known to wrap.
 	writer.cursor = next % back.columns === 0 ? UNKNOWN : next
 
@@ -105,19 +110,48 @@ function start_of(back: Cells, index: number): number {
 	return is_second(back, index) ? index - 1 : index
 }
 
-// Whether a changed cell lies within `MAX_GAP` unchanged cells from `from` on the row it is on; never
-// where `from` starts a row, as the cursor is not known to wrap.
-function run_continues(back: Cells, front: Cells, from: number): boolean {
+// The next changed cell within `MAX_GAP` unchanged cells from `from` on the row it is on; undefined
+// where there is none, or `from` starts a row, as the cursor is not known to wrap.
+function next_changed(back: Cells, front: Cells, from: number): number | undefined {
 	const column = from % back.columns
 
-	if (column === 0) return false
+	if (column === 0) return undefined
 	const end = Math.min(from + back.columns - column, from + MAX_GAP + 1)
 
 	for (let index = from; index < end; index += 1) {
-		if (is_changed(back, front, index)) return true
+		if (is_changed(back, front, index)) return index
 	}
 
-	return false
+	return undefined
+}
+
+function length_of(writer: Writer, write: (scratch: Writer) => void): number {
+	const scratch: Writer = { ...writer, out: [] }
+
+	write(scratch)
+
+	return scratch.out.join('').length
+}
+
+// joshuafolkken/kit#8951: whether writing the unchanged cells `from` up to the changed `to`, then its
+// style, is no longer than moving the cursor to it, then its style.
+function rewrite_is_shorter(back: Cells, writer: Writer, from: number, to: number): boolean {
+	const rewrite = length_of(writer, (scratch) => {
+		for (let index = from; index < to; index += 1) write_plain(back, scratch, index)
+		style_to(scratch, back.styles[to] ?? DEFAULT_STYLE)
+	})
+	const move = length_of(writer, (scratch) => {
+		move_to(back, { ...scratch, cursor: UNKNOWN, out: scratch.out }, to)
+		style_to(scratch, back.styles[to] ?? DEFAULT_STYLE)
+	})
+
+	return rewrite <= move
+}
+
+function run_continues(back: Cells, front: Cells, writer: Writer, from: number): boolean {
+	const to = next_changed(back, front, from)
+
+	return to !== undefined && rewrite_is_shorter(back, writer, from, to)
 }
 
 // joshuafolkken/kit#8917: the run of cells from `start`, written after one cursor move: unchanged cells
@@ -126,7 +160,7 @@ function run_continues(back: Cells, front: Cells, from: number): boolean {
 function write_run(back: Cells, front: Cells, writer: Writer, start: number): number {
 	let index = write_cell(back, writer, start)
 
-	while (run_continues(back, front, index)) index = write_cell(back, writer, index)
+	while (run_continues(back, front, writer, index)) index = write_cell(back, writer, index)
 
 	return index
 }
