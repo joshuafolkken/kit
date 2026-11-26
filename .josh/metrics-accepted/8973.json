@@ -1,0 +1,9 @@
+{
+	"reason": "producer worktree confinement: hook check, scope_line sentence and consult-vs-execute rows (#8973)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 20,
+		"rules.lines": 4,
+		"ai_cost.on_demand_bytes": 785
+	}
+}
