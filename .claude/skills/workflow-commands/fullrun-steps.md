@@ -41,7 +41,7 @@ with the labels `kickoff.md` → "Words typed after `new`" maps (per
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
 `<N>`. (3) `pnpm josh run:entry <N> --adopt` — the `#N` entry with the bare hold re-keyed to `<N>`
 (`run:hold --adopt`) for its claim; before its reads it stashes pre-existing changes, synchronizes
-as every entry does and pops the stash, and a failed step stops with the stash kept, naming it
+as every entry does, pops the stash and switches a primary checkout to the issue's branch, and a failed step stops with the stash kept, naming it
 (`scripts/run/entry/run-entry-sync.ts`); every later stop releases with `run:release <N>`. (4) Record the
 agreed plan in the session language: `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md` (its consumers
 section as in `kickoff.md` step 4). (5) On (3)'s `latest: required` run
