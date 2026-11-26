@@ -44,7 +44,7 @@ async function expect_motion(board: StressBoard, value: ThemeValue): Promise<voi
 
 	try {
 		const runs = await Promise.all(
-			scenes_of(value).map(async (scene) => motion_run({ value, board, scene }, WRITE_MS)),
+			scenes_of(value).map(async (scene) => await motion_run({ value, board, scene }, WRITE_MS)),
 		)
 
 		expect(unwritten(runs)).toStrictEqual([])
