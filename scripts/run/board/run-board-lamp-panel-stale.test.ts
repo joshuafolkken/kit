@@ -26,8 +26,7 @@ const PANEL_WIDTH = 41
 const FOUR_DIGITS = 1128
 const THREE_DIGITS = 128
 const PANEL_ROWS = 5
-const THROUGHPUT_ROWS = 2
-const THEMES: ReadonlyArray<Theme> = ['wargames', 'matrix']
+const THEMES: ReadonlyArray<Theme> = ['wopr', 'trace', 'magi']
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -184,13 +183,17 @@ describe('a stale reading’s age where the usage rows run no panel (joshuafolkk
 		}
 	})
 
-	it('drops both usage rows’ panels, age drawn, where a row reaches the panel without it', () => {
+	// joshuafolkken/kit#8695: the panel is kept; the age goes first, then a row reaching it still is cut.
+	it('keeps both usage rows’ panels where a row reaches the panel without its age, cutting that row', () => {
 		vi.stubEnv('FORCE_COLOR', '3')
 		const usage = usage_of(FOUR_DIGITS, true)
 		const frame = drawn(usage && reaching(usage), rows_part(ROWS, true))
+		const cut = frame.find((line) => line.trimStart().startsWith('x')) ?? ''
+		const kept = cut.slice(0, cut.indexOf(LAMP)).trimEnd()
 
-		expect(lamped(frame)).toBe(PANEL_ROWS - THROUGHPUT_ROWS)
-		expect(codex_of(frame)).toContain(`${String(FOUR_DIGITS)}′`)
+		expect(lamped(frame)).toBe(PANEL_ROWS)
+		expect(codex_of(frame)).not.toContain('′')
+		expect(width_of(kept)).toBe(PANEL_START - GAP)
 	})
 })
 

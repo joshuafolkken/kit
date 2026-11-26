@@ -27,6 +27,11 @@ describe('kit_only.command_names', () => {
 		expect(kit_only.command_names()).toContain('eval')
 	})
 
+	// Its terminal emulator is a kit devDependency a consumer install does not carry.
+	it('lists board:compare', () => {
+		expect(kit_only.command_names()).toContain('board:compare')
+	})
+
 	// `cost` stays a consumer command because its `--over` mode runs in the consumer workflow.
 	it('does not list cost', () => {
 		expect(kit_only.command_names()).not.toContain('cost')

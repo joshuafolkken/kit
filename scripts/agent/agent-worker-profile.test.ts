@@ -15,10 +15,14 @@ const SONNET_NAME = 'sonnet-medium'
 const OPUS_NAME = 'opus-high'
 const UNSET = { kind: 'unset' }
 const HAIKU = { name: HAIKU_NAME, model: HAIKU_MODEL, effort: 'low', when: 'Mechanical work' }
-const SONNET = { name: SONNET_NAME, model: 'claude-sonnet-5-5', effort: 'medium', when: 'A brief' }
-const OPUS = { name: OPUS_NAME, model: 'claude-opus-5-5', effort: 'high', when: 'A core rebuild' }
+const SONNET_MODEL = 'claude-sonnet-5-5'
+const OPUS_MODEL = 'claude-opus-5-5'
+const SONNET = { name: SONNET_NAME, model: SONNET_MODEL, effort: 'medium', when: 'A brief' }
+const OPUS = { name: OPUS_NAME, model: OPUS_MODEL, effort: 'high', when: 'A core rebuild' }
 const WORKER = { default: SONNET_NAME, profiles: [HAIKU, SONNET, OPUS] }
 const KIT_ROOT = path.resolve(import.meta.dirname, '../..')
+const LIGHT_BODY =
+	'## 背景\n\n- 種別: 非不具合\n- 規模見積もり: 約 1 ファイル / 20 行（テスト含む）'
 const fixture = { directory: '' }
 const make_directory = temporary_directory()
 
@@ -86,6 +90,7 @@ describe('agent_worker_profile.read — a josh.worker setting', () => {
 		['an effort outside low to max', with_sonnet({ effort: 'none' }), 'effort none is not one of'],
 		['an unsafe model', with_sonnet({ model: 'claude\nrm' }), 'is not a safe model'],
 		['a consultation model', with_sonnet({ model: 'claude-fable-5-1' }), 'is a consultation model'],
+		['a missing default', { profiles: WORKER.profiles }, 'josh.worker.default'],
 	])('rejects %s with the reason', (_label, worker, reason) => {
 		write_worker(worker)
 		const result = agent_worker_profile.read(fixture.directory)
@@ -108,9 +113,55 @@ describe('agent_worker_profile.read — no josh.worker setting', () => {
 	it('answers unset where no manifest exists', () => {
 		expect(agent_worker_profile.read(fixture.directory)).toEqual(UNSET)
 	})
+})
 
-	it("answers unset for kit's own package.json, which never carries the setting", () => {
-		expect(agent_worker_profile.read(KIT_ROOT)).toEqual(UNSET)
+describe("agent_worker_profile.read — kit's own setting (joshuafolkken/kit#8760)", () => {
+	it('routes between Sonnet and an Opus default', () => {
+		const read = agent_worker_profile.read(KIT_ROOT)
+		if (read.kind !== 'settings') throw new Error(`expected settings, got ${read.kind}`)
+		const models = read.settings.profiles.map((profile) => profile.agent.model)
+
+		expect(read.settings.route).toBe(true)
+		expect(models).toEqual([SONNET_MODEL, OPUS_MODEL])
+		expect(agent_worker_profile.for_labels(read.settings, [])).toMatchObject({
+			worker: { agent: { model: OPUS_MODEL } },
+		})
+	})
+})
+
+// The chosen profile and, after it, what chose it (joshuafolkken/kit#8815).
+async function routed_choice(
+	route: boolean,
+	labels: ReadonlyArray<string>,
+	body?: string,
+): Promise<string> {
+	write_worker({ ...WORKER, route })
+	const result = await agent_worker_profile.resolve(
+		fixture.directory,
+		async () => await labels,
+		async () => await body,
+	)
+
+	return result.kind === 'worker' ? `${result.worker.name} by ${result.reason}` : result.kind
+}
+
+describe('agent_worker_profile.resolve — josh.worker.route', () => {
+	it('runs a light unlabelled Issue on the weakest profile', async () => {
+		expect(await routed_choice(true, [], LIGHT_BODY)).toBe(`${HAIKU_NAME} by route`)
+	})
+
+	it.each<[string, boolean, string | undefined, string]>([
+		['the switch off', false, LIGHT_BODY, 'default'],
+		['a heavy body', true, '## 背景\n\n- 互換性: 破壊的変更', 'route'],
+		['a body read that failed', true, undefined, 'default'],
+	])('keeps the default with %s', async (_name, route, body, reason) => {
+		expect(await routed_choice(route, [], body)).toBe(`${SONNET_NAME} by ${reason}`)
+	})
+
+	it("keeps a person's worker label over the rule", async () => {
+		expect(await routed_choice(true, [`worker:${OPUS_NAME}`], LIGHT_BODY)).toBe(
+			`${OPUS_NAME} by label`,
+		)
 	})
 })
 
@@ -121,6 +172,14 @@ describe('agent_worker_profile.resolve — the profile an Issue runs on', () => 
 
 	it('falls back to the default without a worker label', async () => {
 		expect(await resolved_name(['enhancement'])).toBe(SONNET_NAME)
+	})
+
+	// joshuafolkken/kit#8815: a label naming the default is still the label's choice.
+	it.each([
+		[['enhancement'], 'default'],
+		[[`worker:${SONNET_NAME}`], 'label'],
+	])('says what chose the profile for %j', async (labels, reason) => {
+		expect(await resolved(labels)).toMatchObject({ kind: 'worker', reason })
 	})
 
 	it.each([
@@ -143,6 +202,18 @@ describe('agent_worker_profile.resolve — the profile an Issue runs on', () => 
 
 		expect(await agent_worker_profile.resolve(fixture.directory, fetch_labels)).toEqual(UNSET)
 		expect(fetch_labels).not.toHaveBeenCalled()
+	})
+})
+
+describe('agent_worker_profile.resolve — a setting with keys it does not name (#8882)', () => {
+	it.each([
+		['the worker setting', { ...WORKER, pool: 'next' }],
+		['a profile', { ...WORKER, profiles: [HAIKU, { ...SONNET, pool: 'next' }, OPUS] }],
+	])('starts on the default when %s carries one', async (_label, worker) => {
+		write_worker(worker)
+		const result = await agent_worker_profile.resolve(fixture.directory, async () => [])
+
+		expect(result.kind === 'worker' ? result.worker.name : result.kind).toBe(SONNET_NAME)
 	})
 })
 

@@ -16,8 +16,9 @@ import { verification_inputs } from './verification-inputs'
 // failed check writes no record, so it runs again.
 //
 // **The gate's `lint` record is read for none of them** (joshuafolkken/kit#7250): the gate's
-// `lint --changed` is prettier plus eslint alone, while `lint:related` also runs the structural, document
-// and unused-member checks (`lint-related.ts`), so a gate green does not vouch for it.
+// `lint --changed` is prettier, eslint and the import cycle check alone, while `lint:related` also runs
+// the structural, document and unused-member checks (`lint-related.ts`), so a gate green does not vouch
+// for it.
 //
 // **A `lint:related` green writes the gate's `lint` record only where it vouches for it**
 // (joshuafolkken/kit#7251), so ship's gate after its sync does not lint the same tree again. The gate

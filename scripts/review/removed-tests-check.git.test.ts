@@ -109,4 +109,22 @@ describe('removed_tests_check.read — no merge in progress', () => {
 		},
 		TIMEOUT_MS,
 	)
+
+	// joshuafolkken/kit#8927: a test file deleted whole is one row; a file only edited is not.
+	it(
+		'lists a test file the branch deleted whole, and not the one it only edited',
+		async () => {
+			const gone = 'gone.test.ts'
+
+			await commit({ [gone]: "it('draws the frame', () => {})\n" }, 'gone')
+			await git(fixture.repository_root, ['checkout', '-b', LANE_BRANCH])
+			await git(fixture.repository_root, ['rm', '--quiet', gone])
+			await commit({ [SUITE]: SUITE_ON_LANE }, 'lane')
+
+			await expect(removed_tests_check.read()).resolves.toMatchObject({
+				files: [{ path: gone, titles: ['draws the frame'] }],
+			})
+		},
+		TIMEOUT_MS,
+	)
 })

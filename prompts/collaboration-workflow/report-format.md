@@ -77,6 +77,13 @@
 
 題名だけ変えたテスト → `置き換え` 行が書き込まれた状態で出る（`scripts/review/renamed-tests.ts`）。
 
+まるごと消えたテストファイル → パスを書いた 1 行で、そのファイルのテストを全部処置する。`未記入` 行もファイル単位で出る（`scripts/review/removed-test-files.ts`）。一部だけ消えたファイルは 1 件 1 行のまま:
+
+```md
+- `<消えたテストファイル>` — 置き換え: <いまその振る舞いを守るテスト>
+- `<消えたテストファイル>` — 廃止: #<Issue> <理由>
+```
+
 **`run:carry` の実行証跡は `JOSH_TEMP_ROOT` を新しい一時ディレクトリに向けて取る（必須）。** 状態レコードは本物の run と共有なので、`JOSH_TEMP_ROOT="$(mktemp -d)" pnpm josh run:carry --begin …` のように各コマンドの頭に付ける（`docs/environment-variables.md` → "Runs"）。`run:merge` は main の同期・lane の close・GitHub への書き込みを行うため、これでは切り離せない。
 
 ### 区切りの報告（完了報告と区別する・必須）

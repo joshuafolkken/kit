@@ -60,12 +60,20 @@ interface Overflow {
 
 // `granted` is set only when a unit claim was narrowed to the room left at the wait cap. `waited_ms` is
 // how long the claim waited, about one machine read's window for one admitted on its first read
-// (joshuafolkken/kit#4451).
+// (joshuafolkken/kit#4451). `reserved_cores` is what the admitted claims held when it was decided, so a
+// wait can be told apart from load outside the ledger (joshuafolkken/kit#8869).
+interface AdmissionDecision {
+	reason: string
+	budget: MachineBudget
+	reading: MachineReading
+	reserved_cores?: number | undefined
+}
+
 interface Admission {
 	overflow: Overflow | undefined
 	granted?: number | undefined
 	waited_ms?: number | undefined
-	decision?: { reason: string; budget: MachineBudget; reading: MachineReading } | undefined
+	decision?: AdmissionDecision | undefined
 }
 
 function priority_rank(reservation: LedgerReservation): number {

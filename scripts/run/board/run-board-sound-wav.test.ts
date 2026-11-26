@@ -4,11 +4,12 @@ import { atomic_write } from '#scripts/lib/atomic-write'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Note } from './run-board-sound-synth'
-import { run_board_sound_wav } from './run-board-sound-wav'
+import { run_board_sound_wav, type SampledSound } from './run-board-sound-wav'
 
 // Synthesized PCM is saved once under a digest of its definition and implementation.
 
-const { SAMPLE_RATE, HEADER_BYTES, cached_samples, cached_wav, wav_of } = run_board_sound_wav
+const { SAMPLE_RATE, HEADER_BYTES, cached_samples, cached_wav, resolved_samples, wav_of } =
+	run_board_sound_wav
 
 const SAMPLES: Int16Array = Int16Array.from([0, 1000, -1000, 32_767])
 const DATA_BYTES = 8
@@ -147,6 +148,57 @@ describe('run_board_sound_wav.cached_samples', () => {
 		})
 
 		expect(cached_samples('click', SAMPLES, RATE, directory)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8897: a sampled sound's path is resolved once per process for its directory, name,
+// key and rate.
+const TONE_RATE = 48_000
+
+// A tone rendered from these samples, under its key.
+function tone(key: string, samples: Int16Array = SAMPLES): SampledSound {
+	return { name: 'tone', key, sample_rate: TONE_RATE, render: () => samples }
+}
+
+describe('run_board_sound_wav.resolved_samples', () => {
+	let directory = ''
+
+	beforeEach(() => {
+		directory = create_directory(DIRECTORY_PREFIX)
+	})
+
+	it('ac-981052aa renders the samples once and returns the same path again', () => {
+		const sound = tone('50')
+		const render = vi.spyOn(sound, 'render')
+		const first = resolved_samples(sound, directory)
+
+		expect(resolved_samples(sound, directory)).toBe(first)
+		expect(render).toHaveBeenCalledOnce()
+		expect(readFileSync(first ?? '')).toStrictEqual(wav_of(SAMPLES, TONE_RATE))
+	})
+
+	it('ac-2ee40241 resolves another directory alike and other samples under another name', () => {
+		const first = path.basename(resolved_samples(tone('50'), directory) ?? '')
+		const other = create_directory(DIRECTORY_PREFIX)
+		const moved = resolved_samples(tone('50'), other) ?? ''
+		const reshaped = resolved_samples(tone('60', SAMPLES.subarray(1)), directory) ?? ''
+
+		expect(path.dirname(moved)).toBe(other)
+		expect(path.basename(moved)).toBe(first)
+		expect(path.basename(reshaped)).not.toBe(first)
+	})
+
+	it('keeps no path that could not be written, so the next call renders again', () => {
+		const sound = tone('70')
+		const render = vi.spyOn(sound, 'render')
+		const write = vi.spyOn(atomic_write, 'replace_file').mockImplementationOnce(() => {
+			throw new Error('disk full')
+		})
+
+		expect(resolved_samples(sound, directory)).toBeUndefined()
+		expect(resolved_samples(sound, directory)).toBeDefined()
+		expect(render).toHaveBeenCalledTimes(2)
+		expect(write).toHaveBeenCalledTimes(2)
 	})
 })
 

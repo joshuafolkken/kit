@@ -177,7 +177,8 @@ describe('verification_inputs.fingerprint', () => {
 		install(root, 'vitest', '3.0.0')
 
 		expect(of(gate_labels.TYPE_CHECK_LABEL, { TZ: 'UTC' })).toBe(before)
-		expect(of(gate_labels.UNIT_LABEL, { TZ: 'UTC' })).not.toBe(of(gate_labels.UNIT_LABEL))
+		// joshuafolkken/kit#8684: the unit projects pin TZ, so an outer zone no longer moves the unit check.
+		expect(of(gate_labels.UNIT_LABEL, { TZ: 'UTC' })).toBe(of(gate_labels.UNIT_LABEL))
 	})
 
 	it('answers the whole gate from the union of every declaration', () => {

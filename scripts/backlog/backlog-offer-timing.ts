@@ -5,6 +5,8 @@ import { backlog_listing_trace } from './backlog-listing-trace'
 interface OfferTiming {
 	idle_until_ms?: number | undefined
 	not_before_ms?: number | undefined
+	// Until when a run seeded with an earlier run's children asks nothing (`backlog-drive-state.ts`).
+	settling_until_ms?: number | undefined
 }
 
 interface LoopRun {
@@ -85,16 +87,22 @@ async function is_signalled(run: LoopRun, ports: DuePorts): Promise<boolean> {
 	)
 }
 
+function is_settling(state: DriveState, now_ms: number): boolean {
+	return now_ms < (state.settling_until_ms ?? -Infinity)
+}
+
 // Whether the pass asks now: a dated wait at its deadline, other waits at the interval — or at once
 // when a memory hold cleared, `run:add` handed the run an issue, `lane:limit` raised the limit since
 // the last ask, or the `auto-ok` listing changed. The interval stays the floor for the changes the
-// listing's ETag does not show: a blocker closed, a later page, an epic.
+// listing's ETag does not show: a blocker closed, a later page, an epic. Nothing is due while the run
+// settles; a collection still asks at once (`run_pass`), so a collected outage goes first.
 async function is_due(
 	run: LoopRun,
 	config: LoopConfig,
 	ports: DuePorts,
 	now_ms: number,
 ): Promise<boolean> {
+	if (is_settling(run.state, now_ms)) return false
 	const interval_ms = await interval_for(run, config, ports)
 	if (now_ms >= due_ms(deadline_of(run.state), run.offered_ms, interval_ms)) return true
 
@@ -140,6 +148,7 @@ const backlog_offer_timing = {
 	first_run,
 	interval_of,
 	is_due,
+	is_settling,
 	is_window_spent,
 	sleep_ms,
 	sleeper,

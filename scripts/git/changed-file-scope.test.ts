@@ -219,3 +219,22 @@ describe('changed_file_scope.is_flag', () => {
 		expect(changed_file_scope.is_flag(CHANGED_SOURCE)).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#8686: vitest's `-u [type]` reads a following file as its value; `test:related`
+// splits the two whatever their order, and `vitest_arguments` puts the files first.
+describe('changed_file_scope.resolve_command_scope / flags_of — the update flag', () => {
+	it.each([[['-u', CHANGED_SOURCE]], [[CHANGED_SOURCE, '-u']]])(
+		'keeps the file and the flag apart from %j',
+		async (command_arguments) => {
+			const scope = await changed_file_scope.resolve_command_scope({
+				command_arguments,
+				root: REPOSITORY_ROOT,
+				inputs: inputs(),
+			})
+
+			expect(mocked_changed).not.toHaveBeenCalled()
+			expect(scope.files).toEqual([ABSOLUTE_SOURCE])
+			expect(changed_file_scope.flags_of(command_arguments)).toEqual(['-u'])
+		},
+	)
+})

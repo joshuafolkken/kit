@@ -6,6 +6,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_state } from '#scripts/lane/lane-state'
 import { lane_state_record } from '#scripts/lane/lane-state-record'
+import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { shell_quote } from '#scripts/lib/shell-quote'
@@ -323,9 +324,8 @@ async function read_pr_of_branch(
 	lane: LaneInfo | undefined,
 ): Promise<ChildState> {
 	const pr_state = await read_pr_state(branch_name)
-	const is_lane_branch = lane?.branch === branch_name && !lane.is_stranded
 
-	return is_lane_branch
+	return lane_transition_guards.has_work_tree(lane, branch_name)
 		? { branch_name, lane_directory: lane.directory, pr_state }
 		: { branch_name, pr_state }
 }
@@ -411,7 +411,7 @@ async function is_never_started(issue: string): Promise<boolean> {
 }
 
 async function is_held_dirty(name: string, lane: LaneInfo | undefined): Promise<boolean> {
-	if (lane?.branch !== name || lane.is_stranded || (await is_never_started(lane.issue))) {
+	if (!lane_transition_guards.has_work_tree(lane, name) || (await is_never_started(lane.issue))) {
 		return false
 	}
 

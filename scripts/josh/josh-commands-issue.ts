@@ -106,11 +106,23 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'defect:origin': {
 		script: 'scripts/issue/defect-origin-main.ts',
 		description:
-			'List the merged pull requests that last changed what a defect issue names, as candidates for its origin line',
+			'List the merged pull requests that last changed or first added what a defect issue names, as candidates for its origin line',
 		category: 'AI tools',
 		reference: ['<N>', 'automation', ['network']],
 		usage: {
-			examples: [{ arguments: '4241', note: 'newest first, merged before the issue was filed' }],
+			examples: [
+				{ arguments: '4241', note: 'most targets first, merged before the issue was filed' },
+			],
+		},
+	},
+	'issue:rework-candidates': {
+		script: 'scripts/issue/issue-rework-candidates-main.ts',
+		description:
+			'List closed enhancements that rework delivered work, each with the merged pull request or closed Issue it cites — read-only',
+		category: 'AI tools',
+		reference: ['--since <days>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '--since 30', note: 'closed in the last 30 days' }],
 		},
 	},
 	'defect:report': {
@@ -118,8 +130,16 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Count defects by the origin pull request their issue declares, by change kind and by area',
 		category: 'AI tools',
-		reference: ['', 'automation', ['network']],
-		usage: { examples: [{ arguments: '', note: 'every issue labelled bug, open or closed' }] },
+		reference: ['[--since <days>]', 'automation', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '', note: 'every issue labelled bug, open or closed' },
+				{
+					arguments: '--since 7',
+					note: "only the bugs filed in the last 7 days, with each area's rate",
+				},
+			],
+		},
 	},
 	'effect:audit': {
 		script: 'scripts/issue/effect-audit-cli.ts',

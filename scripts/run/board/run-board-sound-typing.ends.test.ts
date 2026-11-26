@@ -94,3 +94,58 @@ describe('run_board_sound_typing.typing_sound letters end, switched apart', () =
 		expect(test.kill).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#8697: the typed-end sound follows a loop that runs out, never one switched off.
+describe('run_board_sound_typing.typing_sound letters end, the typed end', () => {
+	it('tells `ended` once when the letters type through', () => {
+		const test = sounding()
+		const ended = vi.fn<() => void>()
+
+		test.sound.set(true, LEFT_MS, ended)
+		vi.advanceTimersByTime(LATER_MS)
+		test.sound.set(true, LEFT_MS, ended)
+		vi.advanceTimersByTime(LEFT_MS - 1)
+		expect(ended).not.toHaveBeenCalled()
+		vi.advanceTimersByTime(1)
+		test.sound.set(false, 0, ended)
+
+		expect(ended).toHaveBeenCalledOnce()
+	})
+
+	it('does not tell `ended` when switched off before the letters type through', () => {
+		const test = sounding()
+		const ended = vi.fn<() => void>()
+
+		test.sound.set(true, LEFT_MS, ended)
+		test.sound.set(false, 0, ended)
+		vi.runAllTimers()
+
+		expect(ended).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_board_sound_typing.typing_sound letters end, the typed end by the clock', () => {
+	// A spin turn may switch the trill off just after the letters' end, before the late timer fires.
+	it('tells `ended` once when an off arrives after the letters type through, before the timer', () => {
+		const test = sounding()
+		const ended = vi.fn<() => void>()
+
+		test.sound.set(true, LEFT_MS, ended)
+		vi.setSystemTime(Date.now() + LEFT_MS)
+		test.sound.set(false, 0, ended)
+		vi.runAllTimers()
+
+		expect(ended).toHaveBeenCalledOnce()
+	})
+
+	it('does not tell `ended` once the board stops the trill', () => {
+		const test = sounding()
+		const ended = vi.fn<() => void>()
+
+		test.sound.set(true, LEFT_MS, ended)
+		test.sound.stop()
+		vi.runAllTimers()
+
+		expect(ended).not.toHaveBeenCalled()
+	})
+})

@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs'
 import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from '#scripts/ci/ci-yml-fixture'
 import { describe, expect, it } from 'vitest'
 
-// Both registries receive the one tarball the `pack` job builds, so the same version can never
-// carry different bytes on GitHub Packages and on npm (joshuafolkken/kit#3268).
+// The publish job receives the one tarball the `pack` job builds, so the bytes published are the
+// bytes the credential-free build produced (joshuafolkken/kit#3268). npm is the only registry (#7492).
 const WORKFLOW_PATH = '.github/workflows/publish.yml'
 const PACK_JOB = 'pack'
-const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
+const PUBLISH_JOB_NAMES = ['publish-npm'] as const
 const ARTIFACT_NAME = 'npm-package'
 const TARBALL_OUTPUT = '${{ steps.package.outputs.tarball }}'
 const PACKAGE_OUTPUT = '${{ steps.package.outputs.package }}'
@@ -41,7 +41,7 @@ function steps_with_run(target: WorkflowJob, text: string): Array<WorkflowStep> 
 	return (target.steps ?? []).filter((step) => step.run?.includes(text) === true)
 }
 
-describe('publish.yml — one built artifact for both registries', () => {
+describe('publish.yml — one built artifact for the publish job', () => {
 	it('packs the tarball once and uploads it under the shared artifact name', () => {
 		const pack = job(PACK_JOB)
 		const upload = ci_yml_fixture.find_upload(pack, ARTIFACT_NAME)
@@ -57,7 +57,7 @@ describe('publish.yml — one built artifact for both registries', () => {
 	})
 
 	it('keeps publish credentials out of the job that builds', () => {
-		expect(job(PACK_JOB).permissions).toEqual({ contents: 'read', packages: 'read' })
+		expect(job(PACK_JOB).permissions).toEqual({ contents: 'read' })
 	})
 
 	it('installs in the job that builds without a registry token', () => {

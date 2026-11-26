@@ -1,3 +1,4 @@
+import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
@@ -70,6 +71,17 @@ describe('run_chain_review_fix.route — a lane child past the cut threshold (ac
 		expect(handoff?.instruction).toBe('fullrun #6900')
 		expect(handoff?.remaining).toStrictEqual([`${IN_PLACE} #6900`])
 		expect(run_cut_handoff.carried_findings(handoff)).toStrictEqual(FINDINGS)
+	})
+
+	// joshuafolkken/kit#8817: the review-fix cut is priced over its own measured horizon.
+	it("prices the session over the review-fix resumes' horizon", () => {
+		in_lane(true)
+
+		run_chain_review_fix.route(ISSUE, FINDINGS, fix_next)
+
+		expect(cost_cli.session_verdict).toHaveBeenCalledWith({
+			remaining: context_cut_payback.REVIEW_FIX_REMAINING_REQUESTS,
+		})
 	})
 })
 

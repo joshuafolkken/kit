@@ -39,7 +39,8 @@ const SESSION_ID_FLAG = '--session-id'
 // AskUserQuestion has nobody to answer it in an unattended lane, so narrowing them shrinks every
 // request's preamble. **No web tool is launched**: no role runs with a person at the keyboard, and a
 // fetched page enters the context with no trust label, past the Issue trust filter (#4664). This list
-// is the one place the set is kept.
+// is the one place the set is kept. **`TodoWrite` is not launched**: no measured lane session ever
+// called it (joshuafolkken/kit#8703).
 const LAUNCHED_TOOLS: ReadonlyArray<string> = [
 	'Bash',
 	'Read',
@@ -51,7 +52,6 @@ const LAUNCHED_TOOLS: ReadonlyArray<string> = [
 	'SendMessage',
 	'TaskStop',
 	'Monitor',
-	'TodoWrite',
 ]
 // **A reviewer is the review, not a launcher of one** (joshuafolkken/kit#4715): with `Skill` it ran
 // `/code-review`, which forked a second agent that read the same diff and brief again. Without the two

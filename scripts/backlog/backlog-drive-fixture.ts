@@ -371,8 +371,9 @@ function harness(script: Script): Harness {
 	}
 }
 
+// A run already past its settling window (`backlog-drive-state.ts`): only the seeded test starts in it.
 function state(in_flight: ReadonlyArray<string> = []): DriveState {
-	return backlog_drive.initial_state(in_flight, ACTIVE)
+	return { ...backlog_drive.initial_state(in_flight, ACTIVE), settling_until_ms: undefined }
 }
 
 const backlog_drive_fixture = {

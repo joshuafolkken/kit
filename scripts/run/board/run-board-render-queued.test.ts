@@ -154,9 +154,9 @@ describe('run_board_render.render a queued epic line', () => {
 const { TITLE_MARK, bare, untitled } = run_board_label_pair
 
 function epic_lines(is_themed: boolean): Array<string> {
-	return lines_of(
-		header({ layout: EPIC_LAYOUT, theme: is_themed ? 'wargames' : undefined }),
-	).filter((text) => text.includes('📁') || text.includes('7290'))
+	return lines_of(header({ layout: EPIC_LAYOUT, theme: is_themed ? 'wopr' : undefined })).filter(
+		(text) => text.includes('📁') || text.includes('7290'),
+	)
 }
 
 describe('run_board_render.render a title mark', () => {
@@ -182,16 +182,16 @@ describe('run_board_render.render a title mark', () => {
 // joshuafolkken/kit#8512: on the WarGames screen the queued rule's tail reads as text, and drawing it
 // there moves nothing else.
 function wargames_lines(overrides: Parameters<typeof header>[0]): Array<string> {
-	const view = { header: header({ layout: EMPTY_LAYOUT, theme: 'wargames', ...overrides }) }
+	const view = { header: header({ layout: EMPTY_LAYOUT, theme: 'wopr', ...overrides }) }
 	// A live frame draws its clocks' colons lit (joshuafolkken/kit#8476).
 	const drawn = run_board_spot.drawn(
 		run_board_render.render({ ...view, notes: [] }).join('\n'),
 		run_board_spot.SPOT,
 	)
 
-	return stripVTControlCharacters(
-		untitled(run_board_theme.marked('wargames', drawn, 'letters')),
-	).split('\n')
+	return stripVTControlCharacters(untitled(run_board_theme.marked('wopr', drawn, 'letters'))).split(
+		'\n',
+	)
 }
 
 describe('run_board_render.render queued rule tail on a themed screen', () => {
@@ -200,7 +200,7 @@ describe('run_board_render.render queued rule tail on a themed screen', () => {
 	it('draws HD for the spinner’s ⏳ and AG for the saved plan’s 🕘', () => {
 		const lines = wargames_lines({ ...loading, plan_saved_ms: header().now_ms })
 
-		expect(lines.filter((line) => /^-- -- QUEUED .* HD \S {2}AG \S+$/u.test(line))).toHaveLength(1)
+		expect(lines.filter((line) => /^-- -- queued .* HD \S {2}AG \S+$/u.test(line))).toHaveLength(1)
 	})
 
 	it('changes the queued rule alone', () => {
@@ -210,6 +210,6 @@ describe('run_board_render.render queued rule tail on a themed screen', () => {
 
 		expect(tailed).toHaveLength(plain.length)
 		expect(changed).toHaveLength(1)
-		expect(changed[0]).toMatch(/^-- -- QUEUED 0 -+ HD \S$/u)
+		expect(changed[0]).toMatch(/^-- -- queued 0 -+ HD \S$/u)
 	})
 })

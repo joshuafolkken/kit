@@ -143,6 +143,46 @@ describe('lane_reap.is_child_running', () => {
 	})
 })
 
+// joshuafolkken/kit#8845: `run:review` names the lane child it runs under as its gate's owner.
+describe('lane_reap.own_child', () => {
+	it('answers the matched process among the caller’s ancestors, never another lane’s child', () => {
+		const probes = probes_over(
+			{ matching: [CHILD, OWN_PARENT], children: {}, parents: own_ancestry() },
+			[],
+		)
+
+		expect(lane_reap.own_child(ISSUE, probes)).toBe(OWN_PARENT)
+	})
+
+	it('answers undefined where no ancestor is the lane child', () => {
+		const probes = probes_over({ matching: [CHILD], children: {}, parents: own_ancestry() }, [])
+
+		expect(lane_reap.own_child(ISSUE, probes)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#8845: an orphaned gate ends every process under it, never itself.
+describe('lane_reap.descendants_of', () => {
+	it('answers the whole tree under the pid and leaves the pid out', () => {
+		const probes = probes_over(
+			{
+				matching: [],
+				children: { [CHILD]: [LOOP_SHELL], [LOOP_SHELL]: [LOOP_SUBSHELL] },
+				parents: own_ancestry(),
+			},
+			[],
+		)
+
+		expect(lane_reap.descendants_of(CHILD, probes)).toStrictEqual([LOOP_SHELL, LOOP_SUBSHELL])
+	})
+
+	it('answers the empty list for a pid with no children', () => {
+		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry() }, [])
+
+		expect(lane_reap.descendants_of(CHILD, probes)).toStrictEqual([])
+	})
+})
+
 // joshuafolkken/kit#2472: the Stop hook matches a carry record's owner against this chain.
 describe('lane_reap.own_ancestry', () => {
 	it('holds this process and every process above it', () => {

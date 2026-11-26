@@ -9,6 +9,7 @@ import type { z } from 'zod'
 import { agent_profile_schema, type AgentProfile } from './agent-profile-schema'
 import type { Rejected } from './agent-provider'
 import { agent_role_profile } from './agent-role-profile'
+import { agent_worker_route } from './agent-worker-route'
 
 // The per-Issue worker profile a repository opts into with `josh.worker` in its `package.json`: the
 // Issue's `worker:<name>` label picks a profile, else the configured default. A repository without the
@@ -26,6 +27,7 @@ interface WorkerProfile {
 interface WorkerSettings {
 	default: string
 	escalate: boolean
+	route: boolean
 	profiles: ReadonlyArray<WorkerProfile>
 }
 
@@ -34,8 +36,13 @@ interface Unset {
 }
 
 type SettingsResult = Rejected | Unset | { kind: 'settings'; settings: WorkerSettings }
+// What chose the profile (joshuafolkken/kit#8815): the Issue's `worker:<name>` label, `route` reading
+// the Issue body, or the configured default.
+type WorkerReason = 'label' | 'route' | 'default'
 type WorkerResult =
-	Rejected | Unset | { kind: 'worker'; worker: WorkerProfile; settings: WorkerSettings }
+	| Rejected
+	| Unset
+	| { kind: 'worker'; worker: WorkerProfile; settings: WorkerSettings; reason: WorkerReason }
 type ProfileCheck = Rejected | { kind: 'profile'; worker: WorkerProfile }
 
 const UNSET: Unset = { kind: 'unset' }
@@ -78,10 +85,14 @@ function checked_settings(config: WorkerConfig): SettingsResult {
 		profiles.push(checked.worker)
 	}
 
-	return {
-		kind: 'settings',
-		settings: { default: config.default, escalate: config.escalate, profiles },
+	const settings = {
+		default: config.default,
+		escalate: config.escalate,
+		route: config.route,
+		profiles,
 	}
+
+	return { kind: 'settings', settings }
 }
 
 // A manifest that cannot be read or parsed names no setting, so it reads as an empty object.
@@ -107,10 +118,14 @@ function profile_named(settings: WorkerSettings, name: string): WorkerProfile | 
 	return settings.profiles.find((profile) => profile.name === name)
 }
 
-function for_labels(settings: WorkerSettings, labels: ReadonlyArray<string>): WorkerResult {
-	const names = labels
+function label_names(labels: ReadonlyArray<string>): ReadonlyArray<string> {
+	return labels
 		.filter((label) => label.startsWith(LABEL_PREFIX))
 		.map((label) => label.slice(LABEL_PREFIX.length))
+}
+
+function for_labels(settings: WorkerSettings, labels: ReadonlyArray<string>): WorkerResult {
+	const names = label_names(labels)
 
 	if (names.length > 1) {
 		return rejected(`allows one ${LABEL_PREFIX}<name> label, got ${names.join(', ')}`)
@@ -120,16 +135,46 @@ function for_labels(settings: WorkerSettings, labels: ReadonlyArray<string>): Wo
 	const worker = profile_named(settings, name)
 	if (worker === undefined) return rejected(`has no profile for the label ${LABEL_PREFIX}${name}`)
 
-	return { kind: 'worker', worker, settings }
+	return { kind: 'worker', worker, settings, reason: names.length > 0 ? 'label' : 'default' }
+}
+
+// joshuafolkken/kit#8760: with `route` on, an Issue no `worker:` label names runs on the weakest
+// profile when its body declares light work (`agent-worker-route.ts`), else on the default. A body
+// that cannot be read keeps the default. `route: false` is the one-step revert to the default for all.
+// The reason is `route` wherever the body was read, so a heavy Issue's default is the route's choice.
+function routed(settings: WorkerSettings, body: string | undefined): WorkerResult {
+	const [weakest] = settings.profiles
+	if (body === undefined || weakest === undefined) return for_labels(settings, [])
+
+	if (agent_worker_route.route(body).is_light) {
+		return { kind: 'worker', worker: weakest, settings, reason: 'route' }
+	}
+
+	const kept = for_labels(settings, [])
+
+	return kept.kind === 'worker' ? { ...kept, reason: 'route' } : kept
+}
+
+async function for_issue(
+	settings: WorkerSettings,
+	labels: ReadonlyArray<string>,
+	fetch_body: (() => Promise<string | undefined>) | undefined,
+): Promise<WorkerResult> {
+	const is_routed = settings.route && label_names(labels).length === 0
+
+	return is_routed ? routed(settings, await fetch_body?.()) : for_labels(settings, labels)
 }
 
 // The profile an Issue's worker runs on. `fetch_labels` is called only once a setting exists, so a
 // repository without one never asks GitHub for the Issue's labels. A label read that fails answers
 // `undefined` and is refused: falling back to the default could run a `worker:<name>` Issue on the
-// wrong model.
+// wrong model. `fetch_body` is called only when `route` decides, and a person's label wins over it;
+// a caller without one (a cut relaunch's cap, `agent-argv.ts`) caps at the default, never below the
+// stored profile the dispatch already routed.
 async function resolve(
 	directory: string,
 	fetch_labels: () => Promise<ReadonlyArray<string> | undefined>,
+	fetch_body?: () => Promise<string | undefined>,
 ): Promise<WorkerResult> {
 	const result = read(directory)
 	if (result.kind !== 'settings') return result
@@ -137,7 +182,7 @@ async function resolve(
 	const labels = await fetch_labels()
 	if (labels === undefined) return rejected('could not read the Issue labels')
 
-	return for_labels(result.settings, labels)
+	return await for_issue(result.settings, labels, fetch_body)
 }
 
 // The profile one step above `worker` in the escalation order, or `undefined` at the top.
@@ -150,5 +195,5 @@ function next(settings: WorkerSettings, worker: WorkerProfile): WorkerProfile | 
 
 const agent_worker_profile = { LABEL_PREFIX, for_labels, next, read, resolve }
 
-export type { SettingsResult, WorkerProfile, WorkerResult, WorkerSettings }
+export type { SettingsResult, WorkerProfile, WorkerReason, WorkerResult, WorkerSettings }
 export { agent_worker_profile }

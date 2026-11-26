@@ -3,10 +3,10 @@ import { launch_timing } from '#scripts/lane/launch-timing'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import type { HeapStats } from './run-board-heap'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
-import { run_board_spin } from './run-board-spin'
 import type { StallProbes } from './run-board-stall'
 import type { DrawKind, DrawTimer } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
@@ -99,7 +99,9 @@ describe('run_board_timing.timed draws', () => {
 	})
 
 	it('names no kind it never timed', () => {
-		expect(report({ tick: [1], turn: [] })).not.toContain('turn draw')
+		const draws = { tick: [1], turn: [], receive: [], view: [], reveal: [], sound: [] }
+
+		expect(report(draws)).not.toContain('turn draw')
 	})
 
 	it('times nothing without the flag, drawing straight through', () => {
@@ -187,7 +189,7 @@ function recording(kinds: Array<DrawKind>): DrawTimer {
 
 // Spinner ports on a clock each sleep moves, with every write and every kind of draw timed.
 function spin_ports(): {
-	ports: Parameters<typeof run_board_spin.spin_to_second>[1]
+	ports: Parameters<typeof run_board_frame_fixture.spin_to_second>[1]
 	kinds: Array<DrawKind>
 	writes: Array<string>
 } {
@@ -209,7 +211,7 @@ function spin_ports(): {
 }
 
 describe('run_board_tick.tick timing', () => {
-	it('times a tick that draws a run, from its layout to its write, as a tick', async () => {
+	it('times the view stepped, then the run drawn from its layout to its write', async () => {
 		const { ports } = harness(LOCAL, [])
 		const kinds: Array<DrawKind> = []
 
@@ -218,7 +220,7 @@ describe('run_board_tick.tick timing', () => {
 			time_draw: recording(kinds),
 		})
 
-		expect(kinds).toStrictEqual(['tick'])
+		expect(kinds).toStrictEqual(['view', 'tick'])
 	})
 })
 
@@ -227,7 +229,7 @@ describe('run_board_spin.spin_to_second timing', () => {
 		const { ports, kinds, writes } = spin_ports()
 		const turning = { spots: [{ row: 1, column: 1, style: '' }], typing: NO_TYPING }
 
-		await run_board_spin.spin_to_second(turning, ports)
+		await run_board_frame_fixture.spin_to_second(turning, ports)
 
 		expect(writes.length).toBeGreaterThan(0)
 		expect(kinds).toStrictEqual(writes.map(() => 'turn'))

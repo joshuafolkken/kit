@@ -38,8 +38,39 @@ export const sonarjs_rules = {
 	// 無駄なジャンプ文を禁止
 	'sonarjs/prefer-single-boolean-return': 'error',
 
-	// // 非常に重いため無効化。非推奨チェックは @typescript-eslint/no-deprecated で十分
-	// 'sonarjs/deprecation': 'off',
-	// // AWS関連のルールは不要な場合が多い
-	// 'sonarjs/aws-restricted-ip-admin-access': 'off',
+	// joshuafolkken/kit#8886: every deprecated use it reports, `@typescript-eslint/no-deprecated` reports
+	// at the same place, for a fraction of its cost. Its one extra report is the import line of a
+	// deprecated name, whose use is reported anyway. `base.js` turns the typescript-eslint rule back on
+	// in tests, where this rule was the only one checking.
+	'sonarjs/deprecation': 'off',
+	// joshuafolkken/kit#8886: these check AWS CDK, React, Vue and Angular code. kit and the projects it
+	// configures are SvelteKit and Node TypeScript and import none of them, so the rules ran on every
+	// file and could never report.
+	'sonarjs/aws-apigateway-public-api': 'off',
+	'sonarjs/aws-ec2-rds-dms-public': 'off',
+	'sonarjs/aws-ec2-unencrypted-ebs-volume': 'off',
+	'sonarjs/aws-efs-unencrypted': 'off',
+	'sonarjs/aws-iam-all-privileges': 'off',
+	'sonarjs/aws-iam-privilege-escalation': 'off',
+	'sonarjs/aws-iam-public-access': 'off',
+	'sonarjs/aws-opensearchservice-domain': 'off',
+	'sonarjs/aws-rds-unencrypted-databases': 'off',
+	'sonarjs/aws-restricted-ip-admin-access': 'off',
+	'sonarjs/aws-s3-bucket-granted-access': 'off',
+	'sonarjs/aws-s3-bucket-insecure-http': 'off',
+	'sonarjs/aws-s3-bucket-public-access': 'off',
+	'sonarjs/aws-s3-bucket-versioning': 'off',
+	'sonarjs/aws-sagemaker-unencrypted-notebook': 'off',
+	'sonarjs/aws-sns-unencrypted-topics': 'off',
+	'sonarjs/aws-sqs-unencrypted-queue': 'off',
+	'sonarjs/jsx-no-leaked-render': 'off',
+	'sonarjs/no-angular-bypass-sanitization': 'off',
+	'sonarjs/no-debounce-throttle-in-render': 'off',
+	'sonarjs/no-hook-setter-in-body': 'off',
+	'sonarjs/no-mutate-reactive-state-in-updated-hook': 'off',
+	'sonarjs/no-uniq-key': 'off',
+	'sonarjs/no-useless-react-setstate': 'off',
+	'sonarjs/no-vue-class-component': 'off',
+	'sonarjs/no-vue-mixins': 'off',
+	'sonarjs/prefer-read-only-props': 'off',
 }

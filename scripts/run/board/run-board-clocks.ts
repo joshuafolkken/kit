@@ -12,6 +12,7 @@ const { HEADER_ICONS, day_minute_of, minute_of } = run_board_labels
 const NOW_ICON = '🕒'
 const START_ICON = '🚀'
 const UNKNOWN_TIME = '--:--'
+const UNKNOWN_DATED = `----- ${UNKNOWN_TIME}`
 const { COLON } = run_board_spot
 
 // What the clocks read off the header (`BoardHeader`).
@@ -53,7 +54,16 @@ function clocks_of(header: ClockHeader, finish_ms: number | undefined): Array<st
 	})
 }
 
-const run_board_clocks = { clocks_of }
+// joshuafolkken/kit#8917: the same three times always dated (`MM-DD HH:MM`), with no icon and no colon
+// placeholder — what a theme's own time readouts show while the header drops a shared date (the BTTF
+// time circuits). An unknown finish keeps the width.
+function dated_of(header: ClockHeader, finish_ms: number | undefined): Array<string> {
+	const times = [header.ended_ms ?? finish_ms, header.now_ms, header.started_ms]
+
+	return times.map((ms) => (ms === undefined ? UNKNOWN_DATED : day_minute_of(ms)))
+}
+
+const run_board_clocks = { clocks_of, dated_of }
 
 export { run_board_clocks }
 export type { ClockHeader }

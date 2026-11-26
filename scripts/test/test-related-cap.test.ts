@@ -46,10 +46,14 @@ function reader_of(count: number): CountReader {
 	)
 }
 
+// joshuafolkken/kit#8893: the selection lists the deferred files; the line and the hub read its length.
 function selection_of(deferred: number): Selection {
 	return {
 		tests: [DIRECT_TEST],
-		deferred,
+		deferred: Array.from(
+			{ length: deferred },
+			(_, index) => `src/deferred-${String(index)}.test.ts`,
+		),
 		method: 'import',
 		reach: [
 			{ file: MERGED_HUB, count: MAX_TEST_FILES + 2 },

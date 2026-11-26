@@ -12,7 +12,7 @@ import { run_board_theme_defs } from './run-board-theme-defs'
 
 const { SHADES, field_of } = run_board_header_trace
 const { EMPTY_LAYOUT, NOW, header } = run_board_render_fixture
-const { THEME_DEFS } = run_board_theme_defs
+const { BASE_LOOK } = run_board_theme_defs
 const ESCAPE = '\u{1B}['
 const BLINK = `${ESCAPE}5m`
 const RED = `${ESCAPE}38;2;255;69;58m`
@@ -23,7 +23,7 @@ const CALM_TRACE = 'TRACE ■----'
 const HALTED_TRACE = 'TRACE ■■■■■'
 
 function matrix_board(extra: Partial<BoardHeader>): BoardHeader {
-	return header({ layout: EMPTY_LAYOUT, lane_limit: 3, theme: 'matrix', ...extra })
+	return header({ layout: EMPTY_LAYOUT, lane_limit: 3, theme: 'trace', ...extra })
 }
 
 function alert_of(extra: Partial<BoardHeader>): string {
@@ -94,7 +94,7 @@ describe('run_board_header_trace.SHADES', () => {
 // joshuafolkken/kit#8513: the alert rides the throughput rule; the header's first line draws none.
 describe('run_board_header.alert_part with the matrix theme', () => {
 	it('draws TRACE on the screen at the level DEFCON reads', () => {
-		const alert = vi.spyOn(THEME_DEFS.matrix, 'alert')
+		const alert = vi.spyOn(BASE_LOOK, 'alert')
 		const held = { read_failed_ms: NOW }
 
 		expect(alert_of({})).toBe(CALM_TRACE)

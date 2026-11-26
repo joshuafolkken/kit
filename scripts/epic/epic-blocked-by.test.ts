@@ -120,6 +120,45 @@ describe('epic_blocked_by.record — caused parks', () => {
 	})
 })
 
+describe('epic_blocked_by.record — a prerequisite in another epic', () => {
+	it.each([
+		['one chain', '- [ ] #10'],
+		['two chains', '- [ ] #10\n\n## Dependencies\n\n- #10 -> #12\n- #9 -> #10'],
+	])('writes only the relation with %s', async (_name, body) => {
+		vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({
+			cutoff: 'none',
+			epics: [
+				{ number: EPIC, body },
+				{ number: 8, body: '- [ ] #11' },
+			],
+		})
+
+		expect(await epic_blocked_by.record(REQUEST)).toBe('recorded')
+		expect(add_children).not.toHaveBeenCalled()
+		expect(state.calls).toStrictEqual(['relation'])
+	})
+
+	it('writes nothing when a cut-short listing may hide the epic tracking the prerequisite', async () => {
+		vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({
+			cutoff: 'row_limit',
+			epics: [{ number: EPIC, body: ISSUE_TRACKED }],
+		})
+
+		await expect(epic_blocked_by.record(REQUEST)).rejects.toThrow(UNSEEN)
+		expect(state.calls).toStrictEqual([])
+	})
+
+	it('names the next command and writes nothing when `epic --add` fails', async () => {
+		epics_of(ISSUE_TRACKED)
+		add_children.mockResolvedValue(1)
+
+		await expect(epic_blocked_by.record(REQUEST)).rejects.toThrow(
+			'next: pnpm josh epic --add 7 11 --chain "#11 -> #10"',
+		)
+		expect(state.calls).toStrictEqual([])
+	})
+})
+
 describe('epic_blocked_by.record — inside an epic', () => {
 	it('adds an untracked prerequisite through `epic --add --before`', async () => {
 		epics_of(ISSUE_TRACKED)

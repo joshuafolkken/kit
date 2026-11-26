@@ -27,6 +27,11 @@ beforeEach(() => {
 	vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 	mocked_create.mockResolvedValue(CHECKOUT)
 	mocked_run.mockResolvedValue(0)
+	// The real claim builds the repository's import graph and waits on the core budget, which can
+	// outrun the test timeout on a loaded runner; the claim test below asserts on it directly.
+	vi.spyOn(test_related_claim, 'with_unit_claim').mockImplementation(
+		async (_files, run) => await run(),
+	)
 })
 
 afterEach(() => {

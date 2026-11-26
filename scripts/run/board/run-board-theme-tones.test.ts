@@ -3,7 +3,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_theme_tones } from './run-board-theme-tones'
 
-// joshuafolkken/kit#8150: the colors of the WarGames theme's icon text.
+// joshuafolkken/kit#8150: the colors of a themed board's icon text.
 
 const { TONE_PAINTS, toned } = run_board_theme_tones
 const ESCAPE = '\u{1B}'
@@ -32,19 +32,19 @@ describe('run_board_theme_tones.TONE_PAINTS', () => {
 })
 
 describe('run_board_theme_tones.toned idle', () => {
+	// joshuafolkken/kit#8917: a themed board's base draws idle in the base look's idle; the tones' own
+	// dim is the default.
 	it.each([
-		{ theme: 'matrix', force: '3', expected: rgb('0;165;40') },
-		{ theme: 'wargames', force: '3', expected: rgb(IDLE_RGB) },
-		{ theme: 'matrix', force: '1', expected: `${ESCAPE}[32m${TEXT}${DEFAULT_FOREGROUND}` },
-		{ theme: 'wargames', force: '1', expected: `${ESCAPE}[2m${TEXT}${BOLD_OFF}` },
-	] as const)(
-		'draws $theme idle at depth $force from the theme definition',
-		({ theme, force, expected }) => {
-			vi.stubEnv('FORCE_COLOR', force)
+		{ idle: 'base', force: '3', expected: rgb('0;165;40') },
+		{ idle: 'default', force: '3', expected: rgb(IDLE_RGB) },
+		{ idle: 'base', force: '1', expected: `${ESCAPE}[32m${TEXT}${DEFAULT_FOREGROUND}` },
+		{ idle: 'default', force: '1', expected: `${ESCAPE}[2m${TEXT}${BOLD_OFF}` },
+	] as const)('draws the $idle idle at depth $force', ({ idle, force, expected }) => {
+		vi.stubEnv('FORCE_COLOR', force)
+		const paint = idle === 'base' ? run_board_theme_defs.BASE_LOOK.idle : undefined
 
-			expect(toned('idle', TEXT, run_board_theme_defs.THEME_DEFS[theme].idle)).toBe(expected)
-		},
-	)
+		expect(toned('idle', TEXT, paint)).toBe(expected)
+	})
 })
 
 describe('run_board_theme_tones.toned', () => {

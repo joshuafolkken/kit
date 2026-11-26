@@ -10,9 +10,11 @@ import { lane_human_wait_read } from './lane-human-wait-read'
 import { lane_human_wait_stats } from './lane-human-wait-stats'
 import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_limit_history } from './lane-limit-history'
+import { lane_limit_table } from './lane-limit-table'
 import { lane_net_read } from './lane-net-read'
 import { lane_over_causes } from './lane-over-causes'
 import { lane_pairs } from './lane-pairs'
+import { lane_prefix_stats } from './lane-prefix-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_sinks } from './lane-sinks'
 import { lane_sinks_issues } from './lane-sinks-issues'
@@ -135,12 +137,14 @@ async function period_records(
 	const human_waits = is_human_read
 		? await lane_human_wait_read.read_for(context, events, window)
 		: []
+	const sessions = lane_transcript_stats.read_sessions(transcript_directories(context), window)
 
 	return {
 		entries: await lane_ledger_archive.read_history(context),
 		events,
-		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
+		calls: lane_transcript_stats.calls_of(sessions),
 		human_waits,
+		prefixes: lane_prefix_stats.prefixes_of(sessions),
 	}
 }
 
@@ -189,7 +193,9 @@ async function stats_text(
 	const row = lane_stats.row(records.entries, window, { limit })
 	const tables = lane_stats_tables.tables_of(records, window, { is_all: request.is_all })
 
-	return [`${lane_stats.header()}\n${row}`, ...tables].join('\n\n')
+	const by_limit = lane_limit_table.table(records.entries, window)
+
+	return [`${lane_stats.header()}\n${row}`, by_limit, ...tables].join('\n\n')
 }
 
 // `--since` opens the window at its instant; `--period` opens it that many days before now.

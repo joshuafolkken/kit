@@ -108,7 +108,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Open the review, or --join to join, attest, record and recheck it; --ship then ships a clean recheck. Stops at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
-			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
+			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] [--accept-metrics "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"] [--unpinned-ok "<reason>"]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -117,6 +117,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '<N>',
 					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, check the generated pages (kit only) and the acceptance map, open the review',
+				},
+				{
+					arguments: '<N>',
+					note: 'the same, re-run after `pending`: each half (the opening, the `--join`) runs in the background past the `ship:wait` chunk, and the re-run waits on that run (a `--join` first waits on an unread opening)',
 				},
 				{
 					arguments: '<N> --from check:related',
@@ -145,6 +149,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '<N> --join --ship "<title> #<N>"',
 					note: 'ship a clean round; title must match the issue. Record interaction review first.',
+				},
+				{
+					arguments: '<N> --join --ship "<title> #<N>" --unpinned-ok "<reason>" --from recheck',
+					note: 'after a recheck stop on a place no test can pin: records the reason as run:review does, then rechecks and ships under it',
 				},
 			],
 		},

@@ -43,6 +43,10 @@ const test_related_schema = z.object({
 	// How many test files the cap left out of the run for CI to run — absent on a run that kept the whole
 	// suite and on rows written before it (joshuafolkken/kit#7976), which read `over_cap` instead.
 	deferred: z.number().optional(),
+	// Those test files, root-relative, so a CI failure can be told deferred or not — present only where
+	// the cap cut any, and absent on rows written before it (joshuafolkken/kit#8893), which `deferred`
+	// still counts.
+	deferred_files: z.array(z.string()).optional(),
 	// The changed file that added the most test files to the run, and that number — absent where no
 	// reach was read and on rows written before it (joshuafolkken/kit#7735).
 	widest_file: z.string().optional(),

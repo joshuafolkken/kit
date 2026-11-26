@@ -90,3 +90,40 @@ describe('backlog_offer_timing.is_due — a waiting driver with free lanes', () 
 		await expect(is_due_at(CONFIG.check_ms, false)).resolves.toBe(false)
 	})
 })
+
+// joshuafolkken/kit#8855: a run seeded with an earlier run's children asks nothing until they settle.
+describe('backlog_offer_timing.is_due — a settling run', () => {
+	const { CONFIG, harness, state } = backlog_drive_fixture
+	const SETTLED_MS = 30_000
+
+	async function is_due_at(now_ms: number): Promise<boolean> {
+		const { ports } = harness({})
+		const due_ports = { ...ports, listing_changed: async (): Promise<boolean> => true }
+		const settling = { ...state(['8750']), settling_until_ms: SETTLED_MS, not_before_ms: 0 }
+
+		return await backlog_offer_timing.is_due(
+			backlog_offer_timing.first_run(settling, 0),
+			CONFIG,
+			due_ports,
+			now_ms,
+		)
+	}
+
+	it.each([
+		['before the window ends, a deadline and a changed listing notwithstanding', 0, false],
+		['one millisecond before the window ends', SETTLED_MS - 1, false],
+		['once the window ends', SETTLED_MS, true],
+	])('asks %s', async (_label, now_ms, expected) => {
+		await expect(is_due_at(now_ms)).resolves.toBe(expected)
+	})
+
+	it.each([
+		[undefined, false],
+		[NOW_MS + 1, true],
+		[NOW_MS, false],
+	])('reads settling_until_ms %s as settling: %s', (until, expected) => {
+		const settling = { ...state(), settling_until_ms: until }
+
+		expect(backlog_offer_timing.is_settling(settling, NOW_MS)).toBe(expected)
+	})
+})

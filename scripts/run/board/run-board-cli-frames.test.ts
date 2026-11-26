@@ -3,7 +3,7 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_store, type FrameStore } from './run-board-frame-store'
 import { run_board_gather } from './run-board-gather'
-import type { BoardPorts } from './run-board-state'
+import type { BoardPorts, StallStage } from './run-board-state'
 
 const { LOCAL, START, STOPPED, harness, plan_titled } = run_board_fixture
 const { CHAT_KEY, FRESH_MS, memory_store, once_key } = run_board_frame_store
@@ -113,24 +113,22 @@ describe('run_board_cli.run --fresh and the record date', () => {
 
 // joshuafolkken/kit#7938: a live board records the frames `--chat` and `--once` answer from, drawn
 // from what it already read.
-const ESCAPE = '\u{1B}'
-// joshuafolkken/kit#8125: a live frame starts its synchronized output at the top of the screen.
-const HOME = `${ESCAPE}[?2026h${ESCAPE}[H`
 const LIVE_SECONDS = 11
 const LIVE_MS = LIVE_SECONDS * 1000
 // The run's own reads the live board takes on its own cadence over `LIVE_MS`: one at the start, then
 // one each `LOCAL_READ_MS`.
 const LOCAL_READS = Math.floor(LIVE_MS / run_board_gather.LOCAL_READ_MS) + 1
 
-// A live board run for `LIVE_MS`, its saves counted, its writes kept.
+// A live board run for `LIVE_MS`, its saves counted and its redraws (joshuafolkken/kit#8826: a redraw
+// writes only what changed, so it is counted as it begins, not from its write).
 async function watched(store: FrameStore): Promise<{
 	made: ReturnType<typeof harness>
 	saves: Array<string>
-	writes: Array<string>
+	redraws: Array<StallStage>
 }> {
 	const made = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
 	const saves: Array<string> = []
-	const writes: Array<string> = []
+	const redraws: Array<StallStage> = []
 	const counted: FrameStore = {
 		load: store.load,
 		save: (key, frame) => {
@@ -145,26 +143,25 @@ async function watched(store: FrameStore): Promise<{
 			if (made.clock.now_ms >= START + LIVE_MS) throw STOPPED
 			made.clock.now_ms += ms
 		},
-		write: (text) => {
-			writes.push(text)
+		enter_stage: (stage) => {
+			if (stage === 'redraw') redraws.push(stage)
 		},
 	}
 
 	await expect(run_board_cli.run([], live)).rejects.toBe(STOPPED)
 
-	return { made, saves, writes }
+	return { made, saves, redraws }
 }
 
 // joshuafolkken/kit#8161: the frames are recorded on the worker thread (`run-board-gather-record.ts`),
 // so the board's own redraws record nothing.
 describe('run_board_cli.run live board record', () => {
 	it('records nothing on the board’s own thread while it draws', async () => {
-		const { made, saves, writes } = await watched(memory_store())
-		const frames = writes.filter((text) => text.startsWith(HOME))
+		const { made, saves, redraws } = await watched(memory_store())
 
-		expect(frames.length).toBeGreaterThan(LIVE_SECONDS - 1)
+		expect(redraws.length).toBeGreaterThan(LIVE_SECONDS - 1)
 		expect(saves).toStrictEqual([])
-		expect(made.read_machine).toHaveBeenCalledTimes(frames.length)
+		expect(made.read_machine).toHaveBeenCalledTimes(redraws.length)
 		expect(made.read_local).toHaveBeenCalledTimes(LOCAL_READS)
 	})
 })
@@ -172,7 +169,7 @@ describe('run_board_cli.run live board record', () => {
 describe('run_board_cli.run --once record keys', () => {
 	it.each([
 		['a terminal', once_key(undefined, true)],
-		['another theme', once_key('wargames', false)],
+		['another theme', once_key('wopr', false)],
 	])('reads past a record kept for %s', async (_name, key) => {
 		const store = memory_store()
 		const made = board(store)
@@ -188,8 +185,8 @@ describe('run_board_cli.run --once record keys', () => {
 		const store = memory_store()
 		const made = board(store)
 
-		store.save(once_key('wargames', false), { text: RECORDED, saved_ms: made.clock.now_ms })
-		await run_board_cli.run(['--once', '--theme', 'wargames'], made.ports)
+		store.save(once_key('wopr', false), { text: RECORDED, saved_ms: made.clock.now_ms })
+		await run_board_cli.run(['--once', '--theme', 'wopr'], made.ports)
 
 		expect(made.read_local).not.toHaveBeenCalled()
 		expect(made.frames).toStrictEqual([`${RECORDED}recorded 0s ago\n`])
@@ -199,10 +196,10 @@ describe('run_board_cli.run --once record keys', () => {
 		const store = memory_store()
 		const made = board(store)
 
-		store.save(once_key('wargames', false), { text: RECORDED, saved_ms: made.clock.now_ms })
-		await run_board_cli.run(['--once', '--theme', 'wargames', '--icons', 'letters'], made.ports)
+		store.save(once_key('wopr', false), { text: RECORDED, saved_ms: made.clock.now_ms })
+		await run_board_cli.run(['--once', '--theme', 'wopr', '--icons', 'letters'], made.ports)
 
 		expect(made.read_local).toHaveBeenCalled()
-		expect(store.load(once_key('wargames', false, 'letters'))?.text).toBe(made.frames[0])
+		expect(store.load(once_key('wopr', false, 'letters'))?.text).toBe(made.frames[0])
 	})
 })

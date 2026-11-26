@@ -164,6 +164,45 @@ describe('run_board_sound_typing.typing_sound', () => {
 	})
 })
 
+// joshuafolkken/kit#8917: demo mode's switch sounds the trill in the voice of the theme shown.
+describe('run_board_sound_typing.typing_sound revoice', () => {
+	const OTHER_WAV = 'sounds/click.wav'
+
+	it('ends a sounding player and sounds the new voice in its place', () => {
+		const test = harness()
+		const sound = typing_sound(test.ports)
+
+		sound.set(true)
+		sound.revoice?.(() => OTHER_WAV)
+
+		expect(first_player(test)?.kill).toHaveBeenCalledOnce()
+		expect(test.start.mock.calls.map((call) => call[0])).toStrictEqual([WAV, OTHER_WAV])
+	})
+
+	it('sounds the new voice at the next start where none sounds', () => {
+		const test = harness()
+		const sound = typing_sound(test.ports)
+
+		sound.set(true)
+		sound.set(false)
+		sound.revoice?.(() => OTHER_WAV)
+		sound.set(true)
+
+		expect(test.start.mock.calls.map((call) => call[0])).toStrictEqual([WAV, OTHER_WAV])
+	})
+
+	it('starts nothing once stopped', () => {
+		const test = harness()
+		const sound = typing_sound(test.ports)
+
+		sound.set(true)
+		sound.stop()
+		sound.revoice?.(() => OTHER_WAV)
+
+		expect(test.start).toHaveBeenCalledOnce()
+	})
+})
+
 describe('run_board_sound_typing.typing_sound player ends', () => {
 	it('never restarts an ended stream while still on (ac-036747cc)', () => {
 		const test = harness()

@@ -6,7 +6,12 @@ const approval_file_mock = vi.hoisted(() =>
 	vi.fn(async (): Promise<string | undefined> => undefined),
 )
 
+const kit_mock = vi.hoisted(() => vi.fn(() => true))
+
 vi.mock('#scripts/lane/lane-plan', () => ({ lane_plan: { is_uncleared: uncleared_mock } }))
+vi.mock('#scripts/gate/project-checks', () => ({
+	project_checks: { is_kit_repository: kit_mock },
+}))
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { plan_paths: plan_paths_mock },
 }))
@@ -25,6 +30,7 @@ const PLANNED = ['scripts/lane/lane-overrun-mechanisms-cli.ts', 'docs/josh-comma
 
 beforeEach(() => {
 	uncleared_mock.mockReturnValue(true)
+	kit_mock.mockReturnValue(true)
 	plan_paths_mock.mockResolvedValue([])
 	approval_file_mock.mockResolvedValue(undefined)
 })
@@ -58,21 +64,43 @@ describe('run_step_lane_plan.lines_for', () => {
 	it('follows the command with one line that names --imports', async () => {
 		const lines = await run_step_lane_plan.lines_for(ISSUE, true)
 
-		expect(lines).toHaveLength(2)
+		expect(lines).toHaveLength(3)
 		expect(lines[1]).toBe(lane_plan_auto.IMPORTS_HINT)
 		expect(lines[1]).toContain('--imports <path>...')
-	})
-
-	it('names nothing once the plan is cleared', async () => {
-		uncleared_mock.mockReturnValue(false)
-
-		expect(await run_step_lane_plan.lines_for(ISSUE, true)).toStrictEqual([])
-		expect(plan_paths_mock).not.toHaveBeenCalled()
 	})
 
 	it('names nothing outside a lane child', async () => {
 		expect(await run_step_lane_plan.lines_for(ISSUE, false)).toStrictEqual([])
 		expect(uncleared_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8860: nine lanes in ten stopped once on `metrics-totals` for a foreseen growth.
+describe('run_step_lane_plan.lines_for and the metrics declaration', () => {
+	it('ends with the declaration a lane runs before its first gate (ac-9c279ccf)', async () => {
+		const lines = await run_step_lane_plan.lines_for(ISSUE, true)
+
+		expect(lines.at(-1)).toBe(run_step_lane_plan.EXPECT_HINT)
+		expect(run_step_lane_plan.EXPECT_HINT).toContain('pnpm josh metrics --expect')
+	})
+
+	it('names only the declaration once the plan is cleared', async () => {
+		uncleared_mock.mockReturnValue(false)
+
+		expect(await run_step_lane_plan.lines_for(ISSUE, true)).toStrictEqual([
+			run_step_lane_plan.EXPECT_HINT,
+		])
+		expect(plan_paths_mock).not.toHaveBeenCalled()
+	})
+
+	it('names no declaration outside kit, where josh metrics does not exist', async () => {
+		kit_mock.mockReturnValue(false)
+
+		expect(await run_step_lane_plan.lines_for(ISSUE, true)).not.toContain(
+			run_step_lane_plan.EXPECT_HINT,
+		)
+		uncleared_mock.mockReturnValue(false)
+		expect(await run_step_lane_plan.lines_for(ISSUE, true)).toStrictEqual([])
 	})
 })
 

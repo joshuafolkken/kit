@@ -8,8 +8,7 @@ import { run_board_labels } from './run-board-labels'
 import type { NowLine } from './run-board-now'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_row_key } from './run-board-row-key'
-import { run_board_spot } from './run-board-spot'
-import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
+import type { Theme } from './run-board-theme-defs'
 
 // The header's time cells (`run-board-header.ts`): what the run has left over its age over the third
 // line's spinner and age, and the stale coloring a row's newest activity takes
@@ -23,7 +22,6 @@ const UNKNOWN_SPAN = '--′--″'
 const ENDED_TIME = '—'
 const { cell_of } = run_board_render_slot
 const { padded } = run_board_fresh
-const { SECONDS_MARK, TICK } = run_board_spot
 const aged_fresh = run_board_fresh.aged
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
@@ -110,18 +108,9 @@ function fresh_age(now: NowLine | undefined, header: TimeHeader): number | undef
 	return age === undefined ? undefined : age + header.now_ms - (header.ended_ms ?? header.now_ms)
 }
 
-// Whether the third line's `″` is drawn as the placeholder the sweep below it is placed by
-// (joshuafolkken/kit#8240, #8425): in wargames on a terminal — where a spinner is given — for a run neither stopped nor
-// ended, so a run that waits keeps its heartbeat moving (joshuafolkken/kit#8404).
-function is_swept(header: TimeHeader, mark: RunMark): boolean {
-	if (!run_board_theme_defs.live_of(header.theme).sweep) return false
-
-	return header.spinner !== undefined && mark !== 'stopped' && header.ended_ms === undefined
-}
-
 // The third line's time: the spinner in the signs' column — turning only while the run works, so a
 // watch stands blank, and kept however long the time grows — then its age, emphasized while what the
-// line says is fresh, its `″` the sweep's placeholder where the run is swept. An ended run draws `—`.
+// line says is fresh. An ended run draws `—`.
 function now_time(
 	header: TimeHeader,
 	mark: RunMark,
@@ -131,8 +120,7 @@ function now_time(
 	if (header.ended_ms !== undefined) return ENDED_TIME.padStart(SIGN_WIDTH + width)
 	if (now === undefined) return ''
 	const spinner = WORKING_MARKS.has(mark) ? header.spinner : undefined
-	const span = span_or_blank(now.age_ms)
-	const age = is_swept(header, mark) ? span.split(SECONDS_MARK).join(TICK) : span
+	const age = span_or_blank(now.age_ms)
 	const fresh = aged_fresh(age, fresh_age(now, header), header)
 
 	return `${cell_of(spinner, SIGN_WIDTH)}${padded(age, width, fresh)}`

@@ -333,3 +333,17 @@ describe('run against a live record', () => {
 		expect(read.kind === 'carried' ? read.carry.added : []).toBeUndefined()
 	})
 })
+
+describe('run against a live bare --only record', () => {
+	it('writes a queued issue into a bare --only run, which names none', async () => {
+		run_carry.begin_carry(target(), 'backlogrun --only', run_carry.NO_OWNER, new Date())
+
+		expect(await run_add_cli.run([String(ADDED_ISSUE)], OPEN_PORTS)).toBe(0)
+
+		const read = run_carry.read_carry(target())
+
+		expect(read.kind === 'carried' ? run_carry.remaining_of(read.carry) : []).toStrictEqual([
+			ADDED_ISSUE,
+		])
+	})
+})

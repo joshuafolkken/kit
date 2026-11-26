@@ -3,13 +3,12 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_spin_place } from './run-board-spin-place'
 import { run_board_spot } from './run-board-spot'
 
-const { SPOT, TICK } = run_board_spot
+const { SPOT } = run_board_spot
 // The row key's end mark (`run-board-row-key.ts`), past which a row's suffix rides along.
 const END = '\u{E008}'
 const COLUMNS = 10
 const SCREEN = { rows: 24, columns: COLUMNS }
 // Wide enough for a sweep's 20 cells.
-const WIDE = { rows: 24, columns: 80 }
 
 describe('run_board_spin_place.starts_of', () => {
 	it('starts each line below the rows the lines above it wrap to', () => {
@@ -86,22 +85,5 @@ describe('run_board_spin_place.can_type', () => {
 		const suffixed = { ...line, suffix: 'x'.repeat(COLUMNS) }
 
 		expect(run_board_spin_place.can_type(suffixed, SCREEN.rows, COLUMNS)).toBe(false)
-	})
-})
-
-describe('run_board_spin_place.sweep_in', () => {
-	it('has no sweep without a tick placeholder', () => {
-		expect(run_board_spin_place.sweep_in(['plain'], [1], SCREEN)).toBeUndefined()
-	})
-
-	it('sweeps the empty line below the tick', () => {
-		expect(run_board_spin_place.sweep_in([`12${TICK}`, ''], [1, 2], WIDE)).toStrictEqual({
-			row: 2,
-			left: 1,
-		})
-	})
-
-	it('has no sweep when the lines have no recorded starts', () => {
-		expect(run_board_spin_place.sweep_in([`12${TICK}`, ''], [], WIDE)).toBeUndefined()
 	})
 })

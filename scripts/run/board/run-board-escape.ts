@@ -63,7 +63,6 @@ function link_close_for(open: string): string {
 const run_board_escape = {
 	FRAME_ESCAPE,
 	LINE_ESCAPE,
-	LINK_CLOSE,
 	is_escape,
 	is_link,
 	is_link_open,

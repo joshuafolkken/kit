@@ -1,0 +1,1 @@
+- rf:performance | low | scripts/lint/lint-related.ts:122 | 2026-11-17 | #7829

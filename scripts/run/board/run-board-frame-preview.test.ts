@@ -12,6 +12,7 @@ const { options_of } = run_board_frame_preview
 const ESCAPE = '\u{1B}['
 const NARROW = 60
 const ROWS = 30
+const SIZE = { rows: ROWS, columns: NARROW }
 const NOTICE = ['--notice', 'running', '--issue', '8426']
 const NOTICE_TEXT = /🔊 \d{2}:\d{2} 🔄 launch · #8426 running/u
 
@@ -83,7 +84,7 @@ describe('run_board_frame_preview — the form', () => {
 
 	it('draws in the theme it is given', async () => {
 		const plain = await framed(['--ansi'])
-		const themed = await framed(['--ansi', '--theme', 'wargames'])
+		const themed = await framed(['--ansi', '--theme', 'wopr'])
 
 		expect(themed.text).not.toBe(plain.text)
 	})
@@ -91,7 +92,7 @@ describe('run_board_frame_preview — the form', () => {
 	it('runs the lamp panel a lamp theme runs on a live board', async () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		vi.stubEnv('NO_COLOR', undefined)
-		const { text } = await framed(['--theme', 'wargames'])
+		const { text } = await framed(['--theme', 'wopr'])
 
 		expect(text).toContain('■')
 	})
@@ -104,6 +105,24 @@ describe('run_board_frame_preview — the form', () => {
 
 		expect(store.load).not.toHaveBeenCalled()
 		expect(store.save).not.toHaveBeenCalled()
+	})
+})
+
+const BOLD = `${ESCAPE}1m`
+const FRAME = `${BOLD}rule${ESCAPE}0m\nab■d\n`
+const PLAIN = { cause: undefined, is_repeat: false, is_muted: false, size: SIZE, is_ansi: false }
+
+// joshuafolkken/kit#8917: a frame is printed plain, or with its escapes under `--ansi`; a theme's
+// animation is its theme layer's, which a single frame does not draw.
+describe('run_board_frame_preview.painted', () => {
+	const { painted } = run_board_frame_preview
+
+	it('prints the plain frame', () => {
+		expect(painted(FRAME, PLAIN)).toBe('rule\nab■d\n')
+	})
+
+	it('keeps the escapes under --ansi', () => {
+		expect(painted(FRAME, { ...PLAIN, is_ansi: true })).toBe(FRAME)
 	})
 })
 

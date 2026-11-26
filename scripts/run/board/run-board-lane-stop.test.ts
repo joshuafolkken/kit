@@ -5,6 +5,7 @@ import {
 	NEEDS_HUMAN_MERGE_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
+import { run_resume_wait, type ResumeWaits } from '#scripts/run/event/run-resume-wait'
 import { describe, expect, it } from 'vitest'
 import { run_board_lane_state } from './run-board-lane-state'
 import { run_board_lane_stop } from './run-board-lane-stop'
@@ -26,6 +27,9 @@ const RUNNING: ItemStatus = {
 	lane: 'lane 6577',
 }
 const STOPPED = 'stopped'
+const { SEAT_WAIT } = run_resume_wait
+const NO_WAITS: ResumeWaits = new Map()
+const WAITING: ResumeWaits = new Map([[String(ISSUE), SEAT_WAIT]])
 
 describe('run_board_lane_stop.lane_status', () => {
 	it('dates the stop by the record that ended the lane over its first idle read', () => {
@@ -73,7 +77,7 @@ describe('run_board_lane_stop.stop_lanes', () => {
 		const ended = new Map([[ISSUE, { ended_ms: ENDED_MS, by: CLOSER }]])
 		const lanes = { ...run_board_lane_state.NO_LANES, ended }
 
-		run_board_lane_stop.stop_lanes(statuses, lanes, new Map([[String(ISSUE), IDLE_MS]]))
+		run_board_lane_stop.stop_lanes(statuses, lanes, new Map([[String(ISSUE), IDLE_MS]]), NO_WAITS)
 
 		expect(statuses.get(ISSUE)).toMatchObject({ state: STOPPED, ended_ms: ENDED_MS })
 	})
@@ -85,7 +89,36 @@ describe('run_board_lane_stop.stop_lanes', () => {
 			statuses,
 			run_board_lane_state.NO_LANES,
 			new Map([[String(ISSUE), IDLE_MS]]),
+			NO_WAITS,
 		)
+
+		expect(statuses.get(ISSUE)).toBe(RUNNING)
+	})
+})
+
+describe('run_board_lane_stop.stop_lanes outage waits', () => {
+	it.each([
+		['beside the reason it stopped for', CLOSER],
+		['where nothing named the stop', undefined],
+	])('carries an outage wait %s in its own field', (_case, stop_reason) => {
+		const stopped: ItemStatus = {
+			state: STOPPED,
+			...(stop_reason !== undefined && { stop_reason }),
+		}
+		const statuses = new Map([[ISSUE, stopped]])
+
+		run_board_lane_stop.stop_lanes(statuses, run_board_lane_state.NO_LANES, new Map(), WAITING)
+
+		expect(statuses.get(ISSUE)?.resume_wait).toBe(SEAT_WAIT)
+		expect(statuses.get(ISSUE)?.stop_reason).toBe(stop_reason)
+	})
+
+	it('leaves a running child, and a wait with no reason yet, unchanged', () => {
+		const statuses = new Map([[ISSUE, RUNNING]])
+		const unreasoned = new Map([[String(ISSUE), undefined]])
+
+		run_board_lane_stop.stop_lanes(statuses, run_board_lane_state.NO_LANES, new Map(), WAITING)
+		run_board_lane_stop.stop_lanes(statuses, run_board_lane_state.NO_LANES, new Map(), unreasoned)
 
 		expect(statuses.get(ISSUE)).toBe(RUNNING)
 	})
@@ -163,8 +196,8 @@ describe('run_board_lane_stop — a live lane', () => {
 		const live = new Map([[ISSUE, RUNNING]])
 		const idle = new Map([[ISSUE, RUNNING]])
 
-		run_board_lane_stop.stop_lanes(live, lanes, new Map())
-		run_board_lane_stop.stop_lanes(idle, lanes, new Map([[String(ISSUE), IDLE_MS]]))
+		run_board_lane_stop.stop_lanes(live, lanes, new Map(), NO_WAITS)
+		run_board_lane_stop.stop_lanes(idle, lanes, new Map([[String(ISSUE), IDLE_MS]]), NO_WAITS)
 
 		expect(live.get(ISSUE)).toStrictEqual({ ...RUNNING, is_live: true })
 		expect(idle.get(ISSUE)?.is_live).toBeUndefined()

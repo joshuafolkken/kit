@@ -384,10 +384,10 @@ describe('IMPLEMENTATION_CUT_REASON', () => {
 		// The pointer every delivery names — where `resume-impl`, the handoff's contents, the one
 		// measurement and the per-crossing reissue are stated (`implementation-cut-rule.test.ts`).
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
-		// **The threshold is named by the command that prices it** (joshuafolkken/kit#2385): #5341 prices
-		// the break-even at the session's model, so no fixed figure is right for every run — the reason
-		// names the command that prints the current one.
-		['over `pnpm josh cost --cut`'],
+		// **The threshold is named by its horizon** (joshuafolkken/kit#2385, #8817): #5341 prices the
+		// break-even at the session's model, so no fixed figure is right for every run — the reason
+		// names the row's own horizon, below the shared `pnpm josh cost --cut` figure, never that command.
+		["over its horizon's break-even"],
 	])('carries %j', (marker) => {
 		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(marker)
 	})

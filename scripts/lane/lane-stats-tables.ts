@@ -19,7 +19,9 @@ import { lane_implement_stats } from './lane-implement-stats'
 import { lane_implement_tool_split } from './lane-implement-tool-split'
 import type { lane_ledger } from './lane-ledger'
 import { lane_lint_related_stats } from './lane-lint-related-stats'
+import { lane_model_stats } from './lane-model-stats'
 import { lane_paused_spans } from './lane-paused-spans'
+import { lane_prefix_stats, type SessionPrefix } from './lane-prefix-stats'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_record_command_stats } from './lane-record-command-stats'
 import { lane_round_one_stats } from './lane-round-one-stats'
@@ -46,6 +48,8 @@ interface PeriodRecords {
 	calls: ReadonlyArray<ToolCall>
 	// The waits on a person (`lane-human-wait-read.ts`); absent, none were read.
 	human_waits?: ReadonlyArray<HumanWait>
+	// Each lane session's first request (`lane-prefix-stats.ts`); absent, none were read.
+	prefixes?: ReadonlyArray<SessionPrefix>
 }
 
 // The tables read from the lane transcripts, under the followup critical path table.
@@ -101,7 +105,22 @@ function plan_tables(
 		lane_held_stats.cause_table(entries, window),
 		lane_held_stats.blocker_table(entries, window),
 		lane_dispatch_wait_stats.table(entries, window, events),
+		lane_model_stats.table(entries, window),
 		lane_core_wait_stats.table(entries, window, options),
+	]
+}
+
+// The tables read from the lane sessions as a whole — their verification calls, first requests,
+// recording commands and overlap — closing the period's tables.
+function session_tables(
+	{ entries, calls, prefixes = [] }: PeriodRecords,
+	window: StatsWindow,
+): Array<string> {
+	return [
+		lane_transcript_stats.table(calls, window),
+		lane_prefix_stats.table(prefixes, calls, window),
+		lane_record_command_stats.table(entries, calls, window),
+		lane_concurrency_stats.table(entries, calls, window),
 	]
 }
 
@@ -128,9 +147,7 @@ function tables_of(
 		lane_test_related_stats.table(entries, window),
 		lane_test_related_stats.trigger_table(entries, window),
 		lane_lint_related_stats.table(entries, window),
-		lane_transcript_stats.table(calls, window),
-		lane_record_command_stats.table(entries, calls, window),
-		lane_concurrency_stats.table(entries, calls, window),
+		...session_tables(records, window),
 	]
 }
 

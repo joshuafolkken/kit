@@ -60,7 +60,7 @@ describe('run_entry_cli — missing dispatch after claiming the hold (joshuafolk
 		josh_run_mock
 			.mockResolvedValueOnce({ code: OK, out: 'hold' })
 			.mockResolvedValue({ code: OK, out: 'under' })
-		await lane_ledger_write.record_dispatch(OTHER_ISSUE, fixture.target)
+		await lane_ledger_write.record_dispatch({ issue: OTHER_ISSUE }, fixture.target)
 
 		expect(await run_entry_cli.run(is_adopt ? [ISSUE, '--adopt'] : [ISSUE])).toBe(OK)
 		expect(lane_ledger.read_entries(fixture.target)).toMatchObject([
@@ -73,7 +73,7 @@ describe('run_entry_cli — missing dispatch after claiming the hold (joshuafolk
 		josh_run_mock
 			.mockResolvedValueOnce({ code: OK, out: 'hold' })
 			.mockResolvedValue({ code: OK, out: 'under' })
-		await lane_ledger_write.record_dispatch(Number(ISSUE), fixture.target)
+		await lane_ledger_write.record_dispatch({ issue: Number(ISSUE) }, fixture.target)
 		const before = lane_ledger.read_entries(fixture.target)
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
@@ -116,8 +116,8 @@ describe('run_entry_cli — absent ledgers and skipped claims', () => {
 	})
 
 	it('preserves repeated explicit dispatch records', async () => {
-		await lane_ledger_write.record_dispatch(Number(ISSUE), fixture.target)
-		await lane_ledger_write.record_dispatch(Number(ISSUE), fixture.target)
+		await lane_ledger_write.record_dispatch({ issue: Number(ISSUE) }, fixture.target)
+		await lane_ledger_write.record_dispatch({ issue: Number(ISSUE) }, fixture.target)
 
 		expect(lane_ledger.read_entries(fixture.target)).toHaveLength(2)
 	})

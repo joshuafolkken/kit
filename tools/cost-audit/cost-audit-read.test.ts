@@ -99,12 +99,21 @@ describe('cost_audit_read.session_of — the trigger of a resume session', () =>
 
 // joshuafolkken/kit#5936: the phase table reads each lane transcript's stages by its Issue.
 describe('cost_audit_read.issue_of — the lane a transcript was written under', () => {
-	const lanes = [LANE, '/p/-dev--kit-lanes-12']
+	const lanes = new Set([LANE, '/p/-dev--kit-lanes-12'])
 
 	it("reads a delegated unit's Issue off the lane directory above it", () => {
 		const unit = `${LANE}/s1/subagents/agent-a1.jsonl`
 
 		expect(cost_audit_read.issue_of(unit, lanes)).toBe(5936)
+	})
+
+	it("reads a lane child's own transcript off the lane directory holding it", () => {
+		expect(cost_audit_read.issue_of(`${LANE}/s1.jsonl`, lanes)).toBe(5936)
+	})
+
+	// A lane directory whose name another extends is not an ancestor of the longer one's transcripts.
+	it('answers nothing for a sibling directory sharing a lane prefix', () => {
+		expect(cost_audit_read.issue_of(`${LANE}0/s1.jsonl`, lanes)).toBeUndefined()
 	})
 
 	it('answers nothing for a transcript outside every lane', () => {
@@ -125,7 +134,7 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('gives a lane transcript its Issue and leaves the main checkout one without', () => {
+	it('gives a lane transcript its Issue and leaves the main checkout one without', async () => {
 		const lane_file = { ...MAIN_FILE, session_id: 's2', path: `${LANE}/s2.jsonl` }
 
 		vi.spyOn(cost_transcript, 'session_cwd').mockReturnValue('/dev/kit')
@@ -134,7 +143,8 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 		vi.spyOn(cost_transcript, 'lane_transcript_directories').mockReturnValue([LANE])
 		vi.spyOn(cost_transcript, 'read_raw').mockReturnValue(prompt_line(0, FULLRUN_PROMPT))
 
-		const issues = cost_audit_read.load('/dev/kit', 0).map((one) => [one.issue, one.is_lane])
+		const loaded = await cost_audit_read.load('/dev/kit', 0)
+		const issues = loaded.map((one) => [one.issue, one.is_lane])
 
 		expect(issues).toStrictEqual([
 			[undefined, false],
@@ -143,7 +153,7 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 	})
 
 	// joshuafolkken/kit#8311: a cut resume is placed by the lane's session before it once all are read.
-	it("places a lane's cut resume by the lane session read before it", () => {
+	it("places a lane's cut resume by the lane session read before it", async () => {
 		const first = { ...MAIN_FILE, session_id: 's2', path: `${LANE}/s2.jsonl`, modified_ms: 1 }
 		const second = { ...first, session_id: 's3', path: `${LANE}/s3.jsonl`, modified_ms: 2 }
 		const cut = { name: 'Bash', input: { command: 'pnpm josh run:cut 5936' } }
@@ -155,7 +165,8 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 		stub_lane_files([second, first])
 		vi.spyOn(cost_transcript, 'read_raw').mockImplementation((file) => texts.get(file.path) ?? '')
 
-		const triggers = cost_audit_read.load('/dev/kit', 0).map((one) => one.trigger)
+		const loaded = await cost_audit_read.load('/dev/kit', 0)
+		const triggers = loaded.map((one) => one.trigger)
 
 		expect(triggers).toStrictEqual([undefined, 'pre-gate cut'])
 	})
@@ -194,7 +205,7 @@ describe('cost_audit_read.load — a delegated unit carries its agent type', () 
 		vi.restoreAllMocks()
 	})
 
-	it('gives a loaded delegated unit its agent type and a main session none', () => {
+	it('gives a loaded delegated unit its agent type and a main session none', async () => {
 		const meta = JSON.stringify({ agentType: 'investigator' })
 		const unit_file = { ...MAIN_FILE, path: unit_path('a5', meta), is_delegated: true, depth: 1 }
 		const main_file = { ...MAIN_FILE, session_id: 's9', path: unit_path('a6', meta) }
@@ -205,9 +216,9 @@ describe('cost_audit_read.load — a delegated unit carries its agent type', () 
 		vi.spyOn(cost_transcript, 'lane_transcript_directories').mockReturnValue([])
 		vi.spyOn(cost_transcript, 'read_raw').mockReturnValue(prompt_line(0, FULLRUN_PROMPT))
 
-		const types = cost_audit_read.load('/dev/kit', 0).map((one) => one.agent_type)
+		const loaded = await cost_audit_read.load('/dev/kit', 0)
 
-		expect(types).toStrictEqual([undefined, 'investigator'])
+		expect(loaded.map((one) => one.agent_type)).toStrictEqual([undefined, 'investigator'])
 	})
 })
 
@@ -235,9 +246,9 @@ describe('cost_audit_read.load_lane_children — only lane children are opened',
 		vi.restoreAllMocks()
 	})
 
-	it('opens no main checkout, delegated unit or pre-since transcript', () => {
+	it('opens no main checkout, delegated unit or pre-since transcript', async () => {
 		const read = stub_store()
-		const sessions = cost_audit_read.load_lane_children('/dev/kit', 3)
+		const sessions = await cost_audit_read.load_lane_children('/dev/kit', 3)
 		const lane_file = LANE_FILE
 
 		expect(read.mock.calls.map(([file]) => file.path)).toStrictEqual([lane_file.path])

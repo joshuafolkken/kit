@@ -1,3 +1,4 @@
+import { run_board_cut_styled } from './run-board-cut-styled'
 import {
 	run_board_fit,
 	type DetailPart,
@@ -7,9 +8,9 @@ import {
 	type SectionKey,
 	type TerminalSize,
 } from './run-board-fit'
-import { run_board_flash_parts } from './run-board-flash-parts'
 import { run_board_lamps, type PanelSpan } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
+import { run_board_spot } from './run-board-spot'
 
 // A live `run:board`'s sections folded and unfolded by one key each (joshuafolkken/kit#4172): every
 // section starts as the last board left it, and what a person folds is saved to `~/.claude/josh/board.json`
@@ -37,7 +38,6 @@ const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: a
 // The live terminal a frame is kept within, the footer the frame ends on and gives way first, and the
 // sections a person folded; none for a frame that is not redrawn in place, which is drawn as it was.
 interface FrameBounds {
-	is_flash_keyed?: boolean | undefined
 	size?: TerminalSize | undefined
 	footer?: ReadonlyArray<string> | undefined
 	folded?: ReadonlySet<SectionKey> | undefined
@@ -158,6 +158,9 @@ function widened_parts(parts: FrameParts): FrameParts {
 
 // No panel: every panel started is dropped.
 const NO_PANEL: PanelSpan = { start: 0, end: 0 }
+const { LAMP_START } = run_board_spot
+// A cut row's last column and the blank after it, before the panel's start.
+const CUT_GAP = 2
 
 // Every panel starts where the throughput rows' does and runs on to the end of the throughput rule, its
 // head's widest line (joshuafolkken/kit#8236, joshuafolkken/kit#8277); none where no throughput row starts
@@ -185,10 +188,6 @@ function is_line_clear(line: DetailLine, span: PanelSpan): boolean {
 	return column === undefined || column < span.start
 }
 
-function is_clear(lines: ReadonlyArray<DetailLine>, span: PanelSpan): boolean {
-	return lines.every((line) => is_line_clear(line, span))
-}
-
 // A line reaching the panel's start with the trailing note its text ends on left off; one clear of it
 // keeps its note.
 function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
@@ -199,16 +198,36 @@ function without_aside(line: DetailLine, span: PanelSpan): DetailLine {
 	return { ...line, text: `${text.slice(0, index)}${text.slice(index + aside.length)}` }
 }
 
-// The usage rows run their panels both or neither: where one's text reaches the panel's start, the
-// reaching rows' asides — a stale reading's age — are left off so both run them
-// (joshuafolkken/kit#8644); none where one reaches it still, or where the span has no room for a panel.
+// A line reaching the panel's start still, cut a blank short of it with its panel's start kept: the
+// panel is always kept beside the usage rows (joshuafolkken/kit#8695). The marker's color escapes hold
+// no blank, so the last blank before it is the gap, and the marker is kept with its escapes whole.
+function cut_line(line: DetailLine, span: PanelSpan): DetailLine {
+	const { text } = line
+	if (is_line_clear(line, span)) return line
+
+	const gap = text.lastIndexOf(' ', text.indexOf(LAMP_START))
+	const before = run_board_cut_styled.cut_styled(text.slice(0, gap), span.start - CUT_GAP)
+
+	return { ...line, text: `${before}${text.slice(gap)}` }
+}
+
+// A usage part with no panel beside it — a folded throughput, or no room — draws each row's gauged text
+// where it carries one (joshuafolkken/kit#8695).
+function gauged(usage: DetailPart): DetailPart {
+	return { ...usage, lines: usage.lines.map((line) => ({ ...line, text: line.full ?? line.text })) }
+}
+
+// The usage rows run their panels on every row: where one's text reaches the panel's start, the
+// reaching rows' asides — a stale reading's age — are left off first (joshuafolkken/kit#8644), then a
+// row reaching it still is cut (joshuafolkken/kit#8695); none where the span has no room for a panel.
 function rows_fit(usage: DetailPart, span: PanelSpan): RowsFit {
-	if (run_board_lamps.count_of(span.end - span.start) === 0) return { usage, rows: NO_PANEL }
-	if (is_clear(usage.lines, span)) return { usage, rows: span }
+	if (run_board_lamps.count_of(span.end - span.start) === 0) {
+		return { usage: gauged(usage), rows: NO_PANEL }
+	}
 
-	const bare = { ...usage, lines: usage.lines.map((line) => without_aside(line, span)) }
+	const lines = usage.lines.map((line) => cut_line(without_aside(line, span), span))
 
-	return is_clear(bare.lines, span) ? { usage: bare, rows: span } : { usage, rows: NO_PANEL }
+	return { usage: { ...usage, lines }, rows: span }
 }
 
 // The usage rule's row started as a panel row where the panel rains and the rows under it run theirs
@@ -252,7 +271,7 @@ function lamped_parts(parts: FrameParts): FrameParts {
 		...parts,
 		throughput: lamped(throughput, span),
 		usage: lamped(fit?.usage, span, fit?.rows),
-		usage_alone: lamped(usage, NO_PANEL),
+		usage_alone: lamped(usage === undefined ? undefined : gauged(usage), NO_PANEL),
 	}
 }
 
@@ -260,7 +279,7 @@ function lamped_parts(parts: FrameParts): FrameParts {
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size, folded } = bounds
 	const ruled = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
-	const shown = run_board_flash_parts.keyed(lamped_parts(ruled), bounds.is_flash_keyed)
+	const shown = lamped_parts(ruled)
 
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }

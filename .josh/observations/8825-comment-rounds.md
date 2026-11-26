@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/run/board/run-board-stall.ts:109 | 2026-11-24 | #8825 | - | other
+- rf:bug-risks | low | scripts/run/board/run-board-timing.ts:202 | 2026-11-24 | #8825 | - | stale-cache

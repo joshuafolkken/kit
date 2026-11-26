@@ -85,11 +85,12 @@ const chain_schema = z.object({
 // One `josh run:chain` stage on `issue`, appended as it ends so a run killed or stopped part way still
 // leaves the stages it finished (joshuafolkken/kit#8286): `at` is the stage's end, as on a `stage` line,
 // so its start is `at` less `elapsed_ms`, and `result` is `stopped` on the stage the run stopped at
-// (non-zero exit or a hold).
+// (non-zero exit or a hold), and `pending` on a stage whose wait was cut at the chunk below the
+// prompt-cache TTL with its work still running, which is no stop (joshuafolkken/kit#8705).
 const chain_stage_entry_schema = chain_stage_schema.extend({
 	kind: z.literal(KIND.CHAIN_STAGE),
 	issue: z.number(),
-	result: z.enum(['passed', 'stopped']),
+	result: z.enum(['passed', 'stopped', 'pending']),
 })
 // The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
 // so a preflight `unplanned` stop after it is told apart in `lane:stats` (joshuafolkken/kit#5203).
@@ -139,7 +140,9 @@ const scope_breakdown_schema = z
 	.partial()
 
 // `resumed_from` says whether a scoped pair lap started from the tree a stopped round 2 read
-// (`round-2-fix`) or not (`none`) — `run-ship-narrowed.ts` (joshuafolkken/kit#7789).
+// (`round-2-fix`) or not (`none`) — `run-ship-narrowed.ts` (joshuafolkken/kit#7789). `queued_ms` is the
+// wait a scoped pair spent behind another pair of the same ship before its lap started, absent when
+// none was ahead (`run-ship-pair-runs.ts`, joshuafolkken/kit#8864).
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -150,6 +153,7 @@ const ship_lap_schema = z.object({
 	fallback: z.string().optional(),
 	runs: z.number().optional(),
 	rerun: z.string().optional(),
+	queued_ms: z.number().optional(),
 	reused_tree: z.string().optional(),
 	is_reused: z.boolean().optional(),
 	named: z.number().optional(),
@@ -177,6 +181,7 @@ type ChainEntry = z.infer<typeof chain_schema>
 type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
 type ChainStageEntry = z.infer<typeof chain_stage_schema>
 type ChainStageLedgerRecord = Omit<z.infer<typeof chain_stage_entry_schema>, 'kind'>
+type ChainStageResult = ChainStageLedgerRecord['result']
 type ChainRefusal = NonNullable<ChainEntry['refusal']>
 type PreflightEntry = z.infer<typeof preflight_schema>
 type PreflightLedgerRecord = Omit<PreflightEntry, 'kind' | 'at'>
@@ -200,6 +205,7 @@ export type {
 	ChainRefusal,
 	ChainStageEntry,
 	ChainStageLedgerRecord,
+	ChainStageResult,
 	PreflightEntry,
 	PreflightLedgerRecord,
 	UnpinnedPath,

@@ -86,7 +86,15 @@ function typing_samples(letter_ms: number): Int16Array {
 
 // The typing WAV's path at the theme's letter pace; `undefined` when it cannot be written.
 function typing_wav(letter_ms: number, directory?: string): string | undefined {
-	return run_board_sound_wav.cached_samples(NAME, typing_samples(letter_ms), SAMPLE_RATE, directory)
+	return run_board_sound_wav.resolved_samples(
+		{
+			name: NAME,
+			key: String(letter_ms),
+			sample_rate: SAMPLE_RATE,
+			render: () => typing_samples(letter_ms),
+		},
+		directory,
+	)
 }
 
 const run_board_sound_click = {

@@ -57,8 +57,16 @@ function block_ceiling(size: number): number {
 // a stale entry (a file that no longer exists or that an entry now reads) and on an un-budgeted
 // unreached file, so the definition cannot rot as documents move on or off the execution path.
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
-	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 4096 },
-	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 8192 },
+	// The gate's golden replay check (joshuafolkken/kit#8766) crossed the 4096 block.
+	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 8192 },
+	// The `DEMO_BEATS` / `DEMO_SEED` replay form (joshuafolkken/kit#8750) crossed the 8192 block.
+	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 12_288 },
+	{ path: '.claude/skills/board-theme/render-cost.md', bytes: 4096 },
+	// The theme rules, sound and wiring split out of SKILL.md (joshuafolkken/kit#8917).
+	{ path: '.claude/skills/board-theme/theme-rules.md', bytes: 8192 },
+	{ path: '.claude/skills/board-theme/theme-sound.md', bytes: 4096 },
+	{ path: '.claude/skills/board-theme/theme-split.md', bytes: 4096 },
+	{ path: '.claude/skills/board-theme/theme-wiring.md', bytes: 4096 },
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 4096 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 4096 },
@@ -92,6 +100,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `run:board --timing` (joshuafolkken/kit#7929) crossed the 28672 block.
 	// `run:board --theme matrix` (joshuafolkken/kit#8354) crossed the 32768 block.
 	// `run:board --icons` (joshuafolkken/kit#8505) crossed the 36864 block.
+	// `josh board:compare` (joshuafolkken/kit#8754) crossed the 40960 block.
+	// The old themes' options gave way to the theme host's (joshuafolkken/kit#8917), back under 40960.
 	{ path: 'docs/josh-commands-board.md', bytes: 40_960 },
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
 	// `josh lane:phases` (joshuafolkken/kit#8287) crossed the 36864 block.
@@ -105,14 +115,16 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// (joshuafolkken/kit#6463) crossed the 73728 block; the drive's sample wait (joshuafolkken/kit#6503)
 	// crossed the 77824 block; `issue:fold-existing --found-during` (joshuafolkken/kit#6641) crossed the 81920 block;
 	// `--adopt`'s park loop (joshuafolkken/kit#7820) crossed the 86016 block;
-	// `backlog:plan --pending-publication` (joshuafolkken/kit#8087) crossed the 90112 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 94_208 },
+	// `backlog:plan --pending-publication` (joshuafolkken/kit#8087) crossed the 90112 block;
+	// `issue:rework-candidates` and `issue:file`'s rework check (joshuafolkken/kit#8799) crossed the 94208 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 98_304 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
 	// (joshuafolkken/kit#6193) crossed the 65536 block; project gate steps narrowed by `paths`
-	// (joshuafolkken/kit#7205) crossed the 69632 block.
-	{ path: 'docs/josh-commands.md', bytes: 73_728 },
+	// (joshuafolkken/kit#7205) crossed the 69632 block; one gate per worktree (joshuafolkken/kit#8846)
+	// crossed the 73728 block.
+	{ path: 'docs/josh-commands.md', bytes: 77_824 },
 	// The auto-retry of every `run:stalled` cause (joshuafolkken/kit#7076) crossed the 8192 block.
 	{ path: 'docs/labels-and-run-states.md', bytes: 12_288 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },

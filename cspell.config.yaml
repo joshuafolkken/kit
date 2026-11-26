@@ -1,11 +1,27 @@
 version: "0.2"
 import:
   - "./cspell/index.yaml"
+ignorePaths:
+  # A run:board frame captured as the theme host's test fixture: the board's text as it showed it,
+  # lane titles cut short and contributors' names included (#8917).
+  - "scripts/run/board/__snapshots__/run-board-theme-host-frame.ans"
 words:
+  # The MAGI board's third computer, and the skynet board's listing that rescans the target (#8917).
+  - balthasar
+  - rescans
+  # run:board's cell layers copied onto the back buffer, and a wide character's halves split (#8826).
+  - blit
+  - unpair
+  # SonarCloud scanner's own spelling in its pull-request fetch error, which followup reruns on (#8848).
+  - pullrequest
   # ImageMagick's command, which turns a scratch SVG into a PNG (#8262).
   - magick
   # The WarGames computer the board's lamp panel is drawn after (#8236).
   - WOPR
+  # The Terminator's network, the theme value `skynet` a run:board draws its work after (#8917).
+  - skynet
+  # Dual-tone multi-frequency, the keypad tone the bttf board's typing sound is made from (#8697).
+  - dtmf
   # The launch-code alphabet a wargames board's rules run while a row types, `I` and `O` left out (#8375).
   - ABCDEFGHJKLMNPQRSTUVWXYZ
   # The macOS and Linux audio players the board's sound player starts (#7945).
@@ -45,6 +61,9 @@ words:
   - ncat
   # The Xcode launcher `launched-call.ts` looks past, so `xcrun security` reaches the keychain check (#7198).
   - xcrun
+  # Phone-keypad letter groups the bttf keypad beep maps letters through (#8698).
+  - pqrs
+  - wxyz
   # The option-parsing convention the #7198 review cites for `security -qi` flag clusters.
   - getopt
   # `security -pstop`, an attached-prompt spelling the #7198 round-2 review quotes in its record.
@@ -357,6 +376,7 @@ words:
   - EBADDEVENGINES
   - sonarlint
   - inlines
+  - imul
   - extensionless
   - untriaged
   - mnemecha
@@ -387,6 +407,10 @@ words:
   # The `git log --oneline` flag, quoted in the read-only cases that pin what the piped-verification
   # rule must not catch (joshuafolkken/kit#1556).
   - oneline
+  # Fragments of eslint-plugin-sonarjs rule names that `eslint/rules/sonarjs.js` switches off
+  # (`aws-opensearchservice-domain`, `no-useless-react-setstate`; joshuafolkken/kit#8886).
+  - opensearchservice
+  - setstate
   # GitHub's own name for the combined status of a commit's checks — the thing that counts a skipped
   # job as a passing one, which is why `.github/workflows/ci.yml` explains it twice
   # (joshuafolkken/kit#991, joshuafolkken/kit#1226). A dictionary cspell enables for markdown already
@@ -402,6 +426,12 @@ words:
   # `shutil.copy`/`shutil.move` into an existing path. They appear only in that module's patterns and tests.
   - writelines
   - wargames
+  # The `--theme` aliases of `josh run:board` (joshuafolkken/kit#8917, `run-board-theme-defs.ts`): the
+  # works' titles a theme is also launched by.
+  - backtothefuture
+  - metalgear
+  - steinsgate
+  - evangelion
   - shutil
   # npm package name weighed in `docs/maintainers/shell-tokenizer.md` (joshuafolkken/kit#7334).
   - shlex

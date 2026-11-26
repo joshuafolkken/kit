@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/backlog/backlog-named.ts:72 | 2026-11-25 | #8923 | - | stale-comment

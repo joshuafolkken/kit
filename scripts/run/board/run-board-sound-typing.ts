@@ -10,6 +10,9 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 // notice. It is apart from the cues (`run-board-sound-cues.ts`): no tier, transition or repeat rule
 // reaches it, so a cue sounds over it.
 
+// The events a theme sounds as they start (joshuafolkken/kit#8917).
+type EventKind = 'notice' | 'row' | 'progress'
+
 const NAME = 'teletype'
 const TELETYPE: ReadonlyArray<Note> = [
 	{ pitch: 'Bb5', ms: 25, wave: 'sine' },
@@ -20,10 +23,23 @@ const NOTES: ReadonlyArray<Note> = Array.from({ length: TRILL_PAIRS }, () => TEL
 
 // `left_ms`, given with `on`, is how long the letters still type: the trill stops itself then rather
 // than at the next `set(false)`, which a slow gather can hold up (joshuafolkken/kit#8523). Without it
-// (the intro) the trill sounds until `set(false)`.
+// (the intro) the trill sounds until `set(false)`. `ended`, given with `left_ms`, is called once the
+// trill stops itself that way — its letters typed through, or an off that arrives once they have by the
+// clock though the timer has not yet fired — and never on an earlier `set(false)` or `stop`; `typed`
+// sounds the theme's typed-end once (joshuafolkken/kit#8697).
 interface TypingSound {
-	set: (is_on: boolean, left_ms?: number) => void
+	set: (is_on: boolean, left_ms?: number, ended?: () => void) => void
 	stop: () => void
+	// The trill ended for now, as a new event's sound starts: the next `set` on starts it again.
+	hush?: (() => void) | undefined
+	typed?: (() => void) | undefined
+	// The theme's sound of an event played once as the event starts, `letters` its text's length
+	// (joshuafolkken/kit#8917).
+	event?: ((kind: EventKind, letters: number) => void) | undefined
+	// The theme's sound of a part played once as the part starts, `ms` its length.
+	part?: ((name: 'opening' | 'ending', ms: number) => void) | undefined
+	// The trill sounded in the voice `file` gives from here on (joshuafolkken/kit#8917).
+	revoice?: ((file: () => string | undefined) => void) | undefined
 }
 
 interface TypingPorts {
@@ -32,10 +48,19 @@ interface TypingPorts {
 	// Calls `fire` after `ms`; the returned function cancels it. A timer that holds no process open
 	// when left out.
 	after?: (ms: number, fire: () => void) => () => void
+	// The clock the letters' end is read by; `Date.now` when left out.
+	now?: () => number
+}
+
+// The moment the armed letters type through and who is told then.
+interface End {
+	at_ms: number
+	ended: (() => void) | undefined
 }
 
 // The trill's state: whether it is on, whether the board has closed it for good, the player sounding
-// it, the WAV once written and the cancel of the timer that stops it once its letters type through.
+// it, the WAV once written, the cancel of the timer that stops it once its letters type through and
+// that timer's end.
 interface Held {
 	is_on: boolean
 	is_stopped: boolean
@@ -43,6 +68,7 @@ interface Held {
 	file: string | undefined
 	generation: symbol | undefined
 	disarm: (() => void) | undefined
+	end?: End | undefined
 }
 
 function after(ms: number, fire: () => void): () => void {
@@ -121,21 +147,68 @@ function disarm(held: Held): void {
 	held.disarm = undefined
 }
 
+// How a `set` switches the trill: on or off, how long its letters still type, and who is told once they
+// type through.
+interface Switch {
+	is_on: boolean
+	left_ms?: number | undefined
+	ended?: (() => void) | undefined
+}
+
 // Re-arms only the stop timer while the letters type: the player keeps sounding, never restarted
 // (see `hold`).
-function arm(held: Held, ports: TypingPorts, left_ms: number | undefined): void {
+function arm(held: Held, ports: TypingPorts, { left_ms, ended }: Switch): void {
 	disarm(held)
 	if (left_ms === undefined || !held.is_on) return
+	held.end = { at_ms: (ports.now ?? Date.now)() + left_ms, ended }
 	held.disarm = (ports.after ?? after)(left_ms, () => {
 		held.disarm = undefined
 		turn(held, ports, false)
+		ended?.()
 	})
 }
 
-function set(held: Held, ports: TypingPorts, is_on: boolean, left_ms: number | undefined): void {
+// On an off, the armed `ended` where its letters have typed through by now though its timer has not yet
+// fired: the off is then the letters' end by the clock, not a switch apart (joshuafolkken/kit#8697).
+function due_end(held: Held, ports: TypingPorts): (() => void) | undefined {
+	const { end } = held
+
+	if (end === undefined || held.disarm === undefined) return undefined
+
+	return (ports.now ?? Date.now)() >= end.at_ms ? end.ended : undefined
+}
+
+function set(held: Held, ports: TypingPorts, switched: Switch): void {
 	if (held.is_stopped) return
-	turn(held, ports, is_on)
-	arm(held, ports, left_ms)
+	const ended = switched.is_on ? undefined : due_end(held, ports)
+
+	turn(held, ports, switched.is_on)
+	arm(held, ports, switched)
+	ended?.()
+}
+
+function stop(held: Held): void {
+	held.is_stopped = true
+	held.is_on = false
+	disarm(held)
+	silence(held)
+}
+
+// The trill ended for now, its stop timer with it; unlike `stop`, the next `set` on starts it again.
+function hush(held: Held, ports: TypingPorts): void {
+	turn(held, ports, false)
+	disarm(held)
+}
+
+// The trill in another voice (joshuafolkken/kit#8917: demo mode switches the theme): its WAV read again
+// at the next start, and a sounding player ended and the new voice begun in its place.
+function revoice(held: Held, voice: { ports: TypingPorts }, file: () => string | undefined): void {
+	if (held.is_stopped || voice.ports.file === file) return
+	voice.ports = { ...voice.ports, file }
+	held.file = undefined
+	if (held.child === undefined) return
+	silence(held)
+	begin(held, voice.ports)
 }
 
 // The board's trill, off until a line types; `stop` ends it for good as the board closes.
@@ -148,16 +221,20 @@ function typing_sound(ports: TypingPorts = DEFAULT_PORTS): TypingSound {
 		generation: undefined,
 		disarm: undefined,
 	}
+	const voice = { ports }
 
 	return {
-		set: (is_on, left_ms) => {
-			set(held, ports, is_on, left_ms)
+		set: (is_on, left_ms, ended) => {
+			set(held, voice.ports, { is_on, left_ms, ended })
 		},
 		stop: () => {
-			held.is_stopped = true
-			held.is_on = false
-			disarm(held)
-			silence(held)
+			stop(held)
+		},
+		hush: () => {
+			hush(held, voice.ports)
+		},
+		revoice: (file) => {
+			revoice(held, voice, file)
 		},
 	}
 }
@@ -173,4 +250,4 @@ const run_board_sound_typing = {
 }
 
 export { run_board_sound_typing }
-export type { TypingPorts, TypingSound }
+export type { EventKind, TypingPorts, TypingSound }

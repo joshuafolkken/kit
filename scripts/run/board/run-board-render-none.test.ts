@@ -18,8 +18,8 @@ describe('run_board_render_none.render_no_run', () => {
 
 	// joshuafolkken/kit#8604: the line names the board as the themed header does.
 	it.each([
-		['wargames', 'josh-wopr'],
-		['matrix', 'josh-trace'],
+		['wopr', 'josh-wopr'],
+		['trace', 'josh-trace'],
 	] as const)('names the board %s draws %s', (theme, name) => {
 		const [line = ''] = render_no_run(NOW, { theme })
 

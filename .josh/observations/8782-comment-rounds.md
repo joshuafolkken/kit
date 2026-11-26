@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/run/board/run-board-jump-figure.ts:52 | 2026-11-23 | #8782 | - | edge-input
+- rf:none | none | - | 2026-11-23 | #8782

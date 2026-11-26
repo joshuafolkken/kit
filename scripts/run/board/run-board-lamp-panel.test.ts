@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit, type FrameParts } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_fold } from './run-board-fold'
+import { run_board_lamp_spots } from './run-board-lamp-spots'
+import { run_board_lamps } from './run-board-lamps'
 import type { BoardRow } from './run-board-layout'
 import { run_board_quota_lamps } from './run-board-quota-lamps'
 import { run_board_render } from './run-board-render'
@@ -13,7 +15,6 @@ import { run_board_spot } from './run-board-spot'
 import type { Theme } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
 import { run_board_tick } from './run-board-tick'
-import { run_board_tick_draw } from './run-board-tick-draw'
 
 // joshuafolkken/kit#8236: where the WOPR lamp panel goes — two columns past the throughput rows' NOW,
 // on to the end of the section's rule — and the boards that draw none.
@@ -23,12 +24,12 @@ const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const WIDE = { rows: 60, columns: 200 }
 const { rows_part } = run_board_render_throughput
-const { has_lamps } = run_board_tick_draw
-const THEME: Theme = 'wargames'
+const THEME: Theme = 'wopr'
 const { width_of } = run_board_fit
 const HOUR = 3_600_000
 const GAP = 2
 const FEWEST = 8
+const TRACE_FIELD = /TRACE [■-]+/u
 // A panel 21 columns wide holds 11 lamps.
 const PANEL_WIDTH = 21
 const PANEL_LAMPS = 11
@@ -36,6 +37,10 @@ const SAMPLE_RULE_WIDTH = 114
 const SAMPLE_ROW_END = 67
 const SAMPLE_LAMP_COLUMN = 70
 const SAMPLE_LAMPS = 23
+const PANEL_ROWS = 7
+const LIT_YELLOW = '38;2;255;214;10'
+const LIT_RED = '38;2;255;69;58'
+const SHADE_ORDER = ['yellow', 'yellow', 'yellow', 'red', 'red', 'yellow', 'red']
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -145,10 +150,13 @@ function panel_parts(usage_rows: ReadonlyArray<string>, has_panel: boolean): Fra
 		quotas: { claude: undefined, codex: undefined },
 		now_ms: START,
 		has_lamps: has_panel,
+		has_rule_lamps: true,
 	})
-	const lines = run_board_quota_lamps
-		.provider_rows(usage_rows, has_panel)
-		.map((text) => ({ text, is_detail: false }))
+	const [github = '', ...providers] = usage_rows.toReversed()
+	const lines = [
+		...run_board_quota_lamps.provider_rows(providers.toReversed(), has_panel),
+		run_board_quota_lamps.github_row(github, has_panel),
+	].map((text) => ({ text, is_detail: false }))
 
 	return {
 		above: [],
@@ -183,35 +191,35 @@ function lamp_starts(lines: ReadonlyArray<string>): Array<number> {
 		.map((line) => width_of(line.split(LAMP)[0] ?? ''))
 }
 
-describe('the lamp panel’s five rows (joshuafolkken/kit#8277)', () => {
-	it('runs on throughput’s two rows, the blank line and usage’s first two rows alike', () => {
+// The text before a lamped line's first lamp, its blanks dropped.
+function lead_of(line: string): string {
+	return line.slice(0, line.indexOf(LAMP)).trimEnd()
+}
+
+// joshuafolkken/kit#8702: the usage rule's row runs the panel too, so it shows seven rows unbroken.
+describe('the lamp panel’s seven rows (joshuafolkken/kit#8277, joshuafolkken/kit#8695)', () => {
+	it('runs on throughput’s two rows, the blank line, the rule, usage’s two rows and GitHub’s', () => {
 		const lines = panel_frame(ROWS_TEXT)
 		const lamped = lines.filter((line) => line.includes(LAMP))
 		const [start] = lamp_starts(lines)
-		const leads = lamped.slice(2).map((line) => line.slice(0, line.indexOf(LAMP)).trimEnd())
+		const leads = lamped.slice(2).map((line) => lead_of(line))
 
-		expect(lamped).toHaveLength(5)
-		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: 5 }, () => start))
+		expect(lamped).toHaveLength(PANEL_ROWS)
+		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: PANEL_ROWS }, () => start))
 		for (const line of lamped) expect(line.split(LAMP)).toHaveLength(PANEL_LAMPS + 1)
-		expect(leads).toStrictEqual(['', ...ROWS_TEXT.slice(0, 2)])
+		expect(leads.filter((lead) => !lead.includes('usage'))).toStrictEqual(['', ...ROWS_TEXT])
+		expect(leads[1]).toMatch(/usage.*─$/u)
 	})
 
-	it('draws none on GitHub’s row or the usage rule', () => {
-		const unlit = panel_frame(ROWS_TEXT).filter(
-			(text) => text.includes('GITHUB') || text.includes('usage'),
-		)
-
-		expect(unlit).toHaveLength(2)
-		expect(unlit.join('')).not.toContain(LAMP)
-	})
-
-	it('drops both usage rows’ lamps where one row reaches the panel, keeping the throughput three', () => {
-		const long = 'x'.repeat(width_of(texts(false)[0] ?? '') + 1)
+	it('cuts a row reaching the panel a blank short of it, keeping every row’s lamps', () => {
+		const start = width_of(texts(false)[0] ?? '') + GAP
+		const long = 'x'.repeat(start + 1)
 		const lines = panel_frame([ROWS_TEXT[0] ?? '', long, ROWS_TEXT[2] ?? ''])
+		const cut = lines.find((line) => line.startsWith('x')) ?? ''
 
-		expect(lines.filter((line) => line.includes(LAMP))).toHaveLength(3)
-		expect(lines).toContain(long)
-		expect(lines).toContain(ROWS_TEXT[0])
+		expect(lines.filter((line) => line.includes(LAMP))).toHaveLength(PANEL_ROWS)
+		expect(cut.slice(0, cut.indexOf(LAMP))).toBe(`${'x'.repeat(start - GAP)}${' '.repeat(GAP)}`)
+		expect(lamp_starts(lines)).toStrictEqual(Array.from({ length: PANEL_ROWS }, () => start))
 	})
 
 	it('gives way with the throughput rows: a pane that cuts them draws the usage rows unlit', () => {
@@ -221,6 +229,31 @@ describe('the lamp panel’s five rows (joshuafolkken/kit#8277)', () => {
 		expect(usage_only.join('')).not.toContain('24h')
 		expect(usage_only).toContain(ROWS_TEXT[0])
 		expect(usage_only.join('')).not.toMatch(new RegExp(`[${LAMP}${LAMP_START}]`, 'u'))
+	})
+})
+
+describe('the usage rule’s row in the lamp panel (joshuafolkken/kit#8702)', () => {
+	it('ends the usage rule two columns before the panel and runs lamps on to the rule’s end', () => {
+		const lines = panel_frame(ROWS_TEXT)
+		const rule = lines.find((text) => text.includes('usage')) ?? ''
+		const [start = 0] = lamp_starts(lines)
+
+		expect(width_of(lead_of(rule))).toBe(start - GAP)
+		expect(width_of(rule)).toBe(start + PANEL_WIDTH)
+		expect(rule.split(LAMP)).toHaveLength(PANEL_LAMPS + 1)
+	})
+
+	it('lights the seven rows yellow, yellow, yellow, red, red, yellow, red from the top', () => {
+		vi.stubEnv('FORCE_COLOR', '3')
+		const lines = panel_frame(ROWS_TEXT)
+		const lamps = run_board_lamp_spots.lamps_in(lines, [...lines.keys()], WIDE.columns)
+		const rows = [...new Set(lamps.map((lamp) => lamp.panel_row))]
+		const lit = rows.map((row) => run_board_lamps.lamp_text(row, true))
+
+		expect(lit.map((text) => (text.includes(LIT_RED) ? 'red' : 'yellow'))).toStrictEqual(
+			SHADE_ORDER,
+		)
+		expect(lit.filter((text) => text.includes(LIT_YELLOW))).toHaveLength(4)
 	})
 })
 
@@ -243,7 +276,7 @@ function rendered(is_lit: boolean): Array<string> {
 		quotas: { claude: undefined, codex: undefined },
 		layout: { ...EMPTY_LAYOUT, active: [WIDE_LANE] },
 	})
-	const view = { header, notes: [], throughput: ROWS, has_lamps: is_lit }
+	const view = { header, notes: [], throughput: ROWS, has_lamps: is_lit, has_rule_lamps: is_lit }
 
 	return run_board_render.render(view).map((line) => stripVTControlCharacters(line))
 }
@@ -252,7 +285,7 @@ describe('run_board_render.render with lamps', () => {
 	it('runs the panel on the usage section’s rows as well as the throughput rows', () => {
 		const lamped = rendered(true).filter((line) => line.includes(LAMP))
 
-		expect(lamped).toHaveLength(5)
+		expect(lamped).toHaveLength(6)
 		expect(lamped.filter((line) => line.includes('24h') || line.includes('7d'))).toHaveLength(2)
 	})
 
@@ -261,38 +294,9 @@ describe('run_board_render.render with lamps', () => {
 	})
 })
 
-describe('run_board_tick_draw.has_lamps', () => {
-	it('draws lamps on a live board in a theme, on a terminal drawing color', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_lamps({ types_rows: true, theme: THEME, is_tty: true })).toBe(true)
-	})
-
-	it.each([
-		['no theme', { types_rows: undefined, theme: undefined, is_tty: true }],
-		['--every', { types_rows: false, theme: THEME, is_tty: true }],
-		['--once, --chat and a pipe', { types_rows: true, theme: THEME, is_tty: false }],
-	])('draws none with %s', (_, ports) => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(has_lamps(ports)).toBe(false)
-	})
-
-	it('draws none on a terminal drawing no color', () => {
-		vi.stubEnv('FORCE_COLOR', '0')
-
-		expect(has_lamps({ types_rows: true, theme: THEME, is_tty: true })).toBe(false)
-	})
-
-	it('draws none in a theme whose definition draws no lamps', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-		const ports = { types_rows: true, theme: THEME, is_tty: true }
-
-		expect(has_lamps(ports, { [THEME]: { lamps: false } })).toBe(false)
-	})
-})
-
-// A live redraw of a frame with throughput rows, on a terminal drawing color; `types_rows` as given.
+// A live redraw of a frame with throughput rows, on a terminal drawing color; `types_rows` as given —
+// its lamps and the marks it wrote, which a themed board's theme layer lays its panel out by
+// (joshuafolkken/kit#8917).
 function redrawn(types_rows: boolean): { lamps: number; marks: number } {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { ports, frames } = harness(LOCAL, [])
@@ -302,9 +306,13 @@ function redrawn(types_rows: boolean): { lamps: number; marks: number } {
 	const redraw = { ports: { ...ports, types_rows, theme, size: () => WIDE }, now_ms: START }
 	const active = [{ ...WIDE_LANE }]
 	const drawn = drawn_from(state, local, redraw, { ...layout_for(state, local, START), active })
-	const written = stripVTControlCharacters(frames.join(''))
+	// The base look's `TRACE ■----` field fills its gauge with the same mark; it is no lamp.
+	const written = stripVTControlCharacters(frames.join('')).replace(TRACE_FIELD, '')
 
-	return { lamps: drawn.lamps?.length ?? 0, marks: written.split(LAMP_MARK).length - 1 }
+	return {
+		lamps: drawn.lamps?.length ?? 0,
+		marks: written.split(LAMP_MARK).length - 1,
+	}
 }
 
 describe('run_board_tick_draw.draw_display with lamps', () => {

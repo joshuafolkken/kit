@@ -222,6 +222,9 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			files: FILE_PATTERNS.tests,
 			rules: {
 				...ts.configs.disableTypeChecked.rules,
+				// joshuafolkken/kit#8886: `sonarjs/deprecation` was the one deprecation check on tests and is
+				// off now, so the typed rule `disableTypeChecked` switches off comes back here.
+				'@typescript-eslint/no-deprecated': typescript_rules['@typescript-eslint/no-deprecated'],
 				// Missing awaits can make tests finish before their assertions; void callbacks can
 				// silently discard rejected promises. Keep both checks with real project types.
 				'@typescript-eslint/no-floating-promises':

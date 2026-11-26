@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -88,6 +89,42 @@ describe('lane_measure_cli.run — value cell', () => {
 		expect(lane_measure_cli.USAGE).toContain(
 			'josh lane:value cell --table <title> [--row <label>] [--where <header>=<text>]',
 		)
+	})
+})
+
+// joshuafolkken/kit#8704: the first-request table reads the lane transcripts the context names.
+describe('lane_measure_cli.run — value cell of the first request table', () => {
+	it('reads a lane session first request context from its transcript', async () => {
+		const directory = make_directory('lane-measure-cli-prefix-test-')
+		const usage = {
+			input_tokens: 2,
+			cache_creation_input_tokens: 900,
+			cache_read_input_tokens: 100,
+			output_tokens: 5,
+		}
+		const line = {
+			type: 'assistant',
+			requestId: 'r1',
+			timestamp: AT,
+			message: { model: 'm', usage },
+		}
+		const address = ['--table', 'first request model', '--row', 'm']
+		const argv = [
+			'value',
+			'cell',
+			'--since',
+			SINCE,
+			...address,
+			'--column',
+			'median context (tokens)',
+		]
+
+		writeFileSync(path.join(directory, 'a.jsonl'), JSON.stringify(line))
+
+		const context = { ...fresh_context(), transcript_directories: [directory] }
+
+		await expect(lane_measure_cli.run(argv, context)).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith('1002.00')
 	})
 })
 

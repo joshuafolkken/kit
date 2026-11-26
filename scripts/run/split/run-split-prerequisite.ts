@@ -8,7 +8,8 @@ import { run_split, type EpicSlot, type SplitResult } from './run-split'
 // `josh run:split <N> --prerequisite <P> [--title <title>]` — a prerequisite found mid-run
 // (`backlogrun-child.md` → "When `#N` is not an epic") in one call: `#N` paused on `#P` through
 // `run:pause`, `#P` placed ahead of `#N` — by the relation's own `epic --add --before` into the epic
-// already tracking `#N`, or in a new ordered epic `#P` heads — and that epic audited. A tracking epic
+// already tracking `#N` (a `#P` another epic tracks keeps only the relation), or in a new ordered
+// epic `#P` heads — and that epic audited. A tracking epic
 // the listing cannot rule out parks `#N` with `needs-decision` instead.
 //
 // A new epic is created before the relation, so the relation is recorded inside it, never posted

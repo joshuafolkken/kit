@@ -5,33 +5,32 @@ import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels, type Paint } from './run-board-labels'
 import { run_board_option, type OptionSpec } from './run-board-option'
 import type { BoardPorts } from './run-board-state'
-import { run_board_theme_case } from './run-board-theme-case'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
+import { run_board_tint } from './run-board-tint'
 
-// joshuafolkken/kit#7934: a theme for the board a person watches — `wargames` draws the text no color
-// is given in the cyan glow of the film's terminal phosphor and every rule as a run of `-`, so each
-// character of a line shows; joshuafolkken/kit#7988: each icon as text of its width
-// (`run-board-theme-glyphs.ts`) and the text uppercase, as a text terminal draws it;
+// joshuafolkken/kit#7934: a theme for the board a person watches. A themed board's base is drawn in the
+// base look (`run-board-theme-defs.ts` → `BASE_LOOK`; joshuafolkken/kit#8917): the text no color is
+// given in its paint and every rule as a run of `-`, so each character of a line shows;
+// joshuafolkken/kit#7988: each icon as text of its width (`run-board-theme-glyphs.ts`);
 // joshuafolkken/kit#8150: that text in the color of the state its icon marks
-// (`run-board-theme-tones.ts`). It is put on the frame as it is written, once, so no render module
-// carries it; a color a render module gives (red, yellow, …) is kept, the cyan resumed after it.
+// (`run-board-theme-tones.ts`). The theme host reads that base back as roles and paints it in the
+// theme's own colors. It is put on the frame as it is written, once, so no render module carries it; a
+// color a render module gives (red, yellow, …) is kept, the base paint resumed after it.
 
 const THEME_ENV = 'JOSH_BOARD_THEME'
-const { THEMES, THEME_DEFS } = run_board_theme_defs
+const { BASE_LOOK, THEMES, THEME_ALIASES } = run_board_theme_defs
 const THEME_OPTION: OptionSpec<Theme> = {
 	flag: '--theme',
 	env: THEME_ENV,
 	noun: 'theme',
 	names: THEMES,
+	aliases: THEME_ALIASES,
 }
 const RULE = '─'
 const RULE_RUN = /─+/gu
 const DASH = '-'
-// The escapes that end a color and fall back to the terminal's default foreground: the default
-// foreground itself, and a reset.
-const DEFAULT_FOREGROUND = '\u{1B}[39m'
-const RESET = '\u{1B}[0m'
+const { lit, open_of } = run_board_tint
 // joshuafolkken/kit#8207: the themed lines kept — past a few frames of a resident board, so its spinner
 // and redraws hit the cache while a board left for days holds no more.
 const LINE_LIMIT = 1024
@@ -82,14 +81,6 @@ function refusal(argv: ReadonlyArray<string>, environment: NodeJS.ProcessEnv): s
 	return run_board_option.refusal(argv, environment, THEME_OPTION)
 }
 
-// The escape that opens the theme's color, as `painted` draws it — `''` where stdout draws no color,
-// so the theme draws no escape where the board's own colors would not.
-function phosphor_open(paint: Paint): string {
-	const sample = run_board_labels.painted(paint, DASH)
-
-	return sample.slice(0, sample.indexOf(DASH))
-}
-
 // What `styleText` and the color depth read to decide whether, and in how many colors, stdout draws,
 // as far as a running board can see it change: stdout's TTY and the color variables (a test stubs
 // them); the terminal's other variables (`TMUX`, `CI`, …) are fixed before the board starts.
@@ -106,43 +97,34 @@ function phosphor(look: Look): string {
 
 	if (inputs === memo.inputs) return memo.open
 	memo.inputs = inputs
-	memo.open = phosphor_open(THEME_DEFS[look.theme].paint)
+	memo.open = open_of(BASE_LOOK.paint)
 	memo.lines.clear()
 
 	return memo.open
 }
 
-function lit(open: string, line: string): string {
-	if (open === '' || line === '') return line
-
-	const resumed = line
-		.split(DEFAULT_FOREGROUND)
-		.join(open)
-		.split(RESET)
-		.join(RESET + open)
-
-	return open + resumed + DEFAULT_FOREGROUND
-}
-
-// Only uncolored dashes take the rule paint; render colors and tone colors keep their foreground.
+// Only uncolored rule glyphs take the rule paint; render colors and tone colors keep their foreground.
 function dimmed(rule: Paint, text: string): string {
 	return run_board_theme_glyphs.mapped(text, (part, open) =>
 		open.is_colored ? part : part.split(DASH).join(run_board_labels.painted(rule, DASH)),
 	)
 }
 
+// The line's text as the base look writes it: rules as `-`, icons as text, a heading's `-` in the rule
+// paint (joshuafolkken/kit#8917: every theme's base, the host painting it after).
+function written(look: Look, kept: string, is_rule: boolean): string {
+	const text = run_board_theme_glyphs.textual(kept.split(RULE).join(DASH), look)
+
+	return is_rule ? dimmed(BASE_LOOK.rule.dash, text) : text
+}
+
 // joshuafolkken/kit#8154: an icon beside its label is dropped (`run-board-label-pair.ts`).
 function restyled_line(open: string, look: Look, line: string): string {
-	const definition = THEME_DEFS[look.theme]
 	const kept = run_board_label_pair.dropped(line)
-	const ruled = kept.split(RULE).join(DASH)
-	const glyphs = run_board_theme_glyphs.textual(ruled, look)
-	const text = definition.capitals ? run_board_theme_case.capitals(glyphs) : glyphs
 	const is_rule = run_board_label_pair.heading_lead(stripVTControlCharacters(kept)) !== undefined
+	const text = written(look, kept, is_rule)
 
-	return is_rule
-		? lit(phosphor_open(definition.rule.text), dimmed(definition.rule.dash, text))
-		: lit(open, text)
+	return lit(is_rule ? open_of(BASE_LOOK.rule.text) : open, text)
 }
 
 // joshuafolkken/kit#8207: a line drawn before is taken from the cache — most lines of a redraw, and of
@@ -217,6 +199,7 @@ function themed<P extends Pick<BoardPorts, 'icons' | 'theme' | 'write' | 'write_
 	return {
 		...ports,
 		theme,
+		restyle: (text: string) => restyle(theme, text, ports.icons),
 		write: (frame: string) => {
 			ports.write(restyle(theme, frame, ports.icons))
 		},

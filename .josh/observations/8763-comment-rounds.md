@@ -1,0 +1,2 @@
+- rf:comments | low | prompts/collaboration-workflow/issue-template.en.md:12 | 2026-11-23 | #8763 | deferred:#8832 | stale-docs
+- rf:comments | low | prompts/collaboration-workflow/issue-template.en.md:12 | 2026-11-23 | #8763 | - | stale-docs

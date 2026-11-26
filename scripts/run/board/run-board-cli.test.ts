@@ -1,17 +1,16 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
-import { run_board_fixture, type Harness } from './run-board-fixture'
+import { run_board_fixture } from './run-board-fixture'
+import { run_board_frame_fixture } from './run-board-frame-fixture'
 import type { IssueCount } from './run-board-issue-count'
 import type { BoardPlan } from './run-board-layout'
-import type { BoardPorts } from './run-board-state'
-import { run_board_theme_defs } from './run-board-theme-defs'
-import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#3430: the command's arguments and its terminal. What one redraw reads and draws is
 // `run-board-tick.test.ts`'s (joshuafolkken/kit#3444).
 
-const { LOCAL, SPINNING, START, STOPPED, first_frame, harness, plan_titled } = run_board_fixture
+const { LOCAL, SPINNING, STOPPED, harness, plan_titled } = run_board_fixture
+const { is_synced_once, lines_of, row_text, terminal_of } = run_board_frame_fixture
 
 // A theme colors every write where color is on (`FORCE_COLOR` in the gate's environment), so the
 // screen's control bytes are compared with color off.
@@ -26,8 +25,6 @@ const ESCAPE = '\u{1B}'
 const ENTER = `${ESCAPE}[?1049h${ESCAPE}[?25l${ESCAPE}[2;1H`
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
 const RUN_MARK = '■ josh-board'
-const INTRO_LINE = run_board_theme_defs.THEME_DEFS.wargames.intro.line
-const TYPING_CURSOR = run_board_typing.CURSOR
 const LANE_ROW = '  🔍 1°00′00″ 1°00′00″ 1       a'
 const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', text: '#1 a' }
 
@@ -157,72 +154,17 @@ describe('run_board_cli.run screen', () => {
 		const { ports, frames, leaves } = harness(undefined, [])
 
 		await expect(run_board_cli.run([], ports)).rejects.toBe(STOPPED)
+		const drawn = frames.slice(1, -1)
+
 		expect(frames[0]).toBe(ENTER)
-		expect(frames.slice(1, -1).map((frame) => frame.split(RUN_MARK, 1)[0])).toStrictEqual([
-			`${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`,
-			`${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[K`,
-		])
+		// joshuafolkken/kit#8826: the first frame clears the screen from the top; each writes in one
+		// synchronized block, and the board's mark is on the top row.
+		expect(drawn[0]?.startsWith(`${ESCAPE}[?2026h${ESCAPE}[H${ESCAPE}[2J`)).toBe(true)
+		expect(drawn.every((frame) => is_synced_once(frame))).toBe(true)
+		expect(row_text(terminal_of(drawn), 1)).toContain(RUN_MARK)
 		expect(frames.at(-1)).toBe(LEAVE)
 		leaves[0]?.()
 		expect(frames.filter((frame) => frame === LEAVE)).toHaveLength(1)
-	})
-})
-
-// joshuafolkken/kit#7927: a live board types its line after entering the screen, before the first
-// frame; a single frame, the chat's or a pipe's, types none. joshuafolkken/kit#8029: only a board in a
-// theme types it — `run-board-cli-theme.test.ts` holds the board in none.
-const THEMED = ['--theme', 'wargames']
-// joshuafolkken/kit#7988: the theme draws the board's text in capitals.
-const THEMED_RUN_MARK = RUN_MARK.toUpperCase()
-
-async function no_pause(): Promise<void> {
-	await Promise.resolve()
-}
-
-describe('run_board_cli.run intro', () => {
-	it('types the line between entering the screen and the first frame', async () => {
-		const { ports, frames } = harness(undefined, [])
-
-		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
-			STOPPED,
-		)
-		const first = first_frame(frames)
-
-		expect(frames[0]).toBe(ENTER)
-		expect(stripVTControlCharacters(frames[first - 2] ?? '')).toBe(`\r${INTRO_LINE}`)
-	})
-
-	// joshuafolkken/kit#8000: whatever beat the intro last wrote — a cursor left by a skipped line too —
-	// the first frame wipes from the top before it draws.
-	it('wipes the typed line, cursor and all, before the first frame draws', async () => {
-		const { ports, frames } = harness(undefined, [])
-
-		await expect(run_board_cli.run(THEMED, { ...ports, intro_sleep: no_pause })).rejects.toBe(
-			STOPPED,
-		)
-		const typed = frames.slice(1, first_frame(frames))
-
-		expect(typed.some((frame) => frame.includes(TYPING_CURSOR))).toBe(true)
-		expect(typed.join('')).not.toContain(THEMED_RUN_MARK)
-	})
-
-	it('types no line for --once, --chat or a pipe', async () => {
-		const runs = [['--once'], ['--chat']].map(async (argv) => {
-			const { ports, frames } = harness(LOCAL, [plan_titled('a')])
-
-			await run_board_cli.run([...THEMED, ...argv], { ...ports, intro_sleep: ports.sleep })
-
-			return frames.join('')
-		})
-		const pipe = harness(LOCAL, [plan_titled('a')])
-		const piped = { ...pipe.ports, is_tty: false, intro_sleep: pipe.ports.sleep }
-
-		await run_board_cli.run(THEMED, piped)
-		expect([...(await Promise.all(runs)), pipe.frames.join('')].join('')).not.toContain(INTRO_LINE)
-	})
-
-	it('types the line on the live board the run and backlogrun draw', () => {
-		expect(run_board_cli.LIVE_PORTS.intro_sleep).toBeTypeOf('function')
 	})
 })
 
@@ -236,9 +178,10 @@ describe('run_board_cli.run footer', () => {
 		await run_board_cli.run(['--once'], once.ports)
 
 		// joshuafolkken/kit#3489: one English line that keeps the command that reopens the board.
-		expect(stripVTControlCharacters(frames[1] ?? '').trimEnd()).toMatch(
-			/\nClosing this screen leaves the run going · reopen with `pnpm josh backlogrun`$/u,
-		)
+		expect(lines_of(terminal_of(frames)).slice(-2)).toStrictEqual([
+			'',
+			'Closing this screen leaves the run going · reopen with `pnpm josh backlogrun`',
+		])
 		expect(once.frames[0]).not.toContain('pnpm josh backlogrun')
 	})
 
@@ -262,6 +205,9 @@ describe('run_board_cli.run footer', () => {
 
 // joshuafolkken/kit#3455: the live board draws before a plan read that has not answered, and one plain
 // frame waits for it.
+// A pane the frame is fitted to and painted on alike.
+const PANE = { rows: 24, columns: 120 }
+
 describe('run_board_cli.run plan read', () => {
 	it('draws the first live frame without waiting on the plan read', async () => {
 		const { ports, frames } = harness(LOCAL, [])
@@ -269,10 +215,14 @@ describe('run_board_cli.run plan read', () => {
 			async (): Promise<BoardPlan | undefined> => await new Promise(() => undefined),
 		)
 
-		await expect(run_board_cli.run([], { ...ports, read_plan })).rejects.toBe(STOPPED)
+		await expect(run_board_cli.run([], { ...ports, read_plan, size: () => PANE })).rejects.toBe(
+			STOPPED,
+		)
+		const lines = lines_of(terminal_of(frames, PANE))
+
 		expect(read_plan).toHaveBeenCalledOnce()
-		expect(frames[1]).toMatch(SPINNING)
-		expect(frames[1]?.split('\n', 1)[0]).not.toContain('⏳')
+		expect(lines.join('\n')).toMatch(SPINNING)
+		expect(lines[0]).not.toContain('⏳')
 	})
 
 	it('draws the plan in one plain frame, with no spinner', async () => {
@@ -286,53 +236,7 @@ describe('run_board_cli.run plan read', () => {
 	})
 })
 
-// joshuafolkken/kit#3495: a live board redraws on each second and only turns its spinners in between.
-// joshuafolkken/kit#8125: each frame and each turn in synchronized output.
-const HOME = `${ESCAPE}[?2026h${ESCAPE}[H`
-const TURN =
-	// eslint-disable-next-line no-control-regex -- a turn is made of control characters
-	/^\u{1B}\[\?2026h(?:\u{1B}\[\d+;\d+H(?:\u{1B}\[[\d;]*m)*.\u{1B}\[0m)+\u{1B}\[\?2026l$/u
-const PACED_MS = 2000
-
-// Ports whose sleeps move the clock, stopping the board once `PACED_MS` have passed, and every write
-// with how long after the start it was made.
-function paced(board: Harness): {
-	live: BoardPorts
-	writes: Array<{ at_ms: number; text: string }>
-} {
-	const { ports, clock } = board
-	const writes: Array<{ at_ms: number; text: string }> = []
-	const live = {
-		...ports,
-		write: (text: string) => {
-			writes.push({ at_ms: clock.now_ms - START, text })
-		},
-		sleep: async (ms: number) => {
-			if (clock.now_ms >= START + PACED_MS) throw STOPPED
-			clock.now_ms += ms
-		},
-	}
-
-	return { live, writes }
-}
-
-describe('run_board_cli.run redraw pace', () => {
-	it('redraws once a second on the second, writing only spinner turns between, reading nothing', async () => {
-		const board = harness({ ...LOCAL, events: [LAUNCH] }, [plan_titled('a')])
-		const { live, writes } = paced(board)
-
-		await expect(run_board_cli.run([], live)).rejects.toBe(STOPPED)
-
-		const frames = writes.filter(({ text }) => text.startsWith(HOME))
-		const between = writes.slice(1, -1).filter(({ text }) => !text.startsWith(HOME))
-
-		expect(frames.map(({ at_ms }) => at_ms)).toStrictEqual([0, 1000, 2000])
-		expect(between.length).toBeGreaterThan(0)
-		expect(between.every(({ text }) => TURN.test(text))).toBe(true)
-		expect(board.read_machine).toHaveBeenCalledTimes(frames.length)
-		expect(board.read_local).toHaveBeenCalledOnce()
-	})
-})
+// joshuafolkken/kit#3495: the redraw pace is `run-board-cli.pace.test.ts`'s.
 
 // joshuafolkken/kit#3486: a live frame ends on its footer with nothing after it and is kept to the
 // terminal's rows; every other frame is drawn whole, and every frame is in English.
@@ -382,7 +286,7 @@ async function live_lines(rows: number): Promise<Array<string>> {
 		run_board_cli.run([], { ...ports, size: () => ({ rows, columns: 200 }) }),
 	).rejects.toBe(STOPPED)
 
-	return stripVTControlCharacters(frames[1] ?? '').split('\n')
+	return lines_of(terminal_of(frames, { rows, columns: 200 }))
 }
 
 // joshuafolkken/kit#3505: the footer is the first line a short pane gives up, before any row.

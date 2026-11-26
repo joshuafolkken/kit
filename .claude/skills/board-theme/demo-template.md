@@ -1,24 +1,51 @@
 # run:board theme demo template
 
 Take a real colored frame afresh, copy the code block to `.josh/tmp/scratch/<theme>-theme-demo.mjs`, add
-effects and variants, and run it:
+effects and scenes, and run it:
 
 ```bash
 FORCE_COLOR=3 pnpm josh run:board --once --theme <theme> > .josh/tmp/scratch/<theme>-frame.ans
-pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs [variant]…
+pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs
 ```
 
+`DEMO_STEPS=<n>` ends it after n frames: the check without a terminal. `DEMO_BEATS=1` and `DEMO_SEED=<n>` → the code's comments.
+
+## Demo rules
+
+- A demo of several themes: digits pick the theme (0 no theme, then `THEME_DEFS` order), letters the
+  event (`s` IDLE, `a` PROGRESS, `d` ROW, `w` NOTICE, `q` OPENING, `e` ENDING); it starts on IDLE.
+  Events loop with two seconds of normal display between; OPENING and ENDING play once, then IDLE.
+- Each version is its own file; never change an earlier one. Keep each demo with its base as a pair;
+  give the version the user confirms a copy that plays alone.
+- One file per theme lets themes be fixed in parallel.
+- The `--once` frame is a still frame, not the live board's shape. Also take bases in the live shape:
+  rules with folding marks, emoji on and off. A theme that draws in capitals capitalizes in the demo.
+- Find places from structure (rule headings, gauges, free rows, layout constants), never from a
+  line's text (`startsWith('-- ')`, a regular expression) or a fixed row number.
+- A missing row is no row: never fall back to row 0 or a negative row (no `lane_rows[0] ?? 0`).
+- Find times by place, never by their text's shape (a date in the clock).
+- Turn the terminal's line wrap off and crop to the terminal's size.
+- Keep three checks without a terminal: every frame built, a text capture at a given moment, and the
+  bytes per write. Measure a lengthened NOTICE whole.
+
+## States to try
+
+Try each at the demo stage: no lane, folded sections, the run stopped, no finish estimate (clocks
+`--:--`), clocks with no date, a narrow terminal.
+
 ```js
-// Template for a `run:board` theme demo: a real board frame, a typed message, and one effect per variant.
-// Copy it to .josh/tmp/scratch/<theme>-theme-demo.mjs, then add effects and variants.
-// Usage: pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs [variant]…
-// No argument is a tour: each message types with the next variant. One or more names play those
-// variants on every message. It writes to the terminal only. Needs the frame's columns, 24 rows, 24-bit color.
+// Template for a `run:board` theme demo: a real board frame, a typed message, and scenes a number key picks.
+// Copy it to .josh/tmp/scratch/<theme>-theme-demo.mjs, then add effects and scenes.
+// Usage: pnpm josh scratch:run .josh/tmp/scratch/<theme>-theme-demo.mjs
+// A number key picks a scene; it loops with two seconds of normal display between plays; Q or Ctrl-C
+// quits. An optional [scene] picks the first. DEMO_STEPS=<n> ends it after n frames. Terminal only;
+// needs the frame's columns, 24 rows, 24-bit color. DEMO_BEATS=1 writes each frame as a JSON
+// `{ text, ms }` line on a virtual clock instead; DEMO_SEED=<n> seeds `random()`.
 
 import { readFileSync } from 'node:fs'
 
 const ESC = '\u001B['
-// The frame's rows shown; the caption takes two more.
+// The frame's rows shown; the caption takes two more, above the board.
 const H = 22
 const TICK_MS = 50
 // The board's own paces: a letter every 50 ms (`LETTER_MS`), a spinner frame every 80 ms.
@@ -32,29 +59,17 @@ function rgb(color) {
 const BODY = rgb('62;236;225')
 const WHITE = rgb('235;255;252')
 const CAPTION = rgb('150;150;150')
+const CHOSEN = rgb('255;200;60')
 
 // The base: the real colored frame beside this script, `<theme>-frame.ans` for `<theme>-theme-demo.mjs`,
 // taken afresh for each proposal:
 // `FORCE_COLOR=3 pnpm josh run:board --once --theme <theme> > .josh/tmp/scratch/<theme>-frame.ans`.
 const FRAME = readFileSync(new URL(import.meta.url.replace(/-theme-demo\.mjs$/u, '-frame.ans')), 'utf8')
-// Where the frame's message line sits — its row, its first column and the column after it (the matrix
+// Where the frame's message line sits — its row, its first column and the column after it (the trace
 // frame's); read them off the frame. The typed messages replace that span only.
 const MESSAGE_Y = 2
 const MESSAGE_X = 45
 const MESSAGE_END = 101
-
-// The variants under comparison: its name, the caption shown while it plays, and what it draws.
-// `draw(grid, tick, typed)` changes cells of `grid[y][x] = [character, style]`; a style is escapes, `rgb()` one.
-const VARIANTS = {
-	example: {
-		note: 'EXAMPLE - the typed message is white while it types',
-		draw: (grid, tick, typed) => {
-			if (!typed.is_typing) return
-			const row = grid[MESSAGE_Y]
-			for (let x = MESSAGE_X; x < MESSAGE_X + typed.length; x++) row[x] = [row[x][0], WHITE]
-		},
-	},
-}
 
 const MESSAGES = [
 	{ start: 50, text: '>  #8343 · BASH PNPM JOSH WAIT --PID $(PGREP -F "MEASURE…' },
@@ -62,12 +77,54 @@ const MESSAGES = [
 ]
 const LAST_TICK = 260
 
-function out(text) {
-	process.stdout.write(text)
+// An effect: `draw(grid, tick, typed)` changes cells of `grid[y][x] = [character, style]`; a style is
+// escapes, `rgb()` one.
+function white_while_typing(grid, tick, typed) {
+	if (!typed.is_typing) return
+	const row = grid[MESSAGE_Y]
+	for (let x = MESSAGE_X; x < MESSAGE_X + typed.length; x++) row[x] = [row[x][0], WHITE]
 }
 
+// The animations a number key picks: its name, what it shows, the ticks of the timeline it loops, and
+// what it draws.
+const SCENES = {
+	0: { name: 'ALL', note: 'the whole timeline: two messages type', from: 0, to: LAST_TICK, draw: white_while_typing },
+	1: { name: 'TYPE', note: 'one message types white', from: 45, to: 115, draw: white_while_typing },
+}
+// Between two plays the board shows its normal display for two seconds, from this tick of the timeline.
+const GAP_TICKS = 40
+const NORMAL_FROM = 230
+
+// The beats form: each frame's bytes held, then written as one JSON line when the frame's wait comes.
+const IS_BEATS = process.env.DEMO_BEATS === '1'
+const beat = { text: '' }
+
+// The random source effects draw from: mulberry32, the formula `scripts/run/board/run-board-seeded-fixture.ts`
+// holds, so one seed draws one sequence in both. The replayed board (`run-board-replay.ts`) takes
+// `--seed` and ignores it: its theme host draws its randomness from the moment and the place.
+function seeded(seed) {
+	let state = seed >>> 0
+	return () => {
+		state = (state + 0x6d2b79f5) >>> 0
+		let mixed = Math.imul(state ^ (state >>> 15), state | 1)
+		mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61)
+		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296
+	}
+}
+
+const random = seeded(Number(process.env.DEMO_SEED || 1))
+
+function out(text) {
+	if (IS_BEATS) beat.text += text
+	else process.stdout.write(text)
+}
+
+// A wait: real time on a terminal; in the beats form, the frame's line, the clock moved on at once.
 function sleep(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms))
+	if (!IS_BEATS) return new Promise((resolve) => setTimeout(resolve, ms))
+	process.stdout.write(`${JSON.stringify({ text: beat.text, ms })}\n`)
+	beat.text = ''
+	return Promise.resolve()
 }
 
 function row_of(line, style) {
@@ -129,34 +186,75 @@ function grid_of(typed) {
 	return grid
 }
 
-function variants_of(chosen, typed) {
-	const names = Object.keys(VARIANTS)
-	if (chosen.length > 0) return chosen
-	return typed.index < 0 ? [] : [names[typed.index % names.length]]
+// Where step `step` of scene `key`'s loop is on the timeline: the scene's ticks, then the normal display.
+function moment_of(key, step) {
+	const { from, to } = SCENES[key]
+	const place = step % (to - from + GAP_TICKS)
+	return place < to - from ? { tick: from + place, is_gap: false } : { tick: NORMAL_FROM + place - (to - from), is_gap: true }
 }
 
-async function scene(chosen) {
-	for (let tick = 0; tick < LAST_TICK; tick++) {
-		const typed = typed_line(tick)
-		const names = variants_of(chosen, typed)
-		const caption = typed.is_typing ? names.map((name) => VARIANTS[name].note).join('  +  ') : 'IDLE'
-		const grid = grid_of(typed)
-		grid.push(row_of('', CAPTION), row_of(`  ${caption}`.slice(0, W), CAPTION))
-		for (const name of names) VARIANTS[name].draw(grid, tick, typed)
-		render(grid)
+// The two rows above the board: the scene playing, then the keys with the chosen one picked out.
+function caption_rows(key, moment) {
+	const { name, note } = SCENES[key]
+	const title = moment.is_gap ? `[${key}] ${name} - normal display, two seconds, then it plays again` : `[${key}] ${name} - ${note}`
+	const line = `  KEYS  ${Object.entries(SCENES).map(([each, scene]) => `${each} ${scene.name}`).join('   ')}   Q QUIT`
+	const keys = row_of(line, CAPTION)
+	const at = line.indexOf(`${key} ${name}`)
+	for (let x = at; x < Math.min(W, at + key.length + 1 + name.length); x++) keys[x][1] = CHOSEN
+	return [row_of(`  ${title}`, moment.is_gap ? CAPTION : WHITE), keys]
+}
+
+// One frame: the caption rows, then the board at the moment's tick with the scene's effect drawn.
+function frame_of(key, moment) {
+	const typed = typed_line(moment.tick)
+	const grid = grid_of(typed)
+	SCENES[key].draw(grid, moment.tick, typed)
+	return [...caption_rows(key, moment), ...grid]
+}
+
+// The scene playing and the step of its loop; a number key picks a scene and starts it over.
+const playing = { key: '0', step: 0 }
+
+function on_keys(data) {
+	for (const ch of String(data).toLowerCase()) {
+		if (ch === 'q' || ch === '\u0003') process.exit(0)
+		if (ch in SCENES) [playing.key, playing.step] = [ch, 0]
+	}
+}
+
+function listen() {
+	if (!process.stdin.isTTY) return
+	process.stdin.setRawMode(true)
+	process.stdin.resume()
+	process.stdin.on('data', on_keys)
+}
+
+// Loops the scene playing until a key quits; DEMO_STEPS ends it after that many frames (a check).
+async function play(last_step) {
+	for (let count = 0; count < last_step; count++) {
+		render(frame_of(playing.key, moment_of(playing.key, playing.step)))
+		playing.step += 1
 		await sleep(TICK_MS)
 	}
 }
 
-async function main() {
-	const chosen = process.argv.slice(2)
-	const unknown = chosen.find((name) => !(name in VARIANTS))
-	if (unknown) throw new Error(`Unknown variant: ${unknown}. Known: ${Object.keys(VARIANTS).join(', ')}`)
-	// The alternate screen, with the cursor hidden; both are put back however the script ends.
+// The alternate screen, with the cursor hidden; both are put back however the script ends.
+function enter_screen() {
 	process.on('exit', () => out(`${ESC}0m${ESC}?25h${ESC}?1049l`))
 	process.on('SIGINT', () => process.exit(0))
 	out(`${ESC}?1049h${ESC}?25l${ESC}2J`)
-	await scene(chosen)
+	listen()
+}
+
+async function main() {
+	const [key = '0'] = process.argv.slice(2)
+	if (!(key in SCENES)) throw new Error(`Unknown scene: ${key}. Known: ${Object.keys(SCENES).join(', ')}`)
+	playing.key = key
+	// No wait slows the beats form, so the frame count is what ends it.
+	if (IS_BEATS && !process.env.DEMO_STEPS) throw new Error('DEMO_BEATS=1 takes DEMO_STEPS=<n>')
+	if (!IS_BEATS) enter_screen()
+	await play(Number(process.env.DEMO_STEPS || Infinity))
+	process.exit(0)
 }
 
 await main()

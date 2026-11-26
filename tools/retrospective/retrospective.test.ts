@@ -88,9 +88,31 @@ function inputs(overrides: Partial<RetrospectiveInputs>): RetrospectiveInputs {
 		scope: since(RUN_START),
 		sessions: [],
 		audit_summary: AUDIT_SUMMARY,
+		defects: [],
 		...overrides,
 	}
 }
+
+describe('retrospective.compose — the defect section', () => {
+	const DEFECT_HEADING =
+		'Defects (last 7 days): defects by origin — traced to a pull request: 1 (100%)'
+	const DEFECT_ROW = '  scripts/run  1 / 4  25%'
+
+	it('prints the defect digest between the observations and the friction', () => {
+		const printed = retrospective.compose(inputs({ defects: [DEFECT_HEADING, DEFECT_ROW] }))
+
+		expect(printed).toContain(`${DEFECT_HEADING}\n${DEFECT_ROW}\n\n`)
+		expect(printed).toContain(AUDIT_SUMMARY)
+	})
+
+	it('leaves the section out and prints the rest when GitHub could not be read', () => {
+		const printed = retrospective.compose(inputs({ defects: [] }))
+
+		expect(printed).not.toContain('Defects (last')
+		expect(printed).toContain(AUDIT_SUMMARY)
+		expect(printed).toContain(retrospective.CLOSING)
+	})
+})
 
 describe('retrospective.compose — guard friction', () => {
 	const refused = guard_friction_fixture.session(guard_friction_fixture.node('lane'), [

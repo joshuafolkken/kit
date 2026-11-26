@@ -13,6 +13,8 @@ const { resolve_package_bin } = await import('#scripts/build/local-bin')
 const { git_spawn_sync } = await import('#scripts/git/git-spawn-sync')
 const mocked_git_read = vi.mocked(git_spawn_sync.read)
 const { eslint_daemon } = await import('./eslint-daemon')
+const { eslint_daemon_environment } = await import('./eslint-daemon-environment')
+const { record_file } = eslint_daemon_environment
 
 // joshuafolkken/kit#4867: the daemon's type program keeps the old copy of a module it read but never
 // linted, so a shell edit to it — one the edit hook never sees — has to restart the daemon, and an edit
@@ -59,7 +61,7 @@ function current_checkout(changed: string = IMPORTED): void {
 	}
 
 	write_file(project_root, IMPORTED, EXPORTS_BEFORE)
-	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+	write_file(project_root, record_file(ESLINT_DIRECTORY, project_root), DAEMON)
 	write_file(
 		project_root,
 		`${ESLINT_DIRECTORY}/.eslint_d-toolchain`,

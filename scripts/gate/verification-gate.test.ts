@@ -25,6 +25,7 @@ vi.mock('./type-check-step', () => ({
 const PROJECT_ROOT = '/project'
 
 const { verification_gate } = await import('./verification-gate')
+const { gate_command } = await import('./gate-command')
 const GATE_STEPS = await verification_gate.build_gate_steps(PROJECT_ROOT)
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
@@ -32,9 +33,8 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const PASS = 0
 const FAIL = 1
 const ALL_PASS: ReadonlyArray<number> = GATE_STEPS.map(() => PASS)
-const REFUSAL_MESSAGE = 'josh gate takes no extra arguments'
 
-const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
+const { as_execa_implementation, capture_stdout, fake_result } = gate_test_fixture
 
 // This suite mocks execa but not the tree, so it must use isolated record destinations: simulated
 // success must not authorize skipping checks on the real working tree (joshuafolkken/kit#1328).
@@ -171,36 +171,8 @@ describe('the type check follows the resolver', () => {
 	})
 })
 
+// The refusal and the usage are `gate-command.test.ts`'s; these two drive the real fan-out.
 describe('run_gate_command', () => {
-	// `gate` forwards nothing to its four sub-commands, so an appended flag would vanish silently —
-	// the hole the composite-argument guard closes for `sh -c` entries.
-	it('refuses extra arguments and names where they belong', async () => {
-		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
-
-		try {
-			const code = await verification_gate.run_gate_command([FORWARDED_FLAG])
-
-			expect(code).toBe(1)
-			expect(error).toHaveBeenCalledWith(expect.stringContaining(REFUSAL_MESSAGE))
-			expect(mocked_execa).not.toHaveBeenCalled()
-		} finally {
-			error.mockRestore()
-		}
-	})
-
-	// joshuafolkken/kit#7612: a help request is answered, not refused, and runs nothing.
-	it.each(['--help', '-h'])('prints the usage and exits 0 on %s', async (flag) => {
-		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
-
-		try {
-			expect(await verification_gate.run_gate_command([flag])).toBe(0)
-			expect(info).toHaveBeenCalledWith(expect.stringMatching(/^Usage: josh gate \[--verbose\]/u))
-			expect(mocked_execa).not.toHaveBeenCalled()
-		} finally {
-			info.mockRestore()
-		}
-	})
-
 	// The scoped pre-check is `run_gate_command`'s alone and reads the real checkout's scoped record;
 	// this case is about argument handling, so it turns the enforcement off rather than plant a record
 	// for the surrounding tree. joshuafolkken/kit#2296 pins the pre-check itself in `gate-scoped-precheck.test.ts`.
@@ -210,7 +182,7 @@ describe('run_gate_command', () => {
 		const bare = { ...RECORDS, is_scoped_enforced: false }
 
 		try {
-			expect(await verification_gate.run_gate_command([], bare)).toBe(0)
+			expect(await gate_command.run_gate_command([], bare)).toBe(0)
 		} finally {
 			stdout.restore()
 		}
@@ -307,31 +279,10 @@ describe('run_gate_command — the verbose flag', () => {
 		const stdout = capture_stdout()
 
 		try {
-			expect(
-				await verification_gate.run_gate_command([verification_gate.VERBOSE_FLAG], RECORDS),
-			).toBe(0)
+			expect(await gate_command.run_gate_command([gate_command.VERBOSE_FLAG], RECORDS)).toBe(0)
 			for (const output of every_step_output()) expect(stdout.text()).toContain(output)
 		} finally {
 			stdout.restore()
-		}
-	})
-
-	// The refusal exists because a forwarded flag vanishes into the sub-commands; consuming one flag
-	// here must not stop the others being refused.
-	it('still refuses an argument it would have to forward', async () => {
-		mock_steps(ALL_PASS)
-		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
-
-		try {
-			const code = await verification_gate.run_gate_command([
-				verification_gate.VERBOSE_FLAG,
-				FORWARDED_FLAG,
-			])
-
-			expect(code).toBe(1)
-			expect(error).toHaveBeenCalledWith(expect.stringContaining(REFUSAL_MESSAGE))
-		} finally {
-			error.mockRestore()
 		}
 	})
 })

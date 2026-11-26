@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/gate/gate-worktree-lock.ts:81 | 2026-11-23 | #8846 | - | edge-input

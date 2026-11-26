@@ -101,12 +101,13 @@ Leave it out: `josh gate` runs only its fixed checks.
 
 ## `josh.worker`
 
-Picks the model and effort each lane worker runs on, per Issue, for a [`josh backlogrun`](./josh-commands-backlog.md). kit never picks a profile from an Issue's content: a person chooses it with a label.
+Picks the model and effort each lane worker runs on, per Issue, for a [`josh backlogrun`](./josh-commands-backlog.md). A person chooses a profile with a label; with `route: true`, kit picks one for an unlabelled Issue from its body.
 
 | Setting                         | Value                                                        | Default  |
 | ------------------------------- | ------------------------------------------------------------ | -------- |
 | `josh.worker.default`           | the name of the profile an unlabelled Issue runs on          | required |
 | `josh.worker.escalate`          | `true` lets a stuck worker resume one profile up             | `false`  |
+| `josh.worker.route`             | `true` runs a light unlabelled Issue on the weakest profile  | `false`  |
 | `josh.worker.profiles`          | a non-empty list of profiles, weakest first                  | required |
 | `josh.worker.profiles[].name`   | the profile's name, unique; the label is `worker:<name>`     | required |
 | `josh.worker.profiles[].model`  | a Claude model, such as `claude-sonnet-5-5`                  | required |
@@ -116,6 +117,8 @@ Picks the model and effort each lane worker runs on, per Issue, for a [`josh bac
 How kit uses it:
 
 - Choosing a profile: an Issue labelled `worker:<name>` runs on that profile; an Issue with no such label runs on `default`. More than one `worker:` label, or one naming no profile, stops the lane's dispatch with a note. [`josh issue:file`](./josh-commands-backlog.md) prints the profiles with their `when`, refuses a `worker:` label naming none of them and creates the chosen label.
+- Routing: with `route: true`, an Issue with no `worker:` label runs on the first profile in `profiles` when its `## 背景` declares a size within the split guide, no `振る舞い変更` or `破壊的変更`, and no person's judgement; otherwise, or when its body cannot be read, it runs on `default`. A label always wins.
+- The revert switch: a routed Issue gets its profile's `worker:<name>` label at dispatch; one routed to `default` gets none. `route: false` returns every later dispatch of an unlabelled Issue to `default` in one step; an Issue already labelled keeps its label until it is removed.
 - Environment variables: the chosen profile wins over `JOSH_WORKER_MODEL` and `JOSH_WORKER_EFFORT`. Those two, and kit's defaults, decide only when `josh.worker` is unset.
 - Model and effort: a profile is held to the same rules as `JOSH_WORKER_MODEL` / `JOSH_WORKER_EFFORT`; a consultation model (Fable) is rejected. Every profile names an effort, because kit always passes one: give a model without an effort setting, such as Haiku, `"low"`.
 - The ship phase: once a lane reaches the gate it relaunches on the ship model (`JOSH_WORKER_SHIP_MODEL`, default `claude-sonnet-5-5`) at effort `low`, but never on a model above the Issue's profile: the weaker of the two, ranked by the order of `profiles`, wins. A ship model no profile names is kept.
@@ -127,6 +130,7 @@ How kit uses it:
 		"worker": {
 			"default": "opus-medium",
 			"escalate": true,
+			"route": true,
 			"profiles": [
 				{
 					"name": "haiku",
@@ -153,6 +157,33 @@ How kit uses it:
 ```
 
 Leave it out: every lane worker runs on `JOSH_WORKER_MODEL` / `JOSH_WORKER_EFFORT` or kit's defaults, kit reads no `worker:` label, and no worker escalates.
+
+## `josh.handoff`
+
+Picks the model the [`josh run:handoff`](./josh-commands-board.md) `kickoff` child (filing and planning) runs on.
+
+| Setting              | Value                                                                | Default |
+| -------------------- | -------------------------------------------------------------------- | ------- |
+| `josh.handoff.route` | `true` runs the `kickoff` child on the weakest `josh.worker` profile | `false` |
+
+How kit uses it:
+
+- The profile: with `route: true`, the `kickoff` child runs on the model and effort of the first profile in `josh.worker.profiles`. It keeps the scheduler role, so it still reads `CLAUDE.md`. With `josh.worker` unset, or a first profile on another provider, it runs on the scheduler profile.
+- Unchanged: the `retrospective` child, the `fullrun` / `halfrun` / `prrun` children, the `josh backlogrun` parent, `josh backlog:drive` and the wake session keep their role profiles.
+- Environment variables: `JOSH_SCHEDULER_MODEL` or `JOSH_SCHEDULER_EFFORT`, when set, win over the route.
+- The revert switch: `route: false` returns the `kickoff` child to the scheduler profile in one step.
+- Reading the cost: [`josh cost:audit`](./josh-commands-session.md) splits the hand-off rows by keyword (`handoff:kickoff`, `handoff:retrospective`, …); compare the `handoff:kickoff` row over the same period before and after the switch.
+- Reading the quality: over the Issues the `kickoff` child filed in the same two periods, count those whose plan was recorded more than once (`josh issue:plan`), those split again after filing (a `josh lane:plan` `split`, an `epic --promote`) and those sent back with `needs-decision`. More of any of them after the switch → set `route: false`.
+
+```json
+{
+	"josh": {
+		"handoff": { "route": true }
+	}
+}
+```
+
+Leave it out: the `kickoff` child runs on `JOSH_SCHEDULER_MODEL` / `JOSH_SCHEDULER_EFFORT` or kit's defaults.
 
 ## Written by kit
 

@@ -64,8 +64,11 @@ interface StatsWindow {
 	until_ms: number
 }
 
+// `hours` replaces the active hours the row's own entries give, for a row cut from a longer
+// period (`lane-limit-table.ts`): its samples alone would bridge the gaps other rows hold.
 interface RowLabel {
 	limit: string
+	hours?: number | undefined
 }
 
 function window_of(period_days: number, now_ms: number): StatsWindow {
@@ -173,11 +176,14 @@ function gap_hours(entries: ReadonlyArray<LedgerEntry>): number | undefined {
 	)
 }
 
-// The time from each working sample to the next sample. The cap still applies, so a sampler stopped
-// mid-run does not count its silence as work.
-function sampled_hours(samples: ReadonlyArray<LoadEntry>): number | undefined {
+// The time from each working sample `is_counted` keeps to the next sample. The cap still applies, so a
+// sampler stopped mid-run does not count its silence as work.
+function sampled_hours(
+	samples: ReadonlyArray<LoadEntry>,
+	is_counted: (sample: LoadEntry) => boolean = is_working,
+): number | undefined {
 	const gaps = sample_pairs(samples)
-		.filter(({ sample }) => is_working(sample))
+		.filter(({ sample }) => is_working(sample) && is_counted(sample))
 		.map((pair) => elapsed_ms(pair))
 
 	return sum_hours(gaps)
@@ -212,16 +218,26 @@ function cell(value: number | undefined): string {
 	return value === undefined ? MISSING : value.toFixed(DECIMALS)
 }
 
-function throughput_cells(entries: ReadonlyArray<LedgerEntry>): Array<string> {
-	const merges = entries.filter((entry) => entry.kind === 'merge').length
-	const hours = active_hours(entries)
+function merge_count(entries: ReadonlyArray<LedgerEntry>): number {
+	return entries.filter((entry) => is_merge(entry)).length
+}
+
+// Merges per active hour; `undefined` when nothing leaves any active time.
+function merges_per_hour(
+	entries: ReadonlyArray<LedgerEntry>,
+	hours = active_hours(entries),
+): number | undefined {
+	return hours === undefined ? undefined : merge_count(entries) / hours
+}
+
+function throughput_cells(entries: ReadonlyArray<LedgerEntry>, label: RowLabel): Array<string> {
 	const lanes = entries
 		.filter(is_load)
 		.filter(is_working)
 		.map((entry) => entry.lanes)
-	const per_hour = hours === undefined ? undefined : merges / hours
+	const per_hour = merges_per_hour(entries, label.hours ?? active_hours(entries))
 
-	return [String(merges), cell(per_hour), cell(mean(lanes))]
+	return [String(merge_count(entries)), cell(per_hour), cell(mean(lanes))]
 }
 
 function dispatched_before(
@@ -334,7 +350,7 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 	return to_row([
 		label.limit,
 		days_of(window),
-		...throughput_cells(period),
+		...throughput_cells(period, label),
 		...lane_cells(entries, period),
 		...gate_cells(period),
 		...load_cells(period.filter(is_load)),
@@ -350,6 +366,8 @@ const lane_stats = {
 	mean,
 	median,
 	merge_minutes,
+	merges_per_hour,
+	sampled_hours,
 	peak,
 	row,
 	to_row,

@@ -2,7 +2,6 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
-import { run_board_row_key } from './run-board-row-key'
 import type { ThroughputCell, ThroughputRow } from './run-board-throughput'
 
 // The `📈 throughput` section of `run:board` (joshuafolkken/kit#5705): per row its cells as a
@@ -128,20 +127,14 @@ function summary_of(rows: ReadonlyArray<ThroughputRow>): string {
 
 // Where the frame `has_lamps`, each row ends on where its lamp panel starts (`run-board-lamps.ts`);
 // `tail` is drawn at the right end of the rule — a themed screen's alert level (joshuafolkken/kit#8513);
-// `is_flash_keyed` keys each row for the change flash (joshuafolkken/kit#8353).
 function rows_part(
 	rows: ReadonlyArray<ThroughputRow>,
 	has_lamps = false,
 	tail?: string,
-	is_flash_keyed = false,
 ): DetailPart {
 	const widths = widths_of(rows)
 	const lines = rows.map((row, index) => ({
-		text: run_board_row_key.flashed(
-			line_of(row, widths, has_lamps ? run_board_lamps.start_of(index) : undefined),
-			`throughput:${row.label}`,
-			is_flash_keyed,
-		),
+		text: line_of(row, widths, has_lamps ? run_board_lamps.start_of(index) : undefined),
 		is_detail: false,
 	}))
 	const rule = run_board_render_section.tight_columns_rule(LABEL, rule_columns(widths))
@@ -154,9 +147,8 @@ function throughput_part(
 	rows: ReadonlyArray<ThroughputRow> | undefined,
 	has_lamps = false,
 	tail?: string,
-	is_flash_keyed = false,
 ): DetailPart | undefined {
-	return rows === undefined ? undefined : rows_part(rows, has_lamps, tail, is_flash_keyed)
+	return rows === undefined ? undefined : rows_part(rows, has_lamps, tail)
 }
 
 const run_board_render_throughput = { rows_part, throughput_part }

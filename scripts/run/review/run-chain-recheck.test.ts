@@ -4,6 +4,7 @@ import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinne
 import { run_ship_pre_detach_pinned } from '#scripts/run/ship/run-ship-pre-detach-pinned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
+import { run_chain_worker_fixture } from './run-chain-worker-fixture'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -20,6 +21,7 @@ const UNPINNED = 'unpinned scripts/backlog/backlog-triage-cli.ts:237'
 const RESUME = `--join --ship '${TITLE}' --from recheck`
 const STOPPED = 1
 const REASON = 'no test can pin a log line'
+const UNPINNED_OK = '--unpinned-ok'
 
 const printed: Array<string> = []
 
@@ -43,6 +45,7 @@ function pinned_answers(code: number, out: string): ReturnType<typeof vi.spyOn> 
 }
 
 beforeEach(() => {
+	run_chain_worker_fixture.run_worker_in_place(run_chain_cli.run)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(review_record_slot, 'slot_text').mockReturnValue('')
@@ -92,9 +95,6 @@ describe('run_chain_cli.run --join — the recheck before the ship', () => {
 		expect(ran()).not.toContain(SHIP)
 		expect(output()).toContain(UNPINNED)
 		expect(output()).toContain('stopped at recheck (a changed place no test pins)')
-		expect(output()).toContain(
-			'`pnpm josh ship --detach --review --unpinned-ok "<reason>" "<title>"`',
-		)
 	})
 
 	it('ships when both judgments pass, running no command of its own', async () => {
@@ -107,6 +107,20 @@ describe('run_chain_cli.run --join — the recheck before the ship', () => {
 		await expect(run_chain_cli.run([...SHIPPING, '--from', 'recheck'])).resolves.toBe(0)
 
 		expect(ran()).toStrictEqual([SHIP])
+	})
+})
+
+// joshuafolkken/kit#8862 (ac-e872c43a): one runnable rerun carries the reason; no hand-built ship.
+describe('run_chain_cli.run --join — the unpinned stop’s next action', () => {
+	it('names the join rerun with --unpinned-ok for a change no test can pin', async () => {
+		pinned_answers(1, `${UNPINNED}\n`)
+
+		await run_chain_cli.run(SHIPPING)
+
+		expect(output()).toContain(
+			`\`pnpm josh run:chain ${ISSUE} --join --ship '${TITLE}' --unpinned-ok "<reason>" --from recheck\``,
+		)
+		expect(output()).not.toContain('josh ship --detach')
 	})
 })
 
@@ -131,7 +145,7 @@ describe('run_chain_cli.run --join — the judgments the ship asks (ac-fd7735c5)
 
 describe('run_chain_cli.run --join — the recheck under what the branch accepted', () => {
 	it.each([
-		['the reason this branch recorded', REASON, ['--unpinned-ok', REASON]],
+		['the reason this branch recorded', REASON, [UNPINNED_OK, REASON]],
 		['no reason when none is recorded', undefined, []],
 	])('passes %s to the pinned check', async (_label, reason, unpinned_ok) => {
 		vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(reason)
@@ -142,5 +156,42 @@ describe('run_chain_cli.run --join — the recheck under what the branch accepte
 		// joshuafolkken/kit#8271 (ac-0b9841e2): the fixed tree's check, launched where it is read, is
 		// the one the ship's pre-detach reads next.
 		expect(pinned).toHaveBeenCalledWith({ number: ISSUE, unpinned_ok, is_launching: true })
+	})
+})
+
+// joshuafolkken/kit#8862 (ac-80c02f34, ac-a1d738ed): the join's reason goes into the branch's record
+// before any stage, so the recheck reads it.
+describe('run_chain_cli.run --join --unpinned-ok — the reason the join records', () => {
+	it('records the reason before the recheck and ships past the unpinned place', async () => {
+		const order: Array<string> = []
+		const keep = vi
+			.spyOn(run_review_pinned_accepted, 'keep_reason')
+			.mockImplementation(async () => {
+				order.push('keep')
+			})
+
+		vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockImplementation(async () => {
+			order.push('read')
+
+			return order.includes('keep') ? REASON : undefined
+		})
+		const pinned = pinned_answers(0, '')
+
+		await expect(run_chain_cli.run([...SHIPPING, UNPINNED_OK, REASON])).resolves.toBe(0)
+
+		expect(keep).toHaveBeenCalledExactlyOnceWith(REASON)
+		expect(order).toStrictEqual(['keep', 'read'])
+		expect(pinned).toHaveBeenCalledWith(
+			expect.objectContaining({ unpinned_ok: [UNPINNED_OK, REASON] }),
+		)
+		expect(ran()).toContain(SHIP)
+	})
+
+	it('records nothing on a join without a reason', async () => {
+		const keep = vi.spyOn(run_review_pinned_accepted, 'keep_reason').mockResolvedValue()
+
+		await run_chain_cli.run(SHIPPING)
+
+		expect(keep).not.toHaveBeenCalled()
 	})
 })

@@ -52,6 +52,58 @@ function overwritten_synced(text: string): string {
 	return synced(overwritten(text))
 }
 
+// Writes put together in one synchronized write: each part's own markers taken out, so the terminal
+// draws none of them until the last has arrived.
+function joined_synced(parts: ReadonlyArray<string>): string {
+	return synced(parts.map((part) => part.replaceAll(SYNC_ON, '').replaceAll(SYNC_OFF, '')).join(''))
+}
+
+// joshuafolkken/kit#8796: a writer that, once held, keeps every write until it is flushed, then writes
+// them as one synchronized write; not held, each write goes straight through. A live board's redraw
+// no longer holds it: the frame loop composes every layer into one write (joshuafolkken/kit#8826).
+interface Joint {
+	write: (bytes: string) => void
+	hold: () => void
+	flush: () => void
+}
+
+function joint_of(write: (bytes: string) => void): Joint {
+	const held: Array<string> = []
+	let is_holding = false
+
+	return {
+		write: (bytes) => {
+			if (is_holding) held.push(bytes)
+			else write(bytes)
+		},
+		hold: () => {
+			is_holding = true
+		},
+		flush: () => {
+			const joined = joined_synced(held.splice(0))
+
+			is_holding = false
+			if (joined !== '') write(joined)
+		},
+	}
+}
+
+// Ports writing through the joint, every wait flushing it first, so nothing held waits with them — the
+// spin's first wait comes right after it draws the frame's rain back.
+function jointed<P extends Pick<Joint, 'write'> & { sleep: (ms: number) => Promise<void> }>(
+	ports: P,
+	joint: Joint,
+): P {
+	return {
+		...ports,
+		write: joint.write,
+		sleep: async (ms: number) => {
+			joint.flush()
+			await ports.sleep(ms)
+		},
+	}
+}
+
 // The first frame, revealed a block at a time over the intro's typed line: the screen wiped first,
 // whatever the intro left (joshuafolkken/kit#8000), and nothing held back by synchronized output.
 function wiped(text: string): string {
@@ -79,7 +131,7 @@ function screen_of(mode: ScreenMode): Screen {
 	return mode === 'live' ? LIVE : PLAIN
 }
 
-const run_board_screen = { mode_of, screen_of, synced }
+const run_board_screen = { joined_synced, joint_of, jointed, mode_of, screen_of, synced }
 
 export { run_board_screen }
-export type { Screen, ScreenMode }
+export type { Joint, Screen, ScreenMode }

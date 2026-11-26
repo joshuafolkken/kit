@@ -62,7 +62,7 @@ function part_of(groups: Partial<ProcessGroups>, spinner?: string): DetailPart |
 }
 
 // The supervisor row's key on a theme's board; the matrix keys its rows to flash them.
-function supervisor_key(supervisor_pid?: number, theme: Theme = 'matrix'): string | undefined {
+function supervisor_key(supervisor_pid?: number, theme: Theme = 'trace'): string | undefined {
 	const usages = board_usage(new Map(), { backlogrun: { ...BACKLOGRUN, supervisor_pid } })
 	const part = processes_part(header({ spinner: SPINNER, usages, theme }))
 	const keys = part?.lines.map((line) => run_board_row_key.split_key(line.text).key)
@@ -71,15 +71,12 @@ function supervisor_key(supervisor_pid?: number, theme: Theme = 'matrix'): strin
 }
 
 describe('run_board_render_processes.processes_part supervisor key', () => {
-	it('ac-3a46d3cd keys the supervisor row by its pid where the theme flashes', () => {
-		expect(supervisor_key(123)).toMatch(/^flash:process:.*:supervisor:123$/u)
-		expect(supervisor_key()).toMatch(/:supervisor$/u)
-	})
-
-	it('ac-068e8fdc leaves the wargames rows without keys and as drawn before', () => {
+	// joshuafolkken/kit#8917: no theme keys its rows to flash them any more.
+	it('ac-068e8fdc leaves every theme’s rows without keys and as drawn before', () => {
 		const with_pid = part_of({ backlogrun: { ...BACKLOGRUN, supervisor_pid: 123 } }, SPINNER)
 
-		expect(supervisor_key(123, 'wargames')).toBeUndefined()
+		expect(supervisor_key(123, 'wopr')).toBeUndefined()
+		expect(supervisor_key(123)).toBeUndefined()
 		expect(with_pid).toStrictEqual(part_of({ backlogrun: BACKLOGRUN }, SPINNER))
 	})
 })

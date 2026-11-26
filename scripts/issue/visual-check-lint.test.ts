@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { issue_template_section } from './issue-template-section'
 import { visual_check_lint } from './visual-check-lint'
 
 const VISUAL_ONLY = '- 人の判断: 要（マージ前の目視確認 — 実ボードでの見た目）'
@@ -42,6 +43,12 @@ describe('visual_check_lint.problems — refused', () => {
 
 	it('refuses both the declaration and the criterion in one body', () => {
 		expect(visual_check_lint.problems(body_with([VISUAL_ONLY], [VISUAL_CRITERION]))).toHaveLength(2)
+	})
+
+	it('points at the judgement section of issue-template.md, not the whole document', () => {
+		const [found] = visual_check_lint.problems(body_with([VISUAL_ONLY]))
+
+		expect(found).toContain(issue_template_section.pointer('judgement'))
 	})
 })
 

@@ -24,7 +24,8 @@ function worker(selected: WorkerProfile, profiles = [HAIKU, SONNET, OPUS]): Work
 	return {
 		kind: 'worker',
 		worker: selected,
-		settings: { default: SONNET.name, escalate: false, profiles },
+		settings: { default: SONNET.name, escalate: false, route: false, profiles },
+		reason: 'default',
 	}
 }
 

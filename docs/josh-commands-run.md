@@ -145,7 +145,7 @@ failed step keeps the hold. A rerun whose tracking epic already lists every chil
 again and goes on to the audit.
 
 `--prerequisite <P>` is `run:pause <issue> --for <P>` with the placement: the relation's own
-`epic --add`'s insertion, called in process with `--before <issue>` (no `--order-reason` read), places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
+`epic --add`'s insertion, called in process with `--before <issue>` (no `--order-reason` read), places `<P>` in the epic tracking `<issue>` (a `<P>` another epic already tracks stays there: only the relation is written); with none, `epic "<title>" <P>
 <issue> --ordered` (its `--order-reason` cites `<P>`) is created and the relation recorded inside it. The audit, the
 `needs-decision` park and the `--title` refusal are as above.
 
@@ -419,7 +419,7 @@ A body off the schema is refused before any write, naming the missing piece, pri
 A body on the schema is then judged against the Issue's trusted sources before any write (`scripts/run/park/run-park-answered.ts`); `--clear` is not judged, and the `backlog:drive` yield-cap park is a `run:stalled` stop, not a `run:park`.
 
 - **Unanswered** — parks as below.
-- **Answered** — exit `1`, no write: `Park refused: …` with each quote and its source, then record `Auto-decided: …` with `issue:comment` and continue.
+- **Answered** — exit `1`, no write: `Park refused: …` with each quote and its source, then record `Auto-decided: …` with `issue:comment` and continue. When the pick needs `親` permission the child cannot act on the answer, so it parks as a hand-off with a note naming the Issue's decision.
 - **Failed** — exit `1`, no write: `Park failed: <cause>.` and `Retry: <how>`; follow the printed `Retry:` line.
 
 The parent reads the tiers and the recommendation with `backlog:triage --apply <N> --adopt <k>` (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"): a tier A or B option of a recommending park is the parent's.
@@ -870,6 +870,9 @@ pnpm josh wait                             # a background subagent: the chunk
 ```
 
 <!-- /usage -->
+
+- A lane child's own `check:related`, `lint:related`, `test:related` or `test:unit` runs detached and returns within the chunk (`scripts/josh/bounded-check.ts`). If it finishes in time, its output and exit code print as a synchronous run's.
+- Otherwise it prints `pending`, exits 75 so a `&&` chain stops, and names the `josh wait --result <dir>` that collects them; a check killed before writing its exit code collects as a failure.
 
 ### `josh ship:evidence`
 

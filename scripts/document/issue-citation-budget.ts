@@ -24,8 +24,10 @@ const CITATION_PATTERN = /#\d{3,}\b/gu
 const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	// The kit-only board-theme skill links its worked examples, and its template's mock board shows
 	// issue numbers as the board prints them.
-	{ path: '.claude/skills/board-theme/SKILL.md', citations: 16 },
+	{ path: '.claude/skills/board-theme/SKILL.md', citations: 15 },
 	{ path: '.claude/skills/board-theme/demo-template.md', citations: 3 },
+	// The render-cost steps point at the budget test's Issue and the Issue holding the --timing baseline.
+	{ path: '.claude/skills/board-theme/render-cost.md', citations: 3 },
 	{ path: 'docs/josh-commands-backlog.md', citations: 13 },
 	{ path: 'docs/josh-commands-lane.md', citations: 1 },
 	{ path: 'docs/josh-commands-run.md', citations: 4 },

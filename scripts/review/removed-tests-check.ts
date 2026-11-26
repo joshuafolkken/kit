@@ -6,6 +6,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import type { TypeScriptApi } from './comment-ranges'
+import { removed_test_files, type RemovedFile } from './removed-test-files'
 import { removed_tests, type Removal } from './removed-tests'
 import { renamed_tests } from './renamed-tests'
 import { review_code_tree } from './review-code-tree'
@@ -33,18 +34,36 @@ interface TitleChanges extends Removal {
 	added: ReadonlyArray<string>
 }
 
+// A changed test file the base holds: its path and the tests it held there.
+interface BaseTests {
+	path: string
+	tests: ReadonlyArray<TestEntry>
+}
+
 function tests_in(api: TypeScriptApi, texts: ReadonlyArray<string>): ReadonlyArray<TestEntry> {
 	return texts.flatMap((text) => test_titles.tests_of(api, text))
 }
 
-async function base_texts(
+async function base_tests(
+	api: TypeScriptApi,
 	base: string,
 	paths: ReadonlyArray<string>,
-): Promise<ReadonlyArray<string>> {
+): Promise<ReadonlyArray<BaseTests>> {
 	const held = await changed_paths.read_held_at(base, paths)
 
 	return await Promise.all(
-		held.map(async (relative) => await git_command.show_file(`${base}:${relative}`)),
+		held.map(async (relative) => ({
+			path: relative,
+			tests: tests_in(api, [await git_command.show_file(`${base}:${relative}`)]),
+		})),
+	)
+}
+
+// The test files the change deleted whole, each with the titles one row naming it disposes of.
+function deleted_files(root: string, files: ReadonlyArray<BaseTests>): ReadonlyArray<RemovedFile> {
+	return removed_test_files.wholly_removed(
+		files.map((file) => ({ path: file.path, titles: file.tests.map((entry) => entry.title) })),
+		(relative) => !existsSync(path.join(root, relative)),
 	)
 }
 
@@ -92,9 +111,13 @@ async function changes(): Promise<TitleChanges | undefined> {
 	if (api === undefined) return { ...removed_tests.NONE, added: [] }
 	const changed = await changed_paths.read_changed_since(base)
 	const paths = changed.filter((relative) => test_declared_logic.is_test_file(relative))
-	const before = tests_in(api, await base_texts(base, paths))
+	const files = await base_tests(api, base, paths)
+	const before = files.flatMap((file) => file.tests)
 
-	return title_changes(before, tests_in(api, tree_texts(root, paths)))
+	return {
+		...title_changes(before, tests_in(api, tree_texts(root, paths))),
+		files: deleted_files(root, files),
+	}
 }
 
 async function read(): Promise<Removal | undefined> {
@@ -107,9 +130,9 @@ async function body_refusal(pr_body: string | undefined): Promise<string | undef
 	const removal = await read()
 
 	if (removal === undefined) return UNREADABLE_MESSAGE
-	const left = removed_tests.undisposed(removal.removed, pr_body)
+	const left = removed_tests.undisposed(removal.removed, pr_body, removal.files)
 
-	return left.length === 0 ? undefined : removed_tests.refusal_message(left, removal.renamed)
+	return left.length === 0 ? undefined : removed_tests.refusal_message(left, removal)
 }
 
 async function refusal(branch_name: string): Promise<string | undefined> {

@@ -1,3 +1,5 @@
+import { gate_owner_watch } from '#scripts/gate/gate-owner-watch'
+import { gate_skip } from '#scripts/gate/gate-skip'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { test_related_caller } from '#scripts/test/test-related-caller'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -36,6 +38,7 @@ const { run_ship_scoped } = await import('./run-ship-scoped')
 const { run_ship_pair_runs } = await import('./run-ship-pair-runs')
 const { run_ship_narrowed } = await import('./run-ship-narrowed')
 const { run_ship_lap } = await import('./run-ship-lap')
+const { run_ship_gate_runs } = await import('./run-ship-gate-runs')
 
 // joshuafolkken/kit#7965: each bare check of the scoped pair names the ship stage it runs within as
 // its `test:related` caller, so the ledger row tells the ship's re-run from a hand-started one.
@@ -60,5 +63,23 @@ describe('run_ship_scoped.scoped_pair — the caller', () => {
 			{ should_forward_stderr: true, environment: expected },
 			{ should_forward_stderr: true, environment: expected },
 		])
+	})
+})
+
+// joshuafolkken/kit#8845: ship reads its gate's verdict, so the gate it runs names ship as its owner.
+describe('run_ship_scoped.scoped_gate — the gate owner', () => {
+	it("names ship's own process as the gate's owner", async () => {
+		vi.spyOn(gate_skip, 'reusable_green_gate').mockReturnValue(undefined)
+		run_ship_gate_runs.forget()
+
+		await run_ship_scoped.scoped_gate()
+
+		const gate_call = josh_run_mock.mock.calls.at(-1)?.[1] as
+			{ environment?: Record<string, string> } | undefined
+
+		expect(gate_call?.environment).toHaveProperty(
+			gate_owner_watch.OWNER_PID_KEY,
+			String(process.pid),
+		)
 	})
 })

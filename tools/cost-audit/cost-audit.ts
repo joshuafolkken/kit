@@ -369,7 +369,15 @@ function since_ms(days: number, now_ms: number): number {
 	return windows_of(days, now_ms)[1].start_ms
 }
 
-const cost_audit = { DEFAULT_PERIOD_DAYS, MS_PER_DAY, audit, density_inside, since_ms, windows_of }
+const cost_audit = {
+	DEFAULT_PERIOD_DAYS,
+	MS_PER_DAY,
+	audit,
+	density_inside,
+	inside,
+	since_ms,
+	windows_of,
+}
 
 export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts, ResumeBreakdown }
 export { cost_audit }

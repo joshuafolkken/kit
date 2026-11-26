@@ -9,6 +9,7 @@ import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
+import { bounded_check } from './bounded-check'
 import { command_suggest } from './command-suggest'
 import { ALIASES } from './josh-aliases'
 import {
@@ -283,7 +284,11 @@ async function run_command(
 		resolved,
 		entry.category,
 		subcommand_arguments,
-		async () => await dispatch_entry(resolved, entry, subcommand_arguments),
+		async () =>
+			await bounded_check.run(
+				{ command: resolved, entry, args: subcommand_arguments },
+				async () => await dispatch_entry(resolved, entry, subcommand_arguments),
+			),
 	)
 }
 

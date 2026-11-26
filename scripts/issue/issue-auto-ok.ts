@@ -8,6 +8,7 @@ import {
 	PLAN_UNVERIFIED_LABEL,
 	RELEASE_LABEL,
 } from './issue-labels'
+import { issue_template_section } from './issue-template-section'
 import { markdown_section } from './markdown-section'
 
 // Whether `josh issue:file` applies `auto-ok` to the Issue it files, judged against the criteria
@@ -38,7 +39,7 @@ interface AutoOkDecision {
 const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const JUDGEMENT_NOT_NEEDED = issue_body_keys.line('judgement', 'not_needed')
 const JUDGEMENT_NEEDED = issue_body_keys.line('judgement', 'needed')
-const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account) is needed before merge: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (\`issue-template.md\`)`
+const DECLARATION_PROBLEM = `declare under \`${BACKGROUND_HEADING}\` whether a person's judgement (a policy decision, an external account) is needed before merge: \`${JUDGEMENT_NOT_NEEDED}\` or \`${JUDGEMENT_NEEDED}（<which one>）\` — exactly one (${issue_template_section.pointer('judgement')})`
 const DECISION_RULE_PREFIX = issue_body_keys.prefix('decision_rule')
 const DECISION_PROBLEM = `a decision rule citing a measurement Issue determines the choice; declare \`${JUDGEMENT_NOT_NEEDED}\` and record the applied result and reason in an Issue comment`
 

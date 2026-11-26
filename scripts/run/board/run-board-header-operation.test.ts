@@ -18,10 +18,11 @@ const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_rende
 const SECOND = 1000
 const THIRD = 2
 // No kit version and no repository are read, so the name column draws `-` under the board's name and
-// is blank on the third line.
-const NAME = '▶ josh-board'
-const NAME_BLANK = ' '.repeat(NAME.length)
-const VERSION_CELL = '  -'.padEnd(NAME.length)
+// is blank on the third line; the column is at least 15 columns (joshuafolkken/kit#8917).
+const NAMES_WIDTH = 15
+const NAME = '▶ josh-board'.padEnd(NAMES_WIDTH)
+const NAME_BLANK = ' '.repeat(NAMES_WIDTH)
+const VERSION_CELL = '  -'.padEnd(NAMES_WIDTH)
 const START = `🚀 ${run_board_labels.minute_of(STARTED)}`
 const FIRST_LINE = `${NAME}  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -`
 const SECOND_LINE = `${VERSION_CELL}  🕒 ${run_board_labels.minute_of(NOW)}  +2°10′00″  —`

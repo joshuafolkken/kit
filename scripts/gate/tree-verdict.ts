@@ -39,7 +39,7 @@ function record_path(name: string): string {
 }
 
 // The tools and environment every declared check reads join the files and the base
-// (`verification-inputs.ts`), so a tool upgrade or a changed `TZ` runs the checks again.
+// (`verification-inputs.ts`), so a tool upgrade or a changed `NODE_ENV` runs the checks again.
 function tree_hash(tree: GateTree): string {
 	const files = Object.entries(tree.files).map(([file, digest]) => `${file}\t${digest}`)
 	const inputs = verification_inputs.fingerprint(verification_inputs.DECLARED_LABELS)

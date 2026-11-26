@@ -1,5 +1,5 @@
 {
-	"version": "1.3594.0",
+	"version": "1.3698.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Hand-off kit for Claude Code and Codex: backlogrun takes your GitHub Issues to tested, reviewed, merged PRs — in parallel and unattended — with the rules, hooks and checks that keep the agent on track",
 	"keywords": [
@@ -22,12 +22,33 @@
 		"type": "git",
 		"url": "git+https://github.com/joshuafolkken/kit.git"
 	},
-	"packageManager": "pnpm@12.22.0+sha512.894940a3d9a57dfa6fd373990fb4e41e09c2f2d76d982ed1d75275d39267f988fb4e2d40900cbe9921c68d97c67aa1a1096d276633db248f7b34927ac9ddb7a4",
+	"packageManager": "pnpm@12.23.0+sha512.02da94ffaf133f46074322afe552f90d40b5f71ae259aefbccdacc5085b1d617e98d65e0131f5748b9b67445978ee5055d7d59a473f1eef0d504854fefcd5975",
 	"engines": {
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
 	"josh": {
-		"progress_interval_minutes": 15
+		"progress_interval_minutes": 15,
+		"handoff": {
+			"route": true
+		},
+		"worker": {
+			"default": "opus",
+			"route": true,
+			"profiles": [
+				{
+					"name": "sonnet",
+					"model": "claude-sonnet-5-5",
+					"effort": "medium",
+					"when": "A small Issue declaring no behaviour change, breaking change or person's judgement"
+				},
+				{
+					"name": "opus",
+					"model": "claude-opus-5-5",
+					"effort": "medium",
+					"when": "Design judgement: a behaviour or breaking change, or work over the size guide"
+				}
+			]
+		}
 	},
 	"bin": {
 		"josh": "dist/josh.js"
@@ -232,6 +253,7 @@
 		"@types/node": "^26.6.6",
 		"@types/run-parallel": "^1.1.2",
 		"@types/semver": "^7.8.0",
+		"@xterm/headless": "^6.0.0",
 		"cspell": "^10.5.2",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.15.0",
@@ -242,15 +264,15 @@
 		"eslint-plugin-sonarjs": "^4.2.2",
 		"eslint-plugin-unicorn": "^80.0.0",
 		"eslint_d": "^15.1.1",
-		"fast-check": "^4.10.2",
+		"fast-check": "^4.11.0",
 		"globals": "^17.14.0",
 		"lefthook": "^2.2.2",
 		"prettier": "^3.10.1",
 		"prettier-plugin-svelte": "^4.2.0",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.68.6",
+		"rollup": "^4.68.8",
 		"rollup-plugin-dts": "^6.5.1",
-		"secretlint": "^14.0.1",
+		"secretlint": "^14.1.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.73.0",
 		"vitest": "^5.1.1"
@@ -275,7 +297,7 @@
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "12.22.0+sha512.894940a3d9a57dfa6fd373990fb4e41e09c2f2d76d982ed1d75275d39267f988fb4e2d40900cbe9921c68d97c67aa1a1096d276633db248f7b34927ac9ddb7a4",
+			"version": "12.23.0+sha512.02da94ffaf133f46074322afe552f90d40b5f71ae259aefbccdacc5085b1d617e98d65e0131f5748b9b67445978ee5055d7d59a473f1eef0d504854fefcd5975",
 			"onFail": "download"
 		}
 	}

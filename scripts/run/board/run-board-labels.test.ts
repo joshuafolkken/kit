@@ -138,8 +138,8 @@ describe('run_board_labels.spinner_of', () => {
 		const { THEME_DEFS } = run_board_theme_defs
 
 		expect(run_board_spin.REDRAW_MS).toBe(SECOND)
-		expect(THEME_DEFS.wargames.intro.letter_ms).toBe(50)
-		expect(THEME_DEFS.matrix.intro.letter_ms).toBe(50)
+		expect(THEME_DEFS.wopr.intro.letter_ms).toBe(50)
+		expect(THEME_DEFS.trace.intro.letter_ms).toBe(50)
 	})
 })
 

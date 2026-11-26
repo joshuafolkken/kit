@@ -1,0 +1,4 @@
+- rf:bug-risks | low | scripts/run/board/run-board-sound-wav.ts:174 | 2026-11-24 | #8897 | - | stale-cache
+- rf:performance | low | scripts/run/board/run-board-sound-wav.ts:132 | 2026-11-24 | #8897 | - | other
+- rf:bug-risks | low | scripts/run/board/run-board-sound-wav.ts:174 | 2026-11-24 | #8897 | - | stale-cache
+- rf:performance | low | scripts/run/board/run-board-sound-wav.ts:134 | 2026-11-24 | #8897 | - | other

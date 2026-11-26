@@ -6,7 +6,9 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_chain_background, type Half, type Worker } from './run-chain-background'
 import { run_chain_cli } from './run-chain-cli'
+import { run_chain_worker_fixture } from './run-chain-worker-fixture'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -40,13 +42,19 @@ const MAIN_LINE = [
 	[RUN_REVIEW],
 ]
 const STOP_EXIT = 2
+const PENDING_EXIT = 4
 const UNPINNED_OK = ['--unpinned-ok', 'only logs']
 const ACCEPT_METRICS = ['--accept-metrics', 'a new command']
 const TITLE = 'Title #5630'
 const RESUME_PAST_SELFCHECK = '`pnpm josh run:chain 5630 --from check:related`'
+const { OPENING, JOIN } = run_chain_background.HALF
 
 const info_lines: Array<string> = []
 const error_lines: Array<string> = []
+
+function worker(half: Half): Worker {
+	return run_chain_background.worker_of(ISSUE, half)
+}
 
 function ran(): ReadonlyArray<ReadonlyArray<string>> {
 	return josh_run_mock.mock.calls.map(([argv]) => argv)
@@ -64,6 +72,7 @@ beforeEach(() => {
 	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
 	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+	run_chain_worker_fixture.run_worker_in_place(run_chain_cli.run)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	info_lines.length = 0
@@ -77,6 +86,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 })
 
@@ -198,13 +208,12 @@ describe('run_chain_cli.run — refusals', () => {
 		['a non-number', ['abc']],
 		['an unknown flag', [ISSUE, '--bogus']],
 		['--fixing without --join', [ISSUE, '--fixing']],
-		['--unpinned-ok on the join', [ISSUE, '--join', ...UNPINNED_OK]],
 		['--accept-metrics on the join', [ISSUE, '--join', ...ACCEPT_METRICS]],
 		['--ship without --join', [ISSUE, '--ship', TITLE]],
 		['--ship without a title', [ISSUE, '--join', '--ship']],
 		['--ship without an issue suffix', [ISSUE, '--join', '--ship', 'Title']],
 		['--ship for another issue', [ISSUE, '--join', '--ship', 'Title #5631']],
-		['--ship with opening flags', [ISSUE, '--join', '--ship', TITLE, ...UNPINNED_OK]],
+		['--ship with opening flags', [ISSUE, '--join', '--ship', TITLE, ...ACCEPT_METRICS]],
 	])('refuses %s with the usage and runs nothing', async (_label, argv) => {
 		await expect(run_chain_cli.run(argv)).resolves.toBe(1)
 
@@ -218,7 +227,7 @@ describe('run_chain_cli.run — refusals', () => {
 
 	it('names the --join form in the usage', () => {
 		expect(run_chain_cli.USAGE).toContain('<N> --join [--fixing] [--from <stage>]')
-		expect(run_chain_cli.USAGE).toContain('[--ship "<title> #<N>"]')
+		expect(run_chain_cli.USAGE).toContain('[--ship "<title> #<N>"] [--unpinned-ok "<reason>"]')
 	})
 
 	it('refuses a --from no stage carries and runs nothing', async () => {
@@ -279,5 +288,86 @@ describe('run_chain_cli.run — the ledger line', () => {
 		await run_chain_cli.run([ISSUE, FROM, RUN_CUT])
 
 		expect(record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8705: the opening runs as a background worker the call waits on for one chunk.
+describe('run_chain_cli.run — the background opening', () => {
+	it('hands the opening, --from included, to the background run with the call’s arguments', async () => {
+		const open = vi.spyOn(run_chain_background, 'open').mockResolvedValue(PENDING_EXIT)
+		const argv = [ISSUE, FROM, CHECK_RELATED]
+
+		await expect(run_chain_cli.run(argv)).resolves.toBe(PENDING_EXIT)
+		expect(open).toHaveBeenCalledWith(worker(OPENING), argv)
+		expect(ran()).toStrictEqual([])
+	})
+
+	it('runs the stages in place in the worker and leaves its exit code for the wait', async () => {
+		const finish = vi.spyOn(run_chain_background, 'finish').mockReturnValue()
+
+		stop_at(CHECK_RELATED)
+		await run_chain_cli.run([ISSUE, run_chain_background.WORKER_FLAG])
+
+		expect(finish).toHaveBeenCalledWith(worker(OPENING), 1)
+	})
+
+	it('waits on an unread opening worker before a join runs any stage', async () => {
+		vi.spyOn(run_chain_background, 'has_worker').mockReturnValue(true)
+		const open = vi.spyOn(run_chain_background, 'open').mockResolvedValue(STOP_EXIT)
+
+		await expect(run_chain_cli.run([ISSUE, '--join'])).resolves.toBe(STOP_EXIT)
+		expect(open).toHaveBeenCalledExactlyOnceWith(worker(OPENING), [ISSUE, '--join'])
+		expect(ran()).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#8761: the join runs as its own background worker, never in the call's foreground.
+describe('run_chain_cli.run — the background join (ac-40e0ddab)', () => {
+	it('starts the join’s own worker after an unread opening worker that ended green', async () => {
+		vi.spyOn(run_chain_background, 'has_worker').mockReturnValue(true)
+		const open = vi.spyOn(run_chain_background, 'open').mockResolvedValue(0)
+		const argv = [ISSUE, '--join', '--ship', TITLE]
+
+		await run_chain_cli.run(argv)
+
+		expect(open.mock.calls).toStrictEqual([
+			[worker(OPENING), argv],
+			[worker(JOIN), argv],
+		])
+		expect(ran()).toStrictEqual([])
+	})
+
+	it('hands a join with no unread opening worker to its own worker', async () => {
+		vi.spyOn(run_chain_background, 'has_worker').mockReturnValue(false)
+		const open = vi.spyOn(run_chain_background, 'open').mockResolvedValue(PENDING_EXIT)
+
+		await expect(run_chain_cli.run([ISSUE, '--join'])).resolves.toBe(PENDING_EXIT)
+		expect(open).toHaveBeenCalledExactlyOnceWith(worker(JOIN), [ISSUE, '--join'])
+		expect(ran()).toStrictEqual([])
+	})
+
+	it('runs the join stages in place in its worker and leaves the exit code on the join’s files', async () => {
+		const finish = vi.spyOn(run_chain_background, 'finish').mockReturnValue()
+
+		josh_run_mock.mockResolvedValue({ code: STOP_EXIT, out: '' })
+		const code = await run_chain_cli.run([ISSUE, '--join', run_chain_background.WORKER_FLAG])
+
+		expect(ran()).toHaveLength(1)
+		expect(finish).toHaveBeenCalledExactlyOnceWith(worker(JOIN), code)
+	})
+})
+
+describe('run_chain_cli.run — a worker’s session', () => {
+	it('runs its stages under the session id the call forwarded, which the detached launch stripped', async () => {
+		const session_id = 'session-8761'
+
+		vi.spyOn(run_chain_background, 'finish').mockReturnValue()
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', undefined)
+		vi.stubEnv('JOSH_RUN_CHAIN_SESSION_ID', session_id)
+		josh_run_mock.mockResolvedValue({ code: STOP_EXIT, out: '' })
+
+		await run_chain_cli.run([ISSUE, '--join', run_chain_background.WORKER_FLAG])
+
+		expect(process.env['CLAUDE_CODE_SESSION_ID']).toBe(session_id)
 	})
 })

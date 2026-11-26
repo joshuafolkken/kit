@@ -6,16 +6,12 @@ import {
 	type Typing,
 	type TypingFrame,
 } from './run-board-type-rows'
-import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#8457: the frame the live plan lands on types every line the saved plan's frame drew
-// faint over its saved text at once — the typed part, the block, then the saved line right of it, gone
-// once the row is typed through.
+// faint over its saved text at once, the saved line carried until the row is typed through.
 
-const { NO_TYPING, next, type_bytes, typed_lines } = run_board_type_rows
-const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
-const { CURSOR } = run_board_typing
-const CLEAR_LINE = '\u{1B}[K'
+const { NO_TYPING, next } = run_board_type_rows
+const LETTER_MS = run_board_theme_defs.THEME_DEFS.wopr.intro.letter_ms
 const START = Date.parse('2026-11-21T09:00:00.000Z')
 const SECOND = 1000
 const LANDED = START + 2 * SECOND
@@ -73,26 +69,5 @@ describe('run_board_type_rows.next over a saved frame', () => {
 
 		expect(later.lines.map((line) => [line.start_ms, line.under])).toStrictEqual([[LANDED, SAVED]])
 		expect(later.saved).toBeUndefined()
-	})
-})
-
-describe('run_board_type_rows.typed_lines over a saved frame', () => {
-	const typing = landed_on(LIVE_LINES)
-	const TYPED = 3
-
-	it('draws the typed part, the block, then the saved line right of it', () => {
-		const lines = typed_lines([LANE, LIVE], typing, LANDED + (TYPED - 1) * LETTER_MS)
-
-		expect(lines).toStrictEqual([LANE, `${LIVE.slice(0, TYPED)}${CURSOR}${SAVED.slice(TYPED + 1)}`])
-	})
-
-	it('drops the saved part past a shorter live row once the row is typed through', () => {
-		const done_ms = LANDED + LIVE.length * LETTER_MS
-
-		expect(typed_lines([LANE, LIVE], typing, done_ms)).toStrictEqual([LANE, LIVE])
-	})
-
-	it('rewrites the row with the saved line right of the block between redraws', () => {
-		expect(type_bytes(typing, LANDED)).toContain(`${CURSOR}${SAVED.slice(2)}${CLEAR_LINE}`)
 	})
 })

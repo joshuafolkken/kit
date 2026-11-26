@@ -233,6 +233,7 @@ describe('issue_file_cli.run — the other-change completion', () => {
 const WORKER_SETTINGS: WorkerSettings = {
 	default: 'haiku',
 	escalate: false,
+	route: false,
 	profiles: [{ name: 'haiku', when: 'Mechanical work', agent: AGENT_PROFILE }],
 }
 const GUIDE = 'worker profiles (josh.worker'

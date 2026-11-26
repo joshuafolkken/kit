@@ -16,8 +16,8 @@ import type { SymbolSelection } from './test-symbol-select'
 // (`test-symbol-select.ts`, joshuafolkken/kit#7980). Without typescript or a change base, or where the
 // scope fell to the whole suite, the import graph selects instead: the tests importing a changed code
 // file directly, then the tests the change reaches past those — every test file for the whole suite or
-// a tree with no graph. What the cap cuts is `deferred`: the ledger and the summary line count it, and
-// CI runs it.
+// a tree with no graph. What the cap cuts is `deferred`: the ledger lists it (joshuafolkken/kit#8893),
+// the summary line counts it, and CI runs it.
 
 const UNIT_TEST_SUFFIX = '.test.ts'
 const NO_TEST_REASON = 'no unit test file reaches the change'
@@ -25,10 +25,10 @@ const NO_TEST_REASON = 'no unit test file reaches the change'
 // How the tests past the changed ones were chosen: by declaration users, or by the import graph.
 type SelectMethod = 'symbol' | 'import'
 
-// Root-relative test files to run, how many the cap cut, and each changed code file's reach.
+// Root-relative test files to run, the ones the cap cut, and each changed code file's reach.
 interface Selection {
 	tests: ReadonlyArray<string>
-	deferred: number
+	deferred: ReadonlyArray<string>
 	reach: ReadonlyArray<ReachedCount>
 	method: SelectMethod
 }
@@ -84,7 +84,7 @@ function capped_layers(
 ): Pick<Selection, 'tests' | 'deferred'> {
 	const ordered = [...new Set(layers.flatMap((layer) => layer.toSorted(by_path)))]
 
-	return { tests: ordered.slice(0, max_tests), deferred: Math.max(0, ordered.length - max_tests) }
+	return { tests: ordered.slice(0, max_tests), deferred: ordered.slice(max_tests) }
 }
 
 // The files the scope settled on, root-relative: a narrowed scope's own, else the change itself.
@@ -182,7 +182,7 @@ async function select(
 	changed: ReadonlyArray<string> | undefined,
 	readers: SelectReaders = READERS,
 ): Promise<Selection> {
-	if (scope.mode === 'none') return { tests: [], deferred: 0, reach: [], method: 'import' }
+	if (scope.mode === 'none') return { tests: [], deferred: [], reach: [], method: 'import' }
 	const seeds = seeds_of(root, scope, changed)
 	const code = seeds.filter((file) => is_code(file))
 	const own = changed ?? seeds

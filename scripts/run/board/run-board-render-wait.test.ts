@@ -15,8 +15,18 @@ const { minute_of } = run_board_labels
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_render_fixture
 const SECOND = 1000
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
-// The second line's name column with no kit version recorded: `-` under the board's name.
-const VERSION_CELL = '  -'.padEnd('⏸ josh-board'.length)
+// The second line's name column with no kit version recorded: `-` under the board's name, the column
+// at least 15 columns (joshuafolkken/kit#8917).
+const NAMES_WIDTH = 15
+const VERSION_CELL = '  -'.padEnd(NAMES_WIDTH)
+
+// The board's name under a mark, padded to the column; a wide mark takes two columns.
+function named(mark: string): string {
+	const wide = mark === '✋' ? 1 : 0
+
+	return `${mark} josh-board`.padEnd(NAMES_WIDTH - wide)
+}
+
 // The finish and what is left of a run with nothing estimated, then the machine before it is read.
 const UNKNOWN_TAIL = `🎯 --:--  -  --′--″  ${MACHINE_UNKNOWN}`
 // Now and the run's age, 2°10′00″ in the fixture.
@@ -44,7 +54,7 @@ function clock_of(layout: BoardLayout): string | undefined {
 describe('run_board_render.render — the header while the run waits', () => {
 	it('draws the wait as the mark and the missed heartbeat in the notice slot', () => {
 		expect(lines_of(header({ activity: WAITING })).slice(0, 2)).toStrictEqual([
-			`⏸ josh-board  ${UNKNOWN_TAIL}`,
+			`${named('⏸')}  ${UNKNOWN_TAIL}`,
 			BEAT_LINE,
 		])
 	})
@@ -69,7 +79,7 @@ describe('run_board_render.render — the header while the run waits', () => {
 	it('marks a run waiting on a person ✋ and changes nothing on the second line', () => {
 		const lines = lines_of(header({ activity: WAITING, layout: PEOPLE_LAYOUT }))
 
-		expect(lines[0]).toBe(`✋ josh-board  ${UNKNOWN_TAIL}`)
+		expect(lines[0]).toBe(`${named('✋')}  ${UNKNOWN_TAIL}`)
 		expect(lines[1]?.replace(/^ +- +/u, '')).toBe(BEAT_LINE.replace(/^ +- +/u, ''))
 	})
 
@@ -90,7 +100,7 @@ describe('run_board_render.render — the header once the run has ended', () => 
 		const lines = lines_of(header({ activity, ended_ms }))
 
 		expect(lines.slice(0, 2)).toStrictEqual([
-			`■ josh-board  🎯 ${minute_of(ended_ms)}  -      0″  ${MACHINE_UNKNOWN}`,
+			`${named('■')}  🎯 ${minute_of(ended_ms)}  -      0″  ${MACHINE_UNKNOWN}`,
 			`${VERSION_CELL}  🕒 ${minute_of(NOW)}  +   3′25″  ${SLOT_BLANK}`,
 		])
 	})

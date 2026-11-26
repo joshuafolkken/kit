@@ -52,6 +52,9 @@ interface RetrospectiveInputs {
 	// `josh cost:audit`'s summary line — the trend across runs this run sits in — and, on a
 	// regression, the filing line `retrospective.md` acts on.
 	audit_summary: string
+	// `defect:report --since`'s digest for the last week — origin-line coverage and the
+	// highest-rate areas — or no lines when GitHub could not be read, which leaves the section out.
+	defects: ReadonlyArray<string>
 }
 
 const CLOSING =
@@ -174,6 +177,7 @@ function compose(inputs: RetrospectiveInputs): string {
 		'',
 		...observation_lines(inputs.observations),
 		'',
+		...(inputs.defects.length === 0 ? [] : [...inputs.defects, '']),
 		...friction_lines(inputs.events, inputs.scope),
 		...ship_stop_lines(ship_stop_counts(inputs.events, inputs.scope)),
 		'',

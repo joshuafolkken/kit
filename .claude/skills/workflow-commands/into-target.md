@@ -29,7 +29,7 @@ kickoff new into joshuafolkken/kit#<E>
   compounds over the remaining children goes earlier, and a child already in progress is never jumped
   ahead of.
 - **A target that is not an epic is refused, and the refusal names both ways out**:
-  `pnpm josh epic --promote <N> <N...>` when it is a request, a discussion or a container, or a new
+  `pnpm josh epic --promote <N> <N...> --rationale-file .josh/tmp/<dir>/rationale.md` when it is a request, a discussion or a container, or a new
   epic over both when it is itself one of the deliverables. Never promote on your own.
 - **A cross-repository target is written `owner/repo#N`** and inserted from that repository's
   checkout; run there, since `epic --add` reads and writes only the repository it runs from

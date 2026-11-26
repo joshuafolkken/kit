@@ -96,7 +96,8 @@ The child ends mid-implementation and a fresh one resumes **back into implementa
 ### The measurement is the parent hand-off's, never a second one
 
 Same `cost_verdict.per_request_cost` through `cost_cli.session_verdict` as `backlogrun-progress.md` →
-"The hand-off", against the same threshold `pnpm josh cost --cut` prints.
+"The hand-off", priced over `IMPLEMENTATION_REMAINING_REQUESTS` — below the shared threshold
+`pnpm josh cost --cut` prints ("The threshold").
 
 ### It is a guard, fired at the edit that crosses the threshold
 
@@ -117,8 +118,12 @@ A child that ended without cutting is detected by
 ## The threshold
 
 The threshold is the break-even context `scripts/cost-runtime/context-cut-payback.ts` prices at the
-session's model — `pnpm josh cost --cut` prints it, no fixed figure fits every model; both cuts and the parent hand-off read the same verdict;
-neither cut fires when it is unmeasurable. Both cuts end the turn **before** the gate, so the push is never a
+session's model, so no fixed figure fits every model.
+
+The horizon is per trigger: the
+implementation cut prices over `IMPLEMENTATION_REMAINING_REQUESTS` (65) and the review-fix cut over
+`REVIEW_FIX_REMAINING_REQUESTS` (27), both below the shared 23-request figure `pnpm josh cost --cut`
+prints; the pre-gate cut and the parent hand-off keep the shared one. Neither cut fires when it is unmeasurable. Both cuts end the turn **before** the gate, so the push is never a
 turn boundary (`chain-rule.md`).
 
 ## A lane child records its park before it stops

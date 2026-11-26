@@ -113,7 +113,7 @@ describe('run_board_frame_store.fresh', () => {
 	})
 
 	it('keeps a themed still frame apart from a plain one', () => {
-		expect(once_key('wargames', false)).not.toBe(once_key(undefined, false))
+		expect(once_key('wopr', false)).not.toBe(once_key(undefined, false))
 	})
 
 	it('save_only saves through to the store but loads nothing', () => {
@@ -129,7 +129,7 @@ describe('run_board_frame_store.fresh', () => {
 
 	it('keeps a still frame drawn on a terminal apart from a piped one', () => {
 		expect(once_key(undefined, true)).not.toBe(once_key(undefined, false))
-		expect(once_key('wargames', true)).not.toBe(once_key('wargames', false))
+		expect(once_key('wopr', true)).not.toBe(once_key('wopr', false))
 	})
 })
 
@@ -138,23 +138,20 @@ describe('run_board_frame_store.once_key — the colors stdout draws', () => {
 	// joshuafolkken/kit#8505: the theme's own icons keep the key they had; others keep their own.
 	it('keeps a still frame in other icons apart, the default icons under the key they had', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
-		expect(once_key('wargames', false, 'shapes')).toBe('once-wargames-pipe')
+		expect(once_key('wopr', false, 'shapes')).toBe('once-wopr-pipe')
 		expect(once_key(undefined, true, 'emoji')).toBe('once-tty')
-		expect(once_key('wargames', false, 'letters')).toBe('once-wargames-letters-pipe')
+		expect(once_key('wopr', false, 'letters')).toBe('once-wopr-letters-pipe')
 		expect(once_key(undefined, false, 'shapes')).toBe('once-shapes-pipe')
 	})
 
-	it.each([undefined, 'wargames', 'matrix'] as const)(
-		'keys %s by the forced color depth',
-		(theme) => {
-			vi.stubEnv('FORCE_COLOR', '0')
-			const plain = once_key(theme, false)
+	it.each([undefined, 'wopr', 'trace'] as const)('keys %s by the forced color depth', (theme) => {
+		vi.stubEnv('FORCE_COLOR', '0')
+		const plain = once_key(theme, false)
 
-			vi.stubEnv('FORCE_COLOR', '1')
+		vi.stubEnv('FORCE_COLOR', '1')
 
-			expect(once_key(theme, false)).toBe(`${plain}-color1`)
-		},
-	)
+		expect(once_key(theme, false)).toBe(`${plain}-color1`)
+	})
 
 	it.each(['1', undefined])('draws a pipe in color under FORCE_COLOR alone, NO_COLOR=%s', (no) => {
 		vi.stubEnv('FORCE_COLOR', undefined)

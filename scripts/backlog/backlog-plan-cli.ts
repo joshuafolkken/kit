@@ -4,7 +4,6 @@ import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { epic_report, type EpicNextResult } from '#scripts/epic/epic-report'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { run_invocation } from '#scripts/run/run-invocation'
-import { backlog_named } from './backlog-named'
 import { backlog_next } from './backlog-next'
 import { backlog_pending_publication } from './backlog-pending-publication'
 import { backlog_plan, type NamedPlan } from './backlog-plan'
@@ -70,17 +69,6 @@ function has_only_flag(argv: ReadonlyArray<string>): boolean {
 // taken for a positional or an unknown option; whether each was present is carried as a boolean.
 function without_flags(argv: ReadonlyArray<string>): ReadonlyArray<string> {
 	return argv.filter((token) => token !== ONLY_FLAG && token !== WAVES_FLAG)
-}
-
-// The one start-time refusal: `--only` with no named issues has nothing to run. `backlog_named` is the
-// single source of that decision, so the plan and the run refuse it alike. The refusal turns only on
-// whether anything was named, so the items are built with `is_epic: false` — which item is an epic is
-// decided by the run at dispatch time, not here.
-function only_refusal(named: ReadonlyArray<number>, is_only: boolean): string | undefined {
-	const items = named.map((issue) => ({ issue, is_epic: false }))
-	const startup = backlog_named.startup(items, is_only)
-
-	return startup.kind === 'refused' ? startup.reason : undefined
 }
 
 // A failed open listing is not "nothing is out of scope". Reported rather than rendered around,
@@ -174,19 +162,30 @@ async function run_plan(rest: ReadonlyArray<string>, view: PlanView): Promise<nu
 	return plan === undefined ? FAILURE_EXIT_CODE : await report(plan, view)
 }
 
-// The start-time refusals, `--only`'s and `--waves`'s, in one place so `run` stays a straight line.
+// `--only` before the `#N` block breaks the leading block in the run grammar, so the run reads no named
+// issue. A bare `--only` is a plan (joshuafolkken/kit#8923), so this ordering is refused on its own
+// rather than planned as the bare run that drops the issues typed after it.
+const ONLY_BEFORE_NAMED_MESSAGE =
+	'`--only` goes after the named issues (`pnpm josh backlogrun N1 N2 … --only`); placed before them it drops them.'
+
+// The start-time refusals, `--waves` beside a named scope and `--only` before the named issues.
 //
-// The waves refusal reads the named block from the flag-stripped tokens, so `--waves #5` is refused
-// like `#5 --waves` rather than having its `#5` dropped by the option parser.
+// Both read the named block from the flag-stripped tokens, so `--waves #5` is refused like `#5 --waves`
+// rather than having its `#5` dropped by the option parser.
+function only_refusal(named: ReadonlyArray<number>, is_rest_named: boolean): string | undefined {
+	return is_rest_named && named.length === 0 ? ONLY_BEFORE_NAMED_MESSAGE : undefined
+}
+
 function refusal_of(
 	named: ReadonlyArray<number>,
 	rest: ReadonlyArray<string>,
 	is_only: boolean,
 	is_waves: boolean,
 ): string | undefined {
-	if (!is_waves) return only_refusal(named, is_only)
+	const is_rest_named = named_of(rest).length > 0
+	if (is_waves) return is_only || is_rest_named ? WAVES_WITH_NAMED_MESSAGE : undefined
 
-	return is_only || named_of(rest).length > 0 ? WAVES_WITH_NAMED_MESSAGE : undefined
+	return is_only ? only_refusal(named, is_rest_named) : undefined
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

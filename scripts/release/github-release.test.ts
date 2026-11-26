@@ -14,7 +14,7 @@ const KIT = {
 	repository: 'joshuafolkken/kit',
 	start_tag: 'v1.887.0',
 	workflow: 'publish.yml',
-	jobs: ['publish-github', PUBLISH_NPM, 'update-production'],
+	jobs: ['pack', PUBLISH_NPM, 'update-production'],
 }
 
 function note_request(tag: string, previous: string): string {

@@ -50,10 +50,21 @@ function board_name_of(theme: Theme | undefined): string {
 	return theme === undefined ? BOARD_NAME : run_board_theme_defs.THEME_DEFS[theme].name
 }
 
+// A single run's name, in a theme blanked on to the theme's board name's width: the theme draws its
+// board name over it (joshuafolkken/kit#8917), and the column must hold it whole beside the clocks.
+function run_name_of(run_name: string, theme: Theme | undefined): string {
+	const width = theme === undefined ? 0 : run_board_fit.width_of(board_name_of(theme))
+
+	return `${run_name}${BLANK.repeat(Math.max(0, width - run_board_fit.width_of(run_name)))}`
+}
+
 // The mark stands still in every state: the spinner turns on the third line.
 function run_part(mark: RunMark, fields: NameFields): string {
 	const { glyph, color } = RUN_MARKS[mark]
-	const name = fields.run_name ?? linked(board_name_of(fields.theme), KIT_URL, fields.comment_link)
+	const name =
+		fields.run_name === undefined
+			? linked(board_name_of(fields.theme), KIT_URL, fields.comment_link)
+			: run_name_of(fields.run_name, fields.theme)
 
 	const named = `${glyph} ${name}`
 

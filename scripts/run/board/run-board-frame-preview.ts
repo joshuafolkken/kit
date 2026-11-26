@@ -4,7 +4,6 @@ import type { Notice } from './run-board-header-notice'
 import { run_board_sound_transition, type Cause } from './run-board-sound-transition'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
-import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_tick } from './run-board-tick'
 
 // `josh run:board --frame` — one board frame drawn in a state fixed by its flags, for reading what a
@@ -111,8 +110,8 @@ function notice_of(options: FrameOptions, now_ms: number): Notice | undefined {
 }
 
 // The live ports in the live screen form, with the size and sound switch fixed, the rows typing where
-// the theme's live board types them (so its lamp panel shows), no cue sounded and no frame store; the
-// frame is collected so its escapes can be left off.
+// the theme's live board types them, marked live (so its lamp panel shows though its rows do not
+// type), no cue sounded and no frame store; the frame is collected so its escapes can be left off.
 function fixed_ports(
 	ports: BoardPorts,
 	options: FrameOptions,
@@ -126,10 +125,17 @@ function fixed_ports(
 		form: 'screen',
 		size: () => options.size,
 		sound: () => !options.is_muted,
-		types_rows: run_board_theme_defs.live_of(theme).types_rows,
+		types_rows: theme !== undefined,
+		is_live: true,
 		cue: undefined,
 		frames: undefined,
 	}
+}
+
+// The frame as `--frame` prints it: its escapes kept under `--ansi`, else plain. A themed board's
+// animation is the theme layer's (joshuafolkken/kit#8917), which a single frame does not draw.
+function painted(text: string, options: FrameOptions): string {
+	return options.is_ansi ? text : stripVTControlCharacters(text)
 }
 
 async function draw(
@@ -156,12 +162,18 @@ async function draw(
 	}
 
 	await run_board_tick.tick(state, run_board_theme.themed(fixed, theme))
-	const text = parts.join('')
 
-	ports.write(options.is_ansi ? text : stripVTControlCharacters(text))
+	ports.write(painted(parts.join(''), options))
 }
 
-const run_board_frame_preview = { FRAME_FLAG, FRAME_USAGE, draw, options_of }
+const run_board_frame_preview = {
+	FRAME_FLAG,
+	FRAME_USAGE,
+	draw,
+	fixed_ports,
+	options_of,
+	painted,
+}
 
 export { run_board_frame_preview }
 export type { FrameOptions }

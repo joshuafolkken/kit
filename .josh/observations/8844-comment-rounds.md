@@ -1,0 +1,4 @@
+- rf:comments | low | scripts/josh/josh.ts:31 | 2026-11-23 | #8844 | - | stale-comment
+- rf:comments | low | scripts/gate/gate-command.ts:40 | 2026-11-23 | #8844 | - | stale-comment
+- rf:comments | low | scripts/josh/josh.ts:31 | 2026-11-23 | #8844 | - | stale-comment
+- rf:comments | low | scripts/gate/gate-command.ts:40 | 2026-11-23 | #8844 | - | stale-comment

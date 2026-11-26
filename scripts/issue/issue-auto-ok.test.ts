@@ -1,6 +1,7 @@
 import { KICKOFF_PLAN, USER_PROHIBITION } from '#scripts/auto-ok/auto-ok-kickoff-fixture'
 import { describe, expect, it } from 'vitest'
 import { issue_auto_ok, type AutoOkFiling } from './issue-auto-ok'
+import { issue_template_section } from './issue-template-section'
 
 // joshuafolkken/kit#3853: `issue:file` judges `auto-ok` against the criteria `run-backlog.md` records —
 // the labels that keep a person in the loop and the body's declaration of whether a person's
@@ -154,7 +155,7 @@ describe('issue_auto_ok.declaration_problem', () => {
 		const problem = issue_auto_ok.declaration_problem(UNDECLARED_BODY)
 
 		expect(problem).toContain('is needed before merge')
-		expect(problem).toContain('`issue-template.md`')
+		expect(problem).toContain(issue_template_section.pointer('judgement'))
 	})
 })
 

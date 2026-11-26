@@ -242,6 +242,7 @@ const lane_environment = {
 	read_lane_ports,
 	read_lane_seat,
 	read_root_seed,
+	upsert_assignment,
 	with_lane_output,
 }
 

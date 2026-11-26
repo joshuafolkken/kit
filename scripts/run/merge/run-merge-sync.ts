@@ -1,9 +1,9 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 
 // The primary checkout's return to the default branch after a merge (`run-merge-steps.ts` →
 // `do_merged`).
@@ -14,24 +14,10 @@ import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 // stream; the next sync once the hold is gone — the next merge's, or the holding run's own — catches
 // up. **An unreadable record skips too**: it has not established that nothing runs here.
 
+// The check is the transition table's `merge` guard `checkout-not-held-by-another-run`
+// (`lane-transition-guards.ts`).
+
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
-
-async function read_tree_hold(): Promise<HoldRead> {
-	const directory = await run_hold.worktree_directory()
-
-	if (directory === undefined) return { kind: 'free' }
-
-	return run_hold.read_hold(run_hold.hold_path(directory))
-}
-
-// Why the sync must not run here, or `undefined` where it may. The merged child's own hold — a child
-// run outside a lane — is not another run's.
-function skip_reason(read: HoldRead, child: string): string | undefined {
-	if (read.kind === 'unreadable') return 'its run hold record is unreadable'
-	if (read.kind !== 'held' || run_hold.is_own_hold(read.hold, child)) return undefined
-
-	return `it is held by ${run_hold.describe_holder(read.hold)}`
-}
 
 // **A failed `main:sync` is retried before it ends the run**: a sync right after a merge can fail
 // transiently while several lanes merge at once. **The error carries the step's stderr, not its
@@ -56,7 +42,7 @@ async function retry_sync(): Promise<void> {
 }
 
 async function sync_main(child: string): Promise<void> {
-	const reason = skip_reason(await read_tree_hold(), child)
+	const reason = await lane_transition_guards.rejection('merge', child)
 
 	if (reason === undefined) {
 		await retry_sync()

@@ -1,15 +1,17 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json } from '#scripts/git/parse-json-array'
-import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
+import type { Breakdown } from '#scripts/lane/lane-breakdown'
 import type { LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
 import { cost_audit, type Audit, type AuditWindow, type MergeCounts } from './cost-audit'
+import { cost_audit_breakdown } from './cost-audit-breakdown'
 import { cost_audit_format } from './cost-audit-format'
 import { cost_audit_read, type AuditSession } from './cost-audit-read'
+import { cost_audit_read_chars } from './cost-audit-read-chars'
 
 // `josh cost:audit [--period <days>]` — what AI work cost over a period, by session kind, tool
 // category and guard, with the cost per merged pull request, set against the period before it. It
@@ -22,13 +24,14 @@ import { cost_audit_read, type AuditSession } from './cost-audit-read'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: pnpm josh cost:audit [--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]'
-const DENSITY_FLAG = '--density'
+	'Usage: pnpm josh cost:audit [--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density | --read-chars <path> | --lane-read-chars]'
 const OPTIONS = {
 	period: { type: 'string' },
 	since: { type: 'string' },
 	until: { type: 'string' },
 	density: { type: 'boolean' },
+	'read-chars': { type: 'string' },
+	'lane-read-chars': { type: 'boolean' },
 } as const
 // A positive whole number of days (`cli_flags.to_positive`), at most ten years.
 const MAX_PERIOD_DAYS = 3650
@@ -49,6 +52,11 @@ interface SpanValues {
 	period?: string | undefined
 	since?: string | undefined
 	until?: string | undefined
+}
+
+// The single-number modes' values exclude each other: two given would silently print only one.
+function is_one_mode(modes: ReadonlyArray<unknown>): boolean {
+	return modes.filter((mode) => mode !== undefined).length <= 1
 }
 
 // An unknown flag or a `--period` with no value is refused, not read as the default period.
@@ -106,7 +114,12 @@ function absolute_span(values: SpanValues): AuditSpan | undefined {
 function read_span(argv: ReadonlyArray<string>, now_ms: number): AuditSpan | undefined {
 	const values = cli_flags.values_of(argv, OPTIONS)
 
-	if (values === undefined) return undefined
+	if (
+		values === undefined ||
+		!is_one_mode([values.density, values['read-chars'], values['lane-read-chars']])
+	) {
+		return undefined
+	}
 
 	const is_dated = values.since !== undefined || values.until !== undefined
 
@@ -164,11 +177,8 @@ async function read_breakdowns(
 ): Promise<Map<number, Breakdown>> {
 	const events = await lane_net_read.read_events({})
 	const issues = new Set(sessions.flatMap((session) => session.issue ?? []))
-	const pairs = [...issues].map(
-		(issue) => [issue, lane_breakdown.of(entries, events, issue)] as const,
-	)
 
-	return new Map(pairs.filter((pair): pair is [number, Breakdown] => pair[1] !== undefined))
+	return cost_audit_breakdown.of_issues([...issues], entries, events)
 }
 
 // The Issues the ledger records a merge of, or `undefined` when the ledger could not be read.
@@ -180,13 +190,14 @@ function merged_issues_of(
 	return new Set(entries.flatMap((entry) => (entry.kind === 'merge' ? entry.issue : [])))
 }
 
+// The merge counts are read before the transcripts: the load and the breakdowns hold the event loop
+// for seconds at a time, and a `gh` request left waiting behind them timed out, so the audit printed
+// no merge count (joshuafolkken/kit#8757).
 async function measure(cwd: string, days: number, now_ms: number): Promise<Audit> {
-	const sessions = cost_audit_read.load(cwd, cost_audit.since_ms(days, now_ms))
+	const merges = await read_merges(days, now_ms)
+	const sessions = await cost_audit_read.load(cwd, cost_audit.since_ms(days, now_ms))
 	const entries = await read_ledger()
-	const [merges, breakdowns] = await Promise.all([
-		read_merges(days, now_ms),
-		read_breakdowns(sessions, entries ?? []),
-	])
+	const breakdowns = await read_breakdowns(sessions, entries ?? [])
 	const merged_issues = merged_issues_of(entries)
 
 	return cost_audit.audit({ sessions, days, now_ms, merges, breakdowns, merged_issues })
@@ -205,12 +216,48 @@ async function summary(cwd: string, now_ms: number = Date.now()): Promise<string
 // breakdowns or pricing (joshuafolkken/kit#8284), and prints a label line over the number, so the
 // number stays the output's last line; a period with no lane-child request prints nothing, never a
 // zero a declared bound would read as met.
-function density_lines(cwd: string, span: AuditSpan): Array<string> {
+async function density_lines(cwd: string, span: AuditSpan): Promise<Array<string>> {
 	const [window] = cost_audit.windows_of(span.days, span.now_ms)
-	const sessions = cost_audit_read.load_lane_children(cwd, window.start_ms)
+	const sessions = await cost_audit_read.load_lane_children(cwd, window.start_ms)
 	const value = cost_audit_format.density_value(cost_audit.density_inside(sessions, window))
 
 	return value === undefined ? [] : [cost_audit_format.density_label(window), value]
+}
+
+// `--read-chars` reads every session of the current period, as the Read-file table does;
+// `--lane-read-chars` the lane children's own alone, like `--density`.
+async function read_chars_lines(
+	cwd: string,
+	span: AuditSpan,
+	path: string,
+): Promise<Array<string>> {
+	const [window] = cost_audit.windows_of(span.days, span.now_ms)
+	const sessions = await cost_audit_read.load(cwd, window.start_ms)
+
+	return cost_audit_read_chars.file_lines(sessions, window, path)
+}
+
+async function lane_read_chars_lines(cwd: string, span: AuditSpan): Promise<Array<string>> {
+	const [window] = cost_audit.windows_of(span.days, span.now_ms)
+	const sessions = await cost_audit_read.load_lane_children(cwd, window.start_ms)
+
+	return cost_audit_read_chars.lane_lines(sessions, window)
+}
+
+// The single-number mode the flags name, `undefined` for the full report.
+function single_lines(
+	argv: ReadonlyArray<string>,
+	cwd: string,
+	span: AuditSpan,
+): Promise<Array<string>> | undefined {
+	// `read_span` has already refused flags that do not parse.
+	const values = cli_flags.values_of(argv, OPTIONS) ?? {}
+	const path = values['read-chars']
+
+	if (path !== undefined) return read_chars_lines(cwd, span, path)
+	if (values['lane-read-chars'] === true) return lane_read_chars_lines(cwd, span)
+
+	return values.density === true ? density_lines(cwd, span) : undefined
 }
 
 async function printed_lines(
@@ -218,7 +265,9 @@ async function printed_lines(
 	cwd: string,
 	span: AuditSpan,
 ): Promise<Array<string>> {
-	if (argv.includes(DENSITY_FLAG)) return density_lines(cwd, span)
+	const single = single_lines(argv, cwd, span)
+
+	if (single !== undefined) return await single
 
 	return cost_audit_format.report_lines(await measure(cwd, span.days, span.now_ms))
 }

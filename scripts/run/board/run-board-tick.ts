@@ -182,7 +182,8 @@ function draw_over(
 	const { local } = state
 
 	if (display !== undefined) return draw_display(state, display, { ports, now_ms })
-	if (local === undefined) return draw_no_run(state, ports, now_ms)
+	// No run, no lamp panel: a themed board's theme has nothing to lay out by, so it draws in no theme.
+	if (local === undefined) return draw_no_run(state, ports.plain_ports ?? ports, now_ms)
 
 	const assembled = assemble_display(state, local, now_ms, layout_for(state, local, now_ms))
 
@@ -200,7 +201,10 @@ async function tick(
 	// Taken after the read, which a single frame may have waited on to confirm an idle lane.
 	const now_ms = ports.now()
 	const data = await data_of(state, gathered, { ports, now_ms, pace })
-	const next: BoardState = { ...run_board_data.view_for(state, data), ...data }
+	const next: BoardState = {
+		...drawn(ports, 'view', () => run_board_data.view_for(state, data)),
+		...data,
+	}
 
 	// joshuafolkken/kit#8126: `--timing` times the draw from the layout to the write.
 	return drawn(ports, 'tick', () => draw_over(next, display, ports, now_ms))

@@ -102,7 +102,6 @@ const MOVED_NOTE =
 	'Gate passed on an earlier tree — the tree moved after it (a review fix in place); re-run the gate on this tree before committing.'
 const STILL_RUNNING_NOTE =
 	'Gate still running at the open’s wait cap — no brief written; re-run `pnpm josh run:review` (in a chain, `pnpm josh run:chain <N> --from run:review`), which waits on the same gate.'
-const PENDING_EXIT_CODE = 4
 const JOIN_PENDING_NOTE =
 	'pending — the gate is still running at the join’s wait cap, which ends before the prompt cache expires; re-run the same command (in a chain, the same `pnpm josh run:chain <N> --join …`), which joins the same gate.'
 
@@ -236,7 +235,7 @@ function report_timing(timing: ReviewTiming | undefined): void {
 function join_pending(): number {
 	process.stdout.write(`${JOIN_PENDING_NOTE}\n`)
 
-	return PENDING_EXIT_CODE
+	return run_review.PENDING_EXIT_CODE
 }
 
 async function run_join(is_fixing = false, is_chunked = false): Promise<number> {

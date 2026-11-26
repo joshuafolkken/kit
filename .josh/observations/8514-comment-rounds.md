@@ -1,0 +1,4 @@
+- rf:comments | low | scripts/run/board/run-board-state.ts:158 | 2026-11-21 | #8514 | - | stale-comment
+- rf:bug-risks | low | scripts/run/board/run-board-row-sections.ts:82 | 2026-11-21 | #8514 | - | state-reasoning
+- rf:comments | low | scripts/run/board/run-board-state.ts:157 | 2026-11-21 | #8514 | - | stale-comment
+- rf:bug-risks | low | scripts/run/board/run-board-row-sections.ts:82 | 2026-11-21 | #8514 | - | state-reasoning

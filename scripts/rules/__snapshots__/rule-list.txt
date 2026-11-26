@@ -121,7 +121,7 @@
   - silent: the duration is read from the Actions jobs or `pnpm josh lane:stats`
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child running a heavy tool directly** (`lane-direct-tool`, `docs/josh-commands-automation.md` → `josh reserved-run`)
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`, inside `sh -c`), or eslint with `--concurrency` other than `off` / `1` by any path, `reserved-run` included. A one-command line is rewritten behind `pnpm josh reserved-run <weight> --` at the gate's weight; a chained, piped, redirected or env-prefixed line and a multi-worker eslint are refused, every occurrence
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`, inside `sh -c`), or eslint with `--concurrency` other than `off` / `1` by any path, `reserved-run` included. A one-command line is rewritten: a vitest run `test:related` can carry to `pnpm josh test:related <file>… [-u]`, anything else behind `pnpm josh reserved-run <weight> --` at the gate's weight; a chained, piped, redirected or env-prefixed line and a multi-worker eslint are refused, every occurrence
   - silent: not a lane child, or the run goes through `pnpm josh` with single-worker eslint
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Lane child reading a spilled Bash result whole** (`lane-spilled-read`, `prompts/collaboration-workflow/output-bounds.md`)
@@ -193,7 +193,7 @@
   - silent: `pnpm josh tree:status`, a global flag before the subcommand (`git -C <dir> status`), or a pathspec or any other flag
   - not automated: the refusal is spent once per run and its reissue passes, so a rewrite saves at most one round trip while trading the long-format listing the call asked for for porcelain
 - **The implementation-phase cut** (`implementation-cut`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold")
-  - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing
+  - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` by an uncut lane child whose recent context is over the break-even at its own horizon (`IMPLEMENTATION_REMAINING_REQUESTS`, below `pnpm josh cost --cut`); it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing
   - silent: not a lane child, a non-editing tool, the run's own handoff file, already cut, or under the threshold
   - not automated: the right act is another command, whose arguments the call does not carry
 - **No whole-file Write that keeps most of the old body** (`file-rewrite`, `file-edits.md`)

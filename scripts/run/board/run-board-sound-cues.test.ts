@@ -17,13 +17,19 @@ interface Expected {
 	readonly direction: Direction
 }
 
+// joshuafolkken/kit#8917: the board in no theme sounds plainly — a short click for the info tier, soft
+// rising notes for a notice.
 const EXPECTED: ReadonlyArray<Expected> = [
-	{ name: 'launch', min_ms: 200, max_ms: 300, wave: 'sine', direction: 'rising' },
-	{ name: 'lane-end', min_ms: 400, max_ms: 600, wave: 'sine', direction: 'rising' },
-	{ name: 'drain', min_ms: 1000, max_ms: 1000, wave: 'sine', direction: 'rising' },
-	{ name: 'human', min_ms: 1000, max_ms: 1000, wave: 'triangle', direction: 'any' },
-	{ name: 'alert', min_ms: 3000, max_ms: 3000, wave: 'square', direction: 'falling' },
+	{ name: 'launch', min_ms: 12, max_ms: 12, wave: 'sine', direction: 'any' },
+	{ name: 'lane-end', min_ms: 12, max_ms: 12, wave: 'sine', direction: 'any' },
+	{ name: 'drain', min_ms: 12, max_ms: 12, wave: 'sine', direction: 'any' },
+	{ name: 'human', min_ms: 340, max_ms: 340, wave: 'sine', direction: 'rising' },
+	{ name: 'alert', min_ms: 340, max_ms: 340, wave: 'sine', direction: 'rising' },
 ]
+
+function top_pitch(name: CueName): number {
+	return Math.max(...CUES[name].notes.map((note) => frequency_of(note.pitch)))
+}
 
 function total_ms(notes: ReadonlyArray<Note>): number {
 	return notes.reduce((sum, note) => sum + note.ms, 0)
@@ -65,20 +71,14 @@ describe('run_board_sound_cues.CUES', () => {
 		},
 	)
 
-	it('repeats the alert figure three times', () => {
-		const sounding = CUES.alert.notes.filter((note) => note.pitch !== REST)
+	it('pitches the alert a step higher than the human notice', () => {
+		expect(top_pitch('alert')).toBeGreaterThan(top_pitch('human'))
+	})
 
-		expect(sounding.map((note) => note.pitch)).toStrictEqual([
-			'E5',
-			'C5',
-			'A4',
-			'E5',
-			'C5',
-			'A4',
-			'E5',
-			'C5',
-			'A4',
-		])
+	it('clicks launch, lane-end and drain with one and the same note', () => {
+		expect(CUES['lane-end'].notes).toStrictEqual(CUES.launch.notes)
+		expect(CUES.drain.notes).toStrictEqual(CUES.launch.notes)
+		expect(CUES.launch.notes).toHaveLength(1)
 	})
 })
 

@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/issue/rework-classification.ts:29 | 2026-11-23 | #8799 | - | edge-input

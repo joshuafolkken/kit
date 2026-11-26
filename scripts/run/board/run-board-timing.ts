@@ -2,8 +2,9 @@ import { lane_stats } from '#scripts/lane/lane-stats'
 import { launch_timing } from '#scripts/lane/launch-timing'
 import { run_board_heap, type HeapProbes, type HeapWatch } from './run-board-heap'
 import { run_board_screen } from './run-board-screen'
-import { run_board_stall, type Stall, type StallProbes, type StallWatch } from './run-board-stall'
+import { run_board_stall, type StallProbes, type StallWatch } from './run-board-stall'
 import type { BoardPorts, DrawKind, DrawTimer } from './run-board-state'
+import { run_board_timing_frames, type FrameStats } from './run-board-timing-frames'
 
 // `josh run:board --timing` (joshuafolkken/kit#7929): what the first board waited on, said once the
 // board is done — after the frame `--once` draws, or after a live board leaves its screen. Each phase
@@ -20,10 +21,21 @@ const SCREEN_ENTER_PHASE = 'screen enter at'
 const CODE_LOAD_PHASE = 'code load'
 const SCREEN_ENTER = run_board_screen.screen_of('live').enter
 const HEADING = 'run:board timing (ms):'
+const SPIN_WAKE_ROW = 'spin wake lag'
 const DRAW_KINDS: ReadonlyArray<DrawKind> = ['tick', 'turn']
+const REDRAW_KINDS: ReadonlyArray<DrawKind> = ['receive', 'view', 'reveal', 'sound']
 
 // Each draw's time in ms, by its kind (joshuafolkken/kit#8126).
 type Draws = Record<DrawKind, Array<number>>
+
+type Row = [string, string]
+
+// A kind's report row, from its samples and their median.
+type KindName = (kind: DrawKind, samples: ReadonlyArray<number>, median: number) => Row
+
+// The timer a worker round received is timed on, from when a board under `--timing` starts timing its
+// draws until its report is said (joshuafolkken/kit#8825).
+const timing: { receive?: DrawTimer | undefined } = {}
 
 // The main thread's heap read and the heap's own sampling timer, apart from the stall probe's.
 type HeapTimer = Omit<HeapProbes, 'worker'>
@@ -37,9 +49,13 @@ interface TimingReads {
 	probes?: TimingProbes | undefined
 }
 
+// The stalls, the heaps and how late each spinner wake ran past its due time (joshuafolkken/kit#8902),
+// and each frame's compose time and bytes (joshuafolkken/kit#8917).
 interface Watching {
 	stalls: StallWatch
 	heap: HeapWatch
+	wakes: Array<number>
+	frames: FrameStats
 }
 
 interface TimingArgv {
@@ -67,39 +83,49 @@ function phase_rows(): Array<[string, string]> {
 	return [...named, ...phases].map(([name, ms]) => [name, String(Math.round(ms))])
 }
 
-// A loop, not `Math.max(...samples)`: a board left up for hours times more turns than one call spreads.
-function longest(samples: ReadonlyArray<number>): number {
-	let max = 0
-
-	for (const ms of samples) max = Math.max(max, ms)
-
-	return max
-}
-
 // How many draws of a kind, the longest and the median, in ms to a tenth.
 function summary(samples: ReadonlyArray<number>, median: number): string {
-	return `max ${longest(samples).toFixed(1)} · median ${median.toFixed(1)} (n ${String(samples.length)})`
+	const max = run_board_stall.longest(samples)
+
+	return `max ${max.toFixed(1)} · median ${median.toFixed(1)} (n ${String(samples.length)})`
 }
 
-// A row per kind drawn; a kind never drawn has no median and no row.
-function draw_rows(draws: Draws | undefined): Array<[string, string]> {
-	if (draws === undefined) return []
+function total(samples: ReadonlyArray<number>): number {
+	return samples.reduce((sum, ms) => sum + ms, 0)
+}
 
-	return DRAW_KINDS.flatMap((kind): Array<[string, string]> => {
+// A row per kind timed, named by `name`; a kind never timed has no median and no row. A redraw
+// section says its total ahead, the time it held the redraw stage in all.
+function kind_rows(draws: Draws, kinds: ReadonlyArray<DrawKind>, name: KindName): Array<Row> {
+	return kinds.flatMap((kind): Array<Row> => {
 		const median = lane_stats.median(draws[kind])
 
-		return median === undefined ? [] : [[`${kind} draw`, summary(draws[kind], median)]]
+		return median === undefined ? [] : [name(kind, draws[kind], median)]
 	})
 }
 
-// The launch phases, then — on a live board under `--timing` — each kind of draw it timed, the
-// main-thread stalls it watched (joshuafolkken/kit#8148) and the heaps it sampled (joshuafolkken/kit#8339).
+function draw_row(kind: DrawKind, samples: ReadonlyArray<number>, median: number): Row {
+	return [`${kind} draw`, summary(samples, median)]
+}
+
+function redraw_row(kind: DrawKind, samples: ReadonlyArray<number>, median: number): Row {
+	return [`redraw ${kind}`, `total ${total(samples).toFixed(1)} · ${summary(samples, median)}`]
+}
+
+function draw_rows(draws: Draws | undefined): Array<Row> {
+	if (draws === undefined) return []
+
+	return [...kind_rows(draws, DRAW_KINDS, draw_row), ...kind_rows(draws, REDRAW_KINDS, redraw_row)]
+}
+
+// The launch phases, then — on a live board under `--timing` — each kind of draw it timed and the redraw
+// stage's sections outside its draw (joshuafolkken/kit#8825), the main-thread stalls and wake lag it
+// watched (joshuafolkken/kit#8148) and the heaps it sampled (joshuafolkken/kit#8339).
 function report(
 	draws?: Draws,
-	stalls?: ReadonlyArray<Stall>,
-	heap_rows: ReadonlyArray<[string, string]> = [],
+	stall_rows: ReadonlyArray<Row> = [],
+	heap_rows: ReadonlyArray<Row> = [],
 ): string {
-	const stall_rows = stalls === undefined ? [] : run_board_stall.rows(stalls)
 	const rows = [...phase_rows(), ...draw_rows(draws), ...stall_rows, ...heap_rows]
 	const width = Math.max(0, ...rows.map(([name]) => name.length))
 	const lines = rows.map(([name, value]) => `  ${name.padEnd(width)}  ${value}`)
@@ -117,7 +143,14 @@ function reporting(
 		leave()
 		watching.stalls.stop()
 		watching.heap.stop()
-		ports.write(report(draws, watching.stalls.stalls(), watching.heap.rows()))
+		run_board_timing_frames.stop()
+		timing.receive = undefined
+		const wake_rows = run_board_stall.lag_rows(SPIN_WAKE_ROW, watching.wakes)
+		const frame_rows = run_board_timing_frames.rows(watching.frames)
+
+		ports.write(
+			report(draws, [...frame_rows, ...watching.stalls.rows(), ...wake_rows], watching.heap.rows()),
+		)
 	}
 }
 
@@ -126,32 +159,67 @@ function watch(ports: BoardPorts, probes: TimingProbes): Watching {
 	const timer = probes.heap ?? { main: run_board_heap.main, every: probes.every }
 	const heap = run_board_heap.watch({ ...timer, worker: ports.worker_heap })
 
-	return { stalls: run_board_stall.watch(probes), heap }
-}
-
-// Times each draw into `draws`, by its kind.
-function draw_timer(draws: Draws, now: () => number): DrawTimer {
-	return function time<T>(kind: DrawKind, draw: () => T): T {
-		const start = now()
-		const result = draw()
-
-		draws[kind].push(now() - start)
-
-		return result
+	return {
+		stalls: run_board_stall.watch(probes),
+		heap,
+		wakes: [],
+		frames: run_board_timing_frames.watch(),
 	}
 }
 
-// Each draw timed from here on, the stalls watched from when a live board takes its screen — `--once`
-// never does — and the report said with them after the screen is left.
+// Times each draw into `draws`, by its kind — its own time, less the sections timed inside it (a cue
+// sounded within the tick draw counts as `sound`, never in the tick too; joshuafolkken/kit#8825).
+function draw_timer(draws: Draws, now: () => number): DrawTimer {
+	const nested = { ms: 0 }
+
+	return function time<T>(kind: DrawKind, draw: () => T): T {
+		const start = now()
+		const outer = nested.ms
+
+		nested.ms = 0
+
+		try {
+			return draw()
+		} finally {
+			const elapsed = now() - start
+
+			draws[kind].push(elapsed - nested.ms)
+			nested.ms = outer + elapsed
+		}
+	}
+}
+
+// The cue's sound prepared, timed as the redraw's `sound`; no cue where the ports sound none.
+function timed_cue(cue: BoardPorts['cue'], time: DrawTimer): BoardPorts['cue'] {
+	if (cue === undefined) return undefined
+
+	return (name) => {
+		time('sound', () => {
+			cue(name)
+		})
+	}
+}
+
+function no_draws(): Draws {
+	return { tick: [], turn: [], receive: [], view: [], reveal: [], sound: [] }
+}
+
+// Each draw timed from here on — a worker round received among them, through `received` — the stalls
+// and the spinners' wake lateness watched from when a live board takes its screen — `--once` never does —
+// and the report said with them after the screen is left.
 function draw_ports(
 	ports: BoardPorts,
 	now: () => number,
 	probes: TimingProbes,
-): Pick<BoardPorts, 'enter_stage' | 'on_exit' | 'time_draw'> {
-	const draws: Draws = { tick: [], turn: [] }
+): Pick<BoardPorts, 'cue' | 'enter_stage' | 'on_exit' | 'time_draw' | 'time_wake'> {
+	const draws = no_draws()
 	const watched: { watching?: Watching } = {}
+	const time = draw_timer(draws, now)
+
+	timing.receive = time
 
 	return {
+		cue: timed_cue(ports.cue, time),
 		enter_stage: (stage) => {
 			watched.watching?.stalls.enter(stage)
 		},
@@ -161,13 +229,24 @@ function draw_ports(
 			watched.watching = watching
 			ports.on_exit(reporting(ports, leave, draws, watching))
 		},
-		time_draw: draw_timer(draws, now),
+		time_draw: time,
+		time_wake: (due_ms, woke_ms) => {
+			watched.watching?.wakes.push(Math.max(0, woke_ms - due_ms))
+		},
 	}
 }
 
 // Runs `draw`, timed where the ports time draws.
 function drawn<T>(ports: Pick<BoardPorts, 'time_draw'>, kind: DrawKind, draw: () => T): T {
 	return ports.time_draw === undefined ? draw() : ports.time_draw(kind, draw)
+}
+
+// Hands a worker round to `receive`, timed as the redraw's `receive` while a board under `--timing` is
+// up; the worker's listener holds no ports to time it through.
+function received<A extends Array<unknown>>(receive: (...args: A) => void, ...args: A): void {
+	drawn({ time_draw: timing.receive }, 'receive', () => {
+		receive(...args)
+	})
 }
 
 // How long the dispatcher took to load this command's code, taken where the board starts
@@ -232,8 +311,10 @@ const run_board_timing = {
 	FIRST_FRAME_PHASE,
 	FIRST_READ_PHASE,
 	SCREEN_ENTER_PHASE,
+	SPIN_WAKE_ROW,
 	TIMING_FLAG,
 	drawn,
+	received,
 	report,
 	say,
 	split,

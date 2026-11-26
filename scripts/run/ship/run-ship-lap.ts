@@ -80,12 +80,14 @@ function environment(parent: string): Record<string, string> {
 }
 
 // What a step's own result adds to its lap: why a check read the whole branch, and which run of the
-// scoped pair it was, why it ran again, how many files it was named over or why a merge could not
-// split and what each condition added to it (`run-ship-scoped.ts`), and the tree a gate reused.
+// scoped pair it was, why it ran again, how long it queued behind another pair, how many files it was
+// named over or why a merge could not split and what each condition added to it
+// (`run-ship-scoped.ts`), and the tree a gate reused.
 type LapNote = Pick<
 	ShipLapRecord,
 	| 'fallback'
 	| 'rerun'
+	| 'queued_ms'
 	| 'reused_tree'
 	| 'runs'
 	| 'named'

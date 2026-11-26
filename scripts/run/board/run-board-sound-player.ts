@@ -11,13 +11,17 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 // PATH scan is needed. A platform with no row, or with every candidate failed, rings BEL instead.
 // `windowsHide` keeps the detached PowerShell from opening a console window over the board.
 const BEL = '\u{7}'
-const SPAWN_OPTIONS = { detached: true, stdio: 'ignore', windowsHide: true } as const
+const SPAWN_OPTIONS: SpawnOptions = { detached: true, stdio: 'ignore', windowsHide: true }
+// A native loop never ends by itself, so it waits on a stdin the board holds open and ends at its EOF:
+// the OS closes the board's end however the board dies, SIGKILL and crashes included (joshuafolkken/kit#8747).
+const PIPED_SPAWN_OPTIONS: SpawnOptions = { ...SPAWN_OPTIONS, stdio: ['pipe', 'ignore', 'ignore'] }
 const POWERSHELL_OPTIONS = ['-NoProfile', '-Command']
 const RAW_CHANNELS = '--channels=1'
 
 interface Player {
 	command: string
 	args: (file: string) => Array<string>
+	options?: SpawnOptions
 }
 
 // A started player: `exit` and `kill` let a sound that plays while something lasts be ended
@@ -87,17 +91,29 @@ function players_for(platform: NodeJS.Platform): Array<Player> {
 // is, so it never ends the board drawing it (joshuafolkken/kit#8381).
 function spawned(player: Player, file: string, ports: SoundPorts): Playing | undefined {
 	try {
-		return ports.spawner(player.command, player.args(file), SPAWN_OPTIONS)
+		return ports.spawner(player.command, player.args(file), player.options ?? SPAWN_OPTIONS)
 	} catch {
 		return undefined
 	}
 }
 
+// Every player this process started that has not exited, so the board can end them all as it leaves:
+// a detached player outlives the board otherwise (joshuafolkken/kit#8917).
+const PLAYING = new Set<Playing>()
+
 // A started candidate: one that fails to start goes on to `next`.
 function begin(child: Playing, next: () => void, handlers: StartHandlers): void {
+	PLAYING.add(child)
+	child.on('exit', () => PLAYING.delete(child))
 	child.on('error', next)
 	handlers.started(child)
 	child.unref()
+}
+
+// Every player still playing ended: one-shots, cues and loops alike.
+function stop_all(): void {
+	for (const child of PLAYING) child.kill()
+	PLAYING.clear()
 }
 
 function start_first(
@@ -140,7 +156,8 @@ function mac_loop_args(file: string): Array<string> {
 		'const player = $.AVAudioPlayer.alloc.initWithContentsOfURLError($.NSURL.fileURLWithPath(argv[0]), null);',
 		'player.numberOfLoops = -1;',
 		'if (!player.play) throw new Error("Audio playback failed");',
-		'$.NSRunLoop.currentRunLoop.run;',
+		'$.NSFileHandle.fileHandleWithStandardInput.readDataToEndOfFile;',
+		'player.stop;',
 		'}',
 	].join('\n')
 
@@ -150,7 +167,7 @@ function mac_loop_args(file: string): Array<string> {
 function windows_loop_args(file: string): Array<string> {
 	return [
 		...POWERSHELL_OPTIONS,
-		`$player = New-Object System.Media.SoundPlayer ${powershell_literal(file)}; $player.Load(); $player.PlayLooping(); Wait-Event`,
+		`$player = New-Object System.Media.SoundPlayer ${powershell_literal(file)}; $player.Load(); $player.PlayLooping(); [Console]::In.ReadToEnd() | Out-Null; $player.Stop()`,
 	]
 }
 
@@ -161,8 +178,8 @@ function raw_rate(file: string): string {
 }
 
 const LOOP_PLAYERS: Partial<Record<NodeJS.Platform, Array<Player>>> = {
-	darwin: [{ command: 'osascript', args: mac_loop_args }],
-	win32: [{ command: 'powershell', args: windows_loop_args }],
+	darwin: [{ command: 'osascript', args: mac_loop_args, options: PIPED_SPAWN_OPTIONS }],
+	win32: [{ command: 'powershell', args: windows_loop_args, options: PIPED_SPAWN_OPTIONS }],
 	linux: [
 		{
 			command: 'paplay',
@@ -242,6 +259,7 @@ const run_board_sound_player = {
 	play_cue,
 	loop,
 	start,
+	stop_all,
 }
 
 export type { Player, Playing, SoundPorts, SoundSpawner, StartHandlers }

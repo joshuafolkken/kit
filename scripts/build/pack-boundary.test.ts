@@ -51,8 +51,8 @@ interface PackageManifest {
 
 // Runtime entries a consumer reaches by file path rather than by a static import
 // (joshuafolkken/kit#2899): `init` writes `fix-gh-packages.ts` into the consumer's `prepare`, and the lane
-// supervisor spawns its CLI, the lane broker its request reread, `run:board` its gathering worker and
-// `lane:open` its eslint warm-up by URL. The hook sources (the Codex adapter's fallback included) are
+// supervisor spawns its CLI, the lane broker its request reread, `run:board` its gathering worker,
+// `lane:open` its eslint warm-up and `scratch:run` its resolve hook by URL. The hook sources (the Codex adapter's fallback included) are
 // seeded from `HOOK_BUNDLES`.
 const CONSUMER_TESTS = [
 	'scripts/gate/change-scope-action.integration.test.ts',
@@ -70,6 +70,7 @@ const PATH_LAUNCHED_ENTRIES = [
 	'scripts/registry-migration/migrate-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
 	'scripts/run/run-label-main.ts',
+	'scripts/scratch/scratch-resolve-hook.mjs',
 ]
 
 // Shipped although no consumer entry reaches them: kit's own build and release entries, which run
@@ -111,8 +112,6 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/run/board/run-board-sound-cues.ts',
 	'scripts/run/board/run-board-sound-transition.ts',
 	'scripts/run/board/run-board-sound-repeat.ts',
-	// #8658 stages the matrix notice-trace renderer; remove this entry when #8657 wires it into run:board.
-	'scripts/run/board/run-board-notice-trace.ts',
 ])
 
 interface PackedEntry {

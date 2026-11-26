@@ -23,7 +23,7 @@ Tier C action inside it (`issue-template.md`); `--no-auto-ok` withholds it too.
 | The bound | What it limits | Counted by |
 | --- | --- | --- |
 | `--max` | merges per invocation — a run's own filing competes for it | `run:carry --merged` |
-| `--idle` (8 hours unless typed) | how long the run waits once nothing can proceed | `--active`, the moment its hands became free |
+| `--idle` (8 hours unless typed) | how long the run waits once nothing can proceed — a bare `--only` included | `--active`, the moment its hands became free |
 | **Ten filings per originating work item** | additions to the pool on **every** filing route (`prerequisite.md`) — `route:tier-a`, `route:interrupt` and a review branch-2 filing are exempt from the depth test (`observation-filing.md`), never from this ceiling | `scripts/issue/issue-file-cap.ts` |
 | The WIP cap on open issues | the pool across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
@@ -40,7 +40,7 @@ runs in a delegated unit"), read back with `pnpm josh issue:state <N>`. `pnpm jo
 the pool and reports what was not started (`backlog_named.after_failure`). One already closed or parked
 when offered is booked done alone and skips nothing. A `needs-human-review` named
 issue stops the whole run. **`--only` runs the named list and stops there, draining no pool** — a
-failure ends the run, and `--only` with no named issues is refused (`backlog_named.startup`).
+failure ends the run. A bare `--only` (no named issues) → `backlog-drive-named-offer.ts` → `only_idle`.
 
 ## The session cut is inside the invocation
 

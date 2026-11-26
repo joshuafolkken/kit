@@ -1,0 +1,9 @@
+- rf:tests | medium | scripts/run/board/run-board-frame-loop.ts:68 | 2026-11-24 | #8826 | - | untested-branch
+- rf:comments | low | scripts/run/board/run-board-screen.ts:62 | 2026-11-24 | #8826 | - | stale-comment
+- rf:bug-risks | low | scripts/run/board/run-board-cells-ansi.ts:61 | 2026-11-24 | #8826 | - | edge-input
+- rf:bug-risks | low | scripts/run/board/run-board-write-port.ts:21 | 2026-11-24 | #8826 | - | swallowed-failure
+- rf:assumptions | low | scripts/run/board/run-board-frame-loop.ts:75 | 2026-11-24 | #8826 | - | other
+- rf:bug-risks | low | scripts/run/board/run-board-cells-ansi.ts:61 | 2026-11-24 | #8826 | - | edge-input
+- rf:bug-risks | low | scripts/run/board/run-board-write-port.ts:21 | 2026-11-24 | #8826 | - | swallowed-failure
+- rf:assumptions | low | scripts/run/board/run-board-frame-loop.ts:75 | 2026-11-24 | #8826 | - | other
+- rf:comments | low | scripts/run/board/run-board-screen.ts:66 | 2026-11-24 | #8826 | - | stale-comment

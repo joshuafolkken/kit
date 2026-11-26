@@ -26,14 +26,15 @@ const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreache
 const STALE_MS = 40 * MS_PER_MINUTE
 const STAGE_AGE_MS = 151 * SECOND
 // The third line's repository under the board's name, padded to it, then the start clock and the gap
-// before its time cell.
-const NOW_INDENT = '  app-kit'.padEnd('▶ josh-board'.length + 2)
+// before its time cell; the names column is at least 15 columns (joshuafolkken/kit#8917).
+const NAMES_WIDTH = 15
+const NOW_INDENT = '  app-kit'.padEnd(NAMES_WIDTH + 2)
 const THIRD_HEAD = `${NOW_INDENT}🚀 ${run_board_labels.minute_of(STARTED)}  `
 const NOW_PREFIX = /^ +app-kit +🚀 \d{2}:\d{2} {2}/u
 // The time cell's digits after the spinner's column: their width does not move past an hour.
 const AGE_WIDTH = 8
 // No finish is estimated (no lane totals) and no gauge is read.
-const WORKING_TITLE = '▶ josh-board  🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -'
+const WORKING_TITLE = '▶ josh-board     🎯 --:--  -  --′--″  💪 -  🧠 -  💾 -'
 const PROGRESS_0_OF_1 = /^✅ 0\/1 /u
 
 // The third line's time cell: the spinner's column, then the age right-aligned to its digits.

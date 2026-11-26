@@ -27,6 +27,9 @@ vi.mock('./eslint-cache-dependencies', () => ({
 		})),
 	},
 }))
+vi.mock('./import-cycles', () => ({
+	import_cycles: { run: vi.fn(async () => ({ output: '', exit_code: 0, elapsed_ms: 0 })) },
+}))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
@@ -162,6 +165,24 @@ describe('CI whole-tree resource settings', () => {
 				env: expect.objectContaining({ NODE_OPTIONS: COLD_OPTIONS }),
 			}),
 		)
+	})
+
+	// joshuafolkken/kit#8885: kit's CI lint legs name two eslint workers through the environment.
+	it('hands eslint the workers JOSH_ESLINT_CONCURRENCY names', async () => {
+		vi.stubEnv('CI', 'true')
+		vi.stubEnv('JOSH_ESLINT_CONCURRENCY', '2')
+		mock_exit_codes(0, 0)
+
+		await lint_parallel.run_lint_command(CHANGED_ARGUMENTS)
+
+		expect(mocked_execa.mock.calls.at(-1)?.[1]).toEqual([
+			'exec',
+			'eslint',
+			WHOLE_TREE,
+			...ESLINT_CACHE_FLAGS,
+			'--concurrency',
+			'2',
+		])
 	})
 })
 

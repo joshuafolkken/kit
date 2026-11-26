@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
@@ -16,9 +17,10 @@ import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
 // fix stays in place.
 //
 // **Only past the cut threshold** (joshuafolkken/kit#8312). The saving is the re-read context, so it is
-// priced by the same break-even every other cut reads (`context-cut-payback.ts`): below it, the fresh
+// priced by the same break-even formula every other cut reads (`context-cut-payback.ts`): below it, the fresh
 // session's preamble rewrite costs more than the fix turns re-reading this context, and the fix stays
-// in place. `run:cut --impl` trusts its caller to have checked (`run-cut-cli.ts` → `pre_gate_answer`),
+// in place. The horizon is the review-fix resumes' own (`REVIEW_FIX_REMAINING_REQUESTS`,
+// joshuafolkken/kit#8817). `run:cut --impl` trusts its caller to have checked (`run-cut-cli.ts` → `pre_gate_answer`),
 // so the check lives here.
 
 type FixNext = (issue: string) => string
@@ -58,7 +60,9 @@ function can_cut(): boolean {
 	return (
 		lane_child_marker.is_child_of(process.cwd()) &&
 		run_cut_ready.is_ready_sync() &&
-		cost_cli.session_verdict() === cost_verdict.OVER_VERDICT
+		cost_cli.session_verdict({
+			remaining: context_cut_payback.REVIEW_FIX_REMAINING_REQUESTS,
+		}) === cost_verdict.OVER_VERDICT
 	)
 }
 

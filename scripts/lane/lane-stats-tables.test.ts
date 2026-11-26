@@ -34,6 +34,7 @@ const FIRST_HEADER_CELLS = [
 	'held by cause (a hold with several causes counts in full under each)',
 	'held behind (any cause; a hold naming several issues counts in full under each)',
 	'dispatch wait',
+	'model',
 	'lane',
 	'process',
 	'check',
@@ -43,6 +44,7 @@ const FIRST_HEADER_CELLS = [
 	'test:related whole-suite trigger',
 	'lint:related stage',
 	'transcript metric',
+	'first request model',
 	'recording command',
 	'concurrent lanes',
 ]

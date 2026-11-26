@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { core_priority } from '#scripts/gate/core-priority'
+import { gate_owner_watch } from '#scripts/gate/gate-owner-watch'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { git_location_environment } from '#scripts/git/git-location-environment'
@@ -7,6 +8,8 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_reap } from '#scripts/lane/lane-reap'
 import { poll } from '#scripts/lib/poll'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
@@ -61,11 +64,13 @@ function josh_argv(root: string, josh_args: ReadonlyArray<string>): LaunchArgv {
 
 // A `josh` command left running in the background, its output kept at `log_path`: the gate, and the
 // `test:pinned` check beside it (`run-review-pinned-steps.ts`). A long-running check never inherits the
-// review stage's core-budget priority mark (`core-priority.ts`, joshuafolkken/kit#5819).
-function launch_josh(
+// review stage's core-budget priority mark (`core-priority.ts`, joshuafolkken/kit#5819). `environment`
+// is laid over that, as a bounded check's result directory (`bounded-check.ts`, joshuafolkken/kit#8708).
+function launch_josh_with(
 	josh_args: ReadonlyArray<string>,
 	log_path: string,
-	root: string = PROJECT_ROOT,
+	root: string,
+	environment: Readonly<Record<string, string>>,
 ): LaunchResult {
 	return detached_launch.launch(
 		{
@@ -75,14 +80,35 @@ function launch_josh(
 			env: {
 				...git_location_environment.location_free_environment(),
 				...core_priority.UNMARKED_ENVIRONMENT,
+				...environment,
 			},
 		},
 		(note) => process.stderr.write(`${note}\n`),
 	)
 }
 
+function launch_josh(
+	josh_args: ReadonlyArray<string>,
+	log_path: string,
+	root: string = PROJECT_ROOT,
+): LaunchResult {
+	return launch_josh_with(josh_args, log_path, root, {})
+}
+
+// The gate's owner (`gate-owner-watch.ts`, joshuafolkken/kit#8845): the lane child session this runs
+// under, which reads the verdict at `--join` — not this process, which exits first by design. Outside
+// a lane child no owner is named and the gate is not watched.
+function gate_owner_environment(): Record<string, string> {
+	const issue = lane_child_marker.marked_issue()
+	const pid = issue === undefined ? undefined : lane_reap.own_child(issue)
+
+	if (pid === undefined) return {}
+
+	return gate_owner_watch.environment_of(gate_owner_watch.owner_of(pid))
+}
+
 function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
-	return launch_josh([GATE_COMMAND], gate_log_path(root), root)
+	return launch_josh_with([GATE_COMMAND], gate_log_path(root), root, gate_owner_environment())
 }
 
 function to_timing(value: unknown): TimingStart | undefined {
@@ -200,6 +226,7 @@ const run_review_steps = {
 	gate_log_path,
 	launch_gate,
 	launch_josh,
+	launch_josh_with,
 	mark_gate_starting,
 	read_gate_log,
 	read_gate_state,

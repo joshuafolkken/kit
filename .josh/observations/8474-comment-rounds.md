@@ -1,0 +1,4 @@
+- rf:comments | low | docs/josh-commands-board.md:147 | 2026-11-21 | #8474 | - | stale-docs
+- rf:tests | low | scripts/run/board/run-board-first-lane.test.ts:46 | 2026-11-21 | #8474 | - | untested-branch
+- rf:comments | low | docs/josh-commands-board.md:147 | 2026-11-21 | #8474 | - | stale-docs
+- rf:comments | low | .josh/metrics-accepted/8474.json:2 | 2026-11-21 | #8474 | - | stale-comment
