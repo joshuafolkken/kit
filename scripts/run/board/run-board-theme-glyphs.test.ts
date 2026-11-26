@@ -240,7 +240,7 @@ describe(TEXTUAL, () => {
 	})
 
 	// joshuafolkken/kit#8154: every section heading reads `V -- NAME`.
-	it.each(['💻', '📈', '⛽', '🧵', '📌'])('draws the heading icon %s as its rule', (icon) => {
+	it.each(['💻', '📈', '⛽', '🧵', '📌', '🏠'])('draws the heading icon %s as its rule', (icon) => {
 		expect(textual(icon)).toBe('--')
 	})
 })
