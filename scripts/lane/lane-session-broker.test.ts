@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { poll_turns } from '#tools/test/poll-turns'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
 import { lane_session_broker, type BrokerAction, type BrokerAnswer } from './lane-session-broker'
+import { lane_session_reread } from './lane-session-reread'
 
 const make_directory = temporary_directory()
 
@@ -62,8 +64,13 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 }))
 
 const state = { directory: '' }
+// Two poll waits after a write: a whole serve pass started after it, so the broker read the request.
+const PASSES_AFTER_WRITE = 2
 
 beforeEach(() => {
+	poll_turns.install()
+	// The fresh process finds no open lane for the fixture issue and reads nothing; its own suite pins it.
+	vi.spyOn(lane_session_reread, 'reread').mockResolvedValue(undefined)
 	state.directory = make_directory('review-broker-')
 	LANE.directory = path.join(state.directory, 'lane')
 	CLAUDE_LANE.directory = LANE.directory
@@ -84,7 +91,7 @@ afterEach(() => {
 
 async function invalid_request(): Promise<void> {
 	writeFileSync(lane_session_broker.request_path(LANE.directory, ISSUE), 'exec /bin/sh')
-	await new Promise((resolve) => setTimeout(resolve, 250))
+	await poll_turns.after_passes(PASSES_AFTER_WRITE)
 }
 
 async function extra_field_request(field: string): Promise<void> {
@@ -99,7 +106,7 @@ async function extra_field_request(field: string): Promise<void> {
 	}
 
 	writeFileSync(lane_session_broker.request_path(LANE.directory, ISSUE), JSON.stringify(payload))
-	await new Promise((resolve) => setTimeout(resolve, 250))
+	await poll_turns.after_passes(PASSES_AFTER_WRITE)
 }
 
 async function request_relaunch(lane: LaneInfo): Promise<BrokerAnswer> {

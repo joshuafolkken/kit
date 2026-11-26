@@ -11,7 +11,6 @@ import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { z } from 'zod'
 import { backlog_budget } from './backlog-budget'
 import {
@@ -44,6 +43,7 @@ import { backlog_drive_restore, type LeftOut } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_retrospective_unit } from './backlog-drive-retrospective-unit'
 import { backlog_drive_seats } from './backlog-drive-seats'
+import { backlog_drive_sync_held } from './backlog-drive-sync-held'
 import { backlog_drive_tick, type RunningCheck } from './backlog-drive-tick'
 import { backlog_listing_trace } from './backlog-listing-trace'
 import { backlog_offer_cli } from './backlog-offer-cli'
@@ -188,7 +188,7 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'shor
 // whether a free lane has a new `auto-ok` issue to ask about.
 function room_ports(): Pick<
 	LoopPorts,
-	'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held' | 'usage_limited' | 'listing_changed'
+	'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held' | 'listing_changed'
 > {
 	return {
 		free_lanes: backlog_ready.drive_free_lane_count,
@@ -196,7 +196,6 @@ function room_ports(): Pick<
 		limit_room: backlog_ready.drive_limit_room,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		memory_held: backlog_drive_memory.gauge(),
-		usage_limited: async () => await run_merge_usage_limit.is_held(Date.now()),
 	}
 }
 
@@ -206,11 +205,12 @@ function child_ports(
 	seeded: ReadonlyArray<string>,
 	owner: string,
 	is_running: RunningCheck,
-): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
+): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'launch' | 'merge'> {
 	const known = new Set(seeded)
 
 	return {
 		is_finished: finished_checker(known, is_running),
+		launch: async (issue) => await backlog_drive_launch.launch(issue, owner),
 		merge: async (issue) => await backlog_drive_collect.merge(issue, owner),
 		adoptable: async (in_flight) => {
 			const adopting = await backlog_drive_adopt.adoptable(in_flight)
@@ -242,8 +242,8 @@ function ports_of(
 		...child_ports(seeded, context.owner, tick.is_running),
 		begin_tick: tick.begin_tick,
 		offer: holds.answering(async (state) => await offer_for(state, context)),
-		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		...room_ports(),
+		...backlog_drive_sync_held.production_ports(),
 		judgement_owed: judgement_reader(),
 		...reporters(holds),
 		now: () => new Date(),

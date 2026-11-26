@@ -1,17 +1,10 @@
 import { writeSync } from 'node:fs'
+import type { Writable } from './run-board-output-hold'
 import type { BoardPorts } from './run-board-state'
 
 // A live `run:board`'s writes to the terminal with their backpressure (joshuafolkken/kit#8826): a
 // write the stream could not take at once (`write` answered false) holds `drained` until the stream
 // drains, so the frame loop makes no frame the terminal is not ready for — and writes none it skipped.
-
-// The part of a writable stream the port writes through.
-interface Writable {
-	write: (bytes: string) => boolean
-	once: (event: 'drain', listener: () => void) => unknown
-	// The descriptor a settled port writes to directly; none keeps every write on `write`.
-	fd?: number | undefined
-}
 
 interface Held {
 	pending: Promise<void> | undefined
@@ -78,4 +71,5 @@ function unblock(stream: object): void {
 const run_board_write_port = { port_of, unblock }
 
 export { run_board_write_port }
-export type { Writable }
+
+export { type Writable } from './run-board-output-hold'

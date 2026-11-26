@@ -7,6 +7,7 @@ import { run_hold } from '#scripts/run/hold/run-hold'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_merge_prose } from './run-merge-prose'
+import { run_merge_sync_held } from './run-merge-sync-held'
 
 const make_directory = temporary_directory('suite')
 
@@ -85,6 +86,42 @@ beforeEach(() => {
 	})
 })
 
+describe('run_merge_steps.do_merged — a main:sync that keeps failing', () => {
+	const sync_error = { text: '' }
+
+	beforeEach(() => {
+		stub_carry(CARRY)
+		vi.spyOn(poll, 'sleep').mockResolvedValue()
+		vi.spyOn(run_merge_sync_held, 'hold').mockResolvedValue()
+		vi.mocked(josh_command.josh_run).mockImplementation(async ([command = '']) => {
+			await Promise.resolve()
+			steps.push(command)
+
+			return command === SYNC ? { code: 1, out: '', err: sync_error.text } : { code: 0, out: '' }
+		})
+	})
+
+	it('neither counts nor records a child whose sync failed', async () => {
+		sync_error.text = 'fatal: cannot lock ref'
+
+		await expect(run_merge_steps.do_merged(CONTEXT, record)).rejects.toThrow(/main:sync/u)
+
+		expect(steps).not.toContain('count')
+		expect(steps).not.toContain(RECORD)
+	})
+
+	it('still counts and records a child whose sync git refused over local changes (joshuafolkken/kit#9034)', async () => {
+		sync_error.text =
+			'error: Your local changes to the following files would be overwritten by checkout'
+
+		await run_merge_steps.do_merged(CONTEXT, record)
+
+		expect(steps).toContain('count')
+		expect(steps).toContain(RECORD)
+		expect(run_merge_sync_held.hold).toHaveBeenCalledWith(CONTEXT.child)
+	})
+})
+
 describe('run_merge_steps.do_merged — the order of a merged child’s steps', () => {
 	it('syncs, counts and puts the merge on record before the lane closes', async () => {
 		stub_carry(CARRY)
@@ -92,17 +129,6 @@ describe('run_merge_steps.do_merged — the order of a merged child’s steps', 
 		await run_merge_steps.do_merged(CONTEXT, record)
 
 		expect(steps).toStrictEqual([SYNC, 'count', RECORD, CLOSE])
-	})
-
-	it('neither counts nor records a child whose sync failed', async () => {
-		stub_carry(CARRY)
-		vi.spyOn(poll, 'sleep').mockResolvedValue()
-		vi.mocked(josh_command.josh_run).mockResolvedValue({ code: 1, out: '' })
-
-		await expect(run_merge_steps.do_merged(CONTEXT, record)).rejects.toThrow(/main:sync/u)
-
-		expect(steps).not.toContain('count')
-		expect(steps).not.toContain(RECORD)
 	})
 
 	it('mirrors the count it applied onto the epic', async () => {

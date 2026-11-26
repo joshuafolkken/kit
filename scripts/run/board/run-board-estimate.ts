@@ -8,6 +8,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
+import { run_board_root_layout, type SingleNamed } from './run-board-root-layout'
 import type { ItemState, ItemStatus } from './run-board-status'
 import type { UsualTimes } from './run-board-usual'
 
@@ -44,13 +45,11 @@ interface EstimateRead {
 	lane_limit?: number | undefined
 }
 
-// What says the run still moves, as the board's header carries it, with the run's name and the root
-// checkout's single run beside it.
-interface RunMotion {
+// What says the run still moves, as the board's header carries it, with the run's name and the single
+// runs beside it.
+interface RunMotion extends SingleNamed {
 	ended_ms: number | undefined
 	activity: { is_stopped: boolean }
-	run_name?: string | undefined
-	layout?: Pick<BoardLayout, 'root'> | undefined
 }
 
 interface RowFinish {
@@ -182,23 +181,13 @@ function row_finish(row: BoardRow, read: EstimateRead): RowFinish | undefined {
 	return { finish_ms, drift_ms: finish_ms - foretold_ms }
 }
 
-function is_root_row(row: BoardRow, run: RunMotion): boolean {
-	return run.layout?.root?.row === row
-}
-
-// The root checkout's single run moves on its own, beside a stopped or ended `backlogrun`
+// A single run beside the run moves on its own, beside a stopped or ended `backlogrun`
 // (joshuafolkken/kit#8946); its row stands `stopped` once a stop ends it. Every other row moves with
 // the run.
 function is_moving(row: BoardRow, run: RunMotion): boolean {
-	if (is_root_row(row, run)) return true
+	if (run_board_root_layout.is_single_row(row, run.layout)) return true
 
 	return run.ended_ms === undefined && !run.activity.is_stopped
-}
-
-// The single run a row is drawn under: the root checkout's, else the board's own; `undefined` under a
-// `backlogrun`.
-function single_name_of(row: BoardRow, run: RunMotion): string | undefined {
-	return is_root_row(row, run) ? run.layout?.root?.name : run.run_name
 }
 
 // Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and a parked one, while the
@@ -207,7 +196,7 @@ function single_name_of(row: BoardRow, run: RunMotion): string | undefined {
 // A `halfrun` draws none: the lane totals run to a merge, and it stops before its commit
 // (joshuafolkken/kit#8946).
 function is_finish_drawn(row: BoardRow, run: RunMotion): boolean {
-	const is_measured = single_name_of(row, run) !== HALFRUN && is_foretold(row)
+	const is_measured = run_board_root_layout.single_name_of(row, run) !== HALFRUN && is_foretold(row)
 
 	return is_moving(row, run) && is_measured && FINISH_STATES.has(row.state)
 }

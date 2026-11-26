@@ -12,7 +12,7 @@ import { run_board_throughput } from './run-board-throughput'
 type RunSpan = SpanHere & { span: BoardSpan }
 type RunFields = Pick<
 	LocalRead,
-	| keyof Omit<SpanHere, 'span' | 'root' | 'transcript'>
+	| keyof Omit<SpanHere, 'span' | 'singles' | 'transcript'>
 	| 'scope'
 	| 'throughput'
 	| 'lanes'
@@ -20,13 +20,13 @@ type RunFields = Pick<
 >
 
 // Where each session of the run writes what it does: a lane's child to its dispatch log, in the lane's
-// own checkout; the root checkout's single run beside them to its transcript, read as one more child's
-// (`run_board_single.sources_of`), never listed as a lane; the parent and a judgment session to
-// theirs, in this one.
+// own checkout; each single run beside them, else the drawn single run, to its transcript, read as one
+// more child's (`run_board_single.sources_of`), never listed as a lane; the parent and a judgment
+// session to theirs, in this one.
 function sources_of(
 	repository: string,
 	lanes: ReadonlyArray<LaneInfo>,
-	read: Pick<RunSpan, 'span' | 'root' | 'transcript'>,
+	read: Pick<RunSpan, 'span' | 'singles' | 'transcript'>,
 ): OperationSources {
 	const root = process.cwd()
 	const children = lanes.map((lane) => ({
@@ -36,7 +36,10 @@ function sources_of(
 	}))
 
 	return {
-		lanes: [...children, ...run_board_single.sources_of(read.root ?? read.span)],
+		lanes: [
+			...children,
+			...[read.span, ...(read.singles ?? [])].flatMap((span) => run_board_single.sources_of(span)),
+		],
 		owner: { log: read.transcript, root },
 		judgment: { log: run_wake.wake_log_path(repository), root },
 	}

@@ -1,11 +1,15 @@
 import { josh_command } from '#scripts/josh/josh-run'
+import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_hold, type HoldRead, type RunHold } from '#scripts/run/hold/run-hold'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { run_merge_sync } from './run-merge-sync'
+import { run_merge_sync_held } from './run-merge-sync-held'
 
 const CHILD = '7697'
+const REFUSAL = 'error: Your local changes to the following files would be overwritten by merge'
+const TRANSIENT = 'fatal: unable to access the remote: Could not resolve host'
 const HOLDER = '7686'
 const SYNC = 'main:sync'
 
@@ -93,5 +97,30 @@ describe('run_merge_sync.sync_main — a checkout no other run holds', () => {
 
 		expect(did_sync(spies)).toBe(true)
 		expect(spies.emit).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_merge_sync.sync_main — a main:sync that keeps failing (joshuafolkken/kit#9034)', () => {
+	let spies: SyncSpies
+	let hold: MockInstance<typeof run_merge_sync_held.hold>
+
+	beforeEach(() => {
+		spies = stub_sync()
+		spies.josh_run.mockResolvedValue({ code: 1, out: '', err: REFUSAL })
+		vi.spyOn(poll, 'sleep').mockResolvedValue()
+		hold = vi.spyOn(run_merge_sync_held, 'hold').mockResolvedValue()
+		stub_tree({ kind: 'free' })
+	})
+
+	it('holds instead of throwing when git refuses over uncommitted changes', async () => {
+		await expect(run_merge_sync.sync_main(CHILD)).resolves.toBeUndefined()
+		expect(hold).toHaveBeenCalledWith(CHILD)
+	})
+
+	it('still fails the run on any other failure, carrying its stderr', async () => {
+		spies.josh_run.mockResolvedValue({ code: 1, out: '', err: TRANSIENT })
+
+		await expect(run_merge_sync.sync_main(CHILD)).rejects.toThrow(`main:sync failed: ${TRANSIENT}`)
+		expect(hold).not.toHaveBeenCalled()
 	})
 })

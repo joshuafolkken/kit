@@ -5,6 +5,8 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
 import { implementation_cut_verdict } from '#scripts/rules/implementation-cut-verdict'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_handoff_lanes } from '#scripts/run/handoff-lanes/run-handoff-lanes'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { run_headless } from './run-headless'
 import { run_watcher_hook } from './run-watcher-hook'
 
@@ -26,13 +28,15 @@ import { run_watcher_hook } from './run-watcher-hook'
 // what keeps a second, synchronous spelling of the parent test from existing.
 
 const SWITCH_ENV_KEY = 'JOSH_PARENT_CUT_GUARD'
-const STAMP_PREFIX = 'josh-parent-cut-guard-'
 
-// **One refusal, then a quiet window long enough to finish the hand-off in.** The hand-off is
-// `run:handoff-lanes` and the `lane:output` fix a `blocked` verdict names — and a guard refusing each
-// of them would wedge the very procedure it asks for. A parent that could not cut (a lane
-// nobody can poll) is asked again once the window has passed.
-const QUIET_WINDOW_MS = 600_000
+// **The hand-off procedure is passed by name, never by the clock.** `run:handoff-lanes`, the `next:`
+// line its verdict prints (`run:carry`, `run:board --chat`, `run:report --handoff`) and the lane repair a
+// `blocked` verdict names (`lane:output`, `lane:prune`) are the calls a refusal asks for, so a guard
+// refusing them would wedge the procedure. Every other call is refused while the verdict is over. The
+// names come from `run-handoff-lanes.ts`, which runs them, so a step added there is passed here too.
+const HANDOFF_COMMANDS: ReadonlySet<string> = new Set(
+	run_handoff_lanes.HANDOFF_COMMANDS.map((name) => `josh ${name}`),
+)
 
 // What the decision has to know about the world, passed in so it is testable without a carry record or
 // a session transcript on disk.
@@ -77,30 +81,29 @@ async function is_due(state: ParentCutState): Promise<boolean> {
 	return state.verdict() === cost_verdict.OVER_VERDICT
 }
 
-function is_quiet(target: string, now_ms: number): boolean {
-	const last_ms = hook_decision.create_refusal_stamp(STAMP_PREFIX).last_ms(target)
+// A call is the hand-off only when every `josh` command it chains is one of the procedure's.
+function is_handoff_call(raw_payload: string): boolean {
+	// A payload with no transcript is no call of a session this guard can name, so it passes.
+	if (run_watcher_hook.transcript_of(raw_payload) === undefined) return true
 
-	return last_ms !== hook_decision.NEVER_MS && now_ms - last_ms < QUIET_WINDOW_MS
+	const payload = hook_decision.parse_hook_payload(raw_payload)
+	const commands = time_shell.josh_commands_of(time_shell.bash_command(payload?.tool_input))
+
+	return commands.length > 0 && commands.every((command) => HANDOFF_COMMANDS.has(command))
 }
 
-// The quiet window is read before the carry record and the transcript price, so a refused parent's
-// following calls cost one small file read each.
 async function refusal_for(
-	transcript: string,
-	now_ms: number,
+	raw_payload: string,
 	state: ParentCutState,
 ): Promise<string | undefined> {
-	const stamp = hook_decision.create_refusal_stamp(STAMP_PREFIX)
-	const target = stamp.path(transcript)
+	if (is_handoff_call(raw_payload) || !(await is_due(state))) return undefined
 
-	if (is_quiet(target, now_ms) || !(await is_due(state))) return undefined
-
-	return stamp.record(target, now_ms) ? PARENT_CUT_REASON : undefined
+	return PARENT_CUT_REASON
 }
 
 // A delegated unit's call names the *parent's* transcript and runs under the parent's process, so the
 // carry record reads as owned here; only `agent_id` tells it apart (`hook-decision.ts`). Refusing it
-// would hand the unit a hand-off it cannot take and spend the parent's quiet window on it.
+// would hand the unit a hand-off it cannot take.
 function is_unit_call(raw_payload: string): boolean {
 	try {
 		return (hook_decision.parse_hook_payload(raw_payload)?.agent_id ?? '') !== ''
@@ -118,25 +121,19 @@ function is_exempt(raw_payload: string): boolean {
 /**
  * The deny reason for a call a `backlogrun` parent makes past the shared threshold, or `undefined` when
  * the call proceeds — a lane child, a delegated unit, a person's session, a handed-off or capped
- * record, an `under` or unmeasurable verdict, or a call inside the quiet window after a refusal.
+ * record, an `under` or unmeasurable verdict, or a call of the hand-off procedure itself.
  */
 async function parent_cut_reason(
 	raw_payload: string,
-	now_ms: number,
 	state: ParentCutState = current_state(),
 ): Promise<string | undefined> {
 	if (is_exempt(raw_payload)) return undefined
 
-	const transcript = run_watcher_hook.transcript_of(raw_payload)
-
-	if (transcript === undefined) return undefined
-
-	return await refusal_for(transcript, now_ms, state)
+	return await refusal_for(raw_payload, state)
 }
 
 const run_parent_cut_hook = {
 	PARENT_CUT_REASON,
-	QUIET_WINDOW_MS,
 	SWITCH_ENV_KEY,
 	current_state,
 	parent_cut_reason,

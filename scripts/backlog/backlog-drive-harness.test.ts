@@ -116,6 +116,7 @@ function ports(world_state: World): LoopPorts {
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
 		usage_limited: async () => false,
+		sync_held: async () => false,
 		hold: async () => undefined,
 		idle: async () => undefined,
 		shortfall: async () => undefined,

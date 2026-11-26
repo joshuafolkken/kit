@@ -8,6 +8,9 @@ const REASON_SEPARATOR = ':'
 const USAGE_LIMIT_REASON = 'usage-limit'
 // The `hold` reason a pass held by memory records (`backlog-drive-memory.ts`).
 const MEMORY_REASON = 'memory'
+// The `hold` reason a pass held by a `main:sync` a dirty primary checkout refused records
+// (`run-merge-sync-held.ts`, joshuafolkken/kit#9034).
+const MAIN_DIRTY_REASON = 'main-dirty'
 // Before a hand-back mark's reason no driver recorded (`lane-hand-back-held.ts`).
 const DRIVERLESS_PREFIX = 'driverless:'
 // The offer verdict that started nothing because nothing could start (`backlog-drive.ts`).
@@ -26,6 +29,7 @@ const backlog_hold_codes = {
 	DRAINED_REASON,
 	DRIVERLESS_PREFIX,
 	HAND_BACK_PREFIX,
+	MAIN_DIRTY_REASON,
 	MEMORY_REASON,
 	NAMED_WAIT,
 	OFFER_PREFIX,

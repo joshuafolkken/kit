@@ -29,8 +29,8 @@ import { backlog_drive_park_triage as park_triage } from './backlog-drive-park-t
 import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_state } from './backlog-drive-state'
+import { backlog_drive_sync_held, type LaunchHoldPorts } from './backlog-drive-sync-held'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
-import { backlog_hold_codes } from './backlog-hold-codes'
 import { backlog_offer_timing, type LoopRun, type OfferTiming } from './backlog-offer-timing'
 import { backlog_yield_cap, type YieldCapPorts } from './backlog-yield-cap'
 
@@ -113,7 +113,7 @@ interface DriveEnd {
 type Collected = Pick<MergeResult, 'token' | 'outcome' | 'is_offer' | 'is_parked'>
 
 // The yield cap's ports (`backlog-yield-cap.ts`): the issue's yields, and its park; and the re-admission.
-interface DrivePorts extends YieldCapPorts, ReadmitPorts {
+interface DrivePorts extends YieldCapPorts, ReadmitPorts, LaunchHoldPorts {
 	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
 	is_finished: (issue: string) => boolean
 	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
@@ -143,9 +143,6 @@ interface DrivePorts extends YieldCapPorts, ReadmitPorts {
 	// Whether the machine has no memory for one more lane — `backlog_drive_memory.gauge()` in production,
 	// which carries its hysteresis between calls.
 	memory_held: () => Promise<boolean>
-	// Whether a Claude usage limit that stopped a child has yet to reset — `run_merge_usage_limit.is_held`
-	// in production (joshuafolkken/kit#4745).
-	usage_limited: () => Promise<boolean>
 	// Why an offered pass started nothing (`backlog-drive-hold.ts`). Production records it in the lane
 	// ledger only while a lane is free. `undefined` is the run's stop, which owes no lane a child.
 	hold: (reason: string | undefined, waiting?: ReadonlyArray<number>) => Promise<void>
@@ -281,21 +278,16 @@ function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	return { kind: 'continue', state }
 }
 
-async function usage_held(state: DriveState, ports: DrivePorts): Promise<PassResult> {
-	await ports.hold(backlog_hold_codes.USAGE_LIMIT_REASON)
-
-	return { kind: 'continue', state }
-}
-
-// An offer answered `run`: launched while the machine has memory to spare and no usage limit is in
-// force, held until both hold otherwise. A usage-limited pass polls on as a held one does.
+// An offer answered `run`: launched while the machine has memory to spare and no launch hold is in
+// force (`backlog-drive-sync-held.ts`), held until both hold otherwise.
 async function run_offered(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
 	ports: DrivePorts,
 ): Promise<PassResult> {
-	if (await ports.usage_limited()) return await usage_held(state, ports)
+	const held = await backlog_drive_sync_held.launch_held(state, ports)
 
+	if (held !== undefined) return held
 	if (await ports.memory_held()) return await backlog_drive_memory.held(state, ports)
 
 	return await launch_all(issues, state, ports)
