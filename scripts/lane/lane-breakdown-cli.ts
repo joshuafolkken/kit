@@ -9,6 +9,7 @@ import { lane_breakdown_estimate } from './lane-breakdown-estimate'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text } from './lane-breakdown-text'
 import { lane_cut_stats } from './lane-cut-stats'
+import { lane_implement_split_stats } from './lane-implement-split-stats'
 import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_net_time } from './lane-net-time'
 import { lane_sinks, type SinkRecords } from './lane-sinks'
@@ -20,7 +21,8 @@ import { lane_timeline } from './lane-timeline'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const TIMELINE_FLAG = '--timeline'
-const USAGE = `Usage: josh lane:breakdown <issue> [${TIMELINE_FLAG}]`
+const PERIOD_FLAG = '--period'
+const USAGE = `Usage: josh lane:breakdown <issue> [${TIMELINE_FLAG}] | ${PERIOD_FLAG} <days>`
 const TOP_SINKS = 3
 
 function sinks_line(records: SinkRecords, issue: number): string {
@@ -112,8 +114,24 @@ async function print(issue: string): Promise<number> {
 	return 0
 }
 
-// The printer `argv` asks for, or `undefined` for a malformed one.
-function printer_of(argv: ReadonlyArray<string>): ((issue: string) => Promise<number>) | undefined {
+// `--period <days>`: each implement-split segment's median over the lanes merged in the window
+// (joshuafolkken/kit#8998).
+async function print_period(days: string): Promise<number> {
+	const entries = await lane_ledger_archive.read_history({})
+	const events = await run_event_stream_emit.all_events()
+
+	console.info(lane_implement_split_stats.report(entries, events, Number(days), Date.now()))
+
+	return 0
+}
+
+function period_printer(argv: ReadonlyArray<string>): typeof print | undefined {
+	const [, days = '', ...rest] = argv
+
+	return /^[1-9]\d*$/u.test(days) && rest.length === 0 ? print_period : undefined
+}
+
+function issue_printer(argv: ReadonlyArray<string>): typeof print | undefined {
 	const [issue = '', ...flags] = argv
 
 	if (!issue_number_shape.is_issue_number(issue)) return undefined
@@ -122,8 +140,20 @@ function printer_of(argv: ReadonlyArray<string>): ((issue: string) => Promise<nu
 	return flags.join(' ') === TIMELINE_FLAG ? print_timeline : undefined
 }
 
+// The printer `argv` asks for, or `undefined` for a malformed one.
+function printer_of(argv: ReadonlyArray<string>): typeof print | undefined {
+	return argv[0] === PERIOD_FLAG ? period_printer(argv) : issue_printer(argv)
+}
+
+// The printer's argument: the days for `--period`, else the issue.
+function subject_of(argv: ReadonlyArray<string>): string {
+	const [first = '', second = ''] = argv
+
+	return first === PERIOD_FLAG ? second : first
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const [issue = ''] = argv
+	const issue = subject_of(argv)
 	const printer = printer_of(argv)
 
 	if (printer !== undefined) return await printer(issue)

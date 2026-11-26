@@ -1,0 +1,7 @@
+{
+	"reason": "New lane:breakdown implement split and --period report (#8998)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 192
+	}
+}
