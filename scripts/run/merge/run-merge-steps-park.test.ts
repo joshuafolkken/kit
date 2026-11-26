@@ -8,6 +8,7 @@ import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_stalled } from '#scripts/run/park/run-stalled'
+import { run_maintenance } from '#scripts/run/run-maintenance'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#2769: the driver's park is explained on the issue, and a child GitHub merged but
@@ -102,6 +103,7 @@ describe('run_merge_steps.do_failed — the stale in-progress goes through the s
 
 	it('warns about a removal that failed, and still parks the child', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+		const retry = vi.spyOn(run_maintenance, 'unmark_retry').mockImplementation(() => undefined)
 
 		remove_label_mock.mockRejectedValue(new Error('gh: Forbidden (HTTP 403)'))
 
@@ -109,6 +111,7 @@ describe('run_merge_steps.do_failed — the stale in-progress goes through the s
 
 		expect(result.is_parked).toBe(true)
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('labels/in-progress'))
+		expect(retry).toHaveBeenCalledWith(CHILD)
 	})
 })
 

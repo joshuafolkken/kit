@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { git_followup_label } from '#scripts/followup/git-followup-label'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -31,13 +32,35 @@ async function apply(issue: string, is_retry: boolean): Promise<number> {
 	return is_applied ? 0 : FAILURE
 }
 
-async function run(args: ReadonlyArray<string>): Promise<number> {
-	const [issue = '', retry] = args
-	if (!/^\d+$/u.test(issue)) throw new Error('A numeric issue is required')
-	const is_retry = retry === '--retry'
+async function mark(issue: string, is_retry: boolean): Promise<number> {
 	if (is_retry && !(await is_held(issue))) return 0
 
 	return await apply(issue, is_retry)
+}
+
+// The release's own removal, retried detached when its write failed (joshuafolkken/kit#9042): a run
+// of the issue that holds this tree again by then keeps its label.
+async function unmark(issue: string): Promise<number> {
+	if (await is_held(issue)) return 0
+
+	try {
+		await git_followup_label.strip_in_progress(issue)
+		console.info(`run label: ${session_cite.issue(issue)} removed`)
+
+		return 0
+	} catch {
+		console.info(`run label: ${session_cite.issue(issue)} removal failed`)
+
+		return FAILURE
+	}
+}
+
+async function run(args: ReadonlyArray<string>): Promise<number> {
+	const [issue = '', retry] = args
+	if (!/^\d+$/u.test(issue)) throw new Error('A numeric issue is required')
+	if (retry === '--unmark') return await unmark(issue)
+
+	return await mark(issue, retry === '--retry')
 }
 
 function set_exit_code(code: number): void {
