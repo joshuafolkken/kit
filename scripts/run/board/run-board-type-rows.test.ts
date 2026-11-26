@@ -1,8 +1,4 @@
-import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import { run_board_fit } from './run-board-fit'
-import { run_board_row_key } from './run-board-row-key'
-import { run_board_spin } from './run-board-spin'
 import { run_board_theme_defs } from './run-board-theme-defs'
 import {
 	run_board_type_rows,
@@ -10,15 +6,12 @@ import {
 	type Typing,
 	type TypingFrame,
 } from './run-board-type-rows'
-import { run_board_typing } from './run-board-typing'
 
 // joshuafolkken/kit#8003: the rows a live board in a theme types as they appear after its base frame,
-// a letter at a time at the opening line's pace, a block after the last letter until the row is out.
+// a letter at a time at the opening line's pace; the theme layer draws them (joshuafolkken/kit#8917).
 
-const { NO_TYPING, next, type_bytes, typed_lines } = run_board_type_rows
-const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
-const { CURSOR } = run_board_typing
-const ESC = '\u{1B}'
+const { NO_TYPING, next } = run_board_type_rows
+const LETTER_MS = run_board_theme_defs.THEME_DEFS.wopr.intro.letter_ms
 const START = Date.parse('2026-11-19T09:00:00.000Z')
 const SECOND = 1000
 const ROW = 'x'.repeat(100)
@@ -46,11 +39,6 @@ function frame_of(
 // The typing after a base frame of `base`, then a frame of `drawn`.
 function after_base(base: TypingFrame, drawn: ReadonlyArray<KeyedLine>): Typing {
 	return next(next(NO_TYPING, base, START, true), frame_of(drawn), START + SECOND, true)
-}
-
-// The keyed rows a frame of `lines` leaves on a pane two rows tall.
-function on_screen(lines: ReadonlyArray<string>): Array<KeyedLine> {
-	return run_board_spin.spun(lines, '⠋', { size: { rows: 2, columns: 80 } }).keyed
 }
 
 function keys_of(typing: Typing): Array<string> {
@@ -165,117 +153,21 @@ describe('run_board_type_rows.done_ms', () => {
 })
 
 // joshuafolkken/kit#8376: the lamp strips fill with the row that types through last.
-describe('run_board_type_rows.progress', () => {
-	it('is the share the row typing through last has typed, with rows typing together', () => {
-		const short = line_of('#2', 1, 'x'.repeat(10))
-		const typing = after_base(frame_of([]), [short, line_of('#3', 2)])
-		const at_ms = START + SECOND + (ROW.length / 2 - 1) * LETTER_MS
-
-		expect(run_board_type_rows.progress(typing, at_ms)).toBe(1 / 2)
-	})
-
-	it('is all once no row types', () => {
-		expect(run_board_type_rows.progress(NO_TYPING, START)).toBe(1)
-	})
-})
-
-describe('run_board_type_rows — what is written', () => {
-	it('draws a row on a redraw as typed so far with the block after it, the rest of the frame as drawn', () => {
-		const typing = after_base(frame_of([]), [line_of('done:7', 1)])
-		const later = next(typing, frame_of(typing.lines), START + SECOND + 10 * LETTER_MS, true)
-		const lines = typed_lines(['head', ROW, 'foot'], later, START + SECOND + 10 * LETTER_MS)
-
-		expect(lines).toStrictEqual(['head', `${'x'.repeat(11)}${CURSOR}`, 'foot'])
-	})
-
-	it('types two rows that appear together side by side, each with its own block, at its own row', () => {
-		const typing = after_base(frame_of([]), [line_of('done:7', 2), line_of('done:9', 4)])
-		const bytes = type_bytes(typing, START + SECOND + 6 * LETTER_MS)
-
-		expect(bytes).toBe(
-			`${ESC}[3;1H${'x'.repeat(7)}${CURSOR}${ESC}[K${ESC}[5;1H${'x'.repeat(7)}${CURSOR}${ESC}[K`,
-		)
-	})
-
-	it('writes a row whole, with no block, once it is typed through', () => {
-		const typing = after_base(frame_of([]), [line_of('done:7', 0, ' a b')])
-		const bytes = type_bytes(typing, START + SECOND + 4 * LETTER_MS)
-
-		expect(bytes).toBe(`${ESC}[1;1H a b${ESC}[K`)
-		expect(typed_lines([' a b'], typing, START + SECOND + 4 * LETTER_MS)).toStrictEqual([' a b'])
-		expect(bytes).not.toContain(CURSOR)
-	})
-
-	it('writes nothing for a row the frame was cut to the terminal’s rows without', () => {
-		const base = frame_of(on_screen(['head', 'row']))
-		const drawn = on_screen(['head', 'row', run_board_row_key.keyed('done', 7, ROW)])
-		const typing = after_base(base, drawn)
-
-		expect(typing.lines).toStrictEqual([])
-		expect(type_bytes(typing, START + SECOND + LETTER_MS)).toBe('')
-	})
-})
-
-// joshuafolkken/kit#8356: where the rows decode, a row resolves out of code with no block, as wide as
-// the row it becomes.
-describe('run_board_type_rows — a decoding row', () => {
-	it('writes the row with no block, as wide as the row', () => {
-		const typing = after_base(frame_of([]), [line_of('done:7', 0)])
-		const decoding = { ...typing, is_decoding: true }
-		const [line = ''] = typed_lines([ROW], decoding, START + SECOND + 10 * LETTER_MS)
-
-		expect(line).not.toContain(CURSOR)
-		expect(run_board_fit.width_of(stripVTControlCharacters(line))).toBe(ROW.length)
-		expect(type_bytes(decoding, START + SECOND + 10 * LETTER_MS)).not.toContain(CURSOR)
-	})
-
-	it('carries the frame’s decoding into the typing', () => {
-		const frame = { ...frame_of([]), is_decoding: true }
-
-		expect(next(NO_TYPING, frame, START, true).is_decoding).toBe(true)
-	})
-
-	it('keeps the frame’s decoding past the base', () => {
-		const base = next(NO_TYPING, frame_of([]), START, true)
-		const frame = { ...frame_of([line_of('done:7', 0)]), is_decoding: true }
-
-		expect(next(base, frame, START + SECOND, true).is_decoding).toBe(true)
-	})
-})
-
-// joshuafolkken/kit#8402: the block stays lit at every moment a row types — no blank beat.
-describe('run_board_type_rows — the steady block', () => {
-	it.each([0, 1, 2, 3, 6, 7, 9, 13])(
-		'lights every typing row’s block %i letters in, the letters kept',
-		(letters) => {
-			const typing = after_base(frame_of([]), [line_of('done:7', 2), line_of('done:9', 4)])
-			const shown = 'x'.repeat(letters + 1)
-
-			expect(type_bytes(typing, START + SECOND + letters * LETTER_MS)).toBe(
-				`${ESC}[3;1H${shown}${CURSOR}${ESC}[K${ESC}[5;1H${shown}${CURSOR}${ESC}[K`,
-			)
-		},
-	)
-})
-
 describe('run_board_type_rows — the header’s now line (joshuafolkken/kit#8103)', () => {
-	it('types the now line’s new words after its prefix, the prefix drawn whole', () => {
+	it('types the now line’s new words after its prefix', () => {
 		const typing = after_base(frame_of([now_of('#1 · READ')]), [now_of(WORDS)])
-		const at_ms = START + SECOND + 6 * LETTER_MS
 
 		expect(keys_of(typing)).toStrictEqual([`now:${WORDS}`])
-		expect(type_bytes(typing, at_ms)).toBe(`${ESC}[3;1H${NOW_PREFIX}#8093 ·${CURSOR}${ESC}[K`)
+		expect(typing.lines[0]?.prefix_columns).toBe(NOW_PREFIX.length)
 	})
 
-	it('writes the now line whole once its words are typed through', () => {
+	it('lets the now line go once its words are typed through', () => {
 		const typing = after_base(frame_of([]), [now_of(WORDS)])
 		const at_ms = START + SECOND + WORDS.length * LETTER_MS
 
-		expect(typed_lines(['a', 'b', `${NOW_PREFIX}${WORDS}`], typing, at_ms)).toStrictEqual([
-			'a',
-			'b',
-			`${NOW_PREFIX}${WORDS}`,
-		])
+		const later = next(typing, frame_of([now_of(WORDS)]), at_ms, true)
+
+		expect(later.lines).toStrictEqual([])
 	})
 
 	it('types not the now line whose time alone changed, nor its base frame', () => {

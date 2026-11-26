@@ -2,12 +2,17 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_board_fixture } from '#scripts/run/board/run-board-fixture'
-import { run_board_replay } from '#scripts/run/board/run-board-replay'
-import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
+import { run_board_panel_fixture } from '#scripts/run/board/run-board-panel-fixture'
+import { run_board_replay, type Beat } from '#scripts/run/board/run-board-replay'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { board_golden, type GoldenTheme } from './board-golden'
 
-const { LOCAL, harness, plan_titled } = run_board_fixture
+const { IDLE_ROW, LOCAL, harness, plan_titled } = run_board_fixture
+// joshuafolkken/kit#8917: the throughput rows the lamp panel runs beside, which the theme lays its panel
+// and area out by — without them the board draws no theme.
+const LOCAL_THROUGHPUT = { ...LOCAL, throughput: [IDLE_ROW, IDLE_ROW] }
+// The usage and lane reads the lamp panel is laid out by, so the panel is one a theme is drawn on.
+const { paneled } = run_board_panel_fixture
 const { THEMES, beat_at, is_update, read_golden, replay_argv, verdict, write_golden } = board_golden
 // A replay of the bttf arrival and both theme openings runs past the default 5 s.
 const REPLAY_TIMEOUT_MS = 120_000
@@ -17,9 +22,9 @@ async function replayed(theme: GoldenTheme): Promise<Array<Beat>> {
 	const options = run_board_replay.options_of(replay_argv(theme), process.env)
 
 	if (options === undefined) throw new Error(`refused: ${theme}`)
-	const { ports } = harness(LOCAL, [plan_titled('a')])
+	const board = harness(LOCAL_THROUGHPUT, [plan_titled('a')])
 
-	return await run_board_replay.replay(ports, options)
+	return await run_board_replay.replay(paneled(board), options)
 }
 
 async function golden(theme: GoldenTheme): Promise<Array<Beat>> {
@@ -70,7 +75,7 @@ describe('board_golden.verdict', () => {
 	it(
 		'fails a replay with one cell moved, naming the beat and how to record again (ac-c7d8e264)',
 		async () => {
-			const expected = await golden('bttf')
+			const expected = await golden('flux')
 			const { beats, index } = moved(expected)
 			const text = await verdict(expected, beats)
 
@@ -101,9 +106,9 @@ describe('board_golden.write_golden', () => {
 			{ text: 'b', ms: 0 },
 		]
 
-		await write_golden('wargames', beats, directory)
+		await write_golden('wopr', beats, directory)
 
-		expect(await read_golden('wargames', directory)).toStrictEqual(beats)
+		expect(await read_golden('wopr', directory)).toStrictEqual(beats)
 		await rm(directory, { recursive: true })
 	})
 })

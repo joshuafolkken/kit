@@ -29,25 +29,24 @@ const WIDE_LANE: BoardRow = {
 	waits: [],
 }
 
-// A live redraw of a wargames frame drawing its lamp panel on a terminal drawing color.
+// A live redraw of a themed frame drawing its lamp panel on a terminal drawing color.
 function drawn_lit(): ReturnType<typeof drawn_from> {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { ports } = harness(LOCAL, [])
 	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
 	const local = { ...LOCAL, throughput: [row_of('24h', 5), row_of('7d', undefined)] }
-	const theme = 'wargames' as const
+	const theme = 'wopr' as const
 	const redraw = { ports: { ...ports, types_rows: true, theme, size: () => WIDE }, now_ms: START }
 	const layout = { ...layout_for(state, local, START), active: [WIDE_LANE] }
 
 	return drawn_from(state, local, redraw, layout)
 }
 
-describe('run_board_tick_draw.draw_display — the lamp strip off', () => {
-	it('keeps the rules’ code and no strip cell on a wargames board drawing its lamp panel', () => {
+// joshuafolkken/kit#8917: the lamp panel a theme lays itself out by stays on a frame whose rules run on.
+describe('run_board_tick_draw.draw_display — the lamp panel past long rules', () => {
+	it('places the lamp panel on a themed board whose rules run on past it', () => {
 		const drawn = drawn_lit()
 
 		expect(drawn.lamps?.length ?? 0).toBeGreaterThan(0)
-		expect(drawn.rules?.length ?? 0).toBeGreaterThan(0)
-		expect(drawn.strips).toStrictEqual([])
 	})
 })

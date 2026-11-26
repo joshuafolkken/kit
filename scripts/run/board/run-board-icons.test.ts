@@ -8,8 +8,8 @@ const { ICONS_ENV } = run_board_icons
 describe('run_board_icons.default_of', () => {
 	it.each([
 		{ theme: undefined, icons: 'emoji' },
-		{ theme: 'wargames', icons: 'shapes' },
-		{ theme: 'matrix', icons: 'shapes' },
+		{ theme: 'wopr', icons: 'shapes' },
+		{ theme: 'trace', icons: 'shapes' },
 	] as const)('draws $icons in $theme', ({ theme, icons }) => {
 		expect(run_board_icons.default_of(theme)).toBe(icons)
 	})
@@ -24,15 +24,15 @@ describe('run_board_icons.choose', () => {
 			icons: 'letters',
 		},
 		{ argv: [], env: { [ICONS_ENV]: 'shapes' }, theme: undefined, icons: 'shapes' },
-		{ argv: [], env: { [ICONS_ENV]: 'emoji' }, theme: 'wargames', icons: 'emoji' },
-		{ argv: [], env: { [ICONS_ENV]: '' }, theme: 'matrix', icons: 'shapes' },
+		{ argv: [], env: { [ICONS_ENV]: 'emoji' }, theme: 'wopr', icons: 'emoji' },
+		{ argv: [], env: { [ICONS_ENV]: '' }, theme: 'trace', icons: 'shapes' },
 		{ argv: [], env: {}, theme: undefined, icons: 'emoji' },
 	] as const)('takes $icons from $argv and $env in $theme', ({ argv, env, theme, icons }) => {
 		expect(run_board_icons.choose(argv, env, theme)).toStrictEqual({ icons, argv: [] })
 	})
 
 	it('leaves the arguments past the flag', () => {
-		expect(run_board_icons.choose(['--once', '--icons', 'emoji'], {}, 'wargames')).toStrictEqual({
+		expect(run_board_icons.choose(['--once', '--icons', 'emoji'], {}, 'wopr')).toStrictEqual({
 			icons: 'emoji',
 			argv: ['--once'],
 		})

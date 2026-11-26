@@ -4,6 +4,7 @@ import { run_board_heap, type HeapProbes, type HeapWatch } from './run-board-hea
 import { run_board_screen } from './run-board-screen'
 import { run_board_stall, type StallProbes, type StallWatch } from './run-board-stall'
 import type { BoardPorts, DrawKind, DrawTimer } from './run-board-state'
+import { run_board_timing_frames, type FrameStats } from './run-board-timing-frames'
 
 // `josh run:board --timing` (joshuafolkken/kit#7929): what the first board waited on, said once the
 // board is done — after the frame `--once` draws, or after a live board leaves its screen. Each phase
@@ -48,11 +49,13 @@ interface TimingReads {
 	probes?: TimingProbes | undefined
 }
 
-// The stalls, the heaps and how late each spinner wake ran past its due time (joshuafolkken/kit#8902).
+// The stalls, the heaps and how late each spinner wake ran past its due time (joshuafolkken/kit#8902),
+// and each frame's compose time and bytes (joshuafolkken/kit#8917).
 interface Watching {
 	stalls: StallWatch
 	heap: HeapWatch
 	wakes: Array<number>
+	frames: FrameStats
 }
 
 interface TimingArgv {
@@ -140,10 +143,14 @@ function reporting(
 		leave()
 		watching.stalls.stop()
 		watching.heap.stop()
+		run_board_timing_frames.stop()
 		timing.receive = undefined
 		const wake_rows = run_board_stall.lag_rows(SPIN_WAKE_ROW, watching.wakes)
+		const frame_rows = run_board_timing_frames.rows(watching.frames)
 
-		ports.write(report(draws, [...watching.stalls.rows(), ...wake_rows], watching.heap.rows()))
+		ports.write(
+			report(draws, [...frame_rows, ...watching.stalls.rows(), ...wake_rows], watching.heap.rows()),
+		)
 	}
 }
 
@@ -152,7 +159,12 @@ function watch(ports: BoardPorts, probes: TimingProbes): Watching {
 	const timer = probes.heap ?? { main: run_board_heap.main, every: probes.every }
 	const heap = run_board_heap.watch({ ...timer, worker: ports.worker_heap })
 
-	return { stalls: run_board_stall.watch(probes), heap, wakes: [] }
+	return {
+		stalls: run_board_stall.watch(probes),
+		heap,
+		wakes: [],
+		frames: run_board_timing_frames.watch(),
+	}
 }
 
 // Times each draw into `draws`, by its kind — its own time, less the sections timed inside it (a cue

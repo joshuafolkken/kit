@@ -93,17 +93,17 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 Draw a live board of the running backlogrun, redrawn every second.
 
 ```bash
-pnpm josh run:board                    # redraw until interrupted
-pnpm josh run:board --once             # one frame, then exit
-pnpm josh run:board --chat             # one frame for a chat, recorded as a progress report
-pnpm josh run:board --chat --fresh     # the same, read from scratch past the one-minute record
-pnpm josh run:board --every 5          # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
-pnpm josh run:board --theme wargames   # cyan phosphor text and dashed rules
-pnpm josh run:board --theme matrix     # green phosphor text and the TRACE gauge
-pnpm josh run:board --theme bttf       # grey text, slate rules, header in time-circuit colors
-pnpm josh run:board --icons letters    # every icon as two-letter capitals
-pnpm josh run:board --once --timing    # one frame, then how long each phase of it took
-pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
+pnpm josh run:board                     # redraw until interrupted
+pnpm josh run:board --once              # one frame, then exit
+pnpm josh run:board --chat              # one frame for a chat, recorded as a progress report
+pnpm josh run:board --chat --fresh      # the same, read from scratch past the one-minute record
+pnpm josh run:board --every 5           # the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends
+pnpm josh run:board --theme wopr        # the WOPR board, its opening, events and DEFCON
+pnpm josh run:board --theme trace       # the trace program’s rain and its TRACE gauge
+pnpm josh run:board --theme metalgear   # an alias: the codec board
+pnpm josh run:board --icons letters     # every icon as two-letter capitals
+pnpm josh run:board --once --timing     # one frame, then how long each phase of it took
+pnpm josh run:board --frame --mute      # one live frame, muted, at a fixed size
 ```
 
 **Options:**
@@ -112,26 +112,14 @@ pnpm josh run:board --frame --mute     # one live frame, muted, at a fixed size
 - `--once` / `--chat` — each keeps the frame it drew for one minute, per checkout (`--once` per theme and per terminal or pipe); asked again within the minute, it writes that frame with a `recorded <N>s ago` line, read nothing. The age counts from when the read began.
 - `--fresh` — with `--chat`: reads from scratch past the record, and records what it drew; the `run:handoff-lanes` chain passes it right after a merge.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
-- `--theme wargames` — draws uncolored text in phosphor cyan, rules as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board (`backlogrun` too), `--theme` wins. A live board types its opening line, reveals its first frame block by block, left to right, 75 ms a line (a key skips it), then types each new issue row, `█` after it. Unknown names are refused; `--chat` and `--every` never take it.
-- `--theme wargames` — draws the board as a text terminal does: the text in capitals (escapes and link URLs as written) and the spinner as `│ ╱ ─ ╲`; each icon as `--icons` draws it, `shapes` unless set; the columns line up as without it.
+- `--theme <value>` — draws a live board in a theme, each the work its board is named after: `wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`. `JOSH_BOARD_THEME=<value>` sets it for every board (`backlogrun` too), `--theme` wins; unknown names are refused; `--chat` and `--every` never take it.
+- `--theme <alias>` — read as the value it names: `wargames` (wopr), `matrix` (trace), `bttf` and `backtothefuture` (flux), `metalgear` and `mgs` (codec), `steinsgate` and `sg` (nixie), `terminator` (skynet), `evangelion` and `eva` (magi).
+- `--theme <value>` — the theme host draws it (`run-board-theme-registry.ts`): the theme’s opening (a key skips it), its idle board, its PROGRESS, ROW and NOTICE as the board’s events arrive, its spinner and the clock colons, its level over the throughput rule, and its ending on Ctrl-C (any key leaves at once). Only in 24-bit color: a terminal without it, or no TTY, draws the board in no theme.
+- `--theme <value>` — the base under the theme is drawn in one palette the host reads back as roles (`run-board-theme-defs.ts` → `BASE_LOOK`), with the lamp panel the theme lays its panel out by (`run-board-lamps.ts`); a single frame (`--once`, `--frame`) in a theme draws that base.
+- `--theme <value>` — sounds: the typing trill while a row types and the opening’s sound — wopr the teletype, trace the key click, flux the time-circuit keypad and its ENTER; codec, nixie, skynet and magi the teletype for now.
 - `--icons <emoji|letters|shapes>` — `emoji` as drawn; `letters` as ASCII of their width (`🚨` → `P1`; `run-board-theme-glyphs.ts`); `shapes` a state as a shape where it has one (`🔄` → `>>`, `🔗` → `<-`, `⏸` → `║`). Unset: `emoji` with no theme, else `shapes`. No theme: tone color only. `JOSH_BOARD_ICONS` sets it, `--icons` wins; unknown names refused; not for `--chat` / `--every`.
-- `--theme wargames` — drops an icon drawn beside the label that says what it marks (`CPU`, `QUEUED`), keeping one before a value (`CP 67%`): in a column’s rule its place is the rule, a heading reads `V -- NAME`, a row label moves into its place. One helper marks them (`run-board-label-pair.ts`); no theme and `--chat` draw as before.
-- `--theme wargames` — colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`\O`), green done (`OK`), bold white in progress (`>>`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.
-- `--theme wargames` — ends the `📈 throughput` rule on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.
-- `--theme wargames` — no alert while throughput is unread or cut for height: only that rule carries it.
-- `--theme wargames` / `--theme matrix` — names the board `JOSH-WOPR` / `josh-trace` in place of `josh-board`, in the header and the no-run line (`run-board-theme-defs.ts` → `name`).
-- `--theme wargames` — a live board runs a WOPR lamp panel on `24h`, `7d`, the blank line and usage’s first two provider rows (both or neither): past `NOW`, a `■` every other column to the throughput rule’s end, yellow, yellow, red, yellow, red, out in dimmed half yellow on every row (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.
-- `--theme wargames` — bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).
-- `--theme matrix` — draws as `--theme wargames` does, red and amber kept, with the text as written (only `wargames` draws capitals; `run-board-theme-defs.ts` → `capitals`), uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No lamps or typed rows.
-- `--theme matrix` — a live board types three lead lines in bright green, erasing each, then shows `Knock, knock, Josh.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.
-- `--theme matrix` — a live board traces a new header notice between redraws: its letters spin as rain glyphs and lock from the left, then a green inverse bar blinks and the notice stays bright a while; the change flash leaves its columns alone. A notice already there when the board opens draws as it is; none with no TTY or color (`run-board-notice-turn.ts`, `run-board-notice-trace.ts`).
-- `--theme bttf` — names the board `josh-flux` and types its opening line as written; no alert sound. The keypad beeps every two letters while any row types, and ENTER once each has typed through (`run-board-sound-keypad.ts`, `run-board-sound-enter.ts`).
-- `--theme bttf` — every row that starts typing on a live board starts the time jump, which jumps on the tick after its last letter; a row that starts while a jump runs starts none, one that starts once it has thawed does (`run-board-jump-start.ts`).
-- `--theme bttf` — a live board draws the flux capacitor in the lamp panel’s place: a lamp gauge right-aligned at the throughput rule’s end, the Y of lamps left of it with its red bar, and the speed readout `NN.N` in the throughput rule over the Y; the gauge moves only when the speed range changes (`run-board-flux-panel.ts`). None where the WOPR lamp panel would not show.
-- `--theme bttf` — uncolored text in grey, dim text at 55% of it, `─` rules in slate; state colors kept.
-- `--theme bttf` — the header’s rows in the time circuits’ red, green and amber, the colon at 30% (`run-board-tint.ts`).
+- `--theme <value>` — drops an icon drawn beside the label that says what it marks (`CPU`, `QUEUED`), keeping one before a value (`CP 67%`): in a column’s rule its place is the rule, a heading reads `V -- NAME`, a row label moves into its place. One helper marks them (`run-board-label-pair.ts`); no theme and `--chat` draw as before.
 - `--frame` — one live-form frame in a state its flags fix, for reading what only a live board draws; no frame record, cue or screen control (`run-board-frame-preview.ts`). `--notice <row state>` (`running`, `merged`, …) with `--issue <n>` and `--repeat` (`×2`) sets the notice; `--mute` draws `🔇`; `--columns` / `--rows` the size (120×40); `--ansi` keeps SGR.
-- `--frame` — draws a theme’s animation area (the `bttf` flux capacitor) as a live board’s first turn does: over the plain text, or under `--ansi` as cursor writes after the frame.
 - `--timing` — after the `--once` frame, or once a live board leaves its screen, writes how long each phase of the first frame took (ms). `--chat`, `--every` and `--frame` ignore it.
 - `--timing` — on a live board, adds each kind of draw's max and median, then its main-thread stalls of 200 ms or more: their count, and the longest ten each with its length, the loop's stage that held it (`redraw` or `turn`), the GC within it and when it began (`at`, ms from the screen taken; `run-board-stall.ts`).
 - `--timing` — on a live board, `wake lag` is the stall probe’s lateness and `spin wake lag` each spinner wake’s past its due time: max, median and the wakes over 50 ms.
@@ -175,7 +163,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-In wargames, a live board sweeps `■` once a second across twenty cells below the third line, ending five cells past the age's `″`. Working, watching and human-waiting runs sweep, offline too; stopped and ended runs do not. The line must be empty and on screen. No theme, matrix, `--once`, `--chat` and Telegram draw none. The spinner turns only while working.
+The spinner turns only while working.
 
 Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` in 12-hour cells (a sparkline of closes per cell scaled to the row's peak, `┊` a stopped cell; then columns two apart, labeled without icons, each label ending where its figures end and each column as wide as its widest figure or its fewest characters (`99.9`, `168h`, four-digit closes): `/h` closes per active hour over complete cells, `ACTIVE` active hours (`17h`), `DONE` closes, `PEAK` the peak cell's rate, `NOW` closes this hour; folded with `t`; a themed screen ends its rule on the alert level, the rule keeping its width); then the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (window label, percent, `┊` at even pace, `≈N` tasks left at the spend per task of the last ten done logs, the reset time, and `N′` the reading's age once it is over ten minutes old; read off lane logs and Codex rollout files, no API asked; folded with `u`), and GitHub's `rest` and `graphql` allowances in the same columns, the calls left in place of `≈N`, then a row per touched child (phase icon, time net of host stops per `lane:net`, `(+2′30″)` the sleeps and network outages joined (an outage to a tick, only since the probe began), CPU and memory, then `🎯 HH:MM` its finish from the lane totals the header's 🎯 reads, `MM-DD HH:MM` on another day, with `+N′` past a minute later than the finish its launch foretold, `🎯 —` where no lane total is measured — the time left-aligned and the `+N′` right-aligned across the running rows — and last the newest activity's icon and age, or the checks a held or followup row draws in its place; a parked row ends on its reason and `🎯 —`, a decision row on its reason alone), then an earlier run's lane holding a place (drawn alike, `🧳` after its title in the finish column it draws none of, never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
@@ -281,11 +269,11 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` 
 
 <!-- usage: board:replay -->
 
-Replay the live board on a virtual clock and a seed, one JSON beat line per beat it writes.
+Replay the live board on a virtual clock, one JSON beat line per beat it writes; `--seed` is taken and ignored.
 
 ```bash
-pnpm josh board:replay --theme bttf --seed 1            # the bttf arrival, each beat 50 ms apart
-pnpm josh board:replay --theme matrix --seed 2 --at 0   # the rain another seed draws
+pnpm josh board:replay --theme flux           # the flux opening, each beat 50 ms apart, in 24-bit color
+pnpm josh board:replay --theme trace --at 0   # the trace board from the epoch
 ```
 
 <!-- /usage -->
@@ -297,15 +285,15 @@ pnpm josh board:replay --theme matrix --seed 2 --at 0   # the rain another seed 
 Compare a theme demo and the replayed board cell by cell per beat; exit 1 at the first divergence.
 
 ```bash
-pnpm josh board:compare <demo.mjs> --theme bttf             # cell by cell
-pnpm josh board:compare <demo.mjs> --theme matrix --loose   # glyph and color sets
+pnpm josh board:compare <demo.mjs> --theme flux            # cell by cell
+pnpm josh board:compare <demo.mjs> --theme trace --loose   # glyph and color sets
 ```
 
 <!-- /usage -->
 
 Both streams (`DEMO_BEATS=1`, `board:replay`) run through `@xterm/headless`; screens pair by write time (`board-compare-diff.ts`).
 
-The gate's golden check (`tools/board/board-golden.test.ts`): each theme in `THEMES` (`tools/board/board-golden.ts`) is replayed on the unit-test fixture (seed 1, one redraw, 100×30).
+The gate's golden check (`tools/board/board-golden.test.ts`): each theme in `THEMES` (`tools/board/board-golden.ts`) is replayed on the unit-test fixture (one redraw, 100×30; the replay ignores `--seed`).
 
 - Each replay is compared cell by cell with its recorded one in `tools/board/golden/<theme>.jsonl.gz` (the `board:replay` beat lines, gzipped).
 - A moved cell fails the unit tests with the first diverging moment, its beat and the cells that differ.

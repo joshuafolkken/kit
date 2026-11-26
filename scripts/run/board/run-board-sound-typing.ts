@@ -10,6 +10,9 @@ import { run_board_sound_wav } from './run-board-sound-wav'
 // notice. It is apart from the cues (`run-board-sound-cues.ts`): no tier, transition or repeat rule
 // reaches it, so a cue sounds over it.
 
+// The events a theme sounds as they start (joshuafolkken/kit#8917).
+type EventKind = 'notice' | 'row' | 'progress'
+
 const NAME = 'teletype'
 const TELETYPE: ReadonlyArray<Note> = [
 	{ pitch: 'Bb5', ms: 25, wave: 'sine' },
@@ -27,7 +30,16 @@ const NOTES: ReadonlyArray<Note> = Array.from({ length: TRILL_PAIRS }, () => TEL
 interface TypingSound {
 	set: (is_on: boolean, left_ms?: number, ended?: () => void) => void
 	stop: () => void
+	// The trill ended for now, as a new event's sound starts: the next `set` on starts it again.
+	hush?: (() => void) | undefined
 	typed?: (() => void) | undefined
+	// The theme's sound of an event played once as the event starts, `letters` its text's length
+	// (joshuafolkken/kit#8917).
+	event?: ((kind: EventKind, letters: number) => void) | undefined
+	// The theme's sound of a part played once as the part starts, `ms` its length.
+	part?: ((name: 'opening' | 'ending', ms: number) => void) | undefined
+	// The trill sounded in the voice `file` gives from here on (joshuafolkken/kit#8917).
+	revoice?: ((file: () => string | undefined) => void) | undefined
 }
 
 interface TypingPorts {
@@ -175,6 +187,30 @@ function set(held: Held, ports: TypingPorts, switched: Switch): void {
 	ended?.()
 }
 
+function stop(held: Held): void {
+	held.is_stopped = true
+	held.is_on = false
+	disarm(held)
+	silence(held)
+}
+
+// The trill ended for now, its stop timer with it; unlike `stop`, the next `set` on starts it again.
+function hush(held: Held, ports: TypingPorts): void {
+	turn(held, ports, false)
+	disarm(held)
+}
+
+// The trill in another voice (joshuafolkken/kit#8917: demo mode switches the theme): its WAV read again
+// at the next start, and a sounding player ended and the new voice begun in its place.
+function revoice(held: Held, voice: { ports: TypingPorts }, file: () => string | undefined): void {
+	if (held.is_stopped || voice.ports.file === file) return
+	voice.ports = { ...voice.ports, file }
+	held.file = undefined
+	if (held.child === undefined) return
+	silence(held)
+	begin(held, voice.ports)
+}
+
 // The board's trill, off until a line types; `stop` ends it for good as the board closes.
 function typing_sound(ports: TypingPorts = DEFAULT_PORTS): TypingSound {
 	const held: Held = {
@@ -185,16 +221,20 @@ function typing_sound(ports: TypingPorts = DEFAULT_PORTS): TypingSound {
 		generation: undefined,
 		disarm: undefined,
 	}
+	const voice = { ports }
 
 	return {
 		set: (is_on, left_ms, ended) => {
-			set(held, ports, { is_on, left_ms, ended })
+			set(held, voice.ports, { is_on, left_ms, ended })
 		},
 		stop: () => {
-			held.is_stopped = true
-			held.is_on = false
-			disarm(held)
-			silence(held)
+			stop(held)
+		},
+		hush: () => {
+			hush(held, voice.ports)
+		},
+		revoice: (file) => {
+			revoice(held, voice, file)
 		},
 	}
 }
@@ -210,4 +250,4 @@ const run_board_sound_typing = {
 }
 
 export { run_board_sound_typing }
-export type { TypingPorts, TypingSound }
+export type { EventKind, TypingPorts, TypingSound }

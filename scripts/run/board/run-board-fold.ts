@@ -8,7 +8,6 @@ import {
 	type SectionKey,
 	type TerminalSize,
 } from './run-board-fit'
-import { run_board_flash_parts } from './run-board-flash-parts'
 import { run_board_lamps, type PanelSpan } from './run-board-lamps'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_spot } from './run-board-spot'
@@ -39,7 +38,6 @@ const KEYS_LINE = ` ${[...SECTION_KEYS.keys()].join(' ')}: fold · ${ALL_KEY}: a
 // The live terminal a frame is kept within, the footer the frame ends on and gives way first, and the
 // sections a person folded; none for a frame that is not redrawn in place, which is drawn as it was.
 interface FrameBounds {
-	is_flash_keyed?: boolean | undefined
 	size?: TerminalSize | undefined
 	footer?: ReadonlyArray<string> | undefined
 	folded?: ReadonlySet<SectionKey> | undefined
@@ -281,7 +279,7 @@ function lamped_parts(parts: FrameParts): FrameParts {
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size, folded } = bounds
 	const ruled = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
-	const shown = run_board_flash_parts.keyed(lamped_parts(ruled), bounds.is_flash_keyed)
+	const shown = lamped_parts(ruled)
 
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }

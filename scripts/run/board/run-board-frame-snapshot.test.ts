@@ -8,8 +8,8 @@ import { run_board_fixture } from './run-board-fixture'
 
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const LIVE_LOOKS = [
-	['wargames', ['--theme', 'wargames']],
-	['matrix', ['--theme', 'matrix']],
+	['wopr', ['--theme', 'wopr']],
+	['trace', ['--theme', 'trace']],
 	['no theme', []],
 ] as const
 

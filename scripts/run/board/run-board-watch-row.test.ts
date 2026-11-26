@@ -102,7 +102,7 @@ describe('watch_row of a pin the run holds a row for', () => {
 describe('watch_row icon set', () => {
 	it('draws its icon in the icon set the board draws, as wide as the emoji', () => {
 		const line = watch_row(header(), open_pin())
-		const letters = run_board_theme.restyle('wargames', line, 'letters')
+		const letters = run_board_theme.restyle('wopr', line, 'letters')
 
 		expect(letters).not.toContain(STATE_ICONS.waiting)
 		expect(run_board_fit.width_of(letters)).toBe(run_board_fit.width_of(line))

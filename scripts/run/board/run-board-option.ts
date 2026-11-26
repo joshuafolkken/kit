@@ -7,6 +7,9 @@ interface OptionSpec<Name extends string> {
 	env: string
 	noun: string
 	names: ReadonlyArray<Name>
+	// joshuafolkken/kit#8917: the name another one given stands for — an alias read as the name it names
+	// where the option is parsed, so the board holds only `names`; none takes each name as it is.
+	aliases?: ReadonlyMap<string, Name> | undefined
 }
 
 interface Named {
@@ -41,8 +44,13 @@ function from_environment(
 	return { name: name === '' ? undefined : name, argv: [...argv] }
 }
 
-// The name the flag gives, else the variable's, with the arguments left; `undefined` for a name the
-// setting does not have.
+// The setting's name `name` is or stands for; none where it is neither.
+function named_of<Name extends string>(name: string, spec: OptionSpec<Name>): Name | undefined {
+	return spec.names.find((candidate) => candidate === name) ?? spec.aliases?.get(name)
+}
+
+// The name the flag gives, else the variable's, an alias read as the name it stands for, with the
+// arguments left; `undefined` for a name the setting does not have.
 function choose<Name extends string>(
 	argv: ReadonlyArray<string>,
 	environment: NodeJS.ProcessEnv,
@@ -52,7 +60,7 @@ function choose<Name extends string>(
 		from_flag(argv, spec.flag) ?? from_environment(argv, environment, spec.env)
 
 	if (name === undefined) return { name: undefined, argv: rest }
-	const found = spec.names.find((candidate) => candidate === name)
+	const found = named_of(name, spec)
 
 	return found === undefined ? undefined : { name: found, argv: rest }
 }

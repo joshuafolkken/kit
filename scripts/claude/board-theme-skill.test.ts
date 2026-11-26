@@ -3,7 +3,7 @@ import { closeSync, openSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { epic_chain_kind } from '#scripts/epic/epic-chain-kind'
 import { package_path } from '#scripts/init/init-paths'
-import { run_board_seeded } from '#scripts/run/board/run-board-seeded'
+import { run_board_seeded } from '#scripts/run/board/run-board-seeded-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 
@@ -186,7 +186,7 @@ describe('board-theme demo template beats form', () => {
 		expect(output).toBe('')
 	})
 
-	it('seeds random() with the sequence run-board-seeded.ts draws', async () => {
+	it('seeds random() with the sequence run-board-seeded-fixture.ts draws', async () => {
 		const template_seeded = await seeded_of(code)
 		const [from_template, from_board] = [template_seeded(SEED), run_board_seeded.seeded(SEED)]
 
@@ -256,7 +256,7 @@ describe('board-theme skill theme split', () => {
 	it.each([
 		"the theme's row in `THEME_DEFS` with every field",
 		'the colors',
-		'the switches of the existing effects',
+		'the sound palette',
 		'the signal each effect reads',
 		'the draw order',
 		'the shared timing constants',
@@ -300,7 +300,7 @@ describe('board-theme skill render cost', () => {
 	it.each([
 		'#8825, `scripts/run/board/run-board-composite-budget.test.ts`',
 		'stays green',
-		'wargames, matrix and bttf, each run on the real board with its opening',
+		'`magi`), each run on the real',
 		'`pnpm josh run:board --timing --theme <theme>`',
 		'stall and wake lag no worse than',
 		'baseline recorded on #8904',

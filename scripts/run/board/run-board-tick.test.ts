@@ -161,7 +161,7 @@ describe('run_board_tick.tick reads', () => {
 	it('names the board after the screen’s theme when no run has started', async () => {
 		const { ports, frames } = harness(undefined, [plan_titled('a')])
 
-		await tick(FRESH_STATE, { ...ports, theme: 'matrix' })
+		await tick(FRESH_STATE, { ...ports, theme: 'trace' })
 
 		expect(stripVTControlCharacters(frames.at(-1) ?? '')).toMatch(/■ josh-trace/iu)
 	})

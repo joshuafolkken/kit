@@ -1,12 +1,18 @@
+import { run_board_theme_aliases } from '#scripts/run/board/run-board-theme-aliases'
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 // The run's progress, board and hand-off commands, split out of `josh-commands-run.ts` when each
 // command's usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so
 // the map keeps its order.
 
-const BOARD_THEME = '--theme wargames'
-const MATRIX_THEME = '--theme matrix'
-const BTTF_THEME = '--theme bttf'
+// joshuafolkken/kit#8917: the `--theme` values — the board's name after `josh-` — and their aliases,
+// read off `run-board-theme-defs.ts` (`THEMES`, `THEME_ALIASES`), so the usage never drifts from them.
+const THEME_VALUES = run_board_theme_aliases.value_text()
+const THEME_ALIAS_TEXT = run_board_theme_aliases.alias_text()
+const THEME_FLAG = '--theme <value>'
+const WOPR_THEME = '--theme wopr'
+const TRACE_THEME = '--theme trace'
+const FLUX_THEME = '--theme flux'
 
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
@@ -60,7 +66,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wargames|matrix|bttf] [--icons emoji|letters|shapes] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wopr|trace|flux|codec|nixie|skynet|magi] [--icons emoji|letters|shapes] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -77,9 +83,9 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '--every 5',
 					note: 'the --chat frame as a 📊 Progress Telegram every 5 minutes, until the run ends',
 				},
-				{ arguments: BOARD_THEME, note: 'cyan phosphor text and dashed rules' },
-				{ arguments: MATRIX_THEME, note: 'green phosphor text and the TRACE gauge' },
-				{ arguments: BTTF_THEME, note: 'grey text, slate rules, header in time-circuit colors' },
+				{ arguments: WOPR_THEME, note: 'the WOPR board, its opening, events and DEFCON' },
+				{ arguments: TRACE_THEME, note: 'the trace program’s rain and its TRACE gauge' },
+				{ arguments: '--theme metalgear', note: 'an alias: the codec board' },
 				{ arguments: '--icons letters', note: 'every icon as two-letter capitals' },
 				{ arguments: '--once --timing', note: 'one frame, then how long each phase of it took' },
 				{ arguments: '--frame --mute', note: 'one live frame, muted, at a fixed size' },
@@ -106,14 +112,27 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 						'sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.',
 				},
 				{
-					names: [BOARD_THEME],
-					description:
-						'draws uncolored text in phosphor cyan, rules as `-`; `JOSH_BOARD_THEME=wargames` sets it for every board (`backlogrun` too), `--theme` wins. A live board types its opening line, reveals its first frame block by block, left to right, 75 ms a line (a key skips it), then types each new issue row, `█` after it. Unknown names are refused; `--chat` and `--every` never take it.',
+					names: [THEME_FLAG],
+					description: `draws a live board in a theme, each the work its board is named after: ${THEME_VALUES}. \`JOSH_BOARD_THEME=<value>\` sets it for every board (\`backlogrun\` too), \`--theme\` wins; unknown names are refused; \`--chat\` and \`--every\` never take it.`,
 				},
 				{
-					names: [BOARD_THEME],
+					names: ['--theme <alias>'],
+					description: `read as the value it names: ${THEME_ALIAS_TEXT}.`,
+				},
+				{
+					names: [THEME_FLAG],
 					description:
-						'draws the board as a text terminal does: the text in capitals (escapes and link URLs as written) and the spinner as `│ ╱ ─ ╲`; each icon as `--icons` draws it, `shapes` unless set; the columns line up as without it.',
+						'the theme host draws it (`run-board-theme-registry.ts`): the theme’s opening (a key skips it), its idle board, its PROGRESS, ROW and NOTICE as the board’s events arrive, its spinner and the clock colons, its level over the throughput rule, and its ending on Ctrl-C (any key leaves at once). Only in 24-bit color: a terminal without it, or no TTY, draws the board in no theme.',
+				},
+				{
+					names: [THEME_FLAG],
+					description:
+						'the base under the theme is drawn in one palette the host reads back as roles (`run-board-theme-defs.ts` → `BASE_LOOK`), with the lamp panel the theme lays its panel out by (`run-board-lamps.ts`); a single frame (`--once`, `--frame`) in a theme draws that base.',
+				},
+				{
+					names: [THEME_FLAG],
+					description:
+						'sounds: the typing trill while a row types and the opening’s sound — wopr the teletype, trace the key click, flux the time-circuit keypad and its ENTER; codec, nixie, skynet and magi the teletype for now.',
 				},
 				{
 					names: ['--icons <emoji|letters|shapes>'],
@@ -121,89 +140,14 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 						'`emoji` as drawn; `letters` as ASCII of their width (`🚨` → `P1`; `run-board-theme-glyphs.ts`); `shapes` a state as a shape where it has one (`🔄` → `>>`, `🔗` → `<-`, `⏸` → `║`). Unset: `emoji` with no theme, else `shapes`. No theme: tone color only. `JOSH_BOARD_ICONS` sets it, `--icons` wins; unknown names refused; not for `--chat` / `--every`.',
 				},
 				{
-					names: [BOARD_THEME],
+					names: [THEME_FLAG],
 					description:
 						'drops an icon drawn beside the label that says what it marks (`CPU`, `QUEUED`), keeping one before a value (`CP 67%`): in a column’s rule its place is the rule, a heading reads `V -- NAME`, a row label moves into its place. One helper marks them (`run-board-label-pair.ts`); no theme and `--chat` draw as before.',
-				},
-				{
-					names: [BOARD_THEME],
-					description:
-						'colors each icon’s text by the state it marks, then resumes the cyan: red fault (`FL`), amber caution (`JG`), magenta a person’s turn (`\\O`), green done (`OK`), bold white in progress (`>>`), dim cyan idle (`ZZ`), the rest cyan (tones in the glyph table, colors in `run-board-theme-tones.ts`). Text inside a color already drawn keeps it; no escapes without color.',
-				},
-				{
-					names: [BOARD_THEME],
-					description:
-						'ends the `📈 throughput` rule on the alert level, `DEFCON 5 4 [3] 2 1`: the current level bracketed, green (5), amber (4, 3) or red (2, 1). The lowest level whose condition holds wins — 1 the run is stopped, out of its usage or failing its reads · 2 a person is asked to decide · 3 a `P1` waits while a lane is free · 4 more lanes run than the limit · 5 none of these.',
-				},
-				{
-					names: [BOARD_THEME],
-					description:
-						'no alert while throughput is unread or cut for height: only that rule carries it.',
-				},
-				{
-					names: [BOARD_THEME, MATRIX_THEME],
-					description:
-						'names the board `JOSH-WOPR` / `josh-trace` in place of `josh-board`, in the header and the no-run line (`run-board-theme-defs.ts` → `name`).',
-				},
-				{
-					names: [BOARD_THEME],
-					description:
-						'a live board runs a WOPR lamp panel on `24h`, `7d`, the blank line and usage’s first two provider rows (both or neither): past `NOW`, a `■` every other column to the throughput rule’s end, yellow, yellow, red, yellow, red, out in dimmed half yellow on every row (`run-board-lamps.ts`). None with no theme, `--once`, `--chat`, `--every`, no TTY or color, or under 8 lamps.',
-				},
-				{
-					names: [BOARD_THEME],
-					description:
-						'bursts the lamp panel while a row types (the header’s third line, a section’s new row): the groups of four, each on its own period, all change every 80ms step, back to their periods from the step after typing ends (`run-board-spin.ts`).',
-				},
-				{
-					names: [MATRIX_THEME],
-					description:
-						'draws as `--theme wargames` does, red and amber kept, with the text as written (only `wargames` draws capitals; `run-board-theme-defs.ts` → `capitals`), uncolored text in green phosphor (`green` without 24-bit color) and `TRACE ■■■■-` in place of `DEFCON`: one more `■` per level nearer 1, blinking red at 1 (`run-board-header-trace.ts`). No lamps or typed rows.',
-				},
-				{
-					names: [MATRIX_THEME],
-					description:
-						'a live board types three lead lines in bright green, erasing each, then shows `Knock, knock, Josh.` at once (`run-board-theme-defs.ts`); a key skips it. None with no TTY or color.',
-				},
-				{
-					names: [MATRIX_THEME],
-					description:
-						'a live board traces a new header notice between redraws: its letters spin as rain glyphs and lock from the left, then a green inverse bar blinks and the notice stays bright a while; the change flash leaves its columns alone. A notice already there when the board opens draws as it is; none with no TTY or color (`run-board-notice-turn.ts`, `run-board-notice-trace.ts`).',
-				},
-				{
-					names: [BTTF_THEME],
-					description:
-						'names the board `josh-flux` and types its opening line as written; no alert sound. The keypad beeps every two letters while any row types, and ENTER once each has typed through (`run-board-sound-keypad.ts`, `run-board-sound-enter.ts`).',
-				},
-				{
-					names: [BTTF_THEME],
-					description:
-						'every row that starts typing on a live board starts the time jump, which jumps on the tick after its last letter; a row that starts while a jump runs starts none, one that starts once it has thawed does (`run-board-jump-start.ts`).',
-				},
-				{
-					names: [BTTF_THEME],
-					description:
-						'a live board draws the flux capacitor in the lamp panel’s place: a lamp gauge right-aligned at the throughput rule’s end, the Y of lamps left of it with its red bar, and the speed readout `NN.N` in the throughput rule over the Y; the gauge moves only when the speed range changes (`run-board-flux-panel.ts`). None where the WOPR lamp panel would not show.',
-				},
-				{
-					names: [BTTF_THEME],
-					description:
-						'uncolored text in grey, dim text at 55% of it, `─` rules in slate; state colors kept.',
-				},
-				{
-					names: [BTTF_THEME],
-					description:
-						'the header’s rows in the time circuits’ red, green and amber, the colon at 30% (`run-board-tint.ts`).',
 				},
 				{
 					names: ['--frame'],
 					description:
 						'one live-form frame in a state its flags fix, for reading what only a live board draws; no frame record, cue or screen control (`run-board-frame-preview.ts`). `--notice <row state>` (`running`, `merged`, …) with `--issue <n>` and `--repeat` (`×2`) sets the notice; `--mute` draws `🔇`; `--columns` / `--rows` the size (120×40); `--ansi` keeps SGR.',
-				},
-				{
-					names: ['--frame'],
-					description:
-						'draws a theme’s animation area (the `bttf` flux capacitor) as a live board’s first turn does: over the plain text, or under `--ansi` as cursor writes after the frame.',
 				},
 				{
 					names: ['--timing'],
@@ -282,18 +226,18 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		// Its imports reach `run:board`'s Telegram sender, which the replay never calls; `.env` loads as there.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
-			'Replay the live board on a virtual clock and a seed, one JSON beat line per beat it writes',
+			'Replay the live board on a virtual clock, one JSON beat line per beat it writes; `--seed` is taken and ignored',
 		category: 'AI tools',
 		reference: [
-			'[--theme wargames|matrix|bttf] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]',
+			'[--theme wopr|trace|flux|codec|nixie|skynet|magi] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]',
 			'automation',
 			['files', 'network'],
 		],
 		is_read_only: true,
 		usage: {
 			examples: [
-				{ arguments: `${BTTF_THEME} --seed 1`, note: 'the bttf arrival, each beat 50 ms apart' },
-				{ arguments: `${MATRIX_THEME} --seed 2 --at 0`, note: 'the rain another seed draws' },
+				{ arguments: FLUX_THEME, note: 'the flux opening, each beat 50 ms apart, in 24-bit color' },
+				{ arguments: `${TRACE_THEME} --at 0`, note: 'the trace board from the epoch' },
 			],
 		},
 	},
@@ -315,8 +259,8 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		is_kit_only: true,
 		usage: {
 			examples: [
-				{ arguments: `<demo.mjs> ${BTTF_THEME}`, note: 'cell by cell' },
-				{ arguments: `<demo.mjs> ${MATRIX_THEME} --loose`, note: 'glyph and color sets' },
+				{ arguments: `<demo.mjs> ${FLUX_THEME}`, note: 'cell by cell' },
+				{ arguments: `<demo.mjs> ${TRACE_THEME} --loose`, note: 'glyph and color sets' },
 			],
 		},
 	},

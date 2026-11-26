@@ -117,6 +117,6 @@ describe('run_board_sound_keypad.typing_wav — the bttf keypad loop as a cached
 
 	it('keys the beats on the line the bttf theme types', () => {
 		expect(LINE).toBe("Roads? Where we're going, we don't need roads.")
-		expect(run_board_theme_defs.THEME_DEFS.bttf.intro.line).toBe(LINE)
+		expect(run_board_theme_defs.THEME_DEFS.flux.intro.line).toBe(LINE)
 	})
 })

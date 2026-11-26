@@ -99,6 +99,17 @@ function fire_late(fake: FakeProbes, late_ms: number): void {
 	fake.fire()
 }
 
+// A sleep that moves `clock` on by what it sleeps once, then stops the loop the way an interrupt would.
+function clocked_stopper(clock: { now_ms: number }): (ms: number) => Promise<void> {
+	let slept = 0
+
+	return async (ms) => {
+		slept += 1
+		if (slept > 1) throw STOPPED
+		clock.now_ms += ms
+	}
+}
+
 // A stage mark that keeps every stage entered.
 function marker(stages: Array<StallStage>): (stage: StallStage) => void {
 	return (stage) => {
@@ -251,12 +262,16 @@ describe('run_board_timing.timed stalls', () => {
 })
 
 describe('run_board_live.watch stages', () => {
+	// joshuafolkken/kit#8917: a still second waits on the clock until its end, so the sleep moves it.
 	it('marks the redraws and the turns between in order', async () => {
-		const { ports } = harness(undefined, [])
+		const { ports, clock } = harness(undefined, [])
 		const stages: Array<StallStage> = []
 		const enter_stage = marker(stages)
+		const sleep = clocked_stopper(clock)
 
-		await expect(run_board_live.watch({ ...ports, enter_stage }, undefined)).rejects.toBe(STOPPED)
+		await expect(run_board_live.watch({ ...ports, enter_stage, sleep }, undefined)).rejects.toBe(
+			STOPPED,
+		)
 
 		expect(stages).toStrictEqual(['redraw', 'turn', 'redraw', 'turn'])
 	})

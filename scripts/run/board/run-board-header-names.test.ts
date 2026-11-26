@@ -37,14 +37,14 @@ describe('run_board_header_names.names_of', () => {
 
 	// joshuafolkken/kit#8604: a themed screen names the board after its theme.
 	it.each([
-		['wargames', 'josh-wopr'],
-		['matrix', 'josh-trace'],
+		['wopr', 'josh-wopr'],
+		['trace', 'josh-trace'],
 	] as const)('names the board %s draws %s', (theme, name) => {
 		expect(names({ theme })[0]).toBe(`▶ [${name}](${KIT_URL})`)
 	})
 
 	it('keeps a single run’s own name in a themed screen too', () => {
-		expect(names({ theme: 'wargames', run_name: RUN_NAME })[0]).toBe(`▶ ${RUN_NAME}`)
+		expect(names({ theme: 'wopr', run_name: RUN_NAME })[0]).toBe(`▶ ${RUN_NAME}`)
 	})
 
 	it('draws the recorded kit version, linked to the releases, under the name', () => {

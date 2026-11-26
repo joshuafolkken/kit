@@ -1,4 +1,3 @@
-import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_row_key } from './run-board-row-key'
@@ -15,8 +14,8 @@ import { run_board_watch_panel } from './run-board-watch-panel'
 // joshuafolkken/kit#8607: a typing header row types its own words; the watch panel after its end mark
 // stays whole in its columns while it types.
 
-const { NO_TYPING, left_ms, next, typed_lines } = run_board_type_rows
-const LETTER_MS = run_board_theme_defs.THEME_DEFS.wargames.intro.letter_ms
+const { NO_TYPING, left_ms, next } = run_board_type_rows
+const LETTER_MS = run_board_theme_defs.THEME_DEFS.wopr.intro.letter_ms
 const START = Date.parse('2026-11-19T09:00:00.000Z')
 const SECOND = 1000
 const RULE_WIDTH = 80
@@ -55,15 +54,6 @@ function typing_of(from: string, to: string): { lines: Array<string>; typing: Ty
 }
 
 describe('run_board_type_rows with a suffix', () => {
-	it('keeps the pin row whole at its column while the now line types', () => {
-		const { lines, typing } = typing_of(WAS, IS)
-		const [typed = ''] = typed_lines(lines, typing, START + SECOND + LETTER_MS)
-		const plain = stripVTControlCharacters(typed)
-
-		expect(plain.endsWith(PIN)).toBe(true)
-		expect(run_board_fit.width_of(plain)).toBe(RULE_WIDTH)
-	})
-
 	it('draws the frame line with the pin row after the words, the end mark taken out', () => {
 		const [drawn = ''] = spun_of(now_line(IS)).lines
 

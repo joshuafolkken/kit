@@ -6,8 +6,6 @@ import type { NamedFigure, ProcessGroups } from './run-board-process-groups'
 import { run_board_render_lanes } from './run-board-render-lanes'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_title } from './run-board-render-title'
-import { run_board_row_key } from './run-board-row-key'
-import { run_board_theme_defs } from './run-board-theme-defs'
 import type { UsageFigure, UsageScale } from './run-board-usage'
 import { run_board_usage_text } from './run-board-usage-text'
 
@@ -104,8 +102,8 @@ function named_group(
 	)
 }
 
-// The supervisor's row is keyed by its pid, so the matrix board sees another one take over
-// (joshuafolkken/kit#8470, `run_board_frame_diff.events`).
+// The supervisor's row is keyed by its pid, so the board sees another one take over
+// (joshuafolkken/kit#8470).
 function supervisor_id(pid: number | undefined): string {
 	return pid === undefined ? 'supervisor' : `supervisor:${String(pid)}`
 }
@@ -149,16 +147,12 @@ function padded(text: string, width: number): string {
 	return `${text}${' '.repeat(Math.max(0, width - run_board_fit.width_of(text)))}`
 }
 
-function screen_part(usage: BoardUsage, is_flash_keyed: boolean): DetailPart {
+function screen_part(usage: BoardUsage): DetailPart {
 	const lines = labeled_of(usage).map((entry) => {
 		const cells = column_cells(entry.figure, usage.scale, GAUGE)
 
 		return {
-			text: run_board_row_key.flashed(
-				`${INDENT}${padded(label_text(entry), LABEL_WIDTH)}${CELL_GAP}${cells}`,
-				`process:${entry.id}`,
-				is_flash_keyed,
-			),
+			text: `${INDENT}${padded(label_text(entry), LABEL_WIDTH)}${CELL_GAP}${cells}`,
 			is_detail: entry.is_detail,
 		}
 	})
@@ -219,9 +213,7 @@ function processes_part(header: BoardHeader): DetailPart | undefined {
 
 	if (usages === undefined) return undefined
 
-	const is_flash_keyed = run_board_theme_defs.live_of(header.theme).flash === true
-	const part =
-		header.spinner === undefined ? plain_part(usages) : screen_part(usages, is_flash_keyed)
+	const part = header.spinner === undefined ? plain_part(usages) : screen_part(usages)
 	const tail = run_board_first_lane.part(header.activity)
 
 	return { ...part, label: LABEL, summary: summary_of(usages), tail }

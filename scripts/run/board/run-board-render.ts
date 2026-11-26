@@ -1,3 +1,4 @@
+import { run_board_demo_lanes } from './run-board-demo-lanes'
 import { run_board_faint } from './run-board-faint'
 import type { FrameParts, PlanLine, PlanSection, TerminalSize, YieldStage } from './run-board-fit'
 import { run_board_fold, type FrameBounds } from './run-board-fold'
@@ -31,9 +32,7 @@ import { run_board_row_key } from './run-board-row-key'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_rule_width } from './run-board-rule-width'
 import type { Thanks } from './run-board-thanks-csv'
-import { run_board_theme_defs } from './run-board-theme-defs'
 import type { ThroughputRow } from './run-board-throughput'
-import { run_board_tint } from './run-board-tint'
 import { run_board_watch_panel } from './run-board-watch-panel'
 import { run_board_watch_row } from './run-board-watch-row'
 
@@ -76,6 +75,9 @@ interface BoardView extends FrameBounds {
 	has_rule_lamps?: boolean | undefined
 	// The repository's pinned issues, drawn as the watch panel at the header's right.
 	pinned?: ReadonlyArray<PinnedIssue> | undefined
+	// Whether a lanes section with no lane of its own draws demo mode's sample lanes
+	// (`run-board-demo-lanes.ts`, joshuafolkken/kit#8917).
+	is_demo_lanes?: boolean | undefined
 }
 
 function bare(text: string): PlanLine {
@@ -166,18 +168,38 @@ function decision_frame(rows: ReadonlyArray<BoardRow>, frame: RowFrame): RowFram
 	return { ...frame, section: 'decision', title_limit }
 }
 
+// The lanes' rows; none of the run's own in demo mode draws its sample lanes instead, so its ROW has a
+// lane to type on (joshuafolkken/kit#8917).
+function lane_lines(
+	lead: ReadonlyArray<BoardRow>,
+	lane_frame: RowFrame,
+	is_demo_lanes: boolean | undefined,
+): Array<PlanLine> {
+	if (is_demo_lanes === true && lead.length === 0) {
+		return run_board_demo_lanes.lines_of(lane_frame.header.is_keyed === true, lane_frame.columns)
+	}
+
+	const shared = shared_overrun(lead, lane_frame)
+
+	return lead.map((row) =>
+		row_line(indent_of(row), row, { ...lane_frame, shared, section: 'lanes' }),
+	)
+}
+
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
 // ones waiting on a person's decision — a child parked on one and an untouched plan row alike
 // (joshuafolkken/kit#4099).
-function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+function active_sections(
+	layout: BoardLayout,
+	frame: RowFrame,
+	is_demo_lanes?: boolean,
+): Array<PlanSection> {
 	const people = run_board_layout.people_of(layout)
 	const lead = run_board_layout.lanes_drawn(layout)
 	const decision = pair(STATE_ICONS.human, WORDS.decision)
 	const cells = lane_cells_of(frame.header, lead)
-	const lane_frame = { ...frame, cells, is_lane_row: true }
-	const shared = shared_overrun(lead, lane_frame)
 	const lanes = lanes_section(
-		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared, section: 'lanes' })),
+		lane_lines(lead, { ...frame, cells, is_lane_row: true }, is_demo_lanes),
 		cells,
 		frame.header,
 		frame.columns,
@@ -215,36 +237,30 @@ function below_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 
 // The plan's rest under the findings, the 🔗 waiting rows giving way before them.
 function plan_parts(
-	header: BoardHeader,
-	notes: ReadonlyArray<BoardNote>,
-	size: TerminalSize | undefined,
+	view: BoardView,
 ): Pick<FrameParts, 'below' | 'columns' | 'plan'> & { rule_width: number } {
+	const { header, notes, size } = view
 	const { layout } = header
 	const frame = frame_of(header, notes, size)
 	const widths = { rule_width: run_board_rule_width.rule_width(frame), columns: size?.columns }
 
 	if (layout === undefined) return { plan: [], ...widths }
+	const plan = active_sections(layout, frame, view.is_demo_lanes)
 
-	return { plan: active_sections(layout, frame), ...widths, below: below_sections(layout, frame) }
+	return { plan, ...widths, below: below_sections(layout, frame) }
 }
 
-// The header with the pinned issues' watch panel at its right (joshuafolkken/kit#8607), each pin in its
-// header row's circuit where the theme has them (joshuafolkken/kit#8673), then the session a stopped
-// run resumes from.
+// The header with the pinned issues' watch panel at its right (joshuafolkken/kit#8607), then the
+// session a stopped run resumes from.
 function above_of(view: BoardView, rule_width: number): Array<string> {
 	const pins = (view.pinned ?? []).map((pin) => run_board_watch_row.watch_row(view.header, pin))
-	const rows = run_board_tint.circuit_cells(run_board_header.screen_theme(view.header), pins)
 	const header = run_board_header.header_lines(view.header)
 
-	return [...run_board_watch_panel.composed(header, rows, rule_width), ...resume_lines(view.resume)]
+	return [...run_board_watch_panel.composed(header, pins, rule_width), ...resume_lines(view.resume)]
 }
 
-// The throughput and usage sections, their rows keyed for the change flash where the theme flashes
-// (joshuafolkken/kit#8353).
-function figure_parts(
-	view: BoardView,
-	is_flash_keyed: boolean,
-): Pick<FrameParts, 'throughput' | 'usage'> {
+// The throughput and usage sections.
+function figure_parts(view: BoardView): Pick<FrameParts, 'throughput' | 'usage'> {
 	const { header, has_lamps } = view
 
 	return {
@@ -252,25 +268,22 @@ function figure_parts(
 			view.throughput,
 			has_lamps,
 			run_board_header.alert_part(header),
-			is_flash_keyed,
 		),
 		usage: run_board_render_quota.usage_part({
 			...header,
 			hold: header.quota_hold,
 			has_lamps,
 			has_rule_lamps: view.has_rule_lamps,
-			is_flash_keyed,
 		}),
 	}
 }
 
 function render(view: BoardView): Array<string> {
 	const { header, notes } = view
-	const plan = plan_parts(header, notes, view.size)
-	const is_flash_keyed = run_board_theme_defs.live_of(header.theme).flash === true
+	const plan = plan_parts(view)
 	const parts = {
 		above: above_of(view, plan.rule_width),
-		...figure_parts(view, is_flash_keyed),
+		...figure_parts(view),
 		...plan,
 		processes: run_board_render_processes.processes_part(header),
 		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),
@@ -279,7 +292,7 @@ function render(view: BoardView): Array<string> {
 		footer: view.footer ?? [],
 	}
 
-	return run_board_label_pair.settled(bounded(parts, { ...view, is_flash_keyed }), header)
+	return run_board_label_pair.settled(bounded(parts, view), header)
 }
 
 const run_board_render = {

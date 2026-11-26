@@ -1,11 +1,9 @@
-import { run_board_idle_rain, type RainMoment } from './run-board-idle-rain'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_spot } from './run-board-spot'
 
 // The lamp panel's cells on screen (joshuafolkken/kit#8236), placed as the spinners are
-// (`run-board-spin.ts`): the frame draws every lamp out, and the theme's painter writes each cell as it
-// changes between redraws (`run-board-panel-draw.ts`), so no line of the frame changes from one step to
-// the next.
+// (`run-board-spin.ts`): the frame draws every lamp out, and a themed board's theme layer lays its panel
+// and area out by them (`run-board-theme-layout.ts`; joshuafolkken/kit#8917).
 
 const { LAMP, spot_at } = run_board_spot
 const { place_of } = run_board_lamps
@@ -16,7 +14,7 @@ interface Lamp {
 	row: number
 	column: number
 	panel_row: number
-	// How many rows the frame's panel runs, which sets the idle rain's cycle (joshuafolkken/kit#8647).
+	// How many rows the frame's panel runs (joshuafolkken/kit#8647).
 	panel_rows: number
 	group: number
 	lamp: number
@@ -53,20 +51,7 @@ function lamps_in(
 	)
 }
 
-// The frame's lines with each of `lamps` drawn as the idle rain's cell `at`, so a rain frame's whole draw
-// writes no `■` for the turn to paint over (joshuafolkken/kit#8647); untouched with no `at`.
-function rained(
-	lines: ReadonlyArray<string>,
-	lamps: ReadonlyArray<Lamp>,
-	at: RainMoment | undefined,
-): Array<string> {
-	if (at === undefined) return [...lines]
-	const cells = lamps.map((lamp) => run_board_idle_rain.cell_text(lamp, at)).values()
-
-	return lines.map((line) => line.replaceAll(LAMP, () => cells.next().value ?? LAMP))
-}
-
-const run_board_lamp_spots = { lamps_in, rained }
+const run_board_lamp_spots = { lamps_in }
 
 export { run_board_lamp_spots }
 export type { Lamp }

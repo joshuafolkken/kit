@@ -3,31 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_lamps } from './run-board-lamps'
 import { run_board_spot } from './run-board-spot'
 
-// joshuafolkken/kit#8236: the WOPR lamp panel's pure parts — whether a lamp is lit at a moment, how many
-// fit, and the panel run on to the rule's end.
+// joshuafolkken/kit#8236: the lamp panel's pure parts — how many lamps fit, their colors, and the panel
+// run on to the rule's end.
 
-const {
-	LAMP_TICK_MS,
-	PANEL_ROWS,
-	count_of,
-	expanded,
-	is_colored,
-	is_lit,
-	lamp_text,
-	place_of,
-	start_column,
-	start_of,
-} = run_board_lamps
+const { PANEL_ROWS, count_of, expanded, is_colored, lamp_text, place_of, start_column, start_of } =
+	run_board_lamps
 const { LAMP, LAMP_START } = run_board_spot
 const LIT_YELLOW = '38;2;255;214;10'
 const LIT_RED = '38;2;255;69;58'
-const START = Date.parse('2026-11-20T09:00:00.000Z')
-const STEPS = 20_000
-const GROUPS = 12
-const LEAST_RATE = 0.35
-const MOST_RATE = 0.45
-const LEAST_PERIOD_STEPS = 3
-const MOST_PERIOD_STEPS = 18
 const ESCAPE = '\u{1B}'
 const BLINK = `${ESCAPE}[5m`
 const DIM = `${ESCAPE}[2m`
@@ -43,71 +26,6 @@ afterEach(() => {
 function lamps(count: number): string {
 	return Array.from({ length: count }, () => LAMP).join(' ')
 }
-
-// A group's four lamps at `step` steps past the start, as one string.
-function group_at(group: number, step: number, is_burst: boolean): string {
-	return [0, 1, 2, 3]
-		.map((lamp) => is_lit(START + step * LAMP_TICK_MS, group, lamp, is_burst))
-		.join(',')
-}
-
-// The steps a group's lamps changed on, over `steps` steps.
-function changes_of(group: number, steps: number, is_burst = false): Array<number> {
-	return Array.from({ length: steps }, (_, step) => step).filter(
-		(step) => step > 0 && group_at(group, step, is_burst) !== group_at(group, step - 1, is_burst),
-	)
-}
-
-function divisor_of(left: number, right: number): number {
-	return right === 0 ? left : divisor_of(right, left % right)
-}
-
-// The period a group's changes keep: the greatest common divisor of the steps between them.
-function period_of(changes: ReadonlyArray<number>): number {
-	const gaps = changes.slice(1).map((step, index) => step - (changes[index] ?? 0))
-
-	let period = 0
-
-	for (const gap of gaps) period = divisor_of(period, gap)
-
-	return period
-}
-
-describe('run_board_lamps.is_lit', () => {
-	it('answers the same for the same moment, group and lamp', () => {
-		const moments = [START, START + 1234, START + 98_765]
-
-		for (const now_ms of moments) {
-			expect(is_lit(now_ms, 3, 2, false)).toBe(is_lit(now_ms, 3, 2, false))
-		}
-	})
-
-	it('lights about four lamps in ten over a long time', () => {
-		const lit = Array.from({ length: STEPS }, (_, step) =>
-			is_lit(START + step * LAMP_TICK_MS, step % GROUPS, step % 4, false),
-		).filter(Boolean).length
-
-		expect(lit / STEPS).toBeGreaterThanOrEqual(LEAST_RATE)
-		expect(lit / STEPS).toBeLessThanOrEqual(MOST_RATE)
-	})
-
-	it('holds a group between its own changes, which come every 3 to 18 steps', () => {
-		const periods = Array.from({ length: GROUPS }, (_, group) => period_of(changes_of(group, 400)))
-
-		expect(Math.min(...periods)).toBeGreaterThanOrEqual(LEAST_PERIOD_STEPS)
-		expect(Math.max(...periods)).toBeLessThanOrEqual(MOST_PERIOD_STEPS)
-	})
-
-	it('gives the groups their own periods and phases', () => {
-		const firsts = Array.from({ length: GROUPS }, (_, group) => changes_of(group, 100).join(','))
-
-		expect(new Set(firsts).size).toBeGreaterThan(GROUPS / 2)
-	})
-
-	it('changes a group on nearly every step in a burst', () => {
-		expect(changes_of(1, 100, true).length).toBeGreaterThan(changes_of(1, 100).length * 2)
-	})
-})
 
 describe('run_board_lamps.count_of', () => {
 	it.each([
@@ -204,15 +122,5 @@ describe('run_board_lamps colors', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 
 		expect(is_colored()).toBe(false)
-	})
-})
-
-describe('run_board_lamps.look_text (joshuafolkken/kit#8376)', () => {
-	it('draws a strip’s lamps in the panel’s own yellow, red and out', () => {
-		vi.stubEnv('FORCE_COLOR', '3')
-
-		expect(run_board_lamps.look_text('yellow')).toBe(lamp_text(0, true))
-		expect(run_board_lamps.look_text('red')).toBe(lamp_text(PANEL_ROWS.rule, true))
-		expect(run_board_lamps.look_text('out')).toBe(lamp_text(0, false))
 	})
 })

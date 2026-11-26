@@ -1,59 +1,43 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import { run_board_change_flash } from './run-board-change-flash'
-import { run_board_codes, type RuleCell } from './run-board-codes'
 import type { TerminalSize } from './run-board-fit'
 import { run_board_frame_loop, type FrameScreen } from './run-board-frame-loop'
 import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
 import { run_board_layer, type Layer } from './run-board-layer'
-import { run_board_layer_effects } from './run-board-layer-effects'
 import { run_board_layer_spin } from './run-board-layer-spin'
-import { run_board_notice_turn } from './run-board-notice-turn'
-import {
-	run_board_panel_draw as panel_draw,
-	type PanelArea,
-	type PanelMoment,
-} from './run-board-panel-draw'
 import { run_board_spin_place } from './run-board-spin-place'
 import { run_board_spin_turn, type SpinPorts, type Turning } from './run-board-spin-turn'
 import { run_board_spot, type Spot } from './run-board-spot'
-import { run_board_strip, type StripCell } from './run-board-strip'
-import type { Sweep } from './run-board-sweep'
-import { run_board_trace_spot } from './run-board-trace-spot'
+import { run_board_theme_events } from './run-board-theme-events'
+import { run_board_theme_layer } from './run-board-theme-layer'
+import type { LayoutView } from './run-board-theme-layout'
+import { run_board_theme_run, type ThemeRun } from './run-board-theme-run'
 import { run_board_type_rows, type KeyedLine } from './run-board-type-rows'
 
-// The spinners of a live `run:board` frame turned between redraws. The frame
-// is redrawn once a second, on the second, and between redraws only the spinners' own cells are written
-// at the package's interval: a cursor move and one character each, with no read, layout or render. The
-// renderer draws a placeholder where a spinner goes, and each placeholder's place on screen — its row
-// after the lines above it wrap, its column by display width — is recorded as the frame is written. A
-// row the frame was cut to the terminal's rows without is not on screen, so it records nothing. The
-// sweep under the third line's age (`run-board-sweep.ts`) is placed the same way, by its own placeholder.
-// What one wake writes is `run-board-spin-turn.ts`'s.
+// The spinners of a live `run:board` frame turned between redraws. The frame is redrawn once a second,
+// on the second, and between redraws only the spinners' own cells change: the renderer draws a
+// placeholder where a spinner goes, and each placeholder's place on screen — its row after the lines
+// above it wrap, its column by display width — is recorded as the frame is written. A row the frame was
+// cut to the terminal's rows without is not on screen, so it records nothing. A themed board's second is
+// drawn by its theme layer instead (joshuafolkken/kit#8917), laid out by the lamp panel's lamps and the
+// keyed rows recorded here. What one wake writes is the frame loop's (`run-board-frame-loop.ts`).
 
 const { COLON, SPOT } = run_board_spot
-const { can_type, keyed_of, marks_in, starts_of, sweep_in } = run_board_spin_place
-const { blinking, colons_of, traces_of } = run_board_spin_turn
+const { can_type, keyed_of, marks_in, starts_of } = run_board_spin_place
+const { colons_of } = run_board_spin_turn
 const REDRAW_MS = MS_PER_SECOND
 
-// The frame's lines as written, its spinners' spots, its keyed rows on screen, without their keys, the
-// sweep where the frame has room for one and its lamps (`run-board-lamp-spots.ts`).
+// The frame's lines as written, its spinners' spots, its keyed rows on screen, without their keys, and
+// its lamps (`run-board-lamp-spots.ts`).
 interface Spun {
 	lines: Array<string>
 	spots: Array<Spot>
 	keyed: Array<KeyedLine>
-	sweep: Sweep | undefined
 	lamps: Array<Lamp>
-	area: PanelArea | undefined
-	traces: Array<Spot>
-	rules: Array<RuleCell>
-	strips: Array<StripCell>
 }
 
-// The terminal a frame is spun for and the idle rain's moment its lamps are drawn at; none, an unbounded
-// screen and no rain.
+// The terminal a frame is spun for; none, an unbounded screen.
 interface SpinView {
 	size?: TerminalSize | undefined
-	rain?: PanelMoment | undefined
 }
 
 // The screen's rows and columns, at least one column; none unbounded.
@@ -70,26 +54,17 @@ function on_screen<Cell extends { row: number }>(
 }
 
 // The frame with each placeholder drawn as `frame` and each key taken out, every placeholder's spot on
-// screen, the keyed rows that can type and the sweep; a rain frame's lamps drawn as the idle rain's cells
-// at `rain` (joshuafolkken/kit#8647). No `size` spins an unbounded screen.
-function spun(lines: ReadonlyArray<string>, frame: string, { size, rain }: SpinView = {}): Spun {
+// screen, the keyed rows that can type and the lamps. No `size` spins an unbounded screen.
+function spun(lines: ReadonlyArray<string>, frame: string, { size }: SpinView = {}): Spun {
 	const { columns, rows } = screen_of(size)
 	const starts = starts_of(lines, columns)
-	const found = run_board_lamp_spots.lamps_in(lines, starts, columns)
-	const drawn = keyed_of(run_board_lamp_spots.rained(lines, found, rain), frame, starts)
-	const lamps = on_screen(found, rows)
-	const rules = on_screen(run_board_codes.rule_cells(lines, starts, columns), rows)
+	const drawn = keyed_of(lines, frame, starts)
 
 	return {
 		lines: drawn.lines,
 		spots: marks_in(lines, SPOT, starts, { rows, columns }),
 		keyed: drawn.keyed.filter((line) => can_type(line, rows, columns)),
-		sweep: sweep_in(lines, starts, { rows, columns }),
-		lamps,
-		area: panel_draw.area_of(lines, starts, lamps),
-		traces: on_screen(run_board_trace_spot.traces_in(lines, starts, columns), rows),
-		rules,
-		strips: run_board_strip.strip_cells(lines, starts, { lamps, rules }),
+		lamps: on_screen(run_board_lamp_spots.lamps_in(lines, starts, columns), rows),
 	}
 }
 
@@ -102,62 +77,112 @@ function colons_in(lines: ReadonlyArray<string>, size?: TerminalSize): Array<Spo
 	return marks_in(lines, COLON, starts_of(lines, columns), bounds)
 }
 
-function is_falling(turning: Turning): boolean {
-	return turning.sweep !== undefined || turning.drop !== undefined
-}
-
-function has_effects(turning: Turning): boolean {
-	const is_moving = is_falling(turning) || turning.jump !== undefined
-	const is_blinking = blinking(turning).length > 0 || traces_of(turning).length > 0
-
-	return is_moving || is_blinking || run_board_notice_turn.is_placed(turning.notice_trace)
-}
-
-// A frame with no spinner, sweep, typing row, blinking lamp, flashing cell or clock colon writes
-// nothing between redraws; the colons, drawn lit with the frame, need no write before their first
-// half second.
+// A frame with no spinner, typing row or clock colon writes nothing between redraws; the colons, drawn
+// lit with the frame, need no write before their first half second.
 function is_still(turning: Turning): boolean {
 	const is_bare = turning.spots.length === 0 && colons_of(turning).length === 0
-	// The flash is written over the frame with it, so it needs no write before its first turn.
-	const is_dark = !has_effects(turning) && !run_board_change_flash.is_lit(turning.flash)
 
-	return is_bare && turning.typing.lines.length === 0 && is_dark
+	return is_bare && turning.typing.lines.length === 0
 }
 
-// The frame's layers in the order they are drawn, the redraw at the bottom; the spinners and the rows
-// typing restyled by the theme, the rest drawn past it.
+// joshuafolkken/kit#8917: the theme run that draws this second — a theme chosen, on the themed ports
+// (the plain ones, `run-board-live.ts` plain_of, carry the run but no theme); none otherwise. A frame
+// with no lamp panel on screen (a folded section, a short pane) keeps its theme, which then draws no area
+// parts (`run-board-theme-layout.ts`).
+function themed_run(ports: SpinPorts): ThemeRun | undefined {
+	const run = ports.theme_run
+
+	if (run === undefined || ports.theme === undefined) return undefined
+
+	return run_board_theme_run.is_drawn(run) ? run : undefined
+}
+
+// What the theme layer lays a themed second out by (`run-board-theme-layout.ts`).
+function view_of(turning: Turning, run: ThemeRun): LayoutView {
+	return {
+		lamps: turning.lamps ?? [],
+		keyed: turning.keyed ?? [],
+		colons: colons_of(turning),
+		spots: turning.spots,
+		row_key: run_board_theme_events.row_key_of(run.events),
+		dated_clocks: turning.dated_clocks,
+	}
+}
+
+// The frame's layers in the order they are drawn, the redraw at the bottom: in no theme the spinners,
+// restyled by the theme's restyle; a themed second the theme layer alone over the redraw — it types,
+// turns the spinners and blinks the colons itself.
 function layers_of(turning: Turning, ports: SpinPorts, screen: FrameScreen): Array<Layer> {
-	const restyle = ports.restyle ?? String
+	const base = run_board_frame_loop.base_layer(screen)
+	const run = themed_run(ports)
 
-	return [
-		run_board_frame_loop.base_layer(screen),
-		...run_board_layer_effects.under(turning),
-		run_board_layer_spin.spin_layer(turning, restyle),
-		run_board_layer_spin.typing_layer(turning, restyle),
-		...run_board_layer_effects.over(turning),
-	]
+	if (run !== undefined) {
+		return [base, run_board_theme_layer.theme_layer(run, view_of(turning, run))]
+	}
+
+	return [base, run_board_layer_spin.spin_layer(turning, ports.restyle ?? String)]
 }
 
-// Draws the redraw on `screen`, then turns the spinners, moves the sweep and types the rows until the
-// next second; a still frame just waits. The trill sounds while a row is still typing, off once every
-// row is typed through (joshuafolkken/kit#8250).
+// The theme run told of this second: the board's level, the events its newly typing rows start, and an
+// opening that cannot play ended.
+function observed(turning: Turning, ports: SpinPorts): void {
+	const run = ports.theme_run
+
+	if (run === undefined) return
+	run.level = turning.alert_level
+	// The rows' words as the board draws them — the theme's marks for the board's emoji — so the theme
+	// types what the base shows (joshuafolkken/kit#8917).
+	const restyle = ports.restyle ?? String
+	const lines = turning.typing.lines.map((line) => ({ ...line, text: restyle(line.text) }))
+
+	run_board_theme_run.observe(run, lines, ports.now())
+	run_board_theme_run.settle(run, themed_run(ports) !== undefined)
+}
+
+// The trill while a row is still typing, off once every row is typed through (joshuafolkken/kit#8250);
+// on a themed board, with its opening's sound (`run-board-theme-sound.ts`).
+function sounded(turning: Turning, ports: SpinPorts, at_ms: number): void {
+	const { typing } = turning
+	const board = {
+		is_on: run_board_type_rows.is_typing(typing, at_ms),
+		left_ms: run_board_type_rows.left_ms(typing, at_ms),
+	}
+
+	if (ports.theme_run === undefined) ports.typing_sound?.set(board.is_on, board.left_ms)
+	else run_board_theme_layer.after_frame(ports.theme_run, ports.typing_sound, at_ms, board)
+}
+
+// joshuafolkken/kit#8917: whether the board still shows the look this second was laid out in; a switch
+// in demo mode ends it, so the next redraw draws the base in the new look before its first frame — the
+// old base (the green lamp panel the themed board is laid out on) never shows under the new one.
+function current_check(ports: SpinPorts): (() => boolean) | undefined {
+	const run = ports.theme_run
+
+	if (run === undefined) return undefined
+	const { shown } = run
+
+	return () => run.shown === shown
+}
+
+// Draws the redraw on `screen`, then turns the spinners — or draws the theme — until the next second;
+// a still frame just waits — one the theme draws never is; a theme run showing none (a board launched
+// in no theme, Issue 4-4) is still as a board without one.
 async function spin_to_second(
 	turning: Turning,
 	ports: SpinPorts,
 	screen: FrameScreen,
 ): Promise<void> {
-	const { typing } = turning
+	observed(turning, ports)
 
 	await run_board_frame_loop.run(
 		{
 			layers: layers_of(turning, ports, screen),
 			until_ms: run_board_layer.boundary_after(ports.now(), REDRAW_MS),
-			is_still: is_still(turning),
-			after_frame: (at_ms) =>
-				ports.typing_sound?.set(
-					run_board_type_rows.is_typing(typing, at_ms),
-					run_board_type_rows.left_ms(typing, at_ms),
-				),
+			is_still: themed_run(ports) === undefined && is_still(turning),
+			after_frame: (at_ms) => {
+				sounded(turning, ports, at_ms)
+			},
+			is_current: current_check(ports),
 		},
 		ports,
 		screen,

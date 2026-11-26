@@ -105,6 +105,7 @@ const run_board_cells = {
 	BLANK,
 	CONTINUATION,
 	DEFAULT_STYLE,
+	MAX_STYLE,
 	UNSET,
 	cells_of,
 	char_id,

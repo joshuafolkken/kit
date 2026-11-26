@@ -12,7 +12,6 @@ import {
 	type GithubRateLimit,
 } from './run-board-render-quota-github'
 import { run_board_render_section } from './run-board-render-section'
-import { run_board_row_key } from './run-board-row-key'
 
 // The `⛽ usage` section (joshuafolkken/kit#5395): Claude's and Codex's usage-limit windows, one row
 // each, drawing only the windows the provider reported, shortest first, straight after the name
@@ -78,7 +77,6 @@ interface QuotaHold {
 }
 
 interface QuotaView {
-	is_flash_keyed?: boolean | undefined
 	quotas?: Quotas | undefined
 	scheduler_provider?: QuotaProvider | undefined
 	now_ms: number
@@ -245,11 +243,7 @@ function row_of(provider: QuotaProvider, view: QuotaView, is_short: boolean): Ro
 		provider === 'claude' && hold !== undefined
 			? { text: hold_text(hold, now_ms) }
 			: reading_text(view.quotas?.[provider], now_ms, is_short)
-	const text = run_board_row_key.flashed(
-		`${INDENT}${name_cell(name_of(provider, view))}${body.text}`,
-		`quota:${provider}`,
-		view.is_flash_keyed,
-	)
+	const text = `${INDENT}${name_cell(name_of(provider, view))}${body.text}`
 
 	return { text, aside: body.aside }
 }
@@ -279,11 +273,7 @@ function counts_text(reading: QuotaReading | undefined, now_ms: number): string 
 function github_text(view: QuotaView, rate_limit: GithubRateLimit, is_short: boolean): string {
 	const body = run_board_render_quota_github.row_text(rate_limit, view.now_ms, is_short)
 
-	return run_board_row_key.flashed(
-		`${INDENT}${name_cell(name_of('github', view))}${body}`,
-		'quota:github',
-		view.is_flash_keyed,
-	)
+	return `${INDENT}${name_cell(name_of('github', view))}${body}`
 }
 
 // Nothing where the allowances could not be read; gauge-less, starting the panel's last row, where the

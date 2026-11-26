@@ -1,6 +1,5 @@
 // The five sound cues `run:board` plays, as note definitions in three tiers (joshuafolkken/kit#7946).
-// A rising figure marks a start or a success and a falling one a fault; sine is information, square
-// a warning, so a cue tells its tier by ear. When several cues fall due at once, the highest tier sounds.
+// When several cues fall due at once, the highest tier sounds.
 
 import { run_board_sound_synth, type Note } from './run-board-sound-synth'
 
@@ -17,51 +16,30 @@ const { REST } = run_board_sound_synth
 // Lowest tier first: a tier outranks every tier before it.
 const TIER_ORDER: ReadonlyArray<Tier> = ['info', 'action', 'alert']
 
-const ALERT_REPEATS = 3
-// One falling figure of about a second; the trailing rest parts it from the next repeat.
-const ALERT_FIGURE: ReadonlyArray<Note> = [
-	{ pitch: 'E5', ms: 300, wave: 'square' },
-	{ pitch: 'C5', ms: 300, wave: 'square' },
-	{ pitch: 'A4', ms: 300, wave: 'square' },
-	{ pitch: REST, ms: 100, wave: 'square' },
-]
+// joshuafolkken/kit#8917: the board in no theme sounds as plainly as it draws — a small, short click as
+// a row or a progress line shows (the info tier), soft rising notes as a notice shows (the action and
+// alert tiers, the alert a step higher). A themed board plays none of these: its score sounds instead.
+const CLICK: ReadonlyArray<Note> = [{ pitch: 'C7', ms: 12, wave: 'sine' }]
 
 const CUES: Readonly<Record<CueName, Cue>> = {
-	launch: {
-		tier: 'info',
-		notes: [
-			{ pitch: 'C5', ms: 120, wave: 'sine' },
-			{ pitch: 'G5', ms: 130, wave: 'sine' },
-		],
-	},
-	'lane-end': {
-		tier: 'info',
-		notes: [
-			{ pitch: 'C5', ms: 150, wave: 'sine' },
-			{ pitch: 'E5', ms: 150, wave: 'sine' },
-			{ pitch: 'G5', ms: 200, wave: 'sine' },
-		],
-	},
-	drain: {
-		tier: 'info',
-		notes: [
-			{ pitch: 'C5', ms: 250, wave: 'sine' },
-			{ pitch: 'E5', ms: 250, wave: 'sine' },
-			{ pitch: 'G5', ms: 250, wave: 'sine' },
-			{ pitch: 'C6', ms: 250, wave: 'sine' },
-		],
-	},
+	launch: { tier: 'info', notes: CLICK },
+	'lane-end': { tier: 'info', notes: CLICK },
+	drain: { tier: 'info', notes: CLICK },
 	human: {
 		tier: 'action',
 		notes: [
-			{ pitch: 'A5', ms: 450, wave: 'triangle' },
-			{ pitch: REST, ms: 100, wave: 'triangle' },
-			{ pitch: 'A5', ms: 450, wave: 'triangle' },
+			{ pitch: 'E5', ms: 120, wave: 'sine' },
+			{ pitch: REST, ms: 40, wave: 'sine' },
+			{ pitch: 'A5', ms: 180, wave: 'sine' },
 		],
 	},
 	alert: {
 		tier: 'alert',
-		notes: Array.from({ length: ALERT_REPEATS }, () => ALERT_FIGURE).flat(),
+		notes: [
+			{ pitch: 'G5', ms: 120, wave: 'sine' },
+			{ pitch: REST, ms: 40, wave: 'sine' },
+			{ pitch: 'C6', ms: 180, wave: 'sine' },
+		],
 	},
 }
 

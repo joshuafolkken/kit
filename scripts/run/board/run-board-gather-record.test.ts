@@ -222,9 +222,9 @@ describe('run_board_gather_record.round_recorder’s frames', () => {
 	] as const)(
 		'keys the once frame by the theme, icons %s and terminal it was started with (#8505)',
 		(icons, clock) => {
-			const setup: RecordSetup = { ...SETUP, theme: 'wargames', icons, is_tty: false }
+			const setup: RecordSetup = { ...SETUP, theme: 'wopr', icons, is_tty: false }
 			const { store, saves } = recorded(setup, round_of(START))
-			const key = once_key('wargames', false, icons)
+			const key = once_key('wopr', false, icons)
 
 			expect(saves).toContain(key)
 			expect(store.load(key)?.text).toContain(`${clock} `)
@@ -318,6 +318,6 @@ describe('run_board_gather_record.link', () => {
 
 describe('run_board_gather_record.setup_of', () => {
 	it('carries the board’s theme', () => {
-		expect(run_board_gather_record.setup_of('wargames').theme).toBe('wargames')
+		expect(run_board_gather_record.setup_of('wopr').theme).toBe('wopr')
 	})
 })

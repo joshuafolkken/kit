@@ -71,7 +71,7 @@ describe('run_board processes rule -- time to first lane', () => {
 
 	it('draws the span as `TO` at the rule end in the wargames theme', () => {
 		const rule = processes_rule(lines_with(2 * MINUTE))
-		const themed = stripVTControlCharacters(run_board_theme.restyle('wargames', rule))
+		const themed = stripVTControlCharacters(run_board_theme.restyle('wopr', rule))
 
 		expect(themed).toMatch(/-- TO 2′00″$/u)
 		expect(run_board_fit.width_of(themed)).toBe(run_board_fit.width_of(rule))

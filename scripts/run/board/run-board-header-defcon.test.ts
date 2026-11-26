@@ -8,8 +8,8 @@ import { run_board_theme_defs } from './run-board-theme-defs'
 
 const { field_of, level_of } = run_board_header_defcon
 const { EMPTY_LAYOUT, NOW, header } = run_board_render_fixture
-const { THEME_DEFS } = run_board_theme_defs
-const WARGAMES = { theme: 'wargames' } as const
+const { BASE_LOOK } = run_board_theme_defs
+const WARGAMES = { theme: 'wopr' } as const
 const LANES = 3
 const HALTED = 1
 const ASKING = 2
@@ -166,16 +166,17 @@ function alert_of(extra: Partial<BoardHeader>): string | undefined {
 // joshuafolkken/kit#8513: the level rides the throughput rule's right end; the header draws it on no line.
 describe('run_board_header.alert_part', () => {
 	it('draws the level on a themed screen alone, and on no header line', () => {
-		expect(alert_of(WARGAMES)).toBe('DEFCON [5] 4 3 2 1')
+		expect(alert_of(WARGAMES)).toBe('TRACE ■----')
 		expect(alert_of({})).toBeUndefined()
 		expect(alert_of({ ...WARGAMES, form: 'chat' })).toBeUndefined()
-		expect(header_line(0, WARGAMES)).not.toContain('DEFCON')
-		expect(header_line(1, WARGAMES)).not.toContain('DEFCON')
+		expect(header_line(0, WARGAMES)).not.toContain('TRACE')
+		expect(header_line(1, WARGAMES)).not.toContain('TRACE')
 	})
 
-	// The theme's board name (joshuafolkken/kit#8604) is the one change.
+	// The theme's board name (joshuafolkken/kit#8604) is the one change; the names column keeps its 15
+	// columns (joshuafolkken/kit#8917), so the shorter name is padded to the plain one's place.
 	it('leaves the header of a themed screen as the plain one draws it but the board name', () => {
-		expect(header_line(0, WARGAMES)).toBe(header_line(0, {}).replace('josh-board', 'josh-wopr'))
+		expect(header_line(0, WARGAMES)).toBe(header_line(0, {}).replace('josh-board', 'josh-wopr '))
 	})
 
 	// A chat frame recorded off a themed live board keeps `josh-board`, as `--chat` draws no theme.
@@ -184,17 +185,17 @@ describe('run_board_header.alert_part', () => {
 	})
 })
 
-// joshuafolkken/kit#8358: the theme's row picks how the level is drawn; the level stays shared.
+// joshuafolkken/kit#8358: the base look picks how the level is drawn (joshuafolkken/kit#8917); the level stays shared.
 describe('run_board_header.alert_part with the theme row alert', () => {
-	it('draws the alert the theme row names, at the shared level', () => {
-		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert').mockReturnValue('ALERT')
+	it('draws the alert the base look names, at the shared level', () => {
+		const alert = vi.spyOn(BASE_LOOK, 'alert').mockReturnValue('ALERT')
 
 		expect(alert_of(WARGAMES)).toBe('ALERT')
 		expect(alert).toHaveBeenCalledWith(CALM)
 	})
 
 	it('draws no alert where no theme is drawn', () => {
-		const alert = vi.spyOn(THEME_DEFS.wargames, 'alert')
+		const alert = vi.spyOn(BASE_LOOK, 'alert')
 
 		alert_of({})
 

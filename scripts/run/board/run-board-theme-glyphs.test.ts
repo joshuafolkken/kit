@@ -6,12 +6,16 @@ import { run_board_fit } from './run-board-fit'
 import { run_board_icons } from './run-board-icons'
 import { run_board_labels } from './run-board-labels'
 import { run_board_theme } from './run-board-theme'
+import { run_board_theme_defs } from './run-board-theme-defs'
 import { run_board_theme_glyphs } from './run-board-theme-glyphs'
 import { run_board_theme_tones, type Tone } from './run-board-theme-tones'
 
 // joshuafolkken/kit#7988: the WarGames theme's icons as text; joshuafolkken/kit#8150: in their tones.
 
-const { EMOJI, SYMBOLS, TURN, textual } = run_board_theme_glyphs
+// joshuafolkken/kit#8917: every themed board turns the base look's spinner, its idle tone the base's.
+const { EMOJI, SYMBOLS, textual } = run_board_theme_glyphs
+const { BASE_LOOK } = run_board_theme_defs
+const TURN = [...BASE_LOOK.spinner]
 const BOARD = import.meta.dirname
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/gu
 // Printable ASCII, or one box-drawing character as the rules and gauges the theme keeps (#8505).
@@ -137,7 +141,7 @@ describe('run_board_theme_glyphs table', () => {
 
 	it.each(['🎯', '🕒', '🚀'])('never draws %s as `?` in any icons (#8505)', (glyph) => {
 		for (const icons of run_board_icons.ICONS) {
-			expect(textual(glyph, { theme: 'wargames', icons }).trim()).not.toBe('?')
+			expect(textual(glyph, { theme: 'wopr', icons }).trim()).not.toBe('?')
 		}
 	})
 
@@ -165,7 +169,7 @@ describe(TEXTUAL, () => {
 	})
 
 	it('draws the same icons as their letters where the icons are `letters` (#8505)', () => {
-		expect(textual('🔄|🔗|⏸|', { theme: 'wargames', icons: 'letters' })).toBe('RN|LK|=|')
+		expect(textual('🔄|🔗|⏸|', { theme: 'wopr', icons: 'letters' })).toBe('RN|LK|=|')
 	})
 
 	it('keeps every icon and the spinner with no theme and `emoji` (#8505)', () => {
@@ -192,16 +196,16 @@ describe('run_board_theme_glyphs themed spinners', () => {
 		vi.stubEnv('FORCE_COLOR', '0')
 	})
 
-	it('maps all matrix spinner frames to one-column kana in order (ac-6bea4c04)', () => {
+	it('maps all base spinner frames to one-column kana in order (ac-6bea4c04)', () => {
 		const turns = run_board_labels.SPINNER_FRAMES.map((frame) =>
-			textual(frame, { theme: 'matrix', icons: 'shapes' }),
+			textual(frame, { theme: 'trace', icons: 'shapes' }),
 		)
 
 		expect(turns.join('')).toBe(KANA)
 		expect(turns.map((glyph) => run_board_fit.width_of(glyph))).toStrictEqual(turns.map(() => 1))
 	})
 
-	it.each(['wargames', 'matrix'] as const)(
+	it.each(['wopr', 'trace'] as const)(
 		'draws a waiting run as `║` and a running one as `>>` on the %s board (#8505)',
 		(theme) => {
 			expect(run_board_theme.restyle(theme, '⏸ SITE 🔄 1')).toBe('║ SITE >> 1')
@@ -214,11 +218,11 @@ describe('run_board_theme_glyphs themed spinners', () => {
 		expect(run_board_theme.restyle(undefined, frames)).toBe(frames)
 	})
 
-	it('switches cached spinner writes between matrix and wargames (ac-bfea97d9)', () => {
+	it('draws cached spinner writes in the base kana on every theme (ac-bfea97d9)', () => {
 		const frames = run_board_labels.SPINNER_FRAMES.join('')
 
-		for (const theme of ['matrix', 'wargames', 'matrix'] as const) {
-			const expected = theme === 'matrix' ? KANA : '│││╱╱───╲╲'
+		for (const theme of ['trace', 'wopr', 'magi'] as const) {
+			const expected = KANA
 
 			expect(run_board_theme.restyle(theme, frames)).toBe(expected)
 			expect(run_board_theme.restyle(theme, frames)).toBe(expected)
@@ -254,7 +258,7 @@ describe('run_board_theme_glyphs.textual in color', () => {
 			run_board_theme_tones.toned('done', 'OK'),
 			run_board_theme_tones.toned('human', String.raw`\O`),
 			run_board_theme_tones.toned('running', '>>'),
-			run_board_theme_tones.toned('idle', 'ZZ'),
+			run_board_theme_tones.toned('idle', 'ZZ', BASE_LOOK.idle),
 			'<3|',
 		]
 
@@ -326,8 +330,8 @@ describe('run_board_theme_glyphs.textual after a cursor move', () => {
 	})
 
 	it.each([
-		['wargames', '│'],
-		['matrix', 'ｦ'],
+		['wopr', 'ｦ'],
+		['trace', 'ｦ'],
 	] as const)('turns the spinner glyph after a cursor move on the %s board', (theme, glyph) => {
 		expect(textual(`${MOVE}⠋`, { theme, icons: 'shapes' })).toBe(`${MOVE}${glyph}`)
 	})
@@ -344,7 +348,7 @@ describe('run_board_theme_glyphs.textual in bold or dim', () => {
 		const running = run_board_theme_tones.toned('running', '>>')
 
 		expect(textual(line)).toBe(
-			`${DIM}${running}${DIM} a ${BOLD}${run_board_theme_tones.toned('idle', 'ZZ')}${DIM}${BOLD}${INTENSITY_OFF} ${running}`,
+			`${DIM}${running}${DIM} a ${BOLD}${run_board_theme_tones.toned('idle', 'ZZ', BASE_LOOK.idle)}${DIM}${BOLD}${INTENSITY_OFF} ${running}`,
 		)
 	})
 })

@@ -3,7 +3,6 @@ import { run_board_cli } from './run-board-cli'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_preview } from './run-board-frame-preview'
-import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#8434: `--frame` draws one live-form frame in a state its flags fix — the notice,
 // its repeat mark, the sound switch, the theme and the size — and never touches the frame store.
@@ -85,7 +84,7 @@ describe('run_board_frame_preview — the form', () => {
 
 	it('draws in the theme it is given', async () => {
 		const plain = await framed(['--ansi'])
-		const themed = await framed(['--ansi', '--theme', 'wargames'])
+		const themed = await framed(['--ansi', '--theme', 'wopr'])
 
 		expect(themed.text).not.toBe(plain.text)
 	})
@@ -93,7 +92,7 @@ describe('run_board_frame_preview — the form', () => {
 	it('runs the lamp panel a lamp theme runs on a live board', async () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		vi.stubEnv('NO_COLOR', undefined)
-		const { text } = await framed(['--theme', 'wargames'])
+		const { text } = await framed(['--theme', 'wopr'])
 
 		expect(text).toContain('■')
 	})
@@ -109,59 +108,21 @@ describe('run_board_frame_preview — the form', () => {
 	})
 })
 
-// A frame with one lamp placed on its second row, and a painter writing one cell over it.
-const LAMP = { row: 2, column: 3, panel_row: 0, panel_rows: 1, group: 0, lamp: 0 }
-const PAINTER = { is_idle: true, is_ticking: true, cells: () => [{ row: 2, column: 3, text: 'X' }] }
-const LIT = {
-	...run_board_tick.FRESH_STATE,
-	lamps: [LAMP],
-	panel: { painter: PAINTER, area: { top: 1, end: 10, rows: 7, lamps: [LAMP] } },
-}
 const BOLD = `${ESCAPE}1m`
 const FRAME = `${BOLD}rule${ESCAPE}0m\nab■d\n`
 const PLAIN = { cause: undefined, is_repeat: false, is_muted: false, size: SIZE, is_ansi: false }
 
-// joshuafolkken/kit#8674: the theme's painter is drawn as the live board's first turn draws it.
-describe('run_board_frame_preview — the theme painter', () => {
+// joshuafolkken/kit#8917: a frame is printed plain, or with its escapes under `--ansi`; a theme's
+// animation is its theme layer's, which a single frame does not draw.
+describe('run_board_frame_preview.painted', () => {
 	const { painted } = run_board_frame_preview
 
-	it('lays the painter cells over the plain frame', () => {
-		expect(painted(FRAME, LIT, PLAIN, 0)).toBe('rule\nabXd\n')
+	it('prints the plain frame', () => {
+		expect(painted(FRAME, PLAIN)).toBe('rule\nab■d\n')
 	})
 
-	it('writes the painter cells as cursor writes after the frame under --ansi', () => {
-		expect(painted(FRAME, LIT, { ...PLAIN, is_ansi: true }, 0)).toBe(`${FRAME}${ESCAPE}2;3HX`)
-	})
-
-	it('draws no painter where the frame placed no lamps', () => {
-		const unlit = { ...LIT, lamps: [] }
-
-		expect(painted(FRAME, unlit, PLAIN, 0)).toBe('rule\nab■d\n')
-		expect(painted(FRAME, unlit, { ...PLAIN, is_ansi: true }, 0)).toBe(FRAME)
-	})
-})
-
-describe('run_board_frame_preview.overlaid', () => {
-	const { overlaid } = run_board_frame_preview
-	const WIDE = 'a🔊b'
-
-	it('writes each cell at its 1-based row and column, padding a short line', () => {
-		const cells = [
-			{ row: 1, column: 2, text: 'XY' },
-			{ row: 2, column: 5, text: '●' },
-			{ row: 9, column: 1, text: 'gone' },
-		]
-
-		expect(overlaid('abcd\nab', cells)).toBe('aXYd\nab  ●')
-	})
-
-	it('blanks a wide grapheme a cell writes over half of, keeping the columns after it', () => {
-		expect(overlaid(WIDE, [{ row: 1, column: 3, text: 'X' }])).toBe('a Xb')
-		expect(overlaid(WIDE, [{ row: 1, column: 2, text: 'X' }])).toBe('aX b')
-	})
-
-	it('leaves a frame with no cells as it is', () => {
-		expect(overlaid(`${WIDE}\n── x ──`, [])).toBe(`${WIDE}\n── x ──`)
+	it('keeps the escapes under --ansi', () => {
+		expect(painted(FRAME, { ...PLAIN, is_ansi: true })).toBe(FRAME)
 	})
 })
 

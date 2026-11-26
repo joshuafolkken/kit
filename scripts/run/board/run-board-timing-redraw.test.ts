@@ -3,9 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_thread, type GatherWorker } from './run-board-gather-thread'
-import { run_board_intro } from './run-board-intro'
-import { run_board_intro_fixture } from './run-board-intro-fixture'
-import type { BoardPorts, DrawKind, DrawTimer } from './run-board-state'
+import type { BoardPorts } from './run-board-state'
 import { run_board_timing } from './run-board-timing'
 
 // joshuafolkken/kit#8825: `run:board --timing` says the redraw stage's main-thread work outside its
@@ -13,7 +11,6 @@ import { run_board_timing } from './run-board-timing'
 
 const { harness } = run_board_fixture
 const { received, report } = run_board_timing
-const { NO_KEYS, instant, read_at_once } = run_board_intro_fixture
 const STEP_MS = 2
 const { FIRST_ROUND, LOCAL, START } = run_board_fixture
 const READ = { ...run_board_gather.FRESH_GATHER, local: LOCAL, read_ms: START }
@@ -122,76 +119,6 @@ function posting_worker(): GatherWorker & { post: (value: unknown) => void } {
 		post: (value) => listening.message?.(value),
 	}
 }
-
-// A draw timer that keeps each kind it ran a draw as, once the draw is done.
-function recording(kinds: Array<string>): DrawTimer {
-	return function time<T>(kind: DrawKind, draw: () => T): T {
-		const result = draw()
-
-		kinds.push(kind)
-
-		return result
-	}
-}
-
-// `write`, each text it writes marked in `kinds` as a write.
-function marked(kinds: Array<string>, write: (text: string) => void): (text: string) => void {
-	return function marked_write(text: string): void {
-		kinds.push('write')
-		write(text)
-	}
-}
-
-describe('run_board_intro.opening reveal timing', () => {
-	it('times the opening typed and the first frame revealed as the redraw reveal', async () => {
-		const kinds: Array<DrawKind> = []
-		const { written, ports } = run_board_intro_fixture.recorded(instant)
-		const timed = { ...ports, time_draw: recording(kinds) }
-		const opened = run_board_intro.opening(read_at_once, timed, NO_KEYS, 'wargames')
-
-		await opened.gather('settled')
-		await opened.reveal?.('a\nb')
-
-		expect(written.length).toBeGreaterThan(0)
-		expect(kinds.length).toBeGreaterThan(written.length)
-		expect(new Set(kinds)).toStrictEqual(new Set(['reveal']))
-	})
-
-	it('times each beat taken as the redraw reveal, before the write it makes', async () => {
-		const kinds: Array<string> = []
-		const { ports } = run_board_intro_fixture.recorded(instant)
-		const timed = { ...ports, write: marked(kinds, ports.write), time_draw: recording(kinds) }
-
-		await run_board_intro.opening(read_at_once, timed, NO_KEYS, 'wargames').gather('settled')
-
-		expect(kinds.slice(0, 2)).toStrictEqual(['reveal', 'write'])
-	})
-})
-
-// What a reveal of `a\nb` times, in order: each write timed after it lands; the frame made first, each
-// beat taken, the beats left gathered.
-const REVEALS = [
-	[
-		'wargames',
-		'reveal write reveal reveal reveal write reveal reveal write reveal reveal write reveal reveal write reveal reveal reveal write reveal reveal',
-	],
-	['matrix', 'reveal write reveal'],
-] as const
-
-describe('run_board_intro.opening reveal timing, in order', () => {
-	it.each(REVEALS)(
-		'times the %s frame made, each beat and the rest as the redraw reveal',
-		async (theme, expected) => {
-			const kinds: Array<string> = []
-			const { ports } = run_board_intro_fixture.recorded(instant)
-			const timed = { ...ports, write: marked(kinds, ports.write), time_draw: recording(kinds) }
-
-			await run_board_intro.opening(read_at_once, timed, NO_KEYS, theme).reveal?.('a\nb')
-
-			expect(kinds).toStrictEqual(expected.split(' '))
-		},
-	)
-})
 
 describe('run_board_timing.received', () => {
 	it('hands the round over timed as the redraw receive while a timed board is up', () => {

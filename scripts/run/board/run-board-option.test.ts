@@ -10,6 +10,8 @@ const SPEC: OptionSpec<'small' | 'large'> = {
 	names: ['small', 'large'],
 }
 
+const REFUSED = 'BOARD_SIZE=huge names no size (small, large)\n'
+
 describe('run_board_option.choose', () => {
 	it.each([
 		{ argv: ['--size', 'large', '--once'], env: {}, name: 'large', rest: ['--once'] },
@@ -30,11 +32,29 @@ describe('run_board_option.choose', () => {
 	})
 })
 
+// joshuafolkken/kit#8917: an alias is read as the name it stands for where the option is parsed.
+describe('run_board_option.choose an alias', () => {
+	const ALIASED: OptionSpec<'small' | 'large'> = {
+		...SPEC,
+		aliases: new Map([['big', 'large']]),
+	}
+
+	it.each([
+		{ argv: ['--size', 'big'], env: {} },
+		{ argv: [], env: { BOARD_SIZE: 'big' } },
+	])('reads big as large from $argv and $env', ({ argv, env }) => {
+		expect(run_board_option.choose(argv, env, ALIASED)).toStrictEqual({ name: 'large', argv: [] })
+	})
+
+	it('refuses an alias the spec does not hold, and names only the names', () => {
+		expect(run_board_option.choose(['--size', 'big'], {}, SPEC)).toBeUndefined()
+		expect(run_board_option.refusal([], { BOARD_SIZE: 'huge' }, ALIASED)).toBe(REFUSED)
+	})
+})
+
 describe('run_board_option.refusal', () => {
 	it('names the variable and the names it may take where the variable gave the name', () => {
-		expect(run_board_option.refusal([], { BOARD_SIZE: 'huge' }, SPEC)).toBe(
-			'BOARD_SIZE=huge names no size (small, large)\n',
-		)
+		expect(run_board_option.refusal([], { BOARD_SIZE: 'huge' }, SPEC)).toBe(REFUSED)
 	})
 
 	it('says nothing more where the flag gave the name', () => {

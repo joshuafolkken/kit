@@ -162,7 +162,7 @@ describe('test_related.run_related_tests — a --touched run', () => {
 // run takes the map's listers of a directory whose entries moved — never for an edit in place.
 describe('test_related.run_related_tests — a --touched run with a read map', () => {
 	const ADDED = `${BOARD}/run-board-added.ts`
-	const EDITED = `${BOARD}/run-board-sweep.ts`
+	const EDITED = `${BOARD}/run-board-cells.ts`
 	const GLYPHS = path.join(REPOSITORY_ROOT, GLYPHS_TEST)
 
 	beforeEach(() => {

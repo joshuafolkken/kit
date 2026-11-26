@@ -6,7 +6,7 @@ import { run_board_layer, type Layer } from './run-board-layer'
 // joshuafolkken/kit#8826: one frame loop composes every layer and writes only what changed, in one
 // synchronized write, at the first moment a layer changes.
 
-const { MIN_FRAME_MS, base_layer, revealed, run, screen_of } = run_board_frame_loop
+const { MIN_FRAME_MS, THIN_AFTER_MS, base_layer, revealed, run, screen_of } = run_board_frame_loop
 const { boundary_after } = run_board_layer
 const { char_id, put } = run_board_cells
 const ESC = '\u{1B}'
@@ -20,7 +20,10 @@ const DIGITS = 10
 const START = 1_000_000
 const SECOND_MS = 1000
 const STALL_MS = 300
-const SLOW_MS = 20
+// Slower than a theme tick, so the next frame thins.
+const SLOW_MS = THIN_AFTER_MS + 10
+// Slower than a refresh, within a theme tick.
+const BUSY_MS = 30
 
 interface Fake {
 	ports: FramePorts
@@ -193,28 +196,48 @@ describe('run_board_frame_loop.run — wakes', () => {
 	})
 })
 
-describe('run_board_frame_loop.run — thinning and moments', () => {
-	it('draws the decor at the last moment after a slow frame, the spinner at its own', async () => {
-		const fake = fake_of()
-		const moments: { spin: Array<number>; decor: Array<number> } = { spin: [], decor: [] }
-		const slow: Layer = {
-			...spinner(),
-			draw: (_canvas, at_ms) => {
-				if (moments.spin.length === 0) fake.clock.now_ms += SLOW_MS
-				moments.spin.push(at_ms - START)
-			},
-		}
-		const decor: Layer = {
-			...spinner(SPIN_MS, true),
-			draw: (_canvas, at_ms) => {
-				moments.decor.push(at_ms - START)
-			},
-		}
+interface Moments {
+	spin: Array<number>
+	decor: Array<number>
+}
 
-		await run(run_of([slow, decor], START + SPIN_MS * 3), fake.ports, screen_of())
+// The moments a spinner and a decor layer are drawn at over three steps, the first frame taking
+// `compose_ms` to compose.
+async function moments_of(compose_ms: number): Promise<Moments> {
+	const fake = fake_of()
+	const moments: Moments = { spin: [], decor: [] }
+	const slow: Layer = {
+		...spinner(),
+		draw: (_canvas, at_ms) => {
+			if (moments.spin.length === 0) fake.clock.now_ms += compose_ms
+			moments.spin.push(at_ms - START)
+		},
+	}
+	const decor: Layer = {
+		...spinner(SPIN_MS, true),
+		draw: (_canvas, at_ms) => {
+			moments.decor.push(at_ms - START)
+		},
+	}
+
+	await run(run_of([slow, decor], START + SPIN_MS * 3), fake.ports, screen_of())
+
+	return moments
+}
+
+describe('run_board_frame_loop.run — thinning and moments', () => {
+	it('draws the decor at the last moment after a frame slower than a theme tick', async () => {
+		const moments = await moments_of(SLOW_MS)
 
 		expect(moments.spin).toStrictEqual([0, SPIN_MS, SPIN_MS * 2])
 		expect(moments.decor).toStrictEqual([0, 0, SPIN_MS * 2])
+	})
+
+	it('draws the decor at its own moment after a frame slower than a refresh but within a theme tick', async () => {
+		const moments = await moments_of(BUSY_MS)
+
+		expect(moments.spin).toStrictEqual([0, SPIN_MS, SPIN_MS * 2])
+		expect(moments.decor).toStrictEqual([0, SPIN_MS, SPIN_MS * 2])
 	})
 })
 

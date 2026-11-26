@@ -1,28 +1,21 @@
-import { run_board_change_flash, type Flash } from './run-board-change-flash'
+import { run_board_demo_lanes } from './run-board-demo-lanes'
 import type { BoardDisplay } from './run-board-display'
-import { run_board_drop_screen, type DropScreen } from './run-board-drop-screen'
-import type { TerminalSize } from './run-board-fit'
+import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { FrameBounds } from './run-board-fold'
-import type { BoardHeader } from './run-board-header'
-import type { RainMoment } from './run-board-idle-rain'
-import { run_board_jump_start, type JumpState } from './run-board-jump-start'
+import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_header_defcon } from './run-board-header-defcon'
 import { run_board_labels } from './run-board-labels'
+import { run_board_lamps } from './run-board-lamps'
 import type { BoardLayout } from './run-board-layout'
 import { run_board_link } from './run-board-link'
 import type { BoardNote } from './run-board-notes'
-import { run_board_notice_turn, type NoticeTurn } from './run-board-notice-turn'
-import type { PanelDraw } from './run-board-panel-draw'
-import { run_board_rain_drop } from './run-board-rain-drop'
 import { run_board_render } from './run-board-render'
 import { run_board_row_sections } from './run-board-row-sections'
 import { run_board_spin, type Spot, type Spun } from './run-board-spin'
 import { run_board_standing } from './run-board-standing'
 import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_theme } from './run-board-theme'
-import { run_board_theme_defs } from './run-board-theme-defs'
-import { run_board_tick_flash } from './run-board-tick-flash'
-import { run_board_tick_theme, type LivePorts } from './run-board-tick-theme'
-import { run_board_type_rows, type Typing, type TypingSpan } from './run-board-type-rows'
+import { run_board_type_rows, type Typing } from './run-board-type-rows'
 
 // The frame one `run:board` redraw draws (`run-board-tick.ts`) from what `run-board-display.ts`
 // assembled: the header over the laid-out rows, the notes under them, written with its spinners at this
@@ -30,8 +23,6 @@ import { run_board_type_rows, type Typing, type TypingSpan } from './run-board-t
 // the board's ports.
 
 const { SPOT } = run_board_spin
-const { live_of, panel_of: panel_painter_of } = run_board_theme_defs
-const { decoded_of, entry_of, has_drop, has_lamps, has_rain, has_rule_lamps } = run_board_tick_theme
 
 // The ports a frame is drawn through — no read among them, so the worker thread draws the frames it
 // records through the same ones (`run-board-gather-record.ts`).
@@ -53,6 +44,8 @@ type DrawPorts = Pick<
 	| 'cue'
 	| 'sound'
 	| 'typing_sound'
+	| 'theme_run'
+	| 'plain_ports'
 >
 
 // What one redraw draws with.
@@ -71,7 +64,7 @@ function port_header(ports: DrawPorts): PortHeader {
 	return {
 		form: ports.form,
 		spinner: ports.is_tty ? SPOT : undefined,
-		is_keyed: ports.types_rows === true || live_of(ports.theme).flash === true,
+		is_keyed: ports.types_rows === true,
 		theme: ports.theme,
 		is_sound_on: ports.sound?.(),
 	}
@@ -116,9 +109,25 @@ function header_of(display: BoardDisplay, state: BoardState, redraw: Redraw): La
 	}
 }
 
+// Whether the board is in demo mode, whose lanes section draws its sample lanes where the run has none
+// (`run-board-demo-lanes.ts`, joshuafolkken/kit#8917).
+function is_demo(ports: Pick<DrawPorts, 'theme_run'>): boolean {
+	return ports.theme_run?.demo !== undefined
+}
+
+// The sections drawn folded: a person's folds, but in demo mode the lanes drawn open, so its ROW types
+// on a lane row in sight (joshuafolkken/kit#8917); the folds kept are the person's, back on leaving it.
+function folded_of(ports: DrawPorts): ReadonlySet<SectionKey> | undefined {
+	const folded = ports.folded?.()
+
+	if (folded === undefined || !is_demo(ports)) return folded
+
+	return new Set([...folded].filter((key) => key !== 'lanes'))
+}
+
 // The pane a live frame is kept within and the footer it ends on, read at every redraw.
 function bounds_of(ports: DrawPorts): FrameBounds {
-	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
+	return { size: ports.size?.(), footer: ports.footer, folded: folded_of(ports) }
 }
 
 // A drawn frame, every note it was drawn from — shown or not (joshuafolkken/kit#8117) — and the pane it
@@ -129,20 +138,14 @@ type Drawn = Spun & {
 	colons: ReadonlyArray<Spot>
 }
 
-// The idle rain's moment a rain frame's lamps are drawn at — none where the panel does not rain, so its
-// lamps are drawn as `■` (joshuafolkken/kit#8647).
-function rain_of(redraw: Pick<Redraw, 'ports' | 'now_ms'>): RainMoment | undefined {
-	return has_rain(redraw.ports) ? { ms: redraw.now_ms, is_burst: false } : undefined
-}
+// The lamp panel a themed live board's theme lays its panel and area out by (joshuafolkken/kit#8236,
+// joshuafolkken/kit#8917): a live board — its rows typing, or the board live though they do not
+// (joshuafolkken/kit#8674) — in a theme, on a terminal drawing color. Where it shows it runs over the
+// usage rule's row too (joshuafolkken/kit#8702).
+function has_lamps(ports: Pick<DrawPorts, 'types_rows' | 'is_live' | 'theme' | 'is_tty'>): boolean {
+	const is_live = ports.types_rows === true || ports.is_live === true
 
-// The theme's painter of the animation area and the frame's area, where the lamp panel shows
-// (joshuafolkken/kit#8676).
-function panel_of(ports: LivePorts, drawn: Pick<Drawn, 'area'>): PanelDraw | undefined {
-	const painter = has_lamps(ports) ? panel_painter_of(ports.theme) : undefined
-
-	if (painter === undefined || drawn.area === undefined) return undefined
-
-	return { painter, area: drawn.area }
+	return is_live && ports.theme !== undefined && ports.is_tty && run_board_lamps.is_colored()
 }
 
 // The frame under `header` with its spinners drawn at this moment's frame, and where they are on screen;
@@ -150,20 +153,22 @@ function panel_of(ports: LivePorts, drawn: Pick<Drawn, 'area'>): PanelDraw | und
 function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Drawn {
 	const bounds = bounds_of(redraw.ports)
 	const notes = [...display.notes, ...run_board_standing.notes_of(header)]
+	const is_lamped = has_lamps(redraw.ports)
 	const lines = run_board_render.render({
 		header,
 		notes,
 		resume: display.resume,
 		throughput: display.throughput,
-		has_lamps: has_lamps(redraw.ports),
-		has_rule_lamps: has_rule_lamps(redraw.ports),
+		has_lamps: is_lamped,
+		has_rule_lamps: is_lamped,
 		thanks: display.thanks,
 		pinned: display.pinned,
 		link: redraw.ports.link,
+		is_demo_lanes: is_demo(redraw.ports),
 		...bounds,
 	})
 	const spinner = run_board_labels.spinner_of(redraw.now_ms)
-	const spun = run_board_spin.spun(lines, spinner, { size: bounds.size, rain: rain_of(redraw) })
+	const spun = run_board_spin.spun(lines, spinner, { size: bounds.size })
 	// joshuafolkken/kit#8476: the clocks' colons found as the theme draws them, in its colors and in the
 	// icons every write draws (joshuafolkken/kit#8505), so the restyle reuses those writes' cache.
 	const { theme, icons } = redraw.ports
@@ -173,166 +178,96 @@ function frame_of(display: BoardDisplay, header: LaidHeader, redraw: Redraw): Dr
 	return { ...spun, notes, size: bounds.size, colons }
 }
 
-// The last frame's drop and this frame's flash, which together hold the deja vus a drop rains for.
-interface DropFlash {
-	drop: DropScreen | undefined
-	flash: Flash | undefined
+// The typing with demo mode's sample lanes counted as seen, so they show whole the frame demo mode is
+// entered on rather than typing as new rows: they are scenery, and demo mode's own ROW types on them.
+function seen_samples(typing: Typing, redraw: Redraw): Typing {
+	const { seen } = typing
+
+	if (seen === undefined || !is_demo(redraw.ports)) return typing
+
+	return { ...typing, seen: run_board_demo_lanes.with_samples(seen) }
 }
 
-// The rain of every deja vu that can still be on screen: the last drop's, carried whole so a merged span
-// keeps its end, and one from each of the flash's replays' first frame.
-function deja_spans_of(last: DropFlash): Array<TypingSpan> {
-	const replays = (last.flash?.deja_vu ?? []).map((entry) => entry.start_ms)
-
-	return [
-		...(last.drop?.deja_spans ?? []),
-		...replays.map((start) => run_board_rain_drop.deja_span(start)),
-	]
-}
-
-// The frame's cells the drop falls down, where one falls — as the theme draws them, since the drop is
-// written past the theme and puts each cell it leaves back as it was on screen — with the spans the rain
-// pours over: the last frame's carried on, this frame's rows typing added (joshuafolkken/kit#8369) — and
-// the deja vu rains, the last frame's and this frame's replays' (joshuafolkken/kit#8629).
-function drop_of(
-	redraw: Redraw,
-	drawn: Drawn,
-	typing: Typing,
-	last: DropFlash,
-): DropScreen | undefined {
-	const { ports } = redraw
-
-	if (!has_drop(ports)) return undefined
-	const lines = drawn.lines.map((line) => run_board_theme.restyle(ports.theme, line, ports.icons))
-	const screen = run_board_drop_screen.screen_of({ ...drawn, lines }, typing, drawn.size)
-	const spans = [...(last.drop?.pours ?? []), ...run_board_type_rows.spans_of(typing)]
-
-	return run_board_rain_drop.poured(screen, spans, redraw.now_ms, deja_spans_of(last))
-}
-
-// The rows this frame types where the board types them; a frame before the plan is read is no base — the
-// rows the plan brings were already there — so the frame the plan arrives on is the first base. What
-// counts as known is `run_board_row_sections.known_of`'s, over the notes the frame was drawn from; the
-// lines a saved plan's frame draws faint type over it on the frame the live plan lands on
-// (joshuafolkken/kit#8457).
+// The rows this frame types where the board types them — a themed board, whose theme layer types them
+// (joshuafolkken/kit#8917); a frame before the plan is read is no base — the rows the plan brings were
+// already there — so the frame the plan arrives on is the first base. What counts as known is
+// `run_board_row_sections.known_of`'s, over the notes the frame was drawn from; the lines a saved plan's
+// frame draws faint type over it on the frame the live plan lands on (joshuafolkken/kit#8457).
 function typing_of(
 	state: BoardState,
 	drawn: Pick<Drawn, 'keyed' | 'notes'>,
 	header: LaidHeader,
 	redraw: Redraw,
 ): Typing {
-	const entry = entry_of(redraw.ports)
-	const is_on = entry !== 'none' && state.plan !== undefined
+	const is_on = redraw.ports.types_rows === true && state.plan !== undefined
+	const known = run_board_row_sections.known_of(header, drawn.notes)
 	const frame = {
 		keyed: drawn.keyed,
-		known: run_board_row_sections.known_of(header, drawn.notes),
+		known: is_demo(redraw.ports) ? run_board_demo_lanes.with_samples(known) : known,
 		faint: run_board_row_sections.faint_keys_of(header),
-		is_decoding: entry === 'decode',
 	}
 
-	return run_board_type_rows.next(state.typing, frame, redraw.now_ms, is_on)
+	return run_board_type_rows.next(seen_samples(state.typing, redraw), frame, redraw.now_ms, is_on)
 }
 
 function draw(ports: Pick<DrawPorts, 'write'>, lines: ReadonlyArray<string>): void {
 	ports.write(`${lines.join('\n')}\n`)
 }
 
-// The places the frame drew that the spin turns between redraws.
-function turned_of(drawn: Drawn): Pick<Drawn, 'spots' | 'sweep' | 'lamps' | 'traces' | 'colons'> {
-	const { spots, sweep, lamps, traces, colons } = drawn
+// The places the frame drew that the spin turns between redraws, and its keyed rows the theme layer lays
+// out by (joshuafolkken/kit#8917).
+function turned_of(drawn: Drawn): Pick<Drawn, 'spots' | 'lamps' | 'colons' | 'keyed'> {
+	const { spots, lamps, colons, keyed } = drawn
 
-	return { spots, sweep, lamps, traces, colons }
+	return { spots, lamps, colons, keyed }
 }
 
-// joshuafolkken/kit#8657: the header notice's trace this frame carries on, where the board traces it —
-// the flash's gate, by the theme's own switch; the base frame starts none — no flash and no typing base
-// yet, as a theme with no flash (wargames, bttf: joshuafolkken/kit#8745) has only the typing's.
-function notice_of(
-	state: BoardState,
-	drawn: Drawn,
-	header: LaidHeader,
-	redraw: Redraw,
-): NoticeTurn | undefined {
-	const { ports } = redraw
-
-	if (!run_board_tick_flash.is_enabled(ports, 'notice_trace')) return undefined
-
-	return run_board_notice_turn.turn_of(state.notice_trace, {
-		keyed: drawn.keyed,
-		header,
-		is_base: state.flash === undefined && state.typing.seen === undefined,
-		now_ms: redraw.now_ms,
-		look: { theme: ports.theme, icons: ports.icons },
-		columns: drawn.size?.columns ?? Infinity,
-	})
-}
-
-// The frame written with the change flash over it (joshuafolkken/kit#8353), and the trill switched on
-// while a row types.
-function write_frame(redraw: Redraw, drawn: Drawn, typing: Typing, flash: Flash | undefined): void {
-	const { ports, now_ms } = redraw
-
-	draw(ports, run_board_type_rows.typed_lines(drawn.lines, typing, now_ms))
-	run_board_change_flash.write(ports, flash, now_ms)
-	ports.typing_sound?.set(
-		run_board_type_rows.is_typing(typing, now_ms),
-		run_board_type_rows.left_ms(typing, now_ms),
-	)
-}
-
-// What a drawn frame hands the spin to turn between redraws.
-interface FrameEffects {
-	drawn: Drawn
+// A frame laid out, the redraw it was drawn through and its header.
+interface Laid {
+	redraw: Redraw
 	header: LaidHeader
-	typing: Typing
-	notice_trace: NoticeTurn | undefined
+	drawn: Drawn
 }
 
-// The rules, strips, panel, notice trace and bttf time jump (joshuafolkken/kit#8677) the spin turns.
-function effects_of(
-	state: BoardState,
-	frame: FrameEffects,
-	redraw: Redraw,
-): Pick<BoardState, 'rules' | 'strips' | 'panel' | 'notice_trace'> & JumpState {
-	const { drawn, notice_trace } = frame
-	const panel = panel_of(redraw.ports, drawn)
-	const { ports, now_ms } = redraw
-	const jump_frame = { ...frame, ports, area: panel?.area, painter: panel?.painter, now_ms }
-	const jumped = run_board_jump_start.jump_state(state, jump_frame)
+function laid_in(display: BoardDisplay, state: BoardState, redraw: Redraw): Laid {
+	const header = header_of(display, state, redraw)
 
-	return { ...decoded_of(redraw.ports, drawn), panel, notice_trace, ...jumped }
+	return { redraw, header, drawn: frame_of(display, header, redraw) }
+}
+
+// The frame in the redraw's look. A themed board keeps its theme with no lamp panel on screen — a narrow
+// or short pane, a folded section: the theme then draws no area parts (`run-board-theme-layout.ts`,
+// joshuafolkken/kit#8917). Only a board that draws no lamps at all — a terminal without the colors a
+// theme needs — is drawn through the board's plain ports, in no theme.
+function laid_of(display: BoardDisplay, state: BoardState, redraw: Redraw): Laid {
+	const plain = redraw.ports.plain_ports
+
+	if (plain === undefined || has_lamps(redraw.ports)) return laid_in(display, state, redraw)
+
+	return laid_in(display, state, { ...redraw, ports: plain })
 }
 
 // The assembled frame drawn, its cue sounded through `cue` where the board passes one — before the
-// frame is written, so the notice shows on the frame it sounds on — and the trill switched on while a
-// row types, apart from the cue, so both sound on one frame (joshuafolkken/kit#8250).
-function draw_display(state: BoardState, display: BoardDisplay, redraw: Redraw): BoardState {
-	const header = header_of(display, state, redraw)
-
-	if (display.cue !== undefined) redraw.ports.cue?.(display.cue)
-	const drawn = frame_of(display, header, redraw)
+// frame is written, so the notice shows on the frame it sounds on. Every row is written whole: a themed
+// board's theme layer types the rows typing (joshuafolkken/kit#8917), and the level it shows where its
+// theme shows its own is the header's.
+function draw_display(state: BoardState, display: BoardDisplay, given: Redraw): BoardState {
+	if (display.cue !== undefined) given.ports.cue?.(display.cue)
+	const { redraw, header, drawn } = laid_of(display, state, given)
 	const typing = typing_of(state, drawn, header, redraw)
-	const notice_trace = notice_of(state, drawn, header, redraw)
-	const flash = run_board_tick_flash.flash_of(
-		state.flash,
-		{ ...drawn, notice: notice_trace?.place },
-		redraw,
-		typing,
-	)
 
-	write_frame(redraw, drawn, typing, flash)
+	draw(redraw.ports, drawn.lines)
+	const alert_level = run_board_header_defcon.level_of(header)
+	const dated_clocks = run_board_header.dated_clocks(header)
 
-	const decoded = effects_of(state, { drawn, header, typing, notice_trace }, redraw)
-	const drop = drop_of(redraw, drawn, typing, { drop: state.drop, flash })
-
-	return { ...state, ...display.carried, ...turned_of(drawn), ...decoded, typing, drop, flash }
+	return { ...state, ...display.carried, ...turned_of(drawn), typing, alert_level, dated_clocks }
 }
 
 const run_board_tick_draw = {
 	bounds_of,
 	draw,
 	draw_display,
-	panel_of,
+	has_lamps,
 }
 
 export { run_board_tick_draw }

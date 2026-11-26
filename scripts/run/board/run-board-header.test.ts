@@ -22,9 +22,12 @@ const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 30 * MINUTE
 const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 // The third line's name column where no repository is read, and the second line's where no kit
-// version is: `-` under the board's name.
-const NAME_BLANK = ' '.repeat('⏸ josh-board'.length)
+// version is: `-` under the board's name. The names column is at least 15 columns (joshuafolkken/kit#8917).
+const NAMES_WIDTH = 15
+const NAME_BLANK = ' '.repeat(NAMES_WIDTH)
 const VERSION_CELL = '  -'.padEnd(NAME_BLANK.length)
+const BOARD_NAME = '⏸ josh-board'.padEnd(NAMES_WIDTH)
+const RUNNING_NAME = '▶ josh-board'.padEnd(NAMES_WIDTH)
 // A time cell: one sign — or the spinner — then eight columns.
 const TIME_WIDTH = 9
 const TIME_BLANK = ' '.repeat(TIME_WIDTH)
@@ -32,8 +35,8 @@ const TIME_BLANK = ' '.repeat(TIME_WIDTH)
 const SLOT_BLANK = '  —'
 // The first line where no finish is estimated: the finish and what is left unknown, then the machine.
 const UNKNOWN_FINISH = '🎯 --:--  -  --′--″'
-const IDLE_TITLE = `⏸ josh-board  ${UNKNOWN_FINISH}  ${MACHINE_UNKNOWN}`
-const RUNNING_TITLE = `▶ josh-board  ${UNKNOWN_FINISH}  ${MACHINE_UNKNOWN}`
+const IDLE_TITLE = `${BOARD_NAME}  ${UNKNOWN_FINISH}  ${MACHINE_UNKNOWN}`
+const RUNNING_TITLE = `${RUNNING_NAME}  ${UNKNOWN_FINISH}  ${MACHINE_UNKNOWN}`
 const RUNNING_CLOCK = `${VERSION_CELL}  🕒 ${minute_of(NOW)}  +  30′00″${SLOT_BLANK}`
 // joshuafolkken/kit#3749: the third line — the start alone where the stream holds no event, else
 // what the run is doing now: its time under the signed column, its icon and words after it.
@@ -108,7 +111,7 @@ describe('run_board_header.header_lines state', () => {
 		const board = header({ activity, ended_ms, now_ms })
 
 		expect(lines_of(board)).toStrictEqual([
-			`■ josh-board  🎯 ${minute_of(ended_ms)}  -      0″  ${MACHINE_UNKNOWN}`,
+			`${'■ josh-board'.padEnd(NAMES_WIDTH)}  🎯 ${minute_of(ended_ms)}  -      0″  ${MACHINE_UNKNOWN}`,
 			`${VERSION_CELL}  🕒 ${minute_of(now_ms)}  +1°30′00″${SLOT_BLANK}`,
 			`${NOW_BLANK}  ${'—'.padStart(TIME_WIDTH)}`,
 		])
@@ -146,7 +149,7 @@ describe('run_board_header.header_lines shape', () => {
 		}
 
 		expect(title_of(header({ machine }))).toBe(
-			`⏸ josh-board  ${UNKNOWN_FINISH}  💪  15% ■────  🧠  37% ■■───  💾 3.1M/s ■────`,
+			`${BOARD_NAME}  ${UNKNOWN_FINISH}  💪  15% ■────  🧠  37% ■■───  💾 3.1M/s ■────`,
 		)
 	})
 })
@@ -188,7 +191,7 @@ describe('run_board_header.header_lines chat', () => {
 		}
 
 		expect(title_of(header({ machine, form: 'chat' }))).toBe(
-			`⏸ josh-board  ${UNKNOWN_FINISH}  🧠  37% ■■───`,
+			`${BOARD_NAME}  ${UNKNOWN_FINISH}  🧠  37% ■■───`,
 		)
 	})
 })

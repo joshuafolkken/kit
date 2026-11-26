@@ -11,6 +11,9 @@ const GAP = '  '
 const ELLIPSIS = '…'
 // The fewest header columns kept beside the panel; a narrower board draws the header alone.
 const MIN_HEADER_WIDTH = 40
+// The panel's fewest columns (joshuafolkken/kit#8917): the confirmed demo's pins column, the rules'
+// last 13, so the panel starts on one column whatever its pins' widths.
+const PANEL_WIDTH = 13
 
 const { width_of } = run_board_fit
 
@@ -34,7 +37,7 @@ function composed(
 	rows: ReadonlyArray<string>,
 	rule_width: number,
 ): Array<string> {
-	const limit = rule_width - Math.max(0, ...rows.map((row) => width_of(row))) - GAP.length
+	const limit = rule_width - Math.max(PANEL_WIDTH, ...rows.map((row) => width_of(row))) - GAP.length
 
 	if (rows.length === 0 || limit < MIN_HEADER_WIDTH) return [...lines]
 
@@ -45,6 +48,6 @@ function composed(
 	})
 }
 
-const run_board_watch_panel = { GAP, MIN_HEADER_WIDTH, composed }
+const run_board_watch_panel = { GAP, MIN_HEADER_WIDTH, PANEL_WIDTH, composed }
 
 export { run_board_watch_panel }

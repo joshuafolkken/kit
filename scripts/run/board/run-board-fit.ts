@@ -425,7 +425,7 @@ function fit(parts: FrameParts, size: TerminalSize): Array<string> {
 	return clamped(fitting ?? frames.at(-1) ?? [], size)
 }
 
-const run_board_fit = { ROW_INDENT, fit, height_of, plain_more, whole, width_of }
+const run_board_fit = { ROW_INDENT, fit, height_of, whole, width_of }
 
 export { run_board_fit }
 export type {

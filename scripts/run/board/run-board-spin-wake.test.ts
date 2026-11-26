@@ -23,6 +23,13 @@ const SPIN_WAKE = new RegExp(
 
 type Wake = [number, number]
 
+// A sleep that moves `clock` on by what it sleeps.
+function clock_sleep(clock: { now_ms: number }): (ms: number) => Promise<void> {
+	return async (ms) => {
+		clock.now_ms += ms
+	}
+}
+
 // Spinner ports on a clock each sleep moves `OVERSLEEP_MS` past its due time, every wake kept.
 function waking(): {
 	ports: Parameters<typeof run_board_spin.spin_to_second>[1]
@@ -100,9 +107,10 @@ describe('run_board_timing.timed wakes', () => {
 		expect(frames.at(-1)).not.toContain(run_board_timing.SPIN_WAKE_ROW)
 	})
 
+	// joshuafolkken/kit#8917: a still second waits on the clock until its end, so the ports' sleep moves it.
 	it('takes no wake without the flag, the spinners waking as before', async () => {
-		const { ports } = harness(undefined, [])
-		const board = run_board_timing.timed(ports, false)
+		const { ports, clock } = harness(undefined, [])
+		const board = run_board_timing.timed({ ...ports, sleep: clock_sleep(clock) }, false)
 
 		expect(board.time_wake).toBeUndefined()
 		await expect(

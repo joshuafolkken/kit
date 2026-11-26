@@ -1,21 +1,25 @@
 import { parseArgs } from 'node:util'
 import { run_board_frame_preview, type FrameOptions } from './run-board-frame-preview'
 import { run_board_icons, type Icons } from './run-board-icons'
-import type { IntroPorts } from './run-board-intro'
 import { run_board_live } from './run-board-live'
-import type { Beat } from './run-board-reveal-blocks'
-import { run_board_seeded } from './run-board-seeded'
+import { run_board_paint } from './run-board-paint'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
 
-// The live board's drawing path replayed under a virtual clock and a seeded random source, each beat
-// it writes as one JSON `Beat` line (joshuafolkken/kit#8750). It reads the run once, as `--frame` does,
-// and draws through the live `watch` on the `--frame` fixed ports: the opening, the reveal and `--ticks`
-// redraws. Each sleep closes a beat and moves the clock on by its length, so one read, one `--at` and
-// one `--seed` write the same bytes. The matrix rain draws from the seed.
+// The live board's drawing path replayed under a virtual clock, each beat it writes as one JSON `Beat`
+// line (joshuafolkken/kit#8750). It reads the run once, as `--frame` does, and draws through the live
+// `watch` on the `--frame` fixed ports: the theme's opening and `--ticks` redraws. Each sleep closes a
+// beat and moves the clock on by its length, so one read and one `--at` write the same bytes; the theme
+// host draws its randomness from the moment and the place (joshuafolkken/kit#8917), so `--seed` is
+// taken and changes nothing.
 
-const USAGE =
-	'Usage: josh board:replay [--theme wargames|matrix|bttf] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]'
+// One write the replay records: its bytes and how long the screen holds them before the next.
+interface Beat {
+	text: string
+	ms: number
+}
+
+const USAGE = `Usage: josh board:replay [--theme ${run_board_theme.THEMES.join('|')}] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]`
 const OWN_OPTIONS = {
 	seed: { type: 'string' },
 	at: { type: 'string' },
@@ -27,6 +31,11 @@ const COUNT = /^\d+$/u
 const FAILURE_EXIT_CODE = 2
 // Thrown from the redraw sleep once the asked redraws are drawn: the live board never returns on its own.
 const REPLAY_END = new Error('replay end')
+// The `FORCE_COLOR` level of 24-bit color, and the variables a replay sets for its run: the board's text
+// is colored by what stdout answers (`run-board-paint.ts`), which a pipe or a file answers with none.
+const RGB_COLOR_LEVEL = '3'
+const FORCE_COLOR = 'FORCE_COLOR'
+const NO_COLOR = 'NO_COLOR'
 
 interface Counts {
 	readonly seed: number
@@ -54,7 +63,6 @@ interface Recorder {
 }
 
 type Token = NonNullable<ReturnType<typeof parseArgs>['tokens']>[number]
-type Rain = NonNullable<IntroPorts['rain']>
 
 function written(token: Extract<Token, { kind: 'option' }>): string {
 	return token.inlineValue === true ? `${token.rawName}=${token.value}` : token.rawName
@@ -140,17 +148,10 @@ async function redraw_sleep(recorder: Recorder, ms: number): Promise<void> {
 	advanced(recorder, ms)
 }
 
-// Every clock the board reads, the opening's beat schedule included, on the recorder's virtual time:
-// the live `performance.now()` made the opening's beat lengths differ per run.
-function virtual_clock(
-	recorder: Recorder,
-): Pick<Required<BoardPorts>, 'now' | 'intro_now' | 'intro_sleep' | 'sleep'> {
+// Every clock the board reads on the recorder's virtual time.
+function virtual_clock(recorder: Recorder): Pick<Required<BoardPorts>, 'now' | 'sleep'> {
 	return {
 		now: () => recorder.now_ms,
-		intro_now: () => recorder.now_ms,
-		intro_sleep: async (ms) => {
-			advanced(recorder, ms)
-		},
 		sleep: async (ms) => {
 			await redraw_sleep(recorder, ms)
 		},
@@ -162,12 +163,9 @@ function stay(): void {
 }
 
 // The `--frame` fixed ports on the virtual clock, writing into the open beat, with no keys, exit
-// handler or sound, the rain drawn from the seed.
-function replay_ports(
-	ports: BoardPorts,
-	options: ReplayOptions,
-	recorder: Recorder,
-): BoardPorts & { rain: Rain } {
+// handler or sound, in 24-bit color — a theme is drawn by its theme run only there
+// (joshuafolkken/kit#8917), so a replay on any terminal draws the theme it names.
+function replay_ports(ports: BoardPorts, options: ReplayOptions, recorder: Recorder): BoardPorts {
 	function write(text: string): void {
 		recorder.text += text
 	}
@@ -181,13 +179,36 @@ function replay_ports(
 		keys: undefined,
 		on_exit: stay,
 		typing_sound: undefined,
-		rain: { random: run_board_seeded.seeded(options.seed), is_colored: () => true },
+		color_depth: () => run_board_paint.RGB_COLOR_DEPTH,
+	}
+}
+
+function restore(name: string, value: string | undefined): void {
+	if (value === undefined) Reflect.deleteProperty(process.env, name)
+	else process.env[name] = value
+}
+
+// joshuafolkken/kit#8917: `draw` run with stdout drawing 24-bit color, as the ports' `color_depth` says,
+// the environment put back after. Every color the board paints — and the lamp panel a theme lays out
+// by, drawn only where stdout draws color — reads stdout, so a replay written to a pipe or a file would
+// otherwise draw its themed board in no color and no theme at all.
+async function in_color<Result>(draw: () => Promise<Result>): Promise<Result> {
+	const saved = { force: process.env[FORCE_COLOR], no: process.env[NO_COLOR] }
+
+	process.env[FORCE_COLOR] = RGB_COLOR_LEVEL
+	Reflect.deleteProperty(process.env, NO_COLOR)
+
+	try {
+		return await draw()
+	} finally {
+		restore(FORCE_COLOR, saved.force)
+		restore(NO_COLOR, saved.no)
 	}
 }
 
 // The beats the live board writes for one read: the opening, the reveal and the asked redraws, any
 // bytes written after the last sleep as a closing beat that waits for nothing.
-async function replay(ports: BoardPorts, options: ReplayOptions): Promise<Array<Beat>> {
+async function replay_in_color(ports: BoardPorts, options: ReplayOptions): Promise<Array<Beat>> {
 	const read = await ports.gather('settled')
 	const recorder: Recorder = {
 		beats: [],
@@ -204,6 +225,13 @@ async function replay(ports: BoardPorts, options: ReplayOptions): Promise<Array<
 	}
 
 	return recorder.text === '' ? recorder.beats : [...recorder.beats, { text: recorder.text, ms: 0 }]
+}
+
+// A themed replay drawn in 24-bit color, wherever its stdout goes; one in no theme as stdout draws.
+async function replay(ports: BoardPorts, options: ReplayOptions): Promise<Array<Beat>> {
+	if (options.theme === undefined) return await replay_in_color(ports, options)
+
+	return await in_color(async () => await replay_in_color(ports, options))
 }
 
 function lines_of(beats: ReadonlyArray<Beat>): string {
@@ -227,3 +255,4 @@ async function run(argv: ReadonlyArray<string>, ports: BoardPorts): Promise<numb
 const run_board_replay = { lines_of, options_of, replay, run }
 
 export { run_board_replay }
+export type { Beat }

@@ -58,7 +58,7 @@ describe('run_board_tick_draw.draw_display saved plan typed over', () => {
 	// read after it opened, its rows typing where `types_rows` says.
 	function landed(types_rows: boolean): BoardState['typing'] {
 		const { ports } = harness(LOCAL, [])
-		const typed_ports = { ...ports, opened_ms: OPENED, types_rows, theme: 'wargames' as const }
+		const typed_ports = { ...ports, opened_ms: OPENED, types_rows, theme: 'wopr' as const }
 		const saved = fetched_at(START)
 		const base = drawn_from(
 			saved,

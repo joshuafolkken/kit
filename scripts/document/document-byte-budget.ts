@@ -62,7 +62,11 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The `DEMO_BEATS` / `DEMO_SEED` replay form (joshuafolkken/kit#8750) crossed the 8192 block.
 	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 12_288 },
 	{ path: '.claude/skills/board-theme/render-cost.md', bytes: 4096 },
+	// The theme rules, sound and wiring split out of SKILL.md (joshuafolkken/kit#8917).
+	{ path: '.claude/skills/board-theme/theme-rules.md', bytes: 8192 },
+	{ path: '.claude/skills/board-theme/theme-sound.md', bytes: 4096 },
 	{ path: '.claude/skills/board-theme/theme-split.md', bytes: 4096 },
+	{ path: '.claude/skills/board-theme/theme-wiring.md', bytes: 4096 },
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 4096 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 8192 },
 	{ path: '.claude/skills/epic-commands/epic-bundle.md', bytes: 4096 },
@@ -97,7 +101,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `run:board --theme matrix` (joshuafolkken/kit#8354) crossed the 32768 block.
 	// `run:board --icons` (joshuafolkken/kit#8505) crossed the 36864 block.
 	// `josh board:compare` (joshuafolkken/kit#8754) crossed the 40960 block.
-	{ path: 'docs/josh-commands-board.md', bytes: 45_056 },
+	// The old themes' options gave way to the theme host's (joshuafolkken/kit#8917), back under 40960.
+	{ path: 'docs/josh-commands-board.md', bytes: 40_960 },
 	// The `concurrent lanes` table's core-wait columns (joshuafolkken/kit#7550) crossed the 32768 block.
 	// `josh lane:phases` (joshuafolkken/kit#8287) crossed the 36864 block.
 	{ path: 'docs/josh-commands-lane.md', bytes: 40_960 },

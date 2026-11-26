@@ -23,7 +23,7 @@ const BAR_LEFT_COLOR: TextColor = 'dim'
 // The spinner a running run and a running row turn, at the package's own interval.
 const SPINNER_FRAMES = cli_spinners.dots.frames
 const SPINNER_INTERVAL_MS = cli_spinners.dots.interval
-const { RGB_COLOR_DEPTH, painted } = run_board_paint
+const { painted } = run_board_paint
 
 // The words the board draws, English whatever the session language: one set of words reads the same
 // on every board. The board draws most of what it says as a symbol; the words left are the ones a
@@ -359,7 +359,6 @@ const run_board_labels = {
 	OVERRUN_MARK,
 	PHASE_ICONS,
 	PHASE_WORDS,
-	RGB_COLOR_DEPTH,
 	SPINNER_FRAMES,
 	SPINNER_INTERVAL_MS,
 	STAGE_ICONS,

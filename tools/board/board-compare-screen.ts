@@ -1,5 +1,5 @@
 import xterm, { type IBufferCell } from '@xterm/headless'
-import type { Beat } from '#scripts/run/board/run-board-reveal-blocks'
+import type { Beat } from '#scripts/run/board/run-board-replay'
 
 // The screen each beat leaves (joshuafolkken/kit#8754): the beats' bytes fed through a terminal emulator,
 // every cell read when a beat's bytes are written, so two byte streams that draw the same screen read

@@ -6,7 +6,6 @@ import { run_board_fold } from './run-board-fold'
 import { run_board_lamp_spots } from './run-board-lamp-spots'
 import { run_board_lamps } from './run-board-lamps'
 import type { BoardRow } from './run-board-layout'
-import { run_board_panel_painters } from './run-board-panel-painters'
 import { run_board_quota_lamps } from './run-board-quota-lamps'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -25,11 +24,12 @@ const { LOCAL, START, drawn_from, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, layout_for } = run_board_tick
 const WIDE = { rows: 60, columns: 200 }
 const { rows_part } = run_board_render_throughput
-const THEME: Theme = 'wargames'
+const THEME: Theme = 'wopr'
 const { width_of } = run_board_fit
 const HOUR = 3_600_000
 const GAP = 2
 const FEWEST = 8
+const TRACE_FIELD = /TRACE [■-]+/u
 // A panel 21 columns wide holds 11 lamps.
 const PANEL_WIDTH = 21
 const PANEL_LAMPS = 11
@@ -295,8 +295,9 @@ describe('run_board_render.render with lamps', () => {
 })
 
 // A live redraw of a frame with throughput rows, on a terminal drawing color; `types_rows` as given —
-// its lamps, the marks it wrote and whether its turns carry the lamps' painter (joshuafolkken/kit#8676).
-function redrawn(types_rows: boolean): { lamps: number; marks: number; is_painted: boolean } {
+// its lamps and the marks it wrote, which a themed board's theme layer lays its panel out by
+// (joshuafolkken/kit#8917).
+function redrawn(types_rows: boolean): { lamps: number; marks: number } {
 	vi.stubEnv('FORCE_COLOR', '3')
 	const { ports, frames } = harness(LOCAL, [])
 	const state = { ...FRESH_STATE, plan: plan_titled('a'), run_started_ms: LOCAL.started_ms }
@@ -305,25 +306,24 @@ function redrawn(types_rows: boolean): { lamps: number; marks: number; is_painte
 	const redraw = { ports: { ...ports, types_rows, theme, size: () => WIDE }, now_ms: START }
 	const active = [{ ...WIDE_LANE }]
 	const drawn = drawn_from(state, local, redraw, { ...layout_for(state, local, START), active })
-	const written = stripVTControlCharacters(frames.join(''))
+	// The base look's `TRACE ■----` field fills its gauge with the same mark; it is no lamp.
+	const written = stripVTControlCharacters(frames.join('')).replace(TRACE_FIELD, '')
 
 	return {
 		lamps: drawn.lamps?.length ?? 0,
 		marks: written.split(LAMP_MARK).length - 1,
-		is_painted: drawn.panel?.painter === run_board_panel_painters.LAMP_PAINTER,
 	}
 }
 
 describe('run_board_tick_draw.draw_display with lamps', () => {
 	it('draws the panel and keeps its lamps for the turns where the board has lamps', () => {
-		const { lamps, marks, is_painted } = redrawn(true)
+		const { lamps, marks } = redrawn(true)
 
 		expect(lamps).toBeGreaterThanOrEqual(2 * FEWEST)
 		expect(marks).toBe(lamps)
-		expect(is_painted).toBe(true)
 	})
 
 	it('draws and keeps none where it has none', () => {
-		expect(redrawn(false)).toStrictEqual({ lamps: 0, marks: 0, is_painted: false })
+		expect(redrawn(false)).toStrictEqual({ lamps: 0, marks: 0 })
 	})
 })
