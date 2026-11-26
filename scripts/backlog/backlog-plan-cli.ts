@@ -157,7 +157,7 @@ async function run_plan(rest: ReadonlyArray<string>, view: PlanView): Promise<nu
 		return FAILURE_EXIT_CODE
 	}
 
-	const plan = await backlog_plan_read.classify(opted_in, options.exclude ?? [])
+	const plan = await backlog_plan_read.classify(opted_in, options.exclude ?? [], console.error)
 
 	return plan === undefined ? FAILURE_EXIT_CODE : await report(plan, view)
 }

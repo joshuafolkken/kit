@@ -203,7 +203,18 @@ function recorder(
 	}
 }
 
-const backlog_drive_hold = { hand_back_reason, held, recorder, stopped }
+// A starting driver clears an earlier driver's hand-back mark: the lanes have a driver again, though a
+// full pool's passes write no ledger line to clear it (`no-free-lane`), so a lane freed meanwhile is
+// not recorded as driverless (joshuafolkken/kit#9003).
+async function started(
+	free_lanes: () => Promise<number> = backlog_ready.drive_free_lane_count,
+): Promise<HoldRecorder> {
+	await lane_hand_back_hold.clear()
+
+	return recorder(free_lanes)
+}
+
+const backlog_drive_hold = { hand_back_reason, held, recorder, started, stopped }
 
 export { backlog_drive_hold }
 export type { HeldWaiting, HoldRecorder }

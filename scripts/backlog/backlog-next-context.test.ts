@@ -12,13 +12,15 @@ const OPTED_IN = { kind: 'read' as const, issues: [], cutoff: 'none' as const }
 const OPEN: OpenListing = { rows: [], is_capped: false }
 const REPO = 'owner/repo'
 
-const errors: Array<unknown> = []
+const errors: Array<string> = []
+
+// joshuafolkken/kit#9007: the failures go to the caller's port, which `run:board` leaves silent.
+function report(line: string): void {
+	errors.push(line)
+}
 
 beforeEach(() => {
 	errors.length = 0
-	vi.spyOn(console, 'error').mockImplementation((message: unknown) => {
-		errors.push(message)
-	})
 	vi.spyOn(auto_ok_cli, 'fetch_tracking').mockResolvedValue({
 		kind: 'read',
 		index: new Map(),
@@ -37,7 +39,7 @@ afterEach(() => {
 
 describe('backlog_next.context_of', () => {
 	it('hands the open listing to the tracking read', async () => {
-		const context = await backlog_next.context_of(OPTED_IN, [], OPEN)
+		const context = await backlog_next.context_of(OPTED_IN, [], report, OPEN)
 
 		expect(context?.repo).toBe(REPO)
 		expect(auto_ok_cli.fetch_tracking).toHaveBeenCalledWith(0, OPEN)
@@ -47,14 +49,14 @@ describe('backlog_next.context_of', () => {
 		vi.mocked(auto_ok_cli.fetch_tracking).mockResolvedValue({ kind: 'epics_unreadable' })
 		vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue(undefined)
 
-		await expect(backlog_next.context_of(OPTED_IN, [])).resolves.toBeUndefined()
+		await expect(backlog_next.context_of(OPTED_IN, [], report)).resolves.toBeUndefined()
 		expect(errors).toStrictEqual([auto_ok_cli.EPICS_UNREADABLE_MESSAGE])
 	})
 
 	it('reports an unreadable repository', async () => {
 		vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue(undefined)
 
-		await expect(backlog_next.context_of(OPTED_IN, [])).resolves.toBeUndefined()
+		await expect(backlog_next.context_of(OPTED_IN, [], report)).resolves.toBeUndefined()
 		expect(errors).toStrictEqual([backlog_next.REPO_UNREADABLE_MESSAGE])
 	})
 })
