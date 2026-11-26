@@ -31,14 +31,15 @@ const terminal: Writable = Object.defineProperty(
 	{ get: () => Reflect.get(OUT, '_handle') as unknown },
 )
 
-function text_of(chunk: string | Uint8Array): string {
-	return typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString()
+// Kept as bytes, so a character split across two writes is joined whole when it is said.
+function bytes_of(chunk: string | Uint8Array): Buffer {
+	return Buffer.from(chunk)
 }
 
-// A write that keeps its text and tells the callback it was given that it is done.
-function holder(chunks: Array<string>): Write {
+// A write that keeps its bytes and tells the callback it was given that it is done.
+function holder(chunks: Array<Buffer>): Write {
 	return (chunk, ...rest) => {
-		chunks.push(text_of(chunk))
+		chunks.push(bytes_of(chunk))
 		for (const argument of rest) if (typeof argument === 'function') (argument as () => void)()
 
 		return true
@@ -48,7 +49,7 @@ function holder(chunks: Array<string>): Write {
 // Holds the process's output until the returned release, which says it on stderr; a second release
 // does nothing.
 function hold(): () => void {
-	const chunks: Array<string> = []
+	const chunks: Array<Buffer> = []
 	const { write: before_out } = OUT
 	const { write: before_error } = ERR
 	let is_held = true
@@ -63,7 +64,7 @@ function hold(): () => void {
 		before.out = undefined
 		OUT.write = before_out
 		ERR.write = before_error
-		if (chunks.length > 0) ERR.write(chunks.join(''))
+		if (chunks.length > 0) ERR.write(Buffer.concat(chunks))
 	}
 }
 

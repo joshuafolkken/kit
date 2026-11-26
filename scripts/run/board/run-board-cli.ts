@@ -244,8 +244,11 @@ function leaving(
 
 	return (leave) => {
 		exits.on_exit(() => {
-			leave()
-			release()
+			try {
+				leave()
+			} finally {
+				release()
+			}
 		})
 	}
 }

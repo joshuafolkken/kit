@@ -2,6 +2,6 @@
 	"reason": "Adds the run:board output hold (#9008): one module and its per-kind tests, the intended code growth",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 69
+		"scripts.code_lines": 71
 	}
 }

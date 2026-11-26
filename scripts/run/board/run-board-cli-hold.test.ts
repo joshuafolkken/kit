@@ -13,37 +13,47 @@ afterEach(() => {
 type Leaving = Parameters<typeof run_board_cli.leaving>
 
 // The exit guard registers the leave; the test runs it as the process would on its way out.
-function leave_run(): { release: ReturnType<typeof vi.fn>; order: Array<string> } {
-	const order: Array<string> = []
-	const release = vi.fn(() => {
-		order.push('release')
-	})
+function registered_leave(leave: () => void, release: () => void): () => void {
 	const registered: Array<() => void> = []
 	const exits = {
-		on_exit: (leave: () => void) => {
-			registered.push(leave)
+		on_exit: (listener: () => void) => {
+			registered.push(listener)
 		},
 	} as unknown as NonNullable<Leaving[0]>
 	const live = { on_exit: vi.fn() } as unknown as Leaving[1]
 
-	run_board_cli.leaving(
-		exits,
-		live,
-		release,
-	)((): void => {
-		order.push('leave')
-	})
-	for (const leave of registered) leave()
+	run_board_cli.leaving(exits, live, release)(leave)
 
-	return { release, order }
+	return () => {
+		for (const listener of registered) listener()
+	}
 }
 
 describe('run_board_cli.leaving', () => {
 	it('releases the hold after the screen is left', () => {
-		const { release, order } = leave_run()
+		const order: Array<string> = []
 
-		expect(release).toHaveBeenCalledOnce()
+		registered_leave(
+			() => {
+				order.push('leave')
+			},
+			() => {
+				order.push('release')
+			},
+		)()
+
 		expect(order).toStrictEqual(['leave', 'release'])
+	})
+
+	it('releases the hold even when the screen fails to leave', () => {
+		const release = vi.fn()
+		const failure = new Error('the screen did not close')
+		const run = registered_leave(() => {
+			throw failure
+		}, release)
+
+		expect(run).toThrow(failure)
+		expect(release).toHaveBeenCalledOnce()
 	})
 
 	it('leaves the registration to the live ports when there are no exits', () => {

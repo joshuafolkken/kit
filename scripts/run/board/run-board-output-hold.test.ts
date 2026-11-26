@@ -57,6 +57,16 @@ describe('run_board_output_hold', () => {
 		expect(after).toStrictEqual(['bytes'])
 	})
 
+	it('says a character split across two writes whole', () => {
+		const [first = 0, second = 0, ...rest] = new TextEncoder().encode('あ')
+		const { after } = held_run(() => {
+			process.stderr.write(new Uint8Array([first]))
+			process.stderr.write(new Uint8Array([second, ...rest]))
+		})
+
+		expect(after.join('')).toBe('あ')
+	})
+
 	it('tells the callback of a held write that it is done', () => {
 		const done = vi.fn()
 
