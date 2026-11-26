@@ -227,7 +227,12 @@ async function offer_of(
 
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
-	const gathered = await backlog_drive_named_launch.gather(named.issues, state, context.owner)
+	const gathered = await backlog_drive_named_launch.gather(
+		named.issues,
+		state,
+		context.owner,
+		carry,
+	)
 
 	if (gathered.offer !== undefined) {
 		return { ...gathered, offer: capped(gathered.offer, carry, state, context.forwarded) }
