@@ -17,7 +17,7 @@ type OpeningSound = PartTyping
 
 const SILENT: OpeningSound = { spans: [], typed_ms: undefined }
 
-// The lead lines' letters, each line's hold and gap after it (`run-board-intro.ts` → `lead_in`).
+// The lead lines' letters, each line's hold and gap after it (the removed `run-board-intro.ts` → `lead_in`).
 function lead_spans(
 	lines: ReadonlyArray<string>,
 	letter_ms: number,

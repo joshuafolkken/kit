@@ -8,7 +8,8 @@ import type { Wopr } from './run-board-theme-wopr-place'
 import { run_board_theme_wopr_reveal } from './run-board-theme-wopr-reveal'
 
 // The WARGAMES theme's opening and ending (joshuafolkken/kit#8917), ported from the confirmed theme
-// demo: kit's opening (run-board-intro.ts, run-board-reveal-blocks.ts), and the film's last exchange.
+// demo: kit's former opening (the removed run-board-intro.ts, run-board-reveal-blocks.ts), and the
+// film's last exchange.
 
 const { put, repeated, rows_to, set_cell } = run_board_theme_host_grid
 const { hash } = run_board_theme_host_hash

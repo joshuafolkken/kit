@@ -12,7 +12,7 @@ import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import type { Grid } from './run-board-theme-host-types'
 
-// The BTTF theme's figure (joshuafolkken/kit#8917, run-board-flux-panel.ts): the flux capacitor and the
+// The BTTF theme's figure (joshuafolkken/kit#8917, after the removed run-board-flux-panel.ts): the flux capacitor and the
 // lamp gauge at the panel's right end, and the speed on the panel's last row during an event. Ported
 // from the confirmed theme demo's `fixed-v21-theme-bttf.mjs`.
 

@@ -3,8 +3,9 @@ import type { ThemeApi, ThemePart } from './run-board-theme-host-types'
 import { run_board_theme_trace_paint } from './run-board-theme-trace-paint'
 import { run_board_theme_trace_pass, type PassScene } from './run-board-theme-trace-pass'
 
-// MATRIX's opening and ending (joshuafolkken/kit#8917), from the confirmed theme demo. The opening
-// (run-board-intro.ts, the matrix entry of run-board-theme-defs.ts): on an empty screen three lead
+// MATRIX's opening and ending (joshuafolkken/kit#8917), from the confirmed theme demo, after main's
+// modules this change removed. The opening (run-board-intro.ts, the matrix entry of
+// run-board-theme-defs.ts): on an empty screen three lead
 // lines type in bright green, a letter a tick with the cursor after each, each held and erased
 // after a gap; then `Knock, knock, Josh.` shows at once; then the rain reveals the board
 // (run-board-reveal-rain.ts). The ending (run-board-exit-rain.ts): the reveal's rain run the other

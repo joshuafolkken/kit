@@ -205,12 +205,12 @@ function take_keys(
 	run.release = intercept?.(on_key)
 }
 
-// Demo mode entered: the current theme's idle board, nothing playing.
 // What the board shows switched: the second drawing the old look is over (`run-board-spin.ts`).
 function switched(run: ThemeRun): void {
 	run.shown = (run.shown ?? 0) + 1
 }
 
+// Demo mode entered: the current theme's idle board, nothing playing.
 function enter_demo(run: ThemeRun): void {
 	run.demo = { timeline: IDLE, entered: run.value }
 	run.part = undefined

@@ -3,7 +3,7 @@ import type { Grid } from './run-board-theme-host-types'
 import { run_board_theme_rules } from './run-board-theme-rules'
 
 // The WARGAMES theme's opening reveal (joshuafolkken/kit#8917), ported from the confirmed theme demo
-// (run-board-intro.ts, run-board-reveal-blocks.ts): the first frame is written from the top, a line
+// (the removed run-board-intro.ts, run-board-reveal-blocks.ts): the first frame is written from the top, a line
 // a beat, each line's beat shared evenly between its blocks — runs of words one blank apart, a rule
 // `-` run on its own, a gauge's `■` ending its block, a title to the two blanks after it.
 

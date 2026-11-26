@@ -4,7 +4,8 @@ import type { Cell, Channel } from './run-board-theme-host-types'
 import { run_board_theme_trace_data, type TraceView } from './run-board-theme-trace-data'
 import { run_board_theme_trace_paint } from './run-board-theme-trace-paint'
 
-// MATRIX's typing (joshuafolkken/kit#8917), from the confirmed theme demo: the progress line's glow
+// MATRIX's typing (joshuafolkken/kit#8917), from the confirmed theme demo, after main's modules this
+// change removed: the progress line's glow
 // (run-board-type-glow.ts), the new lane decoding out of dark rain (run-board-decode.ts) and the
 // notice locking out of spinning glyphs (run-board-notice-trace.ts).
 

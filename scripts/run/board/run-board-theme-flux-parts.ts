@@ -36,7 +36,7 @@ const { draw_arcs, draw_bolts } = run_board_theme_flux_run
 const { put } = run_board_theme_host_grid
 const { channel } = run_board_theme_host_state
 
-// Main's bttf intro (`run-board-theme-defs.ts` → `run_board_sound_keypad.LINE`, a letter a tick,
+// Main's bttf intro, its modules since removed (`run-board-theme-defs.ts` → `run_board_sound_keypad.LINE`, a letter a tick,
 // then a forty-tick hold), typed at the top left of an empty screen as `run-board-intro.ts` does; then
 // the arrival (`run-board-jump.ts` ARRIVE_FLASHES, THAW_AT, ARRIVE_THAW_TICKS; `run-board-jump-paint.ts`
 // `arrive_cells`): the board black, lit by three flashes each whiter than the last, then thawing from
