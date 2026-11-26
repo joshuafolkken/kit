@@ -287,13 +287,11 @@ async function put_confirmed(
 	branch_name: string,
 	pr_number: number,
 	head_sha: string,
-): Promise<unknown> {
+): Promise<void> {
 	try {
 		await put_merge(pr_number, head_sha)
-
-		return undefined
 	} catch (error) {
-		return (await has_merge_landed(branch_name, pr_number, error)) ? undefined : error
+		if (!(await has_merge_landed(branch_name, pr_number, error))) throw error
 	}
 }
 
@@ -305,14 +303,13 @@ async function merge_with_confirmation(
 	pr_number: number,
 	head_sha: string,
 ): Promise<void> {
-	const failure = await put_confirmed(branch_name, pr_number, head_sha)
-	if (failure === undefined) return
+	try {
+		await put_confirmed(branch_name, pr_number, head_sha)
+	} catch (error) {
+		if (!is_merge_in_progress(error)) throw error
 
-	const final_failure = is_merge_in_progress(failure)
-		? await put_confirmed(branch_name, pr_number, head_sha)
-		: failure
-
-	if (final_failure !== undefined) throw final_failure
+		await put_confirmed(branch_name, pr_number, head_sha)
+	}
 }
 
 async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
