@@ -1,7 +1,5 @@
 import {
-	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
-	MIGRATION_CLAIM_SUFFIX,
 	observation_ledger,
 	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
@@ -30,7 +28,6 @@ vi.mock('#scripts/observations/observation-ledger-prepare', () => ({
 // joshuafolkken/kit#2919: the ledger is a directory of one file per issue; a lane stages its own.
 const OBSERVATION_LEDGER_PATH = observation_ledger.ledger_file(2919)
 const LEGACY_OBSERVATION_LEDGER_PATH = LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? ''
-const MIGRATION_CLAIM_FILE = `${LEGACY_OBSERVATION_LEDGER_PATH}.123${MIGRATION_CLAIM_SUFFIX}`
 const BROKEN_LINE = { line: '- k:broken', reason: 'expected 5 fields' }
 
 vi.mock('./git-status', () => ({
@@ -118,12 +115,9 @@ describe('git_staging.check_and_confirm_staging — the observation ledger rides
 		expect(git_command.add_tracked).toHaveBeenCalledWith([])
 	})
 
-	it('stages an untracked ledger, but never a migration claim', async () => {
+	it('stages an untracked ledger', async () => {
 		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
-		vi.mocked(git_status.list_untracked_files).mockReturnValueOnce([
-			OBSERVATION_LEDGER_PATH,
-			MIGRATION_CLAIM_FILE,
-		])
+		vi.mocked(git_status.list_untracked_files).mockReturnValueOnce([OBSERVATION_LEDGER_PATH])
 
 		await git_staging.check_and_confirm_staging(true)
 
@@ -165,7 +159,6 @@ describe('git_staging.check_and_confirm_staging — a ledger that breaks the gra
 
 		expect(git_command.add_tracked).toHaveBeenCalledWith([
 			OBSERVATION_LEDGER_DIRECTORY,
-			LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 			...LEGACY_OBSERVATION_LEDGER_PATHS,
 		])
 	})

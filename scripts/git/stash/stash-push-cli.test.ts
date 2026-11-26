@@ -2,9 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import {
-	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
-	MIGRATION_CLAIM_SUFFIX,
 	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -58,15 +56,9 @@ function edit_ledger(): void {
 	write(LEDGER, EDITED)
 }
 
-// Every path `observation_ledger.is_ledger_path` names: the old directory, the single-file ledgers and
-// a claim a killed migration left.
+// Every old path `observation_ledger.is_ledger_path` still names: the single-file ledgers.
 function write_legacy_ledgers(): void {
-	write(path.join(LEGACY_OBSERVATION_LEDGER_DIRECTORY, '1.md'), EDITED)
-
-	for (const legacy of LEGACY_OBSERVATION_LEDGER_PATHS) {
-		write(legacy, EDITED)
-		write(`${legacy}.123${MIGRATION_CLAIM_SUFFIX}`, EDITED)
-	}
+	for (const legacy of LEGACY_OBSERVATION_LEDGER_PATHS) write(legacy, EDITED)
 }
 
 async function push(): Promise<number> {

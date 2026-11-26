@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
-	LEGACY_LEDGER_FILE,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	observation_ledger,
 	OBSERVATION_LEDGER_DIRECTORY,
@@ -57,13 +56,16 @@ describe('observation_ledger_prepare.prepare', () => {
 		expect(await observation_ledger_prepare.prepare(root)).toEqual([])
 	})
 
-	it('moves lines on the old path to the new one before reading', async () => {
-		const root = root_with(LEGACY_OBSERVATION_LEDGER_PATH, `${GOOD_LINE}\n`)
+	it('warns once about a ledger on an old path and leaves it where it is', async () => {
+		const root = root_with(LEGACY_OBSERVATION_LEDGER_PATH, `${BROKEN_LINE}\n`)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
 		expect(await observation_ledger_prepare.prepare(root)).toEqual([])
-		expect(existsSync(path.join(root, LEGACY_OBSERVATION_LEDGER_PATH))).toBe(false)
-		expect(
-			readFileSync(path.join(root, OBSERVATION_LEDGER_DIRECTORY, LEGACY_LEDGER_FILE), 'utf8'),
-		).toContain(GOOD_LINE)
+		expect(warn).toHaveBeenCalledOnce()
+		expect(readFileSync(path.join(root, LEGACY_OBSERVATION_LEDGER_PATH), 'utf8')).toBe(
+			`${BROKEN_LINE}\n`,
+		)
+		expect(existsSync(path.join(root, OBSERVATION_LEDGER_DIRECTORY))).toBe(false)
+		warn.mockRestore()
 	})
 })

@@ -1,7 +1,7 @@
 import {
-	LEDGER_DIRECTORIES,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
 	observation_ledger,
+	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
 import { observation_ledger_prepare } from '#scripts/observations/observation-ledger-prepare'
 import { git_command } from './git-command'
@@ -75,12 +75,11 @@ async function stage_untracked_files(files: ReadonlyArray<string>): Promise<void
 //
 // **A line that breaks the grammar keeps the old exclusion**: the commit
 // goes ahead without the ledger, and `pnpm josh observations:flush` — which refuses the same line and
-// names it — is where it is repaired. The migration is run first, as the flush runs it, so a line
-// still on an old path is committed in the directory. **A lane carries its
+// names it — is where it is repaired. **A lane carries its
 // own lines**: its writers append to its own tree's issue file, so this is
 // the step that takes them to the default branch.
 const LEDGER_PATHSPECS: ReadonlyArray<string> = [
-	...LEDGER_DIRECTORIES,
+	OBSERVATION_LEDGER_DIRECTORY,
 	...LEGACY_OBSERVATION_LEDGER_PATHS,
 ]
 
@@ -93,11 +92,6 @@ async function ledger_exclusions(): Promise<ReadonlyArray<string>> {
 // An excluded pathspec covers what sits under it, as git reads it — the directory's files included.
 function is_excluded(file_path: string, excluded: ReadonlyArray<string>): boolean {
 	return excluded.some((spec) => file_path === spec || file_path.startsWith(`${spec}/`))
-}
-
-// A migration claim is a copy mid-move, never the ledger itself, so it is never staged.
-function is_stageable(file_path: string, excluded: ReadonlyArray<string>): boolean {
-	return !observation_ledger.is_migration_claim(file_path) && !is_excluded(file_path, excluded)
 }
 
 // **Said out loud, because the alternative is an unexplained failure.** With the ledger the only
@@ -128,7 +122,7 @@ async function stage_tracked_files(): Promise<void> {
 	const status_output = await git_command.status()
 	const untracked = git_status
 		.list_untracked_files(status_output)
-		.filter((file_path) => is_stageable(file_path, excluded))
+		.filter((file_path) => !is_excluded(file_path, excluded))
 
 	await git_command.add_tracked(excluded)
 	console.info('💡 Auto-staged tracked modified files (git add -u).')

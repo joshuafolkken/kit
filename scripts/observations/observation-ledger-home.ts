@@ -3,7 +3,6 @@ import path from 'node:path'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
-import { observation_ledger_migrate } from './observation-ledger-migrate'
 
 // Where the observation ledger is read and written, whichever work tree a command runs in.
 //
@@ -21,21 +20,14 @@ function ledger_root(cwd: string = process.cwd()): string {
 	return cwd
 }
 
-// **Resolving the directory migrates the single-file ledgers first**. Every reader and writer asks here — `review:record --check`,
-// `review:findings`, the retrospective, the stash carry's duplicate check — so none of them can read a
-// directory without the lines that still sit at an old path, which for the review-record check would
-// answer `missing` for a round recorded before the move.
+// **Resolving a path touches no file**: every reader and writer asks here, so an old-path check here
+// would run on each read and append. `observation-ledger-legacy.ts` warns about old paths once, where
+// the ledger is committed.
 function ledger_directory(cwd: string = process.cwd()): string {
-	const root = ledger_root(cwd)
-
-	observation_ledger_migrate.migrate(root)
-
-	return path.join(root, OBSERVATION_LEDGER_DIRECTORY)
+	return path.join(ledger_root(cwd), OBSERVATION_LEDGER_DIRECTORY)
 }
 
 function file_path(name: number | string, cwd: string): string {
-	ledger_directory(cwd)
-
 	return path.join(ledger_root(cwd), observation_ledger.ledger_file(name))
 }
 

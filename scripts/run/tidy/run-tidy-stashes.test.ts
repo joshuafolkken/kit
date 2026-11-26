@@ -4,7 +4,6 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { stash_sweep_lock } from '#scripts/git/stash/stash-sweep-lock'
 import {
 	LEGACY_OBSERVATION_LEDGER_PATHS,
-	LEGACY_LEDGER_FILE as MIGRATED_FILE_NAME,
 	observation_ledger,
 	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
@@ -181,8 +180,6 @@ function primary_with_old_ledger(): string {
 	return root
 }
 
-// joshuafolkken/kit#2724: the duplicate check reads the ledger after the migration, not the empty new
-// path before it — otherwise a line both the old ledger and the stash hold is carried twice.
 // joshuafolkken/kit#3047: the path reads run together, and the carry keeps path order.
 describe('run_tidy_stashes.tidy_stashes — concurrent ledger path reads', () => {
 	it('keeps path order when the first path read finishes last', async () => {
@@ -201,8 +198,10 @@ describe('run_tidy_stashes.tidy_stashes — concurrent ledger path reads', () =>
 	})
 })
 
+// joshuafolkken/kit#9049: nothing migrates an old ledger any more, so the carry reads and writes the
+// directory alone and leaves the old file where it is.
 describe('run_tidy_stashes.tidy_stashes — a primary checkout whose ledger is still at the old path', () => {
-	it('carries no line the not-yet-migrated old ledger already holds', async () => {
+	it('carries into the directory and leaves the old ledger untouched', async () => {
 		const root = primary_with_old_ledger()
 
 		vi.mocked(process.cwd).mockReturnValue(root)
@@ -212,10 +211,9 @@ describe('run_tidy_stashes.tidy_stashes — a primary checkout whose ledger is s
 
 		await run_tidy_stashes.tidy_stashes(is_merged)
 
-		const migrated = path.join(root, OBSERVATION_LEDGER_DIRECTORY, MIGRATED_FILE_NAME)
-
-		expect(readFileSync(migrated, 'utf8')).toBe(`${NEW_LINE}\n`)
-		expect(existsSync(path.join(root, LEDGER_FILE))).toBe(false)
+		expect(readFileSync(path.join(root, LEDGER_FILE), 'utf8')).toBe(`${NEW_LINE}\n`)
+		expect(readFileSync(path.join(root, LEGACY_LEDGER_FILE), 'utf8')).toBe(`${NEW_LINE}\n`)
+		expect(existsSync(path.join(root, OBSERVATION_LEDGER_DIRECTORY, 'legacy.md'))).toBe(false)
 	})
 })
 

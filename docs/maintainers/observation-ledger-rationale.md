@@ -62,11 +62,8 @@ back on its own, which no single sighting can demonstrate.
 Measured for joshuafolkken/kit#7336: 2,912 of 8,242 tracked files, 1–2 more per issue.
 
 Every content reader goes through `observation_ledger_home.read`
-(`scripts/observations/observation-ledger-home.ts:104`). It takes every file in the working tree's
-directory in name order (`:83`, `:100`), with no git call (`:20`).
-
-The one exception is the one-time move of the old single-file ledgers
-(`scripts/observations/observation-ledger-migrate.ts`), which reads only those legacy paths.
+(`scripts/observations/observation-ledger-home.ts:96`). It takes every file in the working tree's
+directory in name order (`:80`, `:84`), with no git call (`:19`).
 
 So no reader skips a closed issue's file today; the table says which ones need it.
 
