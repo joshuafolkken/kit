@@ -1,3 +1,4 @@
+import { git_followup_label } from '#scripts/followup/git-followup-label'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { main_entry_fixture } from '#scripts/josh/main-entry-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +7,9 @@ import { run_label_main } from './run-label-main'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_add_label: vi.fn(), issue_remove_label: vi.fn() },
+}))
+vi.mock('#scripts/followup/git-followup-label', () => ({
+	git_followup_label: { strip_in_progress: vi.fn() },
 }))
 vi.mock('./hold/run-hold', () => ({
 	run_hold: {
@@ -69,5 +73,28 @@ describe('the label worker', () => {
 
 		expect(await run_label_main.run([ISSUE, '--retry'])).toBe(1)
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('failed'))
+	})
+})
+
+// joshuafolkken/kit#9042: the release's refused removal is finished by this detached retry.
+describe('the unmark retry', () => {
+	it('strips the label on the unmark retry once no run holds the tree', async () => {
+		vi.mocked(run_hold.is_own_hold).mockReturnValue(false)
+
+		expect(await run_label_main.run([ISSUE, '--unmark'])).toBe(0)
+		expect(git_followup_label.strip_in_progress).toHaveBeenCalledWith(ISSUE)
+		expect(git_gh_command.issue_add_label).not.toHaveBeenCalled()
+	})
+
+	it('keeps the label on the unmark retry while a run of the issue holds the tree', async () => {
+		expect(await run_label_main.run([ISSUE, '--unmark'])).toBe(0)
+		expect(git_followup_label.strip_in_progress).not.toHaveBeenCalled()
+	})
+
+	it('reports a failed unmark retry in its exit status', async () => {
+		vi.mocked(run_hold.is_own_hold).mockReturnValue(false)
+		vi.mocked(git_followup_label.strip_in_progress).mockRejectedValue(new Error('gh api failed'))
+
+		expect(await run_label_main.run([ISSUE, '--unmark'])).toBe(1)
 	})
 })

@@ -1,5 +1,6 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
 import type { Writable } from 'node:stream'
+import { run_board_output_hold } from './run-board-output-hold'
 import { run_board_sound_cues, type CueName } from './run-board-sound-cues'
 import { run_board_sound_stream } from './run-board-sound-stream'
 import { run_board_sound_wav } from './run-board-sound-wav'
@@ -80,7 +81,8 @@ const PLAYERS: Partial<Record<NodeJS.Platform, Array<Player>>> = {
 
 const DEFAULT_PORTS: SoundPorts = {
 	spawner: spawn,
-	write: (text) => process.stdout.write(text),
+	// The bell is the board's own write, so it is not one the run:board output hold keeps (#9008).
+	write: (text) => run_board_output_hold.terminal.write(text),
 }
 
 function players_for(platform: NodeJS.Platform): Array<Player> {
