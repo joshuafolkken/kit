@@ -19,18 +19,9 @@ import { run_board_theme_stress_fixture, type StressBoard } from './run-board-th
 // so blanks are not either; MATRIX's rain and STEINS;GATE's glitches rewrite characters anywhere by
 // design, so their idle is not checked.
 
-const { MIN_PANEL_ROWS, MIN_PANEL_WIDTH, edit_board, layout_of } = run_board_theme_layout
+const { MIN_PANEL_ROWS, edit_board, layout_of } = run_board_theme_layout
 const { frame_of, part_frame_of, part_of } = run_board_theme_host_frame
-const { stress_board } = run_board_theme_stress_fixture
-const THEMES: ReadonlyArray<ThemeValue> = [
-	'wopr',
-	'trace',
-	'flux',
-	'codec',
-	'nixie',
-	'skynet',
-	'magi',
-]
+const { MATRIX, SMALLEST, THEMES, stress_board } = run_board_theme_stress_fixture
 // Their idle touches rewrite characters anywhere on the board.
 const SCREEN_WIDE: ReadonlySet<ThemeValue> = new Set(['trace', 'nixie'])
 // Ticks sampled: an event's every seventh, with the normal display after it; a part's every third.
@@ -38,28 +29,6 @@ const EVENT_STEP = 7
 const PART_STEP = 3
 const AFTER_TICKS = 60
 const UNDER_ROWS = 2
-const DEMO = { edge: 114, px: 68, panel_rows: 7 }
-// A live board at 200×50 lays its rules and panel out so (a real-data `board:replay`).
-const LIVE = { edge: 118, px: 69 }
-const NARROW_PX = 40
-const WIDE_PX = 74
-
-function minimum(px: number): { edge: number; px: number } {
-	return { edge: px + MIN_PANEL_WIDTH, px }
-}
-
-// The smallest panel at the demo's panel column, at a narrow board's and one further right; the demo's
-// own board, a wide one; terminals as wide as the board and wider, short and tall; no lane, one and
-// three; panels of six (the smallest), seven (the demo's), eight and nine rows; a live 200×50 board.
-const MATRIX: ReadonlyArray<StressBoard> = [
-	{ columns: 108, rows: 30, ...minimum(DEMO.px), lanes: 1, panel_rows: MIN_PANEL_ROWS },
-	{ columns: 80, rows: 24, ...minimum(NARROW_PX), lanes: 0, panel_rows: MIN_PANEL_ROWS },
-	{ columns: 199, rows: 60, ...DEMO, lanes: 3 },
-	{ columns: 240, rows: 40, edge: 160, px: DEMO.px, lanes: 3, panel_rows: 8 },
-	{ columns: 130, rows: 24, ...minimum(DEMO.px), lanes: 0, panel_rows: 9 },
-	{ columns: 115, rows: 60, ...minimum(WIDE_PX), lanes: 1, panel_rows: 8 },
-	{ columns: 200, rows: 50, ...LIVE, lanes: 3, panel_rows: MIN_PANEL_ROWS },
-]
 
 type Events = ReturnType<typeof run_board_theme_host_sample.demo_events>
 
@@ -194,15 +163,8 @@ describe('run_board_theme themes on boards of every size', () => {
 	// joshuafolkken/kit#8917 (the confirmed specification §2): the theme keeps its looks on a panel
 	// under the smallest; only its area falls off the frame.
 	it('lays the area off the frame on a panel under the smallest', () => {
-		const smallest: StressBoard = {
-			columns: 108,
-			rows: 30,
-			...minimum(DEMO.px),
-			lanes: 1,
-			panel_rows: MIN_PANEL_ROWS,
-		}
-		const short = stress_board({ ...smallest, panel_rows: MIN_PANEL_ROWS - 1 })
-		const narrow = stress_board({ ...smallest, edge: smallest.edge - 1 })
+		const short = stress_board({ ...SMALLEST, panel_rows: MIN_PANEL_ROWS - 1 })
+		const narrow = stress_board({ ...SMALLEST, edge: SMALLEST.edge - 1 })
 
 		for (const { cells, view, size } of [short, narrow]) {
 			const layout = layout_of(view, run_board_theme_roles.grid_of(cells), size)
