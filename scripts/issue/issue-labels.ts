@@ -156,6 +156,13 @@ const REVIEW_CAP_ROUTE_LABEL = 'route:review-cap'
 const SPLIT_ROUTE_LABEL = 'route:split'
 const TIER_A_ROUTE_LABEL = 'route:tier-a'
 
+// The area an issue is about (joshuafolkken/kit#8960), one per issue: `run:board` draws the word after
+// the prefix before a row's title, so a new area needs a label and no code. A theme issue carries
+// `area:theme` alone, not `area:board` as well.
+const AREA_LABEL_PREFIX = 'area:'
+const AREA_BOARD_LABEL = `${AREA_LABEL_PREFIX}board`
+const AREA_THEME_LABEL = `${AREA_LABEL_PREFIX}theme`
+
 // The pull request release classifications `pr-classification.yml` requires exactly one of.
 // The check is distributed by `josh sync`, so the labels it asks for are
 // provisioned from this same list — a repository that never had them would otherwise fail the check
@@ -258,6 +265,8 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	BUGFIX_LABEL,
 	OTHER_CHANGE_LABEL,
 	IGNORE_FOR_RELEASE_LABEL,
+	AREA_BOARD_LABEL,
+	AREA_THEME_LABEL,
 ])
 
 // The managed labels `REPOSITORY_LABELS` deliberately does not provision, each with its reason. Every
@@ -269,6 +278,9 @@ export type { ReleaseClassification }
 export {
 	ALL_LABELS,
 	ALREADY_DONE_LABEL,
+	AREA_BOARD_LABEL,
+	AREA_LABEL_PREFIX,
+	AREA_THEME_LABEL,
 	AUTO_OK_LABEL,
 	BUG_LABEL,
 	BUGFIX_LABEL,
