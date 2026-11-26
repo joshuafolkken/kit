@@ -187,6 +187,9 @@ interface ThemeModule {
 	notes?: Partial<Record<EventKey, string>>
 	background?: (x: number, y: number, tick: number, s: ThemeState) => string | undefined
 	draw: (grid: Grid, s: ThemeState, tick: number) => void
+	// Whether an event's effect plays at `s`, by the very condition `draw` paints it by; false once the
+	// board is back on its idle look. Demo mode's footer reads it (`run-board-demo-footer.ts`).
+	playing?: (s: ThemeState) => boolean
 	opening?: ThemePart
 	ending?: ThemePart
 	lasts?: Partial<Record<EventKey, number>>

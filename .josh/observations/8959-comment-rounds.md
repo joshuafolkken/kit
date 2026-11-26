@@ -1,0 +1,1 @@
+- rf:project-conventions | low | scripts/issue/issue-labels.ts:7 | 2026-11-26 | #8959 | - | stale-comment

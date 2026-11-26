@@ -9,6 +9,8 @@ import {
 import {
 	ALL_LABELS,
 	ALREADY_DONE_LABEL,
+	AREA_BOARD_LABEL,
+	AREA_THEME_LABEL,
 	AUTO_OK_LABEL,
 	BUG_LABEL,
 	DEFERRED_LABEL,
@@ -63,7 +65,7 @@ describe('FILING_ROUTE_LABELS', () => {
 
 describe('WORKFLOW_LABELS', () => {
 	// What josh start provisions: every label a run applies, and every one a person applies too.
-	it('carries the workflow, opt-in, parking, review and bug labels, then every route label', () => {
+	it('carries the workflow, opt-in, parking, review and bug labels, then the route and area labels', () => {
 		expect(WORKFLOW_LABELS.map((label) => label.name)).toStrictEqual([
 			EPIC_LABEL,
 			IN_PROGRESS_LABEL,
@@ -86,6 +88,8 @@ describe('WORKFLOW_LABELS', () => {
 			NOT_BEFORE_LABEL,
 			BUG_LABEL,
 			...FILING_ROUTE_LABELS.map((label) => label.name),
+			AREA_BOARD_LABEL,
+			AREA_THEME_LABEL,
 		])
 	})
 })

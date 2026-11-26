@@ -40,3 +40,36 @@ describe('run_board_kind.kind_of', () => {
 		expect(run_board_kind.KIND_ORDER).toStrictEqual([BREAKING, FEATURE, FIX])
 	})
 })
+
+// joshuafolkken/kit#8960: a row's area, the word after `area:` of its first area label.
+const AREA_BOARD = 'area:board'
+const AREA_THEME = 'area:theme'
+
+describe('run_board_kind.area_of', () => {
+	it.each([
+		[AREA_BOARD, 'board'],
+		[AREA_THEME, 'theme'],
+		['Area:dashboard', 'dashboard'],
+	])('reads the label %s as the area %s', (label, area) => {
+		expect(run_board_kind.area_of([FEATURE, label])).toBe(area)
+	})
+
+	it('takes the first area where several apply', () => {
+		expect(run_board_kind.area_of([AREA_THEME, AREA_BOARD])).toBe('theme')
+	})
+
+	it('reads the kind, priority and area of a row together', () => {
+		expect(run_board_kind.marks_of([FEATURE, 'priority:high', AREA_BOARD])).toStrictEqual({
+			kind: FEATURE,
+			priority: 'high',
+			area: 'board',
+		})
+	})
+
+	it('reads no area where none applies, or where labels are not read', () => {
+		expect(run_board_kind.area_of([FEATURE, 'auto-ok'])).toBeUndefined()
+		expect(run_board_kind.area_of(['area:'])).toBeUndefined()
+		expect(run_board_kind.area_of([])).toBeUndefined()
+		expect(run_board_kind.area_of(undefined)).toBeUndefined()
+	})
+})
