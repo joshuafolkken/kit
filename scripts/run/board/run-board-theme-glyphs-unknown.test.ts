@@ -30,6 +30,12 @@ describe('run_board_theme_glyphs.textual of an emoji the table misses', () => {
 		expect(textual('🦄🔄|')).toBe('  >>|')
 	})
 
+	it('draws it as plain blanks, with no color escape, in color', () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		expect(textual('a🦄b')).toBe('a  b')
+	})
+
 	it('keeps the frame as it is with `emoji` icons', () => {
 		expect(textual(FRAME, { theme: undefined, icons: 'emoji' })).toBe(FRAME)
 		expect(textual(FRAME, { theme: 'wopr', icons: 'emoji' })).toBe(FRAME)

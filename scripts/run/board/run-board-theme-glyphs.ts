@@ -107,7 +107,6 @@ function text_of(glyph: string, open: Open, look: GlyphLook): string {
 	const entry = entry_of(glyph, look)
 
 	if (entry === undefined) return glyph
-	if (entry === UNKNOWN) return ' '.repeat(run_board_fit.width_of(glyph))
 	const text = drawn_text(entry, look.icons)
 	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
 
