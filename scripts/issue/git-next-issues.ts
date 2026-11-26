@@ -44,7 +44,10 @@ function compare_oldest_first(first: OpenIssueData, second: OpenIssueData): numb
 	return first.createdAt < second.createdAt ? -1 : 1
 }
 
-function label_names(issue: OpenIssueData): Array<string> {
+// The fields a rank row reads: the pool's listing carries them, and so does a single issue read.
+type RankedIssue = Partial<Pick<OpenIssueData, 'body' | 'labels'>>
+
+function label_names(issue: RankedIssue): Array<string> {
 	return (issue.labels ?? []).map((label) => label.name)
 }
 
@@ -61,7 +64,7 @@ function dependency_row(issue: OpenIssueData): DependencyRow {
 	}
 }
 
-function rank_row(issue: OpenIssueData, dependency: DependencyRank): RankRow {
+function rank_row(issue: RankedIssue, dependency: DependencyRank): RankRow {
 	const labels = label_names(issue)
 	const body = issue.body ?? ''
 
@@ -151,6 +154,8 @@ const git_next_issues = {
 	prioritize,
 	format_lines,
 	fetch_next_issue_lines,
+	rank_row,
 }
 
+export type { RankedIssue }
 export { git_next_issues }
