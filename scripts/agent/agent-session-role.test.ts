@@ -66,11 +66,13 @@ describe('agent_session_role.scope_line', () => {
 	// joshuafolkken/kit#7783: a filing instruction in consultation is kickoff new, handed off.
 	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.
 	// joshuafolkken/kit#8943: no-filing work defers tests, the gate and the review to the finish.
+	// joshuafolkken/kit#8973: the producer builds in its own worktree, never in this checkout.
 	it.each([
 		'hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`',
 		'imperative request with investigation, a plan and a filing plan',
 		'「起票せずに」',
 		'investigator and producer subagents, never edited by this session',
+		'the producer is dispatched with `isolation: "worktree"` and never edits this checkout',
 		'tests, the gate and the review wait for the finish unless asked for now',
 		'each such reply ends saying they have not run',
 	])('names the consultation route outside a worker lane: %s', (phrase) => {
