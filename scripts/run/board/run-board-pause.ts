@@ -1,6 +1,7 @@
 import { backlog_triage_adopted } from '#scripts/backlog/backlog-triage-adopted'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
 import type { IssueComment } from '#scripts/issue/issue-read'
+import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_park_body } from '#scripts/run/park/run-park-body'
 import { z } from 'zod'
 import type { RowReason } from './run-board-layout'
@@ -157,9 +158,16 @@ function stale_of(record: PauseRecord, launch: number): RowReason {
 	return { tail: FALLBACK, evidence_url: record.url?.split('#', 1)[0] }
 }
 
+// joshuafolkken/kit#9029: past the drive's auto-retry cap a park's own next action (the yield cap's
+// re-offer) no longer holds — the drive restated the park with its cap note, which hands the row to a
+// person, so the comment's record gives way to that event.
+function is_capped(status?: ItemStatus): boolean {
+	return status?.reason?.includes(run_event_retry.CAP_NOTE) === true
+}
+
 function reason_of(number: number, read: PauseRead, status?: ItemStatus): RowReason | undefined {
 	const record = record_of(number, read, status)
-	if (record === undefined) return undefined
+	if (record === undefined || is_capped(status)) return undefined
 
 	const launch = launch_of(status)
 	const { awaiting } = record

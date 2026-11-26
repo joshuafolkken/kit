@@ -328,7 +328,7 @@ async function drive(context: DriveContext): Promise<number> {
 
 	if (seeded === undefined) return FAILURE_EXIT_CODE
 	const last = { state: seeded_state(seeded, context) }
-	const holds = backlog_drive_hold.recorder()
+	const holds = await backlog_drive_hold.started()
 	const ports = ports_of(context, seeded.lanes, last, holds)
 	const end = await backlog_drive.run_loop(last.state, loop_config(context.window_ms), ports)
 

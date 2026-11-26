@@ -60,3 +60,16 @@ describe('lane_hand_back_held.record', () => {
 		await expect(lane_hand_back_held.record()).resolves.toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#9003: the next driver's start clears the mark though its full pool writes no line.
+describe('lane_hand_back_held.record — after a driver start', () => {
+	it('holds nothing once a starting driver cleared the mark, and holds while none started', async () => {
+		const targets = [ledger('restarted'), ledger('driverless')]
+
+		await Promise.all(targets.map((target) => lane_hand_back_hold.mark(REASON, target)))
+		await lane_hand_back_hold.clear(targets[0])
+		await Promise.all(targets.map((target) => lane_hand_back_held.record(target)))
+
+		expect(targets.map((target) => kinds(target))).toStrictEqual([[], ['held']])
+	})
+})

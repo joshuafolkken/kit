@@ -1,4 +1,5 @@
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_outcome } from '#scripts/issue/issue-outcome'
 import { session_language } from '#scripts/josh/session-language'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -10,8 +11,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_yield_cap } from './backlog-yield-cap'
 
-const { PORTS, TRIP_CAUSE, WINDOW_MS, YIELD_CAP, body_of, capped, is_tripped, times_of } =
-	backlog_yield_cap
+const {
+	PORTS,
+	RETRY_NEXT,
+	TRIP_CAUSE,
+	WINDOW_MS,
+	YIELD_CAP,
+	body_of,
+	capped,
+	is_tripped,
+	times_of,
+} = backlog_yield_cap
 const ISSUE = '6799'
 const NOW = new Date('2026-11-08T16:30:00.000Z')
 
@@ -152,6 +162,15 @@ describe('backlog_yield_cap.body_of', () => {
 			expect(body).toContain(`\`${run_stalled.resume_of(ISSUE, true)}\``)
 			expect(body).not.toContain(RE_OFFER)
 			expect(body).not.toContain('then use')
+		},
+	)
+
+	it.each(['en', 'ja'])(
+		'marks the park with the drive re-offer as its next action under %j (ac-0973b473, ac-f1c836ea)',
+		(lang) => {
+			vi.stubEnv(session_language.ENV_KEY, lang)
+
+			expect(issue_outcome.next_of(body_of(ISSUE))).toBe(RETRY_NEXT)
 		},
 	)
 })

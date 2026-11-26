@@ -226,7 +226,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title (a `docs/*.md` path or one under `.josh/tmp/` never counts); `backlog:next` answers "waits: its `<file>` overlaps …".
 - `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, an earlier run's too; an unread limit leaves it blank.
   An empty seat draws a `💺` line under the lanes rule: the first `blocked: #<N>: <cause>` while the newest launch was refused, the rest `no issue ready to start` when no waiting row is free to start, `held — <sentence>` while the ledger's open hold stops one that is.
-  A hold that a session's driver restart ends, not a person, reads `driver restart pending — <sentence>`.
+  A hold that a driver restart ends — the supervisor's for a window's end, else a session's — not a person, reads `driver restart pending — <sentence>`.
   A held seat with no candidate ends `— <sentence>`. The sentence says what holds the seat and who fills it, as `— open issues await your triage` for `hand-back:judge`.
   The ledger keeps the code (`backlog-hold-text.ts` translates it); an unknown code is shown as is. No seat line is drawn while a free row is about to take the seat, before the plan is read, once the run stopped, or for a single run; none counts as a lane row.
 - `🧵 seats 9/9` — port seats, not the limit, block a launch; on the lanes heading and queued rows. While a live run is handing off, watching or between stages, the header shows `🧵 waiting for seats 9/9`.

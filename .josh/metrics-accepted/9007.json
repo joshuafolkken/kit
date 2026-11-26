@@ -1,0 +1,7 @@
+{
+	"reason": "report port threaded through resolve/prioritize/size notice and the board's no-op notice sink (#9007)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}

@@ -63,6 +63,9 @@ interface BoardPorts {
 	write_drawn?: ((text: string) => void) | undefined
 	// Settles once the terminal has taken every write (`run-board-write-port.ts`); none never waits.
 	drained?: (() => Promise<void>) | undefined
+	// Every write from here on goes to the terminal at once, past any still queued, as the board leaves
+	// (joshuafolkken/kit#9027); none writes as before.
+	settle?: (() => void) | undefined
 	// The theme's restyle of text `write` would put through it; none where no theme draws.
 	restyle?: ((text: string) => string) | undefined
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.

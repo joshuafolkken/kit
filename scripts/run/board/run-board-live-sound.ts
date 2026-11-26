@@ -55,6 +55,23 @@ function hush(): void {
 	HELD.clear()
 }
 
+// The board leaving: the trill stopped, every sound hushed, then each of `steps`. Each runs though one
+// before it threw, so a failing step never leaves a sound playing on (joshuafolkken/kit#9027); the
+// first failure is rethrown once all have run.
+function leave_with(trill: Pick<TypingSound, 'stop'> | undefined, steps: Array<() => void>): void {
+	const failures: Array<unknown> = []
+
+	for (const step of [() => trill?.stop(), hush, ...steps]) {
+		try {
+			step()
+		} catch (error: unknown) {
+			failures.push(error)
+		}
+	}
+
+	if (failures.length > 0) throw failures[0]
+}
+
 // `trill` hushed with every other sound from here on.
 function heard(trill: Pick<TypingSound, 'hush'>): void {
 	TRILLS.add(trill)
@@ -141,6 +158,7 @@ const run_board_live_sound = {
 	heard,
 	hush,
 	is_sounding,
+	leave_with,
 	scored,
 	skipped,
 	switched_end,

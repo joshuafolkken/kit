@@ -1,7 +1,10 @@
 import { backlog_triage_adopted } from '#scripts/backlog/backlog-triage-adopted'
+import { backlog_yield_cap } from '#scripts/backlog/backlog-yield-cap'
 import { issue_outcome } from '#scripts/issue/issue-outcome'
 import type { IssueComment } from '#scripts/issue/issue-read'
-import { describe, expect, it } from 'vitest'
+import { session_language } from '#scripts/josh/session-language'
+import { run_event_retry } from '#scripts/run/event/run-event-retry'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RowReason } from './run-board-layout'
 import { run_board_pause } from './run-board-pause'
 import run_board_pause_fixture from './run-board-pause-fixture.json' with { type: 'json' }
@@ -92,6 +95,37 @@ describe('run_board_pause run:stalled next action', () => {
 	it('does not read a marker holding no next action as a stop', () => {
 		expect(run_board_pause.from_comments([stalled('Merged cleanly')]).summary).toBe(
 			run_board_pause.FALLBACK,
+		)
+	})
+})
+
+// joshuafolkken/kit#9029: the yield-cap park names the drive's own re-offer, not a person's decision.
+describe('run_board_pause yield-cap park', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it.each(['en', 'ja'])(
+		'reads the drive re-offer under %j, not the fallback (ac-0bd54d36, ac-f1c836ea)',
+		(lang) => {
+			vi.stubEnv(session_language.ENV_KEY, lang)
+			const park = { ...stalled(), body: backlog_yield_cap.body_of(String(ISSUE)) }
+
+			expect(run_board_pause.from_comments([note(SIZE_REASON), park])).toMatchObject({
+				summary: backlog_yield_cap.RETRY_NEXT,
+				url: park.html_url,
+			})
+		},
+	)
+
+	it('gives the row to the restated park event once the drive reached its auto-retry cap', () => {
+		const park = { ...stalled(), body: backlog_yield_cap.body_of(String(ISSUE)) }
+		const read = { pause_reasons: new Map([[ISSUE, run_board_pause.from_comments([park])]]) }
+		const reason = `${run_event_retry.CAP_NOTE} — ${backlog_yield_cap.TRIP_CAUSE}`
+
+		expect(run_board_pause.reason_of(ISSUE, read, { state: 'parked', reason })).toBeUndefined()
+		expect(run_board_pause.reason_of(ISSUE, read, { state: 'parked' })?.tail).toBe(
+			backlog_yield_cap.RETRY_NEXT,
 		)
 	})
 })
