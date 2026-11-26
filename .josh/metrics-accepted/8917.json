@@ -1,5 +1,5 @@
 {
-	"reason": "#8917 moves the board onto the cell-layer theme host: seven theme modules (draw, timing, sound) with their tests replace the old per-effect look, and the board-theme skill gains theme-rules / theme-sound / theme-wiring pages; the size was approved in the earlier finishing run and the user decided not to split",
+	"reason": "#8917 adds the seven theme modules' unit tests (draw, timing, sound) in place of the old per-effect ones, so the unit duration grows with the suite; it held at 2.1s across reruns of the gate",
 	"date": "2026-11-26",
 	"growth": {
 		"scripts.code_lines": 10381,
