@@ -75,6 +75,10 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 					note: 'start no probe once one hunk is unpinned; the rest count as unchecked',
 				},
 				{
+					arguments: '--continue-cut',
+					note: 'probe only the hunks a --first-unpinned run stopped before, within its cap',
+				},
+				{
 					arguments: '--reasoned',
 					note: 'mark the run on its lane ledger row as launched under an --unpinned-ok reason',
 				},
