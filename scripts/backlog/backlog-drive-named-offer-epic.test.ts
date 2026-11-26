@@ -4,10 +4,11 @@ import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
+import { backlog_drive_named_fixture } from './backlog-drive-named-fixture'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 
-// joshuafolkken/kit#6840: an epic `run:add` put in whose children all wait holds nothing up — the
-// declared issue behind it, or the pool, fills the free lane — while a declared epic still holds.
+// joshuafolkken/kit#6840, joshuafolkken/kit#8953: a named epic whose children all wait holds nothing
+// up — the named issue behind it, or the pool, fills the free lane — declared or put in by `run:add`.
 
 const ACTIVE = new Date().toISOString()
 const EPIC = 5
@@ -51,6 +52,7 @@ async function offer_of(invocation: string): Promise<OfferRead | undefined> {
 
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	backlog_drive_named_fixture.admit_all()
 })
 
 afterEach(() => {
@@ -91,10 +93,10 @@ test('still waits on an added epic whose read failed, so its retries count', asy
 	expect(await offer_of(POOL_RUN)).toStrictEqual(failed)
 })
 
-test('still holds the issues declared after a declared epic that waits', async () => {
+test('offers the issue declared after a declared epic that waits', async () => {
 	epic_answers(WAIT)
 
 	const offer = await offer_of(`backlogrun #${String(EPIC)} #${String(DECLARED)}`)
 
-	expect(offer).toStrictEqual(WAIT)
+	expect(offer).toMatchObject({ verdict: 'run', issues: [String(DECLARED)] })
 })

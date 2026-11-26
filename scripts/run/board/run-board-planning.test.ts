@@ -17,7 +17,6 @@ const PLANNED_AT = '2026-10-20T04:00:00.000Z'
 const OPENING_AT = '2026-10-20T04:01:00.000Z'
 // joshuafolkken/kit#4288: the row leads with 📝, and its condition column counts the planning.
 const PLANNING = '📝'
-const NAMED_ORDER = '📋'
 const OPENING = '🚪'
 const CARRY: RunCarry = {
 	invocation: `backlogrun #${String(HEAD)} #${String(SECOND)} --only`,
@@ -74,9 +73,9 @@ function rows(extra: Partial<ReasonRead> = {}): Array<Array<string | number | un
 }
 
 describe('run_board_reason.reader — the row a planning run is for', () => {
-	it('says planning, with its time, on the declared head alone', () => {
+	it('says planning, with its time, on the first named issue alone', () => {
 		expect(rows()).toStrictEqual([
-			[NAMED_ORDER, undefined],
+			[undefined, undefined],
 			[PLANNING, Date.parse(PLANNED_AT)],
 		])
 	})
@@ -92,14 +91,14 @@ describe('run_board_reason.reader — the row a planning run is for', () => {
 		const opening = setup(2, OPENING_AT, run_event_setup.opening_lane(String(HEAD)))
 
 		expect(rows({ events: [...PLANNING_EVENTS, opening] })).toStrictEqual([
-			[NAMED_ORDER, undefined],
+			[undefined, undefined],
 			[OPENING, Date.parse(OPENING_AT)],
 		])
 	})
 
 	it('says nothing of planning once the run has stopped', () => {
 		expect(rows({ is_stopped: true })).toStrictEqual([
-			[NAMED_ORDER, undefined],
+			[undefined, undefined],
 			[undefined, undefined],
 		])
 	})

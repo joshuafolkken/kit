@@ -200,6 +200,20 @@ describe('backlog_budget.decide — the maximum issue count', () => {
 })
 
 describe('backlog_budget.decide — reaching the maximum', () => {
+	// joshuafolkken/kit#8953: named issues run in parallel, each its own lane, so they count at once.
+	it('counts named issues running side by side toward the maximum before any merges', () => {
+		const input = input_of({
+			answer: 'candidates',
+			max_issues: MAX_ISSUES,
+			merged: 0,
+			running: MAX_ISSUES,
+		})
+		const decision = backlog_budget.decide(input)
+
+		expect(backlog_budget.taken_by(input)).toBe(MAX_ISSUES)
+		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
+	})
+
 	it('drains the running children rather than abandoning them', () => {
 		const running = MAX_ISSUES - MERGED_UNDER_MAX
 		const decision = backlog_budget.decide(
