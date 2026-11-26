@@ -79,6 +79,8 @@ describe('run_board_plan.read_plan a bare --only run', () => {
 		const read = ports()
 		const plan = await run_board_plan.read_plan({ issues: [], only: true }, read)
 
+		// An empty plan, not a failed read (`undefined`), so the board draws it rather than keeping the last one.
+		expect(plan).toBeDefined()
 		expect(drawn(plan)).toStrictEqual([])
 		expect(read.fetch_opted_in).not.toHaveBeenCalled()
 	})
