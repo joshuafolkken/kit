@@ -1,6 +1,14 @@
-import type { BusyRead } from '#scripts/epic/epic-busy'
+import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import { epic_busy, type BusyRead } from '#scripts/epic/epic-busy'
+import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { lane_plan } from '#scripts/lane/lane-plan'
+import { lane_state } from '#scripts/lane/lane-state'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_named_gate, type NamedPlain } from './backlog-drive-named-gate'
 import { backlog_drive_named_scope } from './backlog-drive-named-scope'
@@ -24,6 +32,19 @@ const RUNNING_ISSUE: OpenIssueData = {
 const BUSY: BusyRead = { kind: 'busy', issues: [RUNNING_ISSUE] }
 const IDLE: BusyRead = { kind: 'idle' }
 const UNREADABLE: StateRead = { kind: 'unreadable' }
+const LISTING_LIMIT = 100
+const PLANNED_AT = '2026-11-27T00:00:00.000Z'
+const BOARD_DIRECTORY = 'scripts/run/board/'
+const BOARD_FILE = 'scripts/run/board/run-board-layout-types.ts'
+const CANDIDATE: OpenIssueData = {
+	number: PLAIN,
+	title: 'candidate',
+	createdAt: '2026-11-26T00:00:00Z',
+	blockedBy: undefined,
+	labels: [],
+	body: `\`${BOARD_FILE}\``,
+}
+const make_directory = temporary_directory('test')
 
 function plain(number: number, labels: ReadonlyArray<string> = []): NamedPlain {
 	return { number, labels }
@@ -153,6 +174,62 @@ describe('backlog_drive_named_gate.admitted — the labels of the gathered epic 
 		expect(
 			await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [String(RUNNING)]),
 		).toStrictEqual([])
+	})
+})
+
+// The real scope over recorded plans: the listing is the only read of the candidates' bodies.
+function listing_of(issues: ReadonlyArray<OpenIssueData>, busy: BusyRead): void {
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(make_directory('named-gate-'))
+	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
+	vi.spyOn(epic_busy, 'read_repository').mockResolvedValue(busy)
+	vi.spyOn(epic_solo_stale, 'release').mockImplementation(async (read) => ({ read }))
+	vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
+	vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
+		kind: 'read',
+		issues: [...issues],
+		cutoff: cutoff_of(issues.length, LISTING_LIMIT, false),
+	})
+}
+
+function holder_planned(): void {
+	lane_plan.record(
+		{ issue: RUNNING, paths: [BOARD_DIRECTORY], planned_at: PLANNED_AT },
+		process.cwd(),
+	)
+}
+
+// joshuafolkken/kit#9031: an unplanned candidate claims the paths its body declares, as `lane:plan`
+// reads it, so it is not launched beside a running lane whose plan covers them only to yield.
+describe('backlog_drive_named_gate.admitted — the bodies of unplanned candidates', () => {
+	it.each([
+		{ name: 'the holder listed', listed: [CANDIDATE, RUNNING_ISSUE] },
+		{ name: 'the holder unlisted', listed: [CANDIDATE] },
+	])('withholds a candidate whose body meets a running plan, $name', async ({ listed }) => {
+		listing_of(listed, BUSY)
+		holder_planned()
+
+		expect(await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [])).toStrictEqual([])
+	})
+
+	it('withholds a candidate whose yielded plan meets a running plan', async () => {
+		listing_of([{ ...CANDIDATE, body: '' }], BUSY)
+		holder_planned()
+		lane_plan.record(
+			{ issue: PLAIN, paths: [BOARD_FILE], planned_at: PLANNED_AT, yielded: true },
+			process.cwd(),
+		)
+
+		expect(await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [])).toStrictEqual([])
+	})
+
+	it.each([
+		{ name: 'no lane running', busy: IDLE, body: CANDIDATE.body },
+		{ name: 'no path declared', busy: BUSY, body: '' },
+	])('admits the candidate with $name', async ({ busy, body }) => {
+		listing_of([{ ...CANDIDATE, body }], busy)
+		holder_planned()
+
+		expect(await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [])).toStrictEqual([PLAIN])
 	})
 })
 
