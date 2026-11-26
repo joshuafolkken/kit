@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/backlog/backlog-human-stop-order.ts:43 | 2026-11-22 | #8574 | - | state-reasoning

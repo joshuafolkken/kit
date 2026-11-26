@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | .claude/skills/workflow-commands/pre-gate-cut.md:99 | 2026-11-23 | #8817 | - | stale-docs

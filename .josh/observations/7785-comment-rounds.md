@@ -1,0 +1,7 @@
+- rf:bug-risks | low | scripts/lane/lane-over-estimate.ts:257 | 2026-11-17 | #7785
+- rf:tests | low | scripts/lane/lane-over-estimate.test.ts:113 | 2026-11-17 | #7785
+- rf:assumptions | low | docs/josh-commands-lane.md:247 | 2026-11-17 | #7785
+- rf:bug-risks | low | scripts/lane/lane-over-estimate.ts:67 | 2026-11-17 | #7785
+- rf:tests | low | scripts/lane/lane-over-estimate.test.ts:60 | 2026-11-17 | #7785
+- rf:assumptions | low | docs/josh-commands-lane.md:247 | 2026-11-17 | #7785
+- rf:none | none | - | 2026-11-17 | #7785

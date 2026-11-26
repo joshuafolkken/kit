@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/lane/lane-plan-size.ts:158 | 2026-11-23 | #8859 | - | state-reasoning
+- rf:bug-risks | low | scripts/lane/lane-plan-size.ts:177 | 2026-11-23 | #8859 | - | edge-input

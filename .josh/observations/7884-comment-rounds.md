@@ -1,0 +1,4 @@
+- rf:bug-risks | medium | scripts/review/review-rubric-sections.ts:23 | 2026-11-18 | #7884 | fixed | edge-input
+- rf:bug-risks | low | scripts/review/review-rubric-sections.ts:42 | 2026-11-18 | #7884 | fixed | stale-docs
+- rf:tests | low | scripts/review/review-brief-cli.ts:271 | 2026-11-18 | #7884 | fixed | untested-branch
+- rf:tests | low | scripts/review/review-brief-cli.ts:271 | 2026-11-18 | #7884 | - | untested-branch

@@ -87,6 +87,28 @@ describe('run_ship_removed_rows.surface — the removed tests before the ship', 
 	})
 })
 
+// joshuafolkken/kit#8927: a test file the change deleted whole gets one pending row naming it.
+describe('run_ship_removed_rows.surface — a test file deleted whole', () => {
+	it('writes and prints one pending row naming the deleted file (ac-3b71a395)', async () => {
+		const gone = 'scripts/review/gone.test.ts'
+		const other = 'removed_tests.removed > lists a second test of the file'
+
+		changes_mock.mockResolvedValue({
+			removed: [TITLE, other],
+			added: [],
+			renamed: [],
+			files: [{ path: gone, titles: [TITLE, other] }],
+		})
+		await run_ship_removed_rows.surface()
+
+		expect(draft_text()).toContain(
+			`${removed_tests.DISPOSITION_HEADING}\n\n- \`${gone}\` — 未記入\n`,
+		)
+		expect(draft_text()).not.toContain(PENDING)
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(`  - ${gone}`))
+	})
+})
+
 // joshuafolkken/kit#5541: an added test naming a criterion's identifier meets its pending row.
 describe('run_ship_removed_rows.surface — the acceptance rows before the ship', () => {
 	it('meets the row an added test names, and keeps it on a second pass (ac-05552640)', async () => {

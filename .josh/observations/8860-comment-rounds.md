@@ -1,0 +1,5 @@
+- rf:comments | medium | .claude/skills/workflow-commands/chain-rule.md:90 | 2026-11-23 | #8860 | - | stale-docs
+- rf:bug-risks | low | tools/metrics/metrics-expect.ts:103 | 2026-11-23 | #8860 | - | edge-input
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:90 | 2026-11-23 | #8860 | - | stale-docs
+- rf:tests | low | tools/metrics/metrics-command.ts:118 | 2026-11-23 | #8860 | - | untested-branch
+- rf:tests | low | scripts/gate/metrics-totals.test.ts:31 | 2026-11-23 | #8860 | - | untested-branch

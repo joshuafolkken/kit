@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/test/test-related-scope.ts:190 | 2026-11-18 | #7978 | false-positive
+- rf:tests | low | scripts/test/whole-suite-narrowing.test.ts:114 | 2026-11-18 | #7978

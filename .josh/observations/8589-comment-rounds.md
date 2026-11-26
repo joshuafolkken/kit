@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/split/split-assess.ts:190 | 2026-11-22 | #8589 | - | edge-input

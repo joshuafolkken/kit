@@ -44,8 +44,13 @@ const RETITLED = `describe('board', () => {\n\tit('kept', () => {})\n\tit('drops
 const REWRITTEN =
 	"describe('board', () => {\n\tit('kept', () => {})\n\tit('drops a row', () => { render(view); expect(screen.getByRole('row')).toBeVisible() })\n})\n"
 const DROPPED = 'board > dropped'
-const REMOVED = [DROPPED, 'whole file']
-const REMOVAL = { removed: REMOVED, renamed: [] }
+const WHOLE_FILE = 'whole file'
+const REMOVED = [DROPPED, WHOLE_FILE]
+const REMOVAL = {
+	removed: REMOVED,
+	renamed: [],
+	files: [{ path: DELETED_FILE, titles: [WHOLE_FILE] }],
+}
 const GONE_AT_BASE = "it('whole file', () => {})\n"
 const AT_BASE: Readonly<Record<string, string>> = {
 	[`${BASE}:${KEPT_FILE}`]: BOARD_AT_BASE,
@@ -102,20 +107,24 @@ describe('removed_tests_check.changes — the titles the change removed and adde
 })
 
 describe('removed_tests_check.refusal — the merge gate', () => {
-	it('refuses with each undisposed test named, reading this branch’s body', async () => {
+	it('refuses with each undisposed test or deleted file named, reading the branch’s body', async () => {
 		const refusal = await removed_tests_check.refusal('4287-lane')
 
-		expect(refusal).toContain('`board > dropped`')
-		expect(refusal).toContain('`whole file`')
+		expect(refusal).toContain(`\`${DROPPED}\``)
+		expect(refusal).toContain(`\`${DELETED_FILE}\` — 未記入`)
 		expect(pr_body_mock).toHaveBeenCalledWith('4287-lane')
 	})
 
-	it('passes once the body disposes of each', async () => {
+	// joshuafolkken/kit#8927: one row naming the deleted file disposes of its tests.
+	it.each([
+		['one row per test (ac-30790fde)', WHOLE_FILE],
+		['the deleted file named in place of its tests (ac-5e6ddb59)', DELETED_FILE],
+	])('passes once the body disposes of each, %s', async (_name, name) => {
 		const body = [
-			'## 消えたテストの処置',
+			removed_tests.DISPOSITION_HEADING,
 			'',
-			'- `board > dropped` — 置き換え: board > kept',
-			'- `whole file` — 廃止: #4287 the file tested a removed command',
+			`- \`${DROPPED}\` — 置き換え: board > kept`,
+			`- \`${name}\` — 廃止: #4287 the file tested a removed command`,
 		].join('\n')
 
 		await expect(removed_tests_check.body_refusal(body)).resolves.toBeUndefined()
@@ -125,11 +134,11 @@ describe('removed_tests_check.refusal — the merge gate', () => {
 	it('still refuses a body holding only the pending rows the draft was given', async () => {
 		const removal = await removed_tests_check.read()
 		const removed = removal?.removed ?? []
-		const body = removed_tests.with_pending_rows('', removed)
+		const body = removed_tests.with_pending_rows('', removed, removal)
 
 		expect(removed).toHaveLength(2)
 		await expect(removed_tests_check.body_refusal(body)).resolves.toBe(
-			removed_tests.refusal_message(removed),
+			removed_tests.refusal_message(removed, removal),
 		)
 	})
 

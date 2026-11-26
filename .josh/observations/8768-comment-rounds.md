@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/backlog/backlog-drive-carried.ts:66 | 2026-11-23 | #8768 | - | untested-branch

@@ -1,0 +1,2 @@
+- rf:comments | low | scripts/gate/gate-checks.ts:129 | 2026-11-18 | #7977 | - | stale-comment
+- rf:comments | low | scripts/gate/gate-checks.ts:129 | 2026-11-18 | #7977 | - | stale-comment
