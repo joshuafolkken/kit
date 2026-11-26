@@ -1,0 +1,8 @@
+{
+	"reason": "run:handoff opens a lane work tree for numbered runs (new run-handoff-tree module) and halfrun stop names the work tree; fullrun-steps (3a) documents the handoff",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 100,
+		"ai_cost.on_demand_bytes": 293
+	}
+}

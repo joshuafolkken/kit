@@ -30,7 +30,8 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
    for CI, verifies AI review findings, sends the completion notification, then merges; if blockers
    are found it exits non-zero — fix and re-run.**
 8. `run:tail` returns the primary checkout to the default branch (`main:sync`) after the merge;
-   every linked checkout skips that step and keeps its branch and port seat.
+   every linked checkout skips that step and keeps its branch and port seat until `run:tidy` closes
+   its merged lane.
 
 ## The `fullrun new` step list
 
@@ -42,7 +43,9 @@ that covers the same work stops the run rather than filing a second Issue (`issu
 `<N>`. (3) `pnpm josh run:entry <N> --adopt` — the `#N` entry with the bare hold re-keyed to `<N>`
 (`run:hold --adopt`) for its claim; before its reads it stashes pre-existing changes, synchronizes
 as every entry does, pops the stash and switches a primary checkout to the issue's branch, and a failed step stops with the stash kept, naming it
-(`scripts/run/entry/run-entry-sync.ts`); every later stop releases with `run:release <N>`. (4) Record the
+(`scripts/run/entry/run-entry-sync.ts`); every later stop releases with `run:release <N>`. (3a)
+`pnpm josh run:release <N>`, then `pnpm josh run:handoff fullrun <N> --brief-file .josh/tmp/brief.md` and end;
+the child continues from (4) in its lane (`scripts/run/handoff/run-handoff-tree.ts`). (4) Record the
 agreed plan in the session language: `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md` (its consumers
 section as in `kickoff.md` step 4). (5) On (3)'s `latest: required` run
 `pnpm josh latest:if-required` and load the `dependency-update` skill; on `skip` neither runs

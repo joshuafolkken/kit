@@ -23,6 +23,7 @@ const TITLE_PLACEHOLDER = '<title>'
 const PR_PLACEHOLDER = '<pr-url>'
 const HALFRUN = 'halfrun'
 const PRRUN = 'prrun'
+const WORKING_TREE = 'Working tree: '
 
 interface StopFacts {
 	issue: string
@@ -53,11 +54,14 @@ function with_urls(values: CliValues, facts: StopFacts): CliValues {
 	return facts.pr_url === undefined ? with_issue : { ...with_issue, 'pr-url': facts.pr_url }
 }
 
-function halfrun_values(facts: StopFacts): CliValues {
+// The work tree is named because a `halfrun` started by `run:handoff` stops in its lane
+// (joshuafolkken/kit#8994), where the person verifies by hand.
+function halfrun_values(facts: StopFacts, directory: string): CliValues {
 	const title = commit_title(facts)
 	const body = [
 		'halfrun ready for manual verification',
 		run_stage.next_line(HALFRUN, facts.issue),
+		`${WORKING_TREE}${directory}`,
 		`Without an agent: pnpm josh git -y ${title} && pnpm josh followup ${title}`,
 	].join('\n')
 	const values: CliValues = {
@@ -77,7 +81,7 @@ function human_review_values(facts: StopFacts, directory: string): CliValues {
 	const body = [
 		'needs-human-review: implemented and gated, stopped before the commit',
 		run_stage.next_line(HALFRUN, facts.issue),
-		`Working tree: ${directory}`,
+		`${WORKING_TREE}${directory}`,
 	].join('\n')
 	const values: CliValues = {
 		'task-type': 'confirmation',
@@ -147,8 +151,9 @@ async function send(target: string, compose: () => Promise<Composed>): Promise<v
 async function send_halfrun(target: string, issue: string): Promise<void> {
 	await send(target, async () => {
 		const facts = await issue_facts(issue)
+		const directory = await git_command.repository_root()
 
-		return { values: halfrun_values(facts), title: facts.title }
+		return { values: halfrun_values(facts, directory), title: facts.title }
 	})
 }
 
