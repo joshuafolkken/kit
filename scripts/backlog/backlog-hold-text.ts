@@ -30,10 +30,12 @@ const HAND_BACK_TEXT: ReadonlyMap<string, string> = new Map([
 	['merge', 'the driver paused after a merge; the session restarts it'],
 	['launch', 'a lane launch failed; the session restarts the driver'],
 	['offer', 'the backlog offer failed; the session restarts the driver'],
-	['window', "the run's time window closed; the session restarts the driver"],
-	[DRAINED_REASON, 'the backlog had nothing to start; the session restarts the driver'],
+	// The supervisor re-drives a window's end with no session (`run-wake-driver.ts`); a drain is a window's
+	// end whose latest offer started nothing (joshuafolkken/kit#9003).
+	['window', "the run's time window closed; the supervisor restarts the driver"],
+	[DRAINED_REASON, 'the backlog had nothing to start; the supervisor restarts the driver'],
 ])
-// The hand-backs only a person ends; every other one ends when the session restarts the driver.
+// The hand-backs only a person ends; every other one ends when the driver restarts.
 const PERSON_HAND_BACKS: ReadonlySet<string> = new Set(['judge', 'triage'])
 
 // `offer:<verdict>:<detail>`: the offer started nothing, for its cause or its answer.
