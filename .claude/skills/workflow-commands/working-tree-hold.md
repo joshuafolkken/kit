@@ -25,8 +25,8 @@ tree has its own three. **`backlogrun`'s per-repository guard (`epic-busy.ts`) i
 does not claim it.**
 
 **Claim it in the checkout the run will edit** — a cross-repository `fullrun owner/repo#N` resolves
-that checkout from `pnpm josh doctor` **first** (a read) and claims there. `run:handoff` picks it
-(`run-handoff-tree.ts`).
+that checkout from `pnpm josh doctor` **first** (a read) and claims there. `run:handoff` opens a lane
+for a bare `#N` only (`run-handoff-tree.ts`).
 
 **A release names the run it belongs to.** `pnpm josh run:release <N>` removes only a record naming
 `<N>`, the bare form only the unnumbered run's; anything else answers **`held`** and stands. **`pnpm

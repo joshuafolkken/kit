@@ -65,3 +65,18 @@ describe('run_handoff_cli.run — the work tree', () => {
 		expect(lines.join('\n')).toContain('lane:close')
 	})
 })
+
+describe('run_handoff_cli.run — the child argv', () => {
+	it('builds it against the lane, so its project files resolve there', async () => {
+		const lane = make_directory('josh-run-handoff-lane-tree-')
+		const mcp_config = path.join(lane, '.mcp.json')
+
+		writeFileSync(mcp_config, '{}')
+
+		const { ports, requests } = fake({ lane_directory: async () => lane })
+
+		await run_handoff_cli.run(['halfrun', '12', BRIEF_FLAG, BRIEF_FILE], ports)
+
+		expect(requests.flatMap((request) => request.argv.args)).toContain(mcp_config)
+	})
+})

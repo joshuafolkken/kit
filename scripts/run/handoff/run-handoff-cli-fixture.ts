@@ -49,6 +49,7 @@ const QUIET_PORTS: Omit<HandoffPorts, RecordingKey> = {
 	now: () => 1,
 	repository_directory: async () => '/repo/.git',
 	tree_hold: async () => ({ kind: 'free' }),
+	branch_at: async () => 'main',
 	lane_directory: async () => '/repo',
 	read_text: () => FINAL,
 	is_retrospective_done: () => true,

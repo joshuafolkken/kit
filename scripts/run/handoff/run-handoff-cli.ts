@@ -7,6 +7,7 @@ import {
 	type AgentEnvironment,
 	type AgentProvider,
 } from '#scripts/agent/agent-provider'
+import { git_command } from '#scripts/git/git-command'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cli_body } from '#scripts/josh/cli-body'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -55,6 +56,7 @@ interface HandoffPorts {
 	repository_directory: () => Promise<string | undefined>
 	// The hold on the work tree at the directory, as `run:entry` would read it there.
 	tree_hold: (directory: string) => Promise<HoldRead>
+	branch_at: (directory: string) => Promise<string>
 	lane_directory: (issue: string) => Promise<string | undefined>
 	read_text: (target: string) => string | undefined
 	launch: (request: LaunchRequest) => LaunchResult
@@ -108,6 +110,7 @@ const LIVE_PORTS: HandoffPorts = {
 	now: () => Date.now(),
 	repository_directory: run_carry.repository_directory,
 	tree_hold: run_handoff_tree.tree_hold,
+	branch_at: git_command.branch_at,
 	lane_directory: run_handoff_tree.lane_directory,
 	read_text: (target) => stamp_file.read_stamp_text(target),
 	launch: (request) => detached_launch.launch(request, note_to_stderr),
