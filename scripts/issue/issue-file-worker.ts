@@ -4,7 +4,7 @@ import {
 	type WorkerSettings,
 } from '#scripts/agent/agent-worker-profile'
 import { issue_file } from './issue-file'
-import type { LabelDefinition } from './issue-labels'
+import type { LabelDefinition } from './issue-label-definitions'
 
 // `issue:file`'s side of `josh.worker`: a filing into a repository that sets it prints the profiles to
 // choose from, refuses a `worker:<name>` label naming none of them, and provisions the chosen label
