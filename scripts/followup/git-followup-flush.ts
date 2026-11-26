@@ -46,7 +46,7 @@ async function push_or_undo_commit(): Promise<void> {
 }
 
 // Only the ledger paths are staged — whatever else the tree holds is the run's to commit, not this
-// step's — and `-A` takes a migration's deletion of an old path with it.
+// step's — and `-A` takes a deleted ledger file with it.
 async function commit_and_push(
 	paths: ReadonlyArray<string>,
 	issue_number: string | undefined,

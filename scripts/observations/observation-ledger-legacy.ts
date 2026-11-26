@@ -29,6 +29,6 @@ function warn(root: string): void {
 	if (paths.length > 0) console.warn(warning(paths))
 }
 
-const observation_ledger_legacy = { found, warn }
+const observation_ledger_legacy = { warn }
 
 export { LEGACY_OBSERVATION_LEDGER_DIRECTORY, observation_ledger_legacy }

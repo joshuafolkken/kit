@@ -304,7 +304,7 @@ async function carried_status(): Promise<{ status_output: string; archived_files
 	return { status_output: await git_command.status(), archived_files }
 }
 
-// Carry, migration and archival run only in the isolated checkout.
+// Carry and archival run only in the isolated checkout.
 async function prepare_isolated(): Promise<number> {
 	const { archived_files } = await carried_status()
 

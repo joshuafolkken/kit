@@ -54,8 +54,12 @@ describe('observation_ledger_legacy.warn', () => {
 		const root = root_with_file(LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? '')
 
 		writeFileSync(path.join(root, LEGACY_OBSERVATION_LEDGER_PATHS[1] ?? ''), `${LINE}\n`)
+		const warn = spy_warn()
 
-		expect(observation_ledger_legacy.found(root)).toEqual(LEGACY_OBSERVATION_LEDGER_PATHS)
+		observation_ledger_legacy.warn(root)
+
+		expect(warn).toHaveBeenCalledOnce()
+		expect(warn.mock.calls[0]?.[0]).toContain(LEGACY_OBSERVATION_LEDGER_PATHS.join(', '))
 	})
 
 	it('says nothing when no old path exists', () => {

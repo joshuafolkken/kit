@@ -116,7 +116,6 @@ function report_excluded_paths(status_output: string, excluded: ReadonlyArray<st
 	}
 }
 
-// The status is read after the migration, so an old-path ledger it moved is not staged by its old name.
 async function stage_tracked_files(): Promise<void> {
 	const excluded = await ledger_exclusions()
 	const status_output = await git_command.status()
