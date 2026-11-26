@@ -182,9 +182,11 @@ function problems_of(value: ThemeValue, board: Board): Array<string> {
 }
 
 describe('run_board_theme themes on boards of every size', () => {
-	it.each(MATRIX)('draws every theme on %o', (stress) => {
-		const board = board_of(stress)
-		const problems = THEMES.flatMap((value) => problems_of(value, board))
+	// One case a theme and a board, so no case carries all seven themes' frames at once.
+	const cases = MATRIX.flatMap((stress) => THEMES.map((value) => ({ stress, value })))
+
+	it.each(cases)('draws $value on $stress', ({ stress, value }) => {
+		const problems = problems_of(value, board_of(stress))
 
 		expect(problems.slice(0, 5)).toStrictEqual([])
 	})
