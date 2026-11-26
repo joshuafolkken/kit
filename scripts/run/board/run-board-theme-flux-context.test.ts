@@ -42,3 +42,14 @@ describe('run_board_theme_flux_context', () => {
 		expect(is_kept(layout, 0, layout.area_top)).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#8928: a start or finish a day or more from now reads its date alone.
+describe('run_board_theme_flux_context date-only clocks', () => {
+	it('finds a header clock that reads a date alone', () => {
+		const api = { ...HOST.api, plain: (y: number) => (y < 3 ? '  🚀 11-25  ' : HOST.api.plain(y)) }
+		const { clocks } = run_board_theme_flux_context.context_of(api)
+
+		expect(clocks.map(({ text }) => text)).toStrictEqual(['11-25', '11-25', '11-25'])
+		expect(clocks.every(({ x }) => x >= 0)).toBe(true)
+	})
+})
