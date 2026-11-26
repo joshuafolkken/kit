@@ -1,0 +1,8 @@
+{
+	"reason": "#8917 moves the board onto the cell-layer theme host: seven theme modules (draw, timing, sound) with their tests replace the old per-effect look, and the board-theme skill gains theme-rules / theme-sound / theme-wiring pages; the size was approved in the earlier finishing run and the user decided not to split",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 10381,
+		"ai_cost.on_demand_bytes": 18730
+	}
+}

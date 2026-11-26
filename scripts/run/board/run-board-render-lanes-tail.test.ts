@@ -93,6 +93,8 @@ describe('run_board_render.render lanes tail in a pane', () => {
 		const board = header({ layout: LAYOUT, theme: 'wopr', repo: 'o/r', issue_count })
 		const frame = run_board_theme.restyle('wopr', rendered(board, WIDE).join('\n'), 'letters')
 
-		expect(lanes_rule(frame.split('\n'))).toMatch(/ OK 1\/3 {2}RN 1 {2}ZZ 0 {2}IS 78\/4,489$/u)
+		const words = stripVTControlCharacters(lanes_rule(frame.split('\n')))
+
+		expect(words).toMatch(/ OK 1\/3 {2}RN 1 {2}ZZ 0 {2}IS 78\/4,489$/u)
 	})
 })

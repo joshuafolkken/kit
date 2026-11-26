@@ -69,6 +69,12 @@ interface Looks {
 	plain: BoardPorts
 }
 
+// Where each look's frames are written, so a failure is drawn in the look its second shows.
+interface Framings {
+	themed: Framing
+	plain: Framing
+}
+
 // Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
 // ends on the line that says closing the screen leaves the run going — only a screen a person can
 // close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
@@ -215,18 +221,6 @@ function reason_of(error: unknown): string {
 	return first
 }
 
-// A failed tick is told to `failed` (`run-board-exit-record.ts`), and the last frame drawn is drawn
-// again with the failure said as a failed read is (`run-board-header.ts`), until a tick draws again.
-function on_failure(ports: BoardPorts, framing: Framing, last: LastFrame, failed?: Failed): Failed {
-	return (error) => {
-		failed?.(error)
-		if (last.text === undefined) return
-		const warning = run_board_header.warning_of(REDRAW_WORD, ports.now(), reason_of(error))
-
-		framing.sink(framing.wrap(warned(last.text, warning ?? '')))
-	}
-}
-
 // A tick that throws is survived (joshuafolkken/kit#8381): `fail` is told, and the state before it is
 // kept, so the board goes on to the next second with its spinners where they were.
 function surviving(step: Step, fail: Failed): Step {
@@ -254,6 +248,21 @@ function current(looks: Looks): BoardPorts {
 	return run_board_tick_draw.has_lamps(looks.themed) ? looks.themed : looks.plain
 }
 
+// A failed tick is told to `failed` (`run-board-exit-record.ts`), and the last frame drawn is drawn
+// again with the failure said as a failed read is (`run-board-header.ts`), until a tick draws again —
+// in the look the second is drawn in, so a run showing no theme warns in none (joshuafolkken/kit#8917).
+function on_failure(looks: Looks, framings: Framings, last: LastFrame, failed?: Failed): Failed {
+	return (error) => {
+		failed?.(error)
+		if (last.text === undefined) return
+		const ports = current(looks)
+		const framing = ports === looks.plain ? framings.plain : framings.themed
+		const warning = run_board_header.warning_of(REDRAW_WORD, ports.now(), reason_of(error))
+
+		framing.sink(framing.wrap(warned(last.text, warning ?? '')))
+	}
+}
+
 // The ports a tick draws through: a themed second's carry the plain ones its frame falls back on.
 function tick_ports(looks: Looks): BoardPorts {
 	const ports = current(looks)
@@ -278,11 +287,14 @@ function drawing_of(
 function ticker(looks: Looks, screen: Screen, start: Start, frame_screen: FrameScreen): Step {
 	const themed = drawing_of(looks.themed, screen, start, frame_screen)
 	const plain = drawing_of(looks.plain, screen, start, frame_screen)
-	const framing = on_screen(looks.themed, screen, frame_screen)
+	const framings = {
+		themed: on_screen(looks.themed, screen, frame_screen),
+		plain: on_screen(looks.plain, screen, frame_screen),
+	}
 
 	return surviving(
 		async (state) => await tick(state, tick_ports({ themed, plain }), 'background'),
-		on_failure(looks.themed, framing, start.last, start.failed),
+		on_failure(looks, framings, start.last, start.failed),
 	)
 }
 

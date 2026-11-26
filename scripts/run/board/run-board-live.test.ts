@@ -117,6 +117,11 @@ function failing_second(): ReturnType<typeof harness> & { begun: Array<Array<str
 	}
 }
 
+// The lanes rule of a screen, whose tallies a theme words as its own.
+function lanes_of(lines: ReadonlyArray<string>): string | undefined {
+	return lines.find((line) => / lanes /iu.test(line))
+}
+
 describe('run_board_live.watch failed tick', () => {
 	it('tells the failure and draws the last frame again with it said, its first line only', async () => {
 		const { ports, begun } = failing_second()
@@ -143,6 +148,20 @@ describe('run_board_live.watch failed tick', () => {
 		expect(begun).toHaveLength(REDRAWS_THROUGH)
 		expect(last.join('\n')).not.toContain(REASON)
 		expect(last).toHaveLength(first?.length ?? 0)
+	})
+
+	// joshuafolkken/kit#8917: a 24-bit board in no theme has a theme run showing none, so its warning
+	// is drawn in the look the second was drawn in, not the run's theme.
+	it('draws the warning in no theme on a 24-bit board shown in none', async () => {
+		const { ports, begun } = failing_second()
+
+		await expect(run_board_live.watch({ ...ports, ...RGB }, undefined, vi.fn())).rejects.toBe(
+			STOPPED,
+		)
+		const [, first = [], warning = []] = begun
+
+		expect(lanes_of(first)).toBeDefined()
+		expect(lanes_of(warning)).toBe(lanes_of(first))
 	})
 })
 
