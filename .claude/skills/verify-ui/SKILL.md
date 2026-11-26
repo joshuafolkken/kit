@@ -48,23 +48,24 @@ the application toolkit.
 
 ## 3. Look at the images
 
-Read every produced image with the Read tool — capturing without opening does not close the gate.
+Read every produced image with the Read tool; capturing alone does not close the gate.
 Check the change's intent: element present, placed, sized, spaced, colored and worded as intended;
-nothing else disappeared or moved; the layout holds at the captured viewport.
+nothing else disappeared or moved; the layout holds at the viewport.
 
 ## Terminal UI
 
 The board is text, so read it: do not look for a screenshot command, and do not stop.
 
 1. List the states the change affects, of: a notice or none, repeat, mute, theme (default, or a
-   `--theme` value: `wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`), a narrow width.
+   `--theme` value: `wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`), an icon change
+   (`--icons letters`, `shapes`), a narrow width.
 2. Per state, run `pnpm josh run:board --frame` once with the flags that fix it (`--notice <row state>`
-   such as `merged` or `stopped`,
-   `--issue <n>`, `--repeat`, `--mute`, `--theme <name>`, `--columns <n>`) and read the output: layout,
-   wording, column alignment and width as intended. For a color change add `--ansi` and read the SGR codes.
+   such as `merged` or `stopped`, `--issue <n>`, `--repeat`, `--mute`, `--theme <name>`,
+   `--icons <letters|shapes>`, `--columns <n>`) and read the output: layout, wording, alignment, width.
+   For a color change add `--ansi` and read the SGR codes.
 
-Read everything the text shows. Only how a color looks, animation and sound are left to a person:
-write them in the issue's `## 背景` as `マージ後の確認: <where to look>`; this is not a stop before the merge.
+Only how a color looks, animation and sound are left to a person: write them in the issue's
+`## 背景` as `マージ後の確認: <where to look>`; not a stop before the merge.
 
 ## 4. Report
 
