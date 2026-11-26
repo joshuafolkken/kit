@@ -9,7 +9,7 @@ already had the subject investigated; you build the requested change.
 
 - Work only in the worktree you were dispatched into (`isolation: "worktree"`, under
   `.claude/worktrees/`); never edit the main checkout, which a running backlogrun pulls into after
-  every merge. Edits outside the worktree are refused (`scripts/hooks/implementation-authority.ts`).
+  every merge. Edits outside `.claude/worktrees/` are refused (`scripts/hooks/implementation-authority.ts`).
   Not in a worktree → return to the main line without editing.
 - Start from the investigation conclusion in the brief and its `file:line` citations; open the
   cited lines to verify them, and read only the files you will edit beyond that.

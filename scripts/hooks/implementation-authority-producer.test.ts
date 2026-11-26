@@ -68,7 +68,7 @@ function subagent_payload(
 // joshuafolkken/kit#8973: the producer is dispatched into a Claude Code worktree under the checkout,
 // and its hooks run there.
 const WORKTREE = path.join(ROOT, '.claude', 'worktrees', 'producer-w1')
-const OUTSIDE = 'edits only inside the worktree it was dispatched into'
+const OUTSIDE = 'edits only inside a worktree under `.claude/worktrees/`'
 const MAIN_DOCUMENT = path.join(ROOT, 'docs', 'guide.md')
 
 function context_at(cwd: string): HookContext {

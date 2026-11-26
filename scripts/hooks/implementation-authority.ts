@@ -58,9 +58,11 @@ const SUBAGENT_CALL_SCHEMA = z.object({
 // A backlogrun's driver runs `main:sync` in the main checkout after every merge, and an uncommitted
 // edit there to a file the merge touched aborts its `git pull` and stalls the whole run. Dispatched
 // with `isolation: "worktree"`, the producer's paths sit under `.claude/worktrees/<name>`
-// (`lane_paths.checkout_of`); any other path is refused, whatever the prompt granted.
+// (`lane_paths.checkout_of`); any other path is refused, whatever the prompt granted. The check is
+// for any worktree under `.claude/worktrees/`, not the producer's own: that is what keeps a synced
+// checkout clean, and the hook's cwd does not name which worktree the producer was dispatched into.
 const OUTSIDE_WORKTREE =
-	' A producer edits only inside the worktree it was dispatched into (`isolation: "worktree"`); this path is in a checkout a run syncs.'
+	' A producer edits only inside a worktree under `.claude/worktrees/` (`isolation: "worktree"`); this path is in a checkout a run syncs.'
 
 function is_in_worktree(file_path: string, cwd: string): boolean {
 	const resolved = path.resolve(cwd, file_path)

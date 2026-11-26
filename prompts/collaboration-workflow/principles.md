@@ -98,7 +98,7 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
   - 後回しにした返信 → 締めで「テストと gate は未実行」と毎回明記する
   - 成果の返信 → worktree のパスとブランチを書く。成果は worktree に未コミットで残す
   - コミットの指示か `fullrun new` など実装系キーワード → 後回しにした分をすべて実行する。`run:handoff` の brief には worktree のパスと、「テスト未作成・gate 未実行」と実装済みの変更ファイルを書く。マージは「マージして」の指示でだけ（`operating-rules.md` → "git-rules"）
-  - メインのチェックアウトに既存の変更 → 指示があれば worktree へ `git diff | git apply` で移し、メイン側を戻す
+  - メインのチェックアウトに既存の変更（未追跡を含む） → `producer` を渡す前に変更ファイルを返信で示し、退避（コミット・移動・破棄）は利用者に頼む。相談スコープの git 書き込みはフックが拒否する（`scripts/hooks/implementation-shell.ts`）
 - 判別できないときは相談として扱う。承認済みの起票・Issue 更新・レーン操作と、実装レーン内の Tier A 判断は再確認せず進める。実行が指示された後の判断点は `CLAUDE.md` → "Decision autonomy" の Tier で決まる
 - 相談スコープのシェルは、取り消せない操作（git・GitHub・依存・共有状態への書き込み）と runtime ファイルへの見える書き込みだけを実行前に拒否し、それ以外の呼び出しが変えた runtime ファイルは、コマンドがそのパスを名指すときだけ実行後に戻し、名指さないものは別セッションの編集かもしれないので名前だけ報告する（`scripts/hooks/bash-revert.ts`）。拒否は `scripts/hooks/implementation-shell.ts` が強制する
 
