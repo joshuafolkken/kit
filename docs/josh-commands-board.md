@@ -259,9 +259,9 @@ A running `fullrun #N`, `halfrun #N` or `prrun #N` this checkout's `run:hold` re
 
 A stop-marked `halfrun` or `prrun` hold keeps its row, led by `✅`, no phase; its time is fixed from start to stop. A backlogrun launched or ended after the stop is drawn instead; a resume draws it running again.
 
-The name is the one the record carries (`--fullrun`, `--prrun`, or none for a `halfrun`), so a running `prrun` is drawn as `🏠 prrun`; an older `prrun` record without it reads as `fullrun`.
+The section is headed `🏠 runs`, and the row names its command, faint before its title. The command is the one the record carries (`--fullrun`, `--prrun`, or none for a `halfrun`); an older `prrun` record without it reads as `fullrun`. An earlier run's lane (`🧳`) names none.
 
-Beside a backlogrun, the root checkout's running or stopped single run is drawn under its own `🏠 <name>` heading above the `🧵` lanes; the lanes heading's tallies count no lane and no `🔄` for it. The legend omits a stopped run's `✅`.
+Beside a backlogrun, every running or stopped single run — the root checkout's and each lane worktree's hold — is drawn as a row under one `🏠 runs` heading above the `🧵` lanes, each naming its command; the lanes heading's tallies count no lane and no `🔄` for them. The legend omits a stopped run's `✅`.
 
 A running `fullrun` or `prrun` row ends on `🎯 HH:MM` and `+N′` read from the lane totals as a child's row is, `🎯 —` where none is measured — even beside a stopped or ended backlogrun, as it moves on its own; a stopped one draws none.
 

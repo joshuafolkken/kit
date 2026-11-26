@@ -121,8 +121,15 @@ interface BoardLayout {
 	// The earlier run's lanes that still hold a place under the limit, and the lanes with no record —
 	// drawn after the run's own lanes, and no row the header counts.
 	earlier?: ReadonlyArray<BoardRow> | undefined
-	// The root checkout's single run beside the run, drawn above its lanes and no row the header counts.
-	root?: { name: string; row: BoardRow } | undefined
+	// The single runs beside the run, one per checkout that holds one, drawn under `🏠 runs` above its
+	// lanes, each row named by its command, and no row the header counts (joshuafolkken/kit#8993).
+	singles?: ReadonlyArray<SingleRow> | undefined
+}
+
+// A single run's row and the command it runs (`fullrun`, `halfrun` or `prrun`).
+interface SingleRow {
+	name: string
+	row: BoardRow
 }
 
 // What an active row is named and classified by — each issue's title and labels.
@@ -155,4 +162,5 @@ export type {
 	ReviewStop,
 	RowRead,
 	RowReason,
+	SingleRow,
 }

@@ -86,7 +86,7 @@ describe('run_board_render_lead.lead_of', () => {
 describe('run_board_render_lead.lead_of — a stopped single run', () => {
 	it('draws ✅ and no phase icon on a stopped single run’s row', () => {
 		const row = lane('stopped')
-		const root = header({ layout: { ...EMPTY_LAYOUT, root: { name: 'halfrun', row } } })
+		const root = header({ layout: { ...EMPTY_LAYOUT, singles: [{ name: 'halfrun', row }] } })
 		const own = header({ ...board(row), run_name: 'halfrun', ended_ms: NOW })
 
 		for (const view of [root, own]) {
