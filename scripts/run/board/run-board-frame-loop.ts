@@ -239,6 +239,7 @@ function revealed(screen: FrameScreen, text: string, size: TerminalSize): void {
 }
 
 const run_board_frame_loop = {
+	CHECK_MS,
 	MIN_FRAME_MS,
 	THIN_AFTER_MS,
 	base_layer,

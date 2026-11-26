@@ -17,6 +17,7 @@ import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
 import type { PinnedIssue } from './run-board-pinned-graphql'
 import type { GithubRateLimit } from './run-board-render-quota-github'
+import type { Repaint } from './run-board-repaint'
 import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
 import type { CueName } from './run-board-sound-cues'
 import type { Pending } from './run-board-sound-repeat'
@@ -79,6 +80,9 @@ interface BoardPorts {
 	// — its frame drawn in the role palette, each row whole, the theme layer typing and animating over
 	// it; none on a board in no theme or on a terminal without 24-bit color.
 	theme_run?: ThemeRun | undefined
+	// joshuafolkken/kit#8939: the redraws asked for between seconds (`run-board-repaint.ts`) — the theme
+	// run's own on a themed board; none where nothing asks.
+	repaint?: Repaint | undefined
 	// The same board in no theme, a themed second's frame drawn through where its theme cannot lay it out
 	// — no lamp panel on screen — so it shows the board's own look, never a base half themed.
 	plain_ports?: BoardPorts | undefined
