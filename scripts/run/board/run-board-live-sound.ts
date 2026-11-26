@@ -123,10 +123,11 @@ function scored(keys: KeyReading, shown: Shown): Pick<TypingSound, 'event' | 'pa
 
 // An opening a key skipped: every sound it was playing ends — its bed, the trill's loop, its typed end
 // — and, under the sound switch, its last sound, the board appearing, plays once as the board shows.
-// Let go rather than held, so the board's first events still sound over it.
+// Let go rather than held, so the board's first events still sound over it. Part of the typing voice, so
+// a board that heard no trill (`--sound off`, joshuafolkken/kit#8915) stays silent even after an `s` flip.
 function skipped(keys: KeyReading | undefined, theme: Theme | undefined): void {
 	hush()
-	if (theme === undefined || keys === undefined || !is_sounding(keys)) return
+	if (theme === undefined || keys === undefined || TRILLS.size === 0 || !is_sounding(keys)) return
 	played(THEME_DEFS[theme].score.appear())
 }
 

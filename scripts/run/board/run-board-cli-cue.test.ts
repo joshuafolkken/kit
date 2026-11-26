@@ -183,6 +183,10 @@ describe('run_board_cli.run --sound', () => {
 		expect(written).toHaveBeenCalledWith(`${run_board_cli.USAGE}\n`)
 		vi.restoreAllMocks()
 	})
+
+	it('names the flag in the usage', () => {
+		expect(run_board_cli.USAGE).toContain('[--sound on|off]')
+	})
 })
 
 // joshuafolkken/kit#8160: the worker decides the cue over its own read of the run and hands it over on
