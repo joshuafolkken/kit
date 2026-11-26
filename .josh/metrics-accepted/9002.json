@@ -1,0 +1,7 @@
+{
+	"reason": "New module ranks run:add additions by the pool's issue_rank order (#9002); the growth is the feature itself",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 61
+	}
+}

@@ -11,6 +11,7 @@ import { backlog_budget_cli } from './backlog-budget-cli'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_launch } from './backlog-drive-named-launch'
+import { backlog_drive_named_rank } from './backlog-drive-named-rank'
 import { backlog_drive_stalled_retry } from './backlog-drive-stalled-retry'
 import type { Declared } from './backlog-overlap'
 import { backlog_plan_comment, type PoolIssue } from './backlog-plan-comment'
@@ -227,7 +228,11 @@ async function offer_of(
 
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
-	const gathered = await backlog_drive_named_launch.gather(named.issues, state, context.owner)
+	const gathered = await backlog_drive_named_launch.gather(
+		await backlog_drive_named_rank.ranked(named.issues, carry),
+		state,
+		context.owner,
+	)
 
 	if (gathered.offer !== undefined) {
 		return { ...gathered, offer: capped(gathered.offer, carry, state, context.forwarded) }

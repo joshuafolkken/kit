@@ -20,7 +20,9 @@ function issues_of(
 }
 
 // The prioritized additions first, in the order they were added, then the declared list, then the
-// appended additions — each issue once, at its first position.
+// appended additions — each issue once, at its first position. This order reads no label; the named
+// offer ranks each chunk of additions by priority before it launches them
+// (`backlog-drive-named-rank.ts`, joshuafolkken/kit#9002), so the run's remaining list stays in it.
 function ordered(
 	declared: ReadonlyArray<number>,
 	added: ReadonlyArray<CarryAddition> = [],
