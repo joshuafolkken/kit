@@ -18,11 +18,10 @@ import { run_board_icons, type Icons } from './run-board-icons'
 import { run_board_live } from './run-board-live'
 import { run_board_saved_state } from './run-board-saved-state'
 import { run_board_screen } from './run-board-screen'
+import { run_board_sound_option } from './run-board-sound-option'
 import { run_board_sound_player } from './run-board-sound-player'
-import { run_board_sound_typing, type TypingSound } from './run-board-sound-typing'
 import type { BoardPorts } from './run-board-state'
 import { run_board_theme, type Theme } from './run-board-theme'
-import { run_board_theme_sound } from './run-board-theme-sound'
 import { run_board_tick } from './run-board-tick'
 import { run_board_timing } from './run-board-timing'
 import { run_board_write_port } from './run-board-write-port'
@@ -33,10 +32,12 @@ import { run_board_write_port } from './run-board-write-port'
 // terminal around it. A run that ended stays on screen until the next one starts; with no run in this
 // checkout it reads nothing from GitHub and waits.
 
-// What a board a person sees is drawn with: its theme and its icons (`run-board-icons.ts`).
+// What a board a person sees is drawn with: its theme, its icons (`run-board-icons.ts`) and the
+// launch's sound, none where the saved switch decides (`run-board-sound-option.ts`).
 interface BoardLook {
 	theme: Theme | undefined
 	icons: Icons
+	is_sound_on?: boolean | undefined
 }
 
 interface LookChoice {
@@ -59,7 +60,7 @@ const FLAGS: ReadonlySet<string> = new Set(['', ONCE_FLAG, CHAT_FLAG])
 const PASSED_ON_FLAGS: ReadonlySet<string> = new Set([CHAT_FLAG, EVERY_FLAG])
 const { SIGHUP_EXIT_CODE, SIGINT_EXIT_CODE, SIGTERM_EXIT_CODE } = run_board_exit_record
 const { FRAME_FLAG, FRAME_USAGE } = run_board_frame_preview
-const USAGE = `Usage: josh run:board [--once | --chat [--fresh] | --every <minutes> | ${FRAME_USAGE}] [--theme ${run_board_theme.THEMES.join('|')}] [--icons emoji|letters|shapes] [--timing]`
+const USAGE = `Usage: josh run:board [--once | --chat [--fresh] | --every <minutes> | ${FRAME_USAGE}] [--theme ${run_board_theme.THEMES.join('|')}] [--icons emoji|letters|shapes] [--sound on|off] [--timing]`
 const DISABLED_NOTICE = `\`${run_progress.DISABLED_KEY}=${run_progress.DISABLED_VALUE}\` is set, so no progress is pushed.`
 const { FRESH_STATE, tick } = run_board_tick
 const { CHAT_KEY, fresh } = run_board_frame_store
@@ -133,23 +134,12 @@ function gather_ports(
 	return { gather, worker_heap: heap }
 }
 
-// The trill in the theme row's voice at its letter pace (joshuafolkken/kit#8365) — the four works the
-// demo added in the wargames teletype's (joshuafolkken/kit#8917); a board in no theme keeps the default,
-// which no draw sounds (`run-board-live.ts` → `trill_of`).
-function typing_sound_of(theme: Theme | undefined): TypingSound {
-	if (theme === undefined) return run_board_sound_typing.typing_sound()
-
-	return run_board_sound_typing.typing_sound(
-		run_board_sound_typing.voiced(run_board_theme_sound.voice_of(theme)),
-	)
-}
-
 // A live board reads and records its frames on its worker thread, so neither stops its spinner, and
 // sounds its cues and the trill (joshuafolkken/kit#8250); a single frame has no spinner to stop, reads
 // where it draws, and stays silent.
 function live_ports(is_live: boolean, look?: BoardLook): BoardPorts {
 	const cue = is_live ? run_board_sound_player.play_cue : undefined
-	const typing_sound = is_live ? typing_sound_of(look?.theme) : undefined
+	const typing_sound = is_live ? run_board_sound_option.typing_sound_of(look?.theme) : undefined
 
 	// Kept off `LIVE_PORTS`, so the profile that spreads them always reads from scratch.
 	return {
@@ -232,7 +222,9 @@ function ports_for(ports: BoardPorts | undefined, is_live: boolean, look?: Board
 
 // The ports a board a person sees is drawn through, carrying its icons.
 function drawn_ports(ports: BoardPorts | undefined, is_live: boolean, look: BoardLook): BoardPorts {
-	return { ...ports_for(ports, is_live, look), icons: look.icons }
+	const drawn = { ...ports_for(ports, is_live, look), icons: look.icons }
+
+	return run_board_sound_option.sounded(drawn, look.is_sound_on)
 }
 
 // A live board on the process's own ports records why it ends (`run-board-exit-record.ts`); one on a
@@ -350,14 +342,18 @@ function look_of(
 	argv: ReadonlyArray<string>,
 	environment: NodeJS.ProcessEnv,
 ): LookChoice | Refused {
-	const themed = run_board_theme.choose(argv, environment)
+	const sounded = run_board_sound_option.split(argv)
 
-	if (themed === undefined) return { refusal: run_board_theme.refusal(argv, environment) }
+	if (sounded === undefined) return { refusal: '' }
+	const themed = run_board_theme.choose(sounded.argv, environment)
+
+	if (themed === undefined) return { refusal: run_board_theme.refusal(sounded.argv, environment) }
 	const drawn = run_board_icons.choose(themed.argv, environment, themed.theme)
 
 	if (drawn === undefined) return { refusal: run_board_icons.refusal(themed.argv, environment) }
+	const look = { theme: themed.theme, icons: drawn.icons, is_sound_on: sounded.is_on }
 
-	return { look: { theme: themed.theme, icons: drawn.icons }, argv: drawn.argv }
+	return { look, argv: drawn.argv }
 }
 
 async function run(given: ReadonlyArray<string>, ports?: BoardPorts): Promise<number> {

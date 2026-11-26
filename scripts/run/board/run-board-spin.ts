@@ -4,6 +4,7 @@ import { run_board_frame_loop, type FrameScreen } from './run-board-frame-loop'
 import { run_board_lamp_spots, type Lamp } from './run-board-lamp-spots'
 import { run_board_layer, type Layer } from './run-board-layer'
 import { run_board_layer_spin } from './run-board-layer-spin'
+import { run_board_repaint } from './run-board-repaint'
 import { run_board_spin_place } from './run-board-spin-place'
 import { run_board_spin_turn, type SpinPorts, type Turning } from './run-board-spin-turn'
 import { run_board_spot, type Spot } from './run-board-spot'
@@ -152,18 +153,6 @@ function sounded(turning: Turning, ports: SpinPorts, at_ms: number): void {
 	else run_board_theme_layer.after_frame(ports.theme_run, ports.typing_sound, at_ms, board)
 }
 
-// joshuafolkken/kit#8917: whether the board still shows the look this second was laid out in; a switch
-// in demo mode ends it, so the next redraw draws the base in the new look before its first frame — the
-// old base (the green lamp panel the themed board is laid out on) never shows under the new one.
-function current_check(ports: SpinPorts): (() => boolean) | undefined {
-	const run = ports.theme_run
-
-	if (run === undefined) return undefined
-	const { shown } = run
-
-	return () => run.shown === shown
-}
-
 // Draws the redraw on `screen`, then turns the spinners — or draws the theme — until the next second;
 // a still frame just waits — one the theme draws never is; a theme run showing none (a board launched
 // in no theme, Issue 4-4) is still as a board without one.
@@ -182,7 +171,10 @@ async function spin_to_second(
 			after_frame: (at_ms) => {
 				sounded(turning, ports, at_ms)
 			},
-			is_current: current_check(ports),
+			// joshuafolkken/kit#8917, #8939: a redraw asked for — a switch in demo mode, a fold, the sound
+			// switch — ends this second, so the next redraw draws the new screen before its first frame; the
+			// old base (the green lamp panel a themed board is laid out on) never shows under it.
+			is_current: run_board_repaint.current_of(ports.repaint),
 		},
 		ports,
 		screen,

@@ -24,7 +24,7 @@ pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it fi
 - `--prrun` — marks it as `prrun #N`'s, also read as a `fullrun`.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
-- `--halfrun-round` — starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record as running, owned by this session; answers `busy` (exit 1) when the tree holds no such stop.
+- `--halfrun-round` — starts a `halfrun` fix round: re-opens the issue's stopped `halfrun` record, or an interrupted round of it whose session ended, as running, owned by this session; answers `busy` (exit 1) when the tree holds neither.
 - `--human-review-stop` — marks a `halfrun` stop and a `human-review` lane, retaining its tree and hold. Sends `confirmation`; its worker's exit frees the execution place. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.
 - `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
@@ -545,6 +545,10 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 `--adopt` claims by `run:hold --adopt <N>` instead — a `new` run's bare hold re-keyed to the Issue it filed; `none` or `busy` stops as a held tree does.
 
 After the budget and before the reads, the entry synchronizes the tree (skipped in a lane child): `stash:push "<command> [new] #<N>: pre-existing changes"`, `main:sync` (primary checkout) or `main:merge` (linked), then `stash:pop` after `stashed`. A failed step exits non-zero, keeps and names the stash, releases the hold and sends the `confirmation` Telegram.
+
+After `main:sync` and a clean `stash:pop`, the entry switches to the issue's branch `<N>-<slug>` (`check_and_create_branch`), so `review:selfcheck` and `preflight:check` find the issue. A failure only warns.
+
+A stop after the switch leaves a branch with no commits; `run:hold`'s preflight reads it as the default branch.
 
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 

@@ -3,7 +3,7 @@ import { run_board_fit } from './run-board-fit'
 import type { Theme } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8154: an icon drawn beside the label that says what it marks — a column's
-// `💪 CPU`, a section's `⏳ queued`, a row's `▶ backlogrun` — is put between two zero-width marks, the
+// `💪 CPU`, a section's `⌛ queued`, a row's `▶ backlogrun` — is put between two zero-width marks, the
 // one place the board tells such an icon from the same icon before a value (`💪 67%`). The WarGames
 // theme drops the marked icons, whose text would only repeat the label; every other frame drops the
 // marks alone, so it is drawn as before.

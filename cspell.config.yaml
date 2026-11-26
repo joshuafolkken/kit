@@ -12,6 +12,8 @@ words:
   # run:board's cell layers copied onto the back buffer, and a wide character's halves split (#8826).
   - blit
   - unpair
+  # A cell whose text takes more than one byte; the cost of a gap's rewrite is measured in them (#8951).
+  - multibyte
   # SonarCloud scanner's own spelling in its pull-request fetch error, which followup reruns on (#8848).
   - pullrequest
   # ImageMagick's command, which turns a scratch SVG into a PNG (#8262).

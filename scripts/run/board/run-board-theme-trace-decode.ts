@@ -90,6 +90,6 @@ function notice_lock(view: TraceView): void {
 	}
 }
 
-const run_board_theme_trace_decode = { decode, notice_lock, type_glow }
+const run_board_theme_trace_decode = { decode, is_glowing, notice_lock, type_glow }
 
 export { run_board_theme_trace_decode }

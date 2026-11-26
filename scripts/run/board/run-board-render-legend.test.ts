@@ -153,7 +153,7 @@ describe('run_board_render_legend.legend_of wait icons', () => {
 	})
 })
 
-// joshuafolkken/kit#4173: ⏳ under `⏳ queued`, 🙋 under `🙋 decision` and ✅ under `✅ done` carry
+// joshuafolkken/kit#4173: ⏳ (its `queued` heading now draws ⌛, joshuafolkken/kit#8944), 🙋 under `🙋 decision` and ✅ under `✅ done` carry
 // their own word. joshuafolkken/kit#4288: 📅 no longer does, so the wait icons name it.
 describe('run_board_render_legend.legend_of icons drawn with their own word', () => {
 	it('names none of ⏳, 🙋 and ✅, and draws nothing where they are all the frame draws', () => {

@@ -234,6 +234,12 @@ function report_unmoved(): LintOutcome {
 	return UNMOVED
 }
 
+function report_refused(refusal: string): LintOutcome {
+	process.stdout.write(refusal)
+
+	return { stage: 'arguments', exit_code: 1 }
+}
+
 // A residual the typed fix pass reported fails a run whose untyped lint passed: the gate's whole-tree
 // lint is typed and reports it too (`lint-related-fix.ts`, joshuafolkken/kit#7825).
 function with_fix_pass(outcome: LintOutcome, fix_exit_code: number): LintOutcome {
@@ -258,6 +264,14 @@ async function checked_outcome(
 	if (moved?.length === 0) return { outcome: report_unmoved(), before }
 
 	const scope = await resolve_lint_scope(command_arguments, root, moved)
+	const refusal = changed_file_scope.refusal_of(
+		command_arguments,
+		scope,
+		lint_related_scope.COMMAND_LABEL,
+	)
+
+	if (refusal !== undefined) return { outcome: report_refused(refusal), before }
+
 	const { before: verified, fix_exit_code } = await lint_related_record.timed(
 		stages,
 		'fix_ms',

@@ -46,17 +46,23 @@ function lanes(count: number, title = SHORT_TITLE): Array<BoardRow> {
 	return Array.from({ length: count }, (_, index) => lane(FIRST_LANE + index, title))
 }
 
+// The watch panel's pins, and a frame drawn before the first usage lands.
+interface Extra {
+	pinned?: ReadonlyArray<PinnedIssue>
+	is_unsampled?: boolean
+}
+
 function rendered(
 	active: Array<BoardRow>,
 	is_themed: boolean,
 	columns: number,
-	pinned: ReadonlyArray<PinnedIssue> = [],
+	extra: Extra = {},
 ): Array<string> {
 	const board = header({
 		layout: { ...EMPTY_LAYOUT, active, unreached: [lane(FIRST_LANE - 1, SHORT_TITLE)] },
 		occupied_count: active.length,
 		lane_limit: LANE_COUNT,
-		usages: board_usage(new Map()),
+		usages: extra.is_unsampled === true ? undefined : board_usage(new Map()),
 		theme: is_themed ? 'wopr' : undefined,
 	})
 	const lines = run_board_render.render({
@@ -64,7 +70,7 @@ function rendered(
 		notes: [note(NOW, 'seen')],
 		size: { rows: TALL, columns },
 		folded: new Set(),
-		pinned,
+		pinned: extra.pinned ?? [],
 	})
 
 	return lines.map((line) => stripVTControlCharacters(line))
@@ -116,6 +122,16 @@ describe.each([false, true])('run_board_render rule width (themed: %s)', (is_the
 		expect(new Set(rules_of(lines))).toStrictEqual(ends)
 	})
 
+	// joshuafolkken/kit#8957: a frame drawn before the first usage lands draws no cells, yet its rules
+	// already run as wide as they will once the usage lands.
+	it('draws every rule at one width before the usage lands and after', () => {
+		const before = rules_of(rendered(lanes(1), is_themed, COLUMNS, { is_unsampled: true }))
+		const after = rule_widths(lanes(1), is_themed)
+
+		expect(new Set(before)).toStrictEqual(new Set(after))
+		expect(new Set(after).size).toBe(1)
+	})
+
 	it('ends every rule at the pane edge where the pane is narrower than a full title', () => {
 		const widths = [
 			...rule_widths([], is_themed, NARROW),
@@ -147,7 +163,7 @@ describe.each([false, true])(
 		})
 
 		it('ends the watch panel’s widest pin at the pane edge where the pane is narrower than the rule width', () => {
-			const lines = rendered([], is_themed, UNDER_RULE, PINNED)
+			const lines = rendered([], is_themed, UNDER_RULE, { pinned: PINNED })
 			const pin = lines.find((line) => line.includes(`✅ ${String(CLOSED_PIN)}`)) ?? ''
 
 			expect(width_of(pin)).toBe(UNDER_RULE)

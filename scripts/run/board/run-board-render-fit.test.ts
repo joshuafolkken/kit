@@ -96,6 +96,54 @@ describe('run_board_render.render in a short pane', () => {
 	})
 })
 
+// A pinned footer — demo mode's selector — is drawn in place of the legend and the footer, and a short
+// pane cuts the rows over it instead.
+const PINNED = ['', 'picked', 'keys']
+
+function pinned_frame(rows: number | undefined): Array<string> {
+	const size = rows === undefined ? undefined : { rows, columns: WIDE }
+
+	return run_board_render
+		.render({ ...VIEW, size, pinned_footer: PINNED })
+		.map((line) => stripVTControlCharacters(line))
+}
+
+describe('run_board_render.render with a pinned footer', () => {
+	it('ends on the pinned rows, the legend and the footer left out', () => {
+		const whole = frame(undefined)
+		const legend = whole.slice(0, -FOOTER.length).at(-1) ?? ''
+		const lines = pinned_frame(undefined)
+
+		expect(legend).not.toBe('')
+		expect(lines.slice(-PINNED.length)).toStrictEqual(PINNED)
+		expect([has(lines, legend), has(lines, 'footer')]).toStrictEqual([false, false])
+		expect(lines.slice(0, -PINNED.length)).toStrictEqual(
+			whole.slice(0, lines.length - PINNED.length),
+		)
+	})
+
+	it('keeps every pinned row in each shorter pane, down to the pinned rows alone', () => {
+		const tallest = pinned_frame(undefined).length
+		const heights = Array.from(
+			{ length: tallest - PINNED.length + 1 },
+			(_, index) => tallest - index,
+		)
+		const frames = heights.map((height) => pinned_frame(height))
+
+		expect(frames.map((lines) => lines.slice(-PINNED.length))).toStrictEqual(
+			heights.map(() => PINNED),
+		)
+		expect(frames.map((lines, index) => lines.length <= (heights[index] ?? 0))).not.toContain(false)
+		expect(frames.at(-1)).toStrictEqual(PINNED)
+	})
+
+	it('ends the frame of no run on them too, over its one line', () => {
+		const bounds = { size: { rows: PINNED.length, columns: WIDE }, pinned_footer: PINNED }
+
+		expect(run_board_render.render_no_run(NOW, { bounds })).toStrictEqual(PINNED)
+	})
+})
+
 describe('run_board_render.render_no_run with a footer', () => {
 	it('ends on the footer where the pane holds it, and gives it way where it does not', () => {
 		const tall = run_board_render.render_no_run(NOW, {

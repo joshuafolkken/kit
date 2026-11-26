@@ -166,15 +166,7 @@ describe('run_ship_pre_detach_pinned.pinned_check on the tree run:review checked
 		expect(run_mock).not.toHaveBeenCalled()
 	})
 
-	// joshuafolkken/kit#5153: a cut answer lists only the first unpinned place, so a reason checks all.
-	it('probes every hunk under a reason when the background check stopped at its first', async () => {
-		reusable_mock.mockResolvedValue(true)
-		on_tree_mock.mockResolvedValue({ ...UNPINNED, is_cut: true })
-
-		await check(UNPINNED_OK)
-
-		expect(run_mock.mock.calls[0]?.[0]).not.toContain(FIRST_UNPINNED)
-	})
+	// A cut answer under a reason checks the rest (joshuafolkken/kit#5153, #8981): `*-pinned-rest.test.ts`.
 	// A cut answer without a reason stops, running no probe here: `*-pinned-remaining.test.ts`.
 })
 

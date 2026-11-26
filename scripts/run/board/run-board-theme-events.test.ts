@@ -131,10 +131,11 @@ describe('run_board_theme_events.row_key_of', () => {
 })
 
 describe('run_board_theme_events.demo_timeline', () => {
-	it('starts the demo event on the key press tick', () => {
+	// joshuafolkken/kit#8969: a demo key plays PROGRESS once — the first sample text alone.
+	it('starts the demo event on the key press tick, a PROGRESS its first text alone', () => {
 		const timeline = demo_timeline('p', 'row', 500)
 
-		expect(timeline.progress.map(({ start }) => start)).toEqual([500, 600])
+		expect(timeline.progress.map(({ start }) => start)).toEqual([500])
 		expect(demo_timeline('n', 'row', 500).notice[0]?.start).toBe(500)
 		expect(demo_timeline('r', 'the row', 7).row[0]).toEqual({ start: 7, text: 'the row' })
 	})

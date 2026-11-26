@@ -11,13 +11,13 @@ import { run_board_spot } from './run-board-spot'
 import { run_board_theme } from './run-board-theme'
 
 // joshuafolkken/kit#4137: a running batch starts each row once a lane and its paths are free, never
-// wave by wave, so the rows not yet started are one `⏳ queued` section in the plan's order.
+// wave by wave, so the rows not yet started are one `⌛ queued` section in the plan's order.
 
 const { EMPTY_LAYOUT, header, lines_of, rule } = run_board_render_fixture
 const REPO = 'joshuafolkken/kit'
 const TALL = 200
 const WIDE = 120
-const EMPTY_QUEUED = rule('⏳ queued 0')
+const EMPTY_QUEUED = rule('⌛ queued 0')
 
 function child(number: number): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels: ['run:lane'], blocked_by: [] }
@@ -43,7 +43,7 @@ describe('run_board_render.render queued rows', () => {
 	const lines = lines_of(header({ layout }))
 
 	it('draws a plan of three waves under one queued heading and no numbered one', () => {
-		expect(lines.filter((line) => line.startsWith('── ⏳ queued '))).toHaveLength(1)
+		expect(lines.filter((line) => line.startsWith('── ⌛ queued '))).toHaveLength(1)
 		expect(lines).not.toContain(rule('1'))
 		expect(lines).not.toContain(rule('2'))
 	})
@@ -83,7 +83,7 @@ describe('run_board_render.render an empty queue', () => {
 		const queued = lines.indexOf(EMPTY_QUEUED)
 
 		expect(queued).not.toBe(-1)
-		expect(lines.slice(queued, queued + 3)).toStrictEqual([EMPTY_QUEUED, '', rule('🔗 waiting 1')])
+		expect(lines.slice(queued, queued + 3)).toStrictEqual([EMPTY_QUEUED, '', rule('🪢 waiting 1')])
 	})
 
 	it('draws no empty decision, waiting or done heading', () => {
@@ -98,15 +98,15 @@ describe('run_board_render.render an empty queue', () => {
 	it('draws no queued heading on a board without a plan', () => {
 		const lines = lines_of(header({ layout: undefined }))
 
-		expect(lines.filter((line) => line.includes('⏳ queued'))).toStrictEqual([])
+		expect(lines.filter((line) => line.includes('⌛ queued'))).toStrictEqual([])
 	})
 
 	it('keeps the empty queue heading whole open and folded', () => {
-		const open = frame(new Set()).find((line) => line.startsWith('▾ ⏳ queued '))
-		const shut = frame(new Set(['queued'])).find((line) => line.startsWith('▸ ⏳ queued '))
+		const open = frame(new Set()).find((line) => line.startsWith('▾ ⌛ queued '))
+		const shut = frame(new Set(['queued'])).find((line) => line.startsWith('▸ ⌛ queued '))
 
-		expect(open).toMatch(/^▾ ⏳ queued 0 ─+$/u)
-		expect(shut).toMatch(/^▸ ⏳ queued ─+ 0 ─+$/u)
+		expect(open).toMatch(/^▾ ⌛ queued 0 ─+$/u)
+		expect(shut).toMatch(/^▸ ⌛ queued ─+ 0 ─+$/u)
 	})
 })
 
@@ -204,7 +204,9 @@ describe('run_board_render.render queued rule tail on a themed screen', () => {
 	})
 
 	it('changes the queued rule alone', () => {
-		const plain = wargames_lines({})
+		// Both live, so the usage gauge's column a live board measures every rule by is the same in each
+		// (joshuafolkken/kit#8957).
+		const plain = wargames_lines({ spinner: loading.spinner })
 		const tailed = wargames_lines(loading)
 		const changed = tailed.filter((line, index) => line !== plain[index])
 

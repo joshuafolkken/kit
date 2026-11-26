@@ -1,4 +1,5 @@
 import type { KeyTaker } from './run-board-keys'
+import { run_board_repaint, type Repaint } from './run-board-repaint'
 import type { EventKind } from './run-board-sound-typing'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import { run_board_theme_events, type BoardEvent, type Lasts } from './run-board-theme-events'
@@ -38,6 +39,9 @@ type ThemeRegistry = (value: ThemeValue) => ThemeFactory | undefined
 interface PlayingPart {
 	name: PartName
 	start_ms: number | undefined
+	// A part a demo key plays: over once through, the board back — an ending too, which the run's own
+	// holds on its last frame.
+	is_once?: boolean
 }
 
 // The theme built over one base: what it was built for, the layout and helpers, the theme itself.
@@ -52,6 +56,8 @@ interface Built {
 interface DemoMode {
 	timeline: ThemeTimeline
 	entered: ThemeValue
+	// The timeline whose play the theme's frame said is over (`demo_over`): this one once it is.
+	over?: ThemeTimeline
 }
 
 interface ThemeRun {
@@ -74,8 +80,9 @@ interface ThemeRun {
 	event_starts?: Partial<Record<EventKind, number>>
 	part_sounded?: PlayingPart
 	// Counts the switches of what the board shows — demo mode entered or left, a work picked — so the
-	// second drawing the old look ends and the board is redrawn in the new one at once.
-	shown?: number
+	// second drawing the old look ends and the board is redrawn in the new one at once; the board's own
+	// repaint, which its keys ask too (`run-board-repaint.ts`).
+	repaint: Repaint
 }
 
 // The opening's sound in a theme value.
@@ -107,6 +114,7 @@ function run_of(
 		release: undefined,
 		opening_sound,
 		sound_ms: undefined,
+		repaint: run_board_repaint.repaint_of(),
 	}
 }
 
@@ -175,8 +183,8 @@ function free_keys(run: ThemeRun): void {
 }
 
 // `name` played from `at_ms`; its sound counts from its start, not from a part played before it.
-function play_part(run: ThemeRun, name: PartName, at_ms: number): void {
-	run.part = { name, start_ms: at_ms }
+function play_part(run: ThemeRun, name: PartName, at_ms: number, is_once = false): void {
+	run.part = { name, start_ms: at_ms, ...(is_once && { is_once }) }
 	run.sound_ms = undefined
 }
 
@@ -186,13 +194,19 @@ function end_part(run: ThemeRun): void {
 	run.part = undefined
 }
 
+// Whether a part gives the board back once through, or where it cannot play: an opening, and a part a
+// demo key played; the run's own ending holds its last frame.
+function is_passing(part: PlayingPart): boolean {
+	return part.name === 'opening' || part.is_once === true
+}
+
 // A second no theme frame is drawn in — no theme shown, or no lamp panel to lay it out by: what was built
 // for an earlier base is dropped, so a part there has no length and Ctrl-C leaves at once, and a launch
-// opening that cannot play is ended, so its keys come back.
+// opening that cannot play is ended, so its keys come back — as is a part a demo key played.
 function settle(run: ThemeRun, is_shown: boolean): void {
 	if (is_shown) return
 	run.built = undefined
-	if (run.part?.name === 'opening') end_part(run)
+	if (run.part !== undefined && is_passing(run.part)) end_part(run)
 }
 
 // The keys taken for `on_key` through `intercept`, giving back whatever took them before.
@@ -207,13 +221,24 @@ function take_keys(
 
 // What the board shows switched: the second drawing the old look is over (`run-board-spin.ts`).
 function switched(run: ThemeRun): void {
-	run.shown = (run.shown ?? 0) + 1
+	run_board_repaint.request(run.repaint)
 }
 
 // Demo mode entered: the current theme's idle board, nothing playing.
 function enter_demo(run: ThemeRun): void {
-	run.demo = { timeline: IDLE, entered: run.value }
+	run.demo = { timeline: IDLE, entered: run.value, over: IDLE }
 	run.part = undefined
+	switched(run)
+}
+
+// Demo mode's event over, as the theme's frame of its timeline says (`ThemeModule.playing`): told once a
+// timeline, and the board redrawn at once, so its footer is back on IDLE on that frame. A part's frames
+// are no frame of the timeline.
+function demo_over(run: ThemeRun): void {
+	const { demo } = run
+
+	if (demo === undefined || run.part !== undefined || demo.over === demo.timeline) return
+	demo.over = demo.timeline
 	switched(run)
 }
 
@@ -231,11 +256,13 @@ function leave_demo(run: ThemeRun): ThemeValue | undefined {
 const run_board_theme_run = {
 	IDLE,
 	THEME_VALUES,
+	demo_over,
 	end_part,
 	enter_demo,
 	factory_of,
 	is_drawn,
 	is_own_level,
+	is_passing,
 	is_value,
 	leave_demo,
 	next_tick_ms,

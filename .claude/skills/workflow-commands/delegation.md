@@ -14,7 +14,7 @@ pnpm josh delegate --list   # the enumeration, and what was rejected and why
 **The mechanism is not the unit.** `pnpm josh delegate` covers a run step, a file-disjoint Step 0
 implementation unit (`pnpm josh fanout`), and `epic-child` — an epic's child and a named issue of a
 `backlogrun` alike. Do not add a second batch-child mechanism. Read `backlogrun-child.md` → "Each child
-runs in a delegated unit" at child dispatch; `backlogrun-steps.md` → "Named issues run first, in order"
+runs in a delegated unit" at child dispatch; `backlogrun-steps.md` → "Named issues run first, in parallel"
 applies to named issues. `docs/josh-commands-backlog.md` → "`josh fanout`" carries file-disjoint dispatch.
 
 **`followup-filing` delegates the late review-finding filing chain** with the parent's finding text;

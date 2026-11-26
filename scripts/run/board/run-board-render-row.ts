@@ -1,4 +1,5 @@
 import { run_board_earlier } from './run-board-earlier'
+import { run_board_faint } from './run-board-faint'
 import { run_board_fit, type PlanLine, type YieldStage } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -28,6 +29,7 @@ const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lea
 const { ELLIPSIS, fitted, row_overrun, title_of } = run_board_render_title
 const { width_of } = run_board_fit
 const { padded } = run_board_fresh
+const { faint } = run_board_faint
 const { condition_of, tail_of, waits_of } = run_board_render_condition
 const GAP = '  '
 // The fewest columns a done row's end is cut to before its title gives them up: its minutes and a cut
@@ -73,14 +75,31 @@ function row_title(row: BoardRow, header: BoardHeader): string | undefined {
 	return ELLIPSIS
 }
 
-// A row the run filed leads its title with ✚ (joshuafolkken/kit#4099), cut by as many columns, so every
-// column after it stays where an unmarked row has it.
+// A row's area (joshuafolkken/kit#8960) and a blank, drawn faint in `lead_of`; none without one.
+function area_tag(row: BoardRow): string {
+	return row.area === undefined ? '' : `${row.area} `
+}
+
+// What leads a row's title: its area, then ✚ where the run filed it (joshuafolkken/kit#4099).
+function title_lead(row: BoardRow, frame: RowFrame): string {
+	return `${area_tag(row)}${frame.filed.has(row.number) ? FILED_LEAD : ''}`
+}
+
+// The title led by `title_lead` and cut by as many columns, so every column after it stays where an
+// unled row has it.
 function title_text(row: BoardRow, frame: RowFrame): string {
-	const title = row_title(row, frame.header)
+	const lead = title_lead(row, frame)
+	// `title_of` cuts nothing at a limit of 0 or below, so a lead that fills the column keeps the mark.
+	const limit = Math.max(1, frame.title_limit - lead.length)
 
-	if (!frame.filed.has(row.number)) return title_of(title, frame.title_limit)
+	return `${lead}${title_of(row_title(row, frame.header), limit)}`
+}
 
-	return `${FILED_LEAD}${title_of(title, frame.title_limit - FILED_LEAD.length)}`
+// The title with its area tag drawn faint, as the rest of the row is not.
+function area_faint(row: BoardRow, title: string): string {
+	const { area } = row
+
+	return area === undefined ? title : `${faint(area)}${title.slice(area.length)}`
 }
 
 // The columns a row's title takes cut to the frame's title column, its ✚ among them — what a section
@@ -160,7 +179,7 @@ function lead_of(row: BoardRow, frame: RowFrame, title: string): string {
 	const number = number_text(row, frame.cells, header.link)
 	const lead = `${icon_text(row, frame)} ${number} ${run_board_priority.cell_of(row)} ${kind}`
 
-	return title === '' ? lead : `${lead} ${run_board_label_pair.titled(title)}`
+	return title === '' ? lead : `${lead} ${run_board_label_pair.titled(area_faint(row, title))}`
 }
 
 // A row up to its tail — the columns that stay where they are on every row. A waiting row has no time
@@ -238,7 +257,7 @@ function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 
 	return {
 		is_line_kept: is_tailed || is_found_squeezed(indent, row, frame),
-		lead: frame.filed.has(row.number) ? FILED_LEAD.length : 0,
+		lead: title_lead(row, frame).length,
 		head: (cut) => `${indent}${head_text(row, { ...frame, ...cut })}`,
 		is_head_kept: frame.is_lane_row === true,
 		shared: is_tailed ? frame.shared : undefined,

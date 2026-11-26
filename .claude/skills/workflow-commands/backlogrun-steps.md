@@ -29,18 +29,18 @@ Tier C action inside it (`issue-template.md`); `--no-auto-ok` withholds it too.
 
 **This section is the single source of how the `epic:bundle` obligation and this boundary meet.**
 
-## Named issues run first, in order
+## Named issues run first, in parallel
 
-**`backlogrun #N1 #N2 …` runs the named issues before it touches the pool**, in the order typed, **one
-at a time — no lanes**, each as a `fullrun` in a delegated unit (`backlogrun-child.md` → "Each child
-runs in a delegated unit"), read back with `pnpm josh issue:state <N>`. `pnpm josh backlog:plan #N1
-#N2 …` renders the order (`scripts/backlog/backlog-named.ts`).
+**`backlogrun #N1 #N2 …` offers every named issue not yet in flight at once, before the pool**; the free
+lanes take them in the typed order, which is only their priority (`backlog-drive-named.ts`). The pool's
+`run:solo` hold and path-overlap separation apply to them (`backlog-drive-named-gate.ts`). **Where one
+named issue must wait for another, record `blocked-by`** — the typed order does not sequence them
+(`backlog-drive-blocked.ts`). `pnpm josh backlog:plan #N1 #N2 …` renders the list.
 
-**A named issue that cannot finish parks, and the rest of the named list is skipped**; the run drains
-the pool and reports what was not started (`backlog_named.after_failure`). One already closed or parked
-when offered is booked done alone and skips nothing. A `needs-human-review` named
+**A named issue that cannot finish parks and skips nothing**: the others run as they would have. One
+already closed or parked when offered is booked done. A `needs-human-review` named
 issue stops the whole run. **`--only` runs the named list and stops there, draining no pool** — a
-failure ends the run. A bare `--only` (no named issues) → `backlog-drive-named-offer.ts` → `only_idle`.
+failed named issue skips nothing; the run stops once every named issue is done. A bare `--only` (no named issues) → `backlog-drive-named-offer.ts` → `only_idle`.
 
 ## The session cut is inside the invocation
 
@@ -148,7 +148,7 @@ with no park adds no triage step; a resumed driver does not repeat it.
 | Step | Where it is defined |
 | --- | --- |
 | `run:carry --begin` + `run:wake --start` before the plan; `run:report --end` at the end | "The session cut is inside the invocation" above |
-| `pnpm josh run:prime` in the primary checkout before the first child | `backlogrun-lanes.md` → "Once per repository, before the first lane opens"; a first child outside a lane: `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
+| `pnpm josh run:prime` in the primary checkout before the first child | `backlogrun-lanes.md` → "Once per repository, before the first lane opens"; `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:hold <N>`'s preflight, before each child not in a lane | `docs/josh-commands-run.md` → "`josh run:hold`" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last merge and lane close | `followup.md` → "When `pnpm josh release` runs" |

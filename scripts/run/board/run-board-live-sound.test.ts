@@ -187,6 +187,7 @@ describe('run_board_live_sound.skipped', () => {
 	it('stops every sound, then sounds the board appearing once while the sound is on', () => {
 		const test = played()
 
+		heard({ hush: vi.fn() })
 		skipped(keys_of(true), 'wopr')
 
 		expect(test.stop_all).toHaveBeenCalledOnce()

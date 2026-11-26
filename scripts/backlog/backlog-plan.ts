@@ -197,14 +197,16 @@ function format_unusable(result: EpicNextResult): string {
 }
 
 // The named prefix a `backlogrun` runs, and whether `--only` stops it there. Carried together because
-// the plan renders the same two facts the run acts on: which issues lead, and whether the pool follows.
+// the plan renders the same two facts the run acts on: which issues come first, and whether the pool
+// fills the lanes they leave free.
 interface NamedPlan {
 	issues: ReadonlyArray<number>
 	only: boolean
 }
 
 // The named issues are this repository's own, so they are cited against it and a title is looked up
-// the same way the pool's rows are. The order is the invocation's, never sorted.
+// the same way the pool's rows are. The order is the invocation's — the priority free lanes take them
+// in — never sorted.
 function named_lines(named: ReadonlyArray<number>, context: PlanContext): Array<string> {
 	return named.map((issue) =>
 		join_row(issue_cite.reference(context.repo, String(issue), context.titles.get(issue)), ''),

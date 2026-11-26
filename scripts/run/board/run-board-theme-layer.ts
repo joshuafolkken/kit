@@ -6,7 +6,7 @@ import { run_board_theme_demo_sound, type Typing } from './run-board-theme-demo-
 import { run_board_theme_host_api } from './run-board-theme-host-api'
 import { run_board_theme_host_frame } from './run-board-theme-host-frame'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
-import type { FinalGrid, PartName, ThemeTimeline } from './run-board-theme-host-types'
+import type { FinalGrid, PartName, ThemeModule, ThemeTimeline } from './run-board-theme-host-types'
 import { run_board_theme_layout, type LayoutView } from './run-board-theme-layout'
 import { run_board_theme_notice_sound } from './run-board-theme-notice-sound'
 import { run_board_theme_roles } from './run-board-theme-roles'
@@ -37,6 +37,18 @@ function key_of(run: ThemeRun, view: LayoutView, canvas: Cells): string {
 	return [run.value, size, view.row_key ?? '', ...(view.dated_clocks ?? [])].join(KEY_JOIN)
 }
 
+// `module` with its draw telling the run once the state it drew says no event plays, so demo mode's
+// footer reads the frame's own state and none is built for it.
+function watched(run: ThemeRun, module: ThemeModule): ThemeModule {
+	return {
+		...module,
+		draw: (grid, state, tick) => {
+			module.draw(grid, state, tick)
+			if (module.playing?.(state) === false) run_board_theme_run.demo_over(run)
+		},
+	}
+}
+
 // The theme built over `canvas`, which holds the base: none without a theme or a layout.
 function build(run: ThemeRun, view: LayoutView, canvas: Cells, key: string): Built | undefined {
 	const factory = factory_of(run)
@@ -49,7 +61,7 @@ function build(run: ThemeRun, view: LayoutView, canvas: Cells, key: string): Bui
 	run_board_theme_layout.edit_board(board, layout, view)
 	const api = run_board_theme_host_api.theme_api_of(layout, board)
 
-	return { key, layout, api, module: factory(api) }
+	return { key, layout, api, module: watched(run, factory(api)) }
 }
 
 // The theme for this base, built once; the run keeps the last one built for its parts and events.
@@ -66,7 +78,7 @@ function built_of(memo: Memo, run: ThemeRun, view: LayoutView, canvas: Cells): B
 }
 
 // The part playing at `at_ms` and its tick: an ending holds its last frame once through; an opening
-// through ends, giving the board back.
+// through ends, giving the board back, as does an ending a demo key played.
 function part_at(
 	run: ThemeRun,
 	built: Built,
@@ -79,7 +91,7 @@ function part_at(
 	const { ticks } = part_of(built.module, built.layout, part.name)
 	const tick = Math.max(0, Math.floor((at_ms - part.start_ms) / TICK_MS))
 
-	const is_on = tick < ticks || part.name === 'ending'
+	const is_on = tick < ticks || !run_board_theme_run.is_passing(part)
 
 	if (is_on) return { name: part.name, tick: Math.min(tick, ticks - 1) }
 	end_part(run)

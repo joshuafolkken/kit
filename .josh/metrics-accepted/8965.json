@@ -1,0 +1,7 @@
+{
+	"reason": "New blocker gate at the --only offer (backlog-drive-blocked.ts + unfinished read) is the feature #8965 asks for",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 50
+	}
+}

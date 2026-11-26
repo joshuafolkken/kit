@@ -39,12 +39,12 @@ const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
 const SOLO_ANSWERS = ['--defect', 'yes', '--verification', 'yes', '--every-run', 'yes']
 
 const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
-const ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
-const BACKGROUND = ['## 概要\n\n要約\n', '## 背景', '', '- 種別: 不具合', '- 原因: #4201', ESTIMATE]
+const BUG =
+	'- 種別: 不具合\n- 原因: #4201\n- 検出漏れの理由: 一覧の漏れ\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
 
 // A body the lint accepts, with `declarations` under its background.
 function body_of(...declarations: ReadonlyArray<string>): string {
-	return [...BACKGROUND, ...declarations, '', SECTIONS].join('\n')
+	return ['## 概要\n\n要約\n\n## 背景\n', BUG, ...declarations, '', SECTIONS].join('\n')
 }
 
 const JUDGEMENT_NEEDED = '- 人の判断: 要（方針の判断）'

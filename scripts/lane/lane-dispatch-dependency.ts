@@ -43,10 +43,21 @@ async function start_wait(child: EpicChild): Promise<string | undefined> {
 	return issue_not_before.waiting_reason(child.body)
 }
 
-async function reason_of(issue: string): Promise<string | undefined> {
+async function child_of(issue: string): Promise<EpicChild> {
 	const repo = await git_gh_command.repo_get_name_with_owner()
 	if (repo === undefined) throw new Error('Cannot resolve launch repository')
-	const child = await epic_live.child(Number(issue), repo)
+
+	return await epic_live.child(Number(issue), repo)
+}
+
+// The issue's blockers `check` would wait on, read without recording a wait or printing one; a failed
+// read throws (joshuafolkken/kit#8965).
+async function unfinished(issue: string): Promise<Array<EpicChild>> {
+	return await unresolved(await child_of(issue))
+}
+
+async function reason_of(issue: string): Promise<string | undefined> {
+	const child = await child_of(issue)
 	const wait = await start_wait(child)
 	if (wait !== undefined) return wait
 	const blockers = await unresolved(child)
@@ -106,7 +117,7 @@ async function begin(issue: string): Promise<void> {
 	await lane_state.record_change({ issue, state: 'running', command: 'lane:dispatch' })
 }
 
-const lane_dispatch_dependency = { check, defer, deferred, begin, WAIT_EXIT_CODE }
+const lane_dispatch_dependency = { check, unfinished, defer, deferred, begin, WAIT_EXIT_CODE }
 
 export type { DependencyWait }
 export { lane_dispatch_dependency }

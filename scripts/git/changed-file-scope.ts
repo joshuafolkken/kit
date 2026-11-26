@@ -190,6 +190,25 @@ function report_unusable_arguments(
 	process.stdout.write(`${label}: ignored — not a file this check reads: ${unusable.join(' ')}\n`)
 }
 
+// File arguments typed by hand with none of them usable are a mistake, not an empty change: running
+// the whole tree for one (joshuafolkken/kit#8979) turned a shell that did not word-split a file list
+// into a multi-minute lint. A command that must not widen asks for this and stops on the text.
+function refusal_of(
+	command_arguments: ReadonlyArray<string>,
+	scope: Pick<ChangedFileScope, 'mode'>,
+	label: string,
+): string | undefined {
+	const explicit_files = explicit_files_of(command_arguments)
+
+	if (explicit_files.length === 0 || scope.mode !== 'all') return undefined
+
+	const split_hint = explicit_files.some((file) => /\s/u.test(file))
+		? ' An argument with spaces in it is probably a file list the shell did not split.'
+		: ''
+
+	return `${label}: refused — none of the file arguments is a file this check reads: ${explicit_files.join(' | ')}.${split_hint} Pass one file per argument, e.g. \`${label} a.ts b.ts\`.\n`
+}
+
 const changed_file_scope = {
 	ARGV_START,
 	LISTED_FILE_LIMIT,
@@ -199,6 +218,7 @@ const changed_file_scope = {
 	format_file_list,
 	is_flag,
 	read_changed_files,
+	refusal_of,
 	report_unusable_arguments,
 	repository_root_or_cwd,
 	resolve_command_scope,

@@ -290,7 +290,7 @@ describe('pr_merge — a merge GitHub reports as already in progress', () => {
 		expect(merge).toHaveBeenCalledTimes(2)
 	})
 
-	it('fails with the 405 when the merge has not landed within the bound', async () => {
+	it('fails with the 405 when the second merge has not landed within the bound either', async () => {
 		const in_progress = merge_in_progress_failure()
 		const detail = vi.fn().mockResolvedValue(rest_pull())
 
@@ -299,8 +299,32 @@ describe('pr_merge — a merge GitHub reports as already in progress', () => {
 
 		await vi.runAllTimersAsync()
 		await outcome
-		expect(detail).toHaveBeenCalledTimes(MERGE_IN_PROGRESS_ATTEMPTS)
-		expect(merge_requests()).toHaveLength(1)
+		expect(detail).toHaveBeenCalledTimes(MERGE_IN_PROGRESS_ATTEMPTS * 2)
+		expect(merge_requests()).toHaveLength(2)
+	})
+})
+
+// joshuafolkken/kit#8965: the lock released with the pull request still open and clean.
+describe('pr_merge — an in-progress merge that ends without landing', () => {
+	beforeEach(() => {
+		forget_pr_numbers()
+		vi.useFakeTimers()
+	})
+
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+
+	it('sends the merge once more and resolves when that one lands', async () => {
+		const merge = vi.fn().mockRejectedValueOnce(merge_in_progress_failure()).mockResolvedValue('')
+		const detail = vi.fn().mockResolvedValue(rest_pull())
+
+		arrange(merge, detail)
+		const outcome = expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined()
+
+		await vi.runAllTimersAsync()
+		await outcome
+		expect(merge).toHaveBeenCalledTimes(2)
 	})
 })
 

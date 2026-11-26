@@ -109,7 +109,7 @@ describe('run_board_render counted rules', () => {
 	it('says how many rows each counted section holds while it is open', () => {
 		const rules = rules_of(frame())
 
-		for (const label of ['📌 findings 1', '⏳ queued 2', '🔗 waiting 1', '✅ done 1']) {
+		for (const label of ['📌 findings 1', '⌛ queued 2', '🪢 waiting 1', '✅ done 1']) {
 			expect(rules.some((line) => line.startsWith(`── ${label} ─`))).toBe(true)
 		}
 	})
@@ -117,7 +117,7 @@ describe('run_board_render counted rules', () => {
 	it('keeps the count after the label on an open ▾ rule', () => {
 		const rules = rules_of(frame(new Set()))
 
-		expect(rules.some((line) => line.startsWith('▾ ⏳ queued 2 ─'))).toBe(true)
+		expect(rules.some((line) => line.startsWith('▾ ⌛ queued 2 ─'))).toBe(true)
 		expect(rules.some((line) => line.startsWith('▾ 📌 findings 1 ─'))).toBe(true)
 	})
 })

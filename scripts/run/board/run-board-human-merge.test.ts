@@ -154,7 +154,7 @@ async function rendered(plan: BoardPlan, form: 'chat' | 'screen'): Promise<Array
 	await run_board_tick.tick(run_board_tick.FRESH_STATE, { ...ports, form })
 	const lines = stripVTControlCharacters(frames.at(-1) ?? '').split('\n')
 
-	return lines.filter((line) => line.includes('🔏') || line.includes('🔗 waiting'))
+	return lines.filter((line) => line.includes('🔏') || line.includes('🪢 waiting'))
 }
 
 describe('run board human merge rows', () => {

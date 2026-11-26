@@ -195,7 +195,7 @@ async function scoped_board(named: NamedPlan, read: PlanRead): Promise<BoardPlan
 
 // The pool, read only when the scope draws it: an `--only` run names its issues and draws no pool.
 async function read_pool(named: NamedPlan, ports: PlanPorts): Promise<OptedInRead | undefined> {
-	if (named.only && named.issues.length > 0) return undefined
+	if (named.only) return undefined
 
 	return await launch_timing.timed('plan: pool', ports.fetch_opted_in)
 }
@@ -212,8 +212,8 @@ async function read_steps(named: NamedPlan, ports: PlanPorts): Promise<BoardPlan
 
 	const read = { listing, pool, ports }
 
-	const plan =
-		named.issues.length === 0 ? await pool_board([], read) : await scoped_board(named, read)
+	const is_bare = named.issues.length === 0 && !named.only
+	const plan = is_bare ? await pool_board([], read) : await scoped_board(named, read)
 	const decided = await launch_timing.timed(
 		'plan: decisions',
 		async () => await run_board_decision_read.with_decisions(plan),

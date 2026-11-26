@@ -113,6 +113,13 @@ describe('run_board_cells_diff.diff — runs', () => {
 		expect(bytes).toBe(`${ESC}[1;1H${RESET}X${ESC}[1;6HY`)
 	})
 
+	it('moves the cursor over unchanged cells whose rewrite, with its styles, is longer', () => {
+		const back = painted(`${RED}X${RESET}  ${RED}Y`)
+		const bytes = diff(back, painted('a  c'))
+
+		expect(bytes).toBe(`${ESC}[1;1H${RESET}${RED}X${ESC}[1;4HY${RESET}`)
+	})
+
 	it('ends a run at the row end and moves the cursor to the next row', () => {
 		const bytes = diff(painted('abcdefgX\nXbc'), painted('abcdefgh\nabc'))
 

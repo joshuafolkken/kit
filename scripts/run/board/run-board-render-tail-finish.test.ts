@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_estimate } from './run-board-estimate'
+import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_condition } from './run-board-render-condition'
@@ -13,7 +15,7 @@ import type { ItemState } from './run-board-status'
 // ends on its reason alone (#8166).
 // No row draws `over budget`.
 
-const { MINUTE, NOW, header } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const HOUR = 60 * MINUTE
 const TOTALS = [20 * MINUTE, 30 * MINUTE, 40 * MINUTE]
 const UNKNOWN = '🎯 —'
@@ -73,6 +75,43 @@ describe('run_board_render_tail.tail_of finish', () => {
 		expect(run_board_render_tail.tail_of(launched(60), header()).join(' ')).not.toContain(
 			'over budget',
 		)
+	})
+})
+
+// joshuafolkken/kit#8946: the root checkout's single run's 🏠 row draws its finish beside a stopped run.
+describe('run_board_render_tail.tail_of finish on a 🏠 row', () => {
+	const STOPPED = { last_event_ms: NOW - MINUTE, is_stopped: true }
+	const ROOT = launched(25)
+
+	// A stopped run's board with `name`'s running 🏠 row.
+	function root_header(name: string, lane_totals: ReadonlyArray<number>): BoardHeader {
+		const layout = { ...EMPTY_LAYOUT, root: { name, row: ROOT } }
+
+		return header({ activity: STOPPED, layout, lane_totals })
+	}
+
+	function root_tail(lane_totals: ReadonlyArray<number>, name = 'fullrun'): string {
+		return run_board_render_tail.tail_of(ROOT, root_header(name, lane_totals)).join(' ')
+	}
+
+	it('draws its finish and drift as a lane row does', () => {
+		const finish = run_board_labels.minute_of(NOW + 10 * MINUTE)
+
+		expect(root_tail(TOTALS)).toContain(`🎯 ${finish} +5′`)
+	})
+
+	it('draws 🎯 — on a 🏠 row where no lane total is measured', () => {
+		expect(root_tail([])).toContain(UNKNOWN)
+	})
+
+	it('draws no finish on a halfrun', () => {
+		expect(root_tail(TOTALS, 'halfrun')).not.toContain('🎯')
+	})
+
+	it('names the 🎯 in the legend', () => {
+		const lines = lines_of(root_header('prrun', TOTALS))
+
+		expect(lines.join('\n')).toContain(run_board_estimate.LEGEND)
 	})
 })
 

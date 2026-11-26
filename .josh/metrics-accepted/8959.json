@@ -1,0 +1,7 @@
+{
+	"reason": "Splitting label definitions into a new module adds its own imports, export list and a colocated test file header (+24 code lines); no logic grew",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}

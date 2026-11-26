@@ -64,24 +64,19 @@ describe('agent_session_role.scope_line', () => {
 	})
 
 	// joshuafolkken/kit#7783: a filing instruction in consultation is kickoff new, handed off.
-	it('hands a filing instruction to run:handoff kickoff new outside a worker lane', () => {
-		const line = agent_session_role.scope_line({}, linked)
-
-		expect(line).toContain('hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`')
-	})
-
 	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.
-	it('answers an imperative request with a plan and a filing plan outside a worker lane', () => {
-		const line = agent_session_role.scope_line({}, linked)
-
-		expect(line).toContain('imperative request with investigation, a plan and a filing plan')
-	})
-
-	it('hands a no-filing request to the investigator and producer subagents outside a worker lane', () => {
-		const line = agent_session_role.scope_line({}, linked)
-
-		expect(line).toContain('「起票せずに」')
-		expect(line).toContain('investigator and producer subagents, never edited by this session')
+	// joshuafolkken/kit#8943: no-filing work defers tests, the gate and the review to the finish.
+	// joshuafolkken/kit#8973: the producer builds in its own worktree, never in this checkout.
+	it.each([
+		'hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`',
+		'imperative request with investigation, a plan and a filing plan',
+		'「起票せずに」',
+		'investigator and producer subagents, never edited by this session',
+		'the producer is dispatched with `isolation: "worktree"` and never edits this checkout',
+		'tests, the gate and the review wait for the finish unless asked for now',
+		'each such reply ends saying they have not run',
+	])('names the consultation route outside a worker lane: %s', (phrase) => {
+		expect(agent_session_role.scope_line({}, linked)).toContain(phrase)
 	})
 
 	// joshuafolkken/kit#8262: a consultation artifact has its own scratch route.

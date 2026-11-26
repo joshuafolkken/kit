@@ -1,0 +1,3 @@
+- rf:none | none | - | 2026-11-26 | #8946
+- rf:project-conventions | low | scripts/run/board/run-board-estimate.ts:35 | 2026-11-26 | #8946 | - | naming-callers
+- rf:project-conventions | low | scripts/run/board/run-board-estimate.ts:185 | 2026-11-26 | #8946 | - | naming-callers

@@ -1,0 +1,172 @@
+import type { BusyRead } from '#scripts/epic/epic-busy'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { backlog_drive_named_gate, type NamedPlain } from './backlog-drive-named-gate'
+import { backlog_drive_named_scope } from './backlog-drive-named-scope'
+import type { Declared } from './backlog-overlap'
+
+// joshuafolkken/kit#8953: the named issues run side by side, so they pass the pool's `run:solo` hold
+// and path-overlap separation before they launch.
+
+const REPO = 'joshuafolkken/kit'
+const RUNNING = 3
+const PLAIN = 10
+const OTHER = 11
+const SHARED_PATH = 'scripts/lane/lane-overrun.ts'
+const RUNNING_ISSUE: OpenIssueData = {
+	number: RUNNING,
+	title: 'running',
+	createdAt: '2026-11-25T00:00:00Z',
+	blockedBy: undefined,
+	labels: [{ name: 'in-progress' }],
+}
+const BUSY: BusyRead = { kind: 'busy', issues: [RUNNING_ISSUE] }
+const IDLE: BusyRead = { kind: 'idle' }
+const UNREADABLE: StateRead = { kind: 'unreadable' }
+
+function plain(number: number, labels: ReadonlyArray<string> = []): NamedPlain {
+	return { number, labels }
+}
+
+function child_labels(labels: ReadonlyArray<string>): void {
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels, is_human_review: false },
+	})
+}
+
+// The scope the gate reads, with every gathered epic child read as an open issue with no labels.
+function scope_of(read: BusyRead, declared: Declared = new Map()): void {
+	child_labels([])
+	vi.spyOn(backlog_drive_named_scope, 'read').mockResolvedValue({
+		read,
+		repo: REPO,
+		declared,
+		lanes: new Map(),
+	})
+}
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
+describe('backlog_drive_named_gate.admitted', () => {
+	it('admits every plain issue in the typed order when nothing holds them', async () => {
+		scope_of(IDLE)
+
+		expect(
+			await backlog_drive_named_gate.admitted([plain(PLAIN), plain(OTHER)], [], []),
+		).toStrictEqual([PLAIN, OTHER])
+	})
+
+	it('withholds a run:solo issue while a lane is busy', async () => {
+		scope_of(BUSY)
+
+		const admitted = await backlog_drive_named_gate.admitted(
+			[plain(PLAIN, ['run:solo']), plain(OTHER)],
+			[String(RUNNING)],
+			[],
+		)
+
+		expect(admitted).not.toContain(PLAIN)
+	})
+
+	it('withholds an issue declaring a path a running lane declares', async () => {
+		const shared = new Set([SHARED_PATH])
+
+		scope_of(
+			BUSY,
+			new Map([
+				[RUNNING, shared],
+				[PLAIN, shared],
+			]),
+		)
+
+		const admitted = await backlog_drive_named_gate.admitted(
+			[plain(PLAIN), plain(OTHER)],
+			[String(RUNNING)],
+			[],
+		)
+
+		expect(admitted).toStrictEqual([OTHER])
+	})
+})
+
+describe('backlog_drive_named_gate.admitted — epic children gathered this tick', () => {
+	it('withholds a run:solo issue beside a gathered epic child, with no lane busy', async () => {
+		scope_of(IDLE)
+
+		const admitted = await backlog_drive_named_gate.admitted(
+			[plain(PLAIN, ['run:solo'])],
+			[],
+			[String(RUNNING)],
+		)
+
+		expect(admitted).toStrictEqual([])
+	})
+
+	it('withholds an issue declaring a path a gathered epic child declares', async () => {
+		const shared = new Set([SHARED_PATH])
+
+		scope_of(
+			IDLE,
+			new Map([
+				[RUNNING, shared],
+				[PLAIN, shared],
+			]),
+		)
+
+		const admitted = await backlog_drive_named_gate.admitted(
+			[plain(PLAIN), plain(OTHER)],
+			[],
+			[String(RUNNING)],
+		)
+
+		expect(admitted).toStrictEqual([OTHER])
+	})
+
+	it('reads the gathered children with the lanes in flight', async () => {
+		scope_of(IDLE)
+		const read = vi.spyOn(backlog_drive_named_scope, 'read')
+
+		await backlog_drive_named_gate.admitted([plain(PLAIN)], ['4'], [String(RUNNING)])
+
+		expect(read).toHaveBeenCalledWith([PLAIN], ['4', String(RUNNING)])
+	})
+})
+
+describe('backlog_drive_named_gate.admitted — the labels of the gathered epic children', () => {
+	it('withholds a plain issue beside a run:solo gathered epic child, with no lane busy', async () => {
+		scope_of(IDLE)
+		child_labels(['run:solo'])
+
+		expect(
+			await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [String(RUNNING)]),
+		).toStrictEqual([])
+	})
+
+	it('admits none when a gathered epic child is unreadable', async () => {
+		scope_of(IDLE)
+		vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue(UNREADABLE)
+
+		expect(
+			await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [String(RUNNING)]),
+		).toStrictEqual([])
+	})
+})
+
+describe('backlog_drive_named_gate.admitted — nothing to gate', () => {
+	it('admits none when the repository is unreadable', async () => {
+		vi.spyOn(backlog_drive_named_scope, 'read').mockResolvedValue(undefined)
+
+		expect(await backlog_drive_named_gate.admitted([plain(PLAIN)], [], [])).toStrictEqual([])
+	})
+
+	it('reads nothing for no plain issue', async () => {
+		const read = vi.spyOn(backlog_drive_named_scope, 'read')
+
+		expect(await backlog_drive_named_gate.admitted([], [], [])).toStrictEqual([])
+		expect(read).not.toHaveBeenCalled()
+	})
+})

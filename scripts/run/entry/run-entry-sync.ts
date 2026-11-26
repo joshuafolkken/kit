@@ -4,6 +4,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_preflight } from '#scripts/run/run-preflight'
+import { run_entry_branch } from './run-entry-branch'
 
 // The tree sync every entry runs before its reads — `#N` (joshuafolkken/kit#5943) and `new`
 // (`--adopt`, joshuafolkken/kit#5747) — so no run issues it as commands of its own: pre-existing changes
@@ -17,6 +18,7 @@ import { run_preflight } from '#scripts/run/run-preflight'
 
 const STASH_PUSH = 'stash:push'
 const STASH_POP = 'stash:pop'
+const MAIN_SYNC = 'main:sync'
 const STASHED_VERDICT = 'stashed'
 const POPPED_VERDICT = 'popped'
 const CONFLICTED_VERDICT = 'conflicted'
@@ -72,7 +74,7 @@ async function is_merged_in_place(issue_number: string): Promise<boolean> {
 }
 
 async function sync_command(issue_number: string): Promise<string> {
-	return (await is_merged_in_place(issue_number)) ? 'main:merge' : 'main:sync'
+	return (await is_merged_in_place(issue_number)) ? 'main:merge' : MAIN_SYNC
 }
 
 function stopped({ failed, kept, recommended, later }: StopText): EntryStop {
@@ -128,6 +130,20 @@ async function restore(message: string, is_stashed: boolean): Promise<EntryStop 
 	return verdict === CONFLICTED_VERDICT ? pop_conflicted(message) : pop_unmatched(message)
 }
 
+// After `main:sync` the checkout stands on the default branch; a restored tree moves to the issue's
+// branch (joshuafolkken/kit#8983). `main:merge` already ran on the issue's branch or a linked worktree.
+async function finish(
+	issue_number: string,
+	command: string,
+	stop: EntryStop | undefined,
+): Promise<EntryStop | undefined> {
+	if (stop !== undefined || command !== MAIN_SYNC) return stop
+
+	await run_entry_branch.switch_to_issue_branch(issue_number)
+
+	return undefined
+}
+
 async function sync_tree(entry: SyncEntry): Promise<EntryStop | undefined> {
 	const message = stash_message(entry)
 	const pushed = await step([STASH_PUSH, message])
@@ -140,9 +156,11 @@ async function sync_tree(entry: SyncEntry): Promise<EntryStop | undefined> {
 	const command = await sync_command(entry.issue_number)
 	const synced = await step([command])
 
-	if (synced.code === SUCCESS_EXIT_CODE) return await restore(message, is_stashed)
+	if (synced.code !== SUCCESS_EXIT_CODE) {
+		return is_stashed ? stash_kept(command, message) : unstashed(command, 'nothing was stashed')
+	}
 
-	return is_stashed ? stash_kept(command, message) : unstashed(command, 'nothing was stashed')
+	return await finish(entry.issue_number, command, await restore(message, is_stashed))
 }
 
 // `undefined` once the tree is synchronized, or in a lane child, whose sync is its ship's; else the stop.

@@ -68,9 +68,10 @@ type WakeStopReason = 'ended' | 'unreadable' | 'failed' | 'stopped' | 'reload'
 type WakeTidyResult = 'absent' | 'removed' | 'superseded'
 
 // `wait` clears the wake mark and `pending` keeps it, or a supervisor would re-wake every interval.
-// `idle` is a launch the record called for and the work did not.
+// `idle` is a launch the record called for and the work did not. `claimed` is a wake whose previous
+// session claimed the record and handed it back unseen.
 type WakeDecision =
-	| { kind: 'wake' }
+	| { kind: 'wake'; claimed?: boolean }
 	| { kind: 'idle' }
 	| { kind: 'wait' }
 	| { kind: 'pending' }
@@ -91,6 +92,7 @@ interface WakeDecisionInput {
 }
 
 const WAKE_DECISION: WakeDecision = { kind: 'wake' }
+const CLAIMED_WAKE_DECISION: WakeDecision = { kind: 'wake', claimed: true }
 const IDLE_DECISION: WakeDecision = { kind: 'idle' }
 const WAIT_DECISION: WakeDecision = { kind: 'wait' }
 const PENDING_DECISION: WakeDecision = { kind: 'pending' }
@@ -134,16 +136,31 @@ function launch_or_idle(input: WakeDecisionInput): WakeDecision {
 	return is_overdue(input.idle_since, input.now, IDLE_CEILING_MS) ? WAKE_DECISION : IDLE_DECISION
 }
 
+function retry_or_fail(input: WakeDecisionInput): WakeDecision {
+	return input.attempts < MAX_WAKE_ATTEMPTS ? launch_or_idle(input) : FAILED_DECISION
+}
+
 // Launch, pend, retry or give up, read from the wake mark alone.
 function decide_launch(input: WakeDecisionInput): WakeDecision {
 	if (input.woke_at === undefined) return launch_or_idle(input)
 	if (!is_overdue(input.woke_at, input.now)) return PENDING_DECISION
 
-	return input.attempts < MAX_WAKE_ATTEMPTS ? launch_or_idle(input) : FAILED_DECISION
+	return retry_or_fail(input)
+}
+
+// A record the woken session already handed back ends the grace: the adopt before a wake unhands it,
+// so a handed-off record with a mark means that session claimed it and finished its turn — between two
+// passes, whether or not its process lingers. That is a claim, not a lost wake: the launch carries
+// `claimed` so the loop counts it, and the attempt cap (which bounds lost wakes) does not apply.
+function decide_handed_back(input: WakeDecisionInput): WakeDecision {
+	const launch = launch_or_idle(input)
+
+	return input.woke_at !== undefined && launch.kind === 'wake' ? CLAIMED_WAKE_DECISION : launch
 }
 
 // A live owner is a session at work; a dead one crashed between its claim and the next cut, and is
-// recovered through the hand-off's grace/retry path. "Cannot tell" counts as living.
+// recovered through the grace/retry path, which belongs to this unhanded branch alone. "Cannot tell"
+// counts as living.
 function decide_not_handed_off(input: WakeDecisionInput): WakeDecision {
 	if (input.is_owner_live) return WAIT_DECISION
 
@@ -154,7 +171,7 @@ function decide(input: WakeDecisionInput): WakeDecision {
 	if (input.read.kind !== 'carried') return { kind: 'stop', reason: STOP_REASONS[input.read.kind] }
 	if (input.read.carry.is_handed_off !== true) return decide_not_handed_off(input)
 
-	return decide_launch(input)
+	return decide_handed_back(input)
 }
 
 // Keyed on the common git directory exactly as the carry record is, so every lane keys alike.

@@ -59,7 +59,7 @@ interface OfferRead extends HeldWaiting, OfferTiming {
 	retries: number
 	answer?: string | undefined
 	// Why a `blocked` answer started nothing — `solo`, or `backlog-wait-cause.ts`'s with its `waiting`;
-	// or why a named run's `wait` did (`backlog_hold_codes.NAMED_WAIT` / `ONLY_WAIT`).
+	// or why a named run's `wait` did (`backlog_hold_codes.ONLY_WAIT`).
 	cause?: string | undefined
 	reason?: string | undefined
 	// Whether a drain here owes the retrospective: the opt-in switch is on and it has not run yet. Absent

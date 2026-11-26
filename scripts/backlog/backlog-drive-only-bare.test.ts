@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_fixture } from './backlog-drive-fixture'
 import { backlog_drive_named } from './backlog-drive-named'
+import { backlog_drive_named_fixture } from './backlog-drive-named-fixture'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 
 // A bare `--only` names nothing: it starts idle and runs only what `run:add` puts in, under the idle
@@ -51,6 +52,7 @@ async function bare_read(
 
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	backlog_drive_named_fixture.admit_all()
 	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
 		kind: 'state',
 		state: { state: 'OPEN', labels: [], is_human_review: false },

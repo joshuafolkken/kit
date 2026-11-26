@@ -1,12 +1,6 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import {
-	EPIC_LABEL,
-	has_label_name,
-	has_parked_label,
-	parked_label_of,
-} from '#scripts/issue/issue-labels'
-import type { IssueState } from '#scripts/issue/issue-state'
+import { parked_label_of } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_plan_probe } from '#scripts/lane/lane-plan-probe'
@@ -15,11 +9,9 @@ import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { backlog_budget, type BacklogAnswer } from './backlog-budget'
 import { backlog_budget_cli } from './backlog-budget-cli'
 import type { DriveState, OfferRead } from './backlog-drive'
-import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
-import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
+import { backlog_drive_named_launch } from './backlog-drive-named-launch'
 import { backlog_drive_stalled_retry } from './backlog-drive-stalled-retry'
-import { backlog_drive_unread } from './backlog-drive-unread'
 import type { Declared } from './backlog-overlap'
 import { backlog_plan_comment, type PoolIssue } from './backlog-plan-comment'
 
@@ -83,34 +75,6 @@ function budget_offer(
 		reason: budget.reason,
 		is_finish: budget.verdict === 'stop',
 	}
-}
-
-// Whether a named issue has already settled without this run dispatching it: closed is merged, and a
-// park (`PARKED_LABELS`) waits on a person, so re-dispatching it only repeats the stop it parked on.
-// Either is booked done rather than offered.
-function is_settled(state: IssueState): boolean {
-	return state.state.toUpperCase() === 'CLOSED' || has_parked_label(state.labels)
-}
-
-async function classify(
-	issue: string,
-	named: OfferRead,
-	state: DriveState,
-	owner: string,
-): Promise<OfferRead> {
-	const result = await issue_state_cli.read_issue(issue)
-
-	if (result.kind !== 'state') return backlog_drive_unread.offer(issue, result, state.retries)
-
-	if (is_settled(result.state)) {
-		await backlog_drive_named.mark_settled(issue, owner)
-
-		return { verdict: 'wait', issues: [], retries: NO_RETRIES }
-	}
-
-	return has_label_name(result.state.labels, EPIC_LABEL)
-		? await backlog_drive_epic.offer(issue, state, owner)
-		: named
 }
 
 // **A named issue booked done is not thereby merged**: a park and a failure are
@@ -222,35 +186,31 @@ async function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Promi
 	return [...new Set([...in_flight, ...held.map(String)])]
 }
 
-// A named launch waits for the reset while the GitHub core allowance is below the floor, before it reads
-// the issue's state (joshuafolkken/kit#6729). Only a launch reads the allowance: a wait or the run's end
-// starts nothing.
-async function launch(
-	issue: string | undefined,
-	named: OfferRead,
+// When every named issue left is passed, the run's end or the pool is read past them, as though in flight.
+async function past_passed(
+	carry: RunCarry,
 	state: DriveState,
-	owner: string,
+	waiting: DriveState,
+	context: NamedContext,
 ): Promise<OfferRead | undefined> {
-	if (issue === undefined) return undefined
+	const named = backlog_drive_named.offer(carry, waiting, context.is_only)
 
-	const held = await backlog_drive_rate_limit.held(state)
-
-	return held ?? (await classify(issue, named, state, owner))
+	return await not_run(carry, state, named, context)
 }
 
-// An epic `run:add` put in that waits on its children holds nothing up, like an added issue in flight
-// (joshuafolkken/kit#6883): its children are what runs, so the offer passes it as in flight and the
-// issues behind it, or the pool, fill the free lanes (joshuafolkken/kit#6840). The pool counts it
-// running, so with no lane of the run's own in flight it does not read the drain while the epic is
-// open. A failed read still waits (`retries`), so the epic's retry count reaches its hand-back.
-function is_passed(
+// The gathered issues the run's maximum still has room for: offered side by side, the named issues
+// would otherwise start past `--max` (joshuafolkken/kit#8953). The budget already answered `run`, so
+// the room is at least one.
+function capped(
+	offer: OfferRead,
 	carry: RunCarry,
-	issue: string | undefined,
-	offered: OfferRead | undefined,
-): issue is string {
-	if (issue === undefined || offered?.verdict !== 'wait') return false
+	state: DriveState,
+	forwarded: ReadonlyArray<string>,
+): OfferRead {
+	const max = max_of(forwarded)
+	if (max === undefined || offer.verdict !== 'run') return offer
 
-	return offered.retries === NO_RETRIES && !backlog_drive_named.is_declared(carry, issue)
+	return { ...offer, issues: offer.issues.slice(0, max - carry.merged - state.in_flight.length) }
 }
 
 async function offer_of(
@@ -267,17 +227,15 @@ async function offer_of(
 
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
-	const [issue] = named.issues
-	const offered = await launch(issue, named, state, context.owner)
-	if (!is_passed(carry, issue, offered)) return { offer: offered, passed: [] }
-	const past = await offer_of(
-		carry,
-		state,
-		{ ...waiting, in_flight: [...waiting.in_flight, issue] },
-		context,
-	)
+	const gathered = await backlog_drive_named_launch.gather(named.issues, state, context.owner)
 
-	return { ...past, passed: [issue, ...past.passed] }
+	if (gathered.offer !== undefined) {
+		return { ...gathered, offer: capped(gathered.offer, carry, state, context.forwarded) }
+	}
+
+	const passed = { ...waiting, in_flight: [...waiting.in_flight, ...gathered.passed] }
+
+	return { offer: await past_passed(carry, state, passed, context), passed: gathered.passed }
 }
 
 // A named issue the yield holds while none of the run's own lanes runs — its holder is outside the run
@@ -292,7 +250,7 @@ function held_alone(state: DriveState, waiting: DriveState): OfferRead | undefin
 // The named offer, and the state the pool's offer reads when it names nothing: a named issue the yield
 // still holds is excluded there too, so the pool does not relaunch it into the same yield
 // (joshuafolkken/kit#4926, joshuafolkken/kit#6883). It is excluded, not counted running: no lane holds it.
-// An added epic the offer passed is counted running there (`is_passed`).
+// An added epic, or a blocked added issue, the offer passed is counted running there (`is_passed`).
 // joshuafolkken/kit#6865: each offer first retries the mechanical parks whose stop has cleared.
 async function read(carry: RunCarry, state: DriveState, context: NamedContext): Promise<NamedRead> {
 	await backlog_drive_stalled_retry.sweep()

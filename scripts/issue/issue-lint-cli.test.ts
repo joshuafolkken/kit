@@ -11,6 +11,7 @@ const SUMMARY = '## 概要\n\n要約\n\n'
 const VALID_BODY = `${SUMMARY}## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n`
 const REQUIRED_SECTIONS = '## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
 const ENHANCEMENT_OUTPUT = 'labels: enhancement'
+const ESCAPE_LINE = '- 検出漏れの理由: テストが一覧に無い場合を回さなかった\n'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -18,7 +19,7 @@ afterEach(() => {
 
 describe('issue:lint label output', () => {
 	it.each([
-		{ body: `${VALID_BODY}- 種別: 不具合\n- 原因: #4201\n`, expected: 'labels: bug' },
+		{ body: `${VALID_BODY}- 種別: 不具合\n- 原因: #4201\n${ESCAPE_LINE}`, expected: 'labels: bug' },
 		{ body: `${VALID_BODY}- 種別: 非不具合\n- 目的: 機能追加\n`, expected: ENHANCEMENT_OUTPUT },
 		{ body: `${VALID_BODY}- 種別: 非不具合\n- 目的: 機能改善\n`, expected: ENHANCEMENT_OUTPUT },
 		{
@@ -117,7 +118,7 @@ describe('issue:lint classification failures', () => {
 
 		await writeFile(
 			body_path,
-			`${VALID_BODY}- 種別: 不具合\n- 原因: #4201\n- 目的: 機能改善\n${REQUIRED_SECTIONS}`,
+			`${VALID_BODY}- 種別: 不具合\n- 原因: #4201\n${ESCAPE_LINE}- 目的: 機能改善\n${REQUIRED_SECTIONS}`,
 		)
 		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -179,6 +180,28 @@ describe('issue:lint leading summary', () => {
 				`${VALID_BODY.replace(SUMMARY, '')}- 種別: 非不具合\n${REQUIRED_SECTIONS}`,
 			),
 		).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#8941: the escape reason is refused at filing only, like the leading summary.
+describe('issue:lint escape reason', () => {
+	const BUG_BODY = `${VALID_BODY}- 種別: 不具合\n- 原因: #1\n${REQUIRED_SECTIONS}`
+
+	it('rejects a bug body with no escape reason before filing', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await lint_body(BUG_BODY)).toBe(1)
+		expect(report).toHaveBeenCalledWith(expect.stringMatching(/^✖ missing escape reason: /u))
+	})
+
+	it('names the escape reason among the filing-only refusals', () => {
+		expect(issue_lint_cli.filing_problems(BUG_BODY)).toStrictEqual([
+			expect.stringMatching(/^missing escape reason: /u),
+		])
+	})
+
+	it('leaves the escape reason out of problems, which issue:body and issue:kind run on filed bugs', () => {
+		expect(issue_lint_cli.problems(BUG_BODY)).toStrictEqual([])
 	})
 })
 

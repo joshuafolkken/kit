@@ -1,5 +1,6 @@
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { split_assess } from '#scripts/split/split-assess'
+import { escape_reason_lint } from './escape-reason-lint'
 import { expected_effect_lint } from './expected-effect-lint'
 import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
@@ -126,6 +127,16 @@ function declarations(body: string): ReadonlyArray<string> {
 		.filter((line) => DECLARATION_PATTERN.test(line) && !is_sizing(line))
 }
 
+// The escape reason `issue:file` requires of a bug (`escape-reason-lint.ts`), for a bug #N filed before
+// the rule and so without one; nothing when #N names one (carried in its declarations) or is no bug.
+function escape_reason_lines(body: string, origin: string): ReadonlyArray<string> {
+	if (escape_reason_lint.problem(body) === undefined) return []
+
+	return [
+		`${issue_body_keys.prefix('escape_reason')} ${origin} に未記載のため不明（引き継ぎ先で調べる）`,
+	]
+}
+
 // #N's expected-effect section, heading included, or nothing when #N has none: a run-time-shortening
 // aim carried over in the declarations makes `issue:file` require it (`expected-effect-lint.ts`).
 function effect_section(body: string): ReadonlyArray<string> {
@@ -162,6 +173,7 @@ function follow_up_body(subject: SpillSubject, sizing: ReadonlyArray<string>): s
 	return [
 		...opening_lines(origin),
 		...declarations(subject.body),
+		...escape_reason_lines(subject.body, origin),
 		...sizing,
 		'',
 		issue_body_keys.heading('symptom'),

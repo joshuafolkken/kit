@@ -1,5 +1,5 @@
 import { lane_state } from '#scripts/lane/lane-state'
-import { run_board_kind } from './run-board-kind'
+import { run_board_kind, type RowMarks } from './run-board-kind'
 import type { BoardRow, RowRead } from './run-board-layout'
 import type { ItemStatus } from './run-board-status'
 
@@ -57,14 +57,11 @@ function is_live(row: BoardRow): boolean {
 function base_row(
 	number: number,
 	read: RowRead,
-): Pick<BoardRow, 'number' | 'title' | 'kind' | 'priority'> {
-	const labels = read.labels.get(number)
-
+): Pick<BoardRow, 'number' | 'title' | keyof RowMarks> {
 	return {
 		number,
 		title: read.titles.get(number),
-		kind: run_board_kind.kind_of(labels),
-		priority: run_board_kind.priority_of(labels),
+		...run_board_kind.marks_of(read.labels.get(number)),
 	}
 }
 

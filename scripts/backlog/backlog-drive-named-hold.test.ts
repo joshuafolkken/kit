@@ -3,10 +3,12 @@ import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_dispatch_dependency } from '#scripts/lane/lane-dispatch-dependency'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type LoopPorts } from './backlog-drive'
 import { backlog_drive_fixture, type Harness } from './backlog-drive-fixture'
+import { backlog_drive_named_gate } from './backlog-drive-named-gate'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_plan_comment } from './backlog-plan-comment'
 
@@ -39,6 +41,10 @@ const DECLARED = new Map([[3, new Set(['scripts/lane/lane-overrun.ts'])]])
 // A launch reads the GitHub core allowance: unread here, so no case calls `gh api`.
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	vi.spyOn(lane_dispatch_dependency, 'unfinished').mockResolvedValue([])
+	vi.spyOn(backlog_drive_named_gate, 'admitted').mockImplementation(async (plain) =>
+		plain.map((issue) => issue.number),
+	)
 })
 
 afterEach(() => {
@@ -49,7 +55,9 @@ function named_ports(harness: Harness): LoopPorts {
 	return {
 		...harness.ports,
 		offer: async (state) => {
-			const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+			// Room for both named issues: `--max` caps how many start side by side.
+			const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+			const { offer } = await backlog_drive_named_offer.read(CARRY, state, context)
 
 			return offer
 		},
@@ -58,8 +66,9 @@ function named_ports(harness: Harness): LoopPorts {
 
 // joshuafolkken/kit#4926: a declared issue that gave its lane back waits on its kept plan while the
 // lane it yielded to runs, rather than relaunching into the same yield. The running lane's body is read
-// with its plan — the scope `lane:plan` yielded on.
-test('waits on a declared issue whose yielded plan a lane in flight still holds', async () => {
+// with its plan — the scope `lane:plan` yielded on. The named issue behind it runs meanwhile
+// (joshuafolkken/kit#8953).
+test('holds back a declared issue whose yielded plan a lane in flight still holds', async () => {
 	vi.spyOn(lane_plan, 'is_yielded').mockImplementation((issue) => issue === 1)
 	vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
 		kind: 'read',
@@ -69,13 +78,15 @@ test('waits on a declared issue whose yielded plan a lane in flight still holds'
 	const declared = vi.spyOn(backlog_plan_comment, 'declared_of').mockResolvedValue(DECLARED)
 	const held = vi.spyOn(lane_plan, 'is_yield_held').mockImplementation((issue) => issue === 1)
 
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue(OPEN_STATE)
+
 	const { offer } = await backlog_drive_named_offer.read(
 		CARRY,
 		backlog_drive.initial_state(['3'], ACTIVE),
-		CONTEXT,
+		{ ...CONTEXT, forwarded: ['--max', '2'] },
 	)
 
-	expect(offer?.verdict).toBe('wait')
+	expect(offer).toMatchObject({ verdict: 'run', issues: ['2'] })
 	expect(declared).toHaveBeenCalledWith([RUNNING], process.cwd())
 	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), {
 		scope: undefined,
@@ -148,7 +159,8 @@ function hold_outside(labels: OpenIssueData['labels']): void {
 }
 
 // joshuafolkken/kit#6800: the lane #1 yielded to runs outside the run, so nothing is in flight once
-// `run:merge` books the yield — the run still holds #1 rather than relaunching it into the same yield.
+// `run:merge` books the yield — the run still holds #1 rather than relaunching it into the same yield,
+// and launches #2 beside it (joshuafolkken/kit#8953).
 test('holds a yielded named issue while its holder lane runs outside the run', async () => {
 	hold_outside(RUNNING.labels)
 	const harness = backlog_drive_fixture.harness({ finished: ['1'], yielded: ['1'] })
@@ -159,8 +171,8 @@ test('holds a yielded named issue while its holder lane runs outside the run', a
 		named_ports(harness),
 	)
 
-	expect(pass).toMatchObject({ kind: 'continue', state: { in_flight: [] } })
-	expect(harness.calls).toEqual(['merge 1'])
+	expect(pass).toMatchObject({ kind: 'continue', state: { in_flight: ['2'] } })
+	expect(harness.calls).toEqual(['merge 1', 'launch 2'])
 })
 
 test('offers a yielded named issue again once its holder lane ends', async () => {
@@ -173,8 +185,8 @@ test('offers a yielded named issue again once its holder lane ends', async () =>
 		named_ports(harness),
 	)
 
-	expect(pass).toMatchObject({ kind: 'continue', state: { in_flight: ['1'] } })
-	expect(harness.calls).toEqual(['merge 1', 'launch 1'])
+	expect(pass).toMatchObject({ kind: 'continue', state: { in_flight: ['1', '2'] } })
+	expect(harness.calls).toEqual(['merge 1', 'launch 1', 'launch 2'])
 })
 
 const ADDED_CARRY = { ...CARRY, done: [1, 2], added: [{ issue: 9, is_priority: false }] }

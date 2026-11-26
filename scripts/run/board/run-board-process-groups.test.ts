@@ -150,6 +150,35 @@ describe('run_board_process_groups.groups_of within the backlogrun', () => {
 	})
 })
 
+// joshuafolkken/kit#8922: a child run outside a lane holds through the parent session.
+const HELD: ReadonlySet<number> = new Set([SESSION, 201])
+
+function held_groups(): ProcessGroups {
+	const rows = ROWS.map((row): Row =>
+		HELD.has(row[0]) ? [row[0], row[1], row[2], row[3], OPEN_LANE] : row,
+	)
+	const mark = { ...mark_of(rows), held: HELD }
+	const figures = run_board_usage.process_figures(undefined, mark)
+
+	return groups_of({
+		mark,
+		figures,
+		open_lanes: new Set([OPEN_LANE]),
+		roots: ROOTS,
+		stuck: new Map(),
+		closing: CLOSING,
+	})
+}
+
+describe('run_board_process_groups.groups_of with a run holding the checkout', () => {
+	it('keeps a process in a lane through the hold alone under the root it descends from', () => {
+		const { backlogrun } = held_groups()
+
+		expect(backlogrun.parent.memory_bytes).toBe(100)
+		expect(backlogrun.lanes.count).toBe(1)
+	})
+})
+
 describe('run_board_process_groups.groups_of outside the backlogrun', () => {
 	it('puts a process under a closed lane’s directory in the leftovers, with its issue number', () => {
 		const { leftover } = groups_for(ROOTS)

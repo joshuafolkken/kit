@@ -78,8 +78,8 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/🧵/u)
 	})
 
-	// joshuafolkken/kit#4206: the declared order is read off the local read's own record.
-	it('draws the declared issue a named run starts a row after', async () => {
+	// joshuafolkken/kit#8953: named issues run side by side, so a named row waits on no earlier one.
+	it('draws no declared-order mark on a named row behind a running one', async () => {
 		const carry = {
 			invocation: `backlogrun #${String(OPENING)} #${String(HELD)} --only`,
 			started_at: OPENED_AT,
@@ -92,8 +92,7 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 		const named = { ...LOCAL, lanes: [String(OPENING)], carry }
 		const plan = plan_of([child(OPENING), child(HELD)])
 
-		expect(await row_of(HELD, named, plan)).toMatch(/^ {5}📋 3720 {8}3714$/u)
-		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/📋/u)
+		expect(await row_of(HELD, named, plan)).not.toMatch(/📋/u)
 	})
 
 	it('draws the stage of the lane the run is opening, and none once the run has stopped', async () => {

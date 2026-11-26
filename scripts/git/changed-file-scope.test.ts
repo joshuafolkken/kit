@@ -210,6 +210,31 @@ describe('changed_file_scope.report_unusable_arguments', () => {
 	})
 })
 
+describe('changed_file_scope.refusal_of', () => {
+	const whole = { mode: 'all' } as const
+	const SPLIT_HINT = 'did not split'
+
+	it('names the arguments, the right form and a possible unsplit list', () => {
+		const refusal = changed_file_scope.refusal_of(['a.ts b.ts'], whole, LABEL)
+
+		expect(refusal).toContain('a.ts b.ts')
+		expect(refusal).toContain('one file per argument')
+		expect(refusal).toContain(SPLIT_HINT)
+	})
+
+	it('does not name a split list for an argument without spaces', () => {
+		expect(changed_file_scope.refusal_of([CHANGED_SOURCE], whole, LABEL)).not.toContain(SPLIT_HINT)
+	})
+
+	it.each([
+		['no arguments', [], whole],
+		['flags only', ['--fix'], whole],
+		['a narrowed scope', [CHANGED_SOURCE], { mode: 'related' } as const],
+	])('does not refuse %s', (_name, command_arguments, scope) => {
+		expect(changed_file_scope.refusal_of(command_arguments, scope, LABEL)).toBeUndefined()
+	})
+})
+
 describe('changed_file_scope.is_flag', () => {
 	it.each(['--silent', '-s'])('reads %j as a flag', (argument) => {
 		expect(changed_file_scope.is_flag(argument)).toBe(true)

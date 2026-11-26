@@ -1,0 +1,7 @@
+{
+	"reason": "decide_handed_back and retry_or_fail added (+7 code lines) to end the wake grace for a handed-back record (#8962)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

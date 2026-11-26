@@ -2,9 +2,9 @@
 // labeler and the next-issues display all key on these exact strings, and a drifted copy would
 // fail silently — an epic filtered on the wrong name is simply never closed or never excluded.
 //
-// **A new label is defined here and added to `REPOSITORY_LABELS`**, so `josh start` and `josh sync`
-// create it; a label deliberately not provisioned goes into `EXEMPT_FROM_PROVISIONING` with its
-// reason. Every other module imports the constant rather than spelling the name —
+// **A new label is defined here and added to `REPOSITORY_LABELS`** (`issue-label-definitions.ts`,
+// which holds each label's color and description), so `josh start` and `josh sync` create it; a
+// label deliberately not provisioned goes into `EXEMPT_FROM_PROVISIONING` with its reason. Every other module imports the constant rather than spelling the name —
 // `issue-label-scan.test.ts` fails on a `*_LABEL` constant missing from `ALL_LABELS`, on a label name
 // spelled outside this module, and on a label call naming a label `ALL_LABELS` does not hold.
 const EPIC_LABEL = 'epic'
@@ -156,147 +156,12 @@ const REVIEW_CAP_ROUTE_LABEL = 'route:review-cap'
 const SPLIT_ROUTE_LABEL = 'route:split'
 const TIER_A_ROUTE_LABEL = 'route:tier-a'
 
-// The route labels with the metadata `gh api ... labels` needs, in one place so a repository is
-// provisioned from the single source rather than from scattered creation commands. Applying one at
-// issue-creation time already auto-creates a missing label (REST, with a generated color and no
-// description); creating them here first is what gives each its stable color and description.
-const FILING_ROUTE_LABELS: ReadonlyArray<{
-	name: string
-	color: string
-	description: string
-}> = [
-	{
-		name: INTERRUPT_ROUTE_LABEL,
-		// Not `5319e7`, which is the `epic` label's purple: in a listing an interrupt would render as
-		// an epic, and the two are read at a glance rather than by name.
-		color: '1d76db',
-		// Keyed to the tests rather than to severity. "A serious defect" is the self-assessment
-		// `wip-cap.md` bans as a criterion, and this string is what a person reads in `gh label list`.
-		description: 'Filed past the WIP cap — meets one of the three interrupt tests (wip-cap.md)',
-	},
-	{
-		name: REVIEW_CAP_ROUTE_LABEL,
-		color: 'eab308',
-		description:
-			"Filed by the review round cap's carry-forward (prompts/review.md → Review round cap)",
-	},
-	{
-		name: SPLIT_ROUTE_LABEL,
-		color: '0e8a16',
-		description: 'A child issue created by a split (split-assessment.md)',
-	},
-	{
-		name: TIER_A_ROUTE_LABEL,
-		color: 'd93f0b',
-		description: 'Filed Tier A during implementation — an upstream defect or a prerequisite',
-	},
-]
-
-interface LabelDefinition {
-	name: string
-	color: string
-	description: string
-}
-
-// What `josh start` provisions on a new repository so the first `kickoff` finds every label a run
-// applies with its intended color. The metadata is the one the workflow documents create each label
-// with. **The labels only a person applies are provisioned too**: a person cannot apply a label the
-// repository does not have, so leaving one out made the first `auto-ok` a manual creation step.
-// `bug` is GitHub's default label, kept because `issue:file` applies it to a bug fix and a
-// repository may have been created without the defaults.
-const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
-	{
-		name: EPIC_LABEL,
-		color: '5319e7',
-		description: 'Tracks a batch of child issues from one split',
-	},
-	{ name: IN_PROGRESS_LABEL, color: '0075ca', description: 'Work is actively in progress' },
-	{ name: PLANNED_LABEL, color: 'c2e0c6', description: 'kickoff posted the plan' },
-	{
-		name: PLAN_UNVERIFIED_LABEL,
-		color: 'e4e669',
-		description: "Planned from another repository's checkout — re-plan in the target to run it",
-	},
-	{
-		name: RUN_SOLO_LABEL,
-		color: 'b60205',
-		description: 'Runs alone in a backlogrun: nothing starts beside it',
-	},
-	{
-		name: RUN_LANE_LABEL,
-		color: '0e8a16',
-		description: 'Judged safe to run beside others in a backlogrun',
-	},
-	{
-		name: PRIORITY_CRITICAL_LABEL,
-		color: 'b60205',
-		description: 'Offered before priority:high in a backlogrun; only a person removes it',
-	},
-	{
-		name: PRIORITY_HIGH_LABEL,
-		color: 'e99695',
-		description: 'Offered first in a backlogrun; only a person removes it',
-	},
-	{
-		name: RELEASE_LABEL,
-		color: 'fef2c0',
-		description: 'Tracks the next release; its blockers are the merged work it publishes',
-	},
-	{
-		name: AUTO_OK_LABEL,
-		color: '0e8a16',
-		description: 'Opted in to unattended execution outside an epic',
-	},
-	{
-		name: NEEDS_DECISION_LABEL,
-		color: 'd93f0b',
-		description: 'Parked: needs a decision before it can run',
-	},
-	{
-		name: RUN_STALLED_LABEL,
-		color: 'e99d42',
-		description:
-			'Parked: the driver could not finish it mechanically — no decision; fix the cause and remove',
-	},
-	{
-		name: NEEDS_HUMAN_REVIEW_LABEL,
-		color: 'd93f0b',
-		description: 'Implement and verify, but stop before committing so a person can look',
-	},
-	{
-		name: NEEDS_HUMAN_MERGE_LABEL,
-		color: 'd93f0b',
-		description: 'Pull request open: a person must inspect the diff and merge on GitHub',
-	},
-	{
-		name: ALREADY_DONE_LABEL,
-		color: '6f42c1',
-		description: 'Verified already merged — a person closes it',
-	},
-	{
-		name: MEASURED_LABEL,
-		color: '6f42c1',
-		description: 'Measurement-only — a run recorded the result and closed it',
-	},
-	{
-		name: MEASURED_UNMET_LABEL,
-		color: '6f42c1',
-		description:
-			'The measurement fell short of the expected effect — retire or shrink the mechanism',
-	},
-	{
-		name: DEFERRED_LABEL,
-		color: 'd4c5f9',
-		description: 'Set aside for now; never opted in to unattended execution',
-	},
-	{
-		name: NOT_BEFORE_LABEL,
-		color: 'bfd4f2',
-		description: "Waiting: the body's 実施可能日 has not arrived yet",
-	},
-	{ name: BUG_LABEL, color: 'd73a4a', description: "Something isn't working" },
-	...FILING_ROUTE_LABELS,
-]
+// The area an issue is about (joshuafolkken/kit#8960), one per issue: `run:board` draws the word after
+// the prefix before a row's title, so a new area needs a label and no code. A theme issue carries
+// `area:theme` alone, not `area:board` as well.
+const AREA_LABEL_PREFIX = 'area:'
+const AREA_BOARD_LABEL = `${AREA_LABEL_PREFIX}board`
+const AREA_THEME_LABEL = `${AREA_LABEL_PREFIX}theme`
 
 // The pull request release classifications `pr-classification.yml` requires exactly one of.
 // The check is distributed by `josh sync`, so the labels it asks for are
@@ -313,25 +178,6 @@ const RELEASE_CLASSIFICATION_NAMES = [
 	IGNORE_FOR_RELEASE_LABEL,
 ] as const
 type ReleaseClassification = (typeof RELEASE_CLASSIFICATION_NAMES)[number]
-
-const RELEASE_CLASSIFICATION_METADATA: Readonly<
-	Record<ReleaseClassification, Omit<LabelDefinition, 'name'>>
-> = {
-	[BREAKING_CHANGE_LABEL]: { color: 'd93f0b', description: 'Release: a breaking change (major)' },
-	[ENHANCEMENT_LABEL]: { color: '84b6eb', description: 'Release: a new feature (minor)' },
-	[BUGFIX_LABEL]: { color: 'd73a4a', description: 'Release: a bug fix (patch)' },
-	[OTHER_CHANGE_LABEL]: { color: 'c2e0c6', description: 'Release: any other change (patch)' },
-	[IGNORE_FOR_RELEASE_LABEL]: { color: 'cfd3d7', description: 'Release: left out of the notes' },
-}
-
-const RELEASE_CLASSIFICATION_LABELS: ReadonlyArray<LabelDefinition> =
-	RELEASE_CLASSIFICATION_NAMES.map((name) => ({ name, ...RELEASE_CLASSIFICATION_METADATA[name] }))
-
-// Every label kit provisions on a repository — `josh start` on a new one, `josh sync` on every run.
-const REPOSITORY_LABELS: ReadonlyArray<LabelDefinition> = [
-	...WORKFLOW_LABELS,
-	...RELEASE_CLASSIFICATION_LABELS,
-]
 
 // The shape `gh issue list --json labels` returns; narrowed here so the predicate below takes any
 // listing row without importing a schema.
@@ -419,6 +265,8 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	BUGFIX_LABEL,
 	OTHER_CHANGE_LABEL,
 	IGNORE_FOR_RELEASE_LABEL,
+	AREA_BOARD_LABEL,
+	AREA_THEME_LABEL,
 ])
 
 // The managed labels `REPOSITORY_LABELS` deliberately does not provision, each with its reason. Every
@@ -426,10 +274,13 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 // neither list, so a label added above cannot silently become one a repository lacks. Empty today.
 const EXEMPT_FROM_PROVISIONING: ReadonlyMap<string, string> = new Map<string, string>()
 
-export type { LabelDefinition, ReleaseClassification }
+export type { ReleaseClassification }
 export {
 	ALL_LABELS,
 	ALREADY_DONE_LABEL,
+	AREA_BOARD_LABEL,
+	AREA_LABEL_PREFIX,
+	AREA_THEME_LABEL,
 	AUTO_OK_LABEL,
 	BUG_LABEL,
 	BUGFIX_LABEL,
@@ -438,7 +289,6 @@ export {
 	ENHANCEMENT_LABEL,
 	EPIC_LABEL,
 	EXEMPT_FROM_PROVISIONING,
-	FILING_ROUTE_LABELS,
 	has_any_label,
 	has_label_name,
 	has_parked_label,
@@ -460,15 +310,12 @@ export {
 	PLANNED_LABEL,
 	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
-	RELEASE_CLASSIFICATION_LABELS,
 	RELEASE_CLASSIFICATION_NAMES,
 	RELEASE_LABEL,
-	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	RUN_STALLED_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
-	WORKFLOW_LABELS,
 }
