@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { json_value } from '#scripts/lib/json-value'
 import { last_prompt } from '#scripts/rules/last-prompt'
 import { unasked_filing } from '#scripts/rules/unasked-filing'
@@ -47,10 +48,36 @@ const PRODUCERS: ReadonlySet<string> = new Set(['producer', 'kit:producer'])
 
 const SUBAGENT_CALL_SCHEMA = z.object({
 	tool_name: z.enum(['Edit', 'Write']),
+	tool_input: z.unknown(),
 	agent_id: z.string().regex(/^[\w-]+$/u),
 	agent_type: z.string(),
 	transcript_path: z.string().min(1),
 })
+
+// **The producer builds in its own Claude Code worktree, never in the checkout** (joshuafolkken/kit#8973).
+// A backlogrun's driver runs `main:sync` in the main checkout after every merge, and an uncommitted
+// edit there to a file the merge touched aborts its `git pull` and stalls the whole run. Dispatched
+// with `isolation: "worktree"`, the producer's paths sit under `.claude/worktrees/<name>`
+// (`lane_paths.checkout_of`); any other path is refused, whatever the prompt granted. The check is
+// for any worktree under `.claude/worktrees/`, not the producer's own: that is what keeps a synced
+// checkout clean, and the hook's cwd does not name which worktree the producer was dispatched into.
+const OUTSIDE_WORKTREE =
+	' A producer edits only inside a worktree under `.claude/worktrees/` (`isolation: "worktree"`); this path is in a checkout a run syncs.'
+
+function is_in_worktree(file_path: string, cwd: string): boolean {
+	const resolved = path.resolve(cwd, file_path)
+
+	return lane_paths.checkout_of(resolved) !== resolved
+}
+
+function is_producer_outside_worktree(raw_payload: string, cwd: string): boolean {
+	const call = SUBAGENT_CALL_SCHEMA.safeParse(json_value.parse_or_undefined(raw_payload))
+	if (!call.success || !PRODUCERS.has(call.data.agent_type)) return false
+
+	return step_zero_notice
+		.edited_paths(call.data.tool_input)
+		.some((file_path) => !is_in_worktree(file_path, cwd))
+}
 
 const LAUNCH_SCHEMA = z.object({ toolUseId: z.string().min(1) })
 
@@ -83,6 +110,12 @@ function is_refused_runtime_edit(raw_payload: string, cwd: string): boolean {
 	return !is_no_filing_production(raw_payload)
 }
 
+function edit_refusal_tail(raw_payload: string, cwd: string): string | undefined {
+	if (is_producer_outside_worktree(raw_payload, cwd)) return OUTSIDE_WORKTREE
+
+	return is_refused_runtime_edit(raw_payload, cwd) ? HANDOFF : undefined
+}
+
 function reason(
 	raw_payload: string,
 	context: HookContext = hook_context.from_process(),
@@ -90,8 +123,9 @@ function reason(
 	if (agent_session_role.can_implement(context.env)) return undefined
 
 	const scope = agent_session_role.scope_line(context.env)
+	const tail = edit_refusal_tail(raw_payload, context.cwd)
 
-	if (is_refused_runtime_edit(raw_payload, context.cwd)) return scope + HANDOFF
+	if (tail !== undefined) return scope + tail
 
 	const rule = unverified_write(raw_payload)
 	if (rule === undefined) return undefined

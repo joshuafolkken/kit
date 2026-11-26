@@ -116,6 +116,8 @@
 
 名指すファイルが実コード行で上限の 90% 以上 → 先に分割のリファクタ Issue を起票し、依存に登録する（`issue:file` が拒否して手順を出す。`scripts/issue/issue-cap-files.ts`）。
 
+領域ラベル（`area:board` / `area:theme`）は宣言を書かない。`issue:file` が本文の backtick 付きパスから付ける（`scripts/issue/issue-area-label.ts`）。
+
 集計・計測（`計測` / `before` / `変更前後`）を Issue コメントに記録する受け入れ条件と実装の見積もりを併せ持つ本文 → 集計・計測を `--route split` の先行 Issue に分け、そのコメントを `## 背景` に引く（`issue:lint` が拒否する。`scripts/issue/aggregation-split.ts`）。
 
 ### 人の判断の選び方
