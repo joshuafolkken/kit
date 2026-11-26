@@ -7,7 +7,8 @@ import { run_board_repaint, type Repaint } from './run-board-repaint'
 // joshuafolkken/kit#8826: one frame loop composes every layer and writes only what changed, in one
 // synchronized write, at the first moment a layer changes.
 
-const { MIN_FRAME_MS, THIN_AFTER_MS, base_layer, revealed, run, screen_of } = run_board_frame_loop
+const { CHECK_MS, MIN_FRAME_MS, THIN_AFTER_MS, base_layer, revealed, run, screen_of } =
+	run_board_frame_loop
 const { boundary_after } = run_board_layer
 const { char_id, put } = run_board_cells
 const { current_of, repaint_of, request } = run_board_repaint
@@ -26,8 +27,7 @@ const STALL_MS = 300
 const SLOW_MS = THIN_AFTER_MS + 10
 // Slower than a refresh, within a theme tick.
 const BUSY_MS = 30
-// The frame loop's check on whether the second is still current, and a moment between two checks.
-const CHECK_MS = 50
+// A moment between two of the frame loop's checks on whether the second is still current.
 const ASK_MS = 120
 
 interface Fake {

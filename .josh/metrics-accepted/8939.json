@@ -2,6 +2,6 @@
 	"reason": "#8939 adds the shared repaint counter (run-board-repaint.ts) so fold and sound keys repaint within one check on every board",
 	"date": "2026-11-26",
 	"growth": {
-		"scripts.code_lines": 35
+		"scripts.code_lines": 36
 	}
 }

@@ -3,6 +3,7 @@ import type { Cells } from './run-board-cells'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_frame_fixture, type Stage } from './run-board-frame-fixture'
+import { run_board_frame_loop } from './run-board-frame-loop'
 import type { KeyInput } from './run-board-keys'
 import { run_board_live } from './run-board-live'
 import { run_board_screen } from './run-board-screen'
@@ -116,7 +117,7 @@ describe('run_board_live.watch themed refresh', () => {
 
 // joshuafolkken/kit#8939: a key that changes the board is drawn within one frame-loop check.
 const PRESS_AFTER_MS = 3500
-const CHECK_MS = 50
+const { CHECK_MS } = run_board_frame_loop
 
 // A terminal whose keys the test types; no store, so a fold lives only in memory.
 function fold_keys(): { input: KeyInput; type: (chunk: string) => void } {
