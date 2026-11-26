@@ -26,16 +26,29 @@ async function branch_name_of(issue_number: string): Promise<string | undefined>
 	return git_issue.parse(`${title} ${issue_cite.plain_for('github', issue_number)}`).branch_name
 }
 
-async function switch_to_issue_branch(issue_number: string): Promise<void> {
+// A remote-only `<N>-*` branch is the run preflight's to resume: cutting a local one from the default
+// branch here would hide its commits behind a bare branch the preflight reads as the default branch.
+async function has_remote_issue_branch(issue_number: string): Promise<boolean> {
+	const names = await git_command.branch_names_remote(`*/${issue_number}-*`)
+
+	return names.length > 0
+}
+
+// The branch to create or switch to; a reason to leave the checkout where it is is thrown.
+async function target_branch(issue_number: string): Promise<string> {
+	if (await has_remote_issue_branch(issue_number)) throw new Error('a remote branch for it exists')
+
 	const branch_name = await branch_name_of(issue_number)
 
-	if (branch_name === undefined) {
-		warn(issue_number, 'its title could not be read')
+	if (branch_name === undefined) throw new Error('its title could not be read')
 
-		return
-	}
+	return branch_name
+}
 
+async function switch_to_issue_branch(issue_number: string): Promise<void> {
 	try {
+		const branch_name = await target_branch(issue_number)
+
 		await git_branch.check_and_create_branch(await git_command.branch(), branch_name)
 	} catch (error: unknown) {
 		warn(issue_number, error instanceof Error ? error.message : String(error))
