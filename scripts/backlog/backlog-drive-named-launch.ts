@@ -1,11 +1,13 @@
 import { EPIC_LABEL, has_label_name, has_parked_label } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_blocked } from './backlog-drive-blocked'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_named_gate, type NamedPlain } from './backlog-drive-named-gate'
+import { backlog_drive_named_rank } from './backlog-drive-named-rank'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
 import { backlog_drive_unread } from './backlog-drive-unread'
 
@@ -150,14 +152,17 @@ async function withheld_of(walked: Walk, in_flight: ReadonlyArray<string>): Prom
 // lanes take them in that order (`backlog_drive_seats.seated`). A launch waits for the reset while the
 // GitHub core allowance is below the floor, before it reads any state (joshuafolkken/kit#6729). A named
 // issue the solo hold or the overlap separation withholds waits for the next tick, as the pool's does.
+// Given the run's carry, the additions are ranked first (`backlog-drive-named-rank.ts`) — after the
+// allowance floor, since the rank reads each one.
 async function gather(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
 	owner: string,
+	carry?: RunCarry,
 ): Promise<Gathered> {
 	const held = await backlog_drive_rate_limit.held(state)
 	if (held !== undefined) return { offer: held, passed: [] }
-	const walked = await walk(issues, state, owner)
+	const walked = await walk(await backlog_drive_named_rank.ranked(issues, carry), state, owner)
 	const withheld = await withheld_of(walked, state.in_flight)
 	const runs = walked.runs.filter((issue) => !withheld.includes(issue))
 

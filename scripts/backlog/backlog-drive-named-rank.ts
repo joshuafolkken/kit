@@ -18,18 +18,19 @@ const ranked_schema = open_issue_schema.pick({ labels: true, body: true })
 const UNREAD: RankedIssue = {}
 const NEUTRAL = issue_rank.dependency_ranks([])('')
 
-function parsed(json: string): RankedIssue {
+function parsed(json: string): RankedIssue | undefined {
 	try {
-		return parse_json_object_or_undefined(json, ranked_schema) ?? UNREAD
+		return parse_json_object_or_undefined(json, ranked_schema)
 	} catch {
-		return UNREAD
+		return undefined
 	}
 }
 
 async function read_ranked(issue: string): Promise<Read> {
 	const result = await git_gh_command.issue_view_json_classified(issue, RANK_FIELDS)
+	const read = result.kind === 'read' ? parsed(result.json) : undefined
 
-	return { issue, ranked: result.kind === 'read' ? parsed(result.json) : UNREAD }
+	return { issue, ranked: read ?? UNREAD }
 }
 
 // One chunk of additions in the pool's order (`git_next_issues.rank_row`, `issue_rank.rank`), stable
@@ -60,7 +61,9 @@ function addition_sets(carry: RunCarry): { ahead: Set<string>; behind: Set<strin
 // order, each chunk on its own — the ones ahead of the queue among themselves, the `--no-priority`
 // ones behind it among themselves. The declared issues keep the typed order between them
 // (`backlog-drive-named-launch.ts`), and so does the chunk each issue sits in (`run_carry_added.ordered`).
-async function ranked(issues: ReadonlyArray<string>, carry: RunCarry): Promise<Array<string>> {
+// Without a carry there is no addition to rank, and the issues keep their order.
+async function ranked(issues: ReadonlyArray<string>, carry?: RunCarry): Promise<Array<string>> {
+	if (carry === undefined) return [...issues]
 	const { ahead, behind } = addition_sets(carry)
 	const declared = issues.filter((issue) => !ahead.has(issue) && !behind.has(issue))
 	const [first, last] = await Promise.all([
