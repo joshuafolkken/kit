@@ -178,8 +178,8 @@ describe(TEXTUAL, () => {
 		expect(textual(frame, { theme: undefined, icons: 'emoji' })).toBe(frame)
 	})
 
-	it('draws an emoji the table misses as `?` of its width', () => {
-		expect(textual('🦄|')).toBe('? |')
+	it('draws an emoji the table misses as blanks of its width', () => {
+		expect(textual('🦄|')).toBe('  |')
 	})
 
 	it('turns the spinner through the line frames, one turn a cycle of the dots', () => {
