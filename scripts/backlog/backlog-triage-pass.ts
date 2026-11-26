@@ -79,7 +79,7 @@ async function classify(context: PoolContext | undefined): Promise<number> {
 		return 1
 	}
 
-	const result = await backlog_next.resolve(context)
+	const result = await backlog_next.resolve(context, console.error)
 
 	return await report(result === undefined ? undefined : { result, repo: context.repo })
 }

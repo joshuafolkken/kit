@@ -130,7 +130,7 @@ async function report(result: EpicNextResult, context: PoolContext): Promise<num
 	const tokens = tokens_of(result, context.repo)
 
 	if (tokens[0] === VERDICT_TOKENS.wait) warn_wait_causes(result, context)
-	await backlog_next_size.warn_over_guide(offered_of(result, context.repo), context)
+	await backlog_next_size.warn_over_guide(offered_of(result, context.repo), context, console.error)
 	for (const token of tokens) console.info(token)
 
 	return SUCCESS_EXIT_CODE

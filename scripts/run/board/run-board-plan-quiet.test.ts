@@ -36,7 +36,26 @@ describe('run_board_plan.read_plan — the live ports', () => {
 		expect(backlog_plan_read.classify).toHaveBeenCalledWith(
 			expect.anything(),
 			[],
+			expect.any(Function),
 			expect.objectContaining({ is_capped: false }),
 		)
+	})
+
+	// joshuafolkken/kit#9007: the board draws only the cells it changed, so a notice the resolution passes
+	// to its port — the defect rate above its baseline or unmeasured, an epic notice, a refusal, an
+	// oversize row — must write nothing.
+	it('hands the classification a report port that writes nothing', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await run_board_plan.read_plan({ issues: [], only: false })
+		const report = vi.mocked(backlog_plan_read.classify).mock.calls.at(-1)?.[2]
+
+		report?.('The defect rate 1.47 (398 / 271) is above its baseline 1.26')
+		expect(report).toBeTypeOf('function')
+		expect(error).not.toHaveBeenCalled()
+		expect(write).not.toHaveBeenCalled()
+		expect(info).not.toHaveBeenCalled()
 	})
 })

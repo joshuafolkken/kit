@@ -9,6 +9,9 @@ import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 // re-ordering stays inside the runnable set — every candidate is already ready to start — so no
 // dependency the graph recorded is crossed.
 
+// Where a backlog notice goes: `console.error` for `backlog:next` / `backlog:plan`, nowhere for `run:board`.
+type Report = (line: string) => void
+
 const UNMEASURED_MESSAGE =
 	'The defect rate could not be read from GitHub, so new mechanisms are not deferred.'
 
@@ -24,16 +27,16 @@ function above_message(measured: DefectRate): string {
 	return `The defect rate ${defect_rate.rate_text(measured)} is above its baseline ${String(defect_rate.BASELINE_RATE)}, so among issues the ranking keys tie, new mechanisms are offered last.`
 }
 
-function should_defer_mechanisms(measured: DefectRate | undefined): boolean {
+function should_defer_mechanisms(measured: DefectRate | undefined, report: Report): boolean {
 	if (measured === undefined || measured.is_capped) {
-		console.error(UNMEASURED_MESSAGE)
+		report(UNMEASURED_MESSAGE)
 
 		return false
 	}
 
 	if (!defect_rate.is_above_baseline(measured)) return false
 
-	console.error(above_message(measured))
+	report(above_message(measured))
 
 	return true
 }
@@ -70,10 +73,12 @@ async function defer_mechanisms(result: EpicNextResult, repo: string): Promise<E
 
 // The result as `backlog:next` should offer it. Only a `run` answer has anything to order, only while
 // the rate is above its baseline is anything moved, and only this repository's bundle is re-ordered,
-// because only its numbers reach standard output.
+// because only its numbers reach standard output. Its notices go to `report`, so a caller drawing its own
+// screen — `run:board` — keeps them off it (joshuafolkken/kit#9007).
 async function prioritize(
 	result: EpicNextResult,
 	repo: string,
+	report: Report,
 	now_ms: number = Date.now(),
 ): Promise<EpicNextResult> {
 	if (result.verdict !== 'run') return result
@@ -81,7 +86,7 @@ async function prioritize(
 	const days = defect_rate.DEFAULT_WINDOW_DAYS
 	const measured = await defect_rate_cli.measure_window(repo, days, now_ms)
 
-	if (!should_defer_mechanisms(measured)) return result
+	if (!should_defer_mechanisms(measured, report)) return result
 
 	return await defer_mechanisms(result, repo)
 }
@@ -89,3 +94,4 @@ async function prioritize(
 const backlog_defect_priority = { UNMEASURED_MESSAGE, prioritize }
 
 export { backlog_defect_priority }
+export type { Report }
