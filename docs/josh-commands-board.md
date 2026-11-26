@@ -263,6 +263,10 @@ The name is the one the record carries (`--fullrun`, `--prrun`, or none for a `h
 
 Beside a backlogrun, the root checkout's running or stopped single run is drawn under its own `🏠 <name>` heading above the `🧵` lanes; the lanes heading's tallies count no lane and no `🔄` for it. The legend omits a stopped run's `✅`.
 
+A running `fullrun` or `prrun` row ends on `🎯 HH:MM` and `+N′` read from the lane totals as a child's row is, `🎯 —` where none is measured — even beside a stopped or ended backlogrun, as it moves on its own; a stopped one draws none.
+
+A `halfrun` draws no `🎯`, alone or beside a backlogrun: the lane totals run to a merge, and it stops before its commit.
+
 The merge that releases its hold keeps the run's issue, start and end, so a merge inside the backlogrun's span moves it out of `🏠` into `✅ done`, placed by its end like a lane's finished row.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".

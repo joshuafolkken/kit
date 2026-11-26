@@ -276,6 +276,52 @@ describe('run_board_estimate.is_finish_drawn', () => {
 	})
 })
 
+// joshuafolkken/kit#8946: the root checkout's single run's 🏠 row moves on its own; a `halfrun` draws none.
+describe('run_board_estimate.is_finish_drawn on a single run', () => {
+	const STOPPED = { ended_ms: NOW, activity: { is_stopped: true } }
+	const MOVING = { ended_ms: undefined, activity: { is_stopped: false } }
+
+	function root_beside(name: string, root: BoardRow): Parameters<typeof is_finish_drawn>[1] {
+		return { ...STOPPED, layout: { root: { name, row: root } } }
+	}
+
+	const { is_finish_drawn } = run_board_estimate
+
+	it.each(['fullrun', 'prrun'])(
+		'draws a finish on a running 🏠 %s beside a stopped run',
+		(name) => {
+			const root = running(1, 'implement', 5)
+
+			expect(is_finish_drawn(root, root_beside(name, root))).toBe(true)
+		},
+	)
+
+	it('draws none on a stopped 🏠 row', () => {
+		const root = row(1, 'stopped')
+
+		expect(is_finish_drawn(root, root_beside('prrun', root))).toBe(false)
+	})
+
+	it('draws none on a 🏠 halfrun, nor on a board’s own halfrun', () => {
+		const root = running(1, 'implement', 5)
+
+		expect(is_finish_drawn(root, root_beside('halfrun', root))).toBe(false)
+		expect(is_finish_drawn(root, { ...MOVING, run_name: 'halfrun' })).toBe(false)
+	})
+
+	it('draws a finish on a board’s own fullrun', () => {
+		expect(is_finish_drawn(running(1, 'implement', 5), { ...MOVING, run_name: 'fullrun' })).toBe(
+			true,
+		)
+	})
+
+	it('keeps the stopped run’s other rows without one', () => {
+		const root = running(1, 'implement', 5)
+
+		expect(is_finish_drawn(running(2, 'implement', 5), root_beside('fullrun', root))).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#8478: no `~` — the 🎯 says the time is an estimate.
 describe('run_board_estimate.stamp_of', () => {
 	it('draws the local finish time after 🎯 on the same day', () => {

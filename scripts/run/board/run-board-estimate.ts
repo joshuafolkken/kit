@@ -32,6 +32,7 @@ const RESUMED_PHASE: Phase = 'implement'
 // The phases a child passes in order, a failed ship aside.
 const PATH: ReadonlyArray<Phase> = run_board_phase.PHASES.filter((phase) => phase !== FAILED_PHASE)
 const MIN_LANES = 1
+const HALFRUN = 'halfrun'
 const NO_USUAL: UsualTimes = new Map()
 
 interface EstimateRead {
@@ -43,10 +44,13 @@ interface EstimateRead {
 	lane_limit?: number | undefined
 }
 
-// What says the run still moves, as the board's header carries it.
+// What says the run still moves, as the board's header carries it, with the run's name and the root
+// checkout's single run beside it.
 interface RunMotion {
 	ended_ms: number | undefined
 	activity: { is_stopped: boolean }
+	run_name?: string | undefined
+	layout?: Pick<BoardLayout, 'root'> | undefined
 }
 
 interface RowFinish {
@@ -178,13 +182,34 @@ function row_finish(row: BoardRow, read: EstimateRead): RowFinish | undefined {
 	return { finish_ms, drift_ms: finish_ms - foretold_ms }
 }
 
+function is_root_row(row: BoardRow, run: RunMotion): boolean {
+	return run.layout?.root?.row === row
+}
+
+// The root checkout's single run moves on its own, beside a stopped or ended `backlogrun`
+// (joshuafolkken/kit#8946); its row stands `stopped` once a stop ends it. Every other row moves with
+// the run.
+function is_moving(row: BoardRow, run: RunMotion): boolean {
+	if (is_root_row(row, run)) return true
+
+	return run.ended_ms === undefined && !run.activity.is_stopped
+}
+
+// The single run a row is drawn under: the root checkout's, else the board's own; `undefined` under a
+// `backlogrun`.
+function single_name_of(row: BoardRow, run: RunMotion): string | undefined {
+	return is_root_row(row, run) ? run.layout?.root?.name : run.run_name
+}
+
 // Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and a parked one, while the
 // run goes on; a row waiting on a person draws none, its finish never measured (joshuafolkken/kit#8166) — a stopped or ended run's header draws no 🎯, nor do its rows. An
 // earlier run's lane (🧳), or an adopted one, draws none: this run's lane totals do not foretell it.
+// A `halfrun` draws none: the lane totals run to a merge, and it stops before its commit
+// (joshuafolkken/kit#8946).
 function is_finish_drawn(row: BoardRow, run: RunMotion): boolean {
-	const is_moving = run.ended_ms === undefined && !run.activity.is_stopped
+	const is_measured = single_name_of(row, run) !== HALFRUN && is_foretold(row)
 
-	return is_moving && is_foretold(row) && FINISH_STATES.has(row.state)
+	return is_moving(row, run) && is_measured && FINISH_STATES.has(row.state)
 }
 
 // The local finish time, with its `MM-DD` when it falls on another day than now.
