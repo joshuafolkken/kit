@@ -88,7 +88,6 @@ describe('test_pinned_probe.selection_of', () => {
 	})
 })
 
-// joshuafolkken/kit#5292: a wide reach runs the direct importers first.
 describe('test_pinned_probe.probe_cost', () => {
 	it('costs a fresh probe its counted reach and an uncounted one nothing', () => {
 		expect(test_pinned_probe.probe_cost(probe_of(HUB_MODULE, WORKERS))).toBe(WORKERS)
@@ -102,6 +101,7 @@ describe('test_pinned_probe.probe_cost', () => {
 	})
 })
 
+// joshuafolkken/kit#5292: a wide reach runs the direct importers first.
 describe('test_pinned_probe.selection_of — a counted reach', () => {
 	beforeEach(open_fixture)
 	afterEach(close_fixture)

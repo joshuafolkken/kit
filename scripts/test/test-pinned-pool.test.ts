@@ -52,9 +52,9 @@ function last_costliest(item: string): number {
 
 // A lane halted after its first item: it takes a second one and never answers it.
 async function halted_lane(queue: Iterable<string>): Promise<Array<string>> {
-	const [first] = queue
+	const [first, second] = queue
 
-	return first === undefined ? [] : [first.toUpperCase()]
+	return first === undefined || second === undefined ? [] : [first.toUpperCase()]
 }
 
 describe('test_pinned_pool.lane_plan', () => {
