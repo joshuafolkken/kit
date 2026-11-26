@@ -130,11 +130,12 @@ function frame(
 	frame_run.after_frame?.(at_ms)
 }
 
-// The first moment a layer changes, no sooner than a refresh after the last frame and no later than
-// `until_ms`.
-function wake_of(frame_run: FrameRun, now_ms: number, last_ms: number): number {
+// The first moment a layer changes after the last frame was made — a change the last frame's write ran
+// past is due at once, not skipped (joshuafolkken/kit#8950) — no sooner than a refresh after the last
+// frame and no later than `until_ms`.
+function wake_of(frame_run: FrameRun, last_ms: number): number {
 	const { layers, until_ms } = frame_run
-	const next_ms = Math.min(until_ms, ...layers.map((layer) => layer.next_change_ms(now_ms)))
+	const next_ms = Math.min(until_ms, ...layers.map((layer) => layer.next_change_ms(last_ms)))
 
 	return Math.min(until_ms, Math.max(next_ms, last_ms + MIN_FRAME_MS))
 }
@@ -142,10 +143,10 @@ function wake_of(frame_run: FrameRun, now_ms: number, last_ms: number): number {
 // Sleeps from `now_ms` until `due_ms`, handing the wake's due and actual time to the ports that time
 // wakes (joshuafolkken/kit#8902); the time it woke at.
 async function sleep_until(ports: FramePorts, now_ms: number, due_ms: number): Promise<number> {
-	await ports.sleep(due_ms - now_ms)
+	await ports.sleep(Math.max(0, due_ms - now_ms))
 	const woke_ms = ports.now()
 
-	ports.time_wake?.(due_ms, woke_ms)
+	ports.time_wake?.(Math.max(due_ms, now_ms), woke_ms)
 
 	return woke_ms
 }
@@ -157,7 +158,7 @@ function is_over(frame_run: FrameRun, ports: FramePorts): boolean {
 
 // The wake, no later than the next check where the second can end early on a switch.
 function checked_wake(frame_run: FrameRun, now_ms: number, last_ms: number): number {
-	const wake_ms = wake_of(frame_run, now_ms, last_ms)
+	const wake_ms = wake_of(frame_run, last_ms)
 
 	return frame_run.is_current === undefined ? wake_ms : Math.min(wake_ms, now_ms + CHECK_MS)
 }
