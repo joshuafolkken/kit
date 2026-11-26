@@ -43,7 +43,7 @@ Before building a feature, run `pnpm josh pkg:scout <keywords>` and act on its `
 
 ## Code Change Rules
 
-0. **Work summary + test declaration** — before writing any implementation code, once per Issue (no-filing work: in the reply, `principles.md` → "consult-vs-execute"): Now / Change / Check, then every change with its test (`prompts/collaboration-workflow/report-format.md` → "作業前サマリはいつ・どう出すか"). **Tests are required for ALL changes** — zero tests without explicit approval is a violation.
+0. **Work summary + test declaration** — before writing any implementation code, once per Issue (no-filing work: in reply, tests last, `principles.md` → "consult-vs-execute"): Now / Change / Check, then every change with its test (`prompts/collaboration-workflow/report-format.md` → "作業前サマリはいつ・どう出すか"). **Tests are required for ALL changes** — zero tests without explicit approval is a violation.
 1. **Refactor first** — `prompts/refactoring.md`; no high/medium refactoring left on new/modified code.
 2. **Tests** — those declared in Step 0 (`prompts/testing-guide.md`).
 3. **Verification gate** — `pnpm josh gate`, never piped: `| tail` reports a red gate as green, and its last lines carry the verdict (`prompts/collaboration-workflow/output-bounds.md`); while implementing re-run one check (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`). Add legitimate flagged terms to `cspell.config.yaml`.

@@ -111,8 +111,8 @@ in shape → the live board's demo mode and bases of the real board's shape chec
 - Keep investigation and implementation in separate pieces of work; finish the implementation first.
 - Never let two pieces of work touch the same file at once; files apart may go in parallel. The agent
   that built a theme also takes its fixes.
-- While the look is being tuned, tests and the gate may wait with the user's explicit approval; the
-  finish runs them all.
+- While the look is being tuned, tests and the gate wait for the finish:
+  `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
 - Two defects of one shape → stop fixing one at a time; find that shape in every theme's code.
 - Read a request no wider than it is: fixing a value shown as `--` changes no effect.
 
