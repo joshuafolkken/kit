@@ -1,0 +1,8 @@
+{
+	"reason": "#9006 adds one concise-reply rule item: every user-pending decision rides the next-step close (+1 rule line, +540 on-demand bytes)",
+	"date": "2026-11-26",
+	"growth": {
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 540
+	}
+}

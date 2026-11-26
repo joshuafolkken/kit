@@ -140,7 +140,7 @@ const ROW: MeasuredRule = {
 		fires:
 			'a reply whose last paragraph has no `次の一手:` / `Next:` line and no `このセッションのやり残しはない` / `Nothing left in this session` line, or closes with the nothing-left line and no `次の一手:` / `Next:` line while a background task (command, subagent or undelivered completion notice) is pending. Blocks the stop',
 		quiet:
-			'a reply with a `Recommended:` decision, a reply that is only a code block (a fixed output), a held stop with no decision (its own refusal asks for the close), no prompt of the person’s on the transcript tail, or an unattended session (headless, a lane child, the backlogrun parent)',
+			'a `次の一手:` / `Next:` line followed by a list in the same paragraph (every decision pending on the user listed, the recommended one on the line — whether the list is complete is not checked), a reply with a `Recommended:` decision, a reply that is only a code block (a fixed output), a held stop with no decision (its own refusal asks for the close), no prompt of the person’s on the transcript tail, or an unattended session (headless, a lane child, the backlogrun parent)',
 	},
 }
 
