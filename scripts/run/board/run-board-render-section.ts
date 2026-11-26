@@ -97,7 +97,7 @@ function row_count(lines: ReadonlyArray<PlanLine>): number {
 	return lines.filter((line) => line.row !== undefined && line.is_seat !== true).length
 }
 
-// A label saying how many its section holds, `tally` after the count: `⏳ queued 10 (🔺 2)`.
+// A label saying how many its section holds, `tally` after the count: `⌛ queued 10 (🔺 2)`.
 function counted(label: string, count: number, tally = ''): string {
 	return `${label} ${String(count)}${tally}`
 }
@@ -198,7 +198,7 @@ function lone_head(head: ReadonlyArray<string>, label: string): Array<string> {
 	return [...head.slice(0, -1), `${RULE} ${label} ${RULE}${rule.slice(lead.length)}`]
 }
 
-// A folded section's one line: `▸ ⏳ queued ── 3 ───`, ending on a rule however long its summary.
+// A folded section's one line: `▸ ⌛ queued ── 3 ───`, ending on a rule however long its summary.
 function folded_head(label: string, summary: string): Array<string> {
 	return ['', rule_to_width(`${FOLDED_MARK} ${label} ${RULE_LEAD} ${summary} ${RULE_LEAD}`)]
 }

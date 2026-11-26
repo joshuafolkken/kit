@@ -3,6 +3,7 @@ import { run_board_faint } from './run-board-faint'
 import type { FrameParts, PlanLine, PlanSection, TerminalSize, YieldStage } from './run-board-fit'
 import { run_board_fold, type FrameBounds } from './run-board-fold'
 import { run_board_header, type BoardHeader } from './run-board-header'
+import { run_board_heading_icons } from './run-board-heading-icons'
 import { run_board_label_pair } from './run-board-label-pair'
 import { run_board_labels } from './run-board-labels'
 import {
@@ -43,7 +44,8 @@ import { run_board_watch_row } from './run-board-watch-row'
 // at the foot names the symbols, so a row carries only what differs between rows. Every word is
 // English whatever the session language: one set of words reads the same on every board.
 
-const { STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
+const { STATE_ICONS, WORDS } = run_board_labels
+const { QUEUED_HEADING_ICON, WAITING_HEADING_ICON } = run_board_heading_icons
 const { pair, titled } = run_board_label_pair
 const { stops_width, time_width } = run_board_render_time
 const { NOTE_LIMIT } = run_board_render_notes
@@ -156,7 +158,7 @@ function frame_of(
 function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
 	const lines = layout.queued.flatMap((entry) => entry_lines(entry, frame))
 
-	return [kept_section(pair(STATE_ICONS.waiting, WORDS.queued), lines)]
+	return [kept_section(pair(QUEUED_HEADING_ICON, WORDS.queued), lines)]
 }
 
 // The decision rows' frame: what to decide matters more than the title, so their title column is as
@@ -212,7 +214,7 @@ function active_sections(
 
 // The 🔗 rows waiting on an issue the run has not reached.
 function waiting_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
-	const waiting = pair(WAITS_ICON, WORDS.waiting)
+	const waiting = pair(WAITING_HEADING_ICON, WORDS.waiting)
 
 	return rows_section(waiting, layout.unreached, { ...frame, section: 'waiting' }, 'waiting')
 }

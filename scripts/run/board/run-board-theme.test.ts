@@ -112,7 +112,7 @@ const { pair } = run_board_label_pair
 const HEADINGS = [
 	`▾ 📈 throughput ── ${pair('⚡', '/h')} ── ${pair('✅', 'DONE')} ── 🏔 PEAK ──`,
 	'▾ 📌 usage ──',
-	`▸ ${pair('🔗', 'waiting')} ── 8 ──`,
+	`▸ ${pair('🪢', 'waiting')} ── 8 ──`,
 ]
 const PROCESSES = [
 	`  ${pair('▶', 'backlogrun')}       46.6`,
