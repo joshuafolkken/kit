@@ -1,0 +1,8 @@
+{
+	"reason": "Issue branch creation at the run:entry sync (#8983): one small module and a doc line for the new entry behavior",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 47,
+		"ai_cost.on_demand_bytes": 51
+	}
+}
