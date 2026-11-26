@@ -1,3 +1,6 @@
+import { closeSync, openSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_write_port, type Writable } from './run-board-write-port'
 
@@ -67,6 +70,43 @@ describe('run_board_write_port.port_of', () => {
 		await expect(is_settled(drained)).resolves.toBe(false)
 		drains[0]?.()
 		await expect(is_settled(drained)).resolves.toBe(true)
+	})
+})
+
+// Settles a port over `stream` writing to `file`, and writes `x` through it.
+function write_settled(file: string, stream: Writable & { _handle: object }): void {
+	const fd = openSync(file, 'w')
+	const port = run_board_write_port.port_of({ ...stream, fd })
+
+	port.settle?.()
+	port.write('x')
+	closeSync(fd)
+}
+
+// joshuafolkken/kit#9027: a settled port writes each byte before `process.exit` can drop it.
+describe('run_board_write_port.port_of settled', () => {
+	const create_directory = temporary_directory()
+
+	it('makes the handle blocking and writes to the descriptor, not the stream', () => {
+		const file = path.join(create_directory('josh-write-port-'), 'out')
+		const set_blocking = vi.fn()
+		const write = vi.fn(() => true)
+
+		write_settled(file, { write, once: vi.fn(), _handle: { setBlocking: set_blocking } })
+
+		expect(readFileSync(file, 'utf8')).toBe('x')
+		expect(write).not.toHaveBeenCalled()
+		expect(set_blocking).toHaveBeenCalledExactlyOnceWith(true)
+	})
+
+	it('keeps writing through the stream when it has no descriptor', () => {
+		const { stream, written } = stream_of(true)
+		const port = run_board_write_port.port_of(stream)
+
+		port.settle?.()
+		port.write('x')
+
+		expect(written).toStrictEqual(['x'])
 	})
 })
 
