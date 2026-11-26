@@ -86,11 +86,21 @@ async function continued(answer: PinnedSummary): Promise<PinnedSummary> {
 // check's answer is read, waited for while it still runs; only another tree, or a check that left no
 // answer, runs one here. **A reason never judges a check that stopped at its first unpinned hunk**
 // (joshuafolkken/kit#5153): the hunks it left are probed here before the reason accepts the list.
+// **On that same tree they are the rest's probe, joined, not a whole check again** (joshuafolkken/kit#8981):
+// the one `run:review` started, or started here, probes only the hunks the cache does not hold.
+async function rest_summary(reason: string | undefined): Promise<PinnedSummary> {
+	await run_review_pinned_remaining.start()
+
+	return (await run_review_pinned_remaining.read()) ?? (await own_summary(reason))
+}
+
 async function summary(reason: string | undefined): Promise<PinnedSummary> {
 	const answer = await run_review_pinned_join.answer_on_tree()
-	const is_whole = answer?.is_cut !== true || reason === undefined
 
-	return await continued(answer !== undefined && is_whole ? answer : await own_summary(reason))
+	if (answer === undefined) return await continued(await own_summary(reason))
+	if (reason === undefined || answer.is_cut !== true) return await continued(answer)
+
+	return await rest_summary(reason)
 }
 
 // The verdicts an earlier probe left for this very tree, read from the cache without a probe
