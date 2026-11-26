@@ -9,7 +9,8 @@ import { run_board_theme_defs } from './run-board-theme-defs'
 // sounds the board appearing once; the NOTICE track is rendered ahead. No sound plays: the player is
 // stubbed and its calls kept.
 
-const { hush, heard, is_sounding, scored, skipped, switched_end, warm } = run_board_live_sound
+const { hush, heard, is_sounding, leave_with, scored, skipped, switched_end, warm } =
+	run_board_live_sound
 const { score } = run_board_theme_defs.THEME_DEFS.wopr
 const LETTERS = 12
 const PART_MS = 2000
@@ -226,5 +227,42 @@ describe('run_board_live_sound switches', () => {
 		warm(undefined)
 
 		expect(score.notice).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#9027: a step of the board leaving that throws leaves no sound playing on.
+describe('run_board_live_sound.leave_with', () => {
+	it.each([
+		[['trill'], 'trill'],
+		[['keys'], 'keys'],
+		[['flush'], 'flush'],
+		[['leave'], 'leave'],
+		[['keys', 'leave'], 'keys'],
+	])('hushes and runs every step though %j throws, rethrowing %s', (failing, first) => {
+		const test = played()
+		const ran: Array<string> = []
+
+		function step(name: string): () => void {
+			return () => {
+				ran.push(name)
+				if (failing.includes(name)) throw new Error(name)
+			}
+		}
+
+		expect(() => {
+			leave_with({ stop: step('trill') }, [step('keys'), step('flush'), step('leave')])
+		}).toThrow(first)
+		expect(test.stop_all).toHaveBeenCalledOnce()
+		expect(ran).toStrictEqual(['trill', 'keys', 'flush', 'leave'])
+	})
+
+	it('leaves quietly where no step throws and no trill plays', () => {
+		const test = played()
+		const leave = vi.fn<() => void>()
+
+		leave_with(undefined, [leave])
+
+		expect(test.stop_all).toHaveBeenCalledOnce()
+		expect(leave).toHaveBeenCalledOnce()
 	})
 })

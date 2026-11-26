@@ -120,12 +120,17 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading, joint: Join
 	return () => {
 		if (has_left) return
 		has_left = true
-		keys.stop?.()
-		ports.typing_sound?.stop()
-		// Every player the board started ends with it: a detached one plays on otherwise (joshuafolkken/kit#8917).
-		run_board_live_sound.hush()
-		joint.flush()
-		ports.write(screen.leave)
+		// Every player the board started ends with it: a detached one plays on otherwise (joshuafolkken/kit#8917),
+		// even where a step fails (joshuafolkken/kit#9027).
+		run_board_live_sound.leave_with(ports.typing_sound, [
+			() => keys.stop?.(),
+			() => {
+				joint.flush()
+			},
+			() => {
+				ports.write(screen.leave)
+			},
+		])
 	}
 }
 

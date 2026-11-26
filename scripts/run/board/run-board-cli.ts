@@ -236,6 +236,9 @@ async function watch(
 	is_timing: boolean,
 ): Promise<void> {
 	const exits = ports === undefined ? run_board_exit_record.start() : undefined
+
+	// A terminal that stops reading must not hold the signal handlers (joshuafolkken/kit#9027).
+	if (exits !== undefined) run_board_write_port.unblock(process.stdout)
 	const live = drawn_ports(ports, true, look)
 	const leaving = exits?.on_exit ?? live.on_exit
 	const board = run_board_timing.timed({ ...live, on_exit: leaving }, is_timing)

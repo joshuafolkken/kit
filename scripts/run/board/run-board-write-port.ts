@@ -31,7 +31,26 @@ function port_of(stream: Writable): Pick<BoardPorts, 'write' | 'drained'> {
 	}
 }
 
-const run_board_write_port = { port_of }
+// The handle Node keeps under a TTY stream, its writes made blocking by `tty.WriteStream`.
+interface Handle {
+	setBlocking: (is_blocking: boolean) => unknown
+}
+
+function is_handle(value: unknown): value is Handle {
+	return typeof value === 'object' && value !== null && 'setBlocking' in value
+}
+
+// joshuafolkken/kit#9027: Node writes a TTY synchronously, so a terminal that stops reading blocks the
+// board's thread on its next write, and every signal handler with it, the leave that ends the sound
+// among them. Unblocked, a write the terminal cannot take waits for `drain` (`port_of`) and a signal
+// still leaves. A stream with no such handle (a pipe, a file) is left as it is.
+function unblock(stream: object): void {
+	const handle: unknown = Reflect.get(stream, '_handle')
+
+	if (is_handle(handle)) handle.setBlocking(false)
+}
+
+const run_board_write_port = { port_of, unblock }
 
 export { run_board_write_port }
 export type { Writable }
