@@ -242,7 +242,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:carry` 
 
 <!-- usage: run:add -->
 
-Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots; --withdrawn re-admits every issue a person withdrew.
+Add issues to a live backlogrun in rank order, ahead of the queue unless --no-priority; epics become roots; --withdrawn re-admits every issue a person withdrew.
 
 ```bash
 pnpm josh run:add 101 102               # ahead of the rest of the queue (`#N` works too)
@@ -257,6 +257,7 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 
 - An open epic becomes an unlabelled root of any run, recorded once.
 - Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`; an issue already labelled `priority:critical` or `priority:high` keeps that label alone, still ahead of the queue. Named runs also record additions beside their unchanged invocation.
+- Several additions are offered in the pool's rank order (`issue_rank`): those ahead of the queue among themselves, the `--no-priority` ones at its end among themselves, equal ranks in the order added. Issues named at launch keep their typed order. An addition whose blockers are unfinished is passed for the next one.
 - Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
 - `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed, stalled or withdrawn issues are refused.

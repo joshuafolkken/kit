@@ -1,5 +1,6 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
+import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_dispatch_dependency } from '#scripts/lane/lane-dispatch-dependency'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -54,6 +55,8 @@ async function offer_of(carry: RunCarry): Promise<OfferRead | undefined> {
 
 beforeEach(() => {
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+	// The additions are read for their rank (`backlog-drive-named-rank.ts`); unread, they keep the order added.
+	vi.spyOn(git_gh_command, 'issue_view_json_classified').mockResolvedValue({ kind: 'missing' })
 	vi.spyOn(backlog_drive_named_gate, 'admitted').mockImplementation(async (plain) =>
 		plain.map((issue) => issue.number),
 	)
