@@ -1,0 +1,7 @@
+{
+	"reason": "lane:list reads the issue state of unlabelled lanes and prints a leftover line for closed-issue lanes (#9035)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 37
+	}
+}
