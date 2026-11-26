@@ -16,6 +16,12 @@ const process_kind_schema = z.object({
 	footprint_mb: z.number().optional(),
 	count: z.number(),
 })
+// One command's admitted core-budget claims at the instant of the sample (`lane-load.ts`), summed, so the
+// CPU a process kind used reads against what the budget had reserved for it (joshuafolkken/kit#9000).
+const reserved_command_schema = z.object({
+	command: z.string(),
+	cores: z.number(),
+})
 // `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
 // platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
 // worth its load. `swapped_mb` is `machine_capacity`'s counter, every page swapped since boot.
@@ -38,6 +44,11 @@ const load_schema = z.object({
 	// The boot and last-wake instants, epoch ms (`kern.boottime`, `kern.waketime`).
 	booted_ms: z.number().optional(),
 	woke_ms: z.number().optional(),
+	// The machine's core count and the budget's admitted claims by command (joshuafolkken/kit#9000), so a
+	// sample whose load passed the cores reads as unreserved work or a claim using more than it reserved.
+	// Absent on rows written before them, or where the reservations could not be read.
+	cores: z.number().optional(),
+	reserved: z.array(reserved_command_schema).optional(),
 })
 
 const lane_ledger_schema_load = { load_schema }

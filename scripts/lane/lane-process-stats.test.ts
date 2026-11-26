@@ -53,6 +53,65 @@ describe('lane_process_stats.table', () => {
 	})
 })
 
+// joshuafolkken/kit#9000: over the samples whose load passed the cores, the CPU beside the reservations.
+const CORES = 11
+const TEST_RELATED = 'test:related'
+const OVER_PROCESSES = [
+	{ kind: 'claude', cpu_percent: 600, rss_mb: 1024, count: 4 },
+	{ kind: 'vitest', cpu_percent: 400, rss_mb: 1024, count: 4 },
+]
+
+function over_sample(
+	load: number,
+	reserved?: Array<{ command: string; cores: number }>,
+): LedgerEntry {
+	return {
+		kind: 'load',
+		at: new Date(NOW - 1).toISOString(),
+		load,
+		processes: OVER_PROCESSES,
+		cores: CORES,
+		reserved,
+	}
+}
+
+describe('lane_process_stats.table over the cores', () => {
+	it('sets the CPU beside the reserved cores over the samples past the cores alone', () => {
+		const entries = [
+			over_sample(13, [{ command: TEST_RELATED, cores: 2 }]),
+			over_sample(15, [{ command: TEST_RELATED, cores: 4 }]),
+			over_sample(CORES, [{ command: 'gate tsc', cores: 9 }]),
+		]
+		const table = lane_process_stats.table(entries, WINDOW)
+
+		expect(table).toContain('| load > cores | 14.0 | 10.0 | 3.0 | 7.0 | 2 |')
+		expect(table).toContain('| test:related | 3.0 |')
+		expect(table).not.toContain('gate tsc')
+		expect(table).toContain('| process (load > cores) |')
+	})
+
+	it('averages a command over every over-core sample, one it held none in reading zero', () => {
+		const entries = [over_sample(13, [{ command: 'gate eslint', cores: 2 }]), over_sample(13, [])]
+
+		expect(lane_process_stats.table(entries, WINDOW)).toContain('| gate eslint | 1.0 |')
+	})
+
+	it('prints no over-core table for samples written before the reservations were recorded', () => {
+		const entries = [{ ...sample(NOW - 1, OVER_PROCESSES), load: 30, cores: CORES }]
+
+		expect(lane_process_stats.table(entries, WINDOW)).not.toContain('load > cores')
+	})
+
+	it('leaves out an over-core sample whose process reading failed rather than read it as zero CPU', () => {
+		const failed = { ...over_sample(CORES + 2, []), processes: undefined }
+		const entries = [over_sample(13, [{ command: TEST_RELATED, cores: 2 }]), failed]
+
+		expect(lane_process_stats.table(entries, WINDOW)).toContain(
+			'| load > cores | 13.0 | 10.0 | 2.0 | 8.0 | 1 |',
+		)
+	})
+})
+
 // joshuafolkken/kit#7244: the footprint, compressed pages included, beside the resident peak.
 describe('lane_process_stats.table footprint', () => {
 	it('prints the footprint peak over the samples that recorded one', () => {

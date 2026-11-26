@@ -54,6 +54,17 @@ describe('core_weights — the declared cost of each heavy tool', () => {
 	)
 })
 
+// joshuafolkken/kit#9000: lint:related ran the unused-members child at 120–170% CPU beside the lint
+// while it reserved the lint's cores alone.
+describe('core_weights — lint:related', () => {
+	it('weighs lint:related as the lint plus the unused-members TypeScript program', () => {
+		const { CORE_WEIGHTS, LINT_RELATED_CORES } = core_weights
+
+		expect(LINT_RELATED_CORES).toBe(CORE_WEIGHTS.lint + CORE_WEIGHTS.type_check)
+		expect(core_weights.tenth_rounded_up(LINT_RELATED_CORES)).toBe(LINT_RELATED_CORES)
+	})
+})
+
 // joshuafolkken/kit#7776: lint and metrics kept a p90 of 1.7 cores busy, never the two they claimed.
 describe('core_weights — the weights read off the lane ledger', () => {
 	it('rounds every ledger p90 up to the tenth of a core at or above it', () => {

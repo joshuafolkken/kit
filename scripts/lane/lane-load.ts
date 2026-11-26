@@ -1,4 +1,6 @@
-import { loadavg } from 'node:os'
+import { availableParallelism, loadavg } from 'node:os'
+import { core_budget } from '#scripts/gate/core-budget'
+import type { Reservation } from '#scripts/gate/core-reservation'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { MS_PER_SECOND, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
@@ -32,6 +34,47 @@ function count_working(
 async function read_lanes(): Promise<number | undefined> {
 	try {
 		return count_working(await lane_registry.list_lanes())
+	} catch {
+		return undefined
+	}
+}
+
+type ReservedCommand = NonNullable<LoadEntry['reserved']>[number]
+type HeldClaim = Pick<Reservation, 'admitted_at' | 'command' | 'granted' | 'weight'>
+
+// A claim with no command label — a launch that wrote none, or an older marker.
+const UNLABELLED_COMMAND = 'unlabelled'
+
+// The cores an admitted claim holds: its narrowed grant where admission narrowed it, else its weight.
+// A claim still waiting holds no core, so it is left out (joshuafolkken/kit#9000).
+function held_cores(reservation: HeldClaim): number {
+	if (reservation.admitted_at === undefined) return 0
+
+	return reservation.granted ?? reservation.weight
+}
+
+// The budget's admitted claims summed by command, so a sample reads each kind's CPU against what was
+// reserved for it.
+function group_reserved(reservations: ReadonlyArray<HeldClaim>): Array<ReservedCommand> {
+	const totals = new Map<string, number>()
+
+	for (const reservation of reservations) {
+		const command = reservation.command ?? UNLABELLED_COMMAND
+
+		totals.set(command, (totals.get(command) ?? 0) + held_cores(reservation))
+	}
+
+	return [...totals]
+		.filter(([, cores]) => cores > 0)
+		.map(([command, cores]) => ({ command, cores }))
+}
+
+// `undefined` where the markers could not be read, so the sample records no reservation rather than none.
+function read_reserved(
+	read: () => ReadonlyArray<{ reservation: HeldClaim }> = () => core_budget.counted_reservations(),
+): Array<ReservedCommand> | undefined {
+	try {
+		return group_reserved(read().map((entry) => entry.reservation))
 	} catch {
 		return undefined
 	}
@@ -113,11 +156,15 @@ async function sample(at: string): Promise<LoadEntry> {
 		processes: reading?.processes,
 		resident_mb: reading?.resident_mb,
 		...host_sleep,
+		cores: availableParallelism(),
+		reserved: read_reserved(),
 	}
 }
 
 const lane_load = {
 	count_working,
+	group_reserved,
+	read_reserved,
 	parse_slept_ms,
 	parse_times,
 	sample,

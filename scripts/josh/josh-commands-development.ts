@@ -69,7 +69,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Apply eslint fixes and prettier to the resolved scope, then check remaining errors and in kit the source guard tests (whole tree on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
-		core_weight: core_weights.CORE_WEIGHTS.lint,
+		core_weight: core_weights.LINT_RELATED_CORES,
 		memory_mb: core_weights.MEMORY_MB.lint,
 		usage: { examples: [{ arguments: '' }, NARROWED] },
 	},
