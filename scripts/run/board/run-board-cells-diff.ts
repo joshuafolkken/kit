@@ -130,7 +130,7 @@ function length_of(writer: Writer, write: (scratch: Writer) => void): number {
 
 	write(scratch)
 
-	return scratch.out.join('').length
+	return scratch.out.reduce((total, part) => total + part.length, 0)
 }
 
 // joshuafolkken/kit#8951: whether writing the unchanged cells `from` up to the changed `to`, then its
@@ -151,7 +151,8 @@ function rewrite_is_shorter(back: Cells, writer: Writer, from: number, to: numbe
 function run_continues(back: Cells, front: Cells, writer: Writer, from: number): boolean {
 	const to = next_changed(back, front, from)
 
-	return to !== undefined && rewrite_is_shorter(back, writer, from, to)
+	// Nothing between: the changed cell is next, and no move is shorter than none.
+	return to !== undefined && (to === from || rewrite_is_shorter(back, writer, from, to))
 }
 
 // joshuafolkken/kit#8917: the run of cells from `start`, written after one cursor move: unchanged cells
