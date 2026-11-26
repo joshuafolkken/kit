@@ -210,7 +210,8 @@ async function count_merged(ctx: MergeContext): Promise<ApplyCarryResult> {
 // (`run-merge-sync.ts`); then counted and put on record by `record`,
 // dated to the moment the ownership check passed (joshuafolkken/kit#4734); then the lane — stashed of
 // any uncommitted work — is closed while the counters are mirrored onto the epic. **A failed sync
-// leaves neither the count nor the record**, so the run's next pass (a restored drive, `run:carry
+// leaves neither the count nor the record** — one a dirty primary checkout refused holds instead and
+// still counts and records (`run-merge-sync.ts`) — so the run's next pass (a restored drive, `run:carry
 // --end`) still reads the child as unsettled and collects it again. **What the next offer reads ends
 // before this returns**: the closed issue and epics, the count, the lane's freed seat, and the default
 // branch whose code the next `josh` runs. Returns the carry when the ownership check fails — the caller

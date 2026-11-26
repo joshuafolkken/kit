@@ -20,16 +20,21 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // only reads it at the next pass. A dispatch no offer saw (a ledger from before `offer` entries, or a
 // lane opened by hand) is counted under `not measured`.
 //
-// **A seat that was not there is not waiting**: a hold by memory, a usage limit or the `run:solo` gate,
-// and the time after a `released` entry (every lane taken, or the run finished), each lasting until the
+// **A seat that was not there is not waiting**: a hold by memory, a usage limit, a dirty main checkout
+// (joshuafolkken/kit#9034) or the `run:solo` gate, and the time after a `released` entry (every lane taken, or the run finished), each lasting until the
 // next `held`, `released` or `dispatch` entry as `lane-held-stats.ts` tiles them, are taken out.
 
 const { KIND } = lane_ledger
-const { MEMORY_REASON, REASON_SEPARATOR, USAGE_LIMIT_REASON } = backlog_hold_codes
+const { MAIN_DIRTY_REASON, MEMORY_REASON, REASON_SEPARATOR, USAGE_LIMIT_REASON } =
+	backlog_hold_codes
 const { NOT_MEASURED, is_dispatch } = lane_stage_stats
 const RETRY_VERDICT = backlog_next_report.VERDICT_TOKENS.retry
 const LIMIT_MS = MS_PER_MINUTE
-const SEATLESS_REASONS: ReadonlySet<string> = new Set([MEMORY_REASON, USAGE_LIMIT_REASON])
+const SEATLESS_REASONS: ReadonlySet<string> = new Set([
+	MAIN_DIRTY_REASON,
+	MEMORY_REASON,
+	USAGE_LIMIT_REASON,
+])
 const SOLO_SUFFIX = `${REASON_SEPARATOR}solo`
 // A filing in this repository: one in another names its owner and repository before the `#`.
 const THIS_REPOSITORY_REFERENCE = /^#(?<issue>\d+)$/u

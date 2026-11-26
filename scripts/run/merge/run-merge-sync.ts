@@ -4,6 +4,7 @@ import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_merge_sync_held } from './run-merge-sync-held'
 
 // The primary checkout's return to the default branch after a merge (`run-merge-steps.ts` →
 // `do_merged`).
@@ -22,8 +23,8 @@ const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 // **A failed `main:sync` is retried before it ends the run**: a sync right after a merge can fail
 // transiently while several lanes merge at once. **The error carries the step's stderr, not its
 // stdout**: `main:sync` reports git's refusal on stderr, while stdout carries the wrapper's guard
-// statistics.
-async function retry_sync(): Promise<void> {
+// statistics. Answers `undefined` once synced, else the last attempt's stderr.
+async function retry_sync(): Promise<string | undefined> {
 	// `poll_until` answers only whether it succeeded, so the last attempt's stderr is kept here.
 	let error_output = ''
 
@@ -38,14 +39,30 @@ async function retry_sync(): Promise<void> {
 		{ ...SYNC_RETRY, sleeper: poll.sleep },
 	)
 
-	if (!is_synced) throw new Error(`main:sync failed: ${error_output}`)
+	return is_synced ? undefined : error_output
+}
+
+// **A sync a person's uncommitted work refuses holds rather than fails** (joshuafolkken/kit#9034): the
+// merge already landed, so it is still counted and recorded, and `backlog:drive` holds launches on the
+// marker until the sync goes through or another run holds the checkout (`run-merge-sync-held.ts`).
+// Any other failure is no such hold and still ends the run.
+async function synced(child: string): Promise<void> {
+	const error_output = await retry_sync()
+
+	if (error_output === undefined) return
+
+	if (!run_merge_sync_held.is_refusal(error_output)) {
+		throw new Error(`main:sync failed: ${error_output}`)
+	}
+
+	await run_merge_sync_held.hold(child)
 }
 
 async function sync_main(child: string): Promise<void> {
 	const reason = await lane_transition_guards.rejection('merge', child)
 
 	if (reason === undefined) {
-		await retry_sync()
+		await synced(child)
 
 		return
 	}

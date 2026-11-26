@@ -110,17 +110,20 @@ describe('lane_dispatch_wait_stats.table — the runnable start', () => {
 })
 
 describe('lane_dispatch_wait_stats.table — seats that were not there', () => {
-	it.each(['memory', 'usage-limit', 'offer:watch:solo'])('takes out a %s hold', (reason) => {
-		const entries = [
-			offer(30, [ISSUE]),
-			held(reason, 29),
-			held('offer:watch:chain', 9),
-			dispatch(8),
-		]
-		const cells = cells_of(entries)
+	it.each(['memory', 'usage-limit', 'main-dirty', 'offer:watch:solo'])(
+		'takes out a %s hold',
+		(reason) => {
+			const entries = [
+				offer(30, [ISSUE]),
+				held(reason, 29),
+				held('offer:watch:chain', 9),
+				dispatch(8),
+			]
+			const cells = cells_of(entries)
 
-		expect([cells[2], cells[4]]).toStrictEqual(['2.0', '1'])
-	})
+			expect([cells[2], cells[4]]).toStrictEqual(['2.0', '1'])
+		},
+	)
 
 	it('takes out the time after a release until the next driver line', () => {
 		const released: LedgerEntry = { kind: 'released', at: minutes_before_now(29) }

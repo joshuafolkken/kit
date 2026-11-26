@@ -91,6 +91,7 @@ function drive_ports(world: World): DrivePorts {
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
 		usage_limited: async () => false,
+		sync_held: async () => false,
 		yields: async () => [],
 		...NO_NOTICE,
 		retrospective: async () => true,
