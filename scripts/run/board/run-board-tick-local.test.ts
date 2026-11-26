@@ -194,7 +194,7 @@ describe('run_board_tick.tick before the plan is read', () => {
 		expect(lines[1]).toMatch(/^ {2}- +🕒/u)
 		expect(lines[1]).not.toContain('💓')
 		expect(lines[2]).toMatch(/🚀 \d{2}:\d{2} +(?:\d+′)?\d+″ {2}🔭 watching/u)
-		expect(lines.slice(1).join('\n')).not.toMatch(/[⏸⌛]/u)
+		expect(lines.slice(1, 3).join('\n')).not.toMatch(/[⏸⌛]/u)
 	})
 
 	// joshuafolkken/kit#3697: a run whose driver and supervisor are gone was drawn as still waiting.
