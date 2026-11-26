@@ -1,4 +1,3 @@
-import { lane_parked } from '#scripts/lane/lane-parked'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
@@ -8,10 +7,9 @@ import { run_invocation } from '#scripts/run/run-invocation'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_hold_codes } from './backlog-hold-codes'
-import { backlog_named } from './backlog-named'
 
 const { MERGE_TOKEN } = run_merge_token
-const { NAMED_WAIT, ONLY_WAIT, REASON_SEPARATOR } = backlog_hold_codes
+const { ONLY_WAIT } = backlog_hold_codes
 
 const NO_RETRIES = 0
 const TERMINAL_OUTCOMES: ReadonlySet<string> = new Set([
@@ -22,43 +20,15 @@ const TERMINAL_OUTCOMES: ReadonlySet<string> = new Set([
 	'withdrawn',
 ])
 
-// The skip follows the declared order alone: an issue `run:add` put in was
-// asked for on its own, so its failure skips nothing and a declared failure does not skip it.
-function is_declared(carry: RunCarry, issue: string): boolean {
-	return run_invocation.issue_numbers(carry.invocation)?.includes(Number(issue)) === true
-}
-
-// An issue `run:add` put in that is already in flight holds nothing up: it was
-// asked for on its own, so the declared item behind it — an epic whose children fill the free lanes —
-// is offered beside it. A declared issue in flight still holds the ones declared after it. When every
-// one left is such an issue in flight, nothing is named and the pool fills the free lanes (joshuafolkken/kit#6883).
-function is_held(carry: RunCarry, in_flight: ReadonlyArray<string>, issue: number): boolean {
-	return !in_flight.includes(String(issue)) || is_declared(carry, String(issue))
-}
-
-function next_of(carry: RunCarry, in_flight: ReadonlyArray<string>): number | undefined {
+// **The named issues run side by side** (joshuafolkken/kit#8953): every one left that is not in flight
+// is offered at once, in the order typed, which is only the order free lanes take them in when there
+// are fewer lanes than issues. A declared issue and one `run:add` put in are the same: neither holds
+// the others up, and an order that matters is a blocked-by link (`backlog-drive-blocked.ts`). When
+// every one left is in flight, nothing is named and the pool fills the free lanes (joshuafolkken/kit#6883).
+function pending_of(carry: RunCarry, in_flight: ReadonlyArray<string>): ReadonlyArray<number> {
 	const remaining = run_carry.remaining_of(carry) ?? []
 
-	return remaining.find((issue) => is_held(carry, in_flight, issue))
-}
-
-// The declared issue `issue` starts after while the declared order holds it: the one declared just
-// before it, once it is behind `next_of` — what `offer` runs or waits on — whether that has started yet
-// or not (joshuafolkken/kit#4279). `run:board` names it on the queued row; an issue `run:add` put in, or
-// one already in flight, is held by nothing.
-function held_after(
-	carry: RunCarry,
-	in_flight: ReadonlyArray<string>,
-	issue: number,
-): number | undefined {
-	const next = next_of(carry, in_flight)
-	if (next === undefined || in_flight.includes(String(issue))) return undefined
-	const declared = (run_carry.remaining_of(carry) ?? []).filter((number) =>
-		is_declared(carry, String(number)),
-	)
-	const index = declared.indexOf(issue)
-
-	return index > declared.indexOf(next) ? declared[index - 1] : undefined
+	return remaining.filter((issue) => !in_flight.includes(String(issue)))
 }
 
 // **An `--only` run ends once nothing it named is left and nothing is in flight**
@@ -76,27 +46,11 @@ function only_end(carry: RunCarry, state: DriveState): OfferRead | undefined {
 	return { verdict: 'stop', issues: [], retries: NO_RETRIES, reason: 'only', is_finish: true }
 }
 
-// The wait on a named issue in flight: the board names it (`named:<N>`), and `lane:stats` counts the
-// time under it in `held behind` through `waiting`.
-function named_wait(issue: number): OfferRead {
-	return {
-		verdict: 'wait',
-		issues: [],
-		retries: NO_RETRIES,
-		cause: `${NAMED_WAIT}${REASON_SEPARATOR}${String(issue)}`,
-		waiting: [issue],
-	}
-}
-
 function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead | undefined {
-	const next = next_of(carry, state.in_flight)
+	const pending = pending_of(carry, state.in_flight)
 
-	if (next !== undefined) {
-		const issue = String(next)
-
-		return state.in_flight.includes(issue)
-			? named_wait(next)
-			: { verdict: 'run', issues: [issue], retries: NO_RETRIES }
+	if (pending.length > 0) {
+		return { verdict: 'run', issues: pending.map(String), retries: NO_RETRIES }
 	}
 
 	return is_only ? only_end(carry, state) : undefined
@@ -127,53 +81,23 @@ function mark_one(target: string, issue: string, owner: string): boolean {
 	return true
 }
 
-function skipped_of(carry: RunCarry, issue: string): ReadonlyArray<number> {
-	if (!is_declared(carry, issue)) return []
-	const remaining = run_carry.remaining_of({ ...carry, added: undefined }) ?? []
-	const named = [
-		{ issue: Number(issue), is_epic: false },
-		...remaining.map((number) => ({ issue: number, is_epic: false })),
-	]
-
-	return backlog_named.after_failure(named, Number(issue)).skipped
-}
-
-function skip_after_failure(target: string, issue: string, owner: string): void {
-	const read = run_carry.read_carry(target)
-	if (read.kind !== 'carried') return
-
-	for (const number of skipped_of(read.carry, issue)) {
-		if (!mark_one(target, String(number), owner)) return
-	}
-}
-
-async function should_skip(issue: string, outcome: MergeResult['outcome']): Promise<boolean> {
-	if (outcome === 'failed') return true
-	if (outcome !== 'parked') return false
-
-	return await lane_parked.is_parked(issue)
-}
-
 async function carry_target(): Promise<string | undefined> {
 	const directory = await run_carry.repository_directory()
 
 	return directory === undefined ? undefined : run_carry.carry_path(directory)
 }
 
-async function mark_done(issue: string, result: MergeResult, owner: string): Promise<void> {
-	if (!is_done(result)) return
-	const target = await carry_target()
-	if (target === undefined || !mark_one(target, issue, owner)) return
-	if (await should_skip(issue, result.outcome)) skip_after_failure(target, issue, owner)
-}
-
-// **A named issue settled before this run dispatched it skips nothing** (joshuafolkken/kit#4746): it
-// did not fail inside the run, so booking the ones declared after it done would end an `--only` run
-// over issues no lane ever started.
+// A named issue settled before this run dispatched it — closed, or parked — is booked done.
 async function mark_settled(issue: string, owner: string): Promise<void> {
 	const target = await carry_target()
 
 	if (target !== undefined) mark_one(target, issue, owner)
+}
+
+// **A named issue that failed or parked skips nothing** (joshuafolkken/kit#8953): it is booked done so
+// the run moves past it, and the other named issues run as they would have.
+async function mark_done(issue: string, result: MergeResult, owner: string): Promise<void> {
+	if (is_done(result)) await mark_settled(issue, owner)
 }
 
 async function reconcile(
@@ -215,10 +139,8 @@ function own_carried(
 }
 
 export const backlog_drive_named = {
-	is_declared,
-	next_of,
+	pending_of,
 	offer,
-	held_after,
 	mark_done,
 	mark_settled,
 	named_issues,

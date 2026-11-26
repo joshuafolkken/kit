@@ -35,8 +35,8 @@ transcript**; the named-epic flags are dropped for the opted-in backlog. It clos
 
 ## After a named epic completes
 
-**When a named epic's children are all processed — merged or parked — the run advances to the next
-named item, and then drains the opted-in backlog** (unless `--only`). A completed epic — or a merged
+**A named epic is done once its children are all processed — merged or parked**; the other named items
+run beside it, and the opted-in backlog fills the free lanes (unless `--only`). A completed epic — or a merged
 bare named Issue — is one step of the invocation, never its end. Its summary is sent per "Who sends the
 summary, and who propagates" below.
 

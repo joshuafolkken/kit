@@ -20,6 +20,8 @@ const BLOCKER = 901
 const WAITING_CHILD = 902
 const NAMED = { issues: [], only: false }
 const EMPTY_POOL = { runnable: [], time: [], human: [] }
+const EN_PARALLEL = 'in parallel'
+const JA_PARALLEL = '並行'
 
 function japanese_context(): PlanContext {
 	return { repo: backlog_fixture.REPO, titles: new Map(), open_numbers: undefined, words: JA }
@@ -49,6 +51,17 @@ describe('backlog_plan_words — the table per session language', () => {
 		vi.stubEnv('JOSH_SESSION_LANG', 'en')
 
 		expect(backlog_plan_words.session_words()).toBe(EN)
+	})
+
+	// joshuafolkken/kit#8953: the named issues run side by side, so no heading says one at a time.
+	it.each([
+		[EN.named_heading, EN_PARALLEL],
+		[EN.only_named_heading, EN_PARALLEL],
+		[JA.named_heading, JA_PARALLEL],
+		[JA.only_named_heading, JA_PARALLEL],
+	])('says the named issues run in parallel: %s', (heading, phrase) => {
+		expect(heading).toContain(phrase)
+		expect(heading).not.toMatch(/one at a time|1 件ずつ/u)
 	})
 })
 

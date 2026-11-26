@@ -21,7 +21,7 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: 'one at a time — no lanes',
+		marker: 'the typed order does not sequence them',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{

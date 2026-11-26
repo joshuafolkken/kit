@@ -7,7 +7,7 @@ import { run_board_setup } from './run-board-setup'
 
 // The queued row the run's planning is for (joshuafolkken/kit#4279): while the run stands at its
 // `planning` stage, the one issue it launches next leads with 📝 and says how long it has planned, and
-// no other row does. That issue is the driver's own next in a named run (`backlog-drive-named.ts`), else
+// no other row does. That issue is the first named issue not yet run (`backlog-drive-named.ts`), else
 // the plan's first waiting row — the head of its first wave. No event says it; the stage and the order do.
 
 const { STAGE } = run_event_setup
@@ -22,7 +22,7 @@ interface Planning {
 function named_next(read: ReasonRead, in_flight: ReadonlyArray<number>): number | undefined {
 	if (read.carry === undefined) return undefined
 
-	return backlog_drive_named.next_of(read.carry, in_flight.map(String))
+	return backlog_drive_named.pending_of(read.carry, in_flight.map(String))[FIRST]
 }
 
 function next_launch(read: ReasonRead, in_flight: ReadonlyArray<number>): number | undefined {

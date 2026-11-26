@@ -95,7 +95,7 @@ const DRIVER_SECTIONS: ReadonlyArray<readonly [string, ReadonlyArray<SectionRefe
 	[
 		'epic #',
 		[
-			reference(STEPS, 'Named issues run first, in order'),
+			reference(STEPS, 'Named issues run first, in parallel'),
 			reference(STEPS, 'The session cut is inside the invocation'),
 		],
 	],
