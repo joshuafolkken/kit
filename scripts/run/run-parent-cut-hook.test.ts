@@ -3,6 +3,7 @@ import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_handoff_lanes } from '#scripts/run/handoff-lanes/run-handoff-lanes'
 import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,10 +14,6 @@ const make_directory = temporary_directory()
 
 // joshuafolkken/kit#2947: a `backlogrun` parent past the shared threshold is steered to the hand-off at
 // its next call, not only at a merge.
-
-const NOW_MS = 1_800_000_000_000
-const AFTER_QUIET_MS = NOW_MS + run_parent_cut_hook.QUIET_WINDOW_MS
-const INSIDE_QUIET_MS = AFTER_QUIET_MS - 1
 
 function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 	return {
@@ -47,22 +44,22 @@ function priced_on(billed: ReadonlyArray<number>): ParentCutState {
 	}
 }
 
-// A payload naming a transcript in a fresh directory, so each test starts with no refusal recorded.
-function fresh_payload(): string {
+// A payload naming a transcript in a fresh directory, carrying the Bash command it asks to run.
+function fresh_payload(command = 'ls'): string {
 	const directory = make_directory('parent-cut-')
 
-	return JSON.stringify({ transcript_path: path.join(directory, 'session.jsonl') })
+	return JSON.stringify({
+		transcript_path: path.join(directory, 'session.jsonl'),
+		tool_name: 'Bash',
+		tool_input: { command },
+	})
 }
 
 async function reason_once(
 	record: RunCarry | undefined,
 	verdict: CostVerdict,
 ): Promise<string | undefined> {
-	return await run_parent_cut_hook.parent_cut_reason(
-		fresh_payload(),
-		NOW_MS,
-		state(record, verdict),
-	)
+	return await run_parent_cut_hook.parent_cut_reason(fresh_payload(), state(record, verdict))
 }
 
 // A gate run inside a headless lane inherits the mark, which exempts the cut cap
@@ -120,8 +117,15 @@ describe('run_parent_cut_hook.parent_cut_reason — who is refused', () => {
 		expect(await reason_once(record, 'over')).toBeUndefined()
 	})
 
+	it('reads its switch from JOSH_PARENT_CUT_GUARD', async () => {
+		vi.stubEnv('JOSH_PARENT_CUT_GUARD', 'off')
+
+		expect(run_parent_cut_hook.SWITCH_ENV_KEY).toBe('JOSH_PARENT_CUT_GUARD')
+		expect(await reason_once(carry(), 'over')).toBeUndefined()
+	})
+
 	it('lets a payload with no transcript through', async () => {
-		const reason = await run_parent_cut_hook.parent_cut_reason('{}', NOW_MS, state(carry(), 'over'))
+		const reason = await run_parent_cut_hook.parent_cut_reason('{}', state(carry(), 'over'))
 
 		expect(reason).toBeUndefined()
 	})
@@ -130,46 +134,76 @@ describe('run_parent_cut_hook.parent_cut_reason — who is refused', () => {
 describe('run_parent_cut_hook.parent_cut_reason — a delegated unit', () => {
 	it("lets a unit's call through, though it names the parent's transcript", async () => {
 		const parent = JSON.parse(fresh_payload()) as Record<string, unknown>
-		const unit_call = JSON.stringify({
-			...parent,
-			agent_id: 'unit-1',
-			tool_name: 'Bash',
-			tool_input: { command: 'ls' },
-		})
+		const unit_call = JSON.stringify({ ...parent, agent_id: 'unit-1' })
 
-		const reason = await run_parent_cut_hook.parent_cut_reason(
-			unit_call,
-			NOW_MS,
-			state(carry(), 'over'),
-		)
+		const reason = await run_parent_cut_hook.parent_cut_reason(unit_call, state(carry(), 'over'))
 
 		expect(reason).toBeUndefined()
 	})
 })
 
-describe('run_parent_cut_hook.parent_cut_reason — the quiet window', () => {
-	it('stays quiet inside the window so the hand-off calls pass, and asks again after it', async () => {
-		const over = state(carry(), 'over')
-		const payload = fresh_payload()
+// joshuafolkken/kit#9041: the hand-off procedure is passed by command name, with no clock — a refusal
+// opens no window other calls slip through, and a parent that could not cut is never wedged.
+describe('run_parent_cut_hook.parent_cut_reason — the hand-off passes by name', () => {
+	const over = state(carry(), 'over')
 
-		expect(await run_parent_cut_hook.parent_cut_reason(payload, NOW_MS, over)).toBeDefined()
-		expect(
-			await run_parent_cut_hook.parent_cut_reason(payload, INSIDE_QUIET_MS, over),
-		).toBeUndefined()
-		expect(await run_parent_cut_hook.parent_cut_reason(payload, AFTER_QUIET_MS, over)).toBe(
+	it('refuses every call that is not the hand-off, again and again', async () => {
+		const payload = fresh_payload('pnpm josh lane:open 9000')
+
+		expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBe(
+			run_parent_cut_hook.PARENT_CUT_REASON,
+		)
+		expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBe(
 			run_parent_cut_hook.PARENT_CUT_REASON,
 		)
 	})
 
-	it('does not price the session inside the window', async () => {
-		const verdict = vi.fn((): CostVerdict => 'over')
-		const priced: ParentCutState = { carry: async (): Promise<RunCarry> => carry(), verdict }
-		const payload = fresh_payload()
+	it.each([
+		'pnpm josh run:handoff-lanes',
+		'pnpm josh run:carry --cut',
+		'pnpm josh run:board --chat',
+		'pnpm josh run:report --handoff',
+		'pnpm josh lane:output 9000 /tmp/out.log',
+		'pnpm josh lane:prune',
+	])('passes the hand-off command `%s` however often it is called', async (command) => {
+		const payload = fresh_payload(command)
 
-		await run_parent_cut_hook.parent_cut_reason(payload, NOW_MS, priced)
-		await run_parent_cut_hook.parent_cut_reason(payload, INSIDE_QUIET_MS, priced)
+		expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBeUndefined()
+		expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBeUndefined()
+	})
 
-		expect(verdict).toHaveBeenCalledTimes(1)
+	it('refuses a chain that smuggles another command behind a hand-off command', async () => {
+		const payload = fresh_payload('pnpm josh run:handoff-lanes && pnpm josh lane:open 9000')
+
+		expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBe(
+			run_parent_cut_hook.PARENT_CUT_REASON,
+		)
+	})
+})
+
+describe('run_parent_cut_hook.parent_cut_reason — the hand-off names are single-sourced', () => {
+	const over = state(carry(), 'over')
+
+	it('passes every command the hand-off procedure runs or names', async () => {
+		for (const name of run_handoff_lanes.HANDOFF_COMMANDS) {
+			const payload = fresh_payload(`pnpm josh ${name}`)
+
+			// eslint-disable-next-line no-await-in-loop -- each name is one call against the same state
+			expect(await run_parent_cut_hook.parent_cut_reason(payload, over)).toBeUndefined()
+		}
+	})
+
+	it('refuses a call that is no command, such as a read of a doc', async () => {
+		const parent = JSON.parse(fresh_payload()) as Record<string, unknown>
+		const read = JSON.stringify({
+			...parent,
+			tool_name: 'Read',
+			tool_input: { file_path: '/doc.md' },
+		})
+
+		expect(await run_parent_cut_hook.parent_cut_reason(read, over)).toBe(
+			run_parent_cut_hook.PARENT_CUT_REASON,
+		)
 	})
 })
 
@@ -182,11 +216,7 @@ describe('run_parent_cut_hook.parent_cut_reason — priced on the newest request
 
 	it('refuses at the request that crosses the threshold while the average is still under', async () => {
 		const growing = [...before_crossing, CONTEXT_CUT_THRESHOLD + 1]
-		const reason = await run_parent_cut_hook.parent_cut_reason(
-			fresh_payload(),
-			NOW_MS,
-			priced_on(growing),
-		)
+		const reason = await run_parent_cut_hook.parent_cut_reason(fresh_payload(), priced_on(growing))
 
 		expect(reason).toBe(run_parent_cut_hook.PARENT_CUT_REASON)
 	})
@@ -194,7 +224,6 @@ describe('run_parent_cut_hook.parent_cut_reason — priced on the newest request
 	it('lets the parent through while the newest request is under the threshold', async () => {
 		const reason = await run_parent_cut_hook.parent_cut_reason(
 			fresh_payload(),
-			NOW_MS,
 			priced_on(before_crossing),
 		)
 

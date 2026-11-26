@@ -25,9 +25,8 @@ vi.mock('#scripts/run/run-parent-cut-hook', () => ({
 		current_state: vi.fn((context: { ancestry: () => ReadonlySet<number> }) => ({
 			ancestry: context.ancestry,
 		})),
-		parent_cut_reason: vi.fn(
-			(_raw: string, _now: number, state: { ancestry: () => ReadonlySet<number> }) =>
-				Promise.resolve(state.ancestry().has(process.ppid) ? OWNER_REASON : undefined),
+		parent_cut_reason: vi.fn((_raw: string, state: { ancestry: () => ReadonlySet<number> }) =>
+			Promise.resolve(state.ancestry().has(process.ppid) ? OWNER_REASON : undefined),
 		),
 	},
 }))

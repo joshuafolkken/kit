@@ -198,8 +198,7 @@ async function async_reason(
 ): Promise<string | undefined> {
 	const watcher = await run_watcher_hook.watcher_hook_reason(raw_payload, context)
 	const state = run_parent_cut_hook.current_state(context)
-	const cut =
-		watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload, Date.now(), state))
+	const cut = watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload, state))
 	const poll = cut ?? (await run_poll_hook.safe_poll_reason(raw_payload, context))
 
 	return poll ?? (await issue_watch_hook.watch_reason(context))

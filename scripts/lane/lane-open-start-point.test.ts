@@ -1,11 +1,11 @@
-import { existsSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_gh_pr_auto_merge } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_install } from './lane-install'
 import { lane_open } from './lane-open'
 import { lane_paths } from './lane-paths'
@@ -41,42 +41,67 @@ const fixture: FixtureWorkspace & { repository_root: string } = {
 	workspace: '',
 }
 
-async function commit_all(message: string): Promise<void> {
-	await git(fixture.repository_root, ['add', '--all'])
-	await git(fixture.repository_root, ['commit', '-m', message])
+// The repository is built once per file and copied into each test's own workspace: every test starts
+// from the same ref state, and git spawns dominate the suite's run time (joshuafolkken/kit#9016).
+const template: { workspace: FixtureWorkspace | undefined } = { workspace: undefined }
+
+async function commit_all(message: string, root = fixture.repository_root): Promise<void> {
+	await git(root, ['add', '--all'])
+	await git(root, ['commit', '-m', message])
+}
+
+// The one absolute path the repository holds, so a copy re-points it at its own workspace.
+async function set_origin_url(root: string): Promise<void> {
+	await git(root, ['config', 'remote.origin.url', path.join(path.dirname(root), 'upstream.git')])
 }
 
 // `origin` is configured with `config` rather than `git remote add`, which the unit suite's network
 // guard refuses outright. The configuration is not decoration: git only treats a ref under
 // `refs/remotes/origin/` as a *remote-tracking branch* — and so only applies `branch.autoSetupMerge`
 // to it — when the remote it names actually exists, which is what makes `--no-track` observable here.
-async function declare_origin(): Promise<void> {
-	const root = fixture.repository_root
-
-	await git(root, ['config', 'remote.origin.url', path.join(fixture.workspace, 'upstream.git')])
+async function declare_origin(root: string): Promise<void> {
+	await set_origin_url(root)
 	await git(root, ['config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*'])
 }
 
 // `origin/main` is moved ahead of `main` with `update-ref`, then the local branch is rewound: the
 // unit suite's network guard refuses `fetch` and `remote` outright, and neither is needed to produce
 // the ref state under test.
-async function advance_origin_past_local_main(): Promise<void> {
-	const root = fixture.repository_root
-
-	await declare_origin()
+async function advance_origin_past_local_main(root: string): Promise<void> {
+	await declare_origin(root)
 	await git(root, [UPDATE_REF, ORIGIN_MAIN_REF, 'refs/heads/main'])
 	await git(root, ['symbolic-ref', 'refs/remotes/origin/HEAD', ORIGIN_MAIN_REF])
 	await git(root, ['reset', '--hard', 'HEAD~1'])
 }
 
-async function build_repository(): Promise<void> {
-	await git(fixture.workspace, ['init', MAIN_BRANCH, PRIMARY])
-	writeFileSync(path.join(fixture.repository_root, 'base.txt'), 'base\n')
-	await commit_all('base')
-	writeFileSync(path.join(fixture.repository_root, MERGED_FILE), 'merged\n')
-	await commit_all('merged')
-	await advance_origin_past_local_main()
+async function build_repository(workspace: string): Promise<void> {
+	const root = path.join(workspace, PRIMARY)
+
+	await git(workspace, ['init', MAIN_BRANCH, PRIMARY])
+	writeFileSync(path.join(root, 'base.txt'), 'base\n')
+	await commit_all('base', root)
+	writeFileSync(path.join(root, MERGED_FILE), 'merged\n')
+	await commit_all('merged', root)
+	await advance_origin_past_local_main(root)
 }
+
+async function copy_template(): Promise<void> {
+	const source = path.join(template.workspace?.workspace ?? '', PRIMARY)
+
+	cpSync(source, fixture.repository_root, { recursive: true })
+	await set_origin_url(fixture.repository_root)
+}
+
+beforeAll(async () => {
+	template.workspace = git_fixture_workspace.open_workspace(WORKSPACE_PREFIX)
+	await build_repository(template.workspace.workspace)
+}, TIMEOUT_MS)
+
+afterAll(async () => {
+	const { workspace } = template
+
+	if (workspace !== undefined) await git_fixture_workspace.close_workspace(workspace)
+})
 
 function lane_directory(): string {
 	return path.join(lane_paths.lane_root(fixture.repository_root), ISSUE)
@@ -132,7 +157,7 @@ beforeEach(async () => {
 	// it is not what is under test: the assertion is which ref the lane is cut from.
 	stub_what_the_fixture_cannot_do()
 
-	await build_repository()
+	await copy_template()
 	process.chdir(fixture.repository_root)
 }, TIMEOUT_MS)
 
