@@ -3,36 +3,37 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { require_pr_number } from '#scripts/gh/git-gh-pr-read'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
+import { git_spawn } from '#scripts/git/git-spawn'
 import { NEEDS_HUMAN_MERGE_LABEL, REPOSITORY_LABELS } from '#scripts/issue/issue-labels'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
 const WORKFLOW_PREFIX = '.github/workflows/'
-// GitHub truncates comparisons at 300 files; an incomplete listing cannot authorize a merge.
-const FILE_LIMIT = 300
 const HEAD_CHANGED = 'The pull request head changed; rerun followup'
-const FILES_SCHEMA = z.array(
-	z.object({ filename: z.string(), previous_filename: z.string().optional() }),
-)
+// `--no-relative` keeps every path root-relative whatever the `diff.relative` setting or cwd.
+const DIFF_NAMES = ['diff', '--name-only', '--no-renames', '--no-relative', '-z']
 const PULL_SCHEMA = z.object({
 	base: z.object({ sha: z.string().min(1) }),
 	head: z.object({ sha: z.string().min(1) }),
 })
-const COMPARISON_SCHEMA = z.object({ files: FILES_SCHEMA })
+
+interface ComparisonCommits {
+	base: string
+	head: string
+}
 
 class HumanMergeRequiredError extends Error {
 	override name = 'HumanMergeRequiredError'
 }
 
-function touches_workflow(files: z.infer<typeof FILES_SCHEMA>): boolean {
-	return files.some(
-		(file) =>
-			file.filename.startsWith(WORKFLOW_PREFIX) ||
-			file.previous_filename?.startsWith(WORKFLOW_PREFIX) === true,
-	)
+function touches_workflow(paths: Array<string>): boolean {
+	return paths.some((path) => path.startsWith(WORKFLOW_PREFIX))
 }
 
-async function comparison_path(branch: string, expected_head: string | undefined): Promise<string> {
+async function comparison_commits(
+	branch: string,
+	expected_head: string | undefined,
+): Promise<ComparisonCommits> {
 	const number = await require_pr_number(branch)
 	const pull_raw = await git_gh_exec.exec_gh_api({
 		path: git_gh_api_path.pull_api_path(String(number)),
@@ -45,21 +46,21 @@ async function comparison_path(branch: string, expected_head: string | undefined
 		throw new Error(HEAD_CHANGED)
 	}
 
-	return `${git_gh_api_path.repo_api_path()}/compare/${encodeURIComponent(pull.base.sha)}...${encodeURIComponent(pull.head.sha)}?per_page=1`
+	return { base: pull.base.sha, head: pull.head.sha }
 }
 
-async function read_files(
+// GitHub's comparison listing stops at 300 files, so the complete listing comes from local git;
+// `--no-renames` lists both sides of a rename, and a failed fetch or diff throws.
+async function read_paths(
 	branch: string,
 	expected_head: string | undefined,
-): Promise<z.infer<typeof FILES_SCHEMA>> {
-	const raw = await git_gh_exec.exec_gh_api({ path: await comparison_path(branch, expected_head) })
-	const comparison = json_value.parse_with(raw, COMPARISON_SCHEMA)
+): Promise<Array<string>> {
+	const { base, head } = await comparison_commits(branch, expected_head)
 
-	if (comparison === undefined || comparison.files.length >= FILE_LIMIT) {
-		throw new Error('Cannot authorize a merge without a complete pull request file listing')
-	}
+	await git_spawn.read_remote(['fetch', '--no-tags', 'origin', base, head])
+	const raw = await git_spawn.read([...DIFF_NAMES, `${base}...${head}`])
 
-	return comparison.files
+	return raw.split('\0').filter((path) => path !== '')
 }
 
 async function mark_waiting(branch: string, issue: string | undefined): Promise<void> {
@@ -91,10 +92,10 @@ async function assert_allowed(
 	issue: string | undefined,
 	expected_head?: string,
 ): Promise<void> {
-	const files = await read_files(branch, expected_head)
+	const paths = await read_paths(branch, expected_head)
 
 	await assert_head(branch, expected_head)
-	if (!touches_workflow(files)) return
+	if (!touches_workflow(paths)) return
 	const url = await git_gh_command.pr_get_url(branch)
 
 	if (url === undefined) throw new Error('Could not read the workflow pull request URL')
