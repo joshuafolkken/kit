@@ -45,8 +45,8 @@ interface LocalRead {
 	// The kit version the run's supervisor recorded as it started (`run-wake.ts`); `undefined` where no
 	// supervisor runs or an older one recorded none.
 	kit_version?: string | undefined
-	// The root checkout's single run beside a carried run, drawn above its lanes.
-	root?: RootRun | undefined
+	// The single runs beside the run, one per checkout that holds one, drawn above its lanes.
+	singles?: ReadonlyArray<RootRun> | undefined
 	// The root checkout's single runs a merge ended inside the run, drawn in `✅ done`.
 	ended_roots?: ReadonlyArray<EndedRoot> | undefined
 	// The board's own single run, where a stop ended it (joshuafolkken/kit#7710).
@@ -292,12 +292,12 @@ async function run_read(
 	lanes: ReadonlyArray<LaneInfo>,
 	table: TableRead | undefined,
 ): Promise<LocalRead> {
-	const { span, root, carry } = read
+	const { span, singles, carry } = read
 	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
 	const roots = { repository, main: await main_root() }
 	const lane_read = lanes_here(lanes, roots, events, span.started_ms)
 	const [root_fields, span_events, room, records] = await Promise.all([
-		read_roots(span, root, events),
+		read_roots(span, singles, events),
 		read_span_events(events, span, table, carry),
 		read_room(lanes, lane_read.lane_states, table),
 		read_records(repository, events),

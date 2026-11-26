@@ -282,7 +282,7 @@ describe('run_board_estimate.is_finish_drawn on a single run', () => {
 	const MOVING = { ended_ms: undefined, activity: { is_stopped: false } }
 
 	function root_beside(name: string, root: BoardRow): Parameters<typeof is_finish_drawn>[1] {
-		return { ...STOPPED, layout: { root: { name, row: root } } }
+		return { ...STOPPED, layout: { singles: [{ name, row: root }] } }
 	}
 
 	const { is_finish_drawn } = run_board_estimate

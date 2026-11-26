@@ -19,8 +19,8 @@ interface SpanHere {
 	carry: RunCarry | undefined
 	is_stranded: boolean
 	is_session_active: boolean
-	// The root checkout's single run beside the carried one.
-	root?: BoardSpan | undefined
+	// The single runs beside the drawn one, one per checkout that holds one (joshuafolkken/kit#8993).
+	singles?: ReadonlyArray<BoardSpan> | undefined
 }
 
 const NO_SPAN: SpanHere = {
@@ -66,18 +66,27 @@ function is_after(recorded: BoardSpan, single: BoardSpan): boolean {
 	return (recorded.ended_ms ?? Infinity) > (single.ended_ms ?? Infinity)
 }
 
-// The single run beside the recorded run: a row of a carried run, else the frame unless the recorded
-// run came after it. A recorded run that reads no span leaves the single run the one drawn.
-function beside(single: BoardSpan, recorded: SpanHere, is_carried: boolean): SpanHere {
-	if (recorded.span === undefined) return { ...NO_SPAN, span: single }
-	if (is_carried) return { ...recorded, root: single }
+// The single runs beside the recorded run: rows of a carried run, else the first is the frame unless
+// the recorded run came after it, and the rest are rows beside the frame. A recorded run that reads no
+// span leaves the first single run the one drawn.
+function beside(
+	singles: readonly [BoardSpan, ...Array<BoardSpan>],
+	recorded: SpanHere,
+	is_carried: boolean,
+): SpanHere {
+	const [first, ...rest] = singles
+	const framed = { ...NO_SPAN, span: first, singles: rest }
 
-	return is_after(recorded.span, single) ? recorded : { ...NO_SPAN, span: single }
+	if (recorded.span === undefined) return framed
+	if (is_carried) return { ...recorded, singles }
+
+	return is_after(recorded.span, first) ? { ...recorded, singles: rest } : framed
 }
 
 // A single run this checkout holds is the one drawn (`run-board-single.ts`) before the ended run; it
-// names no process. Beside a carried run it is the root checkout's, drawn as a row above the carried
-// run's lanes, which stays the frame (joshuafolkken/kit#7524). No repository, no run.
+// names no process. Beside a carried run every single run — the root checkout's and each lane
+// worktree's — is drawn as a row under `🏠 runs` above the carried run's lanes, which stays the frame
+// (joshuafolkken/kit#7524, joshuafolkken/kit#8993). No repository, no run.
 async function span_here(
 	repository: string | undefined,
 	table: TableRead | undefined,
@@ -85,13 +94,13 @@ async function span_here(
 	if (repository === undefined) return NO_SPAN
 	const read = run_carry.read_carry(run_carry.carry_path(repository))
 	const is_carried = read.kind !== 'none'
-	const single = await run_board_single.span_here(is_carried)
+	const singles = await run_board_single.spans_here(is_carried)
 
-	if (single === undefined) return await recorded_span_here(repository, table, read)
-	const is_read = is_carried || single.ended_ms !== undefined
+	if (singles === undefined) return await recorded_span_here(repository, table, read)
+	const is_read = is_carried || singles[0].ended_ms !== undefined
 	const recorded = is_read ? await recorded_span_here(repository, table, read) : NO_SPAN
 
-	return beside(single, recorded, is_carried)
+	return beside(singles, recorded, is_carried)
 }
 
 const run_board_span_read = { span_here }

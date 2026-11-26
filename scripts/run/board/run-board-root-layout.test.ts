@@ -73,6 +73,6 @@ describe('run_board_root_layout.layout_of — a root single run a merge ended', 
 			READ,
 		)
 
-		expect(layout.root).toBeUndefined()
+		expect(layout.singles).toBeUndefined()
 	})
 })

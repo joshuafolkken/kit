@@ -124,11 +124,12 @@ describe('run_board_render_lanes.lanes_section', () => {
 	})
 
 	// joshuafolkken/kit#7523: a single run runs in the root checkout, not in a lane.
-	it.each(['fullrun', 'halfrun'])('heads a single %s row with 🏠 and its name', (run_name) => {
+	// joshuafolkken/kit#8993: the heading is `🏠 runs` whatever the command; the row names it.
+	it.each(['fullrun', 'halfrun'])('heads a single %s row with 🏠 runs', (run_name) => {
 		const [section] = lanes_section([LINE], CELLS, header({ run_name }))
 		const rule = run_board_label_pair.bare(section?.head[1] ?? '')
 
-		expect(rule.startsWith(`── 🏠 ${run_name} `)).toBe(true)
+		expect(rule.startsWith('── 🏠 runs ')).toBe(true)
 		expect(rule).not.toContain(run_board_label_pair.bare(LANES_LABEL))
 		expect(section?.lines).toStrictEqual([LINE])
 		expect(column_of(rule, '💪 CPU')).toBe(USAGE_START)
