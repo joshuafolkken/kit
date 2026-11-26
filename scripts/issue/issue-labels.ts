@@ -2,9 +2,9 @@
 // labeler and the next-issues display all key on these exact strings, and a drifted copy would
 // fail silently — an epic filtered on the wrong name is simply never closed or never excluded.
 //
-// **A new label is defined here and added to `REPOSITORY_LABELS`** (`issue-label-definitions.ts`, which
-// holds each label's color and description), so `josh start` and `josh sync` create it; a label deliberately not provisioned goes into `EXEMPT_FROM_PROVISIONING` with its
-// reason. Every other module imports the constant rather than spelling the name —
+// **A new label is defined here and added to `REPOSITORY_LABELS`** (`issue-label-definitions.ts`,
+// which holds each label's color and description), so `josh start` and `josh sync` create it; a
+// label deliberately not provisioned goes into `EXEMPT_FROM_PROVISIONING` with its reason. Every other module imports the constant rather than spelling the name —
 // `issue-label-scan.test.ts` fails on a `*_LABEL` constant missing from `ALL_LABELS`, on a label name
 // spelled outside this module, and on a label call naming a label `ALL_LABELS` does not hold.
 const EPIC_LABEL = 'epic'
