@@ -1,5 +1,5 @@
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { REPOSITORY_LABELS, type LabelDefinition } from '#scripts/issue/issue-labels'
+import { REPOSITORY_LABELS, type LabelDefinition } from '#scripts/issue/issue-label-definitions'
 
 // Creates the labels kit's workflow and the distributed `pr-classification.yml` rely on, and only
 // those the repository is missing. The one place labels are created: `josh
