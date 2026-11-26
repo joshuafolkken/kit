@@ -1,0 +1,7 @@
+{
+	"reason": "Load samples record core-budget reservations, lane:stats reads them on over-core samples, and lint:related reserves its unused-members child (#9000)",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 112
+	}
+}

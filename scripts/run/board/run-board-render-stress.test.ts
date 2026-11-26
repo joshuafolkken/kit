@@ -15,16 +15,22 @@ const CONDITION_ROWS = [...WAITING_ROWS, DONE]
 const NARROW = 70
 const LANE_PANE = 90
 const PANES = [undefined, NARROW, 50]
+// A lane row's head alone fills a pane under `LANE_PANE`, and a row past every shed cell is cut at its
+// end, number included (joshuafolkken/kit#8990), so its number is pinned where the head fits.
+const LANE_PANES = [undefined, LANE_PANE, NARROW]
 const WIDEST = 160
 const TIGHTEST = 40
 const TALLEST = 60
-// The reasoned row's title cut to its floor, the least it gives up before its reason.
-const FLOORED = 'Issue 4…'
 const LEGEND = '🔨 implement'
 const PROCESS_DETAIL = '🧭 supervisor'
 
+// A row's number stands alone: a row cut after it ends the line there.
+function number_pattern(number: number): RegExp {
+	return new RegExp(`(?:^| )${String(number)}(?: |$)`, 'mu')
+}
+
 function line_of(lines: ReadonlyArray<string>, number: number): string {
-	return lines.find((line) => line.includes(`${String(number)} `)) ?? ''
+	return lines.find((line) => number_pattern(number).test(line)) ?? ''
 }
 
 // The column a row's number starts in, as the terminal counts it.
@@ -40,7 +46,7 @@ function columns_of(lines: ReadonlyArray<string>, numbers: ReadonlyArray<number>
 }
 
 describe('run_board_render.render — a board of long values, by section', () => {
-	it.each(PANES)('starts every lane row’s number in one column on a pane of %s', (columns) => {
+	it.each(LANE_PANES)('starts every lane row’s number in one column on a pane of %s', (columns) => {
 		const lines = lines_on(columns)
 
 		expect(LANE_ROWS.map((number) => line_of(lines, number))).not.toContain('')
@@ -67,11 +73,13 @@ describe('run_board_render.render — a board of long values, by section', () =>
 	})
 })
 
-// The reasoned row at one pane width: whether its title is at its floor, and its reason whole.
+// The reasoned row at one pane width: whether its title is cut to its floor of nothing — its reason
+// follows the row's number column, the first number on the line — and its reason whole.
 function reasoned_at(columns: number): { is_floored: boolean; is_whole: boolean } {
 	const line = line_of(lines_on(columns), REASONED)
+	const floored = new RegExp(String.raw`^\D*${String(REASONED)} +${WIDE_REASON.slice(0, 1)}`, 'u')
 
-	return { is_floored: line.includes(FLOORED), is_whole: line.includes(WIDE_REASON) }
+	return { is_floored: floored.test(line), is_whole: line.includes(WIDE_REASON) }
 }
 
 function widths(): Array<number> {
@@ -102,22 +110,18 @@ function frames(): Array<{ rows: number; text: string }> {
 describe('run_board_render.render — what a shortening pane drops first', () => {
 	const drawn = frames()
 
-	// The tallest pane that no longer draws `marker`.
-	function gone_at(marker: string): number {
-		return drawn.find((frame) => !frame.text.includes(marker))?.rows ?? 0
+	// The tallest pane that no longer draws `marker`: a text, or a row's number.
+	function gone_at(marker: string | number): number {
+		const draws =
+			typeof marker === 'number'
+				? (text: string): boolean => number_pattern(marker).test(text)
+				: (text: string): boolean => text.includes(marker)
+
+		return drawn.find((frame) => !draws(frame.text))?.rows ?? 0
 	}
 
 	it('drops the legend, the finished, the waiting, the process details, the notes, then the lanes', () => {
-		const markers = [
-			LEGEND,
-			`${String(DONE)} `,
-			`${String(REASONED)} `,
-			`${String(CROSS)} `,
-			PROCESS_DETAIL,
-			NOTE_TEXT,
-			`${String(STOPPED)} `,
-			`${String(RUNNING)} `,
-		]
+		const markers = [LEGEND, DONE, REASONED, CROSS, PROCESS_DETAIL, NOTE_TEXT, STOPPED, RUNNING]
 		const gone = markers.map((marker) => gone_at(marker))
 
 		expect(Math.max(...gone)).toBeLessThan(TALLEST)

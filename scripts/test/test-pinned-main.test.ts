@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 import { test_pinned_main } from './test-pinned-main'
 
-const { run } = vi.hoisted(() => ({
+const { run, run_continued } = vi.hoisted(() => ({
 	run: vi.fn<
 		(max_hunks: number, is_first_unpinned?: boolean, origin?: string) => Promise<PinnedReport>
 	>(),
+	run_continued: vi.fn<(max_hunks: number, origin?: string) => Promise<PinnedReport>>(),
 }))
 
 const { write_stamp } = vi.hoisted(() => ({ write_stamp: vi.fn() }))
@@ -14,7 +15,7 @@ const { read_changed_tree } = vi.hoisted(() => ({
 	read_changed_tree: vi.fn<() => Promise<Record<string, string>>>(),
 }))
 
-vi.mock('./test-pinned', () => ({ test_pinned: { run } }))
+vi.mock('./test-pinned', () => ({ test_pinned: { run, run_continued } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
 	stamp_file: {
 		digest: (content: string) => content,
@@ -47,6 +48,7 @@ beforeEach(() => {
 	vi.spyOn(process.stdout, 'write').mockImplementation(capture(output.stdout))
 	vi.spyOn(process.stderr, 'write').mockImplementation(capture(output.stderr))
 	run.mockReset()
+	run_continued.mockReset()
 	write_stamp.mockReset()
 	read_changed_tree.mockReset()
 	read_changed_tree.mockResolvedValue({ [FILE]: 'one' })
@@ -117,7 +119,8 @@ describe('test_pinned_main.main --help', () => {
 
 		const usage = output.stderr.join('')
 
-		expect(usage).toContain('[--first-unpinned] [--reasoned] [--help]')
+		// joshuafolkken/kit#8975: the synopsis names --continue-cut too.
+		expect(usage).toContain('[--first-unpinned] [--continue-cut] [--reasoned] [--help]')
 		expect(usage).toContain('--reasoned marks there a launch under an --unpinned-ok reason')
 	})
 })
@@ -243,6 +246,23 @@ describe('test_pinned_main.main --first-unpinned', () => {
 		await test_pinned_main.main([FIRST_UNPINNED, '--record', TOKEN])
 
 		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ is_cut: true }))
+	})
+})
+
+// joshuafolkken/kit#8975: a cut run's continuation stays within the cut run's cap.
+describe('test_pinned_main.main --continue-cut', () => {
+	it('hands the continuation its cap and origin, never the plain run', async () => {
+		run_continued.mockResolvedValue(CLEAN_REPORT)
+
+		expect(await test_pinned_main.main(['--continue-cut', '--origin', PRE_DETACH])).toBe(0)
+		expect(run_continued).toHaveBeenCalledWith(20, PRE_DETACH)
+		expect(run).not.toHaveBeenCalled()
+	})
+
+	it('names --continue-cut in the usage', async () => {
+		await test_pinned_main.main(['--help'])
+
+		expect(output.stderr.join('')).toContain('--continue-cut probes only the hunks')
 	})
 })
 

@@ -189,11 +189,20 @@ describe('test_pinned_record — the hunks a cut answer left', () => {
 		rmSync(summary.log?.path ?? '', { force: true })
 	})
 
-	it('probes every hunk with no reason when the launch is whole, and stops at the first otherwise', () => {
+	// joshuafolkken/kit#8975: the continuation stays within the cut check's cap.
+	it('continues a cut check when the launch is whole, and stops at the first otherwise', () => {
 		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN, true)).toStrictEqual(
-			launched_argv([]),
+			launched_argv(['--continue-cut']),
 		)
-		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN)).toContain('--first-unpinned')
+		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN)).toStrictEqual(
+			launched_argv(['--first-unpinned']),
+		)
+	})
+
+	it('continues nothing under a reason, whole or not', () => {
+		expect(test_pinned_record.launch_argv(TOKEN, 'accepted', ORIGIN, true)).toStrictEqual(
+			launched_argv([REASONED]),
+		)
 	})
 
 	// joshuafolkken/kit#7809

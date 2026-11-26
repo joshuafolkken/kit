@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 60
+	},
+	"reason": "pull-based probe queue with cost ordering in test-pinned-pool (#8997)",
+	"date": "2026-11-26"
+}

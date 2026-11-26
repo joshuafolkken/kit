@@ -27,4 +27,17 @@ describe('lane_ledger_schema_load — the load sample, read through the entry un
 
 		expect(lane_ledger_schema.entry_schema.parse(load)).toEqual(load)
 	})
+
+	// joshuafolkken/kit#9000: the core count and the budget's admitted claims by command.
+	it('reads the core count and the reserved cores back as written', () => {
+		const load = {
+			kind: 'load',
+			at: AT,
+			load: 12,
+			cores: 11,
+			reserved: [{ command: 'x', cores: 2 }],
+		}
+
+		expect(lane_ledger_schema.entry_schema.parse(load)).toEqual(load)
+	})
 })

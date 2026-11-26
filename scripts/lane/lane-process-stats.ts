@@ -18,9 +18,11 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 
 const RSS_PEAK = 'rss peak (GB)'
 const SAMPLES = 'samples'
+const CPU_MEAN = 'cpu mean (cores)'
+const RESERVED_MEAN = 'reserved mean (cores)'
 const COLUMNS = [
 	'process',
-	'cpu mean (cores)',
+	CPU_MEAN,
 	'cpu peak (cores)',
 	RSS_PEAK,
 	'footprint peak (GB)',
@@ -30,6 +32,17 @@ const RESIDENT_COLUMNS = ['resident apps', 'rss median (GB)', RSS_PEAK, SAMPLES]
 // Not the names: a sample sums the apps `JOSH_LANE_RESIDENT_APPS` named when it ran, which the ledger does
 // not keep, so names read at print time could label sizes another set of apps made (joshuafolkken/kit#5690).
 const RESIDENT_LABEL = 'summed'
+const OVER_CORES_LABEL = 'load > cores'
+const OVERLOAD_COLUMNS = [
+	'samples over cores',
+	'load mean',
+	CPU_MEAN,
+	RESERVED_MEAN,
+	'cpu − reserved mean (cores)',
+	SAMPLES,
+] as const
+const RESERVED_COLUMNS = ['reserved command (load > cores)', RESERVED_MEAN] as const
+const OVER_CORES_PROCESS = 'process (load > cores)'
 const PERCENT_PER_CORE = 100
 const MB_PER_GB = 1024
 const DECIMALS = 1
@@ -114,18 +127,102 @@ function resident_tables(samples: ReadonlyArray<LoadEntry>): Array<string> {
 	return [to_table(RESIDENT_COLUMNS, [[...row, String(sizes.length)]])]
 }
 
+function kind_table(samples: ReadonlyArray<LoadEntry>, columns: ReadonlyArray<string>): string {
+	const rows = group(samples).toSorted(by_mean_cpu)
+
+	return to_table(
+		columns,
+		rows.map((row) => kind_cells(row)),
+	)
+}
+
+type OverSample = LoadEntry & {
+	cores: NonNullable<LoadEntry['cores']>
+	reserved: NonNullable<LoadEntry['reserved']>
+	processes: NonNullable<LoadEntry['processes']>
+}
+
+function has_readings(sample: LoadEntry): boolean {
+	return sample.processes !== undefined && sample.reserved !== undefined
+}
+
+// A sample whose one-minute load passed the core count it recorded; one written before the core count
+// was recorded, or with no process or reservation reading (a `ps` that timed out), is never counted, so
+// a missing reading never reads as zero CPU (joshuafolkken/kit#9000).
+function is_over_cores(sample: LoadEntry): sample is OverSample {
+	return has_readings(sample) && sample.cores !== undefined && sample.load > sample.cores
+}
+
+function sum(values: ReadonlyArray<number>): number {
+	return values.reduce((total, value) => total + value, 0)
+}
+
+function cpu_cores(sample: OverSample): number {
+	return sum(cores(sample.processes))
+}
+
+function reserved_cores(sample: OverSample): number {
+	return sum(sample.reserved.map((reserved) => reserved.cores))
+}
+
+function overload_row(samples: ReadonlyArray<OverSample>): Array<string> {
+	const gaps = samples.map((sample) => cpu_cores(sample) - reserved_cores(sample))
+
+	return [
+		OVER_CORES_LABEL,
+		cell(lane_stats.mean(samples.map((sample) => sample.load))),
+		cell(lane_stats.mean(samples.map((sample) => cpu_cores(sample)))),
+		cell(lane_stats.mean(samples.map((sample) => reserved_cores(sample)))),
+		cell(lane_stats.mean(gaps)),
+		String(samples.length),
+	]
+}
+
+function command_cores(sample: OverSample, command: string): number {
+	const held = sample.reserved.filter((reserved) => reserved.command === command)
+
+	return sum(held.map((reserved) => reserved.cores))
+}
+
+// Each command's reserved cores averaged over every over-core sample, a sample it held none in reading 0.
+function reserved_rows(samples: ReadonlyArray<OverSample>): Array<Array<string>> {
+	const reserved = samples.flatMap((sample) => sample.reserved)
+	const commands = [...new Set(reserved.map((entry) => entry.command))]
+	const held = commands.map((command) => ({
+		command,
+		mean: lane_stats.mean(samples.map((sample) => command_cores(sample, command))) ?? 0,
+	}))
+
+	return held
+		.toSorted((left, right) => right.mean - left.mean)
+		.map((row) => [row.command, cell(row.mean)])
+}
+
+// **What the load past the cores was made of** (joshuafolkken/kit#9000): over the samples whose load
+// passed the core count, the process kinds' CPU beside what the core budget had admitted, so the excess
+// reads as work outside the budget or a claim using more than it reserved. The CPU sums only a sample's
+// heaviest kinds, so `cpu − reserved` is a floor. A period with no such sample prints nothing.
+function overload_tables(samples: ReadonlyArray<LoadEntry>): Array<string> {
+	const over = samples.filter(is_over_cores)
+
+	if (over.length === 0) return []
+
+	return [
+		to_table(OVERLOAD_COLUMNS, [overload_row(over)]),
+		to_table(RESERVED_COLUMNS, reserved_rows(over)),
+		kind_table(over, [OVER_CORES_PROCESS, ...COLUMNS.slice(1)]),
+	]
+}
+
 // The period's table: `entries` is the whole ledger, filtered here to `window`. A period whose samples
 // carried no breakdown prints the header alone.
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
 	const samples = lane_stats.in_window(entries, window).filter(is_load)
-	const rows = group(samples).toSorted(by_mean_cpu)
 
 	return [
-		to_table(
-			COLUMNS,
-			rows.map((row) => kind_cells(row)),
-		),
+		kind_table(samples, COLUMNS),
 		...resident_tables(samples),
+		...overload_tables(samples),
 	].join('\n\n')
 }
 

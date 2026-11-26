@@ -1,3 +1,5 @@
+import { availableParallelism } from 'node:os'
+import { core_budget } from '#scripts/gate/core-budget'
 import type { machine_capacity } from '#scripts/gate/machine-capacity'
 import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -52,10 +54,23 @@ async function read_admission(): Promise<number | undefined> {
 
 const PROCESSES = [{ kind: 'vitest', cpu_percent: 300, rss_mb: 1024, count: 4 }]
 const RESIDENT_MB = 7680
+const TEST_RELATED = 'test:related'
+const RESERVATION = {
+	key: 'josh-core-reserved-test.json',
+	reservation: {
+		pid: process.pid,
+		process_start: 'start',
+		weight: 2,
+		claimed_at: 0,
+		admitted_at: 0,
+		command: TEST_RELATED,
+	},
+}
 
 beforeEach(() => {
 	hanging_execa.reset()
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([])
+	vi.spyOn(core_budget, 'counted_reservations').mockReturnValue([])
 	vi.spyOn(lane_process_load, 'read').mockResolvedValue({
 		processes: PROCESSES,
 		resident_mb: RESIDENT_MB,
@@ -102,6 +117,19 @@ describe('lane_load.sample', () => {
 		stub_platform('win32')
 
 		await expect(lane_load.sample(AT)).resolves.toMatchObject({ processes: PROCESSES })
+	})
+})
+
+// joshuafolkken/kit#9000: the budget's admitted claims and the core count ride on the same sample.
+describe('lane_load.sample reservations', () => {
+	it('carries the core count and the reserved cores beside the load', async () => {
+		stub_platform('win32')
+		vi.spyOn(core_budget, 'counted_reservations').mockReturnValue([RESERVATION])
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({
+			cores: availableParallelism(),
+			reserved: [{ command: TEST_RELATED, cores: 2 }],
+		})
 	})
 })
 
