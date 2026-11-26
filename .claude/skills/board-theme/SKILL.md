@@ -93,6 +93,8 @@ in shape → the live board's demo mode and bases of the real board's shape chec
   look unchanged** (#8376).
 - A look approved or changed → record its golden replay in that PR: `docs/josh-commands-board.md` →
   "`josh board:compare`".
+- Before a theme PR opens → `pnpm josh test:related scripts/run/board/run-board-motion-themes.test.ts`
+  passes (mandatory; the per-frame motion check over every theme, size and scene).
 - Demo-backed: a seam child, then parallel effect children ([split](theme-split.md)); each moves
   the demo's drawing in unchanged and places it by kit's layout ([wiring](theme-wiring.md)).
 
