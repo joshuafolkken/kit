@@ -134,12 +134,25 @@ function launch_or_idle(input: WakeDecisionInput): WakeDecision {
 	return is_overdue(input.idle_since, input.now, IDLE_CEILING_MS) ? WAKE_DECISION : IDLE_DECISION
 }
 
+function retry_or_fail(input: WakeDecisionInput): WakeDecision {
+	return input.attempts < MAX_WAKE_ATTEMPTS ? launch_or_idle(input) : FAILED_DECISION
+}
+
 // Launch, pend, retry or give up, read from the wake mark alone.
 function decide_launch(input: WakeDecisionInput): WakeDecision {
 	if (input.woke_at === undefined) return launch_or_idle(input)
 	if (!is_overdue(input.woke_at, input.now)) return PENDING_DECISION
 
-	return input.attempts < MAX_WAKE_ATTEMPTS ? launch_or_idle(input) : FAILED_DECISION
+	return retry_or_fail(input)
+}
+
+// A record the woken session already handed back ends the grace: the adopt before a wake unhands it,
+// so a handed-off record with a mark means that session finished its turn, whether or not its process
+// lingers.
+function decide_handed_back(input: WakeDecisionInput): WakeDecision {
+	if (input.woke_at === undefined) return launch_or_idle(input)
+
+	return retry_or_fail(input)
 }
 
 // A live owner is a session at work; a dead one crashed between its claim and the next cut, and is
@@ -154,7 +167,7 @@ function decide(input: WakeDecisionInput): WakeDecision {
 	if (input.read.kind !== 'carried') return { kind: 'stop', reason: STOP_REASONS[input.read.kind] }
 	if (input.read.carry.is_handed_off !== true) return decide_not_handed_off(input)
 
-	return decide_launch(input)
+	return decide_handed_back(input)
 }
 
 // Keyed on the common git directory exactly as the carry record is, so every lane keys alike.

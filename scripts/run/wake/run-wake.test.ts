@@ -53,6 +53,8 @@ const HANDED_OFF: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: t
 // it and died. Which of the two is `is_owner_live`, not the record (joshuafolkken/kit#2336).
 const IN_FLIGHT: CarryRead = { kind: 'carried', carry: carry() }
 
+const FRESH_WOKE_AT = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS / 2).toISOString()
+
 function overdue(attempts: number): WakeDecisionInput {
 	const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
 
@@ -99,13 +101,22 @@ describe('run_wake.decide — whether to wake is the record’s answer', () => {
 describe('run_wake.decide — the grace window after a wake', () => {
 	// Without this the supervisor would forget it had already woken and wake again every interval,
 	// putting several sessions into one budget.
-	it('stays pending inside the grace window instead of waking again', () => {
-		const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS / 2).toISOString()
-		const decision = run_wake.decide(
-			input({ kind: 'carried', carry: carry({ is_handed_off: true }) }, woke_at),
-		)
+	it('stays pending inside the grace window while the session has not handed back', () => {
+		expect(run_wake.decide(input(IN_FLIGHT, FRESH_WOKE_AT))).toStrictEqual({ kind: 'pending' })
+	})
 
-		expect(decision).toStrictEqual({ kind: 'pending' })
+	// A session that handed the record back is done; a lingering `claude -p` must not hold the driver.
+	it('wakes at once inside the grace window once the session has handed back', () => {
+		expect(run_wake.decide(input(HANDED_OFF, FRESH_WOKE_AT))).toStrictEqual({ kind: 'wake' })
+	})
+
+	it('still gives up on exhausted attempts and idles without work once handed back', () => {
+		const spent = input(HANDED_OFF, FRESH_WOKE_AT, run_wake.MAX_WAKE_ATTEMPTS)
+
+		expect(run_wake.decide(spent)).toStrictEqual({ kind: 'failed' })
+		expect(run_wake.decide({ ...input(HANDED_OFF, FRESH_WOKE_AT), has_work: false })).toStrictEqual(
+			{ kind: 'idle' },
+		)
 	})
 
 	// Stopping ends a run nobody is watching, so a lost wake is retried before it is called a failure.

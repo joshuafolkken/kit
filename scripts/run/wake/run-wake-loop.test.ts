@@ -96,9 +96,10 @@ beforeEach(() => {
 
 describe('run_wake_loop.run_loop — one wake per cut', () => {
 	it('wakes once for one cut, and not again while the wake is pending', async () => {
-		const scripted = recorder([HANDED_OFF, HANDED_OFF, HANDED_OFF, ENDED])
+		const scripted = recorder([HANDED_OFF, IN_FLIGHT, IN_FLIGHT, ENDED])
+		const ports = { ...scripted.ports, is_owner_live: () => false }
 
-		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
 
 		expect(scripted.wakes).toStrictEqual([INVOCATION])
 	})
@@ -284,9 +285,10 @@ describe('run_wake_loop.run_loop — a stalled cut is visible while it stalls', 
 	// went on reporting one wake against one cut, because the count was taken at the launch. Counted at
 	// the claim, the same forty minutes show a shortfall a person can see at any moment in them.
 	it('leaves the wake count behind the cuts while no session claims the record', async () => {
-		const scripted = recorder([HANDED_OFF, HANDED_OFF, HANDED_OFF])
+		const scripted = recorder([HANDED_OFF, IN_FLIGHT, IN_FLIGHT])
+		const ports = { ...scripted.ports, is_owner_live: () => false }
 
-		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
 
 		expect(run_wake.read_wake(scratch.target)?.woke).toBe(0)
 		expect(run_wake.read_wake(scratch.target)?.attempts).toBe(1)
