@@ -18,7 +18,11 @@ import { session_cite } from '#scripts/issue/session-cite'
 // opens a second pull request, so the repair is a person's — this module only names the difference.
 
 // How a lane listing arrived: the open lanes' issue numbers, or that the listing could not be read.
-type LaneRead = { kind: 'lanes'; issues: ReadonlyArray<number> } | { kind: 'unreadable' }
+// `closed` names the lanes whose issue is closed — no session can claim a closed issue, so such a
+// lane is leftover cleanup, not a claim risk (joshuafolkken/kit#9035). Omitted, every lane counts.
+type LaneRead =
+	| { kind: 'lanes'; issues: ReadonlyArray<number>; closed?: ReadonlyArray<number> }
+	| { kind: 'unreadable' }
 
 // The three liveness verdicts, named so the `lane:list` oracle vocabulary reads them from here rather
 // than repeating the literals. `LIVE` is the silent norm; `STOPPED` and `UNKNOWN` lead the anomaly
@@ -26,6 +30,8 @@ type LaneRead = { kind: 'lanes'; issues: ReadonlyArray<number> } | { kind: 'unre
 const LIVE = 'live'
 const STOPPED = 'stopped'
 const UNKNOWN = 'unknown'
+// Leads the line for a lane whose issue is closed, so it is never read as a claim risk.
+const LEFTOVER = 'leftover'
 
 // Whether an `in-progress` issue's lane is open, stopped, or could not be determined. `unknown` is
 // the answer when the lane listing itself could not be read — never `stopped`, which would report a
@@ -41,9 +47,11 @@ interface OccupancyReport {
 	// Every `in-progress` issue with its lane liveness. A `live` one is the ordinary case; a `stopped`
 	// or `unknown` one is the anomaly `describe` names.
 	labelled: ReadonlyArray<LabelledIssue>
-	// Open lanes whose issue carries no `in-progress` label — the reverse difference. Empty when the
-	// lane listing could not be read, since there is nothing to compare against.
+	// Open lanes whose open issue carries no `in-progress` label — the reverse difference. Empty when
+	// the lane listing could not be read, since there is nothing to compare against.
 	lanes_without_label: ReadonlyArray<number>
+	// Open lanes whose issue is closed — left behind after the merge, never claimable.
+	leftover_lanes: ReadonlyArray<number>
 }
 
 function to_liveness(issue: number, lanes: LaneRead): Liveness {
@@ -58,7 +66,15 @@ function to_lanes_without_label(
 ): Array<number> {
 	if (lanes.kind === 'unreadable') return []
 
-	return lanes.issues.filter((issue) => !in_progress.includes(issue))
+	const closed = lanes.closed ?? []
+
+	return lanes.issues.filter((issue) => !in_progress.includes(issue) && !closed.includes(issue))
+}
+
+function to_leftover_lanes(lanes: LaneRead): Array<number> {
+	if (lanes.kind === 'unreadable') return []
+
+	return lanes.issues.filter((issue) => lanes.closed?.includes(issue) === true)
 }
 
 // The two-directional difference between the `in-progress` issues and the open lanes. Pure: it reads
@@ -67,6 +83,7 @@ function classify(in_progress: ReadonlyArray<number>, lanes: LaneRead): Occupanc
 	return {
 		labelled: in_progress.map((issue) => ({ issue, liveness: to_liveness(issue, lanes) })),
 		lanes_without_label: to_lanes_without_label(in_progress, lanes),
+		leftover_lanes: to_leftover_lanes(lanes),
 	}
 }
 
@@ -80,6 +97,10 @@ function unknown_line(issue: number): string {
 
 function without_label_line(issue: number): string {
 	return `⚠ a lane is open for ${session_cite.issue(issue)} but it carries no \`in-progress\` label — another session could claim the same issue. Apply the label or close the lane (a person's, never this command's).`
+}
+
+function leftover_line(issue: number): string {
+	return `⚠ ${LEFTOVER} lane for ${session_cite.issue(issue)} — its issue is closed, so no session can claim it; it is cleanup left after the merge. \`pnpm josh lane:prune\` discards it once nothing would be lost, or \`pnpm josh lane:close ${String(issue)}\`.`
 }
 
 function labelled_lines(labelled: ReadonlyArray<LabelledIssue>): Array<string> {
@@ -100,12 +121,14 @@ function describe(report: OccupancyReport): string | undefined {
 	const lines = [
 		...labelled_lines(report.labelled),
 		...report.lanes_without_label.map((issue) => without_label_line(issue)),
+		...report.leftover_lanes.map((issue) => leftover_line(issue)),
 	]
 
 	return lines.length === 0 ? undefined : lines.join('\n')
 }
 
 const lane_occupancy = {
+	LEFTOVER,
 	LIVE,
 	STOPPED,
 	UNKNOWN,

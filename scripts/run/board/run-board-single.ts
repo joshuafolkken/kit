@@ -44,6 +44,9 @@ interface EndedRoot extends SingleRun {
 	ended_ms: number
 }
 
+// The single runs the board reads, at least one: the first is the one a board with no carried run draws.
+type SingleSpans = readonly [BoardSpan, ...Array<BoardSpan>]
+
 // The checkout's own git directory, resolved once per working directory: resolving it runs a `git`
 // subprocess the redraw would wait on, as `run-board-read.ts`'s main work tree does.
 const directories = stamped_memo.create<Promise<string | undefined>>()
@@ -120,27 +123,33 @@ function lane_read(issue: string): HoldRead {
 	return read.kind === 'held' && read.hold.is_single_in_lane === true ? read : FREE_READ
 }
 
-// The single run a lane of this repository holds, read from the root checkout (joshuafolkken/kit#7653);
-// an ended lane holds none.
-function lane_span(directory: string): BoardSpan | undefined {
+// The single runs the lanes of this repository hold, each read from its own worktree's git directory
+// (joshuafolkken/kit#7653, #8993); an ended lane holds none.
+function lane_spans(directory: string): Array<BoardSpan> {
 	return run_board_records
 		.read_records(directory)
 		.filter((record) => record.state !== 'ended')
 		.map((record) => span_of(lane_read(record.issue)))
-		.find(Boolean)
+		.filter((span) => span !== undefined)
 }
 
-// The single run held in this checkout, else one a lane holds; `undefined` where none is. A lane's hold
-// is its `backlogrun` child's, drawn as that run's row, so only outside a lane is a hold read beside the
-// carry record — a `fullrun` in the root checkout beside a running `backlogrun`.
-async function span_here(is_carried: boolean): Promise<BoardSpan | undefined> {
+// The single run `directory`'s own hold names, then the lanes'; `undefined` where none is.
+function spans_in(directory: string): SingleSpans | undefined {
+	const own = span_of(run_hold.read_hold(run_hold.hold_path(directory)))
+	const [first, ...rest] = [own ?? [], lane_spans(directory)].flat()
+
+	return first === undefined ? undefined : [first, ...rest]
+}
+
+// The single run held in this checkout, then every one a lane holds; `undefined` where none is. A
+// lane's hold is its `backlogrun` child's, drawn as that run's row, so only outside a lane is a hold read
+// beside the carry record — a `fullrun` in the root checkout beside a running `backlogrun`.
+async function spans_here(is_carried: boolean): Promise<SingleSpans | undefined> {
 	if (is_carried && lane_paths.lane_issue_of(process.cwd()) !== undefined) return undefined
 
 	const directory = await directory_here()
 
-	if (directory === undefined) return undefined
-
-	return span_of(run_hold.read_hold(run_hold.hold_path(directory))) ?? lane_span(directory)
+	return directory === undefined ? undefined : spans_in(directory)
 }
 
 // A run the root checkout's merge released, as `run-hold-ended.ts` kept it; `undefined` where its
@@ -254,10 +263,10 @@ const run_board_single = {
 	root_of,
 	scope_of,
 	sources_of,
-	span_here,
 	span_of,
+	spans_here,
 	stopped_of,
 }
 
 export { run_board_single }
-export type { EndedRoot, RootRun }
+export type { EndedRoot, RootRun, SingleSpans }

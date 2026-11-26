@@ -72,7 +72,7 @@ describe('run_board_run_fields.sources_of', () => {
 	})
 
 	it("reads the root checkout's running single run beside the lanes from its transcript", () => {
-		const read = { ...READ, root: single_span() }
+		const read = { ...READ, singles: [single_span()] }
 
 		expect(run_board_run_fields.sources_of(REPOSITORY, LANES, read).lanes).toContainEqual(
 			SINGLE_SOURCE,
@@ -106,7 +106,7 @@ describe('run_board_run_fields.fields_of', () => {
 
 		const fields = run_board_run_fields.fields_of(
 			REPOSITORY,
-			{ ...READ, root: single_span() },
+			{ ...READ, singles: [single_span()] },
 			LANES,
 			[],
 		)

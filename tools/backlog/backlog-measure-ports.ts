@@ -63,7 +63,7 @@ function launch_of(
 
 function capacity(
 	scenario: MeasureScenario,
-): Pick<DrivePorts, 'free_lanes' | 'limit_room' | 'has_lane' | 'memory_held' | 'usage_limited'> {
+): Pick<DrivePorts, 'free_lanes' | 'limit_room' | 'has_lane'> {
 	return {
 		free_lanes: async function free_lanes(): Promise<number> {
 			return scenario.free_lanes
@@ -74,11 +74,22 @@ function capacity(
 		has_lane: async function has_lane(): Promise<boolean> {
 			return false
 		},
+	}
+}
+
+function holds(
+	scenario: MeasureScenario,
+): Pick<DrivePorts, 'memory_held' | 'usage_limited' | 'sync_held'> {
+	return {
 		memory_held: async function memory_held(): Promise<boolean> {
 			return scenario.memory_held
 		},
 		usage_limited: async function usage_limited(): Promise<boolean> {
 			return scenario.usage_limited
+		},
+		// A measured scenario has no primary checkout to leave dirty.
+		sync_held: async function sync_held(): Promise<boolean> {
+			return false
 		},
 	}
 }
@@ -135,6 +146,7 @@ function ports_of(
 ): DrivePorts {
 	return {
 		...capacity(scenario),
+		...holds(scenario),
 		...lifecycle(),
 		launch: launch_of(scenario, workers, records),
 		stall: async function stall(issue: string, outcome: DriveLaunch): Promise<void> {

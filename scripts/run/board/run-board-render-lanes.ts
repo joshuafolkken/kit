@@ -23,7 +23,7 @@ import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 const { HEADER_ICONS } = run_board_labels
 const { cell_widths, cells_of, lane_limits } = run_board_usage_text
 const { ROW_INDENT, columns_rule } = run_board_render_section
-const { ELAPSED_START, LANES_LABEL, USAGE_START, column_offset, lane_label, root_label } =
+const { ELAPSED_START, LANES_LABEL, SINGLE_RUNS_LABEL, USAGE_START, column_offset, lane_label } =
 	run_board_render_lead
 const { width_of } = run_board_fit
 const { columns_cut } = run_board_render_title
@@ -187,25 +187,33 @@ function rows_section(
 	return [section_of(lines, label, cells, header)]
 }
 
-// The root checkout's single run's row, the first of `rows` (`run_board_layout.lane_rows`), under its
-// own `🏠` rule above the run's lanes (joshuafolkken/kit#7524); then the run's own rows under the lanes
-// rule and the empty seats' reasons. The lanes rule is drawn without a row too, as its tail carries the
-// run's tallies (joshuafolkken/kit#8514).
+// How many of `rows` are the single runs' beside the run: none on a single run's own board, whose lanes
+// rule is already `🏠 runs`.
+function singles_count(header: BoardHeader): number {
+	if (header.run_name !== undefined) return 0
+
+	return header.layout?.singles?.length ?? 0
+}
+
+// The single runs' rows, the first of `rows` (`run_board_layout.lane_rows`), under one `🏠 runs` rule
+// above the run's lanes (joshuafolkken/kit#7524, joshuafolkken/kit#8993); then the run's own rows under
+// the lanes rule and the empty seats' reasons. The lanes rule is drawn without a row too, as its tail
+// carries the run's tallies (joshuafolkken/kit#8514).
 function lanes_section(
 	rows: ReadonlyArray<PlanLine>,
 	cells: LaneCells | undefined,
 	header: BoardHeader,
 	columns?: number,
 ): Array<PlanSection> {
-	const root = header.layout?.root
-	const root_count = root === undefined ? 0 : 1
-	const lanes = [...rows.slice(root_count), ...seat_lines(header, columns)]
+	const count = singles_count(header)
+	const lanes = [...rows.slice(count), ...seat_lines(header, columns)]
 	const lanes_rule = section_of(lanes, lane_label(header), cells, header)
 
 	return [
-		...rows_section(rows.slice(0, root_count), root_label(root?.name ?? ''), cells, header).map(
-			(section) => ({ ...section, flash_key: 'root' }),
-		),
+		...rows_section(rows.slice(0, count), SINGLE_RUNS_LABEL, cells, header).map((section) => ({
+			...section,
+			flash_key: 'root',
+		})),
 		{ ...lanes_rule, tail: run_board_header.lanes_tail(header), flash_key: 'lanes' },
 	]
 }
