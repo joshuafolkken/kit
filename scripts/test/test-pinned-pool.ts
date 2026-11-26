@@ -20,13 +20,28 @@ function lane_plan(count: number, budget: number = UNREAD_BUDGET): LanePlan {
 	return { lanes, workers: Math.max(1, Math.floor(budget / lanes)) }
 }
 
-// The items each lane takes, dealt round-robin so the lanes stay within one item of each other.
-function deal<T>(items: ReadonlyArray<T>, lanes: number): Array<Array<T>> {
-	const groups: Array<Array<T>> = Array.from({ length: lanes }, () => [])
+// The item indexes in the order the lanes take them: the costliest first (joshuafolkken/kit#8997), so
+// the run never ends on one wide probe while the other lanes sit idle; equal costs keep their order.
+function queue_order<T>(items: ReadonlyArray<T>, cost?: (item: T) => number): Array<number> {
+	const indexes = items.map((_item, index) => index)
+	if (cost === undefined) return indexes
 
-	for (const [index, item] of items.entries()) groups[index % lanes]?.push(item)
+	const costs = items.map((item) => cost(item))
 
-	return groups.filter((group) => group.length > 0)
+	return indexes.toSorted((left, right) => (costs[right] ?? 0) - (costs[left] ?? 0))
+}
+
+// One lane's view of the shared queue: it takes its next item only once it is free, and notes which
+// item indexes it took, in order, so its answers can be put back in the items' order.
+function* lane_queue<T>(
+	items: ReadonlyArray<T>,
+	queue: Iterator<number>,
+	took: Array<number>,
+): Generator<T> {
+	for (let next = queue.next(); next.done !== true; next = queue.next()) {
+		took.push(next.value)
+		yield items[next.value] as T
+	}
 }
 
 // The lanes' answers, or the first lane's failure once every lane has ended — a failed lane never
@@ -38,36 +53,52 @@ function settled<R>(outcomes: ReadonlyArray<PromiseSettledResult<R>>): Array<R> 
 	return outcomes.flatMap((outcome) => (outcome.status === 'fulfilled' ? [outcome.value] : []))
 }
 
-// Runs every lane at once; a lane answers its own items in the order it was dealt them.
+// What one lane took and answered: its answers are in the order it took the items.
+interface LaneAnswer<R> {
+	took: ReadonlyArray<number>
+	answers: ReadonlyArray<R>
+}
+
+// A lane answers an item it took, or stops early (a halted run) and leaves the rest of what it took
+// unanswered; the item it took but never answered is left out.
+type RunLane<T, R> = (queue: Iterable<T>) => Promise<ReadonlyArray<R>>
+
+// Runs every lane at once over one shared queue (joshuafolkken/kit#8997): a free lane takes the next
+// item, so no lane waits on a share dealt to it while another lane is still busy.
 async function run_lanes<T, R>(
 	items: ReadonlyArray<T>,
 	lanes: number,
-	run_lane: (group: ReadonlyArray<T>) => Promise<ReadonlyArray<R>>,
-): Promise<Array<ReadonlyArray<R>>> {
-	return settled(
-		await Promise.allSettled(deal(items, lanes).map(async (group) => await run_lane(group))),
-	)
+	run_lane: RunLane<T, R>,
+	cost?: (item: T) => number,
+): Promise<Array<LaneAnswer<R>>> {
+	const queue = queue_order(items, cost).values()
+	const count = Math.max(1, Math.min(lanes, items.length))
+
+	async function lane(): Promise<LaneAnswer<R>> {
+		const took: Array<number> = []
+
+		return { took, answers: await run_lane(lane_queue(items, queue, took)) }
+	}
+
+	return settled(await Promise.allSettled(Array.from({ length: count }, lane)))
 }
 
-// The one-item slice of lane `index % lanes` that holds item `index`.
-function at(index: number, lanes: number): [number, number] {
-	const position = Math.floor(index / lanes)
-
-	return [position, position + 1]
-}
-
-// The lanes' results put back in the items' own order, whatever order the lanes finished in: item
-// `index` sat at `floor(index / lanes)` in lane `index % lanes`.
+// The lanes' results put back in the items' own order, whatever lane took an item and whenever it
+// finished; `cost` orders the queue, costliest first.
 async function run_pool<T, R>(
 	items: ReadonlyArray<T>,
 	lanes: number,
-	run_lane: (group: ReadonlyArray<T>) => Promise<ReadonlyArray<R>>,
+	run_lane: RunLane<T, R>,
+	cost?: (item: T) => number,
 ): Promise<Array<R>> {
-	const results = await run_lanes(items, lanes, run_lane)
+	const answered = await run_lanes(items, lanes, run_lane, cost)
+	const placed = answered.flatMap(({ took, answers }) =>
+		answers.map((answer, position): [number, R] => [took[position] ?? -1, answer]),
+	)
 
-	return items.flatMap((_item, index) => results[index % lanes]?.slice(...at(index, lanes)) ?? [])
+	return placed.toSorted((left, right) => left[0] - right[0]).map(([, answer]) => answer)
 }
 
-const test_pinned_pool = { MAX_TREES, deal, lane_plan, run_pool }
+const test_pinned_pool = { MAX_TREES, lane_plan, queue_order, run_pool }
 
 export { test_pinned_pool }

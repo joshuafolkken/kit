@@ -88,6 +88,19 @@ describe('test_pinned_probe.selection_of', () => {
 	})
 })
 
+describe('test_pinned_probe.probe_cost', () => {
+	it('costs a fresh probe its counted reach and an uncounted one nothing', () => {
+		expect(test_pinned_probe.probe_cost(probe_of(HUB_MODULE, WORKERS))).toBe(WORKERS)
+		expect(test_pinned_probe.probe_cost(probe_of(HUB_MODULE))).toBe(0)
+	})
+
+	it('costs a recheck the tests it reruns, not the reach', () => {
+		const recheck = { verdict: 'green' as const, recheck: [HUB_TEST] }
+
+		expect(test_pinned_probe.probe_cost({ ...probe_of(HUB_MODULE, WORKERS), recheck })).toBe(1)
+	})
+})
+
 // joshuafolkken/kit#5292: a wide reach runs the direct importers first.
 describe('test_pinned_probe.selection_of — a counted reach', () => {
 	beforeEach(open_fixture)
