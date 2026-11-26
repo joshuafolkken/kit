@@ -1,4 +1,9 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { process_identity } from '#scripts/josh/process-identity'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_hold } from '#scripts/run/hold/run-hold'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_phase } from './lane-phase'
@@ -133,5 +138,40 @@ describe('mark_implement', () => {
 		await lane_phase.mark_implement('/home/dev/repo', { [lane_child_marker.KEY]: ISSUE })
 
 		expect(emit).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#8922: a run in the root checkout carries no lane mark; its live hold names it.
+describe('mark_implement — a run holding the root checkout', () => {
+	const RUN_ISSUE = '8922'
+	const OTHER_PID = 7
+	const create_directory = temporary_directory()
+
+	function held_checkout(): string {
+		const directory = create_directory('lane-phase-root-')
+		const git = path.join(directory, '.git')
+		const owner = { owner_pid: process.pid, owner_start: process_identity.read_start(process.pid) }
+		const hold = { issue: RUN_ISSUE, taken_at: new Date().toISOString(), pid: OTHER_PID, ...owner }
+
+		mkdirSync(git)
+		writeFileSync(run_hold.hold_path(git), JSON.stringify(hold))
+
+		return directory
+	}
+
+	it('writes the implement phase for an edit under the hold’s session', async () => {
+		await lane_phase.mark_implement(held_checkout(), {}, () => new Set([OTHER_PID, process.pid]))
+
+		expect(emit).toHaveBeenCalledExactlyOnceWith(
+			run_event_stream.EVENT_KIND.LANE_PHASE,
+			`#${RUN_ISSUE} implement`,
+		)
+	})
+
+	it('writes nothing for a person’s own session beside the run', async () => {
+		await lane_phase.mark_implement(held_checkout(), {}, () => new Set([OTHER_PID]))
+
+		expect(emit).not.toHaveBeenCalled()
+		expect(emit_plan).not.toHaveBeenCalled()
 	})
 })

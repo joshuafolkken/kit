@@ -1,4 +1,5 @@
 import { process_directories } from '#scripts/lane/process-directories'
+import type { LiveHold } from '#scripts/run/hold/run-hold-live'
 
 // Which lane `run:board` counts each listed process in.
 // **The working directory first:** a process whose directory sits under this repository's
@@ -13,6 +14,9 @@ import { process_directories } from '#scripts/lane/process-directories'
 // rather than every process again. A process a finished `lsof` left out — another user's, which a
 // non-root `lsof` never reads, or one gone — is remembered, since asking again would rerun `lsof` every
 // second.
+// **A run holding the board's checkout seeds its own session** (joshuafolkken/kit#8922): a run in the
+// root checkout sits under no lane's directory, so its hold's session is put in its issue's lane and its
+// descendants follow by ancestry. Those are remembered in no lane, so they leave it once the hold does.
 
 interface DirectoryRead {
 	// The working directory of each process that answered.
@@ -25,6 +29,8 @@ interface LaneLookup {
 	directories: (pids: ReadonlyArray<number>) => Promise<DirectoryRead>
 	// The board's own lanes root.
 	root: string
+	// The run holding the board's checkout, read each sample (`run-hold-live.ts`).
+	held?: (() => LiveHold | undefined) | undefined
 }
 
 interface ProcessLanes {
@@ -32,6 +38,8 @@ interface ProcessLanes {
 	lanes: ReadonlyMap<number, string | undefined>
 	// The processes whose lookup was cut short — asked again next time.
 	unread: ReadonlySet<number>
+	// The processes counted in a lane through the hold alone, remembered in none.
+	held?: ReadonlySet<number> | undefined
 }
 
 function directory_lane(directory: string | undefined, root: string): string | undefined {
@@ -45,7 +53,10 @@ function remembered(
 ): Map<number, string | undefined> {
 	if (before === undefined) return new Map()
 
-	return new Map([...before.lanes].filter(([pid]) => parents.has(pid) && !before.unread.has(pid)))
+	const held = before.held ?? new Set()
+	const kept = [...before.lanes].filter(([pid]) => parents.has(pid) && !before.unread.has(pid))
+
+	return new Map(kept.map(([pid, lane]) => [pid, held.has(pid) ? undefined : lane]))
 }
 
 // A process's ancestors, nearest first, each listed once.
@@ -61,14 +72,51 @@ function ancestors_of(pid: number, parents: ReadonlyMap<number, number>): Array<
 	return chain
 }
 
+// The nearest ancestor with a lane of its own.
+function lane_ancestor(
+	pid: number,
+	known: ReadonlyMap<number, string | undefined>,
+	parents: ReadonlyMap<number, number>,
+): number | undefined {
+	return ancestors_of(pid, parents).find((ancestor) => known.get(ancestor) !== undefined)
+}
+
 function ancestor_lane(
 	pid: number,
 	known: ReadonlyMap<number, string | undefined>,
 	parents: ReadonlyMap<number, number>,
 ): string | undefined {
-	return ancestors_of(pid, parents)
-		.map((ancestor) => known.get(ancestor))
-		.find((lane) => lane !== undefined)
+	const ancestor = lane_ancestor(pid, known, parents)
+
+	return ancestor === undefined ? undefined : known.get(ancestor)
+}
+
+// The hold's session put in its run's lane, where that session is still listed in no lane of its own:
+// one working in a lane's directory keeps that lane.
+function seeded(
+	known: ReadonlyMap<number, string | undefined>,
+	hold: LiveHold | undefined,
+): ReadonlyMap<number, string | undefined> {
+	if (hold === undefined || !known.has(hold.pid) || known.get(hold.pid) !== undefined) return known
+
+	return new Map([...known, [hold.pid, hold.issue]])
+}
+
+// The processes in no lane of their own whose lane is the hold's: its session and what descends from it
+// with no nearer lane — never a person's session beside it, which the session's tree does not hold.
+function held_of(
+	known: ReadonlyMap<number, string | undefined>,
+	live: ReadonlyMap<number, string | undefined>,
+	hold: LiveHold | undefined,
+	parents: ReadonlyMap<number, number>,
+): Set<number> {
+	if (hold === undefined || known === live) return new Set()
+
+	const unplaced = [...known.keys()].filter((pid) => known.get(pid) === undefined)
+
+	return new Set(
+		unplaced.filter((pid) => pid === hold.pid || lane_ancestor(pid, live, parents) === hold.pid),
+	)
 }
 
 // The working directories of `fresh`, with no lookup run when there is none to ask about.
@@ -100,11 +148,14 @@ async function lanes_for(
 		(pid) => [pid, directory_lane(read.directories.get(pid), lookup.root)] as const,
 	)
 	const known = new Map([...kept, ...found])
-	const lanes = [...known].map(
-		([pid, lane]) => [pid, lane ?? ancestor_lane(pid, known, parents)] as const,
+	const hold = lookup.held?.()
+	const live = seeded(known, hold)
+	const lanes = [...live].map(
+		([pid, lane]) => [pid, lane ?? ancestor_lane(pid, live, parents)] as const,
 	)
+	const held = held_of(known, live, hold, parents)
 
-	return { lanes: new Map(lanes), unread: unread_of(fresh, read) }
+	return { lanes: new Map(lanes), unread: unread_of(fresh, read), held }
 }
 
 const run_board_usage_lanes = { lanes_for }

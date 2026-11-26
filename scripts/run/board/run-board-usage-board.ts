@@ -17,14 +17,21 @@ type UsageRead = Pick<GatherState, 'usage' | 'usages'>
 // Before the first local read: no lane open, no root running, nothing stuck.
 const NO_LOCAL: Pick<LocalRead, 'closing' | 'lanes' | 'roots' | 'stuck'> = { lanes: [] }
 
+// The lane a root run's processes are counted in through its hold: open while it holds, so they are
+// counted once, in its row, and not again as a closed lane's leftovers.
+function held_lanes(mark: UsageMark): Array<number> {
+	return [...(mark.held ?? [])].map((pid) => Number(mark.lanes.get(pid)))
+}
+
 function sources_of(
 	mark: UsageMark,
 	figures: ProcessFigures,
 	local: LocalRead | undefined,
 ): GroupSources {
 	const { closing = new Set(), lanes, roots = {}, stuck = new Map() } = local ?? NO_LOCAL
+	const open_lanes = new Set([...lanes.map(Number), ...held_lanes(mark)])
 
-	return { mark, figures, open_lanes: new Set(lanes.map(Number)), roots, stuck, closing }
+	return { mark, figures, open_lanes, roots, stuck, closing }
 }
 
 function board_usage_of(
