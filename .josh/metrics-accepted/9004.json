@@ -1,0 +1,8 @@
+{
+	"reason": "#9004 adds the pending-work refusal to reply-close and its condition to principles.md concise-reply",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 62,
+		"ai_cost.on_demand_bytes": 245
+	}
+}

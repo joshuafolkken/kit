@@ -122,6 +122,19 @@ describe('run_board_spin.spin_to_second', () => {
 	})
 })
 
+describe('run_board_frame_fixture.spin_ports — a terminal slow to take a write (joshuafolkken/kit#8936)', () => {
+	it('moves the clock by the write time each write takes', () => {
+		const write_ms = 15
+		const { ports, writes } = spin_ports(START, write_ms)
+
+		ports.write('a')
+		ports.write('b')
+
+		expect(writes.map(({ at_ms }) => at_ms - START)).toStrictEqual([0, write_ms])
+		expect(ports.now()).toBe(START + write_ms * 2)
+	})
+})
+
 describe('run_board_spin — the rows a theme types (joshuafolkken/kit#8003)', () => {
 	it('takes each row’s key out of the frame and records the row it starts on, its spinner kept a placeholder', () => {
 		const lines = ['x'.repeat(25), keyed('done', 7, `${SPOT} ✅ 7`), keyed('lanes', 8, 'off')]

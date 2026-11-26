@@ -11,6 +11,10 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 
 const { EMPTY_LAYOUT, GB, MINUTE, NOW, board_usage, header, lines_of } = run_board_render_fixture
 const USAGE = /🔨 +0″ +0″ +20\.0 +1\.6 +0\.2 1 +Issue 1/u
+// The running row's cells, with no title after them where a narrow pane cuts it to nothing.
+const CELLS = /🔨 +0″ +0″ +20\.0 +1\.6 +0\.2 1 /u
+// The running row's phase, which finds its line where its title is cut to nothing.
+const PHASE_ICON = '🔨'
 const FIGURE = /\d\.\d/u
 const WIDE = 200
 const NARROW = 80
@@ -93,9 +97,10 @@ describe('run_board_render.render usage cells', () => {
 		expect(row_line(lines, 'Issue 1')).toMatch(USAGE)
 	})
 
+	// joshuafolkken/kit#8990: a narrow pane cuts the title to nothing, never the cells before it.
 	it('keeps the cells before the title however narrow the pane', () => {
 		expect(row_line(sized(WIDE), 'Issue 1')).toMatch(USAGE)
-		expect(row_line(sized(NARROW), 'Issue 1')).toMatch(USAGE)
+		expect(row_line(sized(NARROW), PHASE_ICON)).toMatch(CELLS)
 	})
 
 	// joshuafolkken/kit#3769: only the tail and what a row waits on may wrap, never the columns before them.
@@ -111,17 +116,13 @@ describe('run_board_render.render usage cells', () => {
 	})
 })
 
-// A running row's tail, after the head its cells are drawn in.
-const TAIL = '  🔗 3'
-
-// joshuafolkken/kit#3769: a row with cells narrows its title, so its head stays on one line.
+// joshuafolkken/kit#3769, #8990: a row with cells narrows its title, so its line stays on one line.
 describe('run_board_render.render usage cells in a narrow pane', () => {
-	it('narrows a running row’s title so its head, cells and all, stays on one line', () => {
-		const line = row_line(sized(NARROW), 'Issue 1')
-		const head = line.slice(0, line.indexOf(TAIL))
+	it('narrows a running row’s title so its line, cells and all, stays on one line', () => {
+		const line = row_line(sized(NARROW), PHASE_ICON)
 
-		expect(line).toMatch(USAGE)
-		expect(run_board_fit.height_of(head, NARROW)).toBe(1)
+		expect(line).toMatch(CELLS)
+		expect(run_board_fit.height_of(line, NARROW)).toBe(1)
 	})
 })
 

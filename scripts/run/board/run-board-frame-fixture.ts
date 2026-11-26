@@ -236,8 +236,12 @@ interface SpinWrite {
 	raw: string
 }
 
-// A clock that each sleep moves forward, and every write and sleep it saw.
-function spin_ports(now_ms: number): {
+// A clock that each sleep moves forward, and every write and sleep it saw; each write also moves it by
+// `write_ms`, as a terminal slow to take a frame does (joshuafolkken/kit#8936).
+function spin_ports(
+	now_ms: number,
+	write_ms = 0,
+): {
 	ports: SpinPorts
 	writes: Array<SpinWrite>
 	sleeps: Array<number>
@@ -249,6 +253,7 @@ function spin_ports(now_ms: number): {
 		now: () => clock.now_ms,
 		write: (raw: string) => {
 			writes.push({ at_ms: clock.now_ms, text: unsynced(raw), raw })
+			clock.now_ms += write_ms
 		},
 		sleep: async (ms: number) => {
 			sleeps.push(ms)

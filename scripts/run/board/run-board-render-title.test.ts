@@ -16,12 +16,11 @@ const TAIL = 'untriaged'
 const UNTRIAGED: RowReason = { tail: TAIL }
 // joshuafolkken/kit#4288: a stage's time is the condition column's, never what follows the title.
 const INSTALLING: RowReason = { icon: '📥', since_ms: NOW - STAGE_SECONDS * SECOND }
-const TITLE_FLOOR = 8
 const OVERRUN = 8
 const TINY_PANE = 10
-// A pane the floored title leaves room in for only part of the reason.
-const FLOOR_PANE = 14
 const REASON_CUT = 4
+// A pane a title cut to nothing leaves room in for only part of a reason: `TAIL`'s but `REASON_CUT`.
+const FLOOR_PANE = TAIL.length - REASON_CUT
 // Six characters taking two columns each.
 const WIDE_REASON = '理由を書いた'
 const PAUSE_TAIL = 'answer the decision, then run pnpm josh backlog:triage --adopt 2'
@@ -41,10 +40,13 @@ function row_of(extra: Partial<BoardRow> = {}): BoardRow {
 	}
 }
 
-// A row's line as a renderer would draw it: its title at the limit, then its reason with its cut.
+// A row's line as a renderer would draw it: its title at the limit, then its reason with its cut — the
+// blank between them left out with a title cut to nothing.
 function draw_of(row: BoardRow): (cut: RowCut) => string {
 	return function draw({ title_limit, reason_cut }: RowCut): string {
-		return `${title_of(row.title, title_limit)} ${reason_text(row, reason_cut) ?? ''}`
+		const parts = [title_of(row.title, title_limit), reason_text(row, reason_cut) ?? '']
+
+		return parts.filter((part) => part !== '').join(' ')
 	}
 }
 
@@ -71,6 +73,10 @@ describe('run_board_render_title.title_of', () => {
 
 	it('draws a missing title as nothing', () => {
 		expect(title_of()).toBe('')
+	})
+
+	it('draws a title cut to no column as nothing (joshuafolkken/kit#8990)', () => {
+		expect(title_of(LONG_TITLE, 0)).toBe('')
 	})
 })
 
@@ -117,13 +123,19 @@ describe('run_board_render_title.fitted', () => {
 		expect(run_board_fit.width_of(fitted_in(row, columns))).toBe(columns)
 	})
 
-	it('never cuts the title under the floor, and cuts the reason for the rest', () => {
+	// joshuafolkken/kit#8990: the title floor is none.
+	it('cuts the title to nothing before the reason, and cuts the reason for the rest', () => {
 		const row = row_of({ reason: UNTRIAGED })
 		const line = fitted_in(row, FLOOR_PANE)
 
-		expect(line.startsWith(`${title_of(LONG_TITLE, TITLE_FLOOR)} `)).toBe(true)
-		expect(line.endsWith(ELLIPSIS)).toBe(true)
+		expect(line).toBe(reason_text(row, REASON_CUT))
 		expect(run_board_fit.width_of(line)).toBe(FLOOR_PANE)
+	})
+
+	it('draws the reason whole where the title cut to nothing leaves it room', () => {
+		const row = row_of({ reason: UNTRIAGED })
+
+		expect(fitted_in(row, TAIL.length)).toBe(TAIL)
 	})
 
 	// joshuafolkken/kit#4099: a waiting row the run filed leads its title, not padded, with ✚.
@@ -166,10 +178,10 @@ describe('run_board_render_title.fitted on a parked row with a linked reason', (
 		expect(line).toBe(`${title_of(LONG_TITLE, TITLE_LIMIT - OVERRUN)} ${PAUSE_TAIL}`)
 	})
 
-	it('keeps the whole reason past the title floor, leaving the line to wrap', () => {
+	it('keeps the whole reason past a title cut to nothing, leaving the line to wrap', () => {
 		const row = row_of({ state: 'parked', reason: linked })
 
-		expect(fitted_in(row, FLOOR_PANE)).toBe(`${title_of(LONG_TITLE, TITLE_FLOOR)} ${PAUSE_TAIL}`)
+		expect(fitted_in(row, FLOOR_PANE)).toBe(PAUSE_TAIL)
 	})
 
 	it('draws the whole line on a wide pane', () => {
@@ -182,8 +194,9 @@ describe('run_board_render_title.fitted on a parked row with a linked reason', (
 		const row = row_of({ state: 'parked', reason: { ...linked, tail: run_board_pause.FALLBACK } })
 		const line = fitted_in(row, FLOOR_PANE)
 
-		expect(line.startsWith(`${title_of(LONG_TITLE, TITLE_FLOOR)} `)).toBe(true)
+		expect(line.startsWith(run_board_pause.FALLBACK.slice(0, 1))).toBe(true)
 		expect(line.endsWith(ELLIPSIS)).toBe(true)
+		expect(run_board_fit.width_of(line)).toBe(FLOOR_PANE)
 	})
 
 	it('still cuts a linked reason at its end on a row that is not parked', () => {
@@ -199,7 +212,7 @@ describe('run_board_render_title.fitted on a parked row with a linked reason', (
 // rows' as wide as their widest title.
 const SECTION_LIMIT = 20
 const SHARED = 5
-// A section of short titles, its title column under `TITLE_FLOOR`.
+// A section of short titles, its title column narrower than its rows give up.
 const TINY_LIMIT = 4
 
 describe('run_board_render_title.fitted at a section title column', () => {
@@ -217,10 +230,18 @@ describe('run_board_render_title.fitted at a section title column', () => {
 		expect(fitted_limit(row, WIDE_PANE, draw_of(row), fit)).toBe(SECTION_LIMIT - SHARED)
 	})
 
-	it('never widens a title past a section title column narrower than the floor', () => {
+	it('cuts a section title column narrower than its rows give up to nothing (joshuafolkken/kit#8990)', () => {
 		const row = row_of({ state: 'human', title: 'Tiny', reason: UNTRIAGED })
 		const fit = { limit: TINY_LIMIT, shared: SHARED }
 
-		expect(fitted_limit(row, WIDE_PANE, draw_of(row), fit)).toBe(TINY_LIMIT)
+		expect(fitted_limit(row, WIDE_PANE, draw_of(row), fit)).toBe(0)
+	})
+
+	it('never widens a title past its section title column', () => {
+		const row = row_of({ state: 'human', title: 'Tiny', reason: UNTRIAGED })
+
+		expect(fitted_limit(row, WIDE_PANE, draw_of(row), { limit: TINY_LIMIT, shared: 1 })).toBe(
+			TINY_LIMIT - 1,
+		)
 	})
 })
