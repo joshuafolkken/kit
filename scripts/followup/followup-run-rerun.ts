@@ -13,6 +13,11 @@ import { followup_job_rerun, MAX_CHECK_RERUNS } from './followup-job-rerun'
 // (joshuafolkken/kit#6922): that run is rerun whole, up to `MAX_CHECK_RERUNS` reruns. A cancelled run
 // is not: the concurrency group cancels a superseded run before it creates any job. A run with a
 // failed latest job is not rerun, or a test the change broke could be retried into a merge.
+//
+// Kept as is (joshuafolkken/kit#9046): the rate of a partial rerun dropping `Checks` cannot be counted
+// from the Actions history (every attempt of 38 reruns in 2026-11-01..09 lists a `Checks` job) and
+// `followup` records no partial-vs-whole rerun, so no measured rate exceeds the break-even and the
+// recovery stays. Revisit once `followup` records each partial rerun and each whole rerun it triggers.
 
 const PAGE = 'per_page=100'
 const FAILED_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'cancelled', 'timed_out'])
