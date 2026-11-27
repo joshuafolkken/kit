@@ -400,17 +400,20 @@ function background_wait_reason(context: StopContext): string {
 function lane_reason(context: StopContext): string | undefined {
 	if (needs_index_route(context)) return LANE_INDEX_REASON
 	if (needs_background_wait(context)) return background_wait_reason(context)
-	if (context.lane_unrecorded) return lane_park.LANE_STOP_PARK_REASON
 
 	return undefined
 }
 
-// The refusals that need the model: the lane rules alone, else the reply's own and the decision
-// together. **Joined, since the loop-breaker grants one continuation**: a decision refusal queued behind
-// a language or filing refusal would never be sent, and its stop would pass with no notify.
+// The refusals that need the model: the lane rules alone, then the lane child's missing park, else the
+// reply's own and the decision together. **The park is no lane rule**: the run is pausing, so the stop
+// the loop-breaker lets through still runs its actions — a hold left in the lane would read `busy` to the
+// next session (joshuafolkken/kit#8956). **Joined, since the loop-breaker grants one continuation**: a
+// decision refusal queued behind a language or filing refusal would never be sent, and its stop would
+// pass with no notify.
 function model_reason(context: StopContext): string | undefined {
 	const lane = lane_reason(context)
 	if (lane !== undefined) return lane
+	if (context.lane_unrecorded) return lane_park.LANE_STOP_PARK_REASON
 
 	const reasons = [reply_reason(context), decision_reason(context)].filter(
 		(reason) => reason !== undefined,

@@ -74,6 +74,19 @@ describe('stop_rules.stop_outcome — a lane child ending unrecorded', () => {
 		expect(stop_rules.stop_outcome(ending).reason).toBeUndefined()
 	})
 
+	it('still releases the hold on the stop the loop-breaker lets through', () => {
+		const ending = context({
+			lane_child: true,
+			lane_unrecorded: true,
+			stop_hook_active: true,
+			hold_issue: ISSUE,
+			tree_clean: true,
+			notified: true,
+		})
+
+		expect(stop_rules.stop_outcome(ending).actions).toEqual([{ kind: 'release', issue: ISSUE }])
+	})
+
 	it('says nothing about a recorded lane child stop', () => {
 		expect(stop_rules.stop_outcome(context({ lane_child: true })).reason).toBeUndefined()
 	})
