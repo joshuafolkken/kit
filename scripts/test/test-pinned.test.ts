@@ -2,6 +2,7 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { test_pinned } from './test-pinned'
 import { test_pinned_fixture } from './test-pinned-fixture'
+import { test_pinned_fixture_probe } from './test-pinned-fixture-probe'
 import { test_pinned_logic } from './test-pinned-logic'
 
 // Drives `josh test:pinned` against a real git repository (`test-pinned-fixture.ts`). The first hunk
@@ -163,6 +164,8 @@ async function merge_incoming(): Promise<void> {
 }
 
 describe('test_pinned.run while a merge of main is in progress', () => {
+	test_pinned_fixture_probe.use_in_process()
+
 	it('probes only the branch change, not the files main brings in', async () => {
 		await merge_incoming()
 
