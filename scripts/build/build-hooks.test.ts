@@ -26,6 +26,7 @@ const CODEX_ADAPTER_BUNDLE = 'dist/hooks/codex-hook-adapter.js'
 const PRETOOL_BUNDLE = 'dist/hooks/pretool-guard.js'
 const FORMAT_BUNDLE = 'dist/hooks/format-edited.js'
 const OUT_PREFIX = 'build-hooks-out-'
+const LAUNCHED_HOOK = /run-hook\.sh\\" ([a-z-]+)/gu
 
 // Linked into the format fixture so the hook, run from there, finds this project's prettier binary
 // and config exactly as it does from the repository root.
@@ -160,6 +161,15 @@ async function format_with_entrypoint(
 describe('build_hooks', () => {
 	it('builds every hook bundle', () => {
 		for (const bundle of HOOK_BUNDLES) expect(existsSync(outfile_for(bundle))).toBe(true)
+	})
+
+	it('builds a bundle for every hook the Claude settings launch', () => {
+		const settings = readFileSync('.claude/settings.json', 'utf8')
+		const launched = [...settings.matchAll(LAUNCHED_HOOK)].map((match) => match[1])
+		const built = new Set(HOOK_BUNDLES.map((bundle) => bundle.out))
+
+		expect(launched).toContain('session-resume')
+		for (const hook of launched) expect(built).toContain(hook)
 	})
 
 	it('emits the session language identically to the source', async () => {

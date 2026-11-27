@@ -67,6 +67,7 @@ describe('agent_session_role.scope_line', () => {
 	// joshuafolkken/kit#7755: an imperative request goes through investigate, plan and filing plan.
 	// joshuafolkken/kit#8943: no-filing work defers tests, the gate and the review to the finish.
 	// joshuafolkken/kit#8973: the producer builds in its own worktree, never in this checkout.
+	// joshuafolkken/kit#9076: the person may declare no-filing work once for the session.
 	it.each([
 		'hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`',
 		'imperative request with investigation, a plan and a filing plan',
@@ -75,6 +76,9 @@ describe('agent_session_role.scope_line', () => {
 		'the producer is dispatched with `isolation: "worktree"` and never edits this checkout',
 		'tests, the gate and the review wait for the finish unless asked for now',
 		'each such reply ends saying they have not run',
+		'declare it for the whole session with 「このセッションは起票せずに」',
+		'end it with 「起票せずにモードを終了」 (a resume or `/clear` ends it too)',
+		'each closing note also shows the declaration',
 	])('names the consultation route outside a worker lane: %s', (phrase) => {
 		expect(agent_session_role.scope_line({}, linked)).toContain(phrase)
 	})

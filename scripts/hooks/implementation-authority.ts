@@ -10,6 +10,7 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import { z } from 'zod'
 import { hook_context, type HookContext } from './hook-context'
 import { implementation_shell } from './implementation-shell'
+import { no_filing_declaration } from './no-filing-declaration'
 import { step_zero_notice } from './step-zero-notice'
 
 const HANDOFF =
@@ -92,6 +93,18 @@ function dispatch_id(transcript_path: string, agent_id: string): string | undefi
 	return parsed.data?.toolUseId
 }
 
+// **A session's no-filing declaration grants what the phrase would** (joshuafolkken/kit#9076), read
+// after the dispatching prompt's own words: the declaration's end refuses even though it says no
+// filing, the phrase itself still grants, and an explicit filing instruction wins for its own reply
+// without ending the declaration (`no-filing-declaration.ts`).
+function is_granted(prompt: string, transcript_path: string): boolean {
+	if (no_filing_declaration.is_ending(prompt)) return false
+	if (unasked_filing.is_no_filing(prompt)) return true
+	if (unasked_filing.is_instructed(prompt)) return false
+
+	return no_filing_declaration.is_declared(transcript_path)
+}
+
 function is_no_filing_production(raw_payload: string): boolean {
 	const call = SUBAGENT_CALL_SCHEMA.safeParse(json_value.parse_or_undefined(raw_payload))
 	if (!call.success || !PRODUCERS.has(call.data.agent_type)) return false
@@ -100,7 +113,7 @@ function is_no_filing_production(raw_payload: string): boolean {
 	if (tool_use_id === undefined) return false
 	const prompt = last_prompt.call_prompt_at(transcript_path, tool_use_id)
 
-	return prompt !== undefined && unasked_filing.is_no_filing(prompt)
+	return prompt !== undefined && is_granted(prompt, transcript_path)
 }
 
 // A granted edit names its paths, so it passes `unverified_write` too.

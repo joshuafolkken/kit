@@ -47,8 +47,9 @@ const UNLINKED_REQUEST =
 	'GitHub is not linked (gh, its sign-in or a GitHub origin is missing), so answer an imperative request with investigation and a plan only, without a filing plan; '
 // joshuafolkken/kit#7759: a no-filing request is carried out, but through subagents, never by this session.
 // joshuafolkken/kit#8973: in a worktree of its own, so a run's `main:sync` never meets its edits.
+// joshuafolkken/kit#9076: the person may declare it once for the session (`no-filing-declaration.ts`).
 const NO_FILING_REQUEST =
-	'a no-filing request (「起票せずに」) is carried out through the investigator and producer subagents, never edited by this session; the producer is dispatched with `isolation: "worktree"` and never edits this checkout; tests, the gate and the review wait for the finish unless asked for now, and each such reply ends saying they have not run; '
+	'a no-filing request (「起票せずに」) is carried out through the investigator and producer subagents, never edited by this session; the producer is dispatched with `isolation: "worktree"` and never edits this checkout; tests, the gate and the review wait for the finish unless asked for now, and each such reply ends saying they have not run; the person can declare it for the whole session with 「このセッションは起票せずに」 and end it with 「起票せずにモードを終了」 (a resume or `/clear` ends it too), and while declared each closing note also shows the declaration; '
 // joshuafolkken/kit#8262: a consultation artifact (an image, a diagram) has its own scratch route.
 const SCRATCH_ARTIFACT =
 	'a scratch artifact is written under `.josh/tmp/scratch/` and its script run with `pnpm josh scratch:run <path>`; '

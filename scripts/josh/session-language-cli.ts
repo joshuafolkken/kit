@@ -1,5 +1,6 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { no_filing_declaration } from '#scripts/hooks/no-filing-declaration'
 import { confirmation_ledger } from '#scripts/notify/confirmation-ledger'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { session_handoff_line } from './session-handoff-line'
@@ -68,13 +69,20 @@ async function is_run_live(ports: LivePorts = LIVE_PORTS): Promise<boolean> {
 	}
 }
 
-// `handoff` is `session_handoff_line`'s answer for this prompt's payload, `''` when it has none.
-function prompt_lines(resolution: Resolution, is_live: boolean, handoff = ''): Array<string> {
+// `handoff` is `session_handoff_line`'s answer for this prompt's payload, `declared` the session's
+// no-filing declaration line (`no-filing-declaration.ts`); each `''` when it has none.
+function prompt_lines(
+	resolution: Resolution,
+	is_live: boolean,
+	handoff = '',
+	declared = '',
+): Array<string> {
 	return [
 		agent_session_role.scope_line(),
 		format_line(resolution),
 		is_live ? BOARD_LINE : '',
 		handoff,
+		declared,
 	].filter((line) => line !== '')
 }
 
@@ -85,8 +93,10 @@ async function print_prompt_lines(
 	answer_open: () => Promise<void> = confirmation_ledger.answer,
 ): Promise<void> {
 	await answer_open()
-	const handoff = session_handoff_line.handoff_line(await read_payload())
-	const lines = prompt_lines(resolve_session_lang(), await is_run_live(), handoff)
+	const payload = await read_payload()
+	const handoff = session_handoff_line.handoff_line(payload)
+	const declared = no_filing_declaration.prompt_line(payload)
+	const lines = prompt_lines(resolve_session_lang(), await is_run_live(), handoff, declared)
 
 	for (const line of lines) console.info(line)
 }

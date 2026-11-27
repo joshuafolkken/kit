@@ -194,6 +194,6 @@ const ROW = {
 	},
 }
 
-const unasked_filing = { ROW, is_unasked_filing, is_no_filing }
+const unasked_filing = { ROW, is_unasked_filing, is_no_filing, is_instructed, own_words }
 
 export { unasked_filing }

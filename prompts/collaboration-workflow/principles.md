@@ -97,6 +97,7 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
   - worktree で `pnpm josh` を実行 → 依存は上位の `node_modules` から解決され、`run:board --theme <名前>` は稼働中のランを表示する（2026-11-26 実測）
   - 既定 → 実装と動作確認まで。テスト・`pnpm josh gate`・コミット前レビューは仕上げに回す（省略ではなく、コミットの前へ移す）。依頼に「テストと gate も」→ その場で実行する
   - 後回しにした返信 → 締めで「テストと gate は未実行」と毎回明記する
+  - 「このセッションは起票せずに」 → セッション単位の宣言。成立・取り消し・寿命・締めの表示は `scripts/hooks/no-filing-declaration.ts`
   - 成果の返信 → worktree のパスとブランチを書く。成果は worktree に未コミットで残す
   - コミットの指示か `fullrun new` など実装系キーワード → 後回しにした分をすべて実行する。`run:handoff` の brief には worktree のパスと、「テスト未作成・gate 未実行」と実装済みの変更ファイルを書く。マージは「マージして」の指示でだけ（`operating-rules.md` → "git-rules"）
   - メインのチェックアウトに既存の変更（未追跡を含む） → `producer` を渡す前に変更ファイルを返信で示し、退避（コミット・移動・破棄）は利用者に頼む。相談スコープの git 書き込みはフックが拒否する（`scripts/hooks/implementation-shell.ts`）
