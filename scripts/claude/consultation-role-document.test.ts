@@ -55,6 +55,14 @@ describe('no-filing finish', () => {
 		expect(read_unwrapped(PRINCIPLES)).toContain(requirement)
 	})
 
+	// 2026-11-28: the main line opened a `wip/` branch per request, four in one session.
+	it.each([
+		'起票せずにの依頼は何件でも 1 本の `wip/<name>` に積む',
+		'分けるのは利用者が指示したときだけで、主セッションの判断では分けない',
+	])('keeps a no-filing session on one work branch: %s', (requirement) => {
+		expect(read_unwrapped(PRINCIPLES)).toContain(requirement)
+	})
+
 	// 2026-11-28: the main line wrote its own wish to run the tests into a producer brief.
 	it.each([
 		"unless the brief quotes the user's own request for them now",

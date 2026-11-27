@@ -28,6 +28,7 @@ afterEach(() => {
 describe('producer_brief.run — the default brief', () => {
 	it.each([
 		'branch: wip/theme',
+		'This branch carries every no-filing request of the session; a new branch only on the user’s instruction',
 		'`pnpm josh git:checkpoint theme "<what>"`',
 		'`.claude/agents/producer.md`',
 		DEFERRED_LINE,
