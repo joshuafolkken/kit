@@ -5,7 +5,7 @@ import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { josh_in_process } from '#scripts/josh/josh-in-process'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
-import type { NamespaceMember } from '#tools/exports/namespace-members'
+import type { ReportedMember } from '#tools/exports/unused-members-cache'
 
 const CHECK = 'exports'
 const FAIL_EXIT_CODE = 1
@@ -25,11 +25,11 @@ const CLI_BUNDLE = josh_in_process.bundled_script_path(PACKAGE_DIRECTORY, CLI)
 // run, never got a green record. Out of scope by design is not unverified, so the marker stays out.
 const CONSUMER_NOTICE = `josh ${CHECK}: checks only the kit repository itself — ${NOTHING_TO_CHECK_MARKER} in a consumer project.`
 
-function format_member(root: string, member: NamespaceMember): string {
+function format_member(root: string, member: ReportedMember): string {
 	return `${path.relative(root, member.file)}:${String(member.line)}  ${member.namespace}.${member.member}`
 }
 
-function report(root: string, members: ReadonlyArray<NamespaceMember>): string {
+function report(root: string, members: ReadonlyArray<ReportedMember>): string {
 	if (members.length === 0) return `josh ${CHECK}: no unused namespace member`
 
 	return [
@@ -46,7 +46,7 @@ function report(root: string, members: ReadonlyArray<NamespaceMember>): string {
 async function find_members(
 	root: string,
 	files: ReadonlyArray<string> | undefined,
-): Promise<ReadonlyArray<NamespaceMember>> {
+): Promise<ReadonlyArray<ReportedMember>> {
 	const { unused_members } = await import('#tools/exports/unused-members')
 	if (files === undefined) return unused_members.find_unused_members(root)
 

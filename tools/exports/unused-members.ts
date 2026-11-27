@@ -6,6 +6,11 @@ import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import ts from 'typescript'
 import { member_usage } from './member-usage'
 import { namespace_members, type Namespace, type NamespaceMember } from './namespace-members'
+import {
+	unused_members_cache,
+	type ReportedMember,
+	type UnusedMembersScan,
+} from './unused-members-cache'
 
 const TSCONFIG = 'tsconfig.json'
 const TEST_FILE_SUFFIX = '.test.ts'
@@ -143,10 +148,28 @@ async function scope_of(
 // The same judgement as `find_unused_members`, limited to the namespaces the scope declares: the
 // program holds only the files that can read them, and only those readers are walked — the files
 // they import in turn are there for the checker, not as readers (joshuafolkken/kit#4645).
+function scan_scope(scope: ScanScope, options: ts.CompilerOptions): UnusedMembersScan {
+	const program = ts.createProgram({ rootNames: [...scope.readers], options })
+	const loaded = program.getSourceFiles()
+	const sources = loaded.filter((source) => scope.readers.has(path.resolve(source.fileName)))
+	const declaring = sources.filter((source) => scope.declaring.has(path.resolve(source.fileName)))
+
+	return {
+		members: unused_of(declared_namespaces(declaring), program, sources),
+		files: loaded.map((source) => path.resolve(source.fileName)),
+	}
+}
+
+function sorted(files: ReadonlySet<string>): Array<string> {
+	return [...files].toSorted((left, right) => left.localeCompare(right))
+}
+
+// The scoped scan is remembered per clone until a file its program loaded changes
+// (`unused-members-cache.ts`); the whole-tree scan the gate runs is never cached.
 async function find_unused_members_in(
 	root: string,
 	files: ReadonlyArray<string>,
-): Promise<Array<NamespaceMember>> {
+): Promise<ReadonlyArray<ReportedMember>> {
 	const project = project_files(root)
 	const scope = await scope_of(
 		root,
@@ -154,13 +177,15 @@ async function find_unused_members_in(
 		project,
 	)
 	if (scope === undefined) return find_unused_members(root)
-	const program = ts.createProgram({ rootNames: [...scope.readers], options: project.options })
-	const sources = program
-		.getSourceFiles()
-		.filter((source) => scope.readers.has(path.resolve(source.fileName)))
-	const declaring = sources.filter((source) => scope.declaring.has(path.resolve(source.fileName)))
+	const inputs = {
+		roots: sorted(scope.readers),
+		declaring: sorted(scope.declaring),
+		options: project.options,
+		names: project.names,
+		typescript: ts.version,
+	}
 
-	return unused_of(declared_namespaces(declaring), program, sources)
+	return unused_members_cache.reuse(root, inputs, () => scan_scope(scope, project.options))
 }
 
 const unused_members = { find_unused_members, find_unused_members_in }
