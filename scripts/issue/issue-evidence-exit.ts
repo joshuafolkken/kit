@@ -4,6 +4,7 @@ import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { issue_measured_follow_up } from './issue-measured-follow-up'
 import { issue_outcome } from './issue-outcome'
 
 // The shape every evidence exit shares — `josh issue:already-done` and `josh issue:measured`: the
@@ -94,11 +95,18 @@ async function is_admitted(request: EvidenceRequest, exit: EvidenceExit): Promis
 
 async function run(argv: ReadonlyArray<string>, exit: EvidenceExit): Promise<number> {
 	const request = resolve_request(argv, exit.command)
-	if (request === undefined || !(await is_admitted(request, exit))) return FAILURE_EXIT_CODE
 
-	return (await write_exit(request, exit))
-		? await run_hold_cli.run(['--release', request.issue_number])
-		: FAILURE_EXIT_CODE
+	if (
+		request === undefined ||
+		!(await is_admitted(request, exit)) ||
+		!(await write_exit(request, exit))
+	) {
+		return FAILURE_EXIT_CODE
+	}
+
+	issue_measured_follow_up.print_filing_lines(request.evidence, request.issue_number)
+
+	return await run_hold_cli.run(['--release', request.issue_number])
 }
 
 // The writes alone, for evidence composed in process — `backlog:drive`'s measured close

@@ -8,6 +8,7 @@ const emit_mock = vi.hoisted(() => vi.fn())
 const recorded_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
 const investigate_mock = vi.hoisted(() => vi.fn())
+const follow_up_mock = vi.hoisted(() => vi.fn())
 const baseline_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
@@ -33,6 +34,7 @@ vi.mock('#scripts/lane/lane-ledger-write', () => ({
 }))
 vi.mock('#scripts/lane/lane-overrun', () => ({ lane_overrun: { investigate: investigate_mock } }))
 vi.mock('#scripts/lane/lane-baseline', () => ({ lane_baseline: { investigate: baseline_mock } }))
+vi.mock('./run-merge-follow-up', () => ({ run_merge_follow_up: { check: follow_up_mock } }))
 vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
 		ask_next: vi.fn().mockResolvedValue('2039'),
@@ -87,6 +89,13 @@ describe('run_merge_cli.merge_child — asking a merged lane for an overrun', ()
 		await run_merge_cli.merge_child(context())
 
 		expect(baseline_mock).toHaveBeenCalledWith(Number(CHILD))
+	})
+
+	// joshuafolkken/kit#9063: every merge names the follow-ups the child wrote and nobody filed.
+	it('checks the merged child for unfiled follow-ups', async () => {
+		await run_merge_cli.merge_child(context())
+
+		expect(follow_up_mock).toHaveBeenCalledWith(CHILD)
 	})
 })
 

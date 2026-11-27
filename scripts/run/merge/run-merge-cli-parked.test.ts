@@ -25,6 +25,7 @@ vi.mock('#scripts/run/run-ending', () => ({
 	},
 }))
 
+vi.mock('./run-merge-follow-up')
 vi.mock('./run-merge-restart', () => ({
 	run_merge_restart: { is_host_restart: restart_mock },
 }))
