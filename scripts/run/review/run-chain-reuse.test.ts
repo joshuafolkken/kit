@@ -1,11 +1,15 @@
 import path from 'node:path'
-import type { CheckRecords } from '#scripts/gate/check-reuse'
+import { check_related_reuse } from '#scripts/gate/check-related-reuse'
+import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
-import type { JoshResult } from '#scripts/josh/josh-run'
+import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { lane_ledger_write_chain_stage } from '#scripts/lane/lane-ledger-write-chain-stage'
 import { review_tree } from '#scripts/review/review-tree'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_chain } from './run-chain'
 import { run_chain_reuse } from './run-chain-reuse'
 
 // joshuafolkken/kit#9139: run:chain's exports:unused and guard-test stages answer from their green
@@ -22,6 +26,8 @@ const EXPORTS_ARGV = run_ship_pre_detach.exports_argv()
 const GUARD_ARGV = run_ship_pre_detach.guard_test_argv(process.cwd())
 const PASSED: JoshResult = { code: 0, out: '' }
 const MOVED_DOCUMENT = 'docs/moved.md'
+const GREEN_AT = '2026-01-01T00:00:00.000Z'
+const EXPORTS_UNUSED = 'exports:unused'
 
 function records_in(prefix: string): CheckRecords {
 	const directory = make_directory(`run-chain-reuse-${prefix}`)
@@ -56,7 +62,7 @@ beforeEach(() => {
 
 describe('run_chain_reuse — a stage whose inputs did not move', () => {
 	it.each([
-		['exports:unused', EXPORTS_ARGV],
+		[EXPORTS_UNUSED, EXPORTS_ARGV],
 		['the guard tests', GUARD_ARGV],
 	])('answers %s from its green record without running it again', async (_name, argv) => {
 		const { runner, answer } = await twice(argv, RECORDED)
@@ -69,13 +75,33 @@ describe('run_chain_reuse — a stage whose inputs did not move', () => {
 	it('names the guard tests by their label, not their path list, when it reuses them', async () => {
 		const { answer } = await twice(GUARD_ARGV, RECORDED)
 
-		expect(answer.out).toMatch(/^test:unit \(guard-tests\): reused/u)
+		expect(answer.out).toMatch(/^guard-tests: reused/u)
 	})
 
 	it('runs a stage with no record label every time and records nothing', async () => {
 		const { runner } = await twice(['check:related'], RECORDED)
 
 		expect(runner).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('run_chain.run_stages — the default stage runner', () => {
+	it('answers exports:unused from its green record without running it', async () => {
+		const spies = [
+			vi.spyOn(lane_ledger_write_chain_stage, 'record_chain_stage').mockResolvedValue(undefined),
+			vi.spyOn(check_related_reuse, 'read_tree').mockResolvedValue(RECORDED),
+			vi
+				.spyOn(check_reuse, 'reusable_checks')
+				.mockResolvedValue(new Map([[gate_labels.EXPORTS_LABEL, GREEN_AT]])),
+		]
+		const josh = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: FAIL, out: '' })
+		const stage = { name: EXPORTS_UNUSED, argv: EXPORTS_ARGV, next: (): string => '' }
+
+		const chain = await run_chain.run_stages([stage], '9139', vi.fn())
+
+		expect(josh).not.toHaveBeenCalled()
+		expect(chain.stop).toBeUndefined()
+		for (const spy of [...spies, josh]) spy.mockRestore()
 	})
 })
 
