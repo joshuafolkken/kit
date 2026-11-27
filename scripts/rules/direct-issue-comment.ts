@@ -13,7 +13,8 @@ import { standalone_gh_call, type StandaloneCall } from './standalone-gh-call'
 // The `direct-issue-comment` row of `delivered-rules.ts`. A run's own comment has to carry
 // `RUN_MARKER`, or `issue-watch-diff.ts` reads it as a person's update: the run's review then reads as
 // briefed before the issue changed, and `josh followup` refuses the merge (joshuafolkken/kit#4221).
-// `pnpm josh issue:comment` is the one path that writes the marker, so a hand-built `gh issue comment`
+// `pnpm josh issue:comment` is the one path that writes the marker — or, with `--from-user`,
+// `USER_MARKER` for a person's instruction a session relays — so a hand-built `gh issue comment`
 // or `gh api` write to `…/issues/<N>/comments` is refused and pointed there. It reads the argv through
 // `direct-pr-create.ts`'s cut, so a quoted mention is not a call and `bash -c '…'` still is.
 //
@@ -125,7 +126,9 @@ const DIRECT_ISSUE_COMMENT_REASON =
 	'⛔ direct issue comment: `gh issue comment` (or a `gh api` write to `…/issues/<N>/comments`) posts ' +
 	'without the run marker, so the run reads its own comment as a person updating the issue — the ' +
 	'review goes stale and `pnpm josh followup` refuses the merge. Post with ' +
-	'`pnpm josh issue:comment <N> --body-file <path>` instead (`shell-body.md`). ' +
+	'`pnpm josh issue:comment <N> --body-file <path>` instead — adding `--from-user` when the comment ' +
+	"relays a person's instruction, which stamps the user marker the holding run reads as an update " +
+	'(`shell-body.md`). ' +
 	'**This rule fires on every occurrence, not once per run.**'
 
 // **A standalone `gh issue comment <N> --body-file <path>` is rewritten rather than refused**
@@ -192,7 +195,7 @@ const ROW = {
 		fires:
 			"a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. A line that is only `gh issue comment <N>` with one `--body-file` / `-F <path>` is rewritten to `pnpm josh issue:comment <N> --body-file <path>`; every other form is refused, every occurrence",
 		quiet:
-			'`pnpm josh issue:comment`, or reading the comments — the path that writes the run marker',
+			'`pnpm josh issue:comment`, or reading the comments — the path that writes the run marker, or the user marker with `--from-user`',
 	},
 }
 

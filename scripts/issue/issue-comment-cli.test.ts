@@ -8,16 +8,18 @@ import { issue_comment_cli } from './issue-comment-cli'
 // command would post is read back without touching GitHub, and a real temp file exercises the
 // `--body-file` path the rule steers every caller toward.
 
-const { issue_comment } = vi.hoisted(() => ({
+const { issue_comment, issue_user_comment } = vi.hoisted(() => ({
 	issue_comment: vi.fn<(issue_number: string, body: string) => Promise<string>>(),
+	issue_user_comment: vi.fn<(issue_number: string, body: string) => Promise<string>>(),
 }))
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
-	git_gh_command: { issue_comment },
+	git_gh_command: { issue_comment, issue_user_comment },
 }))
 
 const COMMENT_URL = 'https://github.com/o/r/issues/5#issuecomment-1'
 const BODY_FILE_FLAG = '--body-file'
+const FROM_USER_FLAG = '--from-user'
 const INLINE_BODY = 'a short note'
 const FILE_BODY = 'park: needs a decision\n'
 const make_directory = temporary_directory('suite')
@@ -34,6 +36,8 @@ beforeEach(() => {
 	errors.length = 0
 	issue_comment.mockReset()
 	issue_comment.mockResolvedValue(COMMENT_URL)
+	issue_user_comment.mockReset()
+	issue_user_comment.mockResolvedValue(COMMENT_URL)
 	vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
 		printed.push(String(line))
 	})
@@ -70,6 +74,36 @@ describe('issue_comment_cli.run — outcome metadata', () => {
 	it('refuses an unsafe summary before posting', async () => {
 		expect(await issue_comment_cli.run(['5', '--body', INLINE_BODY, '--outcome', 'a\nb'])).toBe(1)
 		expect(issue_comment).not.toHaveBeenCalled()
+	})
+})
+
+// A person's instruction relayed onto an issue must reach the run holding it as an unread update.
+describe('issue_comment_cli.run — --from-user', () => {
+	it.each([
+		['after the body', ['5', '--body', INLINE_BODY, FROM_USER_FLAG]],
+		['before the issue number', [FROM_USER_FLAG, '5', '--body', INLINE_BODY]],
+	])('posts through the user-marked writer with the flag %s', async (_label, argv) => {
+		expect(await issue_comment_cli.run(argv)).toBe(0)
+		expect(issue_user_comment).toHaveBeenCalledWith('5', INLINE_BODY)
+		expect(issue_comment).not.toHaveBeenCalled()
+		expect(printed).toContain(COMMENT_URL)
+	})
+
+	it('posts through the run-marked writer without the flag', async () => {
+		expect(await issue_comment_cli.run(['5', '--body', INLINE_BODY])).toBe(0)
+		expect(issue_user_comment).not.toHaveBeenCalled()
+	})
+
+	it('keeps a body that spells the flag as the body', async () => {
+		expect(await issue_comment_cli.run(['5', ['--body', FROM_USER_FLAG].join('=')])).toBe(0)
+		expect(issue_comment).toHaveBeenCalledWith('5', FROM_USER_FLAG)
+		expect(issue_user_comment).not.toHaveBeenCalled()
+	})
+
+	it('is not a flag the shared request parser accepts, so run:park refuses it', () => {
+		const request = issue_comment_cli.resolve_request(['5', '--body', INLINE_BODY, FROM_USER_FLAG])
+
+		expect(request).toBeUndefined()
 	})
 })
 

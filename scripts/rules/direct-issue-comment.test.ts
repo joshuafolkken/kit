@@ -43,6 +43,7 @@ describe('direct_issue_comment.is_direct_issue_comment — refuses', () => {
 describe('direct_issue_comment.is_direct_issue_comment — is silent on', () => {
 	it.each([
 		'pnpm josh issue:comment 4187 --body-file /tmp/body.md',
+		'pnpm josh issue:comment 4187 --body-file /tmp/body.md --from-user',
 		"gh api repos/{owner}/{repo}/issues/4187/comments --jq '.[] | .body'",
 		'gh api -X GET repos/o/r/issues/4187/comments -f per_page=100',
 		'gh api repos/o/r/issues/4187/comments --paginate',
@@ -129,6 +130,27 @@ describe('direct_issue_comment.ROW.rewrite — the call made right', () => {
 
 		expect(direct_issue_comment.ROW.keeps(call)).toBe(true)
 		expect(direct_issue_comment.ROW.is_trigger(call, CWD_CONTEXT)).toBe(false)
+	})
+})
+
+// Either marker is written by the one command, so the row keeps both spellings and names the flag.
+describe('direct-issue-comment — the run-marked and the user-marked post', () => {
+	it.each([
+		'pnpm josh issue:comment 7 --body-file /tmp/body.md',
+		'pnpm josh issue:comment 7 --body-file /tmp/body.md --from-user',
+		'pnpm josh issue:comment 7 --from-user --body-file /tmp/body.md',
+	])('keeps %s without firing', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(direct_issue_comment.ROW.keeps(call)).toBe(true)
+		expect(direct_issue_comment.ROW.is_trigger(call, CWD_CONTEXT)).toBe(false)
+	})
+
+	it('names the flag for a relayed instruction in the refusal and the listing', () => {
+		const flag = '`--from-user`'
+
+		expect(direct_issue_comment.DIRECT_ISSUE_COMMENT_REASON).toContain(flag)
+		expect(direct_issue_comment.ROW.about.quiet).toContain(flag)
 	})
 })
 
