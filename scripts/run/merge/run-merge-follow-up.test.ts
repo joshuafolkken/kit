@@ -6,8 +6,13 @@ import { run_merge_follow_up } from './run-merge-follow-up'
 
 const { read_with_comments, all_events } = vi.hoisted(() => ({
 	read_with_comments: vi.fn<() => Promise<{ comments_json: string | undefined }>>(),
-	all_events: vi.fn<() => Promise<ReadonlyArray<{ kind: string; text: string }>>>(),
+	all_events: vi.fn<() => Promise<ReadonlyArray<FiledEvent>>>(),
 }))
+
+interface FiledEvent {
+	readonly found_during: string
+	readonly text: string
+}
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_read_with_comments: read_with_comments },
@@ -23,22 +28,25 @@ vi.mock('#scripts/issue/issue-read', () => ({
 vi.mock('#scripts/issue/issue-file-fold', () => ({
 	issue_file_fold: {
 		events_of: all_events,
-		finder_filings: (events: ReadonlyArray<{ text: string }>) =>
-			events.map((event) => ({ title: event.text })),
+		finder_filings: (events: ReadonlyArray<FiledEvent>, child: string) =>
+			events
+				.filter((event) => event.found_during === child)
+				.map((event) => ({ title: event.text })),
 	},
 }))
 
 const CHILD = '9063'
+const OTHER_CHILD = '9064'
 const EVIDENCE = 'result\n後続: Shorten the probe\n後続: Drop the retry\n'
-const FILED = 'FILED'
+const PROBE = 'Shorten the probe'
 const RETRY = 'Drop the retry'
 const infos: Array<string> = []
 
 beforeEach(() => {
 	infos.length = 0
 	read_with_comments.mockReset().mockResolvedValue({ comments_json: EVIDENCE })
-	all_events.mockReset().mockResolvedValue([{ kind: FILED, text: RETRY }])
-	vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
+	all_events.mockReset().mockResolvedValue([{ found_during: CHILD, text: RETRY }])
+	vi.spyOn(console, 'error').mockImplementation((line: unknown) => {
 		infos.push(String(line))
 	})
 })
@@ -53,14 +61,22 @@ describe('run_merge_follow_up.check', () => {
 
 		const printed = infos.join('\n')
 
-		expect(printed).toContain(`issue:file 'Shorten the probe' --found-during ${CHILD}`)
+		expect(printed).toContain(`issue:file '${PROBE}' --found-during ${CHILD}`)
 		expect(printed).not.toContain(RETRY)
+	})
+
+	it('does not count a same-title filing found during another child', async () => {
+		all_events.mockResolvedValue([{ found_during: OTHER_CHILD, text: RETRY }])
+
+		await run_merge_follow_up.check(CHILD)
+
+		expect(infos.join('\n')).toContain(`issue:file '${RETRY}' --found-during ${CHILD}`)
 	})
 
 	it('prints nothing once every follow-up is filed', async () => {
 		all_events.mockResolvedValue([
-			{ kind: FILED, text: 'Shorten the probe' },
-			{ kind: FILED, text: RETRY },
+			{ found_during: CHILD, text: PROBE },
+			{ found_during: CHILD, text: RETRY },
 		])
 
 		await run_merge_follow_up.check(CHILD)

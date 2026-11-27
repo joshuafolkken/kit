@@ -8,7 +8,8 @@ import { error_text } from '#scripts/lib/error-message'
 // A merged child's follow-up lines no `FILED` event of its own carries (joshuafolkken/kit#9063): a
 // measurement's lane child writes them in its evidence comment and the parent files each
 // (`issue-measured-follow-up.ts`), so `run:merge` names the ones still unfiled. It only names them —
-// no filing — and a failed read skips the check with one line, never failing the merge.
+// no filing — and a failed read skips the check with one line, never failing the merge. Both go to
+// stderr: `backlog:drive` keeps only the last stdout line of `run:merge` and forwards stderr.
 
 const COMMENT_FIELDS = 'number'
 
@@ -47,9 +48,9 @@ async function check(child: string): Promise<void> {
 
 		const heading = `Unfiled follow-ups ${cite} names — file each:`
 
-		console.info(issue_measured_follow_up.lines_of(heading, unfiled, child))
+		console.error(issue_measured_follow_up.lines_of(heading, unfiled, child))
 	} catch (error) {
-		console.info(`Follow-up check skipped for ${cite}: ${error_text.message_of(error)}`)
+		console.error(`Follow-up check skipped for ${cite}: ${error_text.message_of(error)}`)
 	}
 }
 
