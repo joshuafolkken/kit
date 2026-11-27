@@ -311,6 +311,30 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<name> <what>', 'automation', ['git']],
 		usage: { examples: [{ arguments: 'theme "colors"' }] },
 	},
+	// The standing part of a no-filing producer's brief, so the main line writes only the goal and the
+	// investigation conclusion — and cannot write its own wish to run the tests into it.
+	'producer:brief': {
+		script: 'scripts/agent/producer-brief-main.ts',
+		description: 'Print the standing part of a no-filing producer brief for wip/<name>',
+		category: 'Workflow',
+		reference: ['<name> [--tests-now-quote <words>]', 'automation', ['none']],
+		usage: {
+			examples: [
+				{ arguments: 'theme', note: 'tests, the gate and the review wait for the finish' },
+				{
+					arguments: 'theme --tests-now-quote "テストと gate も"',
+					note: 'the user asked for the tests and the gate now',
+				},
+			],
+			flags: [
+				{
+					names: ['--tests-now-quote <words>'],
+					description:
+						"the user's own words asking for the tests and the gate now; anything else is refused.",
+				},
+			],
+		},
+	},
 }
 
 export { WORKFLOW_COMMANDS }
