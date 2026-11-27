@@ -9,7 +9,7 @@ import type { ThemeRun } from './run-board-theme-run'
 // drawn, on the first frame at or past its start however many ticks were skipped; an event begun before
 // the run's first frame stays silent, and a part sounds once as it starts.
 
-const { is_notice_started, sound_events, sound_part } = run_board_theme_notice_sound
+const { is_notice_started, sound_events, sound_part, warm_events } = run_board_theme_notice_sound
 const { VIEW, base_canvas, ticking_run } = run_board_theme_layer_fixture
 const { TICK_MS } = run_board_theme_host_state
 const ORIGIN_MS = 10_000
@@ -102,5 +102,35 @@ describe('run_board_theme_notice_sound.sound_part', () => {
 		sound_part(ticking_run(0), trill)
 
 		expect(trill.part).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#9087: the sounds a frame may start are rendered ahead, before it is written.
+describe('run_board_theme_notice_sound.warm_events', () => {
+	it('renders every event due from the tick on, by its text’s length, and none begun before', () => {
+		const run = showing({
+			notice: [{ start: NOTICE_TICK, text: `${ESC}[1m${'a'.repeat(4)}${ESC}[0m` }],
+			progress: [],
+			row: [{ start: 1, text: 'ab' }],
+		})
+		const trill = { warm_event: vi.fn(), warm_part: vi.fn() }
+
+		warm_events(run, trill, at_tick(NOTICE_TICK - 1))
+
+		expect(trill.warm_event.mock.calls).toStrictEqual([['notice', 4]])
+	})
+
+	it('renders both parts once the theme is built, none before', () => {
+		const run = ticking_run(0)
+		const trill = { warm_part: vi.fn() }
+
+		warm_events(run, trill, 0)
+
+		expect(trill.warm_part).not.toHaveBeenCalled()
+
+		run_board_theme_layer.theme_layer(run, VIEW).draw(base_canvas(), 0)
+		warm_events(run, trill, 0)
+
+		expect(trill.warm_part.mock.calls.map(([name]) => name)).toStrictEqual(['opening', 'ending'])
 	})
 })

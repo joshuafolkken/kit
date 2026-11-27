@@ -1,4 +1,5 @@
 import type { KeyReading } from './run-board-keys'
+import { run_board_sound_latency } from './run-board-sound-latency'
 import { run_board_sound_player, type Playing, type StartHandlers } from './run-board-sound-player'
 import type { Score } from './run-board-sound-score'
 import type { EventKind, TypingSound } from './run-board-sound-typing'
@@ -40,6 +41,8 @@ const RANK: Readonly<Record<EventKind | PartName, number>> = {
 	ending: 3,
 }
 const HELD = new Set<Held>()
+// Event and part sounds a frame ranked, started once the frame's typing has (joshuafolkken/kit#9087).
+const PENDING: Array<{ file: string; rank: number }> = []
 // The boards' trills, hushed with the rest.
 const TRILLS = new Set<Pick<TypingSound, 'hush'>>()
 
@@ -53,15 +56,17 @@ function hush(): void {
 	for (const trill of TRILLS) trill.hush?.()
 	run_board_sound_player.stop_all()
 	HELD.clear()
+	// a sound not yet started is dropped with them
+	PENDING.length = 0
 }
 
-// The board leaving: the trill stopped, every sound hushed, then each of `steps`. Each runs though one
+// The board leaving: the trill stopped, every sound hushed, the resident player closed, then each of `steps`. Each runs though one
 // before it threw, so a failing step never leaves a sound playing on (joshuafolkken/kit#9027); the
 // first failure is rethrown once all have run.
 function leave_with(trill: Pick<TypingSound, 'stop'> | undefined, steps: Array<() => void>): void {
 	const failures: Array<unknown> = []
 
-	for (const step of [() => trill?.stop(), hush, ...steps]) {
+	for (const step of [() => trill?.stop(), hush, run_board_sound_player.close, ...steps]) {
 		try {
 			step()
 		} catch (error: unknown) {
@@ -90,15 +95,20 @@ function holding(rank: number): StartHandlers {
 	}
 }
 
-// An event's or a part's sound by the effects' rules: under a higher sound playing it stays silent, as
-// the lower effect shows its text alone; else every sound before it ends — none outranks it then — and
-// it plays.
+// An event's or a part's sound by the effects' rules: under a higher sound playing or due it stays
+// silent, as the lower effect shows its text alone; else every sound before it ends at once — none
+// outranks it then — and it is due to start with the frame's `flush`, after the frame's typing.
 function ranked(file: string | undefined, name: EventKind | PartName): void {
 	const rank = RANK[name]
 
-	if (file === undefined || [...HELD].some((held) => held.rank > rank)) return
+	if (file === undefined || [...HELD, ...PENDING].some((held) => held.rank > rank)) return
 	hush()
-	run_board_sound_player.start(file, holding(rank))
+	PENDING.push({ file, rank })
+}
+
+// The sounds a frame ranked started, each held until it ends.
+function flush(): void {
+	for (const { file, rank } of PENDING.splice(0)) run_board_sound_player.start(file, holding(rank))
 }
 
 // The theme's typed end played once (joshuafolkken/kit#8697); nothing in no theme or a theme with none.
@@ -120,8 +130,15 @@ function switched_end(keys: KeyReading, typed_end: (() => void) | undefined): ()
 	}
 }
 
-// The shown theme's sound of an event or a part as it starts, under the sound switch.
-function scored(keys: KeyReading, shown: Shown): Pick<TypingSound, 'event' | 'part'> {
+type Scored = Pick<
+	TypingSound,
+	'event' | 'part' | 'flush' | 'warm_event' | 'warm_part' | 'delay_ms'
+>
+
+// The shown theme's sound of an event or a part as it starts, under the sound switch; each rendered
+// ahead by the warm ports as the frame that starts it is drawn, and the picture drawn behind the sound by
+// the output's delay while the switch is on (joshuafolkken/kit#9087).
+function scored(keys: KeyReading, shown: Shown): Scored {
 	function score(): Score | undefined {
 		const theme = shown()
 
@@ -135,6 +152,10 @@ function scored(keys: KeyReading, shown: Shown): Pick<TypingSound, 'event' | 'pa
 		part: (name, ms) => {
 			ranked(score()?.part(name, ms), name)
 		},
+		flush,
+		warm_event: (kind, letters) => score()?.[kind](letters),
+		warm_part: (name, ms) => score()?.part(name, ms),
+		delay_ms: () => (is_sounding(keys) ? run_board_sound_latency.delay_ms() : 0),
 	}
 }
 
@@ -148,10 +169,14 @@ function skipped(keys: KeyReading | undefined, theme: Theme | undefined): void {
 	played(THEME_DEFS[theme].score.appear())
 }
 
-// `theme`'s NOTICE track rendered ahead, as the board starts or switches to it: the longest track,
-// which would hold the board's frames while it renders as the first NOTICE starts.
+// `theme`'s NOTICE track and the board appearing rendered ahead, as the board starts or switches to it —
+// the longest track, which would hold the board's frames while it renders as the first NOTICE starts,
+// and the sound a skipped opening plays — and the resident player opened (joshuafolkken/kit#9087).
 function warm(theme: Theme | undefined): void {
-	if (theme !== undefined) THEME_DEFS[theme].score.notice()
+	if (theme === undefined) return
+	THEME_DEFS[theme].score.notice()
+	THEME_DEFS[theme].score.appear()
+	run_board_sound_player.prepare()
 }
 
 const run_board_live_sound = {

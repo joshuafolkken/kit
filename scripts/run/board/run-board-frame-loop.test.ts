@@ -310,3 +310,28 @@ describe('run_board_frame_loop.run — skipped frames', () => {
 		expect(screens[1]?.front).toStrictEqual(screens[0]?.front)
 	})
 })
+
+describe('run_board_frame_loop.run — before and after a frame', () => {
+	it('runs before_write after composing and before the write, after_frame after it', async () => {
+		const fake = fake_of()
+		const order: Array<string> = []
+
+		function noted(name: string): (at_ms: number) => void {
+			return (at_ms) => {
+				order.push(`${name} ${String(at_ms - START)} ${String(fake.writes.length)}`)
+			}
+		}
+
+		await run(
+			{
+				...run_of([spinner()], START + SPIN_MS - 1),
+				before_write: noted('before'),
+				after_frame: noted('after'),
+			},
+			fake.ports,
+			screen_of(),
+		)
+
+		expect(order).toStrictEqual(['before 0 0', 'after 0 1'])
+	})
+})

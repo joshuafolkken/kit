@@ -11,6 +11,7 @@ import { run_board_spot, type Spot } from './run-board-spot'
 import { run_board_theme_events } from './run-board-theme-events'
 import { run_board_theme_layer } from './run-board-theme-layer'
 import type { LayoutView } from './run-board-theme-layout'
+import { run_board_theme_notice_sound } from './run-board-theme-notice-sound'
 import { run_board_theme_run, type ThemeRun } from './run-board-theme-run'
 import { run_board_type_rows, type KeyedLine } from './run-board-type-rows'
 
@@ -110,6 +111,11 @@ function view_of(turning: Turning, run: ThemeRun): LayoutView {
 	}
 }
 
+// joshuafolkken/kit#9087: how far a themed board draws behind its sounds — the output's delay.
+function delay_of(ports: SpinPorts): () => number {
+	return () => ports.typing_sound?.delay_ms?.() ?? 0
+}
+
 // The frame's layers in the order they are drawn, the redraw at the bottom: in no theme the spinners,
 // restyled by the theme's restyle; a themed second the theme layer alone over the redraw — it types,
 // turns the spinners and blinks the colons itself.
@@ -118,7 +124,7 @@ function layers_of(turning: Turning, ports: SpinPorts, screen: FrameScreen): Arr
 	const run = themed_run(ports)
 
 	if (run !== undefined) {
-		return [base, run_board_theme_layer.theme_layer(run, view_of(turning, run))]
+		return [base, run_board_theme_layer.theme_layer(run, view_of(turning, run), delay_of(ports))]
 	}
 
 	return [base, run_board_layer_spin.spin_layer(turning, ports.restyle ?? String)]
@@ -153,6 +159,13 @@ function sounded(turning: Turning, ports: SpinPorts, at_ms: number): void {
 	else run_board_theme_layer.after_frame(ports.theme_run, ports.typing_sound, at_ms, board)
 }
 
+// The sounds a themed frame may start rendered ahead, before it is written (joshuafolkken/kit#9087).
+function warmed(ports: SpinPorts, at_ms: number): void {
+	const run = themed_run(ports)
+
+	if (run !== undefined) run_board_theme_notice_sound.warm_events(run, ports.typing_sound, at_ms)
+}
+
 // Draws the redraw on `screen`, then turns the spinners — or draws the theme — until the next second;
 // a still frame just waits — one the theme draws never is; a theme run showing none (a board launched
 // in no theme, Issue 4-4) is still as a board without one.
@@ -168,6 +181,9 @@ async function spin_to_second(
 			layers: layers_of(turning, ports, screen),
 			until_ms: run_board_layer.boundary_after(ports.now(), REDRAW_MS),
 			is_still: themed_run(ports) === undefined && is_still(turning),
+			before_write: (at_ms) => {
+				warmed(ports, at_ms)
+			},
 			after_frame: (at_ms) => {
 				sounded(turning, ports, at_ms)
 			},

@@ -52,6 +52,9 @@ interface Palette {
 	progress_end?: Sound
 	appear: Sound
 	vanish: Sound
+	// One-shot sounds the OPENING plays on its way, each from its time since the start
+	// (joshuafolkken/kit#9087); a cue past the opening's end is left out.
+	opening_cues?: ReadonlyArray<{ at_ms: number; sound: Sound }>
 }
 
 // A timed part of a track: its samples from `at_ms`, at `gain`.
@@ -187,15 +190,23 @@ function progress_track(end: Sound, letters: number): Array<number> {
 	return fitted([ending_at(end, typing_ms)], typing_ms)
 }
 
-// A part's track, as long as the part: the opening's quiet bed then the board appearing; the ending's
-// sinking bed then the board gone, each ending with the part.
+// The opening's cues that start within its `ms`, each placed at its time.
+function cues_of(palette: Palette, ms: number): Array<Placed> {
+	const cues = palette.opening_cues ?? []
+
+	return cues.filter(({ at_ms }) => at_ms < ms).map(({ at_ms, sound }) => placed(sound, at_ms))
+}
+
+// A part's track, as long as the part: the opening's quiet bed, its cues, then the board appearing; the
+// ending's sinking bed then the board gone, each ending with the part.
 function part_track(palette: Palette, name: PartName, ms: number): Array<number> {
 	const is_opening = name === 'opening'
 	const bed = is_opening ? palette.notice.bed : sinking(palette.notice.bed)
 	const last = is_opening ? palette.appear : palette.vanish
+	const cues = is_opening ? cues_of(palette, ms) : []
 
 	return fitted(
-		[bed_part(bed, 0, ms, is_opening ? OPENING_GAIN : HELD_GAIN), ending_at(last, ms)],
+		[bed_part(bed, 0, ms, is_opening ? OPENING_GAIN : HELD_GAIN), ...cues, ending_at(last, ms)],
 		ms,
 	)
 }

@@ -2,6 +2,11 @@ import { spawn, type SpawnOptions } from 'node:child_process'
 import type { Writable } from 'node:stream'
 import { run_board_output_hold } from './run-board-output-hold'
 import { run_board_sound_cues, type CueName } from './run-board-sound-cues'
+import {
+	run_board_sound_resident,
+	type Resident,
+	type ResidentPorts,
+} from './run-board-sound-resident'
 import { run_board_sound_stream } from './run-board-sound-stream'
 import { run_board_sound_wav } from './run-board-sound-wav'
 
@@ -118,6 +123,34 @@ function stop_all(): void {
 	PLAYING.clear()
 }
 
+// The resident player a themed board keeps open on a Mac (joshuafolkken/kit#9087); none until prepared.
+const RESIDENT: { current: Resident | undefined } = { current: undefined }
+
+// The resident player opened, on a Mac only and once; every sound after plays through it first.
+function prepare({
+	platform = process.platform,
+	ports,
+}: { platform?: NodeJS.Platform; ports?: ResidentPorts } = {}): void {
+	if (platform !== 'darwin' || RESIDENT.current !== undefined) return
+	RESIDENT.current = run_board_sound_resident.open(ports)
+}
+
+// The resident player closed and forgotten, its sounds ended; sounds spawn their own players again.
+function close(): void {
+	if (RESIDENT.current !== undefined) run_board_sound_resident.close(RESIDENT.current)
+	RESIDENT.current = undefined
+}
+
+// `file` started on the resident player; false where there is none or it cannot play it.
+function resident_started(file: string, is_loop: boolean, handlers: StartHandlers): boolean {
+	const child = RESIDENT.current && run_board_sound_resident.play(RESIDENT.current, file, is_loop)
+
+	if (child === undefined) return false
+	begin(child, handlers.failed, handlers)
+
+	return true
+}
+
 function start_first(
 	file: string,
 	players: Array<Player>,
@@ -148,7 +181,9 @@ function start(
 	handlers: StartHandlers,
 	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
 ): void {
-	start_first(file, players_for(platform), { ports, handlers })
+	if (!resident_started(file, false, handlers)) {
+		start_first(file, players_for(platform), { ports, handlers })
+	}
 }
 
 function mac_loop_args(file: string): Array<string> {
@@ -207,11 +242,10 @@ function loop_ports(file: string, platform: NodeJS.Platform, ports: SoundPorts):
 	return platform === 'linux' ? run_board_sound_stream.ports_for(file, ports) : ports
 }
 
-// Loop inside one audio stream, without closing the output between WAV boundaries.
-function loop(
+function loop_spawned(
 	file: string,
 	handlers: StartHandlers,
-	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
+	{ platform, ports }: Required<PlayerOptions>,
 ): void {
 	try {
 		const output = loop_ports(file, platform, ports)
@@ -220,6 +254,16 @@ function loop(
 	} catch {
 		handlers.failed()
 	}
+}
+
+// Loop inside one audio stream, without closing the output between WAV boundaries: on the resident
+// player where one is open, else on a player of its own.
+function loop(
+	file: string,
+	handlers: StartHandlers,
+	{ platform = process.platform, ports = DEFAULT_PORTS }: PlayerOptions = {},
+): void {
+	if (!resident_started(file, true, handlers)) loop_spawned(file, handlers, { platform, ports })
 }
 
 function play(
@@ -256,10 +300,12 @@ function play_cue(
 
 const run_board_sound_player = {
 	BEL,
+	close,
 	players_for,
 	play,
 	play_cue,
 	loop,
+	prepare,
 	start,
 	stop_all,
 }

@@ -158,6 +158,38 @@ describe('run_board_theme_layer.after_frame', () => {
 	})
 })
 
+// joshuafolkken/kit#9087: a frame ranks its event sounds, starts its typing, then starts the ranked
+// sounds; the picture is drawn behind them by the output's delay.
+describe('run_board_theme_layer sound timing', () => {
+	it('ranks a started event, then sets the typing, then starts the ranked sounds', () => {
+		const run = ticking_run(ORIGIN_MS)
+		const trill = { set: vi.fn(), typed: vi.fn(), event: vi.fn(), flush: vi.fn() }
+		const board = { is_on: true, left_ms: 300 }
+
+		run.demo = { timeline: { notice: [], progress: [], row: [] }, entered: 'wopr' }
+		after_frame(run, trill, ORIGIN_MS, board)
+		run.demo = {
+			timeline: { notice: [{ start: 1, text: 'abc' }], progress: [], row: [] },
+			entered: 'wopr',
+		}
+		after_frame(run, trill, ORIGIN_MS + 2 * TICK_MS, board)
+		const order = [trill.event, trill.set, trill.flush].map(
+			(mock) => mock.mock.invocationCallOrder.at(-1) ?? 0,
+		)
+
+		expect(trill.event).toHaveBeenCalledWith('notice', 3)
+		expect(order).toStrictEqual(order.toSorted((first, second) => first - second))
+	})
+
+	it('draws and changes the delay behind the moment', () => {
+		const delay_ms = 2 * TICK_MS
+		const layer = theme_layer(ticking_run(ORIGIN_MS), VIEW, () => delay_ms)
+
+		expect(tick_text(drawn_at(layer, ORIGIN_MS + 150 + delay_ms))).toBe('3')
+		expect(layer.next_change_ms(ORIGIN_MS + delay_ms)).toBe(ORIGIN_MS + TICK_MS + delay_ms)
+	})
+})
+
 // joshuafolkken/kit#8917: a live board in a theme, on a terminal of 24-bit color, drawn by the theme host.
 const { IDLE_ROW, LOCAL, STOPPED, harness, plan_titled } = run_board_fixture
 const STOP_AFTER_MS = 5000

@@ -28,6 +28,9 @@ interface FrameRun {
 	until_ms: number
 	is_still: boolean
 	after_frame?: ((at_ms: number) => void) | undefined
+	// joshuafolkken/kit#9087: run once a frame is composed and before it is written, so the sounds of the
+	// events it shows are rendered before the write and start right after it.
+	before_write?: ((at_ms: number) => void) | undefined
 	// joshuafolkken/kit#8917: false once the layers no longer show what the board shows (a theme switched
 	// in demo mode); the second ends within a check, before another frame, so the redraw comes at once.
 	is_current?: (() => boolean) | undefined
@@ -122,6 +125,7 @@ function frame(
 		compose(frame_run.layers, canvas, at_ms, decor_ms)
 		const compose_ms = ports.now() - start_ms
 
+		frame_run.before_write?.(at_ms)
 		run_board_timing_frames.framed(compose_ms, write_frame(ports, screen, canvas))
 	})
 	clock.is_thin = ports.now() - at_ms > THIN_AFTER_MS

@@ -136,7 +136,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [THEME_FLAG],
 					description:
-						'sounds: the typing trill while a row types and the opening’s sound — wopr the teletype, trace the key click, flux the time-circuit keypad and its ENTER; codec, nixie, skynet and magi the teletype for now.',
+						'sounds: the typing trill while a row types and the opening’s sound — wopr the teletype, trace the key click, flux the time-circuit keypad and its ENTER; codec, nixie, skynet and magi the teletype for now. A Mac plays them through one resident player; frames trail them by the output latency.',
 				},
 				{
 					names: ['--icons <emoji|letters|shapes>'],
