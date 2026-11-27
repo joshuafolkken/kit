@@ -15,9 +15,16 @@ const UNSAMPLED_LAUNCH = 'unsampled' as const
 // Its answer for an issue over the size bar its split-only unit split into children
 // (`backlog-drive-split-unit.ts`): the parent is an epic now, so it is excluded as a measured close is.
 const SPLIT_LAUNCH = 'split' as const
+// Its answer for an issue another run already holds (`backlog-drive-holder.ts`): that run finishes it,
+// so it waits as an unsampled issue does, re-offered no more by this drive and never parked.
+const HELD_LAUNCH = 'held' as const
 
 type DriveLaunch =
-	LaunchOutcome['kind'] | typeof MEASURED_LAUNCH | typeof UNSAMPLED_LAUNCH | typeof SPLIT_LAUNCH
+	| LaunchOutcome['kind']
+	| typeof MEASURED_LAUNCH
+	| typeof UNSAMPLED_LAUNCH
+	| typeof SPLIT_LAUNCH
+	| typeof HELD_LAUNCH
 
 interface Settled {
 	in_flight: Array<string>
@@ -79,15 +86,20 @@ const SETTLED: ReadonlySet<DriveLaunch> = new Set([
 	LAUNCHED,
 	UNSAMPLED_LAUNCH,
 	SPLIT_LAUNCH,
+	HELD_LAUNCH,
 ])
 
 function is_settled(outcome: DriveLaunch): boolean {
 	return SETTLED.has(outcome)
 }
 
+// The outcomes this drive re-offers no more: closed or split ones are excluded, waiting ones wait.
+const CLOSED: ReadonlySet<DriveLaunch> = new Set([MEASURED_LAUNCH, SPLIT_LAUNCH])
+const WAITING: ReadonlySet<DriveLaunch> = new Set([UNSAMPLED_LAUNCH, HELD_LAUNCH])
+
 function settle(settled: Settled, issue: string, outcome: DriveLaunch): void {
-	if (outcome === MEASURED_LAUNCH || outcome === SPLIT_LAUNCH) settled.measured.push(issue)
-	if (outcome === UNSAMPLED_LAUNCH) settled.unsampled.push(issue)
+	if (CLOSED.has(outcome)) settled.measured.push(issue)
+	if (WAITING.has(outcome)) settled.unsampled.push(issue)
 	if (outcome === LAUNCHED) settled.in_flight.push(issue)
 }
 
@@ -140,7 +152,13 @@ async function launch_all(
 	return await refused(refusal.issue, refusal.outcome, next, ports)
 }
 
-const backlog_drive_launch_pass = { MEASURED_LAUNCH, SPLIT_LAUNCH, UNSAMPLED_LAUNCH, launch_all }
+const backlog_drive_launch_pass = {
+	HELD_LAUNCH,
+	MEASURED_LAUNCH,
+	SPLIT_LAUNCH,
+	UNSAMPLED_LAUNCH,
+	launch_all,
+}
 
 export type { DriveLaunch }
 export { backlog_drive_launch_pass }

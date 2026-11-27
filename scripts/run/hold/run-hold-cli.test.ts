@@ -24,6 +24,7 @@ vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn
 
 // A numbered release strips the issue's `in-progress` on GitHub; `run-hold-cli-release.test.ts` pins it.
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
+vi.mock('#scripts/lane/lane-registry', () => ({ lane_registry: { find_open_lane: vi.fn() } }))
 
 // A stop before commit asks the e2e record first; `run-hold-cli-stop.test.ts` pins the refusal.
 vi.mock('#scripts/test/test-e2e-stamp', () => ({

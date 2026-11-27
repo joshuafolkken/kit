@@ -182,6 +182,10 @@ async function claim(target: string, request: ClaimRequest, is_linked: boolean):
 
 	if (gate !== undefined) return gate
 
+	const lane_refusal = await run_hold_block.lane_block(request.issue, is_linked)
+
+	if (lane_refusal !== undefined) return report_busy(lane_refusal)
+
 	const read = run_hold.read_hold(target)
 	const blocked = await run_hold_block.blocking_message(read, request.issue)
 

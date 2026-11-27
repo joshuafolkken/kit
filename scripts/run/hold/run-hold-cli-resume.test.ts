@@ -18,6 +18,7 @@ vi.mock('#scripts/run/run-preflight', () => ({
 }))
 
 vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
+vi.mock('#scripts/lane/lane-registry', () => ({ lane_registry: { find_open_lane: vi.fn() } }))
 
 const scratch = make_directory('run-hold-cli-resume-test-')
 const WORKTREE = path.join(scratch, '.git')
