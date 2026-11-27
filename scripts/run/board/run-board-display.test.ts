@@ -103,6 +103,14 @@ describe('run_board_display.assemble_display', () => {
 		expect(JSON.stringify(busy_display(MANY_EVENTS))).not.toContain('"events"')
 	})
 
+	// joshuafolkken/kit#8954: the header's finish estimate bands a row by the read's declared sizes.
+	it('carries the read’s lane bands into the header', () => {
+		const lane_bands = { totals: new Map(), of_issue: new Map([[RUNNING, 'large' as const]]) }
+		const display = assembled(planned(), [running_row()], START, { ...LOCAL, lane_bands })
+
+		expect(display.header.lane_bands).toEqual(lane_bands)
+	})
+
 	it('decides the cue a lane starting sounds without any port', () => {
 		const state = planned()
 		const before = assembled(state, [], START)

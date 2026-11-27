@@ -20,8 +20,9 @@ import { run_board_usual } from './run-board-usual'
 // Remembered per ledger stamp, so a redraw over an unchanged ledger hands back the same array and the
 // readers' own memos aggregate nothing again (joshuafolkken/kit#7012).
 //
-// The live worker holds only the kinds those readers count — a stage, dispatch, merge, hold, release or declared size
-// — and the whole ledger's only while the window leaves a value to fill, in a tail cache of its own
+// The live worker holds only the kinds those readers count — a stage, dispatch, merge, hold, release,
+// size or declared record (the declared sizes, joshuafolkken/kit#8954) — and the whole ledger's only
+// while the window leaves a value to fill, in a tail cache of its own
 // that grows by the appended lines and is let go once the window covers (joshuafolkken/kit#8034).
 
 const MARGIN_DAYS = 1

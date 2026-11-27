@@ -40,6 +40,7 @@ const info = vi.spyOn(console, 'info')
 const budgets = vi.spyOn(line_budget, 'budgets_for')
 const signals_of = vi.spyOn(lane_plan_signals, 'signals_of')
 const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
+const record_declared = vi.spyOn(lane_ledger_write, 'record_declared')
 // A lane yields unless a test hands it a deadline (`lane-plan-wait.ts`).
 const deadline = vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefined)
 const hold = vi.spyOn(lane_plan_wait, 'hold')
@@ -73,7 +74,7 @@ beforeEach(() => {
 	budgets.mockResolvedValue([])
 	signals_of.mockResolvedValue(QUIET)
 	record_split_notice.mockResolvedValue(undefined)
-	vi.spyOn(lane_ledger_write, 'record_declared').mockResolvedValue(undefined)
+	record_declared.mockResolvedValue(undefined)
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_yield.mockResolvedValue(undefined)
@@ -249,11 +250,13 @@ describe('lane:plan size bar', () => {
 		},
 	)
 
-	it('records and clears a plan within the bar', async () => {
+	// joshuafolkken/kit#8954: the plan also puts its declared size on the ledger, which run:board bands by.
+	it('records and clears a plan within the bar, with its declared size', async () => {
 		fetch_opted_in.mockResolvedValue(holding(DECLARED))
 
 		expect(await lane_plan_cli.run([String(LATER), ...grown.slice(0, 2)], directory)).toBe(SUCCESS)
 		expect(info).toHaveBeenCalledWith('clear')
+		expect(record_declared.mock.calls.at(-1)?.[0]).toMatchObject({ issue: LATER, lines: 20 })
 	})
 })
 
