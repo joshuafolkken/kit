@@ -23,9 +23,9 @@ const NODE_MODULES = 'node_modules'
 // **A unit check that executed nothing may report success only where the project has no unit suite
 // at all**. The two halves of "nothing ran" are not the same state:
 //
-// - **`vitest` absent is the young project.** `josh init` installs no vitest and writes no
-//   `test:unit` script, so a freshly-bootstrapped project always lands here — which is the case the
-//   skip was written for, and it keeps it.
+// - **`vitest` absent and undeclared is the young project.** `josh init` installs no vitest and
+//   writes no `test:unit` script, so a freshly-bootstrapped project always lands here — which is the
+//   case the skip was written for, and it keeps it. Declared but absent is not young: it fails.
 // - **`vitest` present is the full project's declaration that it runs unit tests.** Zero matching
 //   files there is a broken state — a mis-scoped glob, or a deleted suite — and fails. A basic
 //   project may carry vitest as an unused dependency without declaring a unit suite; zero files
