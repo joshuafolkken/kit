@@ -76,13 +76,14 @@ Without `josh`: `issue-template.md` → "複数 Issue に分割するときの e
 
 ## Words typed after `new`
 
-**`auto-ok` is judged by `pnpm josh issue:file`, never typed** — the excluded labels and the
-`- 人の判断:` line; `不要` also needs a run label (`issue-template.md` → "`## 背景` 直下の宣言と分類ラベル").
+**`auto-ok` is judged by `pnpm josh issue:file`, never typed** — the excluded labels (a hand-off
+`new` child's `handoff:implementing`) and the `- 人の判断:` line; `不要` also needs a run label
+(`issue-template.md` → "`## 背景` 直下の宣言と分類ラベル").
 
 **Planning ends this invocation only; it does not prohibit a separate run.** Never infer
-`--no-auto-ok` from `kickoff` or a request to plan only. Before opting out an otherwise eligible
-filing, verify and record the original user's prohibition, its reference and verbatim instruction
-under `## 自動実行の制約` (`docs/how-to/auto-ok-provenance.md`).
+`--no-auto-ok` from `kickoff` or a request to plan only. Before opting out an eligible filing,
+record the user's verified prohibition, reference and quote under `## 自動実行の制約`
+(`docs/how-to/auto-ok-provenance.md`).
 
 **Words after `new`** (`kickoff new high`) are read like `into <target>`, never inferred. Each adds its
 labels to the filing; a word not in the table is asked about:

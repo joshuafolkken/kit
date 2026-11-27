@@ -53,6 +53,7 @@ const QUIET_PORTS: Omit<HandoffPorts, RecordingKey> = {
 	lane_directory: async () => '/repo',
 	read_text: () => FINAL,
 	is_retrospective_done: () => true,
+	release_filing: vi.fn<HandoffPorts['release_filing']>(),
 }
 
 function fake(overrides: Partial<HandoffPorts> = {}): Fake {

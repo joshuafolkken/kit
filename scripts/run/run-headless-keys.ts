@@ -6,16 +6,25 @@ const HEADLESS_ENV_KEY = 'JOSH_RUN_HEADLESS'
 // owner is its ancestor too; the mark keeps it from reading as the `backlogrun` parent the way a lane
 // child's own mark does (`driving_carry`).
 const HANDOFF_CHILD_KEY = 'JOSH_HANDOFF_CHILD'
+// The line a `josh run:handoff` child was handed (`fullrun new`, `kickoff new`, `fullrun 9142`), read
+// only by `issue-handoff-filing.ts`: the filing of a handed-off implementing run withholds `auto-ok`.
+const HANDOFF_LINE_KEY = 'JOSH_HANDOFF_KEYWORD'
 // A triage session `run:wake` started beside its driver (joshuafolkken/kit#7120). It runs under the
 // supervisor that owns the record, so without the mark its turn-end would cut the record the
 // still-running driver holds.
 const BESIDE_CHILD_KEY = 'JOSH_BESIDE_CHILD'
 
-const MARK_KEYS: ReadonlyArray<string> = [HEADLESS_ENV_KEY, HANDOFF_CHILD_KEY, BESIDE_CHILD_KEY]
+const MARK_KEYS: ReadonlyArray<string> = [
+	HEADLESS_ENV_KEY,
+	HANDOFF_CHILD_KEY,
+	HANDOFF_LINE_KEY,
+	BESIDE_CHILD_KEY,
+]
 
 const run_headless_keys = {
 	BESIDE_CHILD_KEY,
 	HANDOFF_CHILD_KEY,
+	HANDOFF_LINE_KEY,
 	HEADLESS_ENV_KEY,
 	MARK_KEYS,
 }

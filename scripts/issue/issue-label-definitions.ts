@@ -9,6 +9,7 @@ import {
 	DEFERRED_LABEL,
 	ENHANCEMENT_LABEL,
 	EPIC_LABEL,
+	HANDOFF_IMPLEMENTING_LABEL,
 	IGNORE_FOR_RELEASE_LABEL,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
@@ -100,6 +101,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		name: PLAN_UNVERIFIED_LABEL,
 		color: 'e4e669',
 		description: "Planned from another repository's checkout — re-plan in the target to run it",
+	},
+	{
+		name: HANDOFF_IMPLEMENTING_LABEL,
+		color: 'd4c5f9',
+		description: 'Filed by a handed-off fullrun/halfrun/prrun new, which implements it itself',
 	},
 	{
 		name: RUN_SOLO_LABEL,

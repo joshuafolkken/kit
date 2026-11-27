@@ -19,7 +19,8 @@ import type { EntryRequest } from './run-entry-children'
 const { HANDOFF_CHILD_KEY } = run_headless_keys
 
 // Root is never the fallback: every `run:handoff` refusal (seats full, `lane:open` failed, a held lane,
-// a launch failure) leaves the issue to the lane `backlogrun` opens for it.
+// a launch failure) leaves the issue to the lane `backlogrun` opens for it; `run-handoff-release.ts`
+// lifts its `handoff:implementing` so `auto-ok` can be decided again.
 const REFUSED_HANDOFF_NOTE = 'If run:handoff refuses, end with its note and the issue URL'
 
 interface RootPorts {

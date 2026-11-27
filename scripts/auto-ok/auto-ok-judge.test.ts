@@ -1,4 +1,8 @@
-import { AUTO_OK_LABEL, DEFERRED_LABEL } from '#scripts/issue/issue-labels'
+import {
+	AUTO_OK_LABEL,
+	DEFERRED_LABEL,
+	HANDOFF_IMPLEMENTING_LABEL,
+} from '#scripts/issue/issue-labels'
 import type { WatchComment } from '#scripts/issue/issue-watch-diff'
 import { describe, expect, it } from 'vitest'
 import { auto_ok_judge, type JudgeIssue } from './auto-ok-judge'
@@ -40,6 +44,10 @@ describe('auto_ok_judge.is_candidate', () => {
 
 	it('skips an issue carrying a label the filing exclusions refuse', () => {
 		expect(auto_ok_judge.is_candidate(issue([DEFERRED_LABEL]))).toBe(false)
+	})
+
+	it('skips an issue a handed-off implementing run filed', () => {
+		expect(auto_ok_judge.is_candidate(issue([HANDOFF_IMPLEMENTING_LABEL]))).toBe(false)
 	})
 
 	it('skips an issue filed by an author without write access', () => {

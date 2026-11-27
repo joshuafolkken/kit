@@ -22,6 +22,7 @@ const EXCLUDED_LABELS = [
 	'needs-human-review',
 	'epic',
 	'plan:unverified',
+	'handoff:implementing',
 ]
 
 function filing_of(overrides: Partial<AutoOkFiling>): AutoOkFiling {
