@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ProcessRow } from '#scripts/lane/lane-process-table'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -149,9 +149,21 @@ describe('run_wait_cli.is_gone_in', () => {
 	})
 })
 
+const FAILING_LOG = ' ❯ |pure| scripts/a.test.ts (2 tests | 1 failed) 4ms\n     × bad 2ms\n'
+const FAILING_SUMMARY = 'failed so far: 1 test file(s) — scripts/a.test.ts'
+
+// A result directory under `root`, its pid file naming `OTHER_PID` as the launch writes it.
+function recorded(root: string, name = 'test-unit-1-2'): { root: string; directory: string } {
+	const directory = path.join(run_wait_cli.results_root(root), name)
+
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(run_wait_cli.result_path(directory, 'pid'), `${String(OTHER_PID)}\n`)
+
+	return { root, directory }
+}
+
 describe('run_wait_cli.collect on pending', () => {
 	const create_directory = temporary_directory()
-	const FAILING_LOG = ' ❯ |pure| scripts/a.test.ts (2 tests | 1 failed) 4ms\n     × bad 2ms\n'
 
 	async function pending_lines(log: string): Promise<{ code: number; lines: Array<string> }> {
 		const directory = create_directory(DIRECTORY_PREFIX)
@@ -171,7 +183,7 @@ describe('run_wait_cli.collect on pending', () => {
 
 		expect(code).toBe(run_wait_cli.PENDING_EXIT_CODE)
 		expect(lines).toHaveLength(2)
-		expect(lines[1]).toContain('failed so far: 1 test file(s) — scripts/a.test.ts')
+		expect(lines[1]).toContain(FAILING_SUMMARY)
 	})
 
 	it.each([' ✓ scripts/ok.test.ts (1 test) 1ms\n', ''])(
@@ -189,25 +201,23 @@ describe('run_wait_cli.collect on pending', () => {
 describe('run_wait_cli.directory_of_pid', () => {
 	const create_directory = temporary_directory()
 
-	// A result directory under a fresh root, its pid file naming `OTHER_PID` as the launch writes it.
-	function recorded(): { root: string; directory: string } {
-		const root = create_directory(DIRECTORY_PREFIX)
-		const directory = path.join(run_wait_cli.results_root(root), 'test-unit-1-2')
-
-		mkdirSync(directory, { recursive: true })
-		writeFileSync(run_wait_cli.result_path(directory, 'pid'), `${String(OTHER_PID)}\n`)
-
-		return { root, directory }
-	}
-
 	it('finds the result directory a bounded check recorded the pid in', () => {
-		const { root, directory } = recorded()
+		const { root, directory } = recorded(create_directory(DIRECTORY_PREFIX))
 
 		expect(run_wait_cli.directory_of_pid(String(OTHER_PID), root)).toBe(directory)
 	})
 
+	it('picks the newest pid file when two unfinished checks recorded the same pid', () => {
+		const { root, directory: stale } = recorded(create_directory(DIRECTORY_PREFIX), 'stale')
+		const { directory: fresh } = recorded(root, 'fresh')
+		const STALE_SECONDS = 1_000_000
+
+		utimesSync(run_wait_cli.result_path(stale, 'pid'), STALE_SECONDS, STALE_SECONDS)
+		expect(run_wait_cli.directory_of_pid(String(OTHER_PID), root)).toBe(fresh)
+	})
+
 	it('passes over a finished check that recorded the same pid', () => {
-		const { root, directory } = recorded()
+		const { root, directory } = recorded(create_directory(DIRECTORY_PREFIX))
 
 		writeFileSync(run_wait_cli.result_path(directory, 'exit'), '1')
 		expect(run_wait_cli.directory_of_pid(String(OTHER_PID), root)).toBeUndefined()
@@ -219,6 +229,39 @@ describe('run_wait_cli.directory_of_pid', () => {
 		expect(run_wait_cli.directory_of_pid(String(OTHER_PID), root)).toBeUndefined()
 		mkdirSync(path.join(run_wait_cli.results_root(root), 'other'), { recursive: true })
 		expect(run_wait_cli.directory_of_pid(String(OTHER_PID), root)).toBeUndefined()
+	})
+})
+
+describe('run_wait_cli.wait_target on pending', () => {
+	const create_directory = temporary_directory()
+
+	async function target_lines(pid: string): Promise<{ code: number; lines: Array<string> }> {
+		const { root, directory } = recorded(create_directory(DIRECTORY_PREFIX))
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		writeFileSync(run_wait_cli.result_path(directory, 'log'), FAILING_LOG)
+		const code = await run_wait_cli.wait_target(() => false, pid, { options: NO_CHUNK, root })
+		const lines = info.mock.calls.map((call) => String(call[0]))
+
+		info.mockRestore()
+
+		return { code, lines }
+	}
+
+	it('adds what the recorded check log shows failed under the verdict line', async () => {
+		const { code, lines } = await target_lines(String(OTHER_PID))
+
+		expect(code).toBe(0)
+		expect(lines).toHaveLength(2)
+		expect(lines[0]).toMatch(/^wait: pending — /u)
+		expect(lines[1]).toContain(FAILING_SUMMARY)
+	})
+
+	it('answers only the verdict line for a pid no bounded check recorded', async () => {
+		const { code, lines } = await target_lines(String(SHELL_PID))
+
+		expect(code).toBe(0)
+		expect(lines).toEqual([expect.stringMatching(/^wait: pending — /u)])
 	})
 })
 

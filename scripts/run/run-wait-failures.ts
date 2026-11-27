@@ -9,7 +9,9 @@
 
 // A per-file line: one space, the state glyph, the optional project tag, the file, its test count.
 const FILE_LINE = /^ [✓×❯↓] (?:\|[^|]+\| )?(\S+) \(\d+ tests?/u
-const FAILED_COUNT = /\| \d+ failed\)/u
+// `K failed` on a file whose tests ran; `(0 test)` under `❯` / `×` on one that failed to collect,
+// which prints no `×` line and no count until the closing ` FAIL ` block.
+const FAILED_COUNT = /\| \d+ failed\)|^ [❯×] .*\(0 tests?\)/u
 const FAILED_TEST = /^\s+× /u
 const FAIL_LINE = /^ FAIL {2}(?:\|[^|]+\| )?(\S+)/u
 // A `×` line read before any per-file line: the failure is real though its file is not named yet.

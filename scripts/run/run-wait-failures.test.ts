@@ -28,6 +28,15 @@ describe('run_wait_failures.failed_files', () => {
 		expect(run_wait_failures.failed_files(FAILED_TEST)).toEqual([run_wait_failures.UNNAMED_FILE])
 	})
 
+	it('reads a file that failed to collect, with its (0 test), as failed', () => {
+		const log = log_of(
+			' ✓ |pure| scripts/empty.test.ts (0 test)',
+			' ❯ |isolated| scripts/broken.test.ts (0 test)',
+		)
+
+		expect(run_wait_failures.failed_files(log)).toEqual(['scripts/broken.test.ts'])
+	})
+
 	it('reads a FAIL summary line alone', () => {
 		expect(run_wait_failures.failed_files(FAIL_SUMMARY)).toEqual([FILE_B])
 	})

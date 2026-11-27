@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
@@ -34,6 +34,12 @@ type Probe = () => Promise<boolean> | boolean
 interface WaitOptions {
 	chunk_ms: number
 	sleeper: (duration_ms: number) => Promise<void>
+}
+
+// A non-`--result` wait's chunk, and the project root whose result directories `--pid` reads.
+interface TargetContext {
+	options: WaitOptions
+	root: string
 }
 
 const POLL_MS = 2000
@@ -150,9 +156,14 @@ function read_text(file_path: string): string {
 	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
 }
 
+function pid_written_ms(directory: string): number {
+	return statSync(result_path(directory, 'pid')).mtimeMs
+}
+
 // The result directory whose launch is `pid`, so `--pid` can read its log; `undefined` when no bounded
 // check recorded it — a process `josh wait` did not launch keeps the plain `pending` answer. A finished
-// check's directory is passed over, so a reused pid never reads an earlier run's log.
+// check's directory is passed over, and of several the newest pid file wins, so a reused pid does not
+// read an earlier run's log.
 function directory_of_pid(pid: string, root: string): string | undefined {
 	const results = results_root(root)
 
@@ -160,8 +171,10 @@ function directory_of_pid(pid: string, root: string): string | undefined {
 
 	return readdirSync(results)
 		.map((name) => path.join(results, name))
+		.filter((directory) => read_text(result_path(directory, 'pid')).trim() === pid.trim())
 		.filter((directory) => !existsSync(result_path(directory, 'exit')))
-		.find((directory) => read_text(result_path(directory, 'pid')).trim() === pid.trim())
+		.toSorted((first, second) => pid_written_ms(second) - pid_written_ms(first))
+		.at(0)
 }
 
 // The failures a pending check's log already shows; no line when it shows none.
@@ -254,13 +267,17 @@ async function collect_result(directory: string): Promise<number> {
 }
 
 // A target other than `--result`: the verdict, and on `pending` what a `--pid` check's log shows failed.
-async function wait_target(is_done: Probe, pid: string | undefined): Promise<number> {
-	const verdict = await wait_for(is_done, live_chunk())
+async function wait_target(
+	is_done: Probe,
+	pid: string | undefined,
+	context: TargetContext,
+): Promise<number> {
+	const verdict = await wait_for(is_done, context.options)
 
 	console.info(`wait: ${verdict} — ${NEXT_ACTION[verdict]}`)
 
 	if (pid !== undefined && verdict === VERDICT.PENDING) {
-		report_failures(directory_of_pid(pid, PROJECT_ROOT))
+		report_failures(directory_of_pid(pid, context.root))
 	}
 
 	return SUCCESS_EXIT_CODE
@@ -279,7 +296,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (result !== undefined) return await collect_result(result)
 
-	return await wait_target(probe, pid)
+	return await wait_target(probe, pid, { options: live_chunk(), root: PROJECT_ROOT })
 }
 
 const run_wait_cli = {
@@ -291,6 +308,7 @@ const run_wait_cli = {
 	live_chunk,
 	result_path,
 	results_root,
+	wait_target,
 	is_gone_in,
 	lineage,
 	probe_of,
