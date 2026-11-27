@@ -12,13 +12,16 @@ import { trusted_measure, type TrustedBody } from './trusted-measure'
 // measures after the merge, so its command may not exist yet.
 
 type PremiseRun =
-	| { kind: 'failed'; declaration: MeasureDeclaration; message: string }
+	| { kind: 'failed'; declaration: MeasureDeclaration; message: string; timed_out: boolean }
 	| { kind: 'judged'; declaration: MeasureDeclaration; output: string; verdict: MeasureVerdict }
 
 function run_of(declaration: MeasureDeclaration, source: TrustedBody): PremiseRun {
 	const run = trusted_measure.run_command(declaration.command, source)
 
-	if (run.kind === 'failed') return { kind: 'failed', declaration, message: run.message }
+	if (run.kind === 'failed') {
+		return { kind: 'failed', declaration, message: run.message, timed_out: run.timed_out === true }
+	}
+
 	const verdict = measure_declaration.judge(declaration, run.output)
 
 	return { kind: 'judged', declaration, output: run.output, verdict }
@@ -37,7 +40,8 @@ function is_inherited(declaration: MeasureDeclaration, inherited: string): boole
 }
 
 // The refusal of each premise of a draft body whose output cannot be read. A failed command or a
-// premise that no longer holds is not refused: the lane entry stops on those. A premise `inherited`
+// premise that no longer holds is not refused: the lane entry stops on those. A timed-out one is a
+// measurement error there, reported and not stopped on. A premise `inherited`
 // declares — an untrusted body the draft was built from — is not the filer's and is never run.
 function draft_problems(body: string, inherited = ''): ReadonlyArray<string> {
 	const source = trusted_measure.drafted(body)

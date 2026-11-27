@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 234361
+	},
+	"reason": "#9122: per-clone result cache for the scoped unused-members scan, fix pass run beside the lint:related checks, and their tests",
+	"date": "2026-11-27"
+}
