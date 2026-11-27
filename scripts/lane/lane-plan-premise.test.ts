@@ -84,7 +84,6 @@ describe('lane:plan premises', () => {
 	it.each([
 		['a value out of the bound', { kind: 'ok', output: '9' }, 'measured 9'],
 		['an unreadable value', { kind: 'ok', output: 'nine' }, UNREADABLE],
-		['a failed command', { kind: 'failed', message: 'boom' }, 'measured failed (boom)'],
 	] as const)('stops before the first edit on %s, unrecorded', async (_case, run, words) => {
 		run_command.mockReturnValue(run)
 
@@ -105,6 +104,23 @@ describe('lane:plan premises', () => {
 		expect(code).toBe(lane_plan_check.PREMISE_EXIT_CODE)
 		expect(printed()).toContain('not re-run: untrusted author')
 		expect(run_command).not.toHaveBeenCalled()
+	})
+})
+
+describe('lane:plan premise measurement errors', () => {
+	it.each([
+		['a timed-out command', 'spawnSync /bin/sh ETIMEDOUT'],
+		['a failing command', 'boom'],
+	])('reports %s as a measurement error, not an unmet premise', async (_case, message) => {
+		run_command.mockReturnValue({ kind: 'failed', message })
+
+		const code = await plan_with(HOLDS)
+
+		expect(code).toBe(0)
+		expect(info).toHaveBeenCalledWith('clear')
+		expect(printed()).toContain(`not measured, error (${message})`)
+		expect(printed()).not.toContain('do not hold')
+		expect(lane_plan.read(ISSUE, directory)).toBeDefined()
 	})
 })
 

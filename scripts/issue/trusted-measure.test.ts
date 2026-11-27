@@ -98,6 +98,13 @@ describe('trusted_measure execution refusal and failure', () => {
 		expect(trusted_measure.text_of(run)).toBe('(command failed: timed out)')
 		expect(console.error).toHaveBeenCalledTimes(1)
 	})
+
+	// joshuafolkken/kit#9125: a minute was shorter than `lane:value` under load.
+	it('gives a command at least five minutes', () => {
+		trusted_measure.run_command(COMMAND, TRUSTED)
+
+		expect(execSync).toHaveBeenCalledWith(COMMAND, expect.objectContaining({ timeout: 300_000 }))
+	})
 })
 
 describe('trusted_measure provenance', () => {

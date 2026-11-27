@@ -8,10 +8,10 @@ import { trusted_measure_source, type MeasureSource } from './trusted-measure-so
 
 // Shell measurements require a trusted author and editor. Execute only an explicit declaration in
 // that verified snapshot, and log its provenance before invoking the shell, even if it fails.
-// One command's budget — the same minute `josh-harness.ts` gives one command it spawns. A measurement
-// is a count or a digest that answers in seconds, so a command still running after a minute is stuck,
-// and without a bound it would hold the whole re-measurement open with nothing printed.
-const MEASURE_TIMEOUT_MS = 60_000
+// One command's budget. A measurement is a count or a digest that answers in seconds when idle, but
+// `lane:value` outran a minute while several lanes ran (joshuafolkken/kit#9125), so the bound sits well
+// above that; it still stops a stuck command from holding the whole re-measurement open with nothing printed.
+const MEASURE_TIMEOUT_MS = 300_000
 const DRAFT = 'draft'
 const LOCAL_FILER = 'local filer'
 
