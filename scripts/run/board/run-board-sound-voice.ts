@@ -36,12 +36,14 @@ interface Pulse extends Voice {
 	jitter?: number
 }
 
-// A bed: its pulse train and drone, `peak` its loudest, swelling from `from_gain` of it.
+// A bed: its pulse train and drone, `peak` its loudest, swelling from `from_gain` of it. A bed a theme
+// computes itself gives its samples for a length as `own`, in place of both (joshuafolkken/kit#9137).
 interface Bed {
 	peak: number
 	from_gain: number
 	pulse?: Pulse | undefined
 	drone?: Voice | undefined
+	own?: ((ms: number) => Array<number>) | undefined
 }
 
 const MS_PER_SECOND = 1000
@@ -118,12 +120,19 @@ function drone_samples(drone: Voice, ms: number): Array<number> {
 	return tone({ hz: drone.hz, to_hz: drone.to_hz, ms, wave: drone.wave })
 }
 
-// A bed `ms` long: its drone under its pulses, swelling from `from_gain` to full.
-function bed_samples(bed: Bed, ms: number): Array<number> {
+// A bed's voices `ms` long before it swells: its own samples, else its drone under its pulses.
+function bed_voices(bed: Bed, ms: number): Array<number> {
+	if (bed.own !== undefined) return bed.own(ms)
 	const pulses = bed.pulse === undefined ? silence(ms) : pulse_train(bed.pulse, ms)
 	const drone = bed.drone === undefined ? silence(ms) : drone_samples(bed.drone, ms)
 	const share = bed.drone === undefined ? 0 : DRONE_SHARE
-	const both = run_board_sound_shape.mixed(pulses, drone, share)
+
+	return run_board_sound_shape.mixed(pulses, drone, share)
+}
+
+// A bed `ms` long: its drone under its pulses, swelling from `from_gain` to full.
+function bed_samples(bed: Bed, ms: number): Array<number> {
+	const both = bed_voices(bed, ms)
 	const rise = 1 - bed.from_gain
 
 	return both.map((value, index) => value * (bed.from_gain + (rise * index) / both.length))

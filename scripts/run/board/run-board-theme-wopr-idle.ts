@@ -11,7 +11,8 @@ import { run_board_theme_wopr_place, type RuleCell, type Wopr } from './run-boar
 // demo, itself a port of kit's live board: the lamp panel, the sweep, the rules' launch code, DEFCON,
 // the lane cracking in and the PROGRESS strip.
 
-const { BOLD, ESC, cell_at, level_x, put, repeated, rows_to, set_cell } = run_board_theme_host_grid
+const { BOLD, ESC, cell_at, level_x, put, repeated, restyle, rows_to, set_cell } =
+	run_board_theme_host_grid
 const { hash } = run_board_theme_host_hash
 const { TICK_MS } = run_board_theme_host_state
 const { CODE, INK, NAMED, SHADES, STRIP_RANK, THE_CODE } = run_board_theme_wopr_data
@@ -33,6 +34,19 @@ const DEFCON_SCALE = ' DEFCON [5] 4 3 2 1'
 const CRACK = { head: 3, ahead: 5, salt: 11 }
 // The PROGRESS strip: three letters, each another on every tick until it locks.
 const STRIP = { letters: 3, salt: 53 }
+const DIGIT = /\d/u
+
+// The roles text has at rest (joshuafolkken/kit#9137), over the host's `body`: on a section rule a
+// heading's letters `head`, and everywhere a digit `num`. Drawn first, so every effect draws over it.
+function rest_roles(wopr: Wopr, grid: Grid): void {
+	const rules = new Set(wopr.rule_cells.map((cell) => cell.y))
+
+	restyle(
+		grid,
+		([ch, style], _, y) => style === 'body' && (DIGIT.test(ch) || (rules.has(y) && ch !== ' ')),
+		(_, __, [ch]) => (DIGIT.test(ch) ? 'num' : 'head'),
+	)
+}
 
 function calm_epoch(step: number, group: number): number {
 	const period = PERIOD.least + (mixed([group, PERIOD.salt]) % PERIOD.spread)
@@ -226,6 +240,7 @@ const run_board_theme_wopr_idle = {
 	out_ink,
 	paint_lamps,
 	progress_strip,
+	rest_roles,
 	sweep_at,
 }
 

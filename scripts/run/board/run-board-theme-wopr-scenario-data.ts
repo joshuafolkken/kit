@@ -1,10 +1,23 @@
-// The WINNER table's strategy names for the WARGAMES theme of `run:board` (joshuafolkken/kit#8917),
-// ported from the confirmed theme demo (`fixed-v21-theme-wargames.mjs`). A replaceable table: the
-// table pages through it in order and rounds again.
+// The WINNER table's strategy names for the WARGAMES theme of `run:board` (joshuafolkken/kit#8917). A
+// replaceable table: the table pages through it in order and rounds again.
 // cspell:disable -- the film's strategy names.
 
-// The film's strategy list: the seven read off the user's stills first, then the rest as recalled.
-const SCENARIOS: ReadonlyArray<string> = [
+// The names read on the film's frames (joshuafolkken/kit#9137), in the order read.
+const READ_ON_FILM: ReadonlyArray<string> = [
+	'U.S. FIRST STRIKE',
+	'USSR FIRST STRIKE',
+	'NATO / WARSAW PACT',
+	'FAR EAST STRATEGY',
+	'INDIA PAKISTAN WAR',
+	'MEDITERRANEAN WAR',
+	'HONGKONG VARIANT',
+	'SEATO DECAPITATING',
+	'ATLANTIC HEAVY',
+	'CUBAN PARAMILITARY',
+	'MIDDLE EAST HEAVY',
+]
+// The names read off the user's stills of the film.
+const READ_ON_STILLS: ReadonlyArray<string> = [
 	'TAIWAN THEATERWIDE',
 	'PACIFIC MANEUVER',
 	'PORTUGAL REVOLUTION',
@@ -12,48 +25,9 @@ const SCENARIOS: ReadonlyArray<string> = [
 	'CYPRUS MANEUVER',
 	'EGYPT MISDIRECTION',
 	'BANGLADESH THRUST',
-	'U.S. FIRST STRIKE',
-	'USSR FIRST STRIKE',
-	'NATO / WARSAW PACT',
-	'FAR EAST STRATEGY',
-	'US USSR ESCALATION',
-	'MIDDLE EAST WAR',
-	'USSR CHINA ATTACK',
-	'INDIA PAKISTAN WAR',
-	'MEDITERRANEAN WAR',
-	'HONGKONG VARIANT',
-	'SEATO DECAPITATING',
-	'CUBAN PROVOCATION',
-	'ATLANTIC HEAVY',
-	'CUBAN PARAMILITARY',
-	'NICARAGUAN PREEMPTIVE',
-	'PACIFIC TERRITORIAL',
-	'BURMESE THEATERWIDE',
-	'TURKISH DECOY',
-	'ARGENTINA ESCALATION',
-	'ICELAND MAXIMUM',
-	'ARABIAN THEATERWIDE',
-	'U.S. SUBVERSION',
-	// Not confirmed against the film: more of the same kind, so the list runs on.
-	'SINO SOVIET WAR',
-	'KOREAN ESCALATION',
-	'BALTIC DECAPITATION',
-	'ALASKAN FLANK',
-	'EUROPEAN THEATER',
-	'GULF STRIKE',
-	'AFRICAN SUBVERSION',
-	'ATLANTIC BLOCKADE',
-	'ARCTIC FIRST STRIKE',
-	'PAN ASIAN WAR',
-	'INDIAN OCEAN',
-	'CARIBBEAN STRIKE',
-	'SOUTH ATLANTIC',
-	'JAPAN DEFENSE',
-	'CANADIAN THEATER',
-	'PANAMA CANAL',
-	'SOVIET IRAN STRIKE',
-	'CHINESE BURMA',
 ]
+// Confirmed names only: none recalled, none made up.
+const SCENARIOS: ReadonlyArray<string> = [...READ_ON_FILM, ...READ_ON_STILLS]
 
 const run_board_theme_wopr_scenario_data = { SCENARIOS }
 

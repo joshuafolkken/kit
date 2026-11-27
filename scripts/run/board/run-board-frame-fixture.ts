@@ -117,6 +117,8 @@ interface Attributes {
 // eslint-disable-next-line no-control-regex -- an SGR opens with ESC
 const SGR = /\u{1B}\[([\d;]*)m/gu
 const EXTENDED_FG = 38
+const EXTENDED_BG = 48
+const EXTENDED = new Set([EXTENDED_FG, EXTENDED_BG])
 const TRUE_COLOR = 2
 const TRUE_COLOR_CODES = 5
 const INDEXED_CODES = 3
@@ -137,9 +139,10 @@ const EFFECTS = new Map<number, Partial<Attributes>>([
 	[DEFAULT_FG, { fg: undefined }],
 ])
 
-// How many codes the code at `index` takes: `38;2;r;g;b` or `38;5;n` for an extended color.
+// How many codes the code at `index` takes: `38;2;r;g;b` or `38;5;n` for an extended color, the
+// background's `48;…` alike (its `2` is not dim).
 function code_length(codes: ReadonlyArray<number>, index: number): number {
-	if (codes[index] !== EXTENDED_FG) return 1
+	if (!EXTENDED.has(codes[index] ?? 0)) return 1
 
 	return codes[index + 1] === TRUE_COLOR ? TRUE_COLOR_CODES : INDEXED_CODES
 }

@@ -3,6 +3,7 @@ import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import { run_board_theme_host_hash } from './run-board-theme-host-hash'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import type { Cell, Grid, ThemeState } from './run-board-theme-host-types'
+import { run_board_theme_wopr_alarm } from './run-board-theme-wopr-alarm'
 import { run_board_theme_wopr_data } from './run-board-theme-wopr-data'
 import { run_board_theme_wopr_led } from './run-board-theme-wopr-led'
 import { run_board_theme_wopr_map } from './run-board-theme-wopr-map'
@@ -16,13 +17,15 @@ import { run_board_theme_wopr_wars } from './run-board-theme-wopr-wars'
 // timeline (s = ticks since the notice began; c = ticks since the peak at s 79):
 // - build, s 0-49: the LAUNCH panel locks a position every 5 ticks in WOPR's order; then the matched
 //   code blinks until the peak. DEFCON 5 → 1 over the build; from s 40 the header carries the match
-//   and the countdown.
+//   and the countdown, the missiles in the pins' column, and along its first row the alarm's beacon
+//   (`run-board-theme-wopr-alarm.ts`), all three to c 146.
 // - c 0-3: the spark burns the whole screen white, white, lavender, dim lavender.
 // - c 4-146: the area splits: sixteen wars on the left, the WINNER table paging on the right.
 // - c 147-237: dark; the film's last three lines type two letters a tick and hold; DEFCON 5.
 
 const { trace_on } = run_board_theme_host_flash
 const { ESC, block, put, restyle } = run_board_theme_host_grid
+const { beacon_bar } = run_board_theme_wopr_alarm
 const { hash } = run_board_theme_host_hash
 const { PEAK_TICKS } = run_board_theme_host_state
 const { CLOSING, INK, LEVEL_INKS, SPARK } = run_board_theme_wopr_data
@@ -198,6 +201,7 @@ function header_overflow(wopr: Wopr, grid: Grid, state: ThemeState, tick: number
 	put(grid, { y: 1, x: 1 }, status, INK.yellow_on)
 	put(grid, { y: PAIR, x: 1 }, clock, INK.red_on)
 	missiles(wopr, grid, state)
+	beacon_bar(wopr, grid, state, tick)
 }
 
 // The board below the area reddens as the level drops — a color a level, held between steps — and at
