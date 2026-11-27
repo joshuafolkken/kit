@@ -124,11 +124,10 @@ function is_any_comment(command: string): boolean {
 
 const DIRECT_ISSUE_COMMENT_REASON =
 	'⛔ direct issue comment: `gh issue comment` (or a `gh api` write to `…/issues/<N>/comments`) posts ' +
-	'without the run marker, so the run reads its own comment as a person updating the issue — the ' +
-	'review goes stale and `pnpm josh followup` refuses the merge. Post with ' +
-	'`pnpm josh issue:comment <N> --body-file <path>` instead — adding `--from-user` when the comment ' +
-	"relays a person's instruction, which stamps the user marker the holding run reads as an update " +
-	'(`shell-body.md`). ' +
+	'without the run marker, so the run reads its own comment as a person’s update and ' +
+	'`pnpm josh followup` refuses the merge. Post with ' +
+	'`pnpm josh issue:comment <N> --body-file <path>` (`--from-user` to relay a person’s words; ' +
+	'`shell-body.md`). ' +
 	'**This rule fires on every occurrence, not once per run.**'
 
 // **A standalone `gh issue comment <N> --body-file <path>` is rewritten rather than refused**
