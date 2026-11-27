@@ -86,6 +86,23 @@ describe('backlog_drive.run_pass — no sample yet', () => {
 	})
 })
 
+// joshuafolkken/kit#9104: an issue another run holds takes no lane — it waits, out of flight, out of
+// later offers and never parked, as an unsampled issue does.
+describe('backlog_drive.run_pass — another run holds the issue', () => {
+	it('keeps the held issue waiting and out of flight', async () => {
+		const { ports, calls } = harness({ offers: [offer('run', [OFFERED, OFFERED_TOO])] })
+
+		ports.launch = async (issue) => (issue === OFFERED ? 'held' : 'launched')
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind).toBe('continue')
+		expect(result.state.in_flight).toStrictEqual([OFFERED_TOO])
+		expect(result.state.waiting).toStrictEqual([OFFERED])
+		expect(result.state.exclude).toStrictEqual([])
+		expect(calls.some((call) => call.startsWith('stall'))).toBe(false)
+	})
+})
+
 // A launch that ends only once every launch of the pass has started — never, launched one by one.
 function gated_launch(count: number): (issue: string) => Promise<'launched'> {
 	const started: Array<string> = []

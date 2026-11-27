@@ -2,6 +2,7 @@ import { has_label_name, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_hold_live } from '#scripts/run/hold/run-hold-live'
 
 // What says another run already holds an issue the offer handed this drive, read just before its lane
@@ -9,21 +10,33 @@ import { run_hold_live } from '#scripts/run/hold/run-hold-live'
 // run stream moves nothing it is keyed on, so a one-off run that claimed the issue in the primary
 // checkout seconds earlier was handed a second worker beside it. Each answer is the reason, or
 // `undefined` when nothing holds the issue:
-// - **a live hold in the primary checkout naming the issue** — a stale one, its session gone, answers
-//   nothing, so the next run still takes over an abandoned claim;
+// - **a live hold in the primary checkout naming the issue** — a stale one, its session gone, is an
+//   abandoned claim: it answers nothing and silences the `in-progress` that crash left behind, so the
+//   next run still takes it over;
 // - **its open lane with a live hold** — a lane whose child ended is the drive's to relaunch, kept;
 // - **`in-progress` with no lane**, read fresh — the claim a run outside any lane left.
 
-async function root_holder(issue: string): Promise<string | undefined> {
-	const directory = await run_carry.repository_directory()
+type RootClaim = { kind: 'live'; reason: string } | { kind: 'abandoned' } | { kind: 'none' }
 
-	if (directory === undefined) return undefined
+const NO_CLAIM: RootClaim = { kind: 'none' }
+const ABANDONED: RootClaim = { kind: 'abandoned' }
 
-	const hold = run_hold_live.live_hold_at(directory)
+function claim_at(git_folder: string, issue: string): RootClaim {
+	const read = run_hold.read_hold(run_hold.hold_path(git_folder))
+
+	if (read.kind === 'stale' && read.hold.issue === issue) return ABANDONED
+
+	const hold = run_hold_live.live_hold_at(git_folder)
 
 	return hold?.issue === issue
-		? `a run in the primary checkout (pid ${String(hold.pid)}) holds it`
-		: undefined
+		? { kind: 'live', reason: `a run in the primary checkout (pid ${String(hold.pid)}) holds it` }
+		: NO_CLAIM
+}
+
+async function root_claim(issue: string): Promise<RootClaim> {
+	const directory = await run_carry.repository_directory()
+
+	return directory === undefined ? NO_CLAIM : claim_at(directory, issue)
 }
 
 function lane_holder(lane: LaneInfo): string | undefined {
@@ -45,13 +58,15 @@ async function label_holder(issue: string): Promise<string | undefined> {
 }
 
 async function holder(issue: string): Promise<string | undefined> {
-	const root = await root_holder(issue)
+	const root = await root_claim(issue)
 
-	if (root !== undefined) return root
+	if (root.kind === 'live') return root.reason
 
 	const lane = await lane_registry.find_open_lane(issue)
 
-	return lane === undefined ? await label_holder(issue) : lane_holder(lane)
+	if (lane !== undefined) return lane_holder(lane)
+
+	return root.kind === 'abandoned' ? undefined : await label_holder(issue)
 }
 
 const backlog_drive_holder = { holder }

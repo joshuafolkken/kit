@@ -29,6 +29,7 @@ type DriveLaunch =
 interface Settled {
 	in_flight: Array<string>
 	measured: Array<string>
+	// Every issue that goes to `waiting` — unsampled or held by another run.
 	unsampled: Array<string>
 }
 
@@ -66,7 +67,8 @@ async function refused(
 // **Only a launch or a measured close is activity**: a pass that started nothing — every lane taken
 // — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good. A
 // measured issue is closed but may still read OPEN to `backlog:next`, so it is excluded as a merge is.
-// An unsampled issue started nothing: it goes to `waiting`, kept out of the offer but not counted merged.
+// An unsampled or held issue started nothing: it goes to `waiting`, kept out of the offer but not
+// counted merged.
 function launched(state: DriveState, settled: Settled, ports: DrivePorts): DriveState {
 	const { in_flight, measured, unsampled } = settled
 	const exclude = [...state.exclude, ...measured]

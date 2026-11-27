@@ -2,6 +2,7 @@ import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
 import { run_hold_live } from '#scripts/run/hold/run-hold-live'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_holder } from './backlog-drive-holder'
@@ -28,6 +29,7 @@ function labelled(labels: ReadonlyArray<string>): StateRead {
 
 beforeEach(() => {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(GIT_FOLDER)
+	vi.spyOn(run_hold, 'read_hold').mockReturnValue({ kind: 'free' })
 	vi.spyOn(run_hold_live, 'live_hold_at').mockReturnValue(undefined)
 	vi.spyOn(run_hold_live, 'live_hold').mockReturnValue(undefined)
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
@@ -78,6 +80,16 @@ describe('backlog_drive_holder.holder — no lane', () => {
 
 		await expect(backlog_drive_holder.holder(ISSUE)).resolves.toContain(IN_PROGRESS_LABEL)
 		expect(issue_state_cli.read_issue).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('takes over the in-progress a crashed root run left beside its stale record', async () => {
+		const hold: RunHold = { issue: ISSUE, taken_at: new Date(0).toISOString(), pid: ROOT_PID }
+
+		vi.mocked(run_hold.read_hold).mockReturnValue({ kind: 'stale', hold })
+		vi.mocked(issue_state_cli.read_issue).mockResolvedValue(labelled([IN_PROGRESS_LABEL]))
+
+		await expect(backlog_drive_holder.holder(ISSUE)).resolves.toBeUndefined()
+		expect(issue_state_cli.read_issue).not.toHaveBeenCalled()
 	})
 
 	it('answers nothing for an issue without the label', async () => {
