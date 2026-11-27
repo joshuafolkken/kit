@@ -28,9 +28,10 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // and runs it again when they have. The record, its judgment and its inputs are the gate's; only the
 // type check (`check`), `exports:unused` (`exports`) and `cspell:dot` (`cspell`) carry a gate label.
 // `cspell:dot` declares every file as its input (`verification-inputs.ts`, joshuafolkken/kit#5156), so
-// the gate reuses it only while no file moved. The rest stay unrecorded: the guard tests are a slice of
-// the unit suite and do not answer for the gate's `test:unit`, and the metrics totals leave out the
-// durations the gate's `metrics` holds.
+// the gate reuses it only while no file moved. The guard tests are a slice of the unit suite and do not
+// answer for the gate's `test:unit`: they are recorded under a label of their own (`guard-tests`) that
+// only `run:chain`'s stage reads (`run-chain-reuse.ts`). The metrics totals stay unrecorded: they leave
+// out the durations the gate's `metrics` holds.
 //
 // joshuafolkken/kit#3924: nine of ten ship gate stops were `exports:unused`, `cspell:dot` or a
 // repository-wide guard test failing on the child's own code — none a check `test:related` selects,
@@ -86,7 +87,9 @@ function present_targets(directory: string): ReadonlyArray<string> {
 function guard_tests(directory: string): Array<PreDetachCheck> {
 	const targets = present_targets(directory)
 
-	return targets.length === 0 ? [] : [{ list: [...GUARD_TEST_COMMAND, ...targets] }]
+	if (targets.length === 0) return []
+
+	return [{ list: [...GUARD_TEST_COMMAND, ...targets], label: gate_labels.GUARD_TESTS_LABEL }]
 }
 
 // The guard tests' `josh` arguments, for `run:chain`'s stage before the review; empty when none is

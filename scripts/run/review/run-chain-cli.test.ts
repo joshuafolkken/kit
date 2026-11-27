@@ -1,4 +1,5 @@
 import { derive_check } from '#scripts/document/derive-check'
+import { check_reuse } from '#scripts/gate/check-reuse'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
@@ -67,11 +68,18 @@ function stop_at(name: string): void {
 	}))
 }
 
-// The metrics and scoped-green asks (`run-chain-gates.ts`) answer green unless a test says otherwise.
-beforeEach(() => {
+// The metrics and scoped-green asks (`run-chain-gates.ts`) answer green unless a test says otherwise;
+// no stage reads or writes a green record over the live tree (`run-chain-reuse.ts`).
+function stub_live_asks(): void {
 	vi.spyOn(metrics_totals, 'totals_check').mockResolvedValue(undefined)
 	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+	vi.spyOn(check_reuse, 'reusable_checks').mockResolvedValue(new Map())
+	vi.spyOn(check_reuse, 'record_green_checks').mockResolvedValue()
+}
+
+beforeEach(() => {
+	stub_live_asks()
 	run_chain_worker_fixture.run_worker_in_place(run_chain_cli.run)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
