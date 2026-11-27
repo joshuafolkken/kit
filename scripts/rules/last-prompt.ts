@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { json_value } from '#scripts/lib/json-value'
 import { time_reported_failure } from '#scripts/time-runtime/time-reported-failure'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
@@ -17,7 +17,8 @@ import { turn_filings } from './turn-filings'
 const NO_PROMPT = ''
 const HUMAN_ORIGIN = 'human'
 // How far back a prompt off the tail is looked for — a bound on one hook's read, not the whole of a
-// long run's transcript, which grows past it (`transcript-tail.ts`; joshuafolkken/kit#7781).
+// long run's transcript, which grows past it (`transcript-tail.ts`; joshuafolkken/kit#7781). A call's
+// prompt is looked for this far before the call's line, wherever that line is (`call_reach`).
 const PROMPT_REACH_BYTES = 4_194_304
 
 const PROMPT_LINE_SCHEMA = z.object({
@@ -113,14 +114,28 @@ function call_prompt(text: string, tool_use_id: string): string | undefined {
 	return person_prompt(lines.slice(0, index).join('\n'))
 }
 
-// `call_prompt` read from the transcript — the tail first, then `PROMPT_REACH_BYTES` back when the
-// call or its prompt sits before the tail.
+// **The transcript up to the end of the call's line, reaching `PROMPT_REACH_BYTES` before it** — read
+// from where the call is, not from the transcript's end, so a long session's growth after the call
+// cannot carry it out of reach (joshuafolkken/kit#9093). The id's first occurrence is the call's own
+// line, as its result comes after it; '' when the id is nowhere in the transcript.
+function call_reach(transcript_path: string, tool_use_id: string): string {
+	const content = readFileSync(transcript_path)
+	const at = content.indexOf(tool_use_id)
+	if (at === -1) return NO_PROMPT
+	const line_end = content.indexOf('\n', at)
+	const end = line_end === -1 ? content.length : line_end
+
+	return content.subarray(Math.max(0, at - PROMPT_REACH_BYTES), end).toString('utf8')
+}
+
+// `call_prompt` read from the transcript — the tail first, then the reach before the call's line when
+// the call or its prompt sits before the tail.
 function call_prompt_at(transcript_path: string, tool_use_id: string): string | undefined {
 	if (!existsSync(transcript_path)) return undefined
 	const prompt = call_prompt(transcript_tail.read_tail(transcript_path), tool_use_id)
 	if (prompt !== undefined) return prompt
 
-	return call_prompt(transcript_tail.read_tail(transcript_path, PROMPT_REACH_BYTES), tool_use_id)
+	return call_prompt(call_reach(transcript_path, tool_use_id), tool_use_id)
 }
 
 // When the person last prompted on the tail, or `undefined` when no prompt of theirs is on it.

@@ -37,6 +37,21 @@ const DISPATCH = JSON.stringify({
 
 const LAUNCHED: { tool_use_id?: string } = { tool_use_id: TOOL_USE_ID }
 
+// More than `PROMPT_REACH_BYTES` of work after the dispatch, in assistant lines (joshuafolkken/kit#9093).
+const BEYOND_REACH_LINES = 5
+const LINE_BYTES = 1_048_576
+
+function beyond_reach(): Array<string> {
+	const text = 'x'.repeat(LINE_BYTES)
+	const line = JSON.stringify({
+		type: 'assistant',
+		timestamp: TIMESTAMP,
+		message: { content: [{ type: 'text', text }] },
+	})
+
+	return Array.from({ length: BEYOND_REACH_LINES }, () => line)
+}
+
 // A parent transcript, with the harness's launch record for `PRODUCER` naming `tool_use_id`, or none.
 function transcript(lines: Array<string>, { tool_use_id } = LAUNCHED): string {
 	const directory = create_directory('authority-transcript-')
@@ -176,6 +191,21 @@ function declare(transcript_path: string, prompt = DECLARE): string {
 
 	return transcript_path
 }
+
+// joshuafolkken/kit#9093: the session grows past the prompt reach after the dispatch.
+describe('no-filing production authority — a dispatch beyond the tail', () => {
+	it('keeps the grant', () => {
+		const grown = transcript([prompt_line(NO_FILING), DISPATCH, ...beyond_reach()])
+
+		expect(verdict(grown, PRODUCER, 'Write')).toBeUndefined()
+	})
+
+	it('still refuses without a no-filing prompt', () => {
+		const grown = transcript([prompt_line(PLAIN), DISPATCH, ...beyond_reach()])
+
+		expect(verdict(grown, PRODUCER, 'Write')).toContain(REFUSED)
+	})
+})
 
 function under(prompt: string): string {
 	return transcript([prompt_line(prompt), DISPATCH])

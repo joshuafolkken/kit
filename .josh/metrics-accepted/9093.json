@@ -1,0 +1,7 @@
+{
+	"reason": "call_reach reads the reach before the dispatching call's own line so a long session keeps the producer's grant (#9093); +8 code lines is the fix itself",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}
