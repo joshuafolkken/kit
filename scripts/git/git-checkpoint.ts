@@ -25,7 +25,7 @@ function is_name(name: string): boolean {
 function is_usage(argv: ReadonlyArray<string>): boolean {
 	const [name = '', what = '', ...rest] = argv
 
-	return is_name(name) && what.trim() !== '' && rest.length === 0
+	return NAME.test(name) && what.trim() !== '' && rest.length === 0
 }
 
 // Why this checkout takes no checkpoint, or `undefined` when it does.

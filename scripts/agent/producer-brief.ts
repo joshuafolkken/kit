@@ -4,7 +4,8 @@ import { unasked_filing } from '#scripts/rules/unasked-filing'
 
 // `josh producer:brief <name>` — the standing part of a no-filing producer's brief. The main line
 // wrote it free-hand and, on 2026-11-28, wrote its own wish to run the tests into it; the command is
-// now the one place that part is written, and only the person's quoted words lift the deferral.
+// now the one place that part is written, and only a quote worded as the person's request for the
+// tests now lifts the deferral. The wording is checked, not who wrote it.
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const QUOTE_FLAG = '--tests-now-quote'

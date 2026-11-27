@@ -197,6 +197,7 @@ describe('unasked_filing.is_tests_now', () => {
 	it.each([
 		'テストと gate も',
 		'起票せずに直して。テストとgateも実行して',
+		'起票せずに直して、テストと gate も実行して',
 		'テストも gate もお願い',
 		'テストとゲートも回して',
 		'run the tests and the gate too',

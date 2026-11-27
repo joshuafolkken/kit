@@ -108,8 +108,11 @@ function is_no_filing(prompt: string): boolean {
 	return without_no_filing(words) !== words
 }
 
+// A no-filing phrase declines the filing, not the tests, so its negation is no deferral.
 function is_tests_now_clause(clause: string): boolean {
-	return TESTS_NOW.some((pattern) => pattern.test(clause)) && !DEFERRAL.test(clause)
+	const is_asked_now = TESTS_NOW.some((pattern) => pattern.test(clause))
+
+	return is_asked_now && !DEFERRAL.test(without_no_filing(clause))
 }
 
 // The person's own words ask for the tests and the gate now — the one reading that lifts a no-filing
