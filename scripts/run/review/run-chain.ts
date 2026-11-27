@@ -291,12 +291,10 @@ async function timed_group(
 	print: Print,
 	run: StageRunner,
 ): Promise<ReadonlyArray<TimedStage>> {
-	const outputs = group.map((): Array<string> => [])
 	const ran = await Promise.all(
-		group.map(async (stage, index) => {
-			const output = outputs[index] ?? []
-
-			return await timed_stage(
+		group.map(async (stage) => {
+			const output: Array<string> = []
+			const timed = await timed_stage(
 				stage,
 				issue,
 				(text) => {
@@ -304,12 +302,16 @@ async function timed_group(
 				},
 				run,
 			)
+
+			return { timed, output }
 		}),
 	)
 
-	for (const text of outputs.flat()) print(text)
+	const output = ran.flatMap((each) => each.output)
 
-	return ran
+	for (const text of output) print(text)
+
+	return ran.map((each) => each.timed)
 }
 
 // Each stage that ran, the stopped one included, so the run's `chain` line shows where a long run

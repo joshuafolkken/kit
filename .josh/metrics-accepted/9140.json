@@ -2,6 +2,6 @@
 	"reason": "Concurrent stage groups in run:chain: grouping and ordered-print logic (#9140)",
 	"date": "2026-11-27",
 	"growth": {
-		"scripts.code_lines": 38
+		"scripts.code_lines": 50
 	}
 }
