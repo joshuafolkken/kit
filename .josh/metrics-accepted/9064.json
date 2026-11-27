@@ -1,0 +1,7 @@
+{
+	"reason": "New run-ending-park builder writes the abandoned park body in the run:park schema (#9064)",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 47
+	}
+}
