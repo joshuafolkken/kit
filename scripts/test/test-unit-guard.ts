@@ -11,6 +11,7 @@ import { execa } from 'execa'
 import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
+import { unit_run_record, type Sizing } from './unit-run-record'
 import { unit_update_arguments } from './unit-update-arguments'
 import { unit_worker_share } from './unit-worker-share'
 import { vitest_failure_summary } from './vitest-failure-summary'
@@ -206,8 +207,14 @@ function isolated_unit_environment(
 // caller's `--maxWorkers` wins whatever it says. The gate's cap is one: its admission narrows it to the
 // free cores, and its unit step bounds it by the free memory once admitted (`gate-run-steps.ts`); a
 // sharing run admitted on a claim is bounded the same way (`unit_worker_share.admitted_capacity`).
-async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<number | undefined> {
-	if (unit_worker_share.has_worker_flag(vitest_arguments)) return undefined
+//
+// **Each bound is applied as its own stage** so the per-run record can name the one that decided the
+// count (`unit_run_record.deciding_bound`, joshuafolkken/kit#9109); the result is the same as the
+// share capped to the capacity and then to the claim.
+async function vitest_sizing(vitest_arguments: ReadonlyArray<string>): Promise<Sizing> {
+	if (unit_worker_share.has_worker_flag(vitest_arguments)) {
+		return unit_run_record.typed_sizing(vitest_arguments)
+	}
 
 	const available_cores = availableParallelism()
 	const live_runs = unit_worker_share.live_run_count()
@@ -216,9 +223,17 @@ async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<nu
 	// The cores and the memory free right now (joshuafolkken/kit#4528), from one reading.
 	const reading = await free_cores.read({ available_cores })
 	const free = unit_worker_share.admitted_capacity(reading, claim, live_runs, live_lanes)
-	const share = unit_worker_share.current_share(available_cores, live_runs, free, live_lanes)
+	const share = unit_worker_share.current_share(available_cores, live_runs, undefined, live_lanes)
 
-	return unit_worker_share.cap_to_claim(share, claim)
+	return unit_run_record.bounded_sizing({ share, free, claim, available_cores })
+}
+
+async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<number | undefined> {
+	if (unit_worker_share.has_worker_flag(vitest_arguments)) return undefined
+
+	const sizing = await vitest_sizing(vitest_arguments)
+
+	return sizing.workers
 }
 
 async function execute_vitest(
@@ -252,16 +267,22 @@ async function run_vitest(
 	directory: string = process.cwd(),
 ): Promise<number> {
 	return await unit_worker_share.with_run_marker(async () => {
+		const sizing = await vitest_sizing(vitest_arguments)
 		const sized = [
 			...vitest_arguments,
-			...unit_worker_share.worker_arguments(vitest_arguments, await vitest_share(vitest_arguments)),
+			...unit_worker_share.worker_arguments(vitest_arguments, sizing.workers),
 		]
 		const root = await changed_file_scope.repository_root_or_cwd()
 
-		return await test_read_recording.with_read_recording(
-			root,
+		return await unit_run_record.with_record(
 			sized,
-			async (recording) => await execute_vitest(sized, recording, directory),
+			sizing,
+			async () =>
+				await test_read_recording.with_read_recording(
+					root,
+					sized,
+					async (recording) => await execute_vitest(sized, recording, directory),
+				),
 		)
 	})
 }

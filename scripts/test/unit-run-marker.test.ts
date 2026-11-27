@@ -185,6 +185,28 @@ describe('unit_run_marker.live_run_count — what it leaves alone', () => {
 	})
 })
 
+// joshuafolkken/kit#9109: the per-run record tells a run in a lane from one outside every lane by the
+// checkout its marker names, and a marker written before that field existed must still be counted.
+describe('unit_run_marker.live_markers — the checkout a run names', () => {
+	it('reads the checkout a live marker names', () => {
+		const directory = probe_directory()
+
+		write_marker(directory, ALIVE_MARKER, { ...process_identity.own_fields(), checkout: '/repo' })
+
+		expect(unit_run_marker.live_markers(directory).map((marker) => marker.checkout)).toEqual([
+			'/repo',
+		])
+	})
+
+	it('still counts a marker that names no checkout', () => {
+		const directory = probe_directory()
+
+		write_marker(directory, ALIVE_MARKER, process_identity.own_fields())
+
+		expect(unit_run_marker.live_markers(directory)).toHaveLength(1)
+	})
+})
+
 describe('unit_run_marker.sharing_runs', () => {
 	it('divides by the runs while no more lanes are live than runs', () => {
 		expect(unit_run_marker.sharing_runs(2, 1)).toBe(2)

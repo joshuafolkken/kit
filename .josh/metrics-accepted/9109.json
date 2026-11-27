@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 205
+	},
+	"reason": "#9109: per-run record line for whole unit-suite runs (unit-run-record.ts + tests) and the checkout on run markers",
+	"date": "2026-11-27"
+}

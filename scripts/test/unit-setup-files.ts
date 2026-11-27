@@ -15,6 +15,10 @@ const STDOUT_GUARD: ReadonlyArray<string> = ['./tools/test/test-stdout-guard.ts'
 // Telegram send and recording which test tried.
 const TELEGRAM_GUARD: ReadonlyArray<string> = ['./tools/test/test-telegram-guard.ts']
 
+// Runs in every worker for the same reason: it replaces the run:board sound player's default
+// spawner, refusing a real player and recording which test tried (joshuafolkken/kit#9094).
+const SOUND_GUARD: ReadonlyArray<string> = ['./tools/test/test-sound-guard.ts']
+
 // Runs in every worker too: it replaces that worker's machine reading, so a suite that drives the gate
 // admits the same way on every platform and every load.
 const MACHINE_GUARD: ReadonlyArray<string> = ['./tools/test/test-machine-guard.ts']
@@ -24,12 +28,13 @@ const MACHINE_GUARD: ReadonlyArray<string> = ['./tools/test/test-machine-guard.t
 const TEST_FILE_ENVIRONMENT: ReadonlyArray<string> = ['./tools/test/test-file-environment.ts']
 
 // The guards every run of the suite arms, whichever config starts it: the network guard once in the
-// main process, the stdout, Telegram and machine guards in every worker. Named here so `vitest.config.ts` and
+// main process, the stdout, Telegram, sound and machine guards in every worker. Named here so `vitest.config.ts` and
 // `vitest.harness.config.ts` read one definition — the harness once ran with none of them.
 const NETWORK_GUARD: ReadonlyArray<string> = ['./tools/test/test-network-guard.ts']
 const WORKER_GUARDS: ReadonlyArray<string> = [
 	...STDOUT_GUARD,
 	...TELEGRAM_GUARD,
+	...SOUND_GUARD,
 	...MACHINE_GUARD,
 	...TEST_FILE_ENVIRONMENT,
 ]
@@ -50,6 +55,7 @@ const unit_setup_files = {
 	MACHINE_GUARD,
 	NETWORK_GUARD,
 	READ_RECORDER,
+	SOUND_GUARD,
 	STATE_GUARD,
 	STDOUT_GUARD,
 	UNIT_FILE_REPORTER,
