@@ -1,0 +1,10 @@
+{
+	"reason": "#9091 adds the producer checkpoint allowance, the WIP-tip ship refusal and their docs (new hook + git modules, producer definition, consult-vs-execute exception)",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 90,
+		"rules.lines": 4,
+		"ai_cost.resident_bytes": 4,
+		"ai_cost.on_demand_bytes": 937
+	}
+}

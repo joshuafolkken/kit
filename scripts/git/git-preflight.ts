@@ -4,6 +4,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { changed_paths } from './changed-paths'
 import { git_branch } from './git-branch'
+import { git_checkpoint_tip } from './git-checkpoint-tip'
 import { git_command } from './git-command'
 import { git_issue, type IssueInfo } from './git-issue'
 
@@ -19,6 +20,7 @@ const PRECONDITION = {
 	ISSUE: 'issue',
 	BRANCH: 'branch',
 	CLASSIFICATION: 'classification',
+	CHECKPOINT: 'checkpoint',
 } as const
 
 interface Unmet {
@@ -152,8 +154,10 @@ async function answer(input: PreflightInput): Promise<PreflightAnswer> {
 	// The classification and the evidence belong to the pull request, so a `--skip-pr` run asks neither.
 	const pr_target = input.will_open_pr ? target : undefined
 	const pr_problems = pr_target === undefined ? [] : await classification_problems(pr_target)
+	const checkpoint = await git_checkpoint_tip.problem()
+	const tip_problems = checkpoint === undefined ? [] : [unmet(PRECONDITION.CHECKPOINT, checkpoint)]
 
-	return { pr_target, problems: [...problems, ...pr_problems] }
+	return { pr_target, problems: [...problems, ...pr_problems, ...tip_problems] }
 }
 
 // The unmet preconditions as a list, each with its kind, so `josh ship` can ask them before its

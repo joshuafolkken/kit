@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { hook_context, type HookContext } from './hook-context'
 import { implementation_shell } from './implementation-shell'
 import { no_filing_declaration } from './no-filing-declaration'
+import { producer_checkpoint } from './producer-checkpoint'
 import { step_zero_notice } from './step-zero-notice'
 
 const HANDOFF =
@@ -48,7 +49,7 @@ function unverified_write(raw_payload: string): string | undefined {
 const PRODUCERS: ReadonlySet<string> = new Set(['producer', 'kit:producer'])
 
 const SUBAGENT_CALL_SCHEMA = z.object({
-	tool_name: z.enum(['Edit', 'Write']),
+	tool_name: z.enum(['Edit', 'Write', 'Bash']),
 	tool_input: z.unknown(),
 	agent_id: z.string().regex(/^[\w-]+$/u),
 	agent_type: z.string(),
@@ -123,6 +124,33 @@ function is_refused_runtime_edit(raw_payload: string, cwd: string): boolean {
 	return !is_no_filing_production(raw_payload)
 }
 
+const SHELL_CWD_SCHEMA = z.object({ cwd: z.string().min(1) })
+
+// The directory the shell runs in: the harness's `cwd` field, else the hook's own.
+function shell_cwd(raw_payload: string, hook_cwd: string): string {
+	const parsed = SHELL_CWD_SCHEMA.safeParse(json_value.parse_or_undefined(raw_payload))
+
+	return parsed.data?.cwd ?? hook_cwd
+}
+
+// A granted producer's checkpoint in its own worktree (`producer-checkpoint.ts`); a shell running
+// outside a worktree is refused like any git write.
+function is_producer_checkpoint(raw_payload: string, cwd: string): boolean {
+	const payload = hook_tool_payload.parse(raw_payload)
+
+	if (payload?.tool_name !== 'Bash' || !is_in_worktree('.', shell_cwd(raw_payload, cwd))) {
+		return false
+	}
+
+	const command = time_shell.bash_command(payload.tool_input)
+
+	return producer_checkpoint.allows(command) && is_no_filing_production(raw_payload)
+}
+
+function unverified_rule(raw_payload: string, cwd: string): string | undefined {
+	return is_producer_checkpoint(raw_payload, cwd) ? undefined : unverified_write(raw_payload)
+}
+
 function edit_refusal_tail(raw_payload: string, cwd: string): string | undefined {
 	if (is_producer_outside_worktree(raw_payload, cwd)) return OUTSIDE_WORKTREE
 
@@ -140,7 +168,7 @@ function reason(
 
 	if (tail !== undefined) return scope + tail
 
-	const rule = unverified_write(raw_payload)
+	const rule = unverified_rule(raw_payload, context.cwd)
 	if (rule === undefined) return undefined
 
 	return `${scope}${HANDOFF}${UNKNOWN}${MATCHED}${rule}.`
