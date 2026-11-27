@@ -52,6 +52,7 @@ const IMPORTED_BY_EVERY_TEST: ReadonlyArray<string> = [
 	'tools/test/duration-sequencer.ts',
 	'tools/test/duration-shard.ts',
 	'tools/test/pure-files.ts',
+	'tools/test/test-guard-record.ts',
 	'tools/test/test-module-elapsed.ts',
 	'tools/test/test-repository-guard.ts',
 	'tools/test/unit-duration-record.ts',

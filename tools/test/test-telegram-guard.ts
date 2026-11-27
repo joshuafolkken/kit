@@ -1,6 +1,4 @@
-import { appendFileSync } from 'node:fs'
-import { expect } from 'vitest'
-import { GUARD_LOG_KEY } from './unit-guard-environment'
+import { test_guard_record } from './test-guard-record'
 
 // **A unit test that forgets to mock a notification must fail rather than notify**.
 // A lane child's new test drove `run_carry_cli.run(['--end', '--stopped',
@@ -29,7 +27,6 @@ const TELEGRAM_HOST = 'api.telegram.org'
 const RECORD_NAME = 'telegram'
 const BLOCKED_MESSAGE =
 	'josh: the unit suite must not send a Telegram notification — mock it instead'
-const UNKNOWN_TEST = '(outside a test)'
 // Marks a `fetch` that is already this wrapper. `isolate: false` re-runs a setup file for every test
 // file in one worker, and wrapping the wrapper each time would stack one closure per file.
 const GUARDED_MARK = Symbol.for('josh.unit-telegram-guard')
@@ -48,17 +45,6 @@ function is_telegram(input: Parameters<Fetch>[0]): boolean {
 	return URL.parse(request_url(input))?.hostname === TELEGRAM_HOST
 }
 
-function current_test(): string {
-	const state = expect.getState()
-
-	return [state.testPath, state.currentTestName ?? UNKNOWN_TEST].filter(Boolean).join(' > ')
-}
-
-// `>>`-style append, for `shim_shell.record_line`'s reason: every worker writes the one record.
-function record(log_file: string | undefined): void {
-	if (log_file !== undefined) appendFileSync(log_file, `${RECORD_NAME} ${current_test()}\n`)
-}
-
 function guarded_fetch(real_fetch: Fetch): GuardedFetch {
 	async function guarded(
 		input: Parameters<Fetch>[0],
@@ -66,7 +52,7 @@ function guarded_fetch(real_fetch: Fetch): GuardedFetch {
 	): Promise<Response> {
 		if (!is_telegram(input)) return await real_fetch(input, init)
 
-		record(process.env[GUARD_LOG_KEY])
+		test_guard_record.record(RECORD_NAME)
 
 		throw new Error(BLOCKED_MESSAGE)
 	}

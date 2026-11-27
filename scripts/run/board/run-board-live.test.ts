@@ -6,6 +6,7 @@ import { run_board_labels } from './run-board-labels'
 import { run_board_live } from './run-board-live'
 import { run_board_paint } from './run-board-paint'
 import { run_board_screen } from './run-board-screen'
+import { run_board_sound_quiet } from './run-board-sound-quiet-fixture'
 import type { TypingSound } from './run-board-sound-typing'
 import type { Theme } from './run-board-theme'
 
@@ -22,6 +23,7 @@ const LEFT_MS = 300
 // joshuafolkken/kit#8917: a theme is drawn by its run only in 24-bit color.
 const RGB = { color_depth: () => run_board_paint.RGB_COLOR_DEPTH }
 
+run_board_sound_quiet.each()
 afterEach(() => {
 	vi.unstubAllEnvs()
 })
