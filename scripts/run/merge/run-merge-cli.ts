@@ -15,6 +15,7 @@ import { run_merge_auth } from './run-merge-auth'
 import { run_merge_dated } from './run-merge-dated'
 import { run_merge_decision } from './run-merge-decision'
 import { run_merge_driver } from './run-merge-driver'
+import { run_merge_follow_up } from './run-merge-follow-up'
 import { run_merge_health } from './run-merge-health'
 import { run_merge_human_review } from './run-merge-human-review'
 import { run_merge_signals } from './run-merge-signals'
@@ -231,6 +232,7 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 
 	await lane_overrun.investigate(Number(ctx.child))
 	await lane_baseline.investigate(Number(ctx.child))
+	await run_merge_follow_up.check(ctx.child)
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) {
 		return emit(MERGE_TOKEN.OVER, SUCCESS_EXIT_CODE)

@@ -1,0 +1,8 @@
+{
+	"growth": {
+		"scripts.code_lines": 110,
+		"ai_cost.on_demand_bytes": 400
+	},
+	"reason": "#9063 adds the follow-up line parser and run:merge's unfiled follow-up check, and the measurement doc's follow-up sentence",
+	"date": "2026-11-27"
+}

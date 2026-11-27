@@ -18,6 +18,7 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
 }))
 
+vi.mock('./run-merge-follow-up')
 vi.mock('#scripts/issue/issue-closing-pr', () => ({
 	issue_closing_pr: { read_closing_pr: read_closing_pr_mock },
 }))

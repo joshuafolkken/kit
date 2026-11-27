@@ -87,3 +87,24 @@ describe('issue_evidence_exit.run', () => {
 		expect(calls).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#9063: a lane child files no Issue, so the follow-ups its evidence names are
+// printed as the parent's filing lines.
+describe('issue_evidence_exit.run follow-up lines', () => {
+	it('prints the parent filing line for each follow-up line once the evidence is posted', async () => {
+		const follow_up_file = path.join(work, 'follow-up.md')
+		const infos: Array<string> = []
+
+		writeFileSync(follow_up_file, 'result\n後続: Shorten the probe\n')
+		vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
+			infos.push(String(line))
+		})
+
+		expect(
+			await issue_evidence_exit.run([ISSUE, FLAG, follow_up_file], { command: COMMAND, finish }),
+		).toBe(0)
+		expect(infos.join('\n')).toContain(
+			`pnpm josh issue:file 'Shorten the probe' --found-during ${ISSUE} --body-file <body.md>`,
+		)
+	})
+})
