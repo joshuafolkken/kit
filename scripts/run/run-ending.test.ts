@@ -1,5 +1,6 @@
 import type { ClaudeResultEvent } from '#scripts/agent/claude-result-event'
 import { describe, expect, it } from 'vitest'
+import { run_park_body } from './park/run-park-body'
 import {
 	ABANDONED_VERDICT,
 	CUT_VERDICT,
@@ -38,6 +39,7 @@ function traces(overrides: Partial<EndingTraces> = {}): EndingTraces {
 		is_child_closed: false,
 		is_cut_taken: false,
 		is_tree_dirty: true,
+		issue: '9064',
 		...overrides,
 	}
 }
@@ -111,6 +113,14 @@ describe('an API outage told apart from an ordinary mid-implementation stop', ()
 })
 
 describe('the basis an abandoned verdict carries', () => {
+	// The parent passes the evidence to `run:park --body-file` unchanged (joshuafolkken/kit#9064).
+	it('is a park body run:park accepts, re-dispatching this issue', () => {
+		const { evidence } = run_ending.decide(traces())
+
+		expect(run_park_body.problem_of(evidence)).toBeUndefined()
+		expect(evidence).toContain('pnpm josh run:add 9064 --retry')
+	})
+
 	it('names the exit-record fields it read and the permission-denial count', () => {
 		const { evidence } = run_ending.decide(traces())
 

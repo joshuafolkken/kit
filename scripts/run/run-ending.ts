@@ -7,6 +7,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state } from '#scripts/issue/issue-state'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_hold } from '#scripts/run/hold/run-hold'
+import { run_ending_park } from './run-ending-park'
 import { run_liveness } from './run-liveness'
 
 // `josh run:ending <N>` — how a dispatched lane child *ended*, not whether it is still moving.
@@ -56,6 +57,7 @@ interface EndingTraces {
 	is_child_closed: boolean | undefined
 	is_cut_taken: boolean
 	is_tree_dirty: boolean
+	issue: string
 }
 
 interface EndingDecision {
@@ -117,16 +119,18 @@ function refused_ask_clause(record: ClaudeResultEvent | undefined): string {
 	return ask === undefined ? '' : ` the refused interactive ask was — ${ask};`
 }
 
-// The basis the park comment carries: which exit-record fields were read, the count of refused tool
-// calls, any refused interactive ask, and whether uncommitted work is still on disk for the parent to
-// stash.
+// The park comment the parent passes to `run:park --body-file` unchanged (`run-ending-park.ts`), its
+// reason the basis: which exit-record fields were read, the count of refused tool calls, any refused
+// interactive ask, and whether uncommitted work is still on disk for the parent to stash.
 function abandoned_evidence(traces: EndingTraces): string {
 	const record =
 		traces.exit_record === undefined ? EXIT_UNREADABLE : describe_exit(traces.exit_record)
 	const ask = refused_ask_clause(traces.exit_record)
 	const tree = traces.is_tree_dirty ? 'uncommitted work remains' : 'the tree is clean'
+	const basis = `${record};${ask} the Issue is OPEN and no cut was recorded (${tree}).`
+	const has_ask = traces.exit_record?.refused_ask !== undefined
 
-	return `${record};${ask} the Issue is OPEN and no cut was recorded (${tree}), so the child ended mid-implementation — include this basis in the park comment.`
+	return run_ending_park.abandoned_body({ basis, has_ask, issue: traces.issue })
 }
 
 // The basis an outage verdict carries: the exit-record fields, and the transport-failure signature the
@@ -232,6 +236,7 @@ async function read_traces(request: EndingRequest): Promise<EndingTraces> {
 		is_child_closed,
 		is_cut_taken,
 		is_tree_dirty,
+		issue: request.issue,
 	}
 }
 
