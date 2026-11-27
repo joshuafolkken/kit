@@ -1,0 +1,7 @@
+{
+	"reason": "New run:entry refusal for a run:handoff child outside its issue's lane or branch (run-entry-handoff-root.ts), the fix for #9103 bug 1",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 53
+	}
+}
