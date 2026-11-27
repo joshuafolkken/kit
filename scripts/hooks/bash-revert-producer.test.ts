@@ -57,25 +57,34 @@ function producer_payload(cwd: string): string {
 	})
 }
 
+const WORKTREE = '.claude/worktrees/producer-w1'
+
 function worktree(): string {
-	return path.join(root(), '.claude', 'worktrees', 'producer-w1')
+	return in_workspace(WORKTREE)
 }
 
-// Stamps the call, lets it write the file it names, and answers with the revert's envelope.
+// Stamps the call, lets it write the file it names, and answers with the revert's envelope; the
+// hook runs where the shell does, as `run-hook.sh` places it.
 function shell_writing_app(cwd: string): string | undefined {
-	bash_revert.stamp(producer_payload(cwd), root())
-	write(APP, WRITTEN)
+	bash_revert.stamp(producer_payload(cwd), cwd)
+	writeFileSync(path.join(cwd, APP), WRITTEN)
 
-	return bash_revert.revert(producer_payload(cwd), root())
+	return bash_revert.revert(producer_payload(cwd), cwd)
+}
+
+async function commit_tree(directory: string): Promise<void> {
+	await git_fixture_workspace.git(directory, ['init', git_fixture_workspace.MAIN_BRANCH])
+	await git_fixture_workspace.git(directory, ['add', '.'])
+	await git_fixture_workspace.git(directory, ['commit', '-q', '-m', 'init'])
 }
 
 beforeEach(async () => {
 	fixtures.push(git_fixture_workspace.open_workspace('bash-revert-producer-'))
-	write('.gitignore', '.josh/tmp/\n')
+	write('.gitignore', '.josh/tmp/\n.claude/\n')
 	write(APP, ORIGINAL)
-	await git_fixture_workspace.git(root(), ['init', git_fixture_workspace.MAIN_BRANCH])
-	await git_fixture_workspace.git(root(), ['add', '.'])
-	await git_fixture_workspace.git(root(), ['commit', '-q', '-m', 'init'])
+	write(path.join(WORKTREE, APP), ORIGINAL)
+	await commit_tree(worktree())
+	await commit_tree(root())
 	vi.stubEnv(agent_session_role.KEY, undefined)
 })
 
@@ -93,7 +102,7 @@ describe('bash_revert with a granted producer in its own worktree', () => {
 		dispatch(NO_FILING)
 
 		expect(shell_writing_app(worktree())).toBeUndefined()
-		expect(read(APP)).toBe(WRITTEN)
+		expect(read(path.join(WORKTREE, APP))).toBe(WRITTEN)
 	})
 })
 
@@ -109,6 +118,6 @@ describe('bash_revert with a producer outside its grant', () => {
 		dispatch(FILING_UNSAID)
 
 		expect(shell_writing_app(worktree())).toContain(APP)
-		expect(read(APP)).toBe(ORIGINAL)
+		expect(read(path.join(WORKTREE, APP))).toBe(ORIGINAL)
 	})
 })
