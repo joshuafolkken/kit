@@ -3,7 +3,7 @@ import { run_board_theme_wopr_fixture } from './run-board-theme-wopr-fixture'
 import { run_board_theme_wopr_parts } from './run-board-theme-wopr-parts'
 
 const { HOST, WOPR, board_grid, row_text, state_at } = run_board_theme_wopr_fixture
-const { ending_of, opening_of } = run_board_theme_wopr_parts
+const { BEATS, ending_of, opening_of } = run_board_theme_wopr_parts
 
 describe('run_board_theme_wopr_parts.opening_of', () => {
 	const opening = opening_of(WOPR)
@@ -44,8 +44,13 @@ describe('run_board_theme_wopr_parts.opening_of', () => {
 describe('run_board_theme_wopr_parts.ending_of', () => {
 	const ending = ending_of(WOPR)
 
-	it('lasts until the screen has been empty ten ticks', () => {
-		expect(ending.ticks).toBe(46 + 31 + 30 + 10)
+	// joshuafolkken/kit#9137: the empty screen holds a second, as every theme's ending does.
+	it('lasts until the screen has been empty twenty ticks', () => {
+		expect(ending.ticks).toBe(46 + 31 + 30 + 20)
+	})
+
+	it('marks the beats its one-shot sounds fall on', () => {
+		expect(BEATS).toStrictEqual({ reveal: 61, dark: 40, words: 46, empty: 46 + 31 + 30 })
 	})
 
 	// joshuafolkken/kit#8917: the ending's sound hears its last line as the opening's — the trill while

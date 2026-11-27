@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_sound_palettes_film } from './run-board-sound-palettes-film'
-import { run_board_sound_score, type Palette } from './run-board-sound-score'
+import { run_board_sound_score, type Cue, type Palette } from './run-board-sound-score'
 import { run_board_sound_shape } from './run-board-sound-shape'
-import { run_board_sound_voice } from './run-board-sound-voice'
+import { run_board_sound_voice, type Sound } from './run-board-sound-voice'
 import { run_board_sound_wav } from './run-board-sound-wav'
 import { run_board_sound_wopr } from './run-board-sound-wopr'
+import { run_board_sound_wopr_norad } from './run-board-sound-wopr-norad'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import { run_board_theme_wopr } from './run-board-theme-wopr'
 import { run_board_theme_wopr_phase } from './run-board-theme-wopr-phase'
@@ -24,9 +25,16 @@ const { PEAK_MS } = run_board_sound_score
 const PART_MS = 3000
 // The build's last beep rings this long past the peak at the most.
 const SPILL_MS = 300
-const BED_PACE = { every_ms: 420, to_every_ms: 180, jitter: 0.8 }
 // A 16-bit sample's bytes.
 const SAMPLE_BYTES = 2
+
+function heard(sound: Sound | undefined): Array<number> {
+	return sound === undefined ? [] : run_board_sound_voice.sound_samples(sound)
+}
+
+function heard_cues(cues: ReadonlyArray<Cue> | undefined): Array<[number, Array<number>]> {
+	return (cues ?? []).map(({ at_ms, sound }) => [at_ms, heard(sound)])
+}
 
 function ms_of(samples: { length: number }): number {
 	return (samples.length * MS_PER_SECOND) / run_board_sound_shape.SAMPLE_RATE
@@ -116,8 +124,7 @@ describe('run_board_sound_palettes_film wopr’s build apart from its bed', () =
 		expect(WOPR.notice.bed).toStrictEqual({
 			peak: 0.08,
 			from_gain: 0.5,
-			drone: { wave: 'triangle', hz: 55, to_hz: 70 },
-			pulse: { wave: 'square', hz: 1200, to_hz: 1200, ms: 25, ...BED_PACE },
+			own: run_board_sound_wopr_norad.ambience,
 		})
 	})
 
@@ -137,11 +144,33 @@ describe('run_board_sound_palettes_film wopr’s build apart from its bed', () =
 			from_gain: 1,
 			drone: { wave: 'noise', hz: 0, to_hz: 0 },
 		})
-		expect(WOPR.row.beats).toBe(run_board_sound_wopr.row_beats)
+		expect(WOPR.row.beats).toBe(run_board_sound_wopr_norad.row_beats)
 		expect([WOPR.row.start, WOPR.row.end]).toStrictEqual([
 			run_board_sound_wopr.LOCK_HIGH,
 			run_board_sound_wopr.LOCK_LOW,
 		])
+	})
+})
+
+// joshuafolkken/kit#9137: wopr's sounds from the film — NORAD's beep and short note, the parts' cues,
+// the ROW's ringing low note.
+describe('run_board_sound_palettes_film wopr’s film sounds', () => {
+	// The low note rings its whole length past the letters.
+	it('rings the ROW’s low note its whole 250 ms past the letters', () => {
+		expect(WOPR.row.ring_ms).toBe(run_board_sound_wopr.LOCK.low_ms)
+		expect(WOPR.row.ring_ms).toBe(250)
+	})
+
+	it('calls with NORAD’s beep, blinks its short note and cues the parts and the build', () => {
+		// The sounds hold fresh shaping functions on each build, so they compare by what they render.
+		const { call_sound, blink_sound, notice_cues, opening_cues, ending_cues } =
+			run_board_sound_wopr_norad
+
+		expect(heard(WOPR.notice.call)).toStrictEqual(heard(call_sound()))
+		expect(heard(WOPR.notice.blink)).toStrictEqual(heard(blink_sound()))
+		expect(heard_cues(WOPR.notice.cues)).toStrictEqual(heard_cues(notice_cues()))
+		expect(heard_cues(WOPR.opening_cues)).toStrictEqual(heard_cues(opening_cues()))
+		expect(heard_cues(WOPR.ending_cues)).toStrictEqual(heard_cues(ending_cues()))
 	})
 })
 
@@ -160,7 +189,7 @@ describe('run_board_sound_palettes_film tracks', () => {
 		score.row(letters)
 		score.notice()
 
-		expect(lengths[0]).toBe(letters * TICK_MS)
+		expect(lengths[0]).toBe(letters * TICK_MS + (palette.row.ring_ms ?? 0))
 		expect(lengths[1]).toBe(palette.notice.ms ?? lengths[1])
 	})
 

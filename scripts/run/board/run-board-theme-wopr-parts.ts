@@ -26,7 +26,8 @@ const LINE_MS = 75
 const SLACK_TICKS = 2
 // The ending: the lamps go out over its first twenty ticks (each group by four before the end), the
 // board's rows leave over the next twenty, six of dark screen, then WOPR's last line types, holds
-// thirty ticks with the block blinking five in ten, and the screen is empty for ten.
+// thirty ticks with the block blinking five in ten, and the screen is empty for twenty — a second, as
+// every theme's ending holds its empty screen (joshuafolkken/kit#9137).
 const LAMPS_OUT = 20
 const LAMP_GROUP = 4
 const LAMP_SALT = 81
@@ -35,9 +36,17 @@ const ROWS_TICKS = 20
 const DARK_TICKS = 6
 const WORDS_FROM = ROWS_FROM + ROWS_TICKS + DARK_TICKS
 const WORDS_HOLD = 30
-const EMPTY_TICKS = 10
+const EMPTY_TICKS = 20
 const CURSOR_BLINK = 5
 const PAIR = 2
+// The ticks the parts' one-shot sounds fall on (joshuafolkken/kit#9137): the opening's board starting
+// to be written; the ending's screen going dark, its last line starting, its screen emptying.
+const BEATS = {
+	reveal: REVEAL_FROM,
+	dark: ROWS_FROM + ROWS_TICKS,
+	words: WORDS_FROM,
+	empty: WORDS_FROM + LAST_WORDS.length + WORDS_HOLD,
+}
 
 function intro(wopr: Wopr, grid: Grid, tick: number): void {
 	const letters = Math.min(INTRO.length, tick + 1)
@@ -151,6 +160,6 @@ function ending_of(wopr: Wopr): ThemePart {
 	}
 }
 
-const run_board_theme_wopr_parts = { ending_of, opening_of }
+const run_board_theme_wopr_parts = { BEATS, ending_of, opening_of }
 
 export { run_board_theme_wopr_parts }

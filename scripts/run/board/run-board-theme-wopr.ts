@@ -1,5 +1,6 @@
 import { run_board_theme_host_flash } from './run-board-theme-host-flash'
 import type { Grid, ThemeApi, ThemeModule, ThemeState } from './run-board-theme-host-types'
+import { run_board_theme_wopr_alarm } from './run-board-theme-wopr-alarm'
 import { run_board_theme_wopr_data } from './run-board-theme-wopr-data'
 import { run_board_theme_wopr_idle } from './run-board-theme-wopr-idle'
 import { run_board_theme_wopr_map } from './run-board-theme-wopr-map'
@@ -16,13 +17,15 @@ import { run_board_theme_wopr_row } from './run-board-theme-wopr-row'
 // - PROGRESS: kit's effect, plus a three-letter strip beside DEFCON that locks `CPE` as the line types.
 // - ROW: WOPR works the code as the lane types but never gets it; DEFCON 4, the lane cracks in, a scan
 //   column crosses the screen, stray characters flicker as code.
-// - NOTICE: the code locks and blinks until the peak; DEFCON 5 → 1 and the board reddens; the spark;
-//   sixteen wars beside the WINNER table; then dark, the film's last three lines.
+// - NOTICE: the code locks and blinks until the peak; DEFCON 5 → 1 and the board reddens; the alarm's
+//   beacon turns along the header's first row; the spark; sixteen wars beside the WINNER table under
+//   the beacon's pink light; then dark, the film's last three lines.
 // The ending is the film's last exchange. Every drawing is a function of (state, tick).
 
 const { notice_trace, start_flash } = run_board_theme_host_flash
-const { COLORS, INK, RED } = run_board_theme_wopr_data
-const { crack_row, draw_codes, draw_defcon, draw_lamps, draw_sweep, progress_strip } =
+const { beacon_light } = run_board_theme_wopr_alarm
+const { COLORS, GROUND, INK, RED } = run_board_theme_wopr_data
+const { crack_row, draw_codes, draw_defcon, draw_lamps, draw_sweep, progress_strip, rest_roles } =
 	run_board_theme_wopr_idle
 const { screen_blobs } = run_board_theme_wopr_map
 const { darken, flash, notice_event } = run_board_theme_wopr_notice
@@ -41,13 +44,14 @@ const NOTES = {
 	i: 'the WOPR lamps blink (80 ms steps, groups of 4) · the sweep crosses under the clock each second · DEFCON [5]',
 	p: 'the now line types 50 ms a letter · the lamps burst · the rules run launch code · CPE locks letter by letter beside DEFCON',
 	r: 'DEFCON 4 · LAUNCH: WOPR locks CPE 1704 TKS out of order, 8 of 10, never gets it · beside it tic-tac-toe, draw after draw · the lane cracks in · a scan column',
-	n: 'DEFCON 5→1 · CPE 1704 TKS locks in 2.5 s, blinks to the peak, tic-tac-toe draws ever faster beside it · then left: sixteen wars, ever faster, white blobs merge to white-out · right: STRATEGY / WINNER pages, ever faster · dark: A STRANGE GAME., 3 s hold',
+	n: 'DEFCON 5→1 · CPE 1704 TKS locks in 2.5 s, blinks to the peak, tic-tac-toe draws ever faster beside it · from 2 s the alarm’s red beacon turns along the header’s first row, its pink light crossing the screen three times after the peak · then left: sixteen wars, ever faster, white blobs merge to white-out · right: STRATEGY / WINNER pages, ever faster · dark: A STRANGE GAME., 3 s hold',
 }
 
 // The NOTICE's whole-screen layers over everything drawn.
 function notice_layers(wopr: Wopr, grid: Grid, state: ThemeState, tick: number): void {
 	screen_blobs(wopr, grid, state)
 	darken(grid, state)
+	beacon_light(wopr, grid, state, tick)
 	notice_trace(grid, state, RED)
 	start_flash(grid, state, tick, INK.red_on)
 	flash(wopr, grid, state)
@@ -68,6 +72,7 @@ function event_drawn(
 
 function draw(wopr: Wopr, grid: Grid, state: ThemeState, tick: number): void {
 	crack_row(wopr, grid, state, tick)
+	rest_roles(wopr, grid)
 	draw_sweep(wopr, grid, tick)
 	const event = event_drawn(wopr, grid, state, tick)
 
@@ -89,6 +94,9 @@ function theme(api: ThemeApi): ThemeModule {
 		colons: true,
 		notes: NOTES,
 		colors: COLORS,
+		// The film's screen behind every cell that sets no ground of its own; the host rounds it to its
+		// wash steps (`run-board-theme-host-frame.ts` → `stepped`).
+		background: () => GROUND,
 		lasts: { n: NOTICE_LASTS },
 		draw: (grid, state, tick) => {
 			draw(wopr, grid, state, tick)
