@@ -42,6 +42,13 @@ describe('no-filing declaration — who declares it', () => {
 		expect(is_declared(transcript_path)).toBe(true)
 	})
 
+	it('keeps the quotes and code spans of the declaring line', () => {
+		const transcript_path = session()
+		const line = `${DECLARE}「Detroit」テーマの \`--color\` を直す`
+
+		expect(update(submitted(transcript_path, line))).toBe(line)
+	})
+
 	it.each([
 		['a quoted phrase', `「${DECLARE}」とはどういう意味？`],
 		['a code span', `\`${DECLARE}\` の仕組みを説明して`],

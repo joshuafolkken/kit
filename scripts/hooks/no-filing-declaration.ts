@@ -59,14 +59,18 @@ function is_ending(prompt: string): boolean {
 	return unasked_filing.own_words(prompt).includes(END)
 }
 
-// The declaring line, kept as the person wrote it so the closing note shows their own words.
-function declaring_line(prompt: string): string | undefined {
-	if (is_ending(prompt)) return undefined
-	const words = unasked_filing.own_words(prompt)
+function declares(text: string): boolean {
+	return unasked_filing.own_words(text).includes(DECLARE)
+}
 
-	return words
+// The declaring line, kept as the person wrote it — quotes and code spans included — so the closing
+// note shows their own words.
+function declaring_line(prompt: string): string | undefined {
+	if (is_ending(prompt) || !declares(prompt)) return undefined
+
+	return prompt
 		.split('\n')
-		.find((line) => line.includes(DECLARE))
+		.find((line) => declares(line))
 		?.trim()
 }
 

@@ -75,6 +75,7 @@ describe('Codex hook wiring', () => {
 			'codex-hook-adapter posttool',
 			'audit-provision',
 			'session-lang',
+			'session-resume',
 		]) {
 			expect(hooks).toContain(String.raw`run-hook.sh\" ${hook}`)
 		}
