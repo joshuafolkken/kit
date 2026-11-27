@@ -87,7 +87,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `ui:shot`'s usage section (joshuafolkken/kit#5633) crossed the 49152 block.
 	// `usage:tee`'s usage section (joshuafolkken/kit#6316) crossed the 53248 block.
 	// `issue:consolidate`'s usage section (joshuafolkken/kit#6609) crossed the 57344 block.
-	{ path: 'docs/josh-commands-automation.md', bytes: 61_440 },
+	// `session:resume`'s usage section (joshuafolkken/kit#9076) crossed the 61440 block.
+	{ path: 'docs/josh-commands-automation.md', bytes: 65_536 },
 	// The run reference crossed a block in eleven lanes (joshuafolkken/kit#4775 …
 	// joshuafolkken/kit#6540), so joshuafolkken/kit#6676 split its board, lane and session commands
 	// into pages of their own, each at its smallest block.

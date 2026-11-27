@@ -332,6 +332,18 @@ pnpm josh session:lang   # run by the UserPromptSubmit hook; `ja` prints nothing
 - On a consultation model (Fable, Codex Astra), a prompt carrying a `run:handoff` keyword gets one line pointing at [`josh run:handoff`](./josh-commands-board.md#josh-runhandoff). It reads the stdin payload (`prompt`, `transcript_path`, `model`); Codex wires the same hook in `.codex/hooks.json`.
 - Claude Code's payload names no model, so the transcript's last assistant turn does: a session's first prompt gets no line, and only the `run:entry` refusal catches it.
 
+### `josh session:resume`
+
+<!-- usage: session:resume -->
+
+Claude Code SessionStart hook (resume): end the session’s no-filing declaration (reads the SessionStart payload on stdin; prints nothing).
+
+```bash
+pnpm josh session:resume   # run by the SessionStart hook on a resume
+```
+
+<!-- /usage -->
+
 ### `josh e2e:retry-check`
 
 <!-- usage: e2e:retry-check -->

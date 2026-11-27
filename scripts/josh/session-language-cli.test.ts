@@ -1,7 +1,11 @@
+import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { session_language_cli, type LivePorts } from './session-language-cli'
+
+const create_directory = temporary_directory('suite')
 
 const {
 	ENV_KEY,
@@ -103,6 +107,35 @@ describe('prompt_lines', () => {
 
 		expect(info.mock.calls.flat().join('\n')).toContain('pnpm josh run:handoff fullrun')
 		info.mockRestore()
+	})
+
+	it('appends the no-filing declaration line after the run:handoff line', () => {
+		expect(prompt_lines(DEFAULT_RESULT, false, 'handoff', 'declared')).toStrictEqual([
+			SCOPE_LINE,
+			'handoff',
+			'declared',
+		])
+	})
+})
+
+// joshuafolkken/kit#9076: a session-wide no-filing declaration is restated on every prompt.
+describe('print_prompt_lines — the no-filing declaration', () => {
+	it('prints the closing-note line for a declaring prompt', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const transcript_path = path.join(create_directory('session-lang-'), 'session.jsonl')
+		const prompt = 'このセッションは起票せずに直して'
+		const payload = JSON.stringify({ hook_event_name: 'UserPromptSubmit', prompt, transcript_path })
+
+		try {
+			await print_prompt_lines(
+				async () => payload,
+				async () => undefined,
+			)
+
+			expect(info.mock.calls.flat().join('\n')).toContain(`起票せずに宣言中 — 「${prompt}」`)
+		} finally {
+			info.mockRestore()
+		}
 	})
 })
 

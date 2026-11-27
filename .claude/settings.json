@@ -80,6 +80,16 @@
 						"timeout": 10
 					}
 				]
+			},
+			{
+				"matcher": "resume",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" session-resume",
+						"timeout": 10
+					}
+				]
 			}
 		],
 		"UserPromptSubmit": [

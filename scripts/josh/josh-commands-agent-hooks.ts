@@ -94,6 +94,16 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
 		// tsx start each turn. It loads `.env` itself through the shared loader.
 	},
+	'session:resume': {
+		script: 'scripts/hooks/session-resume-main.ts',
+		description:
+			'Claude Code SessionStart hook (resume): end the session’s no-filing declaration (reads the SessionStart payload on stdin; prints nothing)',
+		category: 'Development',
+		reference: ['', 'automation', ['files']],
+		usage: {
+			examples: [{ arguments: '', note: 'run by the SessionStart hook on a resume' }],
+		},
+	},
 	'codex:hook-adapter': {
 		script: 'scripts/hooks/codex-hook-adapter.ts',
 		description:
