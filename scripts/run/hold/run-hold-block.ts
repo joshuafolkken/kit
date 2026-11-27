@@ -1,3 +1,5 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
 
 // What stops a claim, and `undefined` when nothing does. **An unreadable record stops it**: the run
@@ -30,6 +32,19 @@ async function blocking_message(read: HoldRead, issue: string): Promise<string |
 	return read.kind === 'stale' ? await stale_block(read.hold, issue) : undefined
 }
 
-const run_hold_block = { blocking_message }
+// **An issue with an open lane is that lane's** (joshuafolkken/kit#9104): a run in the primary checkout
+// that claimed it too would edit the same files beside the lane's child, neither seeing the other. A
+// claim inside a linked worktree — the lane itself — is never refused here, nor the unnumbered `new`.
+async function lane_block(issue: string, is_linked: boolean): Promise<string | undefined> {
+	if (is_linked || issue === run_hold.UNNUMBERED_ISSUE) return undefined
+
+	const lane = await lane_registry.find_open_lane(issue)
+
+	if (lane === undefined) return undefined
+
+	return `${issue_cite.plain_for('program', issue)} already has its lane ${lane.directory} — run it there, not in this checkout.`
+}
+
+const run_hold_block = { blocking_message, lane_block }
 
 export { run_hold_block }

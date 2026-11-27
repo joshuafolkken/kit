@@ -2,13 +2,14 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_startup } from '#scripts/run/startup/run-startup'
+import { backlog_drive_holder } from './backlog-drive-holder'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_split_unit } from './backlog-drive-split-unit'
 import { backlog_drive_trace } from './backlog-drive-trace'
 import { backlog_measure_close } from './backlog-measure-close'
 
-const { MEASURED_LAUNCH, SPLIT_LAUNCH, UNSAMPLED_LAUNCH } = backlog_drive_launch_pass
+const { HELD_LAUNCH, MEASURED_LAUNCH, SPLIT_LAUNCH, UNSAMPLED_LAUNCH } = backlog_drive_launch_pass
 
 // The driver's lane launch. The parent that ran `josh latest` in the primary
 // checkout leaves its rewritten lock file in a stash under this message — `backlogrun-lanes.md` →
@@ -93,6 +94,18 @@ async function launch_and_report(issue: string): Promise<DriveLaunch> {
 	return outcome.kind
 }
 
+// An issue another run holds takes no second worker (`backlog-drive-holder.ts`); its stage ends on the
+// reason. Asked last, after the minutes the split-only unit may take, so a claim made meanwhile counts.
+async function is_held_elsewhere(issue: string): Promise<boolean> {
+	const reason = await backlog_drive_holder.holder(issue)
+
+	if (reason === undefined) return false
+
+	await run_event_setup.emit(no_child(issue, `another run holds it — ${reason}`))
+
+	return true
+}
+
 // Ownership is rechecked after the split-only unit, before any lane opens.
 async function opened(issue: string, owner: string): Promise<DriveLaunch> {
 	await backlog_drive_owner.assert_current(owner)
@@ -106,6 +119,7 @@ async function opened(issue: string, owner: string): Promise<DriveLaunch> {
 	)
 	if (split === 'split') return SPLIT_LAUNCH
 	await backlog_drive_owner.assert_current(owner)
+	if (await is_held_elsewhere(issue)) return HELD_LAUNCH
 
 	return await launch_and_report(issue)
 }

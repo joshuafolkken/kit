@@ -23,6 +23,7 @@ vi.mock('#scripts/run/run-preflight', () => ({
 
 vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
+vi.mock('#scripts/lane/lane-registry', () => ({ lane_registry: { find_open_lane: vi.fn() } }))
 
 const unmark = vi.mocked(run_label.unmark)
 const scratch = make_directory('run-hold-cli-release-test-')
