@@ -37,6 +37,6 @@ function with_label(
 	return is_owed ? [...labels, HANDOFF_IMPLEMENTING_LABEL] : labels
 }
 
-const issue_handoff_filing = { with_label }
+const issue_handoff_filing = { is_handed_off, with_label }
 
 export { issue_handoff_filing }

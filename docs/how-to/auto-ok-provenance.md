@@ -36,6 +36,9 @@ An issue a `run:handoff` `fullrun` / `halfrun` / `prrun new` child files carries
 judgement opts it in. Only the hand-off marks in the environment decide it; a `fullrun new` typed
 into a session directly leaves no mark and is judged as before.
 
+When that child's `run:handoff` into the issue's lane refuses or fails, the child ends: the label is lifted and the filing's `auto-ok`
+decided again without it, so `backlogrun` can take it (`run-handoff-release.ts`).
+
 A body declaring `- 人の判断: 要` is never a candidate, and `--apply` refuses it, writing nothing —
 the same reading `issue:file` withholds `auto-ok` by. `backlog:triage --adopt` settles a park; it
 does not opt the issue in.

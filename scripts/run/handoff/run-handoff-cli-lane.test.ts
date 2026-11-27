@@ -66,6 +66,31 @@ describe('run_handoff_cli.run — the work tree', () => {
 	})
 })
 
+// joshuafolkken/kit#9143: a refused hand-off ends a `new` child, so its filing is released.
+describe('run_handoff_cli.run — releasing a refused filing', () => {
+	it('releases the filing a refused numbered hand-off leaves and prints what it did', async () => {
+		const release_filing = vi.fn(async () => 'lifted')
+		const { ports, lines } = fake({ lane_directory: async () => undefined, release_filing })
+
+		await run_handoff_cli.run(['fullrun', '12', BRIEF_FLAG, BRIEF_FILE], ports)
+
+		expect(release_filing).toHaveBeenCalledWith(
+			expect.objectContaining({ line: 'fullrun #12' }),
+			ports.environment,
+		)
+		expect(lines).toContain('run:handoff: lifted')
+	})
+
+	it('releases nothing when the hand-off starts its child', async () => {
+		const release_filing = vi.fn(async () => 'lifted')
+		const { ports } = fake({ lane_directory: async () => LANE, release_filing })
+
+		await run_handoff_cli.run(['fullrun', '12', BRIEF_FLAG, BRIEF_FILE], ports)
+
+		expect(release_filing).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_handoff_cli.run — the child argv', () => {
 	it('builds it against the lane, so its project files resolve there', async () => {
 		const lane = make_directory('josh-run-handoff-lane-tree-')

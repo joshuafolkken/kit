@@ -23,7 +23,8 @@ const PLANNED_LABEL = 'run:planned'
 const PLAN_UNVERIFIED_LABEL = 'plan:unverified'
 // Applied by `issue:file` in a `run:handoff fullrun new` / `halfrun new` / `prrun new` child: that run
 // implements the Issue itself, so `issue-auto-ok.ts` excludes it from `backlogrun`'s pool
-// (joshuafolkken/kit#9143). A person resumes a stopped one with `fullrun #N`.
+// (joshuafolkken/kit#9143). A refused `run:handoff` lifts it (`run-handoff-release.ts`); a person
+// resumes a run stopped later with `fullrun #N`.
 const HANDOFF_IMPLEMENTING_LABEL = 'handoff:implementing'
 // Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting

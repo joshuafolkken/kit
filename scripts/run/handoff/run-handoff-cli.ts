@@ -25,6 +25,7 @@ import { execa } from 'execa'
 import { run_handoff_args, type WorkflowHandoff } from './run-handoff-args'
 import { run_handoff_final } from './run-handoff-final'
 import { run_handoff_launch, type BuiltArgv, type HandoffChild } from './run-handoff-launch'
+import { run_handoff_release } from './run-handoff-release'
 import { run_handoff_retrospective } from './run-handoff-retrospective'
 import { run_handoff_tree } from './run-handoff-tree'
 
@@ -65,6 +66,11 @@ interface HandoffPorts {
 	backlogrun: (argv: ReadonlyArray<string>) => Promise<number>
 	// Whether the carry record under this git directory marks the retrospective as run.
 	is_retrospective_done: (git_directory: string) => boolean
+	// Lifts `handoff:implementing` from a hand-off child's filing a failed hand-off leaves behind.
+	release_filing: (
+		handoff: WorkflowHandoff,
+		environment: AgentEnvironment,
+	) => Promise<string | undefined>
 	write: (line: string) => void
 }
 
@@ -122,6 +128,7 @@ const LIVE_PORTS: HandoffPorts = {
 	backlogrun: josh_backlogrun,
 	is_retrospective_done: (git_directory) =>
 		run_carry.retrospective_done_of(run_carry.read_carry(run_carry.carry_path(git_directory))),
+	release_filing: run_handoff_release.release,
 	write: (line) => process.stdout.write(`${line}\n`),
 }
 
@@ -331,6 +338,21 @@ async function handed(
 		: await launched(result.started, ports)
 }
 
+// A failed hand-off ends a `new` child, so its filing is released to the lane `backlogrun` opens.
+async function released(
+	handoff: WorkflowHandoff,
+	exit_code: number,
+	ports: HandoffPorts,
+): Promise<number> {
+	if (exit_code === SUCCESS_EXIT_CODE) return exit_code
+
+	const line = await ports.release_filing(handoff, ports.environment)
+
+	if (line !== undefined) ports.write(`run:handoff: ${line}`)
+
+	return exit_code
+}
+
 async function dispatch(argv: ReadonlyArray<string>, ports: HandoffPorts): Promise<number> {
 	const parsed = run_handoff_args.parse(argv)
 
@@ -344,7 +366,7 @@ async function dispatch(argv: ReadonlyArray<string>, ports: HandoffPorts): Promi
 		return await ports.backlogrun(with_agent(parsed.rest, selected.provider))
 	}
 
-	return await handed(parsed, selected.provider, ports)
+	return await released(parsed, await handed(parsed, selected.provider, ports), ports)
 }
 
 async function run(argv: ReadonlyArray<string>, ports: HandoffPorts = LIVE_PORTS): Promise<number> {
