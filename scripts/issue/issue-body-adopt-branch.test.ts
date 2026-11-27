@@ -80,9 +80,19 @@ describe('issue_body_adopt_branch environment', () => {
 	it('puts the handed-down row into the filed body and leaves it alone without one', () => {
 		const value = issue_body_adopt_branch.to_environment(ROW)
 
-		expect(issue_body_adopt_branch.with_handoff_row(BODY, value)).toStrictEqual(
+		expect(issue_body_adopt_branch.with_handoff_row(BODY, { value })).toStrictEqual(
 			issue_body_adopt_branch.with_row(BODY, ROW),
 		)
-		expect(issue_body_adopt_branch.with_handoff_row(BODY, '')).toStrictEqual({ body: BODY })
+		expect(issue_body_adopt_branch.with_handoff_row(BODY, { value: '' })).toStrictEqual({
+			body: BODY,
+		})
+	})
+
+	it('leaves the row out of a follow-up or split filing naming --found-during', () => {
+		const value = issue_body_adopt_branch.to_environment(ROW)
+
+		expect(
+			issue_body_adopt_branch.with_handoff_row(BODY, { found_during: '9148', value }),
+		).toStrictEqual({ body: BODY })
 	})
 })

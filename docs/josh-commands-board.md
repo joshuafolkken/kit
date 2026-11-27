@@ -361,7 +361,7 @@ pnpm josh run:handoff backlogrun <E> --only                         # josh backl
 
 Consultation main (Fable / Astra): its provider's role profile (`kickoff` / `retrospective` scheduler, else worker); [`josh.handoff.route`](./package-settings.md) puts `kickoff` on Sonnet. Background `kickoff`. Lane children: exit 1 before launch; continue in the current session.
 
-`--wip <name>` pins `wip/<name>`'s tip into the Issue's `- 取り込むブランチ:` row; a missing branch exits 1.
+`--wip <name>` pins `wip/<name>`'s tip into the Issue's `- 取り込むブランチ:` row: on `new` the child's `issue:file` writes it (a `--found-during` filing never does), on one `#N` it is written into #N's body before launch. Any other line, a missing branch or a row #N cannot take exits 1.
 
 `run:handoff retrospective` starts the end-of-run unit on a generated brief and waits; the brief's close names the calling session as `--owner`, since the carry is that session's. It exits 0 only once the carry holds the unit's `run:carry --retrospective` mark, and exits 1 without starting when the mark is already there.
 

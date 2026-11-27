@@ -1,7 +1,6 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { require_pr_number } from '#scripts/gh/git-gh-pr-read'
 import { git_ancestor } from '#scripts/git/git-ancestor'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
@@ -67,14 +66,15 @@ async function read_paths(
 	return { paths: raw.split('\0').filter((path) => path !== ''), head }
 }
 
-// joshuafolkken/kit#9148: a PR whose head lacks the commit the Issue's adopt-branch row names is refused.
+// joshuafolkken/kit#9148: a PR whose head lacks the commit the Issue's adopt-branch row names is refused,
+// and so is one whose Issue body cannot be read or carries a malformed row.
 async function assert_adopted(issue: string | undefined, head: string): Promise<void> {
 	if (issue === undefined) return
-	const present = issue_body_adopt_branch.read(
-		(await git_gh_issue_read.issue_get_body(issue)) ?? '',
-	)
+	const present = await issue_body_adopt_branch.read_issue(issue)
 
-	if (present.kind !== 'row' || (await git_ancestor.is_ancestor(present.row.sha, head))) return
+	if (present.kind === 'malformed') throw new Error(`adopt-branch row: ${present.note}`)
+
+	if (present.kind === 'none' || (await git_ancestor.is_ancestor(present.row.sha, head))) return
 	const { sha, branch } = present.row
 
 	throw new Error(

@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -47,10 +48,12 @@ const ISSUE = '4156'
 const OTHER_ISSUE = 4157
 const OK = 0
 const fixture = { target: '' }
+const EMPTY_BODY = { kind: 'read', text: '' } as const
 
 beforeEach(() => {
 	fixture.target = path.join(make_directory(path.join(scratch, 'case-')), 'ledger.jsonl')
 	vi.spyOn(lane_ledger, 'target').mockResolvedValue(fixture.target)
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue(EMPTY_BODY)
 	josh_run_mock.mockReset().mockResolvedValueOnce({ code: OK, out: 'fresh' })
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)

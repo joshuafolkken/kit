@@ -1,3 +1,4 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import type { ConfirmInput } from '#scripts/notify/telegram-notify'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -52,6 +53,7 @@ const OK = 0
 const ISSUE = '4663'
 const RELEASE = ['--release', ISSUE]
 const PLANNED = 'run:planned'
+const EMPTY_BODY = { kind: 'read', text: '' } as const
 
 const STOP_CASES: ReadonlyArray<[string, boolean, Array<string>]> = [
 	['no plan', false, []],
@@ -83,6 +85,7 @@ beforeEach(() => {
 	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(OK)
 	record_baseline_mock.mockReset().mockResolvedValue(true)
 	read_issue_mock.mockReset().mockResolvedValue(state_read([]))
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue(EMPTY_BODY)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 

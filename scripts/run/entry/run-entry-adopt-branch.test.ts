@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_entry_adopt_branch } from './run-entry-adopt-branch'
 
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
-	git_gh_issue_read: { issue_get_body: vi.fn() },
+	git_gh_issue_read: { issue_get_body_classified: vi.fn() },
 }))
 
 // The fixture has no `origin`; the fetch of a missing branch is the one remote call, answered as a failure.
@@ -65,7 +65,10 @@ async function make_wip(): Promise<{ adopted: string; later: string }> {
 function give_body(row: string | undefined): void {
 	const body = ['## 背景', '', ...(row === undefined ? [] : [row]), '- 種別: 非不具合'].join('\n')
 
-	vi.mocked(git_gh_issue_read.issue_get_body).mockResolvedValue(body)
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue({
+		kind: 'read',
+		text: body,
+	})
 }
 
 function row_of(sha: string, branch: string = WIP_BRANCH): string {
@@ -135,6 +138,18 @@ describe('run_entry_adopt_branch.adopt — nothing to take in', () => {
 		},
 		TIMEOUT_MS,
 	)
+
+	it(
+		'stops when the Issue body cannot be read rather than reading it as no row',
+		async () => {
+			vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue({ kind: 'missing' })
+
+			const stop = await run_entry_adopt_branch.adopt(ISSUE)
+
+			expect(stop?.report).toContain(`could not read #${ISSUE}'s body`)
+		},
+		TIMEOUT_MS,
+	)
 })
 
 describe('run_entry_adopt_branch.adopt — refusals', () => {
@@ -184,6 +199,22 @@ describe('run_entry_adopt_branch.adopt — merging', () => {
 			await expect(run_entry_adopt_branch.adopt(ISSUE)).resolves.toBeUndefined()
 			expect(await contains(adopted)).toBe(true)
 			expect(await contains(later)).toBe(false)
+		},
+		TIMEOUT_MS,
+	)
+})
+
+describe('run_entry_adopt_branch.adopt — merge shape', () => {
+	it(
+		'records a merge commit rather than fast-forwarding onto the wip commit',
+		async () => {
+			const { adopted } = await make_wip()
+
+			give_body(row_of(adopted))
+
+			await expect(run_entry_adopt_branch.adopt(ISSUE)).resolves.toBeUndefined()
+			expect(await head()).not.toBe(adopted)
+			expect(await git(fixture.root, ['rev-parse', 'HEAD^2'])).toBe(adopted)
 		},
 		TIMEOUT_MS,
 	)

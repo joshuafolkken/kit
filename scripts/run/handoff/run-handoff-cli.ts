@@ -8,6 +8,7 @@ import {
 	type AgentProvider,
 } from '#scripts/agent/agent-provider'
 import { git_command } from '#scripts/git/git-command'
+import type { AdoptBranch } from '#scripts/issue/issue-body-adopt-branch'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cli_body } from '#scripts/josh/cli-body'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -75,6 +76,8 @@ interface HandoffPorts {
 	write: (line: string) => void
 	// The commit `ref` names, or `undefined` when it names none.
 	resolve_commit: (reference: string) => Promise<string | undefined>
+	// `--wip` on `#N`: writes the adopt row into #N's body; the problem when it could not.
+	write_adopt_row: (issue: string, row: AdoptBranch) => Promise<string | undefined>
 }
 
 interface StartInput {
@@ -136,6 +139,7 @@ const LIVE_PORTS: HandoffPorts = {
 	release_filing: run_handoff_release.release,
 	write: (line) => process.stdout.write(`${line}\n`),
 	resolve_commit: run_handoff_wip.resolve_commit,
+	write_adopt_row: run_handoff_wip.write_row,
 }
 
 function refuse(note: string, ports: HandoffPorts): number {
@@ -348,7 +352,10 @@ async function handed(
 		return refuse('the carry already marks the retrospective as run; nothing is owed', ports)
 	}
 
-	const wip = await run_handoff_wip.environment_of(handoff.wip, ports.resolve_commit)
+	const wip = await run_handoff_wip.environment_of(handoff, {
+		resolve: ports.resolve_commit,
+		write_row: ports.write_adopt_row,
+	})
 
 	if ('problem' in wip) return refuse(wip.problem, ports)
 

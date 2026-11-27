@@ -2,9 +2,9 @@
 	"reason": "new adopt-branch row, its --wip writer, lane-entry adoption and pre-merge ancestor check add code, a template row and one-line docs",
 	"date": "2026-11-27",
 	"growth": {
-		"scripts.code_lines": 253,
+		"scripts.code_lines": 325,
 		"rules.lines": 3,
-		"ai_cost.on_demand_bytes": 700,
+		"ai_cost.on_demand_bytes": 749,
 		"prose.long_paragraphs": 1
 	}
 }

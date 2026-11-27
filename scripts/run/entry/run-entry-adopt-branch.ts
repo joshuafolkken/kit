@@ -4,7 +4,6 @@
 // branch already taken in is left alone; anything it cannot take in stops the entry with the reason,
 // never a silent rebuild. The `wip/` branch itself is never deleted here.
 
-import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_ancestor } from '#scripts/git/git-ancestor'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { issue_body_adopt_branch, type AdoptBranch } from '#scripts/issue/issue-body-adopt-branch'
@@ -15,7 +14,6 @@ const REASON = 'the Issue names a wip branch the lane could not take in — see 
 const RECOMMENDED =
 	'Make the named commit reachable on its branch here (or fix the row), then resume'
 const HEAD = 'HEAD'
-const NO_BODY = ''
 
 function stop_of(note: string): EntryStop {
 	return { report: `(adopt branch: ${note})`, notice: { reason: REASON, recommended: RECOMMENDED } }
@@ -36,10 +34,11 @@ async function has_branch(branch: string): Promise<boolean> {
 	}
 }
 
-// The row's commit merged — not the branch's tip, which may have moved on; a conflict is aborted.
+// The row's commit merged — not the branch's tip, which may have moved on; a conflict is aborted. Never a
+// fast-forward: the wip tip may be a `WIP checkpoint:` commit, which the ship refuses as the lane's tip.
 async function merged(row: AdoptBranch): Promise<EntryStop | undefined> {
 	try {
-		await git_spawn.read(['merge', '--no-edit', row.sha])
+		await git_spawn.read(['merge', '--no-ff', '--no-edit', row.sha])
 
 		return undefined
 	} catch {
@@ -63,10 +62,10 @@ async function adopted(row: AdoptBranch): Promise<EntryStop | undefined> {
 	return await merged(row)
 }
 
-// The entry's stop when the row cannot be taken in; `undefined` without a row or once it is in.
+// The entry's stop when the row cannot be taken in or the body cannot be read; `undefined` without a row
+// or once it is in.
 async function adopt(issue_number: string): Promise<EntryStop | undefined> {
-	const body = await git_gh_issue_read.issue_get_body(issue_number)
-	const present = issue_body_adopt_branch.read(body ?? NO_BODY)
+	const present = await issue_body_adopt_branch.read_issue(issue_number)
 
 	if (present.kind === 'malformed') return stop_of(present.note)
 

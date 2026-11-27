@@ -3,7 +3,9 @@
 // it through `issue:file`, `issue:lint` refuses a malformed one, and the lane entry and the pre-merge check
 // read it here; the key is `issue-body-keys.ts`'s `adopt_branch`.
 
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
+import { issue_cite } from '#scripts/issue/issue-cite'
 
 const ROW_VALUE = /^(?<branch>wip\/\S+) @ (?<sha>[0-9a-f]{7,40})$/u
 const NEWLINE = '\n'
@@ -11,6 +13,13 @@ const NEWLINE = '\n'
 interface AdoptBranch {
 	branch: string
 	sha: string
+}
+
+// `issue:file`'s filing as the row sees it: its `--found-during`, and the handed-down value (the
+// environment's when absent).
+interface HandoffFiling {
+	found_during?: string | undefined
+	value?: string | undefined
 }
 
 type AdoptRead =
@@ -112,13 +121,29 @@ function to_environment(row: AdoptBranch): string {
 const ENVIRONMENT_KEY = 'JOSH_HANDOFF_WIP'
 
 // `issue:file`'s body: carrying the row `run:handoff --wip` handed down in `value`, unchanged without one.
+// A filing naming `found_during` is a follow-up or a split of the run's own Issue, never the Issue the
+// hand-off files, so it never carries the row.
 function with_handoff_row(
 	body: string,
-	value: string | undefined = process.env[ENVIRONMENT_KEY],
+	filing: HandoffFiling = {},
 ): { body: string } | { problem: string } {
-	const row = from_environment(value)
+	const { found_during, value = process.env[ENVIRONMENT_KEY] } = filing
+	const row = found_during === undefined ? from_environment(value) : undefined
 
 	return row === undefined ? { body } : with_row(body, row)
+}
+
+// The Issue's row, read live; a body that could not be read is `malformed` with the reason, never `none`.
+async function read_issue(issue_number: string): Promise<AdoptRead> {
+	const fetched = await git_gh_issue_read.issue_get_body_classified(issue_number)
+
+	if (fetched.kind !== 'read') {
+		const cited = issue_cite.plain_for('terminal', issue_number)
+
+		return { kind: 'malformed', note: `could not read ${cited}'s body (${fetched.kind})` }
+	}
+
+	return read(fetched.text ?? '')
 }
 
 const issue_body_adopt_branch = {
@@ -126,6 +151,7 @@ const issue_body_adopt_branch = {
 	from_environment,
 	problems,
 	read,
+	read_issue,
 	to_environment,
 	with_handoff_row,
 	with_row,
