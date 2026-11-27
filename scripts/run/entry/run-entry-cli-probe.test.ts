@@ -33,6 +33,7 @@ vi.mock('#scripts/run/run-pr-return', () => ({
 }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/gh/git-gh-issue-read')
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: vi.fn() } }))
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: {

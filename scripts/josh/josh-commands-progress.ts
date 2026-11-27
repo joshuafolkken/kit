@@ -212,7 +212,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Hand a workflow keyword typed in a consultation session to a child on the role profile model',
 		category: 'AI tools',
-		reference: ['<keyword> [N|new ...] --brief-file <path>', 'automation', ['processes', 'files']],
+		reference: [
+			'<keyword> [N|new ...] --brief-file <path> [--wip <name>]',
+			'automation',
+			['processes', 'files'],
+		],
 		usage: {
 			examples: [
 				{

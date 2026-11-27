@@ -9,6 +9,7 @@ const make_directory = temporary_directory('suite')
 const josh_run_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/gh/git-gh-issue-read')
 vi.mock('#scripts/notify/telegram-notify', () => ({
 	telegram_notify: { confirm: async () => true },
 }))

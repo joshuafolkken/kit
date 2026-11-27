@@ -28,6 +28,7 @@ import { run_handoff_launch, type BuiltArgv, type HandoffChild } from './run-han
 import { run_handoff_release } from './run-handoff-release'
 import { run_handoff_retrospective } from './run-handoff-retrospective'
 import { run_handoff_tree } from './run-handoff-tree'
+import { run_handoff_wip } from './run-handoff-wip'
 
 // `josh run:handoff <keyword> [N|new ...] --brief-file <path>` — hand a workflow keyword typed in a
 // consultation session to a child session on the kit role profile's model, on the main session's own
@@ -43,7 +44,7 @@ const LONE_FLAGS: ReadonlySet<string> = new Set(['--stop', '--restart'])
 // The line `kickoff new …` — `kickoff #N` plans an existing Issue instead.
 const KICKOFF_NEW_LINE = /^kickoff\s+new(?:\s|$)/u
 const USAGE =
-	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> | retrospective | backlogrun [...]'
+	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> [--wip <name>] | retrospective | backlogrun [...]'
 // `josh backlogrun --agent` names a provider by its CLI.
 const AGENT_NAMES: Readonly<Record<AgentProvider, string>> = {
 	anthropic: 'claude',
@@ -72,6 +73,8 @@ interface HandoffPorts {
 		environment: AgentEnvironment,
 	) => Promise<string | undefined>
 	write: (line: string) => void
+	// The commit `ref` names, or `undefined` when it names none.
+	resolve_commit: (reference: string) => Promise<string | undefined>
 }
 
 interface StartInput {
@@ -79,6 +82,8 @@ interface StartInput {
 	provider: AgentProvider
 	brief: string
 	git_directory: string
+	// The child's extra environment: `--wip`'s resolved branch for its `issue:file` to write.
+	wip_environment: Readonly<Record<string, string>>
 }
 
 interface Started {
@@ -130,6 +135,7 @@ const LIVE_PORTS: HandoffPorts = {
 		run_carry.retrospective_done_of(run_carry.read_carry(run_carry.carry_path(git_directory))),
 	release_filing: run_handoff_release.release,
 	write: (line) => process.stdout.write(`${line}\n`),
+	resolve_commit: run_handoff_wip.resolve_commit,
 }
 
 function refuse(note: string, ports: HandoffPorts): number {
@@ -270,7 +276,10 @@ function started_of(input: StartInput, directory: string, ports: HandoffPorts): 
 	if (built.kind === 'rejected') return { kind: 'refused', note: `could not start: ${built.note}` }
 
 	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, now)
-	const request = run_handoff_launch.request_of(built, directory, log, handoff.line)
+	const request = run_handoff_wip.with_environment(
+		run_handoff_launch.request_of(built, directory, log, handoff.line),
+		input.wip_environment,
+	)
 	const started = { handoff, built, request, log, scratch, git_directory, directory }
 
 	return { kind: 'started', started }
@@ -312,6 +321,14 @@ function is_already_closed(
 	return ports.is_retrospective_done(git_directory)
 }
 
+async function from_input(input: StartInput, ports: HandoffPorts): Promise<number> {
+	const result = await tree_started(input, ports)
+
+	return result.kind === 'refused'
+		? refuse(result.note, ports)
+		: await launched(result.started, ports)
+}
+
 async function handed(
 	handoff: WorkflowHandoff,
 	provider: AgentProvider,
@@ -331,11 +348,14 @@ async function handed(
 		return refuse('the carry already marks the retrospective as run; nothing is owed', ports)
 	}
 
-	const result = await tree_started({ handoff, provider, brief, git_directory }, ports)
+	const wip = await run_handoff_wip.environment_of(handoff.wip, ports.resolve_commit)
 
-	return result.kind === 'refused'
-		? refuse(result.note, ports)
-		: await launched(result.started, ports)
+	if ('problem' in wip) return refuse(wip.problem, ports)
+
+	return await from_input(
+		{ handoff, provider, brief, git_directory, wip_environment: wip.environment },
+		ports,
+	)
 }
 
 // A failed hand-off ends a `new` child, so its filing is released to the lane `backlogrun` opens.

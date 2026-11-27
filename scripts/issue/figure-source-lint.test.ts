@@ -54,6 +54,7 @@ describe('figure_source_lint.warnings — sourced or not a figure', () => {
 		['a figure in a fenced output', `${BACKGROUND}\`\`\`\n| 177 | 16.9 |\n\`\`\`\n`],
 		['a figure under another heading', `## 現象\n\n約 35 分\n`],
 		['an ordered-list marker', `${BACKGROUND}1. 予算を守る\n`],
+		['an adopt-branch declaration', `${BACKGROUND}- 取り込むブランチ: wip/demo @ 0ef07e8ba\n`],
 	])('does not warn about %s', (_case, body) => {
 		expect(figure_source_lint.warnings(body)).toStrictEqual([])
 	})

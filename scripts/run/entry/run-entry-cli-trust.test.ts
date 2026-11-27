@@ -12,6 +12,7 @@ const record_baseline_mock = vi.hoisted(() => vi.fn())
 const read_issue_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/gh/git-gh-issue-read')
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { read_plan: async () => undefined },

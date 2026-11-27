@@ -6,6 +6,7 @@ import { escape_reason_lint } from './escape-reason-lint'
 import { expected_effect_lint } from './expected-effect-lint'
 import { figure_source_lint } from './figure-source-lint'
 import { issue_auto_ok } from './issue-auto-ok'
+import { issue_body_adopt_branch } from './issue-body-adopt-branch'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 import { issue_not_before } from './issue-not-before'
@@ -58,6 +59,7 @@ function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<s
 		...size_estimate.problems(body),
 		...aggregation_split.problems(body),
 		...visual_check_lint.problems(body),
+		...issue_body_adopt_branch.problems(body),
 		issue_auto_ok.decision_problem(body),
 		issue_priority.order_problem(body),
 	]

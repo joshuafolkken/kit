@@ -20,9 +20,8 @@ const record_baseline_mock = vi.hoisted(() => vi.fn())
 const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
 const ENTRY_KEY = vi.hoisted(() => 'entry')
 
-// The sync's own steps are `run-entry-sync.test.ts`'s; its call on a #N entry, `run-entry-cli-adopt.test.ts`'s.
-vi.mock('./run-entry-sync', () => ({ run_entry_sync: { sync: async () => undefined } }))
-
+// The sync's steps are its own suites'; its call on a #N entry, `run-entry-cli-adopt.test.ts`'s.
+vi.mock('./run-entry-adopt-branch')
 vi.mock('#scripts/run/run-step-section', () => ({
 	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock, print_once: () => 0 },
 }))

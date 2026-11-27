@@ -35,6 +35,7 @@ checked out here. A third-party owner is Tier C: stop rather than file.
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
   deliverable takes the **single-issue path**, several "Split path" below. A `run:handoff`
   child → the directory its prompt names (`prompts/collaboration-workflow/shell-body.md` → "安全な書き方").
+  A `run:handoff --wip <name>` child's `issue:file` writes the `- 取り込むブランチ:` row (`scripts/run/handoff/run-handoff-wip.ts`).
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
     "<title>" --body-file .josh/tmp/body.md --over-cap` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `issue-template.md` → "Step 1: Issue 作成テンプレ") —

@@ -28,6 +28,7 @@ const DECLARATIONS = (
 		'measure_absent',
 		'measurement',
 		'decision_rule',
+		'adopt_branch',
 	] as const
 ).map((key) => issue_body_keys.prefix(key))
 
