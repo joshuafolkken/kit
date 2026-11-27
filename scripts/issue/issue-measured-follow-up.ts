@@ -12,7 +12,7 @@ const INDENT = '  '
 
 function titles_of(text: string): ReadonlyArray<string> {
 	return [...text.matchAll(FOLLOW_UP_PATTERN)]
-		.map((match) => (match.groups?.['title'] ?? '').trim())
+		.map((match) => match.slice(1).join('').trim())
 		.filter((title) => title.length > 0)
 }
 

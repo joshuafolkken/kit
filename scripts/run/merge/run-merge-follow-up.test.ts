@@ -84,10 +84,29 @@ describe('run_merge_follow_up.check', () => {
 		expect(infos).toStrictEqual([])
 	})
 
+	it('reads no filing when the comments name no follow-up', async () => {
+		read_with_comments.mockResolvedValue({ comments_json: 'result only\n' })
+
+		await run_merge_follow_up.check(CHILD)
+
+		expect(all_events).not.toHaveBeenCalled()
+		expect(infos).toStrictEqual([])
+	})
+})
+
+describe('run_merge_follow_up.check on a failed read', () => {
 	it('skips with one line and does not throw when the comments are not read', async () => {
 		read_with_comments.mockRejectedValue(new Error('gh down'))
 
 		await expect(run_merge_follow_up.check(CHILD)).resolves.toBeUndefined()
 		expect(infos).toStrictEqual([`Follow-up check skipped for #${CHILD}: gh down`])
+	})
+
+	it('skips with one line when the comments read back empty', async () => {
+		read_with_comments.mockResolvedValue({ comments_json: undefined })
+
+		await run_merge_follow_up.check(CHILD)
+
+		expect(infos).toStrictEqual([`Follow-up check skipped for #${CHILD}: comments not read`])
 	})
 })
