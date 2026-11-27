@@ -299,6 +299,8 @@ pnpm josh board:compare <demo.mjs> --theme trace --loose   # glyph and color set
 
 Both streams (`DEMO_BEATS=1`, `board:replay`) run through `@xterm/headless`; screens pair by write time (`board-compare-diff.ts`).
 
+The demo's beat form: with `DEMO_BEATS=1` and `DEMO_STEPS=<n>` it draws no terminal and writes each frame as one JSON `{ text, ms }` line on a virtual clock, ending after n frames; `DEMO_SEED=<n>` seeds its `random()` with mulberry32 (`run-board-seeded-fixture.ts`).
+
 The gate's golden check (`tools/board/board-golden.test.ts`): each theme in `THEMES` (`tools/board/board-golden.ts`) is replayed on the unit-test fixture (one redraw, 100×30; the replay ignores `--seed`).
 
 - Each replay is compared cell by cell with its recorded one in `tools/board/golden/<theme>.jsonl.gz` (the `board:replay` beat lines, gzipped).

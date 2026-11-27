@@ -12,8 +12,8 @@ import { run_board_theme_run, type ThemeRun, type ThemeValue } from './run-board
 
 const { VIEW, base_canvas, ticking_run } = run_board_theme_layer_fixture
 const KEYS_ROWS = [
-	'  KEYS  0 none   1 wopr   2 trace   3 flux   4 codec   5 nixie   6 skynet   7 magi',
-	'        s IDLE   a PROGRESS   d ROW   w NOTICE   q OPENING   e ENDING   / EXIT',
+	'  KEYS  0 none   1 wopr   2 trace   3 flux   4 codec   5 nixie   6 skynet   7 magi   8 deviant   9 isac',
+	'        Y ghost   s IDLE   a PROGRESS   d ROW   w NOTICE   q OPENING   e ENDING   / EXIT',
 ]
 const ITEMS = KEYS_ROWS.flatMap((row) => row.trim().split(/ {2,}/u)).filter(
 	(item) => item !== 'KEYS',
@@ -153,13 +153,14 @@ describe('run_board_demo_footer.rows_of in a narrow pane', () => {
 		expect(keys.every((row) => run_board_fit.width_of(row) <= NARROW)).toBe(true)
 	})
 
-	it('starts what a key plays on a row of its own, the works wrapped above it', () => {
+	it('starts the letters’ works and what a key plays on a row of their own, the digits’ works wrapped above it', () => {
 		const keys = plain_rows('trace', PANE_COLUMNS).slice(2)
 
 		expect(keys.map((row) => row.trim().split(/ {2,}/u, 1)[0])).toStrictEqual([
 			'KEYS',
 			'7 magi',
-			's IDLE',
+			'Y ghost',
+			'/ EXIT',
 		])
 	})
 

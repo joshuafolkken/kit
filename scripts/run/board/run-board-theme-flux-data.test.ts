@@ -26,6 +26,9 @@ describe('run_board_theme_flux_data', () => {
 			hi: '235;255;252',
 			type: body,
 			notice: body,
+			info: '130;190;255',
+			idle: '110;118;128',
+			human: '255;130;190',
 		})
 	})
 
