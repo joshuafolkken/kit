@@ -28,10 +28,11 @@ function stage_label(argv: ReadonlyArray<string>, directory: string): string | u
 	return guard.length > 0 && command === guard.join(' ') ? gate_labels.GUARD_TESTS_LABEL : undefined
 }
 
-function reused_report(argv: ReadonlyArray<string>, at: string): JoshResult {
+// Names the command and its record label, never the guard tests' path list.
+function reused_report(argv: ReadonlyArray<string>, label: string, at: string): JoshResult {
 	return {
 		code: SUCCESS_EXIT_CODE,
-		out: `${argv.join(' ')}: reused — green at ${at} and none of its inputs moved since`,
+		out: `${argv[0] ?? label} (${label}): reused — green at ${at} and none of its inputs moved since`,
 	}
 }
 
@@ -66,7 +67,7 @@ function reusing(
 		const reusable = await check_reuse.reusable_checks([label], tree, records)
 		const at = reusable.get(label)
 
-		if (at !== undefined) return reused_report(argv, at)
+		if (at !== undefined) return reused_report(argv, label, at)
 
 		return await run_recorded(argv, label, tree, { run, records })
 	}

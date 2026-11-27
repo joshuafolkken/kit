@@ -66,6 +66,12 @@ describe('run_chain_reuse — a stage whose inputs did not move', () => {
 		expect(answer.out).toContain('reused')
 	})
 
+	it('names the guard tests by their label, not their path list, when it reuses them', async () => {
+		const { answer } = await twice(GUARD_ARGV, RECORDED)
+
+		expect(answer.out).toMatch(/^test:unit \(guard-tests\): reused/u)
+	})
+
 	it('runs a stage with no record label every time and records nothing', async () => {
 		const { runner } = await twice(['check:related'], RECORDED)
 
