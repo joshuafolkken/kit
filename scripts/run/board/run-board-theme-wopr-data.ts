@@ -6,30 +6,50 @@ import type { ThemeColors } from './run-board-theme-host-types'
 
 const { BOLD, ESC, bg, fg } = run_board_theme_host_grid
 
-// CYAN, the phosphor paint (theme-defs.ts:120); IDLE_PAINT, the rule dashes and idle marks
-// (theme-tones.ts:17); GAUGE_SHADES (labels.ts:325-329); the running tone white bold (theme-tones.ts:23).
-const CYAN = '62;236;225'
-const IDLE = '31;118;113'
+// CYAN, the phosphor's text color `#41eaff`, measured on the film's cursor (joshuafolkken/kit#9137), and
+// GROUND, the screen behind it, `#040608`. The running tone white bold (theme-tones.ts:23).
+const CYAN = '65;234;255'
+const GROUND = '4;6;8'
 const YELLOW = '255;214;10'
 const RED = '255;69;58'
 const GREEN = '48;209;88'
 const WHITE = '255;255;255'
+// The lavender of the film's caption, `#e4e3ff` (measured): the notice's letters, and the spark's flood.
+const LAVENDER = '228;227;255'
 const COLORS: ThemeColors = {
 	body: CYAN,
-	rule: IDLE,
+	// The rule's dashes, the darkest shade of the phosphor (invented).
+	rule: '24;88;96',
 	ok: GREEN,
 	red: RED,
 	warn: YELLOW,
 	hi: WHITE,
-	type: CYAN,
-	notice: CYAN,
-	// The marks' tones: info, idle, waiting on a person.
-	info: '120;200;230',
-	idle: '45;150;145',
+	// Letters being typed: the phosphor at its hottest (invented).
+	type: '225;250;255',
+	notice: LAVENDER,
+	// The marks' tones (invented): info a blue tint between the rule and the body, idle the body
+	// halved, waiting on a person the one violet accent.
+	info: '90;160;230',
+	idle: '32;117;128',
 	human: '190;170;255',
+	// The roles text has at rest beyond the host's own (joshuafolkken/kit#9137), each a shade of the
+	// phosphor (invented: the film's screen is one color): a heading on a rule, and a number.
+	head: '45;164;179',
+	num: '175;245;255',
 }
 const NAVY = '6;12;38'
 const PALE = '200;220;255'
+// The alarm (joshuafolkken/kit#9137): the rotating beacon's red, `#e03020` by eye on the film, from
+// its lobe's centre out to the unlit lamp (the shades between invented), and the pink light it throws
+// across the room (the film's pink unmeasured: invented).
+const BEACON_RED = '224;48;32'
+const BEACON: ReadonlyArray<string> = [
+	`${fg('255;150;130')}${BOLD}`,
+	`${fg(BEACON_RED)}${BOLD}`,
+	fg('150;32;22'),
+	fg('70;15;10'),
+]
+const BEACON_PINK = `${fg('255;150;175')}${BOLD}`
 
 // The effects' own inks (beyond kit). The LAUNCH panel: its frame and labels; a spinning position is
 // a dim orange, a locked one a bright orange, the lock itself white-hot for three ticks; an unlit
@@ -72,7 +92,6 @@ const LED = { spin: '170;70;20', locked: '255;150;50', hot: '255;235;190', ghost
 // The spark floods the whole screen white, white, lavender, dim lavender: the film floods white and
 // lavender, no yellow or orange (measured on the film's frames; the lavender `#e4e3ff` on its caption).
 // The last frame is that lavender at 0.65 of its brightness (invented).
-const LAVENDER = '228;227;255'
 const LAVENDER_DIM = '148;148;166'
 const SPARK_WHITE = `${fg(WHITE)}${BOLD}${bg('255;255;235')}`
 const SPARK: ReadonlyArray<string> = [
@@ -148,10 +167,13 @@ const INTRO = 'SHALL WE PLAY A GAME?'
 const LAST_WORDS = 'HOW ABOUT A NICE GAME OF CHESS?'
 
 const run_board_theme_wopr_data = {
+	BEACON,
+	BEACON_PINK,
 	CLOSING,
 	CODE,
 	COLORS,
 	GAMES,
+	GROUND,
 	INK,
 	INTRO,
 	LAST_WORDS,

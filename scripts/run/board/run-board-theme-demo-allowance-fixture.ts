@@ -125,8 +125,26 @@ const WOPR_CODE_CELLS = [
 	})),
 ]
 
+// joshuafolkken/kit#9137: the NOTICE's alarm beacon turns across the header's first row, and the
+// WINNER table pages through the 18 confirmed strategy names (the demo had others).
+// `run-board-theme-wopr-alarm.test.ts` and `run-board-theme-wopr-scenario-data.test.ts` hold them.
+const WOPR_WINNER_W = 7
+const WOPR_BEACON_CELLS = Array.from({ length: HOST.layout.head_top.w }, (_, index) => ({
+	y: 0,
+	x: HOST.layout.head_top.x + index,
+}))
+const WOPR_NAME_CELLS = Array.from({ length: WOPR.bottom - WOPR.sky }, (_row, row) =>
+	Array.from({ length: WOPR.table.w - WOPR_WINNER_W }, (_cell, index) => ({
+		y: WOPR.sky + 1 + row,
+		x: WOPR.table.x + index,
+	})),
+).flat()
+
 const ALLOWANCES = {
-	wopr: cells_changed('prn', WOPR_CODE_CELLS),
+	wopr: masks_of(
+		cells_changed('prn', WOPR_CODE_CELLS),
+		cells_changed('n', [...WOPR_BEACON_CELLS, ...WOPR_NAME_CELLS]),
+	),
 	// §4 trace: the gauge on the rule's right end; the NOTICE rain over all but the blinking spots.
 	trace: masks_of(level_moved(LEVELS.trace), rows_redrawn('n', TRACE_HEADER_ROWS)),
 	// §4 flux: the NOTICE's and ENDING's flames twice the demo's pace; the big clock shows the last

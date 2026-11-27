@@ -4,9 +4,30 @@ import { run_board_theme_wopr_scenario_data } from './run-board-theme-wopr-scena
 const { SCENARIOS } = run_board_theme_wopr_scenario_data
 
 describe('run_board_theme_wopr_scenario_data', () => {
-	it('names the film’s first strikes', () => {
-		expect(SCENARIOS.slice(7, 9)).toStrictEqual(['U.S. FIRST STRIKE', 'USSR FIRST STRIKE'])
+	// cspell:disable -- the film's strategy names.
+	it('names only the 18 confirmed strategies: the film’s in the order read, then the stills’', () => {
+		expect(SCENARIOS).toStrictEqual([
+			'U.S. FIRST STRIKE',
+			'USSR FIRST STRIKE',
+			'NATO / WARSAW PACT',
+			'FAR EAST STRATEGY',
+			'INDIA PAKISTAN WAR',
+			'MEDITERRANEAN WAR',
+			'HONGKONG VARIANT',
+			'SEATO DECAPITATING',
+			'ATLANTIC HEAVY',
+			'CUBAN PARAMILITARY',
+			'MIDDLE EAST HEAVY',
+			'TAIWAN THEATERWIDE',
+			'PACIFIC MANEUVER',
+			'PORTUGAL REVOLUTION',
+			'ALBANIAN DECOY',
+			'CYPRUS MANEUVER',
+			'EGYPT MISDIRECTION',
+			'BANGLADESH THRUST',
+		])
 	})
+	// cspell:enable
 
 	it('names each strategy once, in capitals', () => {
 		expect(new Set(SCENARIOS).size).toBe(SCENARIOS.length)

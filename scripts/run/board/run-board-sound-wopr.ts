@@ -26,12 +26,13 @@ interface Overtone {
 }
 
 // A note: its partials sounding together, its length, the time it rises in, and the time constant its
-// level dies away by (none: flat).
+// level dies away by (none: flat); the time it falls to nothing in at its end (none: `RELEASE_MS`).
 interface Note {
 	partials: ReadonlyArray<Overtone>
 	ms: number
 	attack_ms: number
 	decay_ms?: number
+	release_ms?: number
 }
 
 const MS_PER_SECOND = 1000
@@ -87,7 +88,8 @@ function amplitude(level: number): number {
 
 // The note's gain `ms` in: its rise, its hard gate at the end, its decay.
 function gain_at(note: Note, ms: number): number {
-	const edge = Math.max(0, Math.min(1, ms / note.attack_ms, (note.ms - ms) / RELEASE_MS))
+	const release_ms = note.release_ms ?? RELEASE_MS
+	const edge = Math.max(0, Math.min(1, ms / note.attack_ms, (note.ms - ms) / release_ms))
 
 	return note.decay_ms === undefined ? edge : edge * Math.exp(-ms / note.decay_ms)
 }
@@ -119,12 +121,12 @@ function high_note(ms: number): Note {
 	return { partials: HIGH_PARTIALS, ms, attack_ms: SHARP_MS, decay_ms: HIGH_DECAY_MS }
 }
 
-function low_note(partials: ReadonlyArray<Overtone>, ms: number): Note {
+function flat_note(partials: ReadonlyArray<Overtone>, ms: number): Note {
 	return { partials, ms, attack_ms: SHARP_MS }
 }
 
 const LOCK_HIGH = sound_of(high_note(LOCK.high_ms), LOCK.peak)
-const LOCK_LOW = sound_of(low_note(LOW_PARTIALS, LOCK.low_ms), LOCK.peak)
+const LOCK_LOW = sound_of(flat_note(LOW_PARTIALS, LOCK.low_ms), LOCK.peak)
 
 // The low beep's length for moves `every_ms` apart: the longest at the slowest pace, the shortest at
 // the fastest.
@@ -141,7 +143,7 @@ function game_beep(count: number, every_ms: number): Sound {
 	const room_ms = every_ms * GAME.share
 	const low_ms = Math.min(game_low_ms(every_ms), room_ms)
 	const high_ms = Math.min(GAME.high_ms, room_ms)
-	const note = count % PAIR === 1 ? low_note(GAME_LOW_PARTIALS, low_ms) : high_note(high_ms)
+	const note = count % PAIR === 1 ? flat_note(GAME_LOW_PARTIALS, low_ms) : high_note(high_ms)
 
 	return sound_of(note, GAME.peak)
 }
@@ -219,11 +221,16 @@ function row_beats(letters: number): Array<Cue> {
 
 const run_board_sound_wopr = {
 	BUILD_GAP_TICKS,
+	GAME,
+	LOCK,
 	LOCK_HIGH,
 	LOCK_LOW,
 	build_cues,
+	flat_note,
+	note_samples,
 	notice_cues,
 	row_beats,
+	sound_of,
 }
 
 export { run_board_sound_wopr }

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_theme_host_grid } from './run-board-theme-host-grid'
+import type { Grid } from './run-board-theme-host-types'
 import { run_board_theme_wopr_data } from './run-board-theme-wopr-data'
 import { run_board_theme_wopr_fixture } from './run-board-theme-wopr-fixture'
 import { run_board_theme_wopr_idle } from './run-board-theme-wopr-idle'
@@ -6,8 +8,9 @@ import { run_board_theme_wopr_idle } from './run-board-theme-wopr-idle'
 const { HOST, WOPR, board_grid, cell_of, row_text, state_at } = run_board_theme_wopr_fixture
 const { crack_row, draw_codes, draw_defcon, draw_lamps, draw_sweep, is_lit, out_ink } =
 	run_board_theme_wopr_idle
-const { progress_strip } = run_board_theme_wopr_idle
+const { progress_strip, rest_roles } = run_board_theme_wopr_idle
 const { SHADES } = run_board_theme_wopr_data
+const { set_cell } = run_board_theme_host_grid
 const STEP_MS = 80
 const WATCHED_MS = 20_000
 const SAMPLE_MS = 10
@@ -167,5 +170,66 @@ describe('run_board_theme_wopr_idle — code on every tick', () => {
 		expect(kept).toStrictEqual([])
 		expect(strip_at(LAST_TYPING - 1).slice(1)).toBe(strip_at(LAST_TYPING).slice(1))
 		expect(strip_at(LAST_TYPING - 1).charAt(0)).not.toBe(strip_at(LAST_TYPING).charAt(0))
+	})
+})
+
+// joshuafolkken/kit#9137: text at rest takes the theme's roles over the host's body.
+const [{ y: RULE_Y } = { y: 0 }] = WOPR.rule_cells
+const OFF_RULE_Y = RULE_Y - 1
+
+// A board of blanks with `cells` set on it, its text given its roles at rest.
+function rest_of(cells: ReadonlyArray<[y: number, x: number, ch: string, style: string]>): Grid {
+	const grid: Grid = Array.from({ length: RULE_Y + 1 }, () => [])
+
+	for (const [y, x, ch, style] of cells) set_cell(grid, { y, x }, [ch, style])
+	rest_roles(WOPR, grid)
+
+	return grid
+}
+
+describe('run_board_theme_wopr_idle.rest_roles', () => {
+	it('styles a body digit as num on any row', () => {
+		const grid = rest_of([
+			[OFF_RULE_Y, 0, '7', 'body'],
+			[RULE_Y, 0, '4', 'body'],
+		])
+		const styles = [OFF_RULE_Y, RULE_Y].map((y) => cell_of(grid, { y, x: 0 })[1])
+
+		expect(styles).toStrictEqual(['num', 'num'])
+	})
+
+	it('styles a body letter as head on a rule row only', () => {
+		const grid = rest_of([
+			[OFF_RULE_Y, 0, 'a', 'body'],
+			[RULE_Y, 0, 'A', 'body'],
+		])
+
+		expect(cell_of(grid, { y: OFF_RULE_Y, x: 0 })[1]).toBe('body')
+		expect(cell_of(grid, { y: RULE_Y, x: 0 })[1]).toBe('head')
+	})
+
+	it('leaves blanks and cells in any other style as they are', () => {
+		const kept: Grid[number] = [
+			[' ', 'body'],
+			['-', 'rule'],
+			['9', 'ok'],
+			['B', 'body:dim'],
+		]
+		const grid = rest_of(kept.map(([ch, style], x) => [RULE_Y, x, ch, style]))
+
+		expect(grid[RULE_Y]).toStrictEqual(kept)
+	})
+})
+
+describe('run_board_theme_wopr_idle.rest_roles — the demo board', () => {
+	it('styles the demo board’s rule heading as head and keeps its dashes', () => {
+		const grid = board_grid()
+		const text = row_text(grid, RULE_Y)
+		const word = text.search(/[a-z]/iu)
+
+		rest_roles(WOPR, grid)
+
+		expect(cell_of(grid, { y: RULE_Y, x: word })[1]).toBe('head')
+		expect(cell_of(grid, { y: RULE_Y, x: text.indexOf('-') })[1]).toBe('rule')
 	})
 })

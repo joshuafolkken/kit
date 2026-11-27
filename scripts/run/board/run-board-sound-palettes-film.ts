@@ -1,9 +1,10 @@
 import { run_board_sound_click } from './run-board-sound-click'
 import { run_board_sound_enter } from './run-board-sound-enter'
-import { run_board_sound_score, type Palette } from './run-board-sound-score'
+import { run_board_sound_score, type Cue, type Palette } from './run-board-sound-score'
 import { run_board_sound_shape } from './run-board-sound-shape'
-import { run_board_sound_voice, type Sound } from './run-board-sound-voice'
+import { run_board_sound_voice, type Bed, type Sound } from './run-board-sound-voice'
 import { run_board_sound_wopr } from './run-board-sound-wopr'
+import { run_board_sound_wopr_norad } from './run-board-sound-wopr-norad'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import { run_board_theme_wopr } from './run-board-theme-wopr'
 import { run_board_theme_wopr_phase } from './run-board-theme-wopr-phase'
@@ -24,7 +25,7 @@ function one(peak: number, ...segments: Sound['layers'][number]): Sound {
 	return { peak, layers: [segments] }
 }
 
-// wopr: the terminal's single square beep, the same pitch thrice to call.
+// wopr: the terminal's single square beep, as the board appears.
 const WOPR_BEEP = 880
 const WOPR_FLASH: Sound = one(0.14, hiss(220, 90, 41))
 const WOPR_TABLE: Sound = one(0.05, beep(1500, 20, 'square', { decay_ms: 12 }))
@@ -55,9 +56,16 @@ function strewn(
 	}
 }
 
+// Each cue's sound at its own peak, into `out` at its time.
+function lay(out: Array<number>, cues: ReadonlyArray<Cue>): void {
+	for (const { at_ms, sound } of cues) {
+		add_into(out, scaled(sound_samples(sound), sound.peak), sample_at(at_ms))
+	}
+}
+
 // wopr after its peak, from the peak on: the war's white flashes, ever closer, with the table's short
-// beeps under them, then the last three lines typed in the terminal's pips while they type, and the
-// typed end once they are through.
+// beeps and the alarm's drone under them, then the last three lines typed in the terminal's pips while
+// they type, and the typed end once they are through.
 function wopr_after_peak(): Array<number> {
 	const war: [number, number] = [WAR_START * TICK_MS, CLOSE_FROM * TICK_MS]
 	const typed_ms = CLOSE_TYPED * TICK_MS
@@ -73,7 +81,7 @@ function wopr_after_peak(): Array<number> {
 	})
 	strewn(out, WOPR_TABLE, war, () => WOPR_TABLE_EVERY_MS)
 	strewn(out, WOPR_TYPE, [war_to, typed_ms], () => WOPR_TYPE_EVERY_MS)
-	add_into(out, scaled(sound_samples(WOPR_TYPED), WOPR_TYPED.peak), sample_at(typed_ms))
+	lay(out, [...run_board_sound_wopr_norad.alarm_cues(), { at_ms: typed_ms, sound: WOPR_TYPED }])
 
 	return out
 }
@@ -88,54 +96,46 @@ function wopr_typed_wav(directory?: string): string | undefined {
 	)
 }
 
+// joshuafolkken/kit#9137: the cabinet's ambience — its hum in its rumble, its ticks in pairs — under the
+// NOTICE, the opening and the ending.
+const WOPR_ROOM: Bed = { peak: 0.08, from_gain: 0.5, own: run_board_sound_wopr_norad.ambience }
+
 const WOPR: Palette = {
 	name: 'wopr',
 	notice: {
-		call: one(
-			0.16,
-			beep(WOPR_BEEP, 140, 'square'),
-			rest(110),
-			beep(WOPR_BEEP, 140, 'square'),
-			rest(110),
-			beep(WOPR_BEEP, 140, 'square'),
-		),
-		bed: {
-			peak: 0.08,
-			from_gain: 0.5,
-			drone: { wave: 'triangle', hz: 55, to_hz: 70 },
-			pulse: {
-				wave: 'square',
-				hz: 1200,
-				to_hz: 1200,
-				ms: 25,
-				every_ms: 420,
-				to_every_ms: 180,
-				jitter: 0.8,
-			},
-		},
+		// joshuafolkken/kit#9137: NORAD's beep, one long note and three short.
+		call: run_board_sound_wopr_norad.call_sound(),
+		bed: WOPR_ROOM,
 		peak: {
 			peak: 0.22,
 			layers: [[hiss(600, 220, 77)], [beep(70, 500, 'sine', { to_hz: 40, decay_ms: 250 })]],
 		},
+		// joshuafolkken/kit#9137: NORAD's short note on each of the notice's three bars.
+		blink: run_board_sound_wopr_norad.blink_sound(),
 		close: one(0.13, beep(440, 260, 'square', { decay_ms: 180 })),
 		ms: run_board_theme_wopr.NOTICE_LASTS * TICK_MS,
 		after_peak: wopr_after_peak,
-		// joshuafolkken/kit#9137: the build keeps `bed`'s drone at the level it has there (half the
-		// bed's peak) and plays the tic-tac-toe beeps and the lock's two notes as cues, in place of
-		// `bed`'s pulse train.
-		build: { peak: 0.04, from_gain: 0.5, drone: { wave: 'triangle', hz: 55, to_hz: 70 } },
-		cues: run_board_sound_wopr.notice_cues(),
+		// joshuafolkken/kit#9137: the build keeps the ambience at half the bed's peak, under its cues:
+		// the tic-tac-toe beeps, the lock's two notes, the code's tick and the tone the games end on.
+		build: { ...WOPR_ROOM, peak: 0.04 },
+		cues: run_board_sound_wopr_norad.notice_cues(),
 	},
 	// joshuafolkken/kit#9137: the lock's high note starts a ROW and its low note ends it; the game's
-	// moves beep over the noise, which keeps the level it had under the former pulse (half the bed's).
+	// moves beep and the code ticks over the noise, which keeps the level it had under the former
+	// pulse (half the bed's).
 	row: {
 		start: run_board_sound_wopr.LOCK_HIGH,
 		during: { peak: 0.035, from_gain: 1, drone: { wave: 'noise', hz: 0, to_hz: 0 } },
 		end: run_board_sound_wopr.LOCK_LOW,
-		beats: run_board_sound_wopr.row_beats,
+		beats: run_board_sound_wopr_norad.row_beats,
+		// The low note starts as the letters finish and rings its whole length past them (invented).
+		ring_ms: run_board_sound_wopr.LOCK.low_ms,
 	},
 	appear: one(0.1, beep(WOPR_BEEP, 60, 'square'), rest(60), beep(1320, 80, 'square')),
 	vanish: one(0.1, beep(440, 250, 'square', { to_hz: 220, decay_ms: 150 })),
+	// joshuafolkken/kit#9137: the lock's notes and the cabinet's tick on what the parts draw.
+	opening_cues: run_board_sound_wopr_norad.opening_cues(),
+	ending_cues: run_board_sound_wopr_norad.ending_cues(),
 }
 
 // trace: thin sine falling from high, droplets of noise running down.
