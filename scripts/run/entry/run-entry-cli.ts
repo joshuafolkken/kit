@@ -27,6 +27,7 @@ import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_children, type EntryRequest, type Resume } from './run-entry-children'
 import { run_entry_dispatch } from './run-entry-dispatch'
+import { run_entry_handoff_root } from './run-entry-handoff-root'
 import { run_entry_lane_plan } from './run-entry-lane-plan'
 import { run_entry_spill } from './run-entry-spill'
 import { run_entry_stop, type StopNotice } from './run-entry-stop'
@@ -444,6 +445,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 		return FAILURE_EXIT_CODE
 	}
+
+	if (await run_entry_handoff_root.is_refused(request)) return FAILURE_EXIT_CODE
 
 	return await run_entry_children.within(request.issue_number, async () => await open_run(request))
 }

@@ -6,6 +6,7 @@ import type { KeyInput } from './run-board-keys'
 import { run_board_live } from './run-board-live'
 import { run_board_paint } from './run-board-paint'
 import { run_board_panel_fixture } from './run-board-panel-fixture'
+import { run_board_sound_quiet } from './run-board-sound-quiet-fixture'
 import type { TypingSound } from './run-board-sound-typing'
 import type { Theme } from './run-board-theme'
 
@@ -111,6 +112,7 @@ function screen_left(frames: ReadonlyArray<string>): { styles: Array<string>; te
 	return { styles, text: lines_of(cells).join('\n') }
 }
 
+run_board_sound_quiet.each()
 afterEach(() => {
 	vi.unstubAllEnvs()
 })
