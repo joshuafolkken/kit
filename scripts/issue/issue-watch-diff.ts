@@ -14,6 +14,11 @@ import { z } from 'zod'
 // through a raw `gh api` counts as a person's — the direction that costs one `josh issue:ack`, never a
 // missed correction.
 //
+// **A person's instruction a session relays through josh is a person's update.** A session other than
+// the run posts through josh too, so `josh issue:comment --from-user` stamps `USER_MARKER` in place of
+// `RUN_MARKER`, and a comment carrying it is never read as the run's own — even one whose text quotes
+// the run marker. It says nothing about trust: that stays the author's write access.
+//
 // **Only an author with write access is a person here** (`gh_author_association`). On a public
 // repository anyone can comment, so a comment from anyone else is never handed to a run as an update,
 // and its `RUN_MARKER` is not taken as josh's own. A `MEMBER` / `COLLABORATOR` whose lookup failed
@@ -31,6 +36,7 @@ import { z } from 'zod'
 // one keeps its id and is not seen. The body is compared whole, so its edits are.
 
 const RUN_MARKER = '<!-- josh:run -->'
+const USER_MARKER = '<!-- josh:user -->'
 const BOT_TYPE = 'Bot'
 const BOT_SUFFIX = '[bot]'
 const NO_COMMENT_ID = 0
@@ -85,11 +91,15 @@ function is_bot(user: z.infer<typeof comment_schema>['user']): boolean {
 	return user?.type === BOT_TYPE || (user?.login.endsWith(BOT_SUFFIX) ?? false)
 }
 
+function is_run_marked(body: string): boolean {
+	return body.includes(RUN_MARKER) && !body.includes(USER_MARKER)
+}
+
 function is_automated(
 	raw: Pick<z.infer<typeof comment_schema>, 'user' | 'body'>,
 	is_trusted: boolean | undefined,
 ): boolean {
-	return is_bot(raw.user) || (is_trusted === true && (raw.body?.includes(RUN_MARKER) ?? false))
+	return is_bot(raw.user) || (is_trusted === true && is_run_marked(raw.body ?? ''))
 }
 
 async function to_comment(
@@ -226,6 +236,7 @@ function withheld_notice(baseline: WatchBaseline, snapshot: WatchSnapshot): stri
 const issue_watch_diff = {
 	BOT_SUFFIX,
 	RUN_MARKER,
+	USER_MARKER,
 	WITHHELD_BODY_EDIT,
 	baseline_of,
 	is_automated,

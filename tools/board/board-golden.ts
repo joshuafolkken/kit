@@ -30,7 +30,7 @@ const TICKS: Readonly<Record<GoldenTheme, number>> = {
 	nixie: 100,
 	skynet: 60,
 	magi: 140,
-	deviant: 154,
+	rk800: 154,
 	isac: 120,
 	ghost: 100,
 }

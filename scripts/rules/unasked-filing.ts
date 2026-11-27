@@ -45,6 +45,17 @@ const NO_FILING_PHRASES: ReadonlyArray<RegExp> = [
 	/\b(?:don['’]t|do not) file\b/giu,
 ]
 
+// No-filing work defers tests and the gate to the finish; these words ask for them now
+// (`principles.md` → "consult-vs-execute").
+const TESTS_NOW: ReadonlyArray<RegExp> = [
+	/テスト\s*[とも・、]\s*(?:gate|ゲート)\s*も/iu,
+	/\btests and (?:the )?gate (?:too|now|as well)\b/iu,
+]
+// A clause that names them only to put them off or decline them.
+const DEFERRAL =
+	/ない|不要|後回し|後で|せず|なし|\b(?:don['’]t|do not|never|skip|without|later)\b/iu
+const CLAUSE_END = /[。．.!?！？\n]/u
+
 // A short yes to the model's own proposal is the confirmation the refusal asks for.
 const AFFIRMATIVE = /^(?:はい|うん|お願い|どうぞ|進めて|yes|ok|okay|sure|please do|go ahead)/iu
 const SHORT_REPLY = 40
@@ -95,6 +106,21 @@ function is_no_filing(prompt: string): boolean {
 	const words = own_words(prompt)
 
 	return without_no_filing(words) !== words
+}
+
+// A no-filing phrase declines the filing, not the tests, so its negation is no deferral.
+function is_tests_now_clause(clause: string): boolean {
+	const is_asked_now = TESTS_NOW.some((pattern) => pattern.test(clause))
+
+	return is_asked_now && !DEFERRAL.test(without_no_filing(clause))
+}
+
+// The person's own words ask for the tests and the gate now — the one reading that lifts a no-filing
+// run's deferral. Read per clause, so a refusal elsewhere in the prompt does not cancel the request.
+function is_tests_now(prompt: string): boolean {
+	return own_words(prompt)
+		.split(CLAUSE_END)
+		.some((clause) => is_tests_now_clause(clause))
 }
 
 function is_instructed(prompt: string): boolean {
@@ -194,6 +220,13 @@ const ROW = {
 	},
 }
 
-const unasked_filing = { ROW, is_unasked_filing, is_no_filing, is_instructed, own_words }
+const unasked_filing = {
+	ROW,
+	is_unasked_filing,
+	is_no_filing,
+	is_tests_now,
+	is_instructed,
+	own_words,
+}
 
 export { unasked_filing }

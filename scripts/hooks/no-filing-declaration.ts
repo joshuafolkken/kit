@@ -20,6 +20,10 @@ import { z } from 'zod'
 // it. A `--resume` keeps the transcript too, so its `SessionStart` drops the record: the first prompt
 // after a resume must not reach an edit before the person has seen the declaration again.
 const DECLARE = 'このセッションは起票せずに'
+// `DECLARE` is the phrase the documents show; the same phrase with the particle `de-wa` in place of
+// `wa` declares too — on 2026-11-28 it recorded nothing and the producer was refused. No other
+// spelling is read.
+const DECLARED = /このセッション(?:は|では)起票せずに/u
 const END = '起票せずにモードを終了'
 const RECORD_FILE = 'no-filing-declaration.json'
 
@@ -60,7 +64,7 @@ function is_ending(prompt: string): boolean {
 }
 
 function declares(text: string): boolean {
-	return unasked_filing.own_words(text).includes(DECLARE)
+	return DECLARED.test(unasked_filing.own_words(text))
 }
 
 // The declaring line, kept as the person wrote it — quotes and code spans included — so the closing

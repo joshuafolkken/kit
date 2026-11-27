@@ -47,8 +47,8 @@ const ALIASES = [
 	['terminator', 'skynet'],
 	['evangelion', 'magi'],
 	['eva', 'magi'],
-	['detroit', 'deviant'],
-	['dbh', 'deviant'],
+	['detroit', 'rk800'],
+	['dbh', 'rk800'],
 	['division', 'isac'],
 	['shd', 'isac'],
 	['gits', 'ghost'],
@@ -65,7 +65,7 @@ describe('run_board_theme_defs.THEMES', () => {
 			'nixie',
 			'skynet',
 			'magi',
-			'deviant',
+			'rk800',
 			'isac',
 			'ghost',
 		])
@@ -79,12 +79,18 @@ describe('run_board_theme_defs.THEMES', () => {
 		expect(run_board_theme.THEMES).toBe(THEMES)
 	})
 
-	it.each(THEMES.filter((theme) => theme !== 'deviant'))('names the %s board josh-%s', (theme) => {
+	it.each(THEMES)('names the %s board josh-%s', (theme) => {
 		expect(THEME_DEFS[theme].name).toBe(`josh-${theme}`)
 	})
 
-	it('names the deviant board after its model, josh-rk800', () => {
-		expect(THEME_DEFS.deviant.name).toBe('josh-rk800')
+	it('holds rk800 as a value, its board josh-rk800', () => {
+		expect(THEMES).toContain('rk800')
+		expect(THEME_DEFS.rk800.name).toBe('josh-rk800')
+	})
+
+	it('holds deviant as neither a value nor an alias', () => {
+		expect(Object.keys(THEME_DEFS)).not.toContain('deviant')
+		expect(THEME_ALIASES.has('deviant')).toBe(false)
 	})
 })
 

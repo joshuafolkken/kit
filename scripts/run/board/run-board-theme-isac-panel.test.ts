@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { run_board_theme_deviant_fixture } from './run-board-theme-deviant-fixture'
 import { run_board_theme_isac_data } from './run-board-theme-isac-data'
 import { run_board_theme_isac_panel } from './run-board-theme-isac-panel'
+import { run_board_theme_rk800_fixture } from './run-board-theme-rk800-fixture'
 
 // joshuafolkken/kit#9096: the isac theme's panel — when a transmission takes it, the waveform's
 // bar heights, the idle status block with its scanner, and the transmission with its brackets.
 
 const { is_receiving, panel, wave_height } = run_board_theme_isac_panel
 const { SCAN, STATUS, TX } = run_board_theme_isac_data
-const { HOST, draw_at, panel_text, state_at } = run_board_theme_deviant_fixture
+const { HOST, draw_at, panel_text, state_at } = run_board_theme_rk800_fixture
 const TYPING = 15
 const RECEIVED = 60
 const IDLE_TICK = 30

@@ -17,6 +17,11 @@ const USAGE = 'usage: pnpm josh git:checkpoint <name> "<what>"'
 const NAME = /^\w[\w.-]*$/u
 const NO_HOOKS = { LEFTHOOK: '0' }
 
+// A work name `wip/<name>` can carry — shared with `josh producer:brief`, which names the same branch.
+function is_name(name: string): boolean {
+	return NAME.test(name)
+}
+
 function is_usage(argv: ReadonlyArray<string>): boolean {
 	const [name = '', what = '', ...rest] = argv
 
@@ -76,6 +81,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return problem === undefined ? await committed(name, what) : failed(problem)
 }
 
-const git_checkpoint = { run }
+const git_checkpoint = { run, is_name }
 
 export { git_checkpoint }

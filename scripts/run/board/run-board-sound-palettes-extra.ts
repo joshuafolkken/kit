@@ -2,7 +2,7 @@ import type { Palette } from './run-board-sound-score'
 import { run_board_sound_shape } from './run-board-sound-shape'
 import { run_board_sound_voice, type Sound } from './run-board-sound-voice'
 
-// Two more boards' palettes (deviant's is `run-board-sound-palettes-deviant.ts`): isac's triangle pings
+// Two more boards' palettes (rk800's is `run-board-sound-palettes-rk800.ts`): isac's triangle pings
 // and radio squelch, ghost's high chirps and data noise. Each is the kind and texture of its work's
 // sound, never a melody or a figure of notes from it. A board's letter and typed end are sounds of
 // its palette, written out as its typing loop and typed-end WAVs by `voices_of`.

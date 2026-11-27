@@ -57,7 +57,7 @@ nothing else disappeared or moved; the layout holds at the viewport.
 The board is text, so read it: do not look for a screenshot command, and do not stop.
 
 1. List the states the change affects, of: a notice or none, repeat, mute, theme (default, or a
-   `--theme` value: `wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`, `deviant`, `isac`,
+   `--theme` value: `wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`, `rk800`, `isac`,
    `ghost`), an icon change
    (`--icons letters`, `shapes`), a narrow width.
 2. Per state, run `pnpm josh run:board --frame` once with the flags that fix it (`--notice <row state>`

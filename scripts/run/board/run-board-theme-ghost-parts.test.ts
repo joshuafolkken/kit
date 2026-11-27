@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { run_board_theme_deviant_fixture } from './run-board-theme-deviant-fixture'
 import { run_board_theme_ghost_data } from './run-board-theme-ghost-data'
 import { run_board_theme_ghost_parts } from './run-board-theme-ghost-parts'
 import type { Grid } from './run-board-theme-host-types'
+import { run_board_theme_rk800_fixture } from './run-board-theme-rk800-fixture'
 
 // joshuafolkken/kit#9096: the ghost theme's opening and ending — the board assembling from digits
 // behind a wave and a scan line, the characters drifting off as dots until the screen is empty.
 
 const { ASSEMBLE, DRIFT, INKS } = run_board_theme_ghost_data
 const { ending_of, opening_of, resolve_tick } = run_board_theme_ghost_parts
-const { HOST, draw_at, fresh_grid, row_text, state_at } = run_board_theme_deviant_fixture
+const { HOST, draw_at, fresh_grid, row_text, state_at } = run_board_theme_rk800_fixture
 const OPENING = opening_of(HOST.api)
 const ENDING = ending_of(HOST.api)
 const MID_WAVE = 20

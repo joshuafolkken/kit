@@ -12,7 +12,7 @@ and from [split](theme-split.md).
 - Write both in the body and the acceptance criteria of every theme and effect Issue:
   - the all-layers budget test of #8825, `scripts/run/board/run-board-composite-budget.test.ts`,
     stays green;
-  - every theme (`wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`, `deviant`, `isac`,
+  - every theme (`wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`, `rk800`, `isac`,
     `ghost`), each run on the real
     board with its opening by
     `pnpm josh run:board --timing --theme <theme>`, stall and wake lag no worse than the

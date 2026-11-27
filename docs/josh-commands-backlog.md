@@ -297,6 +297,7 @@ pnpm josh issue:comment 2304 --body "a short note"           # inline, for a bod
 
 - `--body <text>` — the comment body, inline. Trimmed, with `\n` expanded to a newline.
 - `--body-file <path>` — read the body from a file, or from stdin with `-`. The safe form the rule steers every caller toward.
+- `--from-user` — the comment relays a person's instruction: it carries the user marker in place of the run marker, so the run holding the issue reads it as an unread update.
 
 <!-- /usage -->
 

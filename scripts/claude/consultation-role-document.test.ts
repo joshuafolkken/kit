@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const PRINCIPLES = 'prompts/collaboration-workflow/principles.md'
 const WORKFLOW = '.claude/skills/workflow-commands'
+const PRODUCER = '.claude/agents/producer.md'
 
 describe('consultation main-session responsibilities', () => {
 	it.each([
@@ -48,12 +49,31 @@ describe('no-filing finish', () => {
 		'締めで「テストと gate は未実行」と毎回明記する',
 		'後回しにした分をすべて実行する',
 		'「テスト未作成・gate 未実行」と実装済みの変更ファイルを書く',
+		'後回しのテストやその成果物（golden 等）が赤・実行不能 → 仕上げの項目として報告し、その場で直さない',
+		'brief の定型部分 → `pnpm josh producer:brief <name>` の出力を使い',
 	])('defines the deferral in consult-vs-execute: %s', (requirement) => {
 		expect(read_unwrapped(PRINCIPLES)).toContain(requirement)
 	})
 
+	// 2026-11-28: the main line opened a `wip/` branch per request, four in one session.
 	it.each([
-		'.claude/agents/producer.md',
+		'起票せずにの依頼は何件でも 1 本の `wip/<name>` に積む',
+		'分けるのは利用者が指示したときだけで、主セッションの判断では分けない',
+	])('keeps a no-filing session on one work branch: %s', (requirement) => {
+		expect(read_unwrapped(PRINCIPLES)).toContain(requirement)
+	})
+
+	// 2026-11-28: the main line wrote its own wish to run the tests into a producer brief.
+	it.each([
+		"unless the brief quotes the user's own request for them now",
+		'`pnpm josh producer:brief --tests-now-quote`',
+		"the main line's own wish is not one",
+	])('lets only the user’s quoted request lift the deferral for the producer: %s', (phrase) => {
+		expect(read_unwrapped(PRODUCER)).toContain(phrase)
+	})
+
+	it.each([
+		PRODUCER,
 		'.claude/skills/board-theme/SKILL.md',
 		'prompts/collaboration-workflow/report-format.md',
 	])('%s defers to the shared no-filing finish', (document) => {
