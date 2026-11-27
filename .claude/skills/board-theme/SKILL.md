@@ -1,6 +1,6 @@
 ---
 name: board-theme
-description: Show a `run:board` look change as a JS demo or a printf; build themes and effects from a demo the user picks. Read it unasked before proposing or filing a theme or board look change — not a fix restoring the look.
+description: Show a `run:board` look change on the live board's demo mode or as a printf; build themes and effects directly in kit from the original measured on video. Read it unasked before proposing or filing a theme or board look change — not a fix restoring the look.
 ---
 
 # Show and build run:board looks
@@ -13,20 +13,20 @@ opening line, typing voice, typed end, sound score) and a module the theme host 
 |---|---|
 | [What a theme carries](theme-rules.md) | Deciding a theme's items, events, places, timing, names |
 | [Sound](theme-sound.md) | Deciding and building its sounds |
-| [Demo template](demo-template.md) | Building the demo and the states it must try |
-| [Wiring](theme-wiring.md) | Moving a confirmed demo into kit and checking it |
+| [From video](theme-video.md) | Finding and measuring the original's look and sound |
+| [Wiring](theme-wiring.md) | Placing the look by kit's layout and checking it |
 | [Split](theme-split.md), [render cost](render-cost.md) | Filing |
 
-The order: a throwaway JS demo confirms the look → its drawing moves into the theme's module unchanged
-in shape → the live board's demo mode and bases of the real board's shape check it.
+The order: the theme is built directly in kit → the live board's demo mode shows it (`/`, the theme's
+key, `s` `a` `d` `w` `q` `e`) → bases of the real board's shape check it. No throwaway JS demo.
 
 ## 0. Show the change
 
 - Before proposing or filing a look change, unasked:
-  - It moves → a JS demo (step 3).
+  - It moves → the live board's demo mode, in the work tree that holds the change (step 4).
   - It does not move → a `printf` command in the reply that prints the frame before and after the
     change, for the user to paste into a terminal — you cannot see the screen.
-- Base both on a real colored frame, taken afresh for each proposal, never a hand-drawn board:
+- Base the `printf` on a real colored frame, taken afresh for each proposal, never a hand-drawn board:
   `FORCE_COLOR=3 pnpm josh run:board --once --theme <theme> > .josh/tmp/scratch/<theme>-frame.ans`.
 - Skip it for a fix that only restores the existing look.
 
@@ -34,45 +34,45 @@ in shape → the live board's demo mode and bases of the real board's shape chec
 
 - Candidates: #8384.
 - Decide every item of [what a theme carries](theme-rules.md) → "Checklist" before asking for approval.
-- Echo the work through color, motion and computed sound only; no logo, recorded sound or asset file
-  of the work in the repository (#8365, [sound](theme-sound.md)).
+- Names of the work may be written as text on the board (the user's decision, 2026-11-27). No asset
+  file and no recorded sound of the work in the repository (#8365, [sound](theme-sound.md)).
+- A logo: an exact copy of the work's logo in the repository is the user's call per theme — ask. A
+  plain mark drawn in characters needs no asking.
 
 ## 2. Measure the original
 
 - Reproduce first, then add one touch (`principles.md` → "reproduce-first").
-- Write down colors (hex), characters, speeds and the order of motion, stepping frame by frame
-  through video or frames the user supplies. Keep only the numbers.
-- You cannot play video: ask the user for screenshots of the moments to match. Given only a time, say
-  so, and answer what is known and unknown about that scene; add no guessed effect.
+- Find and read the original yourself from video: [from video](theme-video.md). Do not ask the user
+  for timestamps or screenshots.
+- Write down colors (hex), characters, speeds and the order of motion. Keep only the numbers.
+- What you could not confirm on a frame is written "unconfirmed", never filled from memory.
 - Copy the text, order, colors and layout an image shows as they are. Report what you filled in from
   memory or invention.
 - A terminal draws no true curve: line characters are smooth but thin, blocks bold but square — let
   the user compare both.
 
-## 3. Build the demo
+## 3. Build it in kit
 
-- Copy the code block of [`demo-template.md`](demo-template.md) to
-  `.josh/tmp/scratch/<theme>-theme-demo.mjs`; write the effects in JS on the step 0 frame. Run it
-  only through `pnpm josh scratch:run <path>`.
-- A number key picks a scene from its start; it loops, two seconds of normal display between
-  plays; the top two rows name the scene and list the keys; `Q` quits. Other axes: letter keys, a
-  third row. `DEMO_STEPS=<n>` checks it headless.
+- A no-filing request → the `producer`: one work tree for the whole theme; fixes go to the same unit.
+  Give every change in one brief — a unit resumed many times can lose its authority.
+- An Issue → the usual lanes.
+- Decide yourself how what you found maps to IDLE / PROGRESS / ROW / NOTICE / OPENING / ENDING and
+  the ground look, and build. The user reviews the result, not a menu of options.
 - Keep the board's paces (a letter every 50 ms, a spinner frame every 80 ms).
-- Follow [demo template](demo-template.md) → "Demo rules" and try its "States to try" at the demo stage.
-- Sound: decide it by waveform values ([sound](theme-sound.md)); the demo plays none.
+- Place every part by kit's layout and check it on real bases: [wiring](theme-wiring.md).
+- Sound: decide it by waveform values ([sound](theme-sound.md)).
 
 ## 4. Show it
 
-- Every reply: the one command, no argument, alone in its code block, no trailing comment.
+- Every reply: the one view command alone in its code block, no trailing comment —
+  `cd <work tree> && pnpm josh run:board --theme <value>`; then `/`, the theme's key and
+  `s` `a` `d` `w` `q` `e`.
 - Write "behavior checked, look unchecked"; for sounds, "unchecked by ear". You see neither color nor
   motion: check places on a text capture and say which parts you checked.
-- One change per reply, in two stages: the demo that matches the original item by item beside the
-  measured numbers; once passed, three variant scenes each adding a touch. A rejected one may stay;
-  note its name.
-- Take fixes as "the theme's number and the event's key". When an instruction reads two ways, say how
+- Take fixes as "the theme's key and the event's key". When an instruction reads two ways, say how
   you read it and go on.
-- Report every change that affects the look, asked for or not. Report additions nobody asked for
-  apart and ask whether to keep them.
+- Report every departure from the original or the brief, and every invented word or value. Report
+  additions nobody asked for apart and ask whether to keep them.
 - Before a change the user "may revert", keep a copy of the current version under another name.
 
 ## 5. File the Issue once the user decides
@@ -80,29 +80,29 @@ in shape → the live board's demo mode and bases of the real board's shape chec
 - Only after the user says to file it (`kickoff new`). The brief carries the decided numbers and the
   existing behavior that must not change, and lists the items kept as in the original apart from the
   items changed on purpose.
-- **Put the demo's code in the Issue body when filing**, never in a later comment — #8354 started
-  implementing before a code comment was read. Write: colors, characters, speeds and odds follow the
-  code; what the demo lacks (disable conditions, simultaneous typing, existing behavior) follows
-  the body.
-- Write the render-cost conditions in the body and the acceptance criteria — the demo's
-  lightness proves nothing: [render cost](render-cost.md) → "When filing".
-- The body names the functions to read, the rejected variants (not implemented), the demo's shortcuts
-  (the real behavior wins), and which element takes which color (rules, text inside the rules,
-  the waiting mark, gauges) — numbers without the assignment caused #8354's two misses (#8390).
+- **The Issue body names the work tree or commit that holds the look**, never a later comment — #8354
+  started implementing before a comment was read. Write: colors, characters, speeds and odds follow
+  that code; what it lacks (disable conditions, simultaneous typing, existing behavior) follows the
+  body.
+- Write the render-cost conditions in the body and the acceptance criteria — a light look on one
+  base proves nothing: [render cost](render-cost.md) → "When filing".
+- The body names the functions to read, the rejected variants (not implemented), the built look's
+  shortcuts (the real behavior wins), and which element takes which color (rules, text inside the
+  rules, the waiting mark, gauges) — numbers without the assignment caused #8354's two misses (#8390).
 - **Write in the body and the acceptance criteria that the new effect leaves the existing themes'
   look unchanged** (#8376).
 - A look approved or changed → record its golden replay in that PR: `docs/josh-commands-board.md` →
   "`josh board:compare`".
 - Before a theme PR opens → `pnpm josh test:related scripts/run/board/run-board-motion-*x*.test.ts`
   passes (mandatory; the per-frame motion check over every theme, size and scene).
-- Demo-backed: a seam child, then parallel effect children ([split](theme-split.md)); each moves
-  the demo's drawing in unchanged and places it by kit's layout ([wiring](theme-wiring.md)).
+- Split into children: a seam child, then parallel effect children ([split](theme-split.md)); each
+  takes the look's drawing in unchanged and places it by kit's layout ([wiring](theme-wiring.md)).
 
 ## 6. After the first merge
 
-- **Compare the implementation's commit with the demo's code**, comment the matches and the
-  differences on the Issue, and file each difference as a fix Issue — #8354's comparison caught three
-  (#8390, #8391).
+- **Compare the implementation's commit with the work tree or commit the Issue named**, comment the
+  matches and the differences on the Issue, and file each difference as a fix Issue — #8354's
+  comparison caught three (#8390, #8391).
 - Comment the real board's `--timing` values on the Issue once every effect child has merged:
   [render cost](render-cost.md) → "After every effect child has merged".
 
@@ -119,6 +119,8 @@ in shape → the live board's demo mode and bases of the real board's shape chec
 - Read a request no wider than it is: fixing a value shown as `--` changes no effect.
 
 ## Examples
+
+Built from a JS demo, before themes were built in kit directly:
 
 - trace: epic #8357; demo code in its children's comments, #8352–#8370.
 - wopr typing effect: epic #8377 (#8375, #8376); demo code:

@@ -66,7 +66,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Draw a live board of the running backlogrun, redrawn every second',
 		category: 'AI tools',
 		reference: [
-			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wopr|trace|flux|codec|nixie|skynet|magi] [--icons emoji|letters|shapes] [--sound on|off] [--timing]`,
+			`[--once | --chat [--fresh] | --every <minutes> | --frame [<frame flags>]] [--theme wopr|trace|flux|codec|nixie|skynet|magi|deviant|isac|ghost] [--icons emoji|letters|shapes] [--sound on|off] [--timing]`,
 			'automation',
 			['files', 'network'],
 		],
@@ -136,7 +136,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [THEME_FLAG],
 					description:
-						'sounds: the typing trill while a row types and the opening’s sound — wopr the teletype, trace the key click, flux the time-circuit keypad and its ENTER; codec, nixie, skynet and magi the teletype for now. A Mac plays them through one resident player; frames trail them by the output latency.',
+						'sounds: the typing trill while a row types and the opening’s sound — wopr the teletype, trace the key click, flux the time-circuit keypad and its ENTER; codec, nixie, skynet and magi the teletype for now; deviant, isac and ghost each their own letters. A Mac plays them through one resident player; frames trail them by the output latency.',
 				},
 				{
 					names: ['--icons <emoji|letters|shapes>'],
@@ -238,7 +238,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			'Replay the live board on a virtual clock, one JSON beat line per beat it writes; `--seed` is taken and ignored',
 		category: 'AI tools',
 		reference: [
-			'[--theme wopr|trace|flux|codec|nixie|skynet|magi] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]',
+			'[--theme wopr|trace|flux|codec|nixie|skynet|magi|deviant|isac|ghost] [--icons emoji|letters|shapes] [--seed <n>] [--at <epoch ms>] [--ticks <n>] [--mute] [--columns <n>] [--rows <n>]',
 			'automation',
 			['files', 'network'],
 		],

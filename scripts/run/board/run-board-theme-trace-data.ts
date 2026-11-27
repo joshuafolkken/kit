@@ -33,6 +33,10 @@ const COLORS: ThemeColors = {
 	hi: '255;255;255',
 	type: SHADE.body,
 	notice: SHADE.bright,
+	// The marks' tones: info, idle, waiting on a person.
+	info: '120;230;150',
+	idle: '0;120;35',
+	human: '200;255;120',
 }
 const GLYPHS: ReadonlyArray<string> = code_points(
 	'ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789Z:.=*+<>',

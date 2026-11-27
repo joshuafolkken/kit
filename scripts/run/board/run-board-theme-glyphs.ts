@@ -78,9 +78,28 @@ function drawn_text([letters, , shape = letters]: Glyph, icons: Icons): string {
 	return icons === 'shapes' ? shape : letters
 }
 
-// The idle tone's paint: the base look's, else the tones' own dim.
-function idle_of(theme: Theme | undefined): Paint | undefined {
-	return theme === undefined ? undefined : BASE_LOOK.idle
+// The paints of the idle and the info tones: none of its own on a board in no theme — the idle tone
+// then takes the tones' own dim and the info tone the line's color.
+interface MarkPaints {
+	idle: Paint | undefined
+	info: Paint | undefined
+}
+
+const NO_PAINTS: MarkPaints = { idle: undefined, info: undefined }
+// A themed board's: the base look's, each a color of its own, so the theme host reads a mark's tone
+// back as a role (`run-board-theme-roles.ts`).
+const BASE_PAINTS: MarkPaints = { idle: BASE_LOOK.idle, info: BASE_LOOK.info }
+// A text that reads as a rule (a section heading's icon, `--`) is the rule's, not an info mark.
+const RULE_TEXT = /^-+$/u
+
+// The paints `text` is drawn with for `glyph`. The spinner's turn and a heading's rule keep the line's
+// color: the host turns its own spinner there, and a theme's rule effects run over the rule.
+function paints_of(glyph: string, text: string, theme: Theme | undefined): MarkPaints {
+	if (theme === undefined) return NO_PAINTS
+
+	return SPINNER.has(glyph) || RULE_TEXT.test(text)
+		? { ...BASE_PAINTS, info: undefined }
+		: BASE_PAINTS
 }
 
 // What a render module left open where a glyph is drawn: a foreground color, and the escapes of the
@@ -94,9 +113,9 @@ const PLAIN: Open = { is_colored: false, intensity: '' }
 
 // Inside a color a render module gave, the text is left uncolored, so that color is not cut; a tone
 // that ends bold or dim (`ESC[22m`) is followed by the bold or dim the line had on.
-function toned_text(text: string, tone: Tone, open: Open, idle: Paint | undefined): string {
+function toned_text(text: string, tone: Tone, open: Open, paints: MarkPaints): string {
 	if (open.is_colored) return text
-	const toned = run_board_theme_tones.toned(tone, text, idle)
+	const toned = run_board_theme_tones.toned(tone, text, paints.idle, paints.info)
 
 	return toned === text ? text : toned + open.intensity
 }
@@ -110,7 +129,7 @@ function text_of(glyph: string, open: Open, look: GlyphLook): string {
 	const text = drawn_text(entry, look.icons)
 	const padding = ' '.repeat(Math.max(0, run_board_fit.width_of(glyph) - text.length))
 
-	return toned_text(text, entry[1], open, idle_of(look.theme)) + padding
+	return toned_text(text, entry[1], open, paints_of(glyph, text, look.theme)) + padding
 }
 
 function glyphs_as_text(text: string, open: Open, look: GlyphLook): string {

@@ -22,6 +22,21 @@ words:
   - WOPR
   # The Terminator's network, the theme value `skynet` a run:board draws its work after (#8917).
   - skynet
+  # The theme value `isac` and the aliases of the deviant, isac and ghost boards; a lane decloaks on
+  # the ghost board's ROW.
+  - isac
+  - dbh
+  - shd
+  - gits
+  - decloak
+  - decloaks
+  - decloaking
+  # The tools and `ffmpeg` filters the board-theme skill measures an original's video with
+  # (`.claude/skills/board-theme/theme-video.md`).
+  - dlp
+  - signalstats
+  - showspectrumpic
+  - drawtext
   # Dual-tone multi-frequency, the keypad tone the bttf board's typing sound is made from (#8697).
   - dtmf
   # The launch-code alphabet a wargames board's rules run while a row types, `I` and `O` left out (#8375).

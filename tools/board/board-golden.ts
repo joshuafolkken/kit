@@ -30,6 +30,9 @@ const TICKS: Readonly<Record<GoldenTheme, number>> = {
 	nixie: 100,
 	skynet: 60,
 	magi: 140,
+	deviant: 154,
+	isac: 120,
+	ghost: 100,
 }
 const GOLDEN_DIRECTORY = fileURLToPath(new URL('golden/', import.meta.url))
 // Set to record the golden replays again instead of comparing with them.

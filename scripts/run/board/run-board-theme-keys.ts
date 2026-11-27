@@ -20,14 +20,13 @@ import {
 // The keys of a themed live board (joshuafolkken/kit#8917, Issue 4-3 and 4-4): any key skips the
 // opening to the board; Ctrl-C plays the ending, and any key during it — Ctrl-C too — leaves at once;
 // `/` toggles demo mode, whose footer names the work picked and its keys in place of the legend
-// (`run-board-demo-footer.ts`). In demo mode `0`-`7` pick the work, `s` `a` `d`
+// (`run-board-demo-footer.ts`). In demo mode `0`-`9` and `y` pick the work, `s` `a` `d`
 // `w` play IDLE, PROGRESS, ROW and NOTICE from the demo's sample texts, `q` and `e` the opening and the
 // ending, and every other key — the folds, the sound switch — is taken by it. Leaving it after a switch
 // keeps the new theme and saves it as `JOSH_BOARD_THEME` in `.env`, that line alone.
 
-const { DEMO_KEY, EVENT_OF_KEY, PART_OF_KEY } = run_board_demo_keys
+const { DEMO_KEY, EVENT_OF_KEY, PART_OF_KEY, theme_index } = run_board_demo_keys
 const THEME_ENV = 'JOSH_BOARD_THEME'
-const DIGIT = /^\d$/u
 const NOTICE_EVENT: DemoKey = 'n'
 const NOTICE_CUE: CueName = 'alert'
 const { THEME_VALUES, play_part, take_keys, tick_at } = run_board_theme_run
@@ -49,9 +48,10 @@ interface KeyHolder {
 
 type DemoPress = (run: ThemeRun, key: string, now_ms: number) => boolean
 
-// `0`-`7`: the work switched to, on its idle board.
+// `0`-`9`, `y`: the work switched to, on its idle board.
 function demo_value(run: ThemeRun, key: string): boolean {
-	const value = DIGIT.test(key) ? THEME_VALUES[Number(key)] : undefined
+	const index = theme_index(key)
+	const value = index === undefined ? undefined : THEME_VALUES[index]
 
 	if (value === undefined) return false
 	run.value = value

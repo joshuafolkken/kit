@@ -33,10 +33,20 @@ and write "unchecked by ear". The user listens and adjusts.
 
 ## The original's sound
 
-- Echo the kind and texture: an old terminal's single beep, a teletype, relay clicks, a two-tone
-  alarm, radio static, a machine's hum, a radar ping.
-- Never copy a short sound the original is known by — a melody or a fixed figure of notes (an alert's
-  or a call's pitch order, a theme's rhythm, a cue from the score). The package ships the sounds.
+The user's split (2026-11-27):
+
+| Kind | Rule |
+|---|---|
+| Sound effect (a beep, a click, a ping, an alarm, static, a hum) | Imitate with high fidelity from measured values: partials, length, envelope, order |
+| Music (a melody, a theme's rhythm, a cue from the score) | Never copy. Make a melody from the original's motif with a small change |
+
+- A sound effect, even one made of a few notes and a few seconds long, is reproduced as it is. What
+  gets arranged (the original's motif with a small change) is music: a main melody, a theme, a cue
+  from the score.
+- For every effect on screen, find the sound that stands for it in the original and make it. Decide
+  yourself which sounds the theme adopts.
+- Sounds are measured from clips: [from video](theme-video.md) → "Sound".
+- The package ships the sounds.
 
 ## Loudness
 
@@ -71,3 +81,5 @@ OPENING's and ENDING's sounds.
 - Report per theme and event: pitch, length, peak and when it plays.
 - Record the play calls of one NOTICE, one ROW and one PROGRESS: one call each, at the event's start.
 - Write "unchecked by ear" and give the user the steps to listen (restart the board, demo mode keys).
+- Every sound of every theme late against the screen → check the output device before the code: a
+  Bluetooth output adds its own delay; time `afplay` on a short silent file to see it (sync: #9087).
