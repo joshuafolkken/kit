@@ -28,11 +28,11 @@ describe('the pre-gate cut next action', () => {
 		expect(error).toHaveBeenCalledExactlyOnceWith(`next: ${action}`)
 	})
 
-	it('points an unmet --deliverable close at a rerun, not the gate', () => {
+	it('points an unmet --deliverable close at a rerun first, the gate as the other way out', () => {
 		run_cut_next.print_next('unready', '6235', DELIVERABLE)
 
 		expect(error).toHaveBeenCalledExactlyOnceWith(
-			'next: meet the condition printed above, then rerun `pnpm josh run:cut 6235 --deliverable https://example.test/c`.',
+			`next: meet the condition printed above, then rerun \`pnpm josh run:cut 6235 --deliverable ${DELIVERABLE}\`; if the lane is meant to ship its diff instead, run ${GATE}.`,
 		)
 	})
 
