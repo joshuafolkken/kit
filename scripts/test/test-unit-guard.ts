@@ -7,6 +7,7 @@ import { core_budget } from '#scripts/gate/core-budget'
 import { free_cores } from '#scripts/gate/free-cores'
 import { project_checks } from '#scripts/gate/project-checks'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { execa } from 'execa'
 import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
@@ -115,8 +116,16 @@ function resolve_guard_action(
 	return is_basic ? BASIC_MISSING_PACKAGE_ACTIONS[script_state] : SKIP_ACTION
 }
 
+function has_vitest_package(directory: string): boolean {
+	return existsSync(path.join(directory, VITEST_PACKAGE))
+}
+
+// **Installed means resolvable from the project, not present in its own `node_modules`.** Node looks
+// in each ancestor's `node_modules` in turn, and so does the launch below (`direct_launch`), so a
+// checkout nested in one that holds the dependencies — a worktree under `.claude/worktrees/` — runs
+// its unit suite and must not be refused as uninstalled.
 function is_vitest_installed(project_directory: string): boolean {
-	return existsSync(path.join(project_directory, VITEST_PACKAGE))
+	return ancestor_directories.nearest(project_directory, has_vitest_package) !== undefined
 }
 
 function is_in_node_modules(entry: string): boolean {
@@ -133,8 +142,8 @@ function has_unit_tests(project_directory: string): boolean {
 }
 
 // **The young-project skip is for a project that never declared vitest.** One whose package.json
-// declares it but whose `node_modules/vitest` is absent — a checkout with no dependencies installed —
-// has a unit suite that could not run, and fails instead of passing on a skip (joshuafolkken/kit#9095).
+// declares it but for which no `node_modules/vitest` resolves — a checkout with no dependencies
+// installed, nested in none that has them — has a unit suite that could not run, and fails instead of passing on a skip (joshuafolkken/kit#9095).
 function declared_missing_action(project_directory: string): GuardAction {
 	return project_checks.is_declared(project_directory, VITEST_NAME)
 		? FAIL_MISSING_ACTION
