@@ -56,6 +56,7 @@ function brief(request: BriefRequest): string {
 	return [
 		'Producer brief — standing part. Append the goal and the investigation conclusion.',
 		`branch: wip/${name}`,
+		'- This branch carries every no-filing request of the session; a new branch only on the user’s instruction.',
 		`- Start, checkpoint (\`pnpm josh git:checkpoint ${name} "<what>"\`) and reply as \`.claude/agents/producer.md\` states ("Checkpoint your own work branch", "Reply with").`,
 		...(quote === undefined ? DEFERRED : tests_now(quote)),
 		'- Never push, merge or open a pull request. A hook refuses a step → take the route its message names, else stop that step and report its exact text.',

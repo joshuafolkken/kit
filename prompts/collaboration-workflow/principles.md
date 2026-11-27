@@ -100,7 +100,7 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
   - 後回しにした返信 → 締めで「テストと gate は未実行」と毎回明記する
   - 「このセッションは起票せずに」 → セッション単位の宣言。成立・取り消し・寿命・締めの表示は `scripts/hooks/no-filing-declaration.ts`
   - 依頼 → 1 件来たらすぐ `producer` に渡す。途中の依頼は同じ `producer` へ来た順に渡す
-  - 作業ブランチ → 作業 1 つに `wip/<作業の名前>` 1 つ。brief に書き、ユニットを替えても同じ名前で次の `producer` を起動する。取り込み・チェックポイントの手順は `.claude/agents/producer.md`（チェックポイントは `pnpm josh git:checkpoint <name> "<what>"`）、許す操作は `scripts/hooks/producer-checkpoint.ts`
+  - 作業ブランチ → 起票せずにの依頼は何件でも 1 本の `wip/<name>` に積む。分けるのは利用者が指示したときだけで、主セッションの判断では分けない。brief に書き、ユニットを替えても同じ名前で次の `producer` を起動する。取り込み・チェックポイントの手順は `.claude/agents/producer.md`（チェックポイントは `pnpm josh git:checkpoint <name> "<what>"`）、許す操作は `scripts/hooks/producer-checkpoint.ts`
   - チェックポイント（`WIP checkpoint:`）→ 仕上げではない。テスト・gate・コミット前レビュー・lefthook は仕上げのコミットの前に通す（`scripts/git/git-checkpoint-tip.ts`）
   - 宣言の有無 → その都度「起票せずに」と書く使い方でも同じ
   - 成果の返信 → worktree のパス、`wip/<name>` と最新のコミットを書く
