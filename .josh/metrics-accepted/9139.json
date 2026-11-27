@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 64
+	},
+	"reason": "run:chain reuses exports:unused and guard-tests green records via a new runner wrapper (#9139)",
+	"date": "2026-11-27"
+}

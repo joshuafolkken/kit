@@ -357,13 +357,19 @@ describe('run_ship_pre_detach.checks — what the gate reuses', () => {
 		expect(record_mock).toHaveBeenCalledWith(expect.anything(), READ_TREE, expect.anything())
 	})
 
-	it('hands over no guard test or metrics result', async () => {
+	// joshuafolkken/kit#9139: the guard tests under their own label, which run:chain's stage reads.
+	it('hands the guard tests over under their own label, and no metrics result', async () => {
 		create(GUARD_TARGET)
 		is_kit_mock.mockReturnValue(true)
 
 		await run_ship_pre_detach.checks(tree.directory)
 
-		expect(handed().map(({ label }) => label)).toStrictEqual(['check', 'exports', 'cspell'])
+		expect(handed().map(({ label }) => label)).toStrictEqual([
+			'check',
+			'exports',
+			'cspell',
+			'guard-tests',
+		])
 	})
 
 	it('hands a failed check over as failed, for the gate to leave unrecorded', async () => {

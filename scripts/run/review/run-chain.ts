@@ -1,4 +1,5 @@
 import { derive_check } from '#scripts/document/derive-check'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import type {
 	ChainRefusal,
@@ -8,6 +9,7 @@ import type {
 import { lane_ledger_write_chain_stage } from '#scripts/lane/lane-ledger-write-chain-stage'
 import { run_ship_pre_detach } from '#scripts/run/ship/run-ship-pre-detach'
 import { test_related_caller } from '#scripts/test/test-related-caller'
+import { run_chain_reuse } from './run-chain-reuse'
 import { run_review } from './run-review'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
@@ -28,7 +30,7 @@ const CHECK_RELATED = 'check:related'
 const ACCEPTANCE_CHECK = 'acceptance:check'
 const PREFLIGHT_CHECK = 'preflight:check'
 const EXPORTS_UNUSED = 'exports:unused'
-const GUARD_TESTS = 'guard-tests'
+const GUARD_TESTS = gate_labels.GUARD_TESTS_LABEL
 const RUN_REVIEW = 'run:review'
 const [DERIVE_CHECK = ''] = derive_check.DERIVE_CHECK_ARGV
 
@@ -264,7 +266,7 @@ async function run_stages(
 	stages: ReadonlyArray<ChainStage>,
 	issue: string,
 	print: Print,
-	run: StageRunner = josh_stage,
+	run: StageRunner = run_chain_reuse.reusing(josh_stage),
 ): Promise<ChainRun> {
 	const timed: Array<ChainStageEntry> = []
 
