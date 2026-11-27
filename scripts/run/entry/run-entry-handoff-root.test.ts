@@ -44,6 +44,14 @@ describe('run_entry_handoff_root.is_refused — a hand-off child outside the iss
 
 		expect(await run_entry_handoff_root.is_refused(request(), other)).toBe(true)
 	})
+
+	it('tells a child whose run:handoff refused to end rather than fall back to this checkout', async () => {
+		await run_entry_handoff_root.is_refused(request(), ports())
+
+		expect(console.error).toHaveBeenCalledExactlyOnceWith(
+			expect.stringContaining('If run:handoff refuses, end with its note and the issue URL'),
+		)
+	})
 })
 
 describe('run_entry_handoff_root.is_refused — the entries that pass', () => {

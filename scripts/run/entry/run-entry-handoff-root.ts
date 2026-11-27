@@ -18,6 +18,10 @@ import type { EntryRequest } from './run-entry-children'
 
 const { HANDOFF_CHILD_KEY } = run_headless_keys
 
+// Root is never the fallback: every `run:handoff` refusal (seats full, `lane:open` failed, a held lane,
+// a launch failure) leaves the issue to the lane `backlogrun` opens for it.
+const REFUSED_HANDOFF_NOTE = 'If run:handoff refuses, end with its note and the issue URL'
+
 interface RootPorts {
 	readonly cwd: string
 	readonly environment: LaneEnvironment
@@ -46,7 +50,8 @@ function refusal_text({ issue_number, command }: EntryRequest, cwd: string): str
 	return [
 		`run:entry ${issue_number}: a run:handoff child does not claim ${cwd} —`,
 		`it is neither ${session_cite.issue(issue_number)}'s lane nor on its branch.`,
-		`Hand the run into its lane and end: \`pnpm josh run:release\`, then \`${handoff}\``,
+		`Hand the run into its lane and end: \`pnpm josh run:release\`, then \`${handoff}\`.`,
+		`${REFUSED_HANDOFF_NOTE} — the issue stays filed for its lane.`,
 		'(fullrun-steps.md → "The `fullrun new` step list").',
 	].join('\n')
 }

@@ -35,6 +35,6 @@ the stop again (it sends the `confirmation`), stop again.
 mirror `fullrun new` (1)–(6): derive an English title (or use the provided one) → create the Issue
 (`pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --over-cap`, with the labels
 `kickoff.md` → "Words typed after `new`" maps, body per
-`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → `pnpm josh run:entry <N> --to halfrun --adopt` (as `fullrun new` (3), the tree sync included) → post the agreed plan → on the entry's `latest: required`, `pnpm josh latest:if-required` → implement → run the gate (as above, `pnpm
+`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → hand-off child: `fullrun new` (2a) → `run:entry <N> --to halfrun --adopt` (`fullrun new` (3)) → post the agreed plan → on the entry's `latest: required`, `pnpm josh latest:if-required` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` (it sends the `confirmation`)
 → **stop**.
