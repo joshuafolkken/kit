@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_theme_wopr_fixture } from './run-board-theme-wopr-fixture'
+import { run_board_theme_wopr_led } from './run-board-theme-wopr-led'
 import { run_board_theme_wopr_phase } from './run-board-theme-wopr-phase'
 
 const { state_at } = run_board_theme_wopr_fixture
+const POOLS = ['0123456789', run_board_theme_wopr_led.LETTER_POOL]
 const {
 	EFFECT_END,
 	code_char,
 	cooled_of,
 	count,
+	cycled,
 	is_notice,
 	is_progress,
 	is_row,
@@ -53,5 +56,30 @@ describe('run_board_theme_wopr_phase', () => {
 		expect(count(7)).toBe('07')
 		expect(seconds(79)).toBe('03.95')
 		expect(seconds(-3)).toBe('00.00')
+	})
+})
+
+// joshuafolkken/kit#9137: a code character changes on every tick.
+describe('run_board_theme_wopr_phase.cycled', () => {
+	const SHARES = [0, 0.3, 0.6, 0.999]
+
+	function picks_at(pool: string, tick: number): Array<string> {
+		return SHARES.map((share) => cycled(pool, tick, share))
+	}
+
+	it.each(POOLS)('picks from %s', (pool) => {
+		const picks = [0, 1, 2, 3].flatMap((tick) => picks_at(pool, tick))
+
+		expect(picks.every((ch) => ch !== '' && pool.includes(ch))).toBe(true)
+	})
+
+	it.each(POOLS)('never repeats a tick’s pick of %s', (pool) => {
+		const repeats = [0, 1, 2, 3].flatMap((tick) => {
+			const next = picks_at(pool, tick + 1)
+
+			return picks_at(pool, tick).filter((ch) => next.includes(ch))
+		})
+
+		expect(repeats).toStrictEqual([])
 	})
 })

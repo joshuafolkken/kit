@@ -3,6 +3,7 @@ import { run_board_sound_enter } from './run-board-sound-enter'
 import { run_board_sound_score, type Palette } from './run-board-sound-score'
 import { run_board_sound_shape } from './run-board-sound-shape'
 import { run_board_sound_voice, type Sound } from './run-board-sound-voice'
+import { run_board_sound_wopr } from './run-board-sound-wopr'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import { run_board_theme_wopr } from './run-board-theme-wopr'
 import { run_board_theme_wopr_phase } from './run-board-theme-wopr-phase'
@@ -119,16 +120,19 @@ const WOPR: Palette = {
 		close: one(0.13, beep(440, 260, 'square', { decay_ms: 180 })),
 		ms: run_board_theme_wopr.NOTICE_LASTS * TICK_MS,
 		after_peak: wopr_after_peak,
+		// joshuafolkken/kit#9137: the build keeps `bed`'s drone at the level it has there (half the
+		// bed's peak) and plays the tic-tac-toe beeps and the lock's two notes as cues, in place of
+		// `bed`'s pulse train.
+		build: { peak: 0.04, from_gain: 0.5, drone: { wave: 'triangle', hz: 55, to_hz: 70 } },
+		cues: run_board_sound_wopr.notice_cues(),
 	},
+	// joshuafolkken/kit#9137: the lock's high note starts a ROW and its low note ends it; the game's
+	// moves beep over the noise, which keeps the level it had under the former pulse (half the bed's).
 	row: {
-		start: one(0.11, beep(WOPR_BEEP, 90, 'square')),
-		during: {
-			peak: 0.07,
-			from_gain: 1,
-			pulse: { wave: 'square', hz: 1500, to_hz: 1500, ms: 18, every_ms: 300, to_every_ms: 300 },
-			drone: { wave: 'noise', hz: 0, to_hz: 0 },
-		},
-		end: one(0.11, beep(330, 180, 'square', { decay_ms: 120 })),
+		start: run_board_sound_wopr.LOCK_HIGH,
+		during: { peak: 0.035, from_gain: 1, drone: { wave: 'noise', hz: 0, to_hz: 0 } },
+		end: run_board_sound_wopr.LOCK_LOW,
+		beats: run_board_sound_wopr.row_beats,
 	},
 	appear: one(0.1, beep(WOPR_BEEP, 60, 'square'), rest(60), beep(1320, 80, 'square')),
 	vanish: one(0.1, beep(440, 250, 'square', { to_hz: 220, decay_ms: 150 })),

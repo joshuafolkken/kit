@@ -6,6 +6,7 @@ import {
 	type SnapMask,
 } from './run-board-theme-host-snap-fixture'
 import type { ThemeFactory } from './run-board-theme-host-types'
+import { run_board_theme_wopr_fixture } from './run-board-theme-wopr-fixture'
 
 // joshuafolkken/kit#8917: the differences from the confirmed theme demo the user decided after it
 // (the Issue's last comment, the confirmed specification's §2 and §4). Each is a narrow allowance a
@@ -16,6 +17,7 @@ const { HOST, snap_text } = run_board_theme_host_fixture
 const { demo_snaps, frame_at, theme_of } = run_board_theme_host_snap_fixture
 const { area_end, area_top, edge, level_spot } = HOST.layout
 const { code_points } = run_board_theme_host_grid
+const { WOPR } = run_board_theme_wopr_fixture
 
 // §2: every work's level display ends at the rule's right end, the rule filling its left. The demo
 // left-aligned it in an 18-column spot, so the columns a level of up to this width moves across
@@ -65,6 +67,28 @@ function rows_redrawn(events: string, rows: ReadonlyArray<number>): SnapMask {
 	}
 }
 
+function blank_cells(row: string, cells: ReadonlyArray<{ x: number }>): string {
+	let masked = row
+
+	for (const { x } of cells) masked = blank_columns(masked, x, x + 1)
+
+	return masked
+}
+
+// The cells `cells` of the snaps of the events named in `events`.
+function cells_changed(events: string, cells: ReadonlyArray<{ y: number; x: number }>): SnapMask {
+	return (key, text) => {
+		if (!events.includes(event_of(key))) return text
+
+		return rows_mapped(text, (row, y) =>
+			blank_cells(
+				row,
+				cells.filter((cell) => cell.y === y),
+			),
+		)
+	}
+}
+
 function masks_of(...masks: ReadonlyArray<SnapMask>): SnapMask {
 	return (key, text) => {
 		let masked = text
@@ -89,7 +113,20 @@ const LEVELS = {
 	magi: /CONDITION [A-Z]+|MAGI DELIBERATING|POWER CUT|RESULT \d\/3 PASSED/u,
 } as const
 
+// joshuafolkken/kit#9137: wopr's code not yet locked changes on every tick, as measured on the film
+// (the demo changed it every other tick): the rules' dashes running code and the PROGRESS strip's
+// three letters. `run-board-theme-wopr-idle.test.ts` holds what kit draws there.
+const WOPR_STRIP_LETTERS = 3
+const WOPR_CODE_CELLS = [
+	...WOPR.rule_cells,
+	...Array.from({ length: WOPR_STRIP_LETTERS }, (_, index) => ({
+		y: level_spot.y,
+		x: WOPR.strip_x + index,
+	})),
+]
+
 const ALLOWANCES = {
+	wopr: cells_changed('prn', WOPR_CODE_CELLS),
 	// §4 trace: the gauge on the rule's right end; the NOTICE rain over all but the blinking spots.
 	trace: masks_of(level_moved(LEVELS.trace), rows_redrawn('n', TRACE_HEADER_ROWS)),
 	// §4 flux: the NOTICE's and ENDING's flames twice the demo's pace; the big clock shows the last

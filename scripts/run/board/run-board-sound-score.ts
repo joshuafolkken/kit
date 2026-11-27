@@ -47,6 +47,12 @@ interface Palette {
 		// A theme whose NOTICE plays on past the blinks: its length and its track from the peak.
 		ms?: number
 		after_peak?: () => Array<number>
+		// The bed rising to the peak where it is not `bed`; `bed` stays the held one after the peak, the
+		// opening's and the ending's (joshuafolkken/kit#9137).
+		build?: Bed
+		// One-shot sounds the NOTICE plays on its way, each from its time since the start; a cue past
+		// the NOTICE's end is left out.
+		cues?: ReadonlyArray<Cue>
 	}
 	row: {
 		start: Sound
@@ -162,8 +168,15 @@ function closing_of(notice: Palette['notice'], ms: number): { held_to: number; c
 	return { held_to: ms - OWN_HOLD_LEAD_MS, close: ending_at(notice.close, ms) }
 }
 
+// The cues that start within `ms`, each placed at its time.
+function cues_within(cues: ReadonlyArray<Cue> | undefined, ms: number): Array<Placed> {
+	const due = (cues ?? []).filter(({ at_ms }) => at_ms < ms)
+
+	return due.map(({ at_ms, sound }) => placed(sound, at_ms))
+}
+
 // A NOTICE's track, no longer than it shows: call, rising bed, peak, blinks over the held bed, close; a
-// theme with its own after-peak lays that from the peak.
+// theme with its own after-peak lays that from the peak, and its cues sound on the way.
 function notice_track(palette: Palette): Array<number> {
 	const { notice } = palette
 	const ms = notice.ms ?? NOTICE_MS
@@ -174,12 +187,13 @@ function notice_track(palette: Palette): Array<number> {
 	return fitted(
 		[
 			placed(notice.call, 0),
-			bed_part(notice.bed, 0, PEAK_MS),
+			bed_part(notice.build ?? notice.bed, 0, PEAK_MS),
 			bed_part(held, PEAK_MS, held_to - PEAK_MS, HELD_GAIN),
 			placed(notice.peak, PEAK_MS),
 			...blinks_of(notice.blink),
 			{ at_ms: PEAK_MS, samples: after, gain: 1 },
 			close,
+			...cues_within(notice.cues, ms),
 		],
 		ms,
 	)
@@ -187,13 +201,6 @@ function notice_track(palette: Palette): Array<number> {
 
 function letters_ms(letters: number): number {
 	return Math.max(1, letters) * TICK_MS
-}
-
-// The cues that start within `ms`, each placed at its time.
-function cues_within(cues: ReadonlyArray<Cue> | undefined, ms: number): Array<Placed> {
-	const due = (cues ?? []).filter(({ at_ms }) => at_ms < ms)
-
-	return due.map(({ at_ms, sound }) => placed(sound, at_ms))
 }
 
 // A ROW's track over the letters typing, as long as they: its start, its bed, its beats, and its end
