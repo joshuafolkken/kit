@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
+import { size_estimate } from './size-estimate'
 
 // joshuafolkken/kit#4621: a follow-up measurement ("measure K merges after #N") took a lane for 20–40
 // minutes to run one command and compare its value with a bound — work `backlog:drive` can do itself.
@@ -134,7 +135,31 @@ function without_premises(body: string): string {
 		.join('\n')
 }
 
-// The declaration's problems, then every premise line's, each read as the declaration is.
+// joshuafolkken/kit#8955: a measurement Issue whose criteria branch on the result ("if any differ, file
+// a follow-up" / "if none do, close") always leaves the side that did not happen unchecked, so neither
+// `issue:measured` nor `run:cut --deliverable` reads it done. Its criteria record the result only.
+const BRANCH_PATTERN = /場合|あれば|なければ/u
+
+function is_measurement(body: string): boolean {
+	return is_stated(body) || size_estimate.declared_files(body) === 0
+}
+
+function branch_problems(body: string): ReadonlyArray<string> {
+	if (!is_measurement(body)) return []
+
+	const criteria = markdown_section.section_lines(body, issue_body_keys.heading('criteria'))
+
+	return markdown_section
+		.unfenced_lines(criteria.join('\n'))
+		.filter((line) => BRANCH_PATTERN.test(line))
+		.map(
+			(line) =>
+				`a measurement Issue's criterion branches on the result, so one side stays unchecked — record the result instead and leave a follow-up to the close (issue-comments.md → "A measurement-only Issue"): ${line.trim()}`,
+		)
+}
+
+// The declaration's problems, then every premise line's, each read as the declaration is, then a
+// measurement Issue's branching criteria.
 function problems(body: string): ReadonlyArray<string> {
 	const value = declared_value(body)
 	const declared = value === undefined ? [] : value_problems(value, PREFIX)
@@ -142,7 +167,7 @@ function problems(body: string): ReadonlyArray<string> {
 		value_problems(premise, PREMISE_PREFIX),
 	)
 
-	return [...declared, ...premised]
+	return [...declared, ...premised, ...branch_problems(body)]
 }
 
 function format(declaration: MeasureDeclaration): string {

@@ -107,6 +107,32 @@ describe('measure_declaration.problems on premise lines', () => {
 	})
 })
 
+// joshuafolkken/kit#8955: a measurement Issue's criteria record the result and never branch on it.
+function estimated_body(files: number, criterion: string): string {
+	const background = `${BACKGROUND}- 規模見積もり: 約 ${String(files)} ファイル / 0 行（テスト含む）\n\n`
+
+	return `${background}## 受け入れ条件\n\n- [ ] ${criterion}\n`
+}
+
+describe('measure_declaration.problems on a measurement Issue criterion', () => {
+	it('refuses a 0-file-estimate criterion that files a follow-up only if one is needed (ac-68cf7791)', () => {
+		const criterion = '差があれば後続を起票する'
+		const found = measure_declaration.problems(estimated_body(0, criterion))
+
+		expect(found).toStrictEqual([expect.stringContaining(criterion)])
+	})
+
+	it('accepts a 0-file-estimate criterion that only records the result (ac-68cf7791)', () => {
+		expect(measure_declaration.problems(estimated_body(0, '計測結果を記録する'))).toStrictEqual([])
+	})
+
+	it('does not refuse a branching criterion on a non-measurement Issue (ac-68cf7791)', () => {
+		const body = estimated_body(3, '失敗した場合は再試行する')
+
+		expect(measure_declaration.problems(body)).toStrictEqual([])
+	})
+})
+
 // joshuafolkken/kit#5144: a follow-up states its measurement — a declaration line, or a reason for none.
 describe('measure_declaration.is_stated', () => {
 	it.each([
