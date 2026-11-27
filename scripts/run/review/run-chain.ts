@@ -53,6 +53,9 @@ interface ChainStage {
 	// The action after a stop here, for the issue the run is on.
 	next: NextAction
 	hold?: StageHold
+	// Runs alongside the adjacent concurrent stages: it neither writes the tree nor reads what they
+	// write (joshuafolkken/kit#9140).
+	concurrent?: boolean
 }
 
 interface ChainStop {
@@ -122,18 +125,22 @@ const PREFLIGHT_STAGE: ChainStage = {
 }
 
 // The pre-detach checks `check:related` does not run: `exports:unused` and the guard tests, with the
-// ship's own argv (`run-ship-pre-detach.ts`), so they stop here rather than at the pre-detach.
+// ship's own argv (`run-ship-pre-detach.ts`), so they stop here rather than at the pre-detach. Both
+// only read the tree, so they run together as the pre-detach runs them; each child's core-budget claim
+// keeps the pair inside the budget.
 function pre_detach_stages(): ReadonlyArray<ChainStage> {
 	return [
 		{
 			name: EXPORTS_UNUSED,
 			argv: run_ship_pre_detach.exports_argv(),
 			next: (issue) => `fix each unused export it names, ${rerun(issue, EXPORTS_UNUSED)}`,
+			concurrent: true,
 		},
 		{
 			name: GUARD_TESTS,
 			argv: run_ship_pre_detach.guard_test_argv(process.cwd()),
 			next: (issue) => `fix the red guard test, ${rerun(issue, GUARD_TESTS)}`,
+			concurrent: true,
 		},
 	]
 }
@@ -260,8 +267,54 @@ async function timed_stage(
 	return { entry, stop }
 }
 
+function joins(groups: ReadonlyArray<Array<ChainStage>>, stage: ChainStage): boolean {
+	return stage.concurrent === true && groups.at(-1)?.[0]?.concurrent === true
+}
+
+// The stages in run order: each adjacent run of concurrent stages one group, every other stage alone.
+function stage_groups(stages: ReadonlyArray<ChainStage>): ReadonlyArray<ReadonlyArray<ChainStage>> {
+	const groups: Array<Array<ChainStage>> = []
+
+	for (const stage of stages) {
+		if (joins(groups, stage)) groups.at(-1)?.push(stage)
+		else groups.push([stage])
+	}
+
+	return groups
+}
+
+// A group's stages run together; their output is printed in stage order once all end, so the run reads
+// as it would one stage at a time.
+async function timed_group(
+	group: ReadonlyArray<ChainStage>,
+	issue: string,
+	print: Print,
+	run: StageRunner,
+): Promise<ReadonlyArray<TimedStage>> {
+	const outputs = group.map((): Array<string> => [])
+	const ran = await Promise.all(
+		group.map(async (stage, index) => {
+			const output = outputs[index] ?? []
+
+			return await timed_stage(
+				stage,
+				issue,
+				(text) => {
+					output.push(text)
+				},
+				run,
+			)
+		}),
+	)
+
+	for (const text of outputs.flat()) print(text)
+
+	return ran
+}
+
 // Each stage that ran, the stopped one included, so the run's `chain` line shows where a long run
-// spent its time (joshuafolkken/kit#7736).
+// spent its time (joshuafolkken/kit#7736). A group's stop is its first stopped stage in stage order,
+// the stop a one-at-a-time run would report.
 async function run_stages(
 	stages: ReadonlyArray<ChainStage>,
 	issue: string,
@@ -270,11 +323,12 @@ async function run_stages(
 ): Promise<ChainRun> {
 	const timed: Array<ChainStageEntry> = []
 
-	for (const stage of stages) {
-		// eslint-disable-next-line no-await-in-loop -- each stage runs on the tree the earlier ones left
-		const { entry, stop } = await timed_stage(stage, issue, print, run)
+	for (const group of stage_groups(stages)) {
+		// eslint-disable-next-line no-await-in-loop -- each group runs on the tree the earlier ones left
+		const ran = await timed_group(group, issue, print, run)
+		const stop = ran.find((stage) => stage.stop !== undefined)?.stop
 
-		timed.push(entry)
+		timed.push(...ran.map((stage) => stage.entry))
 		if (stop !== undefined) return { stop, stages: timed }
 	}
 
