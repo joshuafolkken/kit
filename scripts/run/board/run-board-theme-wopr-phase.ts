@@ -27,6 +27,7 @@ const NOT_COOLED = -1
 // Park–Miller mix (run-board-lamps.ts:31-61): the one deterministic source kit's lamps and codes use.
 const PARK_MILLER = { multiplier: 48_271, modulus: 2_147_483_647 }
 const COUNT_WIDTH = 2
+const PAIR = 2
 const SECOND_TICKS = 20
 const SECONDS_WIDTH = 5
 const SECONDS_DIGITS = 2
@@ -43,6 +44,16 @@ function mixed(values: ReadonlyArray<number>): number {
 
 function code_char(first: number, second: number, third: number): string {
 	return CODE.charAt(Math.floor(hash(first, second, third) * CODE.length))
+}
+
+// A character of `pool` picked by `share` (0 to 1), never the one of the tick before: an even tick
+// picks from the pool's even places, an odd tick from its odd ones. Measured on the film's frames: a
+// code character not yet locked changes on every tick.
+function cycled(pool: string, tick: number, share: number): string {
+	const parity = Math.abs(tick) % PAIR
+	const places = Math.ceil((pool.length - parity) / PAIR)
+
+	return pool.charAt(PAIR * Math.floor(share * places) + parity)
 }
 
 // NOTICE from its start to EFFECT_END ticks after the peak (longer than the host's NOTICE_END: the
@@ -126,6 +137,7 @@ const run_board_theme_wopr_phase = {
 	code_char,
 	cooled_of,
 	count,
+	cycled,
 	is_notice,
 	is_progress,
 	is_row,

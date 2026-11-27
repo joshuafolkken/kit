@@ -62,8 +62,6 @@ const INK = {
 	// The ending's lines and the dimmed screen behind them.
 	close: `${fg('170;205;255')}${BOLD}`,
 	dark: fg('40;48;60'),
-	// Out lamps: yellow halved per channel, dimmed, on every row (lamps.ts:89-104).
-	out: `${ESC}2m${fg('128;107;5')}`,
 }
 const TRACK_INKS: ReadonlyArray<string> = [
 	`${fg('200;225;255')}${BOLD}${bg(NAVY)}`,
@@ -71,20 +69,40 @@ const TRACK_INKS: ReadonlyArray<string> = [
 ]
 // The LED colors as 'r;g;b': a spinning position, a locked one, the lock's flash, an unlit segment.
 const LED = { spin: '170;70;20', locked: '255;150;50', hot: '255;235;190', ghost: '72;24;8' }
-// The spark burns the whole screen white, white, yellow, orange.
+// The spark floods the whole screen white, white, lavender, dim lavender: the film floods white and
+// lavender, no yellow or orange (measured on the film's frames; the lavender `#e4e3ff` on its caption).
+// The last frame is that lavender at 0.65 of its brightness (invented).
+const LAVENDER = '228;227;255'
+const LAVENDER_DIM = '148;148;166'
 const SPARK_WHITE = `${fg(WHITE)}${BOLD}${bg('255;255;235')}`
 const SPARK: ReadonlyArray<string> = [
 	SPARK_WHITE,
 	SPARK_WHITE,
-	`${fg(WHITE)}${BOLD}${bg('255;232;140')}`,
-	`${fg('255;250;220')}${BOLD}${bg(LED.locked)}`,
+	`${fg(WHITE)}${BOLD}${bg(LAVENDER)}`,
+	`${fg(LAVENDER)}${BOLD}${bg(LAVENDER_DIM)}`,
 ]
 // The board below the area reddens as the level drops: a color a level, levels 1 to 3.
 const LEVEL_INKS: ReadonlyArray<string> = [fg(RED), fg('255;130;70'), fg('255;190;90')]
-// The lamp rows' lit shades: 24h, 7d, the blank line, the usage rule, two providers, GitHub.
-const SHADES: ReadonlyArray<string> = [YELLOW, YELLOW, YELLOW, RED, RED, YELLOW, RED].map((shade) =>
-	fg(shade),
-)
+
+// A lamp row's shade, lit and out. An out lamp is dimmed: on the yellow rows yellow halved per channel
+// (lamps.ts:89-104), on the red rows a red halved (joshuafolkken/kit#9137, the user's choice).
+interface LampShade {
+	lit: string
+	out: string
+}
+
+const LAMP_YELLOW: LampShade = { lit: fg(YELLOW), out: `${ESC}2m${fg('128;107;5')}` }
+const LAMP_RED: LampShade = { lit: fg(RED), out: `${ESC}2m${fg('128;38;40')}` }
+// The lamp rows' shades: 24h, 7d, the blank line, the usage rule, two providers, GitHub.
+const SHADES: ReadonlyArray<LampShade> = [
+	LAMP_YELLOW,
+	LAMP_YELLOW,
+	LAMP_YELLOW,
+	LAMP_RED,
+	LAMP_RED,
+	LAMP_YELLOW,
+	LAMP_RED,
+]
 // DEFCON's named colors' SGR, level 1 to 5 (1-2 red, 3-4 yellow, 5 green): `3` and this digit.
 const NAMED = '11332'
 

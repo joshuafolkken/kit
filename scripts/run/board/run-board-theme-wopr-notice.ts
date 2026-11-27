@@ -17,7 +17,7 @@ import { run_board_theme_wopr_wars } from './run-board-theme-wopr-wars'
 // - build, s 0-49: the LAUNCH panel locks a position every 5 ticks in WOPR's order; then the matched
 //   code blinks until the peak. DEFCON 5 → 1 over the build; from s 40 the header carries the match
 //   and the countdown.
-// - c 0-3: the spark burns the whole screen white, white, yellow, orange.
+// - c 0-3: the spark burns the whole screen white, white, lavender, dim lavender.
 // - c 4-146: the area splits: sixteen wars on the left, the WINNER table paging on the right.
 // - c 147-237: dark; the film's last three lines type two letters a tick and hold; DEFCON 5.
 

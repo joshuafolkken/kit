@@ -12,7 +12,7 @@ const { bg, code_points, fg, set_cell } = run_board_theme_host_grid
 const { hash } = run_board_theme_host_hash
 const { LED, ORDER, THE_CODE } = run_board_theme_wopr_data
 const { JOINS, K_STEPS, ROW_SPANS, SEGMENTS, SEGMENT_AT } = run_board_theme_wopr_font_data
-const { notice_age } = run_board_theme_wopr_phase
+const { cycled, notice_age } = run_board_theme_wopr_phase
 
 // A position as it shows: its character, its lit segments' color ('r;g;b', none for the whole
 // character dark), and whether it holds the code's character.
@@ -30,8 +30,9 @@ const LED_W = GRID_SIZE
 const HALF = 2
 const DIGIT_POOL = '0123456789'
 const LETTER_POOL = [...SEGMENTS.keys()].filter((ch) => /[A-Z]/u.test(ch)).join('')
-// A spinning position changes every other tick; the lock is white-hot for three ticks.
-const SPIN = { every: 2, salt: 51 }
+// A spinning position changes on every tick (measured on the film's frames); the lock is white-hot
+// for three ticks.
+const SPIN_SALT = 51
 const HOT_TICKS = 3
 // ROW: positions lock in WOPR's order as the row types — one every ninth of the typing, up to eight.
 const ROW_REACH = 8
@@ -111,12 +112,11 @@ function rank_of(position: number): number {
 	return ORDER.indexOf(String(position))
 }
 
-// A spinning position shows a random letter or digit, as its slot holds, changing every other tick.
+// A spinning position shows a random letter or digit, as its slot holds, another on every tick.
 function spin(position: number, tick: number): string {
 	const pool = /\d/u.test(THE_CODE.charAt(position)) ? DIGIT_POOL : LETTER_POOL
-	const step = Math.floor(tick / SPIN.every)
 
-	return pool.charAt(Math.floor(hash(position, step, SPIN.salt) * pool.length))
+	return cycled(pool, tick, hash(position, tick, SPIN_SALT))
 }
 
 function spun(position: number, tick: number): Look {
@@ -172,6 +172,7 @@ function matched(look: LookAt): number {
 const run_board_theme_wopr_led = {
 	LETTER_POOL,
 	LED_ROWS,
+	MATCHED_AT,
 	led,
 	matched,
 	notice_look,
