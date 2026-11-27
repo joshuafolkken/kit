@@ -262,18 +262,31 @@ function lane_minutes(
 	return start === undefined ? undefined : (Date.parse(merge.at) - start) / MS_PER_MINUTE
 }
 
+// One merged lane: its issue and how many minutes it took.
+interface MergedLane {
+	issue: number
+	minutes: number
+}
+
 // One merge's lane time runs from the latest dispatch of its issue — looked up in the whole ledger,
 // since a lane may start before the window — to the merge. A merge no dispatch preceded is skipped.
-function merge_minutes(
+function merged_lanes(
 	entries: ReadonlyArray<LedgerEntry>,
 	period: ReadonlyArray<LedgerEntry>,
-): Array<number> {
+): Array<MergedLane> {
 	const dispatches = entries.filter(is_dispatch)
 
 	return period
 		.filter((entry) => is_merge(entry))
-		.map((merge) => lane_minutes(dispatches, merge))
-		.filter(is_number)
+		.map((merge) => ({ issue: merge.issue, minutes: lane_minutes(dispatches, merge) }))
+		.filter((lane): lane is MergedLane => is_number(lane.minutes))
+}
+
+function merge_minutes(
+	entries: ReadonlyArray<LedgerEntry>,
+	period: ReadonlyArray<LedgerEntry>,
+): Array<number> {
+	return merged_lanes(entries, period).map((lane) => lane.minutes)
 }
 
 // The median lane, then its tail (`lane-tail-stats.ts`).
@@ -366,6 +379,7 @@ const lane_stats = {
 	mean,
 	median,
 	merge_minutes,
+	merged_lanes,
 	merges_per_hour,
 	sampled_hours,
 	peak,
@@ -374,5 +388,5 @@ const lane_stats = {
 	window_of,
 }
 
-export type { RowLabel, StatsWindow }
+export type { MergedLane, RowLabel, StatsWindow }
 export { lane_stats }

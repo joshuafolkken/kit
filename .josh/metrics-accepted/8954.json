@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 130
+	},
+	"reason": "joshuafolkken/kit#8954: lane:plan records the start-time declared size and run:board bands each row's finish estimate by it",
+	"date": "2026-11-27"
+}

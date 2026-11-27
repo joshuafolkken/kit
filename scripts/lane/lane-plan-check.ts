@@ -10,6 +10,7 @@ import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_plan_declared } from './lane-plan-declared'
 import { lane_plan_premise } from './lane-plan-premise'
 import { lane_plan_probe } from './lane-plan-probe'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
@@ -283,6 +284,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	const sized = sized_of(plan, issues)
 
 	lane_plan.record(sized, directory)
+	await lane_plan_declared.record(plan.issue, issues)
 	const found = lane_plan_probe.probe(sized, issues, directory)
 
 	if (lane_plan_probe.is_unread(found)) return unread()
