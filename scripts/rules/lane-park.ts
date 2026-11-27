@@ -114,6 +114,18 @@ function is_unparked_child(place: ChildPlace = {}): boolean {
 	return issue === undefined || !run_park.is_parked_sync(issue, directory)
 }
 
+// **A lane child ending its turn with nothing left on its Issue** (joshuafolkken/kit#8956): unparked,
+// no ship running, and no ship that succeeded. A merged ship is the stop's own record, read the way
+// the `Stop` hook reads a running one; a failed one owes the park like any other stop.
+function is_unrecorded_end(place: ChildPlace = {}): boolean {
+	const { directory, source } = resolved_place(place)
+	if (!is_unparked_child({ directory, source })) return false
+
+	const issue = lane_child_marker.marked_issue(source)
+
+	return issue === undefined || !lane_handoff.is_ship_succeeded(issue, directory, 0)
+}
+
 function is_unparked_stop(command: string, is_child: () => boolean = is_unparked_child): boolean {
 	if (!is_confirmation_notify(command)) return false
 
@@ -161,6 +173,17 @@ const LANE_PARK_REASON =
 	'after it. Refused once per run ' +
 	'(`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 
+// The `Stop` refusal for `is_unrecorded_end`. It names the fields the Issue lacks and points at the
+// one body check (`run-park-body.ts`) rather than restating its shape; the stops that close the Issue
+// another way leave no local record, so they are named and the loop-breaker lets the next stop pass.
+const LANE_STOP_PARK_REASON =
+	'⛔ lane child end without a park: this Issue has no reason, next action (`--outcome`), options or ' +
+	'recommendation from this run. Park it before ending: `pnpm josh run:park <N> --body-file <path> ' +
+	'--outcome "<next action>"` (its body check, `scripts/run/park/run-park-body.ts`, names any field ' +
+	'still missing; `backlogrun-park.md` → "park and continue"). A stop that already left them — a ' +
+	'`run:cut --deliverable` close, `start: reached`, a `needs-human-review` / `already-done` label — ' +
+	'ends as is. Refused once per stop.'
+
 // The row itself, so `delivered-rules.ts` spreads one entry. **Once per run rather than `decide`.** The
 // stop ends the turn, so it is not the recurring act `decide` is for. A parked child is excluded in the
 // trigger itself (`is_unparked_child`), so the park record is the satisfaction and no
@@ -182,11 +205,13 @@ const ROW = {
 const lane_park = {
 	COMMAND_NOTIFY_MARKER,
 	LANE_PARK_REASON,
+	LANE_STOP_PARK_REASON,
 	ROW,
 	is_confirmation_notify,
 	is_parking_child,
 	is_unparked_child,
 	is_unparked_stop,
+	is_unrecorded_end,
 	mentions_confirmation_notify,
 	records_the_park,
 }

@@ -5,6 +5,7 @@ import { concise_reply } from './concise-reply'
 import { deferral_owner } from './deferral-owner'
 import { filing_offer } from './filing-offer'
 import { lane_background } from './lane-background'
+import { lane_park } from './lane-park'
 import { reply_close } from './reply-close'
 import { reply_language } from './reply-language'
 import { stop_decision, type StopDecision } from './stop-decision'
@@ -87,6 +88,8 @@ interface StopContext {
 	headless_refusals: number
 	// This session is a dispatched lane child for this checkout — `lane_child_marker.is_child_of`.
 	lane_child: boolean
+	// This lane child ends with nothing left on its Issue — `lane_park.is_unrecorded_end`.
+	lane_unrecorded: boolean
 	// This session is a child kit started headless — a lane, hand-off or beside child —
 	// `run_headless.is_started_child`. Nothing re-invokes it once its turn ends.
 	started_child: boolean
@@ -397,6 +400,7 @@ function background_wait_reason(context: StopContext): string {
 function lane_reason(context: StopContext): string | undefined {
 	if (needs_index_route(context)) return LANE_INDEX_REASON
 	if (needs_background_wait(context)) return background_wait_reason(context)
+	if (context.lane_unrecorded) return lane_park.LANE_STOP_PARK_REASON
 
 	return undefined
 }
