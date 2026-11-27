@@ -1,5 +1,7 @@
+import { git_command } from '#scripts/git/git-command'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#5629: `run:entry <N> --adopt` — a `new` run's entry once its Issue is filed. Kept
 // apart from `run-entry-cli.test.ts`, which is at the file-length cap.
@@ -167,6 +169,25 @@ describe('run_entry_cli.run — a carried cut relays the section after its token
 		expect(info).toHaveBeenNthCalledWith(1, expect.stringContaining('— resume: resume'))
 		expect(info).toHaveBeenNthCalledWith(2, '## Resuming')
 		expect(info).toHaveBeenCalledTimes(2)
+	})
+})
+
+// joshuafolkken/kit#9103: a `fullrun new` hand-off child that filed hands the run into its lane.
+describe('run_entry_cli.run --adopt — a run:handoff child off the issue tree', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('refuses before claiming, naming the hand-off into the lane', async () => {
+		vi.stubEnv(run_headless_keys.HANDOFF_CHILD_KEY, '1')
+		vi.spyOn(git_command, 'branch_at').mockResolvedValue('main')
+
+		expect(await run_entry_cli.run([ISSUE, '--adopt'])).not.toBe(OK)
+		expect(josh_run_mock).not.toHaveBeenCalled()
+		expect(sync_mock).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining(`run:handoff fullrun ${ISSUE}`),
+		)
 	})
 })
 
