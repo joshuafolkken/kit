@@ -240,6 +240,6 @@ function opening_of(api: ThemeApi): ThemePart {
 	}
 }
 
-const run_board_theme_deviant_opening = { ice_at, opening_of }
+const run_board_theme_deviant_opening = { faded, ice_at, opening_of }
 
 export { run_board_theme_deviant_opening }

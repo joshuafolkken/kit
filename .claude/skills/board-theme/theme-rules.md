@@ -12,10 +12,7 @@ themes already in kit (`run-board-theme-<value>-*.ts`) are the examples.
 | Colors | Body, rules, marks (OK, red, yellow, bold white), letters being typed, the notice's letters; the roles text has at rest (rule marks, headings, numbers); the three mark tones `human`, `idle`, `info` (→ "IDLE") |
 | Level readout | The theme's own readout at the right end of the THROUGHPUT rule |
 | Spinner | Ten glyphs of the work (→ "Spinner, colons and level readout") |
-| IDLE | A rich panel that always moves (pages, a readout, a mark) and the quiet screen-wide effects |
-| PROGRESS | Typing, the panel's reaction and its slight whole-screen touch |
-| ROW | The scene of the work over the whole of THROUGHPUT and USAGE, and its whole-screen effect |
-| NOTICE | Its acts (before, main, after), the whole screen and the header's effect areas |
+| IDLE, PROGRESS, ROW, NOTICE | What each shows (→ "Events and showiness", "IDLE") |
 | OPENING, ENDING | How the board appears and goes |
 | Sound | Every item of [sound](theme-sound.md) → "What a new theme decides" |
 | Weight | A NOTICE frame's bytes ([render cost](render-cost.md) → "Frame weight") |
@@ -34,7 +31,7 @@ themes already in kit (`run-board-theme-<value>-*.ts`) are the examples.
 
 ## Events and showiness
 
-As the user holds it (2026-11-27); the seven released themes are brought to this under #9071.
+The user's rules (2026-11-27); the seven released themes follow under #9071.
 
 | Tier | When | Required |
 |---|---|---|
@@ -43,21 +40,15 @@ As the user holds it (2026-11-27); the seven released themes are brought to this
 | ROW | A row changes (a lane added); medium | The WHOLE of THROUGHPUT and USAGE as a scene of the work, plus a whole-screen effect; clearly richer than PROGRESS; runs until the row has typed through |
 | NOTICE | Header row 2's notice; rare, the maximum | The whole screen and the header's effect areas (left three columns, pinned right column, row 1's CPU / MEM / SWAP), plainly apart from the other two |
 
-- NOTICE's header (the user's rule, 2026-11-27): the header's effect areas carry the theme's own
-  content for at least half of the NOTICE's length. Recommended: all of the header except the notice
-  message — the left three columns, the pinned right column and row 1's CPU / MEM / SWAP together,
-  not one or two of them.
-- What counts: the theme's own content drawn in those blocks. A whole-screen flash or wash passing
-  over the header, or the existing clocks' digits and colors changing, does not count. (Today nixie,
-  trace and flux use none of the areas: #9071.)
+- NOTICE's header: its effect areas carry the theme's own content for at least half of the NOTICE;
+  recommended all three areas together — everything but the notice message.
+- A whole-screen flash or wash over the header, or the clocks' digits and colors changing, does not
+  count. (nixie, trace and flux use none of the areas: #9071.)
 - NOTICE has acts: something before the main effect (a choice, a call) and something after it (a new
   state, a stamp), not one idea alone.
 - Every effect is taken from the work's own screens; add no generic effect the work does not have.
-- Where the work's screens go: its menus, selection and chapter screens — what the player sees
-  before starting and while waiting — to IDLE (panel pages) and OPENING; its in-play readouts to
-  PROGRESS and ROW; its signature moment to NOTICE.
-- The panel shows something of the work in every state, not only in IDLE: its own content for
-  PROGRESS, ROW and NOTICE too.
+- The work's menus, selection and chapter screens → IDLE (panel pages) and OPENING; its in-play
+  readouts → PROGRESS and ROW; its signature moment → NOTICE.
 - Play the three side by side and check the steps between them.
 - A mark or blink on a row repeats while the row types, not once at its start.
 - Keep the best effect off the frequent events. A ROW need not show success; save the climax for
@@ -78,7 +69,7 @@ As the user holds it (2026-11-27); the seven released themes are brought to this
 | Right of THROUGHPUT and USAGE (the panel) | Always; the work's own content in every state |
 | THROUGHPUT and USAGE whole, rules included | During an event — ROW takes the whole of it; the data there may be overwritten |
 | The whole screen (color, flash, glitch, rain) | During an event; in IDLE quiet effects only |
-| Header's left three columns, the pinned right column, row 1's CPU / MEM / SWAP | NOTICE: the theme's own content for at least half of it (→ "Events and showiness") |
+| The header's effect areas | NOTICE (→ "Events and showiness") |
 | Header row 2's notice text and row 3's progress text | Recolor only; draw nothing over them |
 | The free seat rows under LANES | Never |
 
@@ -110,9 +101,9 @@ As the user holds it (2026-11-27); the seven released themes are brought to this
   start on different ticks. Each may keep running through events where it does not clash, else it
   stops.
 - Text has color roles even at rest: rule marks, headings and numbers each in their own.
-- A theme declares colors for the three mark tones that otherwise fall to the body color — `human`,
-  `idle`, `info` (`ThemeColors`) — inside its palette: idle clearly dimmer than body, info a quiet
-  tint between rule and body, human the one mild accent.
+- The mark tones `human`, `idle`, `info` (`ThemeColors`; the body color where not given) come from
+  the palette: idle clearly dimmer than body, info a quiet tint between rule and body, human the one
+  mild accent.
 - Speed may follow activity (IDLE < PROGRESS < ROW).
 - Check the motion is calm and fits the work; gauges snap in steps, overshoot a little and settle.
 

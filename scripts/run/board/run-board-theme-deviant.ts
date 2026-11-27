@@ -4,7 +4,9 @@ import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
 import { run_board_theme_deviant_ending } from './run-board-theme-deviant-ending'
 import { run_board_theme_deviant_header } from './run-board-theme-deviant-header'
 import { run_board_theme_deviant_idle } from './run-board-theme-deviant-idle'
+import { run_board_theme_deviant_led } from './run-board-theme-deviant-led'
 import { run_board_theme_deviant_link } from './run-board-theme-deviant-link'
+import { run_board_theme_deviant_note } from './run-board-theme-deviant-note'
 import { run_board_theme_deviant_opening } from './run-board-theme-deviant-opening'
 import { run_board_theme_deviant_panel, type PanelLook } from './run-board-theme-deviant-panel'
 import { run_board_theme_deviant_parts } from './run-board-theme-deviant-parts'
@@ -35,6 +37,8 @@ import type {
 // NOTICE: the order's prompt in the header; the board freezes grey and the red wall of orders
 // grows, cracks and shatters; color returns in a ring and the objective is stamped; SOFTWARE
 // INSTABILITY stays on the model line until the notice ends.
+// Always: the lanes' marks as LEDs (`run-board-theme-deviant-led.ts`) and the small notices on the
+// THROUGHPUT rule (`run-board-theme-deviant-note.ts`).
 
 const { notice_trace } = run_board_theme_host_flash
 const { put_level } = run_board_theme_host_grid
@@ -45,7 +49,9 @@ const { after } = run_board_theme_deviant_after
 const { analysis, hopping_brackets, is_analyzing, scan_mode } = run_board_theme_deviant_analysis
 const { close, open } = run_board_theme_deviant_header
 const { glitch, rule_glints, scan_tint } = run_board_theme_deviant_idle
+const { SPINNER, leds } = run_board_theme_deviant_led
 const { link } = run_board_theme_deviant_link
+const { note } = run_board_theme_deviant_note
 const { idle } = run_board_theme_deviant_panel
 const { ink, mix } = run_board_theme_deviant_parts
 const { rule_bar, rule_inks } = run_board_theme_deviant_rules
@@ -129,11 +135,13 @@ function deviant(draw: ThemeDraw): void {
 	const { grid, s, tick } = draw
 	const age = wall_age(s, tick)
 
+	leds(draw)
 	rule_inks(draw)
 	if (age < 0) board(draw)
 	else notice_acts(draw, age)
 	notice_trace(grid, s, RGB.red)
 	level(draw, age)
+	note(draw)
 }
 
 // The wash behind every cell: the night; the wall's red through a NOTICE's build; the scan band's
@@ -152,7 +160,7 @@ function theme(api: ThemeApi): ThemeModule {
 	return {
 		name: 'DETROIT',
 		board: MODEL.board,
-		spinner: '◜◜◠◝◝◞◞◡◟◟',
+		spinner: SPINNER,
 		colons: true,
 		notes: theme_notes,
 		colors: theme_colors,

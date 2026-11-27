@@ -1,6 +1,7 @@
 import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
 import { run_board_theme_deviant_parts } from './run-board-theme-deviant-parts'
 import { run_board_theme_deviant_scrub, type Scrub } from './run-board-theme-deviant-scrub'
+import { run_board_theme_deviant_tables } from './run-board-theme-deviant-tables'
 import { run_board_theme_draw, type Pane, type ThemeDraw } from './run-board-theme-draw'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import type { ThemeLayout } from './run-board-theme-host-types'
@@ -26,7 +27,8 @@ const CARDS = {
 	count: 'EVENTS ANALYZED',
 	settle: 0.55,
 }
-const CARD_AT = { first: 0.3, second: 0.55, third: 0.85 }
+// Where the cards' ticks stand; a ROW's sounds read it too.
+const { CARD_AT } = run_board_theme_deviant_tables
 const MARK = /^[A-Z]{2}$/u
 // What stands between a lane's number and its title: its priority and its kind's marker.
 const LEAD = /^\s*(?:P\d\s+)?(?:(?:\*\*|BG)\s+)?/u

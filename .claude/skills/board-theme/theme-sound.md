@@ -40,35 +40,29 @@ The user's split (2026-11-27):
 | Sound effect (a beep, a click, a ping, an alarm, static, a hum) | Imitate with high fidelity from measured values: partials, length, envelope, order |
 | Music (a melody, a theme's rhythm, a cue from the score) | Never copy. Make a melody from the original's motif with a small change |
 
-- A sound effect, even one made of a few notes and a few seconds long, is reproduced as it is. What
-  gets arranged (the original's motif with a small change) is music: a main melody, a theme, a cue
-  from the score.
+- A sound effect is reproduced as it is, even one of a few notes and a few seconds; only music is
+  arranged.
 - For every effect on screen, find the sound that stands for it in the original and make it. Decide
   yourself which sounds the theme adopts.
-- Sounds are measured from clips: [from video](theme-video.md) → "Sound".
+- Measure from clips: [from video](theme-video.md) → "Sound".
 - The package ships the sounds.
 
 ## Loudness
 
 - Take the teletype typing's peak (about 0.14 of full scale) as the reference.
 - NOTICE's peak is the loudest (about 0.22), still not sudden; the call about 0.16; ROW's sounds about
-  0.11; PROGRESS's typed end about 0.09; the bed about half the call.
+  0.11; PROGRESS's typed end about 0.09.
 
 ## How kit plays them
 
-- `THEME_DEFS` (`run-board-theme-defs.ts`): `typing` (the trill's loop), `typed_end` (the opening's
-  typed end) and `score: score_of(<palette>)`.
-- A palette is data (`run-board-sound-palettes-*.ts`): one-shot sounds of tones, noise and rests
-  (`run-board-sound-voice.ts` → `Sound`) and beds of pulses and a drone (`Bed`). Build from the shared
+- `THEME_DEFS` (`run-board-theme-defs.ts`): `typing`, `typed_end` and `score: score_of(<palette>)`.
+- A palette is data (`run-board-sound-palettes-*.ts`): `Sound`s and `Bed`s built from the shared
   parts (`run-board-sound-voice.ts`, `run-board-sound-shape.ts`); write no per-theme copy of them.
-- Each event plays one WAV from its start (`run-board-sound-score.ts`): what overlaps on its time line
-  is mixed into it beforehand. The start is found on the timeline drawn
-  (`run-board-theme-notice-sound.ts`), so demo mode sounds its own events.
-- `opening_cues` mix into the OPENING's track at their `at_ms` (`run-board-sound-score.ts`).
-- A Mac plays every sound through one resident player; frames trail by its latency
-  (`run-board-sound-resident.ts`, `run-board-sound-latency.ts`).
-- No theme plays the board's cues (`run-board-sound-cues.ts`): a click for a row or progress line, two
-  soft rising notes for a notice. A shown theme mutes them.
+- Each event plays one WAV from its start, what overlaps mixed in beforehand
+  (`run-board-sound-score.ts`); it starts on the timeline drawn, so demo mode sounds its own events.
+- A sound at a moment of its own: `opening_cues` / `ending_cues` (`at_ms`), `row.beats` (by the row's
+  letters), `row.ring_ms` (the end rings on), `notice.after_peak`.
+- No theme plays the board's cues (`run-board-sound-cues.ts`); a shown theme mutes them.
 
 ## What a new theme decides
 
@@ -80,6 +74,5 @@ OPENING's and ENDING's sounds.
 
 - Report per theme and event: pitch, length, peak and when it plays.
 - Record the play calls of one NOTICE, one ROW and one PROGRESS: one call each, at the event's start.
-- Write "unchecked by ear" and give the user the steps to listen (restart the board, demo mode keys).
-- Every sound of every theme late against the screen → check the output device before the code: a
-  Bluetooth output adds its own delay; time `afplay` on a short silent file to see it (sync: #9087).
+- Give the user the steps to listen (restart the board, demo mode keys).
+- Every sound late → the output device first ([from video](theme-video.md) → "Sound").

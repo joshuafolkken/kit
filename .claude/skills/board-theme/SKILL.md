@@ -53,8 +53,9 @@ key, `s` `a` `d` `w` `q` `e`) → bases of the real board's shape check it. No t
 
 ## 3. Build it in kit
 
-- A no-filing request → the `producer`: one work tree for the whole theme; fixes go to the same unit.
-  Give every change in one brief — a unit resumed many times can lose its authority.
+- A no-filing request → the `producer`: one request starts it; requests arriving while it builds go
+  to the same unit, taken in turn; the work is kept on a working branch
+  (`prompts/collaboration-workflow/principles.md` → "consult-vs-execute").
 - An Issue → the usual lanes.
 - Decide yourself how what you found maps to IDLE / PROGRESS / ROW / NOTICE / OPENING / ENDING and
   the ground look, and build. The user reviews the result, not a menu of options.

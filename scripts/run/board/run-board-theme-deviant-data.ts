@@ -64,7 +64,15 @@ const ORDINALS: ReadonlyMap<string, string> = new Map([
 
 // The triangle: a lit left face and a darker right face, breathing as an LED does.
 const TRIANGLE = ['   ▟▙   ', '  ▟██▙  ', ' ▟████▙ ', '▟██████▙']
-const FACE = { lit: 0.25, lit_glow: 0.2, dark: 0.35, dark_glow: 0.15, breath: 9, back: 10 }
+const FACE = {
+	lit: 0.25,
+	lit_glow: 0.2,
+	dark: 0.35,
+	dark_glow: 0.15,
+	breath: 9,
+	back: 10,
+	steps: 8,
+}
 
 // The model line: its two weights, the mark a NOTICE leaves and where each sits.
 const MODEL = {
@@ -264,34 +272,7 @@ const MENU = {
 }
 const REVEAL = { lead: 4, spread: 26, rise: 0.2, rise_max: 11, flash: 2, column: 4, salt: 7 }
 
-// ENDING: the mission stamp over the grey board, the wipe in columns, a second of empty screen.
-const CLOSE = {
-	stamp_ticks: 36,
-	wipe_ticks: 30,
-	empty_ticks: 20,
-	grey: 0.3,
-	row: 3,
-	up: 3,
-	back: 12,
-	pace: 2,
-	box_x: 2,
-	box_w: 30,
-	word: 'MISSION',
-	rest: 'SUCCESSFUL',
-	rest_x: 8,
-	rest_after: 8,
-	rule_after: 6,
-	rule_w: 18,
-	odds: 'PROBABILITY OF SUCCESS',
-	odds_after: 18,
-	full: '100%',
-	full_x: 23,
-	full_after: 44,
-	column: 4,
-	salt: 3,
-	spread: 20,
-	rise: 0.15,
-}
+// ENDING's table is in `run-board-theme-deviant-tables.ts` → `RESULTS`.
 
 const theme_colors: ThemeColors = {
 	body: RGB.text,
@@ -321,7 +302,6 @@ const run_board_theme_deviant_data = {
 	BAR,
 	CARD,
 	CHOICES,
-	CLOSE,
 	CURSOR,
 	FACE,
 	MENU,

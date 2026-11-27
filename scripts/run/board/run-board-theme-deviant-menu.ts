@@ -1,5 +1,6 @@
 import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
 import { run_board_theme_deviant_parts, type Stage } from './run-board-theme-deviant-parts'
+import { run_board_theme_deviant_tables } from './run-board-theme-deviant-tables'
 import { run_board_theme_draw, type Pane, type ThemeDraw } from './run-board-theme-draw'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import type { ThemeApi } from './run-board-theme-host-types'
@@ -16,8 +17,8 @@ const { CURSOR, FACE, MODEL, PANEL, RGB } = run_board_theme_deviant_data
 const { card_of, ink, mix } = run_board_theme_deviant_parts
 
 const HALF = 1 / PAIR
-// The entrance: the ticks from one bar to the next, the pause before the labels, and each fade.
-const ENTER = { step: 2, pause: 2, fade: 4 }
+// The entrance's pace; the OPENING's sounds read it too.
+const { ENTER } = run_board_theme_deviant_tables
 // The idle panel turns its page every fifteen seconds, through these in turn.
 const PAGES = { ticks: 300, names: ['choices', 'chapters', 'status'] } as const
 

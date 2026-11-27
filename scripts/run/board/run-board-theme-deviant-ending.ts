@@ -1,111 +1,99 @@
 import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
+import { run_board_theme_deviant_opening } from './run-board-theme-deviant-opening'
 import { run_board_theme_deviant_parts } from './run-board-theme-deviant-parts'
+import { run_board_theme_deviant_results } from './run-board-theme-deviant-results'
+import { run_board_theme_deviant_tables } from './run-board-theme-deviant-tables'
 import { run_board_theme_draw, type ThemeDraw } from './run-board-theme-draw'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import { run_board_theme_host_hash } from './run-board-theme-host-hash'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
-import type { Cell, Point, ThemeApi, ThemePart } from './run-board-theme-host-types'
+import type { Grid, ThemeApi, ThemePart } from './run-board-theme-host-types'
 
-// The deviant theme's ending: the board freezes grey under the mission stamp, typed two letters a
-// tick; the board leaves in columns from the bottom up; the empty screen holds about a second.
+// The deviant theme's ending, a results screen: the board freezes grey and the OPENING's light bars
+// close over it; on the ice-white screen the results stand (`run-board-theme-deviant-results.ts`);
+// the bars go dark one by one and the empty screen holds a second.
 
-const { put, repeated, restyle } = run_board_theme_host_grid
+const { bg, restyle } = run_board_theme_host_grid
 const { hash } = run_board_theme_host_hash
-const { BLANK, PAIR } = run_board_theme_draw
-const { CLOSE, RGB } = run_board_theme_deviant_data
-const { bold, ink, mix } = run_board_theme_deviant_parts
-// How long the stamp types: until its last figure lands.
-const STAMP_TYPED_MS = (CLOSE.full_after / CLOSE.pace) * run_board_theme_host_state.TICK_MS
-
-// `text` as far as `shown` letters have reached it.
-function typed(text: string, shown: number): string {
-	return text.slice(0, Math.max(0, shown))
+const { TICK_MS } = run_board_theme_host_state
+const { BLANK } = run_board_theme_draw
+const { RGB } = run_board_theme_deviant_data
+const { ice_at } = run_board_theme_deviant_opening
+const { ink, mix } = run_board_theme_deviant_parts
+const { results } = run_board_theme_deviant_results
+const { RESULTS } = run_board_theme_deviant_tables
+// The tick the last light bar has closed on: the results stand from here.
+const BARS_SHUT = RESULTS.bars_from + RESULTS.bars_spread
+const STATUS_LETTERS = RESULTS.word.length + 1 + RESULTS.rest.length
+// When the status line types, in ms from the ENDING's start.
+const STATUS_MS = {
+	from: RESULTS.status_from * TICK_MS,
+	to: (RESULTS.status_from + Math.ceil(STATUS_LETTERS / RESULTS.pace)) * TICK_MS,
 }
 
-// Where the stamp's first word starts: over the area, kept on screen.
-function stamp_at(draw: ThemeDraw): Point {
-	const { h, edge, area_top } = draw.api.layout
+// The columns whose light bar has moved by `elapsed` ticks, each bar a few columns wide at a moment
+// of its own within `spread`.
+function moved_columns(grid: Grid, elapsed: number, spread: number): Array<number> {
+	const columns = [...(grid[0] ?? []).keys()]
 
-	return {
-		y: Math.max(1, Math.min(h - CLOSE.up, area_top + CLOSE.row)),
-		x: Math.max(0, Math.floor(edge / PAIR) - CLOSE.back),
-	}
-}
-
-// The odds over the stamp, their percent landing last.
-function odds(draw: ThemeDraw, at: Point, shown: number): void {
-	const { x, y } = at
-
-	put(draw.grid, { y, x }, typed(CLOSE.odds, shown - CLOSE.odds_after), ink(RGB.soft))
-
-	if (shown > CLOSE.full_after) {
-		put(draw.grid, { y, x: x + CLOSE.full_x }, CLOSE.full, bold(RGB.white))
-	}
-}
-
-// The stamp on a patch cleared for it: the odds over it, the two-weight line, a rule under it.
-function stamp(draw: ThemeDraw): void {
-	const { grid, tick } = draw
-	const { x, y } = stamp_at(draw)
-	const shown = tick * CLOSE.pace
-	const rule = Math.min(CLOSE.rule_w, shown - CLOSE.rule_after)
-
-	for (let row = -1; row <= 1; row++) {
-		put(grid, { y: y + row, x: x - CLOSE.box_x }, repeated(' ', CLOSE.box_w), 'body')
-	}
-
-	put(grid, { y, x }, typed(CLOSE.word, shown), bold(RGB.cyan))
-	put(grid, { y, x: x + CLOSE.rest_x }, typed(CLOSE.rest, shown - CLOSE.rest_after), ink(RGB.text))
-	put(grid, { y: y + 1, x }, repeated('─', rule), ink(RGB.blue))
-	odds(draw, { y: y - 1, x }, shown)
-}
-
-function wipe_row(row: Array<Cell>, since: number): void {
-	const gone = [...row.keys()].filter(
-		(x) => since > hash(Math.floor(x / CLOSE.column), CLOSE.salt, CLOSE.salt) * CLOSE.spread,
+	return columns.filter(
+		(x) => elapsed >= hash(Math.floor(x / RESULTS.column), RESULTS.salt, RESULTS.salt) * spread,
 	)
-
-	for (const x of gone) row[x] = BLANK
 }
 
-// The board leaves in columns, each a few cells wide at a moment of its own, the lowest rows first.
-function wipe(draw: ThemeDraw, elapsed: number): void {
-	const { h } = draw.api.layout
+// The light bars close over the frozen board, bar by bar.
+function close_bars(grid: Grid, elapsed: number): void {
+	const closed = moved_columns(grid, elapsed, RESULTS.bars_spread)
 
-	for (const [y, row] of draw.grid.entries()) wipe_row(row, elapsed - (h - y) * CLOSE.rise)
-}
-
-function ending_draw(draw: ThemeDraw): void {
-	const { api, grid, tick } = draw
-	const grey = ink(mix(RGB.grey, RGB.night, CLOSE.grey))
-
-	if (tick >= CLOSE.stamp_ticks + CLOSE.wipe_ticks) {
-		api.blank_screen(grid)
-
-		return
+	for (const row of grid) {
+		for (const x of closed) row[x] = [' ', bg(ice_at(x, 1))]
 	}
+}
+
+// The light bars go dark, bar by bar, the screen left empty behind them.
+function shut_bars(grid: Grid, elapsed: number): void {
+	const dark = moved_columns(grid, elapsed, RESULTS.shut_spread)
+
+	for (const row of grid) {
+		for (const x of dark) row[x] = BLANK
+	}
+}
+
+// The board frozen grey, the light bars closing over it from `RESULTS.bars_from` on.
+function frozen(draw: ThemeDraw): void {
+	const { grid, tick } = draw
+	const grey = ink(mix(RGB.grey, RGB.night, RESULTS.grey))
 
 	restyle(
 		grid,
 		() => true,
 		() => grey,
 	)
-	stamp(draw)
-	if (tick >= CLOSE.stamp_ticks) wipe(draw, tick - CLOSE.stamp_ticks)
+	if (tick >= RESULTS.bars_from) close_bars(grid, tick - RESULTS.bars_from)
+}
+
+function ending_draw(draw: ThemeDraw): void {
+	const { api, grid, tick } = draw
+
+	if (tick >= RESULTS.shut_from + RESULTS.shut_ticks) api.blank_screen(grid)
+	else if (tick < BARS_SHUT) frozen(draw)
+	else results(draw, tick)
+
+	if (tick >= RESULTS.shut_from) shut_bars(grid, tick - RESULTS.shut_from)
 }
 
 function ending_of(api: ThemeApi): ThemePart {
 	return {
-		ticks: CLOSE.stamp_ticks + CLOSE.wipe_ticks + CLOSE.empty_ticks,
-		note: 'the board freezes grey under MISSION SUCCESSFUL · it leaves in columns · a second of empty screen',
-		// The stamp's letters, typed until its last figure lands.
-		typing: { spans: [{ from_ms: 0, to_ms: STAMP_TYPED_MS }], typed_ms: STAMP_TYPED_MS },
+		ticks: RESULTS.shut_from + RESULTS.shut_ticks + RESULTS.empty_ticks,
+		note: 'the board freezes grey · the light bars close · the results: MISSION SUCCESSFUL and the run in numbers · the bars go dark · a second of empty screen',
+		// The status line's letters, typed until its last lands.
+		typing: { spans: [{ from_ms: STATUS_MS.from, to_ms: STATUS_MS.to }], typed_ms: STATUS_MS.to },
 		draw: (grid, tick, state) => {
 			ending_draw({ api, grid, s: state, tick })
 		},
 	}
 }
 
-const run_board_theme_deviant_ending = { ending_of, typed }
+const run_board_theme_deviant_ending = { ending_of }
 
 export { run_board_theme_deviant_ending }

@@ -59,6 +59,10 @@ Read from `SKILL.md` → "2. Measure the original" (the user's workflow, 2026-11
 - Write the values as the theme's computed sounds ([sound](theme-sound.md)).
 - Give the user the play command for the original clip. You cannot hear: the user listens and
   corrects.
+- A Mac plays every sound through one resident player; frames trail by its latency
+  (`run-board-sound-resident.ts`, `run-board-sound-latency.ts`).
+- Every sound of every theme late against the screen → check the output device before the code: a
+  Bluetooth output adds its own delay; time `afplay` on a short silent file to see it (sync: #9087).
 
 ## Tooling
 

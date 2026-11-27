@@ -169,9 +169,11 @@ function triangle_row(pane: Pane, at: Point, line: string, inks: readonly [strin
 	}
 }
 
-// The triangle, its top left corner at `at`, breathing.
+// The triangle, its top left corner at `at`, breathing — its glow held in `FACE.steps` steps, so its
+// cells are rewritten as a step is crossed, not every tick.
 function triangle(pane: Pane, at: Point, tick: number, color: string): void {
-	const glow = (1 + Math.sin(tick / FACE.breath)) / PAIR
+	const breath = (1 + Math.sin(tick / FACE.breath)) / PAIR
+	const glow = Math.round(breath * FACE.steps) / FACE.steps
 	const inks = [face_ink(color, true, glow), face_ink(color, false, glow)] as const
 
 	for (const [row, line] of TRIANGLE.entries()) {
