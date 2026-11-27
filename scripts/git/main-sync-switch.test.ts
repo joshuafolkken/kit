@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { lane_reap } from '#scripts/lane/lane-reap'
+import { run_hold_live } from '#scripts/run/hold/run-hold-live'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { git_command } from './git-command'
 import { main_sync_switch, type SwitchReaders } from './main-sync-switch'
 
 // joshuafolkken/kit#9106: the root checkout, held by #9096's run with 140 uncommitted changes on its ship
@@ -12,6 +15,7 @@ const CLEAN = ''
 const SOURCE_CHANGE = ' M scripts/git/main-sync.ts'
 const LEDGER_APPEND = ' M .josh/observations/9096.md'
 const RUN_HOLD = { issue: '9096', pid: RUN_PID }
+const ROOT = '/repo'
 
 function readers(overrides: Partial<SwitchReaders> = {}): SwitchReaders {
 	return {
@@ -39,6 +43,24 @@ describe('refusing to switch a checkout in use', () => {
 		const reason = await refusal_of({ live_hold: async () => await RUN_HOLD })
 
 		expect(reason).toContain('#9096')
+	})
+})
+
+describe('reading the checkout by default', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it("reads the branch, status, root's hold and own ancestry when no readers are passed", async () => {
+		vi.spyOn(git_command, 'branch').mockResolvedValue(SHIP_BRANCH)
+		vi.spyOn(git_command, 'status').mockResolvedValue(CLEAN)
+		vi.spyOn(git_command, 'repository_root').mockResolvedValue(ROOT)
+		const live_hold = vi.spyOn(run_hold_live, 'live_hold').mockReturnValue(RUN_HOLD)
+
+		vi.spyOn(lane_reap, 'own_ancestry').mockReturnValue(new Set([OWN_PID]))
+
+		expect(await main_sync_switch.refusal(DEFAULT_BRANCH)).toContain('#9096')
+		expect(live_hold).toHaveBeenCalledWith(ROOT)
 	})
 })
 

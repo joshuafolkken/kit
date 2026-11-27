@@ -29,8 +29,12 @@ const DEFAULT_READERS: SwitchReaders = {
 	ancestry: () => lane_reap.own_ancestry(),
 }
 
+// The words a caller matches to tell this refusal from a failed sync — `run-merge-sync-held.ts` holds
+// on it as it holds on git's own local-changes refusal (joshuafolkken/kit#9034).
+const UNCOMMITTED_REFUSAL = 'uncommitted change(s) outside the observation ledger'
+
 function changes_reason(others: ReadonlyArray<string>): string {
-	return `it has ${String(others.length)} uncommitted change(s) outside the observation ledger (${others.join(', ')}), which the checkout would carry onto the default branch. Commit them or set them aside first.`
+	return `it has ${String(others.length)} ${UNCOMMITTED_REFUSAL} (${others.join(', ')}), which the checkout would carry onto the default branch. Commit them or set them aside first.`
 }
 
 function hold_reason(hold: LiveHold): string {
@@ -70,7 +74,7 @@ async function refusal(
 	return reason && `josh main:sync will not switch ${current} to ${default_branch}: ${reason}`
 }
 
-const main_sync_switch = { refusal }
+const main_sync_switch = { UNCOMMITTED_REFUSAL, refusal }
 
 export { main_sync_switch }
 export type { SwitchReaders }
