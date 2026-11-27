@@ -23,22 +23,43 @@ interface DeferRequest {
 	issue: string
 	id: string
 	target: CiteTarget
+	// This repository's `owner/repo` when the target is in another one, else empty.
+	source: string
 	reason: string
 }
 
-function target_of(raw: string, issue: string): CiteTarget {
+interface LocalizedTarget {
+	target: CiteTarget
+	source: string
+}
+
+function target_of(raw: string): CiteTarget {
 	const target = issue_cite.parse_target(raw, undefined)
 
 	if (target === undefined || !issue_number_shape.is_issue_number(target.number)) {
 		throw new Error(USAGE)
 	}
 
-	// A self-target would overwrite its own reference line with the mark, which the merge then refuses.
+	return target
+}
+
+// A target naming this repository is the unqualified one; another repository's target needs this
+// one's `owner/repo` for its reference line, resolved before anything is read or written.
+function localized(target: CiteTarget): LocalizedTarget {
+	if (target.repo === undefined) return { target, source: '' }
+	const slug = gh_spawn.get_repo_name_with_owner()
+
+	if (slug === undefined) throw new Error('josh issue:defer: could not resolve this repository')
+	if (slug.toLowerCase() !== target.repo.toLowerCase()) return { target, source: slug }
+
+	return { target: { number: target.number, repo: undefined }, source: '' }
+}
+
+// A self-target would overwrite its own reference line with the mark, which the merge then refuses.
+function refuse_self(target: CiteTarget, issue: string): void {
 	if (target.repo === undefined && target.number === issue) {
 		throw new Error('josh issue:defer: the target must be another issue')
 	}
-
-	return target
 }
 
 function positionals_of(argv: ReadonlyArray<string>): ReadonlyArray<string> {
@@ -54,7 +75,11 @@ function request_of(argv: ReadonlyArray<string>): DeferRequest {
 
 	if (!issue_number_shape.is_issue_number(issue)) throw new Error(USAGE)
 
-	return { issue, id, target: target_of(target, issue), reason: reason.join(' ') }
+	const local = localized(target_of(target))
+
+	refuse_self(local.target, issue)
+
+	return { issue, id, ...local, reason: reason.join(' ') }
 }
 
 function target_name(target: CiteTarget): string {
@@ -70,29 +95,23 @@ async function read_body(target: CiteTarget): Promise<string> {
 	return body
 }
 
-// A reference line landing in another repository names its source as `owner/repo#N`.
-function source_repo(target: CiteTarget): string {
-	if (target.repo === undefined) return ''
-	const slug = gh_spawn.get_repo_name_with_owner()
-
-	if (slug === undefined) throw new Error('josh issue:defer: could not resolve this repository')
-
-	return slug
-}
-
-async function carry(request: DeferRequest, repo: string): Promise<void> {
-	const { target } = request
+async function carry(request: DeferRequest): Promise<void> {
+	const { target, source } = request
 	const target_body = await read_body(target)
 
 	if (acceptance_map_defer.carries(target_body, request.id)) return
-	const line = acceptance_map_defer.reference_line(request.issue, request.id, request.reason, repo)
+	const line = acceptance_map_defer.reference_line(
+		request.issue,
+		request.id,
+		request.reason,
+		source,
+	)
 	const updated = `${target_body.trimEnd()}\n\n${line}\n`
 
 	await git_gh_command.issue_edit_body(target.number, updated, target.repo)
 }
 
-// The mark and the source repository are computed first, so an unknown identifier or an unresolved
-// repository is refused before either issue is written.
+// The mark is computed first, so an unknown identifier is refused before either issue is written.
 async function apply(request: DeferRequest): Promise<void> {
 	const body = await read_body({ number: request.issue, repo: undefined })
 	const { number, repo: target_repo = '' } = request.target
@@ -101,9 +120,8 @@ async function apply(request: DeferRequest): Promise<void> {
 		request.id,
 		issue_cite.plain_for('github', number, target_repo),
 	)
-	const repo = source_repo(request.target)
 
-	await carry(request, repo)
+	await carry(request)
 	if (updated !== body) await git_gh_command.issue_edit_body(request.issue, updated)
 	console.info(`Acceptance criterion ${request.id} deferred to ${target_name(request.target)}`)
 }

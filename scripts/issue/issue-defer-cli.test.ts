@@ -73,6 +73,19 @@ describe('issue_defer_cli.run', () => {
 		expect(await issue_defer_cli.run([ISSUE, FIRST, `#${TARGET}`, 'split'])).toBe(0)
 		expect(written(TARGET)).toBeUndefined()
 	})
+})
+
+describe('issue_defer_cli.run — a repository-qualified target', () => {
+	it('treats a target naming this repository as an unqualified one', async () => {
+		expect(await issue_defer_cli.run([ISSUE, FIRST, `o/r#${TARGET}`, 'r'])).toBe(0)
+
+		expect(written(ISSUE)).toContain(`- [ ] First → #${TARGET}\n`)
+		expect(issue_edit_body).toHaveBeenCalledWith(
+			TARGET,
+			`${TARGET_BODY}\n\n引き継ぎ: #${ISSUE} \`${FIRST}\` r\n`,
+			undefined,
+		)
+	})
 
 	it('defers to another repository, naming this one in the reference line', async () => {
 		answer({ [ISSUE]: BODY, [CROSS_NUMBER]: TARGET_BODY })
@@ -96,6 +109,7 @@ describe('issue_defer_cli.run refusals', () => {
 			['0', FIRST, TARGET, 'r'],
 			[ISSUE, FIRST, 'x', 'r'],
 			[ISSUE, FIRST, `#${ISSUE}`, 'self'],
+			[ISSUE, FIRST, `O/R#${ISSUE}`, 'self, this repository named'],
 		].map((args) => ({ args })),
 	)('refuses invalid arguments $args without reading GitHub', async ({ args }) => {
 		expect(await issue_defer_cli.run(args)).toBe(1)
@@ -107,12 +121,12 @@ describe('issue_defer_cli.run refusals', () => {
 		expect(issue_edit_body).not.toHaveBeenCalled()
 	})
 
-	it('refuses a cross-repository target when this repository is unresolved, before any write', async () => {
+	it('refuses a cross-repository target when this repository is unresolved, before any read', async () => {
 		answer({ [ISSUE]: BODY, [CROSS_NUMBER]: TARGET_BODY })
 		get_repo_name_with_owner.mockReturnValue(undefined)
 
 		expect(await issue_defer_cli.run([ISSUE, FIRST, `${CROSS_REPO}#${CROSS_NUMBER}`, 'r'])).toBe(1)
-		expect(issue_edit_body).not.toHaveBeenCalled()
+		expect(issue_get_body).not.toHaveBeenCalled()
 	})
 
 	it('refuses an unreadable target without writing', async () => {
