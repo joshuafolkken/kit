@@ -1,6 +1,7 @@
 import { existsSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { main_sync_switch } from '#scripts/git/main-sync-switch'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_transition_guards } from '#scripts/lane/lane-transition-guards'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
@@ -55,6 +56,12 @@ describe('run_merge_sync_held.is_refusal (joshuafolkken/kit#9034)', () => {
 		'error: Your local changes to the following files would be overwritten by merge',
 		REFUSAL,
 	])('reads git’s local-changes refusal: %s', (text) => {
+		expect(run_merge_sync_held.is_refusal(text)).toBe(true)
+	})
+
+	it('reads main:sync’s uncommitted-changes switch refusal (joshuafolkken/kit#9106)', () => {
+		const text = `josh main:sync will not switch 1-lane to main: it has 1 ${main_sync_switch.UNCOMMITTED_REFUSAL} (a.ts), which the checkout would carry onto the default branch.`
+
 		expect(run_merge_sync_held.is_refusal(text)).toBe(true)
 	})
 

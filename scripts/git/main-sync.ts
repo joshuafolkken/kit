@@ -4,6 +4,7 @@ import { git_command } from './git-command'
 import { git_worktree } from './git-worktree'
 import { gone_branch, type PruneResult } from './gone-branch'
 import { lockfile_sync } from './lockfile-sync'
+import { main_sync_switch } from './main-sync-switch'
 import { repository_lock } from './repository-lock'
 
 // `josh main:sync` (`josh ms`) — return this checkout to the default branch and pull,
@@ -94,9 +95,7 @@ async function reinstall(root: string): Promise<number> {
 	return FAILURE_EXIT_CODE
 }
 
-async function synchronize(): Promise<number> {
-	const default_branch = await git_command.get_default_branch()
-
+async function switch_and_pull(default_branch: string): Promise<number> {
 	await fast_forward_quietly(default_branch)
 	await git_command.checkout(default_branch)
 	await git_command.pull_fast_forward()
@@ -104,6 +103,18 @@ async function synchronize(): Promise<number> {
 	console.info(default_branch)
 
 	return await reinstall(await git_command.repository_root())
+}
+
+// A checkout in use — uncommitted work, or another run's live hold — is never switched
+// (`main-sync-switch.ts`); the refusal names why, and nothing is fetched, checked out or pulled.
+async function synchronize(): Promise<number> {
+	const default_branch = await git_command.get_default_branch()
+	const refusal = await main_sync_switch.refusal(default_branch)
+
+	if (refusal === undefined) return await switch_and_pull(default_branch)
+	console.error(refusal)
+
+	return FAILURE_EXIT_CODE
 }
 
 // **One sync of a checkout at a time** (joshuafolkken/kit#7826). The ship's followup and the backlogrun

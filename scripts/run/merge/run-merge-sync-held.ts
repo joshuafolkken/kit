@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { main_sync_switch } from '#scripts/git/main-sync-switch'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -68,10 +69,13 @@ async function hold(child: string): Promise<void> {
 	if (stamp_file.create_stamp(target, { child, at: new Date().toISOString() })) await notify(text)
 }
 
-// **Only git's own local-changes refusal holds** — "would be overwritten by checkout / merge", for
-// tracked and untracked files alike. A dirty tree alone is no such refusal: a ledger line `main:sync`
+// **Only a local-changes refusal holds** — git's own "would be overwritten by checkout / merge", for
+// tracked and untracked files alike, or `main:sync`'s refusal to switch a branch carrying uncommitted
+// work (joshuafolkken/kit#9106). A dirty tree alone is no such refusal: a ledger line `main:sync`
 // carries over leaves it dirty, and a transient failure on it still ends the run.
 function is_refusal(error_output: string): boolean {
+	if (error_output.includes(main_sync_switch.UNCOMMITTED_REFUSAL)) return true
+
 	return LOCAL_CHANGES_REFUSAL.test(error_output)
 }
 

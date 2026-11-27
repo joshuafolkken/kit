@@ -81,13 +81,6 @@ function pull_request_body(archived_files: number): string {
 	].join('\n')
 }
 
-function status_paths(status_output: string): ReadonlyArray<string> {
-	return status_output
-		.split('\n')
-		.filter((line) => line.trim().length > 0)
-		.map((line) => observation_ledger.status_path(line))
-}
-
 // **Single-sourced with `pnpm josh followup`'s pre-flush short-circuit**:
 // the ledger-change test lives in `observation-ledger.ts`, so the two callers cannot drift.
 function has_ledger_change(status_output: string): boolean {
@@ -95,9 +88,7 @@ function has_ledger_change(status_output: string): boolean {
 }
 
 function other_changed_paths(status_output: string): ReadonlyArray<string> {
-	return status_paths(status_output).filter(
-		(file_path) => !observation_ledger.is_ledger_path(file_path),
-	)
+	return observation_ledger.other_paths(status_output)
 }
 
 // **The branch a failed flush leaves behind holds the only copy of those lines**, because the working
