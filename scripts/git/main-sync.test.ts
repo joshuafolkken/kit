@@ -24,6 +24,9 @@ vi.mock('./lockfile-sync', () => ({
 	lockfile_sync: { reinstall_if_stale: vi.fn() },
 }))
 
+// Which checkouts are in use is pinned in `main-sync-switch.test.ts`; this pins that a refusal stops the sync.
+vi.mock('./main-sync-switch', () => ({ main_sync_switch: { refusal: vi.fn() } }))
+
 // The real lock at a path of each test's own, so a test never contends with a live `josh ms`.
 vi.mock('./repository-lock', async (import_original) => {
 	const { repository_lock: actual } = await import_original<Record<'repository_lock', object>>()
@@ -36,6 +39,7 @@ const { repository_lock } = await import('./repository-lock')
 const { gone_branch } = await import('./gone-branch')
 const { lockfile_sync } = await import('./lockfile-sync')
 const { main_sync } = await import('./main-sync')
+const { main_sync_switch } = await import('./main-sync-switch')
 
 const MAIN_GIT_DIRECTORY = '/repo/.git'
 const LANE_GIT_DIRECTORY = '/repo/.git/worktrees/1535'
@@ -58,8 +62,10 @@ const REPOSITORY_ROOT = '/repo'
 const INSTALL_OUTPUT = 'ERR_PNPM_OUTDATED_LOCKFILE'
 const create_directory = temporary_directory()
 
+// The main work tree, with nothing in use that would refuse the switch.
 function in_main_work_tree(): void {
 	git_directories.mockResolvedValue([MAIN_GIT_DIRECTORY, MAIN_GIT_DIRECTORY])
+	vi.mocked(main_sync_switch.refusal).mockResolvedValue(undefined)
 }
 
 // What follows the pull — nothing to prune and an unchanged lock — so a test changes only its own step.
@@ -86,6 +92,19 @@ beforeEach(() => {
 	)
 	with_a_quiet_tail()
 	in_main_work_tree()
+})
+
+// joshuafolkken/kit#9106: a held root checkout with 140 uncommitted changes was switched to the default
+// branch, its changes in tow.
+describe('refusing to switch a checkout in use', () => {
+	it('prints the refusal and asks git for no checkout and no pull', async () => {
+		vi.mocked(main_sync_switch.refusal).mockResolvedValue(CHECKOUT_FAILURE)
+
+		expect(await main_sync.run(NO_ARGUMENTS)).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(CHECKOUT_FAILURE)
+		expect(checkout).not.toHaveBeenCalled()
+		expect(pull).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#3463: a pull that added a dependency left `node_modules` behind the lock, and every
