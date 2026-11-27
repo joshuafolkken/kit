@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_gh_pr_auto_merge } from '#scripts/gh/git-gh-pr-auto-merge'
 import { git_command } from '#scripts/git/git-command'
@@ -6,7 +6,7 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 import { git_worktree } from '#scripts/git/git-worktree'
 import { git_stash, type Selection } from '#scripts/git/stash/git-stash'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_close } from './lane-close'
 import { lane_install } from './lane-install'
 import { lane_open, type OpenOutcome } from './lane-open'
@@ -88,9 +88,11 @@ interface TwoLanes {
 	second: LaneInfo
 }
 
-// Two holders rather than module-level bindings: `unicorn/no-top-level-assignment-in-function`
+// Holders rather than module-level bindings: `unicorn/no-top-level-assignment-in-function`
 // refuses a hook assigning to a top-level `let`. The workspace is held apart from the lanes so that
-// a `beforeEach` failing *after* the workspace exists still has something to tear down.
+// a hook failing *after* the workspace exists still has something to tear down. The template holds
+// the base repository every fixture copies.
+const template: { current: FixtureWorkspace | undefined } = { current: undefined }
 const workspace: { current: FixtureWorkspace | undefined } = { current: undefined }
 const state: { current: TwoLanes | undefined } = { current: undefined }
 
@@ -212,12 +214,20 @@ async function open_both_lanes(): Promise<[LaneInfo, LaneInfo]> {
 	return [opened_lane(first), opened_lane(second)]
 }
 
-beforeEach(async () => {
+// The base repository is built with git once per file and copied into each fixture in process: the
+// copy is the same repository, and the lanes opened from it are what each case is about.
+function template_repository(): string {
+	if (template.current === undefined) throw new Error('the template repository was not built')
+
+	return path.join(template.current.workspace, PRIMARY)
+}
+
+async function open_fixture(): Promise<void> {
 	workspace.current = git_fixture_workspace.open_workspace('lane-concurrency-')
 
 	const repository_root = path.join(workspace.current.workspace, PRIMARY)
 
-	await build_repository(repository_root)
+	cpSync(template_repository(), repository_root, { preserveTimestamps: true, recursive: true })
 	// Blank counts as unset, so the lane root is the default sibling of the fixture repository and the
 	// lanes land inside the workspace. Stubbed rather than deleted so it is restored afterwards.
 	vi.stubEnv(lane_paths.LANE_ROOT_KEY, '')
@@ -227,12 +237,12 @@ beforeEach(async () => {
 	const [first, second] = await open_both_lanes()
 
 	state.current = { first, repository_root, second }
-}, TIMEOUT_MS)
+}
 
-// Unguarded on purpose. A `beforeEach` that failed — which is what this file *doing its job* looks
+// Unguarded on purpose. An open that failed — which is what this file *doing its job* looks
 // like — must still leave the process's directory, environment, spies and temp tree as it found
 // them, or the failure spreads to every later file in the same worker.
-afterEach(async () => {
+async function close_fixture(): Promise<void> {
 	const opened = workspace.current
 
 	state.current = undefined
@@ -240,9 +250,31 @@ afterEach(async () => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 	if (opened !== undefined) await git_fixture_workspace.close_workspace(opened)
+}
+
+// A fresh pair per case for every describe whose cases move a lane, its index or the shared stash.
+function fresh_lanes(): void {
+	beforeEach(open_fixture, TIMEOUT_MS)
+	afterEach(close_fixture, TIMEOUT_MS)
+}
+
+beforeAll(async () => {
+	template.current = git_fixture_workspace.open_workspace('lane-concurrency-template-')
+	await build_repository(template_repository())
+}, TIMEOUT_MS)
+
+afterAll(async () => {
+	const built = template.current
+
+	template.current = undefined
+	if (built !== undefined) await git_fixture_workspace.close_workspace(built)
 }, TIMEOUT_MS)
 
 describe('two lanes opened at the same time', () => {
+	// One pair for both cases: each only reads what the concurrent open handed back.
+	beforeAll(open_fixture, TIMEOUT_MS)
+	afterAll(close_fixture, TIMEOUT_MS)
+
 	it(
 		'gives each lane its own seat, branch and work tree, and releases both seat locks',
 		() => {
@@ -272,6 +304,8 @@ describe('two lanes opened at the same time', () => {
 })
 
 describe('what git and the lane registry see', () => {
+	fresh_lanes()
+
 	it(
 		'reads both lanes back with the seat and ports each one was handed',
 		async () => {
@@ -291,6 +325,8 @@ describe('what git and the lane registry see', () => {
 })
 
 describe('the head and index each lane holds', () => {
+	fresh_lanes()
+
 	// Not "two directories are two directories" — that is a property of the filesystem and would stay
 	// green if `worktree add` were a `mkdirSync`. Staging inside one lane is what a shared index would
 	// make visible in the other, which is the shape joshuafolkken/kit#1530 already found once.
@@ -312,6 +348,8 @@ describe('the head and index each lane holds', () => {
 })
 
 describe('closing one of two open lanes', () => {
+	fresh_lanes()
+
 	it(
 		'leaves the other lane whole',
 		async () => {
@@ -333,6 +371,8 @@ describe('closing one of two open lanes', () => {
 })
 
 describe('closing with an unreadable process listing', () => {
+	fresh_lanes()
+
 	it.each(['directories', 'marks'] as const)(
 		'keeps the close incomplete when the %s listing is refused',
 		async (listing) => {
@@ -354,6 +394,8 @@ describe('closing with an unreadable process listing', () => {
 })
 
 describe('the stash stack two lanes share', () => {
+	fresh_lanes()
+
 	// The premise of joshuafolkken/kit#2050, asserted rather than assumed: the stack is one stack, and
 	// the lane that parked last owns its top. A positional pop from the first lane would take the
 	// second lane's work into the first lane's tree. Matched through the production rule rather than
@@ -394,6 +436,8 @@ describe('the stash stack two lanes share', () => {
 })
 
 describe('a message no lane parked under', () => {
+	fresh_lanes()
+
 	// The refusal is paired with the match on the same entries, so a matcher that answered `none` to
 	// everything could not pass this by refusing.
 	it(
