@@ -64,6 +64,21 @@ describe('run_board_motion_check.motion_failures — the cell budget', () => {
 			`${LABEL} frame 0: cell-budget — 656 units for 2 changed cells, over 144`,
 		])
 	})
+
+	it('budgets a link mark as written, however long its URL', () => {
+		const url = `https://example.com/${'a'.repeat(CELL_UNITS)}`
+		const linked = `\u{1B}]8;id=josh-run-board;${url}\u{1B}\\${'x'.repeat(CELL_UNITS * 2)}\u{1B}]8;;\u{7}`
+		const frames = [frame_of(0, linked, 2)]
+
+		expect(motion_failures({ label: LABEL, frames, due_ms: [0] })).toStrictEqual([])
+	})
+
+	it('still fails cells over budget beside a link mark', () => {
+		const linked = `\u{1B}]8;;https://example.com\u{7}${'x'.repeat(CELL_UNITS * 2 + 1)}`
+		const frames = [frame_of(0, linked, 2)]
+
+		expect(motion_failures({ label: LABEL, frames, due_ms: [0] })).toHaveLength(1)
+	})
 })
 
 // `count` frames, each writing one unit more than the last for the same one changed cell.

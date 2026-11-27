@@ -15,6 +15,11 @@ const CELL_UNITS = 64
 const FRAME_UNITS = 16
 // How many frames in a row may each write more than the last for no more changed cells.
 const GROWTH_RUN = 8
+// joshuafolkken/kit#9069: an OSC 8 link mark, opener or closer. Its length follows its URL, not the
+// cells it covers, so it is budgeted as written rather than as part of `CELL_UNITS`.
+const ESC = '\u{1B}'
+const BEL = '\u{7}'
+const LINK_MARK = new RegExp(String.raw`${ESC}\]8;[^${BEL}${ESC}]*(?:${BEL}|${ESC}\\)`, 'gu')
 
 // A frame as the terminal took it: when it was made, its writes, and how many cells they changed.
 interface MotionFrame {
@@ -53,9 +58,17 @@ function write_failures(frame: MotionFrame, index: number): Array<Failure> {
 	return [{ frame: index, rule: 'one-write', detail: 'written outside one synchronized block' }]
 }
 
+// The units the frame's link marks take.
+function link_units_of(frame: MotionFrame): number {
+	return frame.writes.reduce(
+		(total, write) => total + [...write.matchAll(LINK_MARK)].join('').length,
+		0,
+	)
+}
+
 function budget_failures(frame: MotionFrame, index: number): Array<Failure> {
 	const units = units_of(frame)
-	const budget = FRAME_UNITS + frame.changed * CELL_UNITS
+	const budget = FRAME_UNITS + frame.changed * CELL_UNITS + link_units_of(frame)
 
 	if (units <= budget) return []
 	const detail = `${String(units)} units for ${String(frame.changed)} changed cells, over ${String(budget)}`
