@@ -126,6 +126,20 @@ describe('measure_declaration.problems on a measurement Issue criterion', () => 
 		expect(measure_declaration.problems(estimated_body(0, '計測結果を記録する'))).toStrictEqual([])
 	})
 
+	it('refuses a branching criterion on a body that declares its measurement (ac-68cf7791)', () => {
+		const body = `${DECLARED}\n## 受け入れ条件\n\n- [ ] 超えた場合は後続を起票する\n`
+
+		expect(measure_declaration.problems(body)).toStrictEqual([
+			expect.stringContaining('超えた場合は'),
+		])
+	})
+
+	it('accepts a criterion that only names a case on a measurement Issue (ac-68cf7791)', () => {
+		expect(measure_declaration.problems(estimated_body(0, '空の場合の値を記録する'))).toStrictEqual(
+			[],
+		)
+	})
+
 	it('does not refuse a branching criterion on a non-measurement Issue (ac-68cf7791)', () => {
 		const body = estimated_body(3, '失敗した場合は再試行する')
 

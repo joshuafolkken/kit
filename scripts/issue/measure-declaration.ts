@@ -138,7 +138,7 @@ function without_premises(body: string): string {
 // joshuafolkken/kit#8955: a measurement Issue whose criteria branch on the result ("if any differ, file
 // a follow-up" / "if none do, close") always leaves the side that did not happen unchecked, so neither
 // `issue:measured` nor `run:cut --deliverable` reads it done. Its criteria record the result only.
-const BRANCH_PATTERN = /場合|あれば|なければ/u
+const BRANCH_PATTERN = /場合は|あれば|なければ/u
 
 function is_measurement(body: string): boolean {
 	return is_stated(body) || size_estimate.declared_files(body) === 0
