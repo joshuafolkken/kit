@@ -31,18 +31,20 @@ function row_prefix(): string {
 	return issue_body_keys.prefix('adopt_branch')
 }
 
-// The value after the key on every row line, in either column.
+// The key `raw` starts with, in either column; `undefined` when it is not a row line.
+function prefix_of(raw: string): string | undefined {
+	const text = raw.trim()
+
+	return issue_body_keys.prefix_variants('adopt_branch').find((prefix) => text.startsWith(prefix))
+}
+
+// The value after the key on every row line.
 function values_of(body: string): ReadonlyArray<string> {
-	const prefixes = issue_body_keys.prefix_variants('adopt_branch')
+	return body.split(NEWLINE).flatMap((raw) => {
+		const found = prefix_of(raw)
 
-	return body
-		.split(NEWLINE)
-		.map((raw) => raw.trim())
-		.flatMap((text) => {
-			const found = prefixes.find((prefix) => text.startsWith(prefix))
-
-			return found === undefined ? [] : text.slice(found.length).trim()
-		})
+		return found === undefined ? [] : raw.trim().slice(found.length).trim()
+	})
 }
 
 function value_read(value: string): AdoptRead {
@@ -107,6 +109,25 @@ function with_row(body: string, row: AdoptBranch): { body: string } | { problem:
 	return { body: lines.join(NEWLINE) }
 }
 
+// `body` naming `row` (`issue:wip`, joshuafolkken/kit#9153): the present row rewritten in place, the row
+// inserted when it has none, and a problem when the present one is malformed.
+function with_rewritten_row(
+	body: string,
+	row: AdoptBranch,
+): { body: string } | { problem: string } {
+	const present = read(body)
+
+	if (present.kind === 'malformed') return { problem: present.note }
+
+	if (present.kind === 'none') return with_row(body, row)
+
+	const lines = body.split(NEWLINE)
+
+	lines[lines.findIndex((raw) => prefix_of(raw) !== undefined)] = line(row)
+
+	return { body: lines.join(NEWLINE) }
+}
+
 // The `JOSH_HANDOFF_WIP` value `run:handoff --wip` hands its child: `wip/<name>@<sha>`.
 function from_environment(value: string | undefined): AdoptBranch | undefined {
 	const at = value?.lastIndexOf('@') ?? -1
@@ -161,6 +182,7 @@ const issue_body_adopt_branch = {
 	read_issue,
 	to_environment,
 	with_handoff_row,
+	with_rewritten_row,
 	with_row,
 }
 

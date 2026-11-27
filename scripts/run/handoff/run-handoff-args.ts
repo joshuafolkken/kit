@@ -134,6 +134,7 @@ const run_handoff_args = {
 	RETROSPECTIVE_KEYWORD,
 	WORKFLOW_KEYWORDS,
 	parse,
+	wip_branch,
 }
 
 export type { HandoffArguments, WorkflowHandoff, WorkflowKeyword }

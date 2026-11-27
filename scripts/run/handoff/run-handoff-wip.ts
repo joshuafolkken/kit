@@ -65,8 +65,14 @@ async function edited(issue: string, body: string): Promise<string | undefined> 
 	}
 }
 
-// `row` written into `issue`'s live body; the body is edited only when the row changes it.
-async function write_row(issue: string, row: AdoptBranch): Promise<string | undefined> {
+type RowCompose = (body: string, row: AdoptBranch) => { body: string } | { problem: string }
+
+// `row` written into `issue`'s live body by `compose`; the body is edited only when the row changes it.
+async function composed_row(
+	issue: string,
+	row: AdoptBranch,
+	compose: RowCompose,
+): Promise<string | undefined> {
 	const fetched = await git_gh_issue_read.issue_get_body_classified(issue)
 
 	if (fetched.kind !== 'read') {
@@ -74,11 +80,21 @@ async function write_row(issue: string, row: AdoptBranch): Promise<string | unde
 	}
 
 	const body = fetched.text ?? ''
-	const written = issue_body_adopt_branch.with_row(body, row)
+	const written = compose(body, row)
 
 	if ('problem' in written) return written.problem
 
 	return written.body === body ? undefined : await edited(issue, written.body)
+}
+
+// `row` added to `issue`'s body; a problem when the body names another row.
+async function write_row(issue: string, row: AdoptBranch): Promise<string | undefined> {
+	return await composed_row(issue, row, issue_body_adopt_branch.with_row)
+}
+
+// `row` replacing `issue`'s present row, or added when it has none (`issue:wip`, joshuafolkken/kit#9153).
+async function rewrite_row(issue: string, row: AdoptBranch): Promise<string | undefined> {
+	return await composed_row(issue, row, issue_body_adopt_branch.with_rewritten_row)
 }
 
 async function placed(
@@ -123,6 +139,6 @@ function with_environment(
 	return { ...request, env: { ...request.env, ...environment } }
 }
 
-const run_handoff_wip = { environment_of, resolve_commit, with_environment, write_row }
+const run_handoff_wip = { environment_of, resolve_commit, rewrite_row, with_environment, write_row }
 
 export { run_handoff_wip }

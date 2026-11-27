@@ -142,6 +142,22 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'issue:wip': {
+		script: 'scripts/issue/issue-wip-cli.ts',
+		description: "Rewrite an issue's adopt-branch row to the commit a wip branch names now",
+		category: 'AI tools',
+		reference: ['<issue> --wip <name>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '9153 --wip review-fix' }],
+			flags: [
+				{
+					names: ['--wip <name>'],
+					description:
+						'the `wip/<name>` branch (prefix optional), resolved with `git rev-parse`; one naming no commit is refused. The row is added when the body has none.',
+				},
+			],
+		},
+	},
 	'issue:plan': {
 		script: 'scripts/issue/issue-plan-cli.ts',
 		description:
