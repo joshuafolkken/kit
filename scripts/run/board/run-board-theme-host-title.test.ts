@@ -32,13 +32,13 @@ function title_styles(board: string): Array<string> {
 	return row.slice(NAME_X, NAME_X + board.length).map((cell) => cell[1])
 }
 
-// The base with its run waiting on a person: ✋ as a theme draws it, two letters and a blank, its name
-// one column further right.
+// The base with its run waiting on a person: ✋ as a theme draws it, its two-column shape and a blank,
+// its name one column further right.
 function waiting_api(): ThemeApi {
 	const [first = [], ...rest] = HOST.api.board
 	const mark: Array<Cell> = [
-		['H', 'body'],
-		['U', 'body'],
+		['!', 'body'],
+		['?', 'body'],
 		[' ', 'body'],
 	]
 
@@ -59,9 +59,9 @@ describe('board name place', () => {
 	})
 
 	// A two-column mark moved the base's name a column right: the theme's name drawn at the usual
-	// column left the mark touching it and the base's last letter after it (`HUjosh-detroitt`).
+	// column left the mark touching it and the base's last letter after it (`!?josh-detroitt`).
 	it('draws the name a column further right after a two-column mark', () => {
-		expect(title_text(waiting_api(), LONG_NAME).startsWith(`HU ${LONG_NAME}`)).toBe(true)
+		expect(title_text(waiting_api(), LONG_NAME).startsWith(`!? ${LONG_NAME}`)).toBe(true)
 	})
 })
 

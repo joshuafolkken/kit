@@ -31,7 +31,7 @@ const INTENSITY_OFF = `${ESCAPE}[22m`
 const TABLE: Readonly<Record<Tone, ReadonlyArray<string>>> = {
 	alert: ['P1', 'FL', '[]', 'XX', '!!', 'XP', 'RL', '##', 'NO', 'HT', 'X'],
 	caution: ['P2', '??', 'JG', '[_', 'LC', 'T+', '!', '<<'],
-	human: [String.raw`\O`, 'HU', 'Q?'],
+	human: [String.raw`\O`, 'HU', '!?', 'Q?'],
 	done: ['OK', '|>', 'MG', 'SH', '^^', 'AC', '+', 'V'],
 	running: ['>>', 'IV', 'PL', 'BD', 'RV', 'CM', 'R2', 'RP'],
 	idle: ['ZZ', '..', '||', '>|', 'OF', '<X', 'OO', '<-', '>=', '║'],
@@ -60,6 +60,7 @@ const SHAPES: ReadonlyArray<readonly [string, string]> = [
 	['⏸', '║'],
 	['📅', '>='],
 	['🙋', String.raw`\O`],
+	['✋', '!?'],
 	['📁', '[+'],
 	['🔭', 'OO'],
 	['🔁', '<<'],
