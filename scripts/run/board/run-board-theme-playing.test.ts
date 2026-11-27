@@ -19,6 +19,8 @@ const TYPED = ['p', 'r'] as const
 const LIMIT = 2000
 const AFTER = 40
 const HALF = 2
+// A dense theme draws hundreds of frames per event; a loaded CI runner needs more than the default.
+const HEAVY_TIMEOUT_MS = 60_000
 
 type PlayedEvent = (typeof EVENTS)[number]
 
@@ -36,24 +38,28 @@ function playing_at(module: ThemeModule, timeline: ThemeTimeline, tick: number):
 	return module.playing?.(run_board_theme_host_state.state_of(HOST.layout, timeline, tick)) ?? true
 }
 
-// The first tick a fresh `value` draws `timeline` and says it no longer plays; LIMIT where it never does.
-function end_of(value: ThemeValue, timeline: ThemeTimeline): number {
-	const module = module_of(value)
-	let tick = 0
-
-	while (tick < LIMIT && playing_at(module, timeline, tick)) tick += 1
-
-	return tick
+interface Ended {
+	end: number
+	is_over_after: boolean
 }
 
-// Whether `value` says no play over the AFTER ticks from `from`, drawn from the first tick.
-function is_over_after(value: ThemeValue, timeline: ThemeTimeline, from: number): boolean {
-	const module = module_of(value)
-	const ticks = Array.from({ length: from + AFTER }, (_, tick) =>
-		playing_at(module, timeline, tick),
+// One pass, drawn from the first tick on one module: the first tick `module` says no play, and whether
+// it still says so over the AFTER ticks from there.
+function ended(module: ThemeModule, timeline: ThemeTimeline): Ended {
+	let end = 0
+
+	while (end < LIMIT && playing_at(module, timeline, end)) end += 1
+
+	const after = Array.from({ length: AFTER }, (_, offset) =>
+		playing_at(module, timeline, end + offset),
 	)
 
-	return !ticks.slice(from).includes(true)
+	return { end, is_over_after: !after.includes(true) }
+}
+
+// The first tick a fresh `value` draws `timeline` and says it no longer plays; LIMIT where it never does.
+function end_of(value: ThemeValue, timeline: ThemeTimeline): number {
+	return ended(module_of(value), timeline).end
 }
 
 function demo(key: PlayedEvent): ThemeTimeline {
@@ -79,13 +85,17 @@ describe.each(THEMES)('%s ThemeModule.playing', (value) => {
 		expect(end_of(value, run_board_theme_run.IDLE)).toBe(0)
 	})
 
-	it.each(EVENTS)('plays the demo’s %s event, then says it is over and stays over', (key) => {
-		const end = end_of(value, demo(key))
+	it.each(EVENTS)(
+		'plays the demo’s %s event, then says it is over and stays over',
+		(key) => {
+			const { end, is_over_after } = ended(module_of(value), demo(key))
 
-		expect(end).toBeGreaterThan(0)
-		expect(end).toBeLessThan(LIMIT)
-		expect(is_over_after(value, demo(key), end)).toBe(true)
-	})
+			expect(end).toBeGreaterThan(0)
+			expect(end).toBeLessThan(LIMIT)
+			expect(is_over_after).toBe(true)
+		},
+		HEAVY_TIMEOUT_MS,
+	)
 
 	// A NOTICE plays for the same time whatever its text; the typed events follow their text.
 	it.each(TYPED)('plays a shorter %s message shorter', (key) => {

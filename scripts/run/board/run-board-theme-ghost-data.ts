@@ -128,7 +128,7 @@ const INTRUSION = {
 	gap_salt: 77,
 	gaps: 0.35,
 	hold: 3,
-	glyphs: '0123456789ABCDEF<>/\\░▒',
+	glyphs: String.raw`0123456789ABCDEF<>/\░▒`,
 	reach: 0.42,
 	flash: 6,
 	shrink_from: 60,
