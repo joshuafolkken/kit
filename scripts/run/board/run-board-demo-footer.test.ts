@@ -12,7 +12,7 @@ import { run_board_theme_run, type ThemeRun, type ThemeValue } from './run-board
 
 const { VIEW, base_canvas, ticking_run } = run_board_theme_layer_fixture
 const KEYS_ROWS = [
-	'  KEYS  0 none   1 wopr   2 trace   3 flux   4 codec   5 nixie   6 skynet   7 magi   8 deviant   9 isac',
+	'  KEYS  0 none   1 wopr   2 trace   3 flux   4 codec   5 nixie   6 skynet   7 magi   8 rk800   9 isac',
 	'        Y ghost   s IDLE   a PROGRESS   d ROW   w NOTICE   q OPENING   e ENDING   / EXIT',
 ]
 const ITEMS = KEYS_ROWS.flatMap((row) => row.trim().split(/ {2,}/u)).filter(
@@ -85,6 +85,11 @@ describe('run_board_demo_footer.rows_of', () => {
 
 	it('names the work picked and IDLE under a blank row, then the keys in two groups of rows', () => {
 		expect(plain_rows('trace')).toStrictEqual(['', `  [2] trace - ${IDLE_TITLE}`, ...KEYS_ROWS])
+	})
+
+	it('names the Detroit board rk800, its key 8, in the title and the keys', () => {
+		expect(plain_rows('rk800')).toStrictEqual(['', `  [8] rk800 - ${IDLE_TITLE}`, ...KEYS_ROWS])
+		expect(KEYS_ROWS[0]).toContain('   8 rk800   ')
 	})
 
 	it('names no theme as none, its key 0', () => {
