@@ -118,6 +118,7 @@ const JOSH_SHARED_WRITES: ReadonlySet<string> = new Set([
 	'dogfood:commit',
 	'followup',
 	'git',
+	'git:checkpoint',
 	'init',
 	'latest',
 	'latest:corepack',

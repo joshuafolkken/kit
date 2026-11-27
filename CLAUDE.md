@@ -55,7 +55,7 @@ In order, none skipped: tests (Step 0) → refactor → `pnpm josh gate` → Pre
 
 ## Pre-commit Self-Review (mandatory)
 
-Before every `git commit`, a subagent runs `/code-review` per `prompts/review.md` — level from `pnpm josh review:brief --level-only`, no further than the round cap, then the three-way disposition (`prompts/review.md` → "Review round cap").
+Before every `git commit` but a `WIP checkpoint:`, a subagent runs `/code-review` per `prompts/review.md` — level from `pnpm josh review:brief --level-only`, no further than the round cap, then the three-way disposition (its "Review round cap").
 
 ## Git Rules
 

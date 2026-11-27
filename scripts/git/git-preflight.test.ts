@@ -25,8 +25,11 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	},
 }))
 
+vi.mock('./git-checkpoint-tip', () => ({ git_checkpoint_tip: { problem: vi.fn() } }))
+
 const { git_preflight } = await import('./git-preflight')
 const { git_command } = await import('./git-command')
+const { git_checkpoint_tip } = await import('./git-checkpoint-tip')
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 
 const UNCLASSIFIED_ISSUE = JSON.stringify({ labels: [], body: 'no classification here' })
@@ -46,6 +49,18 @@ beforeEach(() => {
 	vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
 	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue(undefined)
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
+	vi.mocked(git_checkpoint_tip.problem).mockResolvedValue(undefined)
+})
+
+describe('git_preflight.check — a checkpoint tip', () => {
+	it('reports a clean branch whose tip is a checkpoint', async () => {
+		arrange(NUMBERED_BRANCH, CLASSIFIED_ISSUE)
+		vi.mocked(git_checkpoint_tip.problem).mockResolvedValue('the branch tip is a checkpoint')
+
+		const result = git_preflight.check({ cli_input: NUMBERED_TITLE, will_open_pr: true })
+
+		await expect(result).rejects.toThrow(/the branch tip is a checkpoint/u)
+	})
 })
 
 describe('git_preflight.check — every unmet precondition in one report', () => {

@@ -103,6 +103,18 @@ describe('agent_session_role.scope_line', () => {
 	})
 })
 
+// joshuafolkken/kit#9091: a producer checkpoints its `wip/<name>` branch for its replacement.
+describe('agent_session_role.scope_line — producer checkpoints', () => {
+	it.each([
+		'each request goes to the producer at once, in arrival order',
+		'one `wip/<name>` branch named in every brief',
+		'commits a `WIP checkpoint:` when no request is left or before it stops',
+		'a replacement producer starts from that branch instead of copied files',
+	])('names the checkpoint route outside a worker lane: %s', (phrase) => {
+		expect(agent_session_role.scope_line({}, linked)).toContain(phrase)
+	})
+})
+
 // joshuafolkken/kit#7756: nothing can be filed without GitHub, so the line drops the filing plan.
 describe('agent_session_role.scope_line without GitHub', () => {
 	it('answers an imperative request with a plan only when GitHub is not linked', () => {

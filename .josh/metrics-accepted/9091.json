@@ -1,0 +1,10 @@
+{
+	"reason": "#9091: josh git:checkpoint command and its tests replace the raw-git producer checkpoint",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 141,
+		"rules.lines": 4,
+		"ai_cost.resident_bytes": 4,
+		"ai_cost.on_demand_bytes": 1008
+	}
+}
