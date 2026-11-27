@@ -22,6 +22,19 @@ describe('test_guard_record', () => {
 		)
 	})
 
+	it('names a call made outside a test as such', () => {
+		const outside = { ...expect.getState() }
+
+		Reflect.deleteProperty(outside, 'currentTestName')
+		Reflect.deleteProperty(outside, 'testPath')
+		vi.spyOn(expect, 'getState').mockReturnValue(outside)
+
+		const name = test_guard_record.current_test()
+
+		vi.restoreAllMocks()
+		expect(name).toBe('(outside a test)')
+	})
+
 	it('appends one named line to the guard log', () => {
 		const log_file = path.join(make_directory(TEMP_PREFIX), LOG_NAME)
 
