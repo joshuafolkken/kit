@@ -38,6 +38,7 @@ const OTHER = 8513
 const PLANNED = 'run:planned'
 const WITHHELD = 'dependencies are not recorded'
 const PUBLISHED_BODY = '## 概要\n\nPublished.'
+const UNLISTED = 'Cannot list the open Issues'
 const rows = new Map<number, EpicChild>()
 const publish_mock = vi.spyOn(issue_publication, 'publish')
 
@@ -166,6 +167,7 @@ describe('run_ship_prepared_children.problems — a child no epic of the run lis
 
 		expect(problems).toHaveLength(2)
 		expect(problems.join('\n')).toContain(`pnpm josh issue:plan ${String(ORPHAN)}`)
+		expect(problems[1]).toContain('`pnpm josh issue:file --publish <E>`, then re-detach the ship')
 	})
 
 	it('publishes it through the other epic that lists it', async () => {
@@ -191,9 +193,13 @@ describe('run_ship_prepared_children.problems — the open Issues it reads', () 
 	it('fails rather than passes when the open Issues cannot be listed', async () => {
 		open_mock.mockResolvedValue(undefined)
 
-		await expect(run_ship_prepared_children.problems()).rejects.toThrow(
-			'Cannot list the open Issues',
-		)
+		await expect(run_ship_prepared_children.problems()).rejects.toThrow(UNLISTED)
+	})
+
+	it('fails rather than passes when the open Issues listing is capped', async () => {
+		open_mock.mockResolvedValue({ rows: [], is_capped: true })
+
+		await expect(run_ship_prepared_children.problems()).rejects.toThrow(UNLISTED)
 	})
 })
 

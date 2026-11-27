@@ -60,10 +60,11 @@ async function listed_children(issue: number, repo: string): Promise<Array<Filed
 	return [...by_child.values()]
 }
 
-// Every open prepared child recording this run's Issue as its `origin`, whichever task list holds it.
+// Every open prepared child recording this run's Issue as its `origin`, whichever task list holds it;
+// a capped listing may hide one, so it fails like an unreadable one.
 async function origin_children(issue: number, repo: string): Promise<Array<number>> {
 	const listing = await backlog_plan_read.read_open_relations()
-	if (listing === undefined) throw new Error(UNLISTED_MESSAGE)
+	if (listing === undefined || listing.is_capped) throw new Error(UNLISTED_MESSAGE)
 
 	return backlog_pool
 		.to_children(listing.rows, repo)
