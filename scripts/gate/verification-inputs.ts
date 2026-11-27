@@ -214,11 +214,22 @@ const SPELLING: InputDeclaration = {
 	env: COMMON_ENV,
 }
 
+// **The guard tests read the repository at large** — SKILL.md pointers, byte budgets, the command list,
+// every source's colocated test — so, as for cspell, any moved file answers "run again".
+const GUARD_TESTS: InputDeclaration = {
+	is_input: is_any_file,
+	reads: 'matched',
+	is_config: configures_tests,
+	tools: ['vitest', 'typescript'],
+	env: COMMON_ENV,
+}
+
 const DECLARATIONS: ReadonlyMap<string, InputDeclaration> = new Map([
 	[gate_labels.LINT_LABEL, LINT],
 	[gate_labels.SPELL_CHECK_LABEL, SPELLING],
 	[gate_labels.TYPE_CHECK_LABEL, compiled(is_source_input)],
 	[gate_labels.EXPORTS_LABEL, compiled(is_source_input)],
+	[gate_labels.GUARD_TESTS_LABEL, GUARD_TESTS],
 	[gate_labels.METRICS_LABEL, compiled(is_metrics_input)],
 	[gate_labels.UNIT_LABEL, UNIT],
 ])

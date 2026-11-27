@@ -4,6 +4,7 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned } from './test-pinned'
 import { test_pinned_fixture, type Template } from './test-pinned-fixture'
+import { test_pinned_fixture_probe } from './test-pinned-fixture-probe'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_reach, type ReachInputs } from './test-pinned-reach'
 import { test_red } from './test-red'
@@ -36,6 +37,8 @@ const APP_THROUGH_DRIVER = `export { label, token_of } from './${DRIVER_FILE}'\n
 type Report = Awaited<ReturnType<typeof test_pinned.run>>
 
 const fixture: { current?: FixtureWorkspace; template?: Template<Report> } = {}
+
+test_pinned_fixture_probe.use_in_process()
 
 beforeEach(() => {
 	const workspace = git_fixture_workspace.open_workspace('test-pinned-reach-')
