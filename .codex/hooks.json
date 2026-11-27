@@ -20,6 +20,16 @@
 						"timeout": 10
 					}
 				]
+			},
+			{
+				"matcher": "resume",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "sh \"$( (unset GIT_DIR GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)/scripts/hooks/run-hook.sh\" session-resume",
+						"timeout": 10
+					}
+				]
 			}
 		],
 		"UserPromptSubmit": [

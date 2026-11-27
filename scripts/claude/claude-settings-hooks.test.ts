@@ -287,6 +287,22 @@ describe('.claude/settings.json — clear-start model record', () => {
 	})
 })
 
+// joshuafolkken/kit#9076: a resume ends the no-filing declaration through its own silent hook, so the
+// language hook stays on `UserPromptSubmit` alone.
+describe('.claude/settings.json — resume ends the no-filing declaration', () => {
+	const wiring: HookWiring = {
+		event: 'SessionStart',
+		command: hook_launch.hook_launch_command('session-resume'),
+		minimum_timeout_seconds: STARTUP_ALLOWANCE_SECONDS,
+	}
+
+	describe_shared_hook_properties(wiring)
+
+	it('matches only a resume start', () => {
+		expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual(['resume'])
+	})
+})
+
 // `UserPromptSubmit` carries no tool matcher, so it shares the session hook's three checks and the
 // empty-matcher assertion. The language hook rides this event alone since joshuafolkken/kit#1930 —
 // wired beside the work-summary echoes — because running it on SessionStart too resolved it twice on

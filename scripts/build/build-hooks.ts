@@ -69,6 +69,7 @@ const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/hooks/stop-guard.ts', out: 'stop-guard' },
 	{ source: 'scripts/hooks/format-edited-cli.ts', out: 'format-edited' },
 	{ source: 'scripts/josh/session-language-main.ts', out: 'session-lang' },
+	{ source: 'scripts/hooks/session-resume-main.ts', out: 'session-resume' },
 	{ source: 'scripts/security/security-audit-provision-main.ts', out: 'audit-provision' },
 ]
 
