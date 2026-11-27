@@ -16,6 +16,9 @@ const UNIT_TARGET = 'test:related'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
 const EXPORTS_LABEL = 'exports'
+// Not a gate step: the guard-test slice `run:chain` and ship's pre-detach run, which records its green
+// under this label alone (`run-chain-reuse.ts`), never answering for the gate's `test:unit`.
+const GUARD_TESTS_LABEL = 'guard-tests'
 const LOCKFILE_LABEL = 'lockfile'
 
 // The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
@@ -29,6 +32,7 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 const gate_labels = {
 	BEHAVIOR_LABEL,
 	EXPORTS_LABEL,
+	GUARD_TESTS_LABEL,
 	LINT_LABEL,
 	LINT_TARGET,
 	LOCKFILE_LABEL,
