@@ -23,7 +23,8 @@ interface Lanes {
 	ends: Map<number, number>
 	// No waiting child starts before this — the end of a `run:solo` child running or placed.
 	floor: number
-	per_child: number
+	// How long a waiting child takes, by its issue — its declared size's band (joshuafolkken/kit#8954).
+	per_child: (issue: number) => number
 }
 
 interface Pending {
@@ -66,7 +67,7 @@ function place(pending: Pending, lanes: Lanes): void {
 	const busy = pending.is_solo ? lanes.free : []
 	const ready = Math.max(lanes.floor, ...waited, ...busy)
 	const lane = lane_for(lanes.free, ready)
-	const end = Math.max(lanes.free[lane] ?? 0, ready) + lanes.per_child
+	const end = Math.max(lanes.free[lane] ?? 0, ready) + lanes.per_child(pending.number)
 
 	lanes.free[lane] = end
 	lanes.ends.set(pending.number, end)

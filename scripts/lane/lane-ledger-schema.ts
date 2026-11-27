@@ -199,6 +199,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	size_schema,
 	limit_schema,
 	lane_ledger_schema_estimate.estimate_schema,
+	lane_ledger_schema_estimate.declared_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>

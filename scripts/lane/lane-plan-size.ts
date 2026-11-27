@@ -371,6 +371,7 @@ function oversize(
 }
 
 const lane_plan_size = {
+	declared_of,
 	declares,
 	is_past_cap,
 	is_waived,
