@@ -50,6 +50,7 @@ vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
 vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([])
 vi.spyOn(lane_plan_signals, 'signals_of').mockResolvedValue(QUIET)
 vi.spyOn(lane_ledger_write, 'record_split_notice').mockResolvedValue(undefined)
+vi.spyOn(lane_ledger_write, 'record_declared').mockResolvedValue(undefined)
 vi.spyOn(console, 'error').mockImplementation(vi.fn())
 vi.spyOn(console, 'info').mockImplementation(vi.fn())
 vi.spyOn(git_common_directory, 'repository').mockReturnValue(ROOT)

@@ -73,6 +73,7 @@ beforeEach(() => {
 	budgets.mockResolvedValue([])
 	signals_of.mockResolvedValue(QUIET)
 	record_split_notice.mockResolvedValue(undefined)
+	vi.spyOn(lane_ledger_write, 'record_declared').mockResolvedValue(undefined)
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_yield.mockResolvedValue(undefined)

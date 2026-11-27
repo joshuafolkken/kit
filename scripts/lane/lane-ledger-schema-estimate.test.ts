@@ -19,3 +19,18 @@ describe('lane_ledger_schema_estimate — the estimate kind, read through the en
 		expect(lane_ledger_schema.entry_schema.safeParse(entry).success).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#8954: the size an Issue declared as its lane planned.
+describe('lane_ledger_schema_estimate — the declared kind, read through the entry union', () => {
+	it('reads a declared size back as written', () => {
+		const entry = { kind: 'declared', at: AT, issue: 8954, files: 12, lines: 310 }
+
+		expect(lane_ledger_schema.entry_schema.parse(entry)).toEqual(entry)
+	})
+
+	it('rejects a declared size with no lines', () => {
+		const entry = { kind: 'declared', at: AT, issue: 8954, files: 12 }
+
+		expect(lane_ledger_schema.entry_schema.safeParse(entry).success).toBe(false)
+	})
+})
