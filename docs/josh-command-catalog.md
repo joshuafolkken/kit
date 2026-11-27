@@ -190,6 +190,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行" [--reason "<理由>"] [--distinct <N,…>]` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |
 | `josh issue:tick` | `<issue> <ac-id>...` | automation | network | Tick selected acceptance checkboxes by their plan identifiers |
+| `josh issue:wip` | `<issue> --wip <name>` | automation | network | Rewrite an issue's adopt-branch row to the commit a wip branch names now |
 | `josh lane:adopt` · `josh lad` | `<issue> \| --all` | developer | files, git, processes, network | Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched |
 | `josh lane:await` | `<issue> [<issue>...] [--owner <pid>]` | automation | files, processes | Block until any of the named in-flight lane children completes; prints which one finished |
 | `josh lane:breakdown` · `josh lbd` | `<issue> [--timeline] \| --period <days>` | maintainer | none | Print a merged lane's net time by stage, longest first, the implementation split by its tool calls |

@@ -328,6 +328,24 @@ pnpm josh issue:body 6982 --body-file .josh/tmp/issue-6982-body.md
 It prints the issue URL. It replaces a non-blank body (`issue:plan` writes a blank one). An epic body (`## Split rationale`) skips `issue:lint`; check it with `epic:check`. It is a consultation session's body rewrite route (non-GET `gh api` is refused).
 An unpublished child keeps its `issue:file --publish` record.
 
+### `josh issue:wip`
+
+<!-- usage: issue:wip -->
+
+Rewrite an issue's adopt-branch row to the commit a wip branch names now.
+
+```bash
+pnpm josh issue:wip 9153 --wip review-fix
+```
+
+**Options:**
+
+- `--wip <name>` — the `wip/<name>` branch (prefix optional), resolved with `git rev-parse`; one naming no commit is refused. The row is added when the body has none.
+
+<!-- /usage -->
+
+The one path that moves the `- 取り込むブランチ:` row after `run:handoff --wip` filed it; a running lane takes the new sha in at its next entry. A rewritten wip history (the present row's commit not an ancestor of the new one) is written with a warning: a lane that already took the old commit in keeps its changes.
+
 ### `josh issue:plan`
 
 <!-- usage: issue:plan -->

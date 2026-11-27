@@ -65,6 +65,45 @@ describe('issue_body_adopt_branch.with_row', () => {
 	})
 })
 
+describe('issue_body_adopt_branch.with_rewritten_row', () => {
+	const NEW_SHA = 'fff9999'
+	const NEW_ROW = { branch: 'wip/y', sha: NEW_SHA }
+	const NEW_LINE = `- 取り込むブランチ: wip/y @ ${NEW_SHA}`
+
+	it('rewrites the present row in place to the new branch and sha', () => {
+		const body = [...HEAD_LINES, JA_LINE, KIND_LINE, ''].join('\n')
+		const expected = [...HEAD_LINES, NEW_LINE, KIND_LINE, ''].join('\n')
+
+		expect(issue_body_adopt_branch.with_rewritten_row(body, NEW_ROW)).toStrictEqual({
+			body: expected,
+		})
+	})
+
+	it('rewrites a row written in the other column', () => {
+		const result = issue_body_adopt_branch.with_rewritten_row(`${BODY}\n${EN_LINE}`, NEW_ROW)
+
+		expect(result).toStrictEqual({ body: `${BODY}\n${NEW_LINE}` })
+	})
+
+	it('inserts the row when the body has none', () => {
+		expect(issue_body_adopt_branch.with_rewritten_row(BODY, ROW)).toStrictEqual(
+			issue_body_adopt_branch.with_row(BODY, ROW),
+		)
+	})
+
+	it('returns a body already naming the new sha as it is, so a second run changes nothing', () => {
+		const body = `${BODY}\n${JA_LINE}`
+
+		expect(issue_body_adopt_branch.with_rewritten_row(body, ROW)).toStrictEqual({ body })
+	})
+
+	it('refuses a malformed present row', () => {
+		const result = issue_body_adopt_branch.with_rewritten_row(`${BODY}\n${NO_SHA_LINE}`, ROW)
+
+		expect(result).toHaveProperty('problem')
+	})
+})
+
 describe('issue_body_adopt_branch environment', () => {
 	it('round-trips the row through the handed-down value', () => {
 		const value = issue_body_adopt_branch.to_environment(ROW)
