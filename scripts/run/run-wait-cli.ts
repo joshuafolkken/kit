@@ -1,10 +1,13 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_process_table, type ProcessTable } from '#scripts/lane/lane-process-table'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { poll } from '#scripts/lib/poll'
+import { run_wait_failures } from './run-wait-failures'
 import { run_ship_wait_cli } from './ship/run-ship-wait-cli'
 
 // `josh wait` — one foreground wait for a started child, which nothing re-invokes after its turn
@@ -33,6 +36,12 @@ interface WaitOptions {
 	sleeper: (duration_ms: number) => Promise<void>
 }
 
+// A non-`--result` wait's chunk, and the project root whose result directories `--pid` reads.
+interface TargetContext {
+	options: WaitOptions
+	root: string
+}
+
 const POLL_MS = 2000
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -52,6 +61,8 @@ const ARGUMENT_OPTIONS = {
 // A bounded check's result directory: the detached launch's log and pid, and the exit code its child
 // writes.
 const RESULT_FILES = { log: 'check.log', exit: 'exit-code', pid: 'pid' } as const
+// Where `bounded-check.ts` puts each result directory, under the project root.
+const RESULTS_DIRECTORY = 'bounded-check'
 // The line `detached_launch` stamps at the head of a log, which the check itself never printed.
 const LOG_HEADER = /^\n=== .* ===\n/u
 
@@ -137,6 +148,43 @@ function result_path(directory: string, file: keyof typeof RESULT_FILES): string
 	return path.join(directory, RESULT_FILES[file])
 }
 
+function results_root(root: string): string {
+	return path.join(root, JOSH_TMP_DIRECTORY, RESULTS_DIRECTORY)
+}
+
+function read_text(file_path: string): string {
+	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
+}
+
+function pid_written_ms(directory: string): number {
+	return statSync(result_path(directory, 'pid')).mtimeMs
+}
+
+// The result directory whose launch is `pid`, so `--pid` can read its log; `undefined` when no bounded
+// check recorded it — a process `josh wait` did not launch keeps the plain `pending` answer. A finished
+// check's directory is passed over, and of several the newest pid file wins, so a reused pid does not
+// read an earlier run's log.
+function directory_of_pid(pid: string, root: string): string | undefined {
+	const results = results_root(root)
+
+	if (!existsSync(results)) return undefined
+
+	return readdirSync(results)
+		.map((name) => path.join(results, name))
+		.filter((directory) => read_text(result_path(directory, 'pid')).trim() === pid.trim())
+		.filter((directory) => !existsSync(result_path(directory, 'exit')))
+		.toSorted((first, second) => pid_written_ms(second) - pid_written_ms(first))
+		.at(0)
+}
+
+// The failures a pending check's log already shows; no line when it shows none.
+function report_failures(directory: string | undefined): void {
+	if (directory === undefined) return
+	const summary = run_wait_failures.summary_of(read_text(result_path(directory, 'log')))
+
+	if (summary !== undefined) console.info(summary)
+}
+
 // A check killed by a signal never emits `exit`, so its launch being gone also ends the wait.
 function is_launch_gone(directory: string): boolean {
 	const pid_path = result_path(directory, 'pid')
@@ -179,15 +227,16 @@ async function collect(directory: string, options: WaitOptions): Promise<number>
 	console.info(
 		`pending — the check is still running in the background: run \`pnpm josh wait --result ${directory}\` for its output and exit code`,
 	)
+	report_failures(directory)
 
 	return PENDING_EXIT_CODE
 }
 
-function result_of(argv: ReadonlyArray<string>): string | undefined {
+function targets_of(argv: ReadonlyArray<string>): { pid?: string; result?: string } {
 	try {
-		return parseArgs({ args: [...argv], options: ARGUMENT_OPTIONS, strict: true }).values.result
+		return parseArgs({ args: [...argv], options: ARGUMENT_OPTIONS, strict: true }).values
 	} catch {
-		return undefined
+		return {}
 	}
 }
 
@@ -217,6 +266,23 @@ async function collect_result(directory: string): Promise<number> {
 	return FAILURE_EXIT_CODE
 }
 
+// A target other than `--result`: the verdict, and on `pending` what a `--pid` check's log shows failed.
+async function wait_target(
+	is_done: Probe,
+	pid: string | undefined,
+	context: TargetContext,
+): Promise<number> {
+	const verdict = await wait_for(is_done, context.options)
+
+	console.info(`wait: ${verdict} — ${NEXT_ACTION[verdict]}`)
+
+	if (pid !== undefined && verdict === VERDICT.PENDING) {
+		report_failures(directory_of_pid(pid, context.root))
+	}
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const probe = read_probe(argv)
 
@@ -226,14 +292,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const result = result_of(argv)
+	const { pid, result } = targets_of(argv)
 
 	if (result !== undefined) return await collect_result(result)
-	const verdict = await wait_for(probe, live_chunk())
 
-	console.info(`wait: ${verdict} — ${NEXT_ACTION[verdict]}`)
-
-	return SUCCESS_EXIT_CODE
+	return await wait_target(probe, pid, { options: live_chunk(), root: PROJECT_ROOT })
 }
 
 const run_wait_cli = {
@@ -241,8 +304,11 @@ const run_wait_cli = {
 	PENDING_EXIT_CODE,
 	VERDICT,
 	collect,
+	directory_of_pid,
 	live_chunk,
 	result_path,
+	results_root,
+	wait_target,
 	is_gone_in,
 	lineage,
 	probe_of,
