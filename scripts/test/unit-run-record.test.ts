@@ -55,6 +55,28 @@ describe('unit_run_record.bounded_sizing and typed_sizing — what sized the run
 		expect(sizing).toStrictEqual({ bound: 'claim', workers: 3 })
 	})
 
+	it('names the free cores when they are below the share', () => {
+		const sizing = unit_run_record.bounded_sizing({
+			share: 6,
+			free: { cores: 4, memory_workers: undefined },
+			claim: undefined,
+			available_cores: 11,
+		})
+
+		expect(sizing).toStrictEqual({ bound: 'cores', workers: 4 })
+	})
+
+	it('names the free memory when it is below the free cores', () => {
+		const sizing = unit_run_record.bounded_sizing({
+			share: 6,
+			free: { cores: 4, memory_workers: 2 },
+			claim: undefined,
+			available_cores: 11,
+		})
+
+		expect(sizing).toStrictEqual({ bound: 'memory', workers: 2 })
+	})
+
 	it('names a typed --maxWorkers count as the flag bound', () => {
 		expect(
 			unit_run_record.typed_sizing(['run', `--maxWorkers=${String(FLAG_WORKERS)}`]),
