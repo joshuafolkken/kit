@@ -7,6 +7,7 @@ import { run_board_frame_loop } from './run-board-frame-loop'
 import type { KeyInput } from './run-board-keys'
 import { run_board_live } from './run-board-live'
 import { run_board_screen } from './run-board-screen'
+import { run_board_sound_quiet } from './run-board-sound-quiet-fixture'
 import type { TypingSound } from './run-board-sound-typing'
 
 // joshuafolkken/kit#8401: every live refresh keeps the rules dimmed — the theme restyles the board's own
@@ -85,6 +86,7 @@ function is_dim_ruled(written: ReadonlyArray<Refresh>): boolean {
 	)
 }
 
+run_board_sound_quiet.each()
 afterEach(() => {
 	vi.unstubAllEnvs()
 })

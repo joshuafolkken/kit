@@ -4,6 +4,7 @@ import { run_board_fixture } from './run-board-fixture'
 import { run_board_live } from './run-board-live'
 import { run_board_sound_enter } from './run-board-sound-enter'
 import { run_board_sound_player } from './run-board-sound-player'
+import { run_board_sound_quiet } from './run-board-sound-quiet-fixture'
 import type { TypingSound } from './run-board-sound-typing'
 import { run_board_sound_wav } from './run-board-sound-wav'
 import { run_board_theme_defs } from './run-board-theme-defs'
@@ -49,6 +50,8 @@ function trill_with(
 
 	return { ...test, trill }
 }
+
+run_board_sound_quiet.each()
 
 describe('run_board_live.trill_of typed end', () => {
 	// joshuafolkken/kit#8917: the typed end sounds at the time line's own moment through `typed`, never
