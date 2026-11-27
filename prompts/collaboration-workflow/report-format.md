@@ -66,6 +66,8 @@
 - `ac-5e6f7a8b` <条件> — 見送り: #<切り出した Issue> <理由>
 ```
 
+`見送り` 行 → Issue にも `josh issue:defer`。
+
 ### PR 本文の消えたテストの処置
 
 `## 消えたテストの処置` 節の行の形（`pnpm josh review:brief` が `Removed tests` として一覧化し、`pnpm josh ship` と `pnpm josh followup` が照合する — `scripts/review/removed-tests.ts`。緑の `pnpm josh test:related` が、テスト名入りの `未記入` 行を ship 本文の下書きに足す — `scripts/run/ship/run-ship-removed-rows.ts`）:

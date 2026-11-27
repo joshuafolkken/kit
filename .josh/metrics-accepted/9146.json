@@ -1,0 +1,9 @@
+{
+	"reason": "#9146 adds issue:defer (CLI + command entry) and moves the merge's acceptance judgment to require the Issue to tick or mark each open criterion; report-format.md gains the one-line issue:defer pointer",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 247,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 160
+	}
+}
