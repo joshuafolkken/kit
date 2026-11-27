@@ -1,12 +1,21 @@
 // The pre-gate cut's next action is printed beside its verdict; other modes keep their own protocol.
-function print_next(verdict: string, issue: string): void {
+// An `unready` on `--deliverable` means the close condition is unmet: the way to close is to meet the
+// printed note and reissue the same close. A lane that did change files is no no-diff investigation and
+// has no such condition to meet, so the gate stays named as the other way out.
+function unready_action(issue: string, gate: string, deliverable: string | undefined): string {
+	if (deliverable === undefined) return gate
+
+	return `meet the condition printed above, then rerun \`pnpm josh run:cut ${issue} --deliverable ${deliverable}\`; if the lane is meant to ship its diff instead, run ${gate}.`
+}
+
+function print_next(verdict: string, issue: string, deliverable?: string): void {
 	const gate = `pnpm josh run:chain ${issue}`
 	const actions: ReadonlyMap<string, string> = new Map([
 		['cut', 'End the turn immediately.'],
 		['concluded', "End the turn; the parent's run:merge returns the lane."],
 		['under-threshold', gate],
 		['not-a-lane', gate],
-		['unready', gate],
+		['unready', unready_action(issue, gate, deliverable)],
 		['busy', 'Do not relaunch; a cut is already in flight.'],
 		['failed', gate],
 		['unknown', gate],
