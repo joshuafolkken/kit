@@ -147,6 +147,48 @@ describe('run_board_theme_layer.after_frame', () => {
 		expect(trill.set).toHaveBeenCalledWith(false, 0)
 	})
 
+	// The board is not on screen through the opening: rows a landing plan types under it sound nothing.
+	it('keeps the board’s typing out of the opening’s trill, off once its letters typed', () => {
+		const run = opening_run()
+		const trill = { set: vi.fn(), typed: vi.fn() }
+		const board = { is_on: true, left_ms: 500 }
+
+		for (const at of [400, 1200, 3000]) after_frame(run, trill, ORIGIN_MS + at, board)
+
+		expect(trill.set.mock.calls).toStrictEqual([
+			[true, undefined],
+			[false, 0],
+			[false, 0],
+		])
+		expect(trill.typed).toHaveBeenCalledOnce()
+	})
+
+	it('sounds the board’s typing from the frame the opening is over, timed by its rows', () => {
+		const run = opening_run()
+		const trill = { set: vi.fn(), typed: vi.fn() }
+
+		after_frame(run, trill, ORIGIN_MS + 1200, { is_on: true, left_ms: 500 })
+		run_board_theme_run.end_part(run)
+		after_frame(run, trill, ORIGIN_MS + 1250, { is_on: true, left_ms: 450 })
+		after_frame(run, trill, ORIGIN_MS + 1700, { is_on: false, left_ms: 0 })
+
+		expect(trill.set.mock.calls).toStrictEqual([
+			[false, 0],
+			[true, 450],
+			[false, 0],
+		])
+	})
+
+	it('keeps sounding the board’s typing through the ending, as before', () => {
+		const run = ticking_run(ORIGIN_MS)
+		const trill = { set: vi.fn(), typed: vi.fn() }
+
+		run.part = { name: 'ending', start_ms: ORIGIN_MS }
+		after_frame(run, trill, ORIGIN_MS + 200, { is_on: true, left_ms: 300 })
+
+		expect(trill.set).toHaveBeenCalledWith(true, 300)
+	})
+
 	it('keeps the board typing trill outside the opening', () => {
 		const run = ticking_run(ORIGIN_MS)
 		const trill = { set: vi.fn(), typed: vi.fn() }
