@@ -26,12 +26,14 @@ function listed_premises(
 	return listed === undefined ? undefined : measure_declaration.premises(listed.body ?? '').length
 }
 
-// joshuafolkken/kit#9125: a measurement that errored (a timeout under load, a failing command) says
-// nothing about the premise, so it is reported as an error and never counted as unmet.
+// joshuafolkken/kit#9125: a measurement that timed out under load says nothing about the premise, so it
+// is reported as an error and never counted as unmet. A command that ran and failed still stops the lane.
 function measured(premise: PremiseRun): Measured {
-	if (premise.kind === 'failed') {
+	if (premise.kind === 'failed' && premise.timed_out) {
 		return { unmet: false, value: `not measured, error (${premise.message}); re-run to check it` }
 	}
+
+	if (premise.kind === 'failed') return { unmet: true, value: `failed (${premise.message})` }
 
 	const { verdict } = premise
 	const value = 'value' in verdict ? String(verdict.value) : verdict.kind

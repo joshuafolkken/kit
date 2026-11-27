@@ -108,19 +108,26 @@ describe('lane:plan premises', () => {
 })
 
 describe('lane:plan premise measurement errors', () => {
-	it.each([
-		['a timed-out command', 'spawnSync /bin/sh ETIMEDOUT'],
-		['a failing command', 'boom'],
-	])('reports %s as a measurement error, not an unmet premise', async (_case, message) => {
-		run_command.mockReturnValue({ kind: 'failed', message })
+	it('reports a timed-out command as a measurement error, not an unmet premise', async () => {
+		run_command.mockReturnValue({ kind: 'failed', message: 'ETIMEDOUT', timed_out: true })
 
 		const code = await plan_with(HOLDS)
 
 		expect(code).toBe(0)
 		expect(info).toHaveBeenCalledWith('clear')
-		expect(printed()).toContain(`not measured, error (${message})`)
+		expect(printed()).toContain('not measured, error (ETIMEDOUT)')
 		expect(printed()).not.toContain('do not hold')
 		expect(lane_plan.read(ISSUE, directory)).toBeDefined()
+	})
+
+	it('still stops on a command that ran and failed', async () => {
+		run_command.mockReturnValue({ kind: 'failed', message: 'boom' })
+
+		const code = await plan_with(HOLDS)
+
+		expect(code).toBe(lane_plan_check.PREMISE_EXIT_CODE)
+		expect(printed()).toContain('measured failed (boom)')
+		expect(lane_plan.read(ISSUE, directory)).toBeUndefined()
 	})
 })
 

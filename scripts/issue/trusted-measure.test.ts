@@ -98,6 +98,26 @@ describe('trusted_measure execution refusal and failure', () => {
 		expect(trusted_measure.text_of(run)).toBe('(command failed: timed out)')
 		expect(console.error).toHaveBeenCalledTimes(1)
 	})
+})
+
+describe('trusted_measure measurement timeout', () => {
+	it.each([
+		[
+			'a timeout',
+			Object.assign(new Error('spawnSync /bin/sh ETIMEDOUT'), { code: 'ETIMEDOUT' }),
+			true,
+		],
+		['a failing exit', new Error('exit 1'), false],
+	])('marks %s as timed out only when the command never answered', (_case, thrown, timed_out) => {
+		vi.mocked(execSync).mockImplementation(() => {
+			throw thrown
+		})
+
+		expect(trusted_measure.run_command(COMMAND, TRUSTED)).toMatchObject({
+			kind: 'failed',
+			timed_out,
+		})
+	})
 
 	// joshuafolkken/kit#9125: a minute was shorter than `lane:value` under load.
 	it('gives a command at least five minutes', () => {

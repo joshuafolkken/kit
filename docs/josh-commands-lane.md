@@ -574,7 +574,7 @@ After its first edit it never answers `split`: its first plan past any axis prin
 
 A first plan re-runs each `- 前提:` line of its issue's trusted body (`scripts/lane/lane-plan-premise.ts`), printing `premise: <declaration> measured <value>` on stderr. One that does not hold, or an untrusted body, answers `premise`, exit 4, unrecorded: park the lane. No premise line runs nothing; a re-plan never re-runs them.
 
-A premise measurement that errors (a timeout past 300 s, a failing command) prints `not measured, error (<message>)` and is not counted as unmet: the plan goes on, and the premise can be re-run by hand.
+A premise measurement that times out (past 300 s) prints `not measured, error (<message>)` and is not counted as unmet: the plan goes on, and the premise can be re-run by hand.
 
 `--size-approval <json-file>` (optional; a re-plan never needs one): `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain. Steps: [Approve a lane plan past its size guide](./how-to/lane-size-approval.md).
 
