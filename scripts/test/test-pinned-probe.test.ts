@@ -5,6 +5,7 @@ import { test_pinned } from './test-pinned'
 import { test_pinned_cache } from './test-pinned-cache'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_fixture } from './test-pinned-fixture'
+import { test_pinned_fixture_probe } from './test-pinned-fixture-probe'
 import { test_pinned_ledger, type Skipped } from './test-pinned-ledger'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
@@ -40,6 +41,8 @@ it('labels a busy code', () => {
 `
 
 const fixture: { current?: FixtureWorkspace } = {}
+
+test_pinned_fixture_probe.use_in_process()
 
 beforeEach(() => {
 	const workspace = git_fixture_workspace.open_workspace('test-pinned-probe-')
