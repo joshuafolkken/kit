@@ -87,6 +87,15 @@ function has_pending_append(status_output: string): boolean {
 	return status_output.split('\n').some((line) => is_ledger_line(line))
 }
 
+// The changed paths a porcelain status names outside the ledger — the work a checkout or a flush must not
+// carry off, since only the ledger's appended lines are expected to ride along.
+function other_paths(status_output: string): ReadonlyArray<string> {
+	return status_output
+		.split('\n')
+		.filter((line) => line.trim().length > 0 && !is_ledger_line(line))
+		.map((line) => status_path(line))
+}
+
 const observation_ledger = {
 	has_pending_append,
 	is_ledger_file_name,
@@ -94,6 +103,7 @@ const observation_ledger = {
 	is_ledger_path,
 	ledger_file,
 	ledger_paths,
+	other_paths,
 	status_path,
 }
 

@@ -1,0 +1,8 @@
+{
+	"reason": "Skill docs point a run:handoff child at the hand-off into its lane instead of a root fallback the new run:entry refusal blocks (#9103 bug 1)",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 55,
+		"ai_cost.on_demand_bytes": 55
+	}
+}

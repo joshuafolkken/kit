@@ -7,6 +7,7 @@ import { run_startup } from '#scripts/run/startup/run-startup'
 import type { StartupEntry } from '#scripts/run/startup/run-startup-schema'
 import { run_startup_store } from '#scripts/run/startup/run-startup-store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { backlog_drive_holder } from './backlog-drive-holder'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_split_unit } from './backlog-drive-split-unit'
@@ -56,6 +57,28 @@ beforeEach(() => {
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(backlog_measure_close, 'outcome').mockResolvedValue('launch')
 	vi.spyOn(backlog_drive_split_unit, 'run').mockResolvedValue('launch')
+	vi.spyOn(backlog_drive_holder, 'holder').mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#9104: an issue another run holds takes no second worker.
+describe('backlog_drive_launch.launch — an issue another run holds', () => {
+	it('answers held without opening a lane and names the holder in the stage', async () => {
+		const reason = 'a run in the primary checkout (pid 7) holds it'
+
+		vi.mocked(backlog_drive_holder.holder).mockResolvedValue(reason)
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('held')
+		expect(backlog_drive_holder.holder).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
+		expect(String(vi.mocked(run_event_setup.emit).mock.calls.at(-1)?.[0])).toContain(reason)
+	})
+
+	it('asks no holder for an issue the split-only unit split', async () => {
+		vi.mocked(backlog_drive_split_unit.run).mockResolvedValue('split')
+
+		await backlog_drive_launch.launch(FIRST, OWNER)
+		expect(backlog_drive_holder.holder).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#7182: an issue over the size bar goes to its split-only unit before any lane.

@@ -263,7 +263,8 @@ function close(resident: Resident): void {
 	closed(resident)
 }
 
-const run_board_sound_resident = { SCRIPT, close, open, play, wav_length_ms }
+// `DEFAULT_PORTS` is exported for the unit suite's sound guard alone (`tools/test/test-sound-guard.ts`).
+const run_board_sound_resident = { DEFAULT_PORTS, SCRIPT, close, open, play, wav_length_ms }
 
 export { run_board_sound_resident }
 export type { Resident, ResidentChild, ResidentPlaying, ResidentPorts, ResidentSpawner }

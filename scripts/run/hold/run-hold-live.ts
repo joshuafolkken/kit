@@ -24,14 +24,18 @@ function owner_of(hold: RunHold): LiveHold | undefined {
 	return { issue: hold.issue, pid: hold.owner_pid }
 }
 
+// The live hold in a git directory itself — the primary checkout's, read by a driver that knows only
+// the repository's git directory (`backlog-drive-holder.ts`).
+function live_hold_at(git_folder: string, now: Date = new Date()): LiveHold | undefined {
+	const read = run_hold.read_hold(run_hold.hold_path(git_folder), now)
+
+	return read.kind === 'held' ? owner_of(read.hold) : undefined
+}
+
 function live_hold(directory: string, now: Date = new Date()): LiveHold | undefined {
 	const own = git_directory.own_git_directory(directory)
 
-	if (own === undefined) return undefined
-
-	const read = run_hold.read_hold(run_hold.hold_path(own), now)
-
-	return read.kind === 'held' ? owner_of(read.hold) : undefined
+	return own === undefined ? undefined : live_hold_at(own, now)
 }
 
 // The issue of the live hold whose session `ancestry` runs under; the ancestry is read only when a hold
@@ -44,7 +48,7 @@ function held_by(directory: string, ancestry: () => ReadonlySet<number>): string
 	return ancestry().has(hold.pid) ? hold.issue : undefined
 }
 
-const run_hold_live = { held_by, live_hold }
+const run_hold_live = { held_by, live_hold, live_hold_at }
 
 export { run_hold_live }
 export type { LiveHold }

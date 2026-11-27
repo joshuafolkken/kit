@@ -11,6 +11,7 @@ import { execa } from 'execa'
 import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
+import { unit_run_record, type Sizing } from './unit-run-record'
 import { unit_update_arguments } from './unit-update-arguments'
 import { unit_worker_share } from './unit-worker-share'
 import { vitest_failure_summary } from './vitest-failure-summary'
@@ -23,9 +24,9 @@ const NODE_MODULES = 'node_modules'
 // **A unit check that executed nothing may report success only where the project has no unit suite
 // at all**. The two halves of "nothing ran" are not the same state:
 //
-// - **`vitest` absent is the young project.** `josh init` installs no vitest and writes no
-//   `test:unit` script, so a freshly-bootstrapped project always lands here — which is the case the
-//   skip was written for, and it keeps it.
+// - **`vitest` absent and undeclared is the young project.** `josh init` installs no vitest and
+//   writes no `test:unit` script, so a freshly-bootstrapped project always lands here — which is the
+//   case the skip was written for, and it keeps it. Declared but absent is not young: it fails.
 // - **`vitest` present is the full project's declaration that it runs unit tests.** Zero matching
 //   files there is a broken state — a mis-scoped glob, or a deleted suite — and fails. A basic
 //   project may carry vitest as an unused dependency without declaring a unit suite; zero files
@@ -51,13 +52,16 @@ const SKIP_NO_SCRIPT_ACTION = 'skip-no-test-script'
 const SKIP_REENTRANT_ACTION = 'skip-reentrant'
 const RUN_SCRIPT_ACTION = 'run-project-script'
 const FAIL_ACTION = 'fail-no-tests'
+const FAIL_MISSING_ACTION = 'fail-missing-package'
+const VITEST_NAME = 'vitest'
 
 type SkipAction =
 	| typeof SKIP_ACTION
 	| typeof SKIP_NO_TESTS_ACTION
 	| typeof SKIP_NO_SCRIPT_ACTION
 	| typeof SKIP_REENTRANT_ACTION
-type GuardAction = 'run' | typeof RUN_SCRIPT_ACTION | SkipAction | typeof FAIL_ACTION
+type FailAction = typeof FAIL_ACTION | typeof FAIL_MISSING_ACTION
+type GuardAction = 'run' | typeof RUN_SCRIPT_ACTION | SkipAction | FailAction
 
 // What each skip did not run, said in full: a basic project that declares no test script was not
 // skipped for lacking vitest alone, and the unit tests it skipped were never vitest's. The
@@ -81,8 +85,12 @@ const SKIP_NOTICES: Record<SkipAction, { reason: string; subject: string }> = {
 		subject: UNIT_SUBJECT,
 	},
 }
-const FAIL_REASON =
-	'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing'
+const FAIL_REASONS: Record<FailAction, string> = {
+	[FAIL_ACTION]:
+		'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing',
+	[FAIL_MISSING_ACTION]:
+		'package.json declares vitest but node_modules/vitest is missing — install the dependencies; refusing to report a unit check that ran nothing',
+}
 
 const BASIC_MISSING_PACKAGE_ACTIONS: Record<ProjectScriptState, GuardAction> = {
 	declared: RUN_SCRIPT_ACTION,
@@ -124,15 +132,26 @@ function has_unit_tests(project_directory: string): boolean {
 	return matches.length > 0
 }
 
+// **The young-project skip is for a project that never declared vitest.** One whose package.json
+// declares it but whose `node_modules/vitest` is absent — a checkout with no dependencies installed —
+// has a unit suite that could not run, and fails instead of passing on a skip (joshuafolkken/kit#9095).
+function declared_missing_action(project_directory: string): GuardAction {
+	return project_checks.is_declared(project_directory, VITEST_NAME)
+		? FAIL_MISSING_ACTION
+		: SKIP_ACTION
+}
+
 // The guard's decision for one project, asked here once so the run, the scoped record and the gate's
 // precondition can never disagree about whether this project's vitest runs.
 function guard_action(project_directory: string): GuardAction {
-	return resolve_guard_action(
+	const action = resolve_guard_action(
 		is_vitest_installed(project_directory),
 		has_unit_tests(project_directory),
 		project_checks.is_basic(project_directory),
 		project_test_script.state(project_directory),
 	)
+
+	return action === SKIP_ACTION ? declared_missing_action(project_directory) : action
 }
 
 function is_skip_action(action: GuardAction): action is SkipAction {
@@ -188,8 +207,14 @@ function isolated_unit_environment(
 // caller's `--maxWorkers` wins whatever it says. The gate's cap is one: its admission narrows it to the
 // free cores, and its unit step bounds it by the free memory once admitted (`gate-run-steps.ts`); a
 // sharing run admitted on a claim is bounded the same way (`unit_worker_share.admitted_capacity`).
-async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<number | undefined> {
-	if (unit_worker_share.has_worker_flag(vitest_arguments)) return undefined
+//
+// **Each bound is applied as its own stage** so the per-run record can name the one that decided the
+// count (`unit_run_record.deciding_bound`, joshuafolkken/kit#9109); the result is the same as the
+// share capped to the capacity and then to the claim.
+async function vitest_sizing(vitest_arguments: ReadonlyArray<string>): Promise<Sizing> {
+	if (unit_worker_share.has_worker_flag(vitest_arguments)) {
+		return unit_run_record.typed_sizing(vitest_arguments)
+	}
 
 	const available_cores = availableParallelism()
 	const live_runs = unit_worker_share.live_run_count()
@@ -198,9 +223,17 @@ async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<nu
 	// The cores and the memory free right now (joshuafolkken/kit#4528), from one reading.
 	const reading = await free_cores.read({ available_cores })
 	const free = unit_worker_share.admitted_capacity(reading, claim, live_runs, live_lanes)
-	const share = unit_worker_share.current_share(available_cores, live_runs, free, live_lanes)
+	const share = unit_worker_share.current_share(available_cores, live_runs, undefined, live_lanes)
 
-	return unit_worker_share.cap_to_claim(share, claim)
+	return unit_run_record.bounded_sizing({ share, free, claim, available_cores })
+}
+
+async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<number | undefined> {
+	if (unit_worker_share.has_worker_flag(vitest_arguments)) return undefined
+
+	const sizing = await vitest_sizing(vitest_arguments)
+
+	return sizing.workers
 }
 
 async function execute_vitest(
@@ -234,16 +267,22 @@ async function run_vitest(
 	directory: string = process.cwd(),
 ): Promise<number> {
 	return await unit_worker_share.with_run_marker(async () => {
+		const sizing = await vitest_sizing(vitest_arguments)
 		const sized = [
 			...vitest_arguments,
-			...unit_worker_share.worker_arguments(vitest_arguments, await vitest_share(vitest_arguments)),
+			...unit_worker_share.worker_arguments(vitest_arguments, sizing.workers),
 		]
 		const root = await changed_file_scope.repository_root_or_cwd()
 
-		return await test_read_recording.with_read_recording(
-			root,
+		return await unit_run_record.with_record(
 			sized,
-			async (recording) => await execute_vitest(sized, recording, directory),
+			sizing,
+			async () =>
+				await test_read_recording.with_read_recording(
+					root,
+					sized,
+					async (recording) => await execute_vitest(sized, recording, directory),
+				),
 		)
 	})
 }
@@ -265,9 +304,9 @@ const UNIT_COMMAND_LABEL = 'test:unit'
 // they mean different things: one says the project has no unit suite yet, the other says it has one
 // that could not be found. Only the first keeps `SKIP_MARKER`, so the
 // gate's "passed without running" handling still means exactly what it did.
-function report_no_run(action: SkipAction | typeof FAIL_ACTION, command_label: string): number {
-	if (action === FAIL_ACTION) {
-		console.error(`josh ${command_label}: ${FAIL_REASON}.`)
+function report_no_run(action: SkipAction | FailAction, command_label: string): number {
+	if (!is_skip_action(action)) {
+		console.error(`josh ${command_label}: ${FAIL_REASONS[action]}.`)
 
 		return FAIL_EXIT_CODE
 	}

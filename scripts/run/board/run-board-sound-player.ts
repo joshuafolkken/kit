@@ -306,6 +306,8 @@ function play_cue(
 const run_board_sound_player = {
 	BEL,
 	close,
+	// Exported for the unit suite's sound guard alone (`tools/test/test-sound-guard.ts`).
+	DEFAULT_PORTS,
 	players_for,
 	play,
 	play_cue,

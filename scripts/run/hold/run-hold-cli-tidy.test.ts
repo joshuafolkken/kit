@@ -21,6 +21,7 @@ vi.mock('#scripts/run/run-preflight', () => ({
 
 vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
+vi.mock('#scripts/lane/lane-registry', () => ({ lane_registry: { find_open_lane: vi.fn() } }))
 
 const sweep = vi.mocked(run_maintenance.sweep)
 const scratch = make_directory('run-hold-cli-tidy-test-')
