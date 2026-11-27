@@ -120,6 +120,8 @@
 
 集計・計測（`計測` / `before` / `変更前後`）を Issue コメントに記録する受け入れ条件と実装の見積もりを併せ持つ本文 → 集計・計測を `--route split` の先行 Issue に分け、そのコメントを `## 背景` に引く（`issue:lint` が拒否する。`scripts/issue/aggregation-split.ts`）。
 
+計測だけの Issue の受け入れ条件 → 結果を記録し、結果で分岐させない（`scripts/issue/measure-declaration.ts`）。
+
 ### 人の判断の選び方
 
 `要` はマージ前に人が見る・決める場合だけ。マージ後に見て後続の Issue で直せる表示変更は `不要` とし、`## 背景` に `マージ後の確認: <見る所>` と書く（受け入れ条件の外）。目視だけを理由にした `要` と人の目視を求める受け入れ条件は `scripts/issue/visual-check-lint.ts` が拒否する（`マージ前の目視の理由:` を宣言した本文を除く）。完了ゲート側の扱い → `.claude/skills/verify-ui/SKILL.md` → "When there is no screenshot command"。

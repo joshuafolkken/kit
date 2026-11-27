@@ -4,6 +4,8 @@ import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_plan_probe } from '#scripts/lane/lane-plan-probe'
+import { error_text } from '#scripts/lib/error-message'
+import { file_reader } from '#scripts/lib/read-file'
 import { run_review_unplanned } from '#scripts/run/review/run-review-unplanned'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,6 +18,7 @@ const make_directory = temporary_directory()
 const ROOT = make_suite_directory('unplanned-edit-')
 const ISSUE = 7640
 const LANE = path.join(ROOT, '.kit-lanes', String(ISSUE))
+const JOSH_SCRATCH = path.join(LANE, '.josh')
 const CHILD = { JOSH_LANE_CHILD: String(ISSUE) }
 const PLANNED = 'scripts/hooks/planned.ts'
 const UNPLANNED = 'scripts/gh/git-gh-pr-read.ts'
@@ -29,7 +32,7 @@ function file_of(relative: string): string {
 }
 
 beforeEach(() => {
-	rmSync(path.join(LANE, '.josh'), { recursive: true, force: true })
+	rmSync(JOSH_SCRATCH, { recursive: true, force: true })
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(make_directory('repository-'))
 	refusal_to.mockResolvedValue(YIELD_TEXT)
 	lane_plan.record(PLAN, LANE)
@@ -66,6 +69,25 @@ describe('unplanned_edit.notice', () => {
 		expect(await unplanned_edit.notice(file_of(UNPLANNED), LANE, {})).toBeUndefined()
 		expect(await unplanned_edit.notice(file_of(UNPLANNED), ROOT, CHILD)).toBeUndefined()
 		expect(refusal_to).not.toHaveBeenCalled()
+	})
+})
+
+describe('unplanned_edit.notice — swallowed failures', () => {
+	it('records the ask failing, and an unreadable asked-note, once each', async () => {
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+
+		refusal_to.mockRejectedValue(new Error('ask failed'))
+		const read = vi.spyOn(file_reader, 'read_optional').mockImplementation(() => {
+			throw new Error('note unreadable')
+		})
+
+		expect(await unplanned_edit.notice(file_of(UNPLANNED), LANE, CHILD)).toBeUndefined()
+		expect(trace.mock.calls.map((call) => call[0])).toStrictEqual([
+			'unplanned_edit.was_asked',
+			'unplanned_edit.ask',
+		])
+		read.mockRestore()
+		trace.mockRestore()
 	})
 })
 

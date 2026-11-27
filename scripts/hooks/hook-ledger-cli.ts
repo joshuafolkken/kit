@@ -5,6 +5,7 @@ import { lane_stats_request } from '#scripts/lane/lane-stats-request'
 import { lane_transcript_calls, type ToolCall } from '#scripts/lane/lane-transcript-calls'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { error_text } from '#scripts/lib/error-message'
 import { hook_demoted } from './hook-demoted'
 import { hook_ledger } from './hook-ledger'
 import { hook_ledger_demote } from './hook-ledger-demote'
@@ -80,7 +81,9 @@ async function calls_of(session: string): Promise<ReadonlyArray<ToolCall>> {
 		const raw = await readFile(session, 'utf8')
 
 		return lane_transcript_calls.parse({ session_id: session, lane: '' }, raw)
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('hook_ledger_cli.calls_of', error)
+
 		return []
 	}
 }

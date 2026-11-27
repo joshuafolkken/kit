@@ -5,14 +5,13 @@ import { git_diff_reads } from '#scripts/git/git-diff-reads'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { session_cite } from '#scripts/issue/session-cite'
-import { size_estimate } from '#scripts/issue/size-estimate'
 import type { CutState } from './run-cut'
 import { run_cut_report } from './run-cut-report'
 
 // The end of a no-diff investigation lane (joshuafolkken/kit#7821): an Issue whose deliverable is a
 // comment has nothing to cut or ship, so `run:cut <N> --deliverable <comment-url>` closes it as
-// completed instead — but only on all three conditions: the body declares a 0-file estimate, every
-// acceptance criterion is checked, and the lane changed no file. Any one missing keeps today's
+// completed instead — but only on both conditions: every acceptance criterion is checked, and the
+// lane changed no file. Either one missing keeps today's
 // `unready` refusal, with the missing condition named. The close itself is `backlog-triage-close.ts`'s,
 // so the adopt's not-planned close and this completed one stay one path. It labels the Issue
 // `measured` before closing it, so the parent's `run:merge` counts the child merged
@@ -30,14 +29,10 @@ function unchecked_count(body: string): number {
 	return marks.filter((mark) => mark === UNCHECKED_MARK).length
 }
 
-// The first missing condition as one line, or `undefined` when the lane may close as completed.
+// The first missing condition as one line, or `undefined` when the lane may close as completed. The
+// diff is the judge, not the declared size estimate (joshuafolkken/kit#8955): a measurement's one-off
+// script under the ignored `.josh/tmp/scratch/` is no change, yet a body may have counted it.
 function missing_of(body: string, changed: ReadonlyArray<string>): string | undefined {
-	const declared = size_estimate.declared_files(body)
-
-	if (declared !== 0) {
-		return `the body does not declare a 0-file size estimate (${String(declared)})`
-	}
-
 	if (changed.length > 0) return `the lane changed ${changed.join(', ')}`
 
 	const unchecked = unchecked_count(body)

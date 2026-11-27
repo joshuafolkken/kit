@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { error_text } from '#scripts/lib/error-message'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hook_ledger_cli, type LedgerContext } from './hook-ledger-cli'
@@ -126,6 +127,22 @@ describe('hook_ledger_cli.run — the table', () => {
 		const context = { ...context_of([]), now: new Date('2026-12-31T00:00:00.000Z') }
 
 		expect(await printed(['--period', '1'], context)).toContain('no refusals in the last 1 day(s)')
+	})
+})
+
+describe('hook_ledger_cli.run — a transcript that cannot be read', () => {
+	it('counts no later passes and records the failure once', async () => {
+		const context = context_of([])
+		const directory = context.directory ?? ''
+		const missing = path.join(path.dirname(directory), 'gone.jsonl')
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+
+		writeFileSync(path.join(directory, `${DAY}.jsonl`), `${ledger_line('batch', missing)}\n`)
+
+		const output = await printed(['--period', '7'], context)
+
+		expect(output).toContain(`| ${GUARD} | batch | 1 | 0 | 0 |`)
+		expect(trace).toHaveBeenCalledOnce()
 	})
 })
 

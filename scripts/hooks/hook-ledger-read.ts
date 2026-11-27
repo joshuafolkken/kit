@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
+import { file_reader } from '#scripts/lib/read-file'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { z } from 'zod'
 
@@ -52,7 +54,11 @@ function day_files(directory: string, period_days: number, now: Date): Array<str
 async function read_text(file: string): Promise<string> {
 	try {
 		return await readFile(file, 'utf8')
-	} catch {
+	} catch (error) {
+		if (!file_reader.is_absent(error)) {
+			error_text.trace_swallowed('hook_ledger_read.read_text', error)
+		}
+
 		return ''
 	}
 }
