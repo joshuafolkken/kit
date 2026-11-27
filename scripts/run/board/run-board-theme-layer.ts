@@ -137,6 +137,8 @@ function theme_layer(run: ThemeRun, view: LayoutView, delay: () => number = () =
 			const built = built_of(memo, run, view, canvas)
 
 			if (built === undefined) return
+			// A part starts in sound time, as its sound does; only the picture trails it.
+			if (run.part !== undefined) run.part.start_ms ??= at_ms
 			run_board_theme_canvas.put_frame(canvas, frame_at(run, built, at_ms - delay()))
 		},
 	}

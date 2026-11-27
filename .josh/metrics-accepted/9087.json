@@ -1,8 +1,8 @@
 {
-	"growth": {
-		"scripts.code_lines": 318,
-		"ai_cost.on_demand_bytes": 168
-	},
 	"reason": "#9087 adds the resident sound player, the output-latency delay and OPENING cues with their tests; theme-sound.md documents the OPENING cues as the Issue requires",
-	"date": "2026-11-27"
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 319,
+		"ai_cost.on_demand_bytes": 168
+	}
 }

@@ -188,6 +188,18 @@ describe('run_board_theme_layer sound timing', () => {
 		expect(tick_text(drawn_at(layer, ORIGIN_MS + 150 + delay_ms))).toBe('3')
 		expect(layer.next_change_ms(ORIGIN_MS + delay_ms)).toBe(ORIGIN_MS + TICK_MS + delay_ms)
 	})
+
+	it('starts a part on its first draw in sound time, the picture trailing it', () => {
+		const run = ticking_run(ORIGIN_MS)
+
+		run.part = { name: 'opening', start_ms: undefined }
+		drawn_at(
+			theme_layer(run, VIEW, () => 2 * TICK_MS),
+			ORIGIN_MS,
+		)
+
+		expect(run.part.start_ms).toBe(ORIGIN_MS)
+	})
 })
 
 // joshuafolkken/kit#8917: a live board in a theme, on a terminal of 24-bit color, drawn by the theme host.
