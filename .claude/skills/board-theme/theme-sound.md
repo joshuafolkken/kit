@@ -54,7 +54,9 @@ and write "unchecked by ear". The user listens and adjusts.
 - Each event plays one WAV from its start (`run-board-sound-score.ts`): what overlaps on its time line
   is mixed into it beforehand. The start is found on the timeline drawn
   (`run-board-theme-notice-sound.ts`), so demo mode sounds its own events.
-- Each play starts its own player, so sounds overlap; the OS mixes them.
+- `opening_cues` mix into the OPENING's track at their `at_ms` (`run-board-sound-score.ts`).
+- A Mac plays every sound through one resident player; frames trail by its latency
+  (`run-board-sound-resident.ts`, `run-board-sound-latency.ts`).
 - No theme plays the board's cues (`run-board-sound-cues.ts`): a click for a row or progress line, two
   soft rising notes for a notice. A shown theme mutes them.
 

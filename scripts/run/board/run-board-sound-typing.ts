@@ -40,6 +40,13 @@ interface TypingSound {
 	part?: ((name: 'opening' | 'ending', ms: number) => void) | undefined
 	// The trill sounded in the voice `file` gives from here on (joshuafolkken/kit#8917).
 	revoice?: ((file: () => string | undefined) => void) | undefined
+	// joshuafolkken/kit#9087: the event and part sounds a frame ranked started, after its typing.
+	flush?: (() => void) | undefined
+	// An event's or a part's sound rendered ahead, before the frame that starts it is written.
+	warm_event?: ((kind: EventKind, letters: number) => unknown) | undefined
+	warm_part?: ((name: 'opening' | 'ending', ms: number) => unknown) | undefined
+	// How far the picture is drawn behind the sounds it starts: the output's delay.
+	delay_ms?: (() => number) | undefined
 }
 
 interface TypingPorts {

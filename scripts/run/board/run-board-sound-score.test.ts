@@ -157,6 +157,47 @@ describe('run_board_sound_score.score_of tracks', () => {
 	})
 })
 
+// The samples a part's track renders, the writer stubbed.
+function part_pcm(palette: Palette, part: 'opening' | 'ending'): Array<number> {
+	const rendered: Array<Array<number>> = []
+
+	vi.spyOn(run_board_sound_wav, 'resolved_samples').mockImplementation((track) => {
+		rendered.push([...track.render()])
+
+		return '/sounds/part.wav'
+	})
+	score_of(palette).part(part, PART_MS)
+	vi.restoreAllMocks()
+
+	return rendered[0] ?? []
+}
+
+describe('run_board_sound_score.score_of opening cues', () => {
+	const CUE_MS = 500
+	const cue_at = (CUE_MS * SAMPLE_RATE) / MS_PER_SECOND
+
+	it('mixes each cue into the opening from its time, the track before it unchanged', () => {
+		const plain = palette_of()
+		const cued = part_pcm(
+			{ ...plain, opening_cues: [{ at_ms: CUE_MS, sound: sound() }] },
+			'opening',
+		)
+		const without = part_pcm({ ...plain, name: `${plain.name}-plain` }, 'opening')
+
+		expect(cued.slice(0, cue_at)).toStrictEqual(without.slice(0, cue_at))
+		expect(cued.slice(cue_at)).not.toStrictEqual(without.slice(cue_at))
+		expect(cued).toHaveLength(without.length)
+	})
+
+	it('leaves out a cue past the opening, and the ending, unchanged', () => {
+		const plain = palette_of()
+		const late = { ...plain, opening_cues: [{ at_ms: PART_MS, sound: sound() }] }
+
+		expect(part_pcm(late, 'opening')).toStrictEqual(part_pcm({ ...plain, name: 'p2' }, 'opening'))
+		expect(part_pcm(late, 'ending')).toStrictEqual(part_pcm({ ...plain, name: 'p3' }, 'ending'))
+	})
+})
+
 describe('run_board_sound_score helpers', () => {
 	it('lays parts into a track long enough for the last of them', () => {
 		const track = laid([{ at_ms: SOUND_MS, samples: [1, 1], gain: 1 }], 0)

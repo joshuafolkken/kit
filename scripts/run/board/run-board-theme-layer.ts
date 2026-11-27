@@ -119,19 +119,27 @@ function frame_at(run: ThemeRun, built: Built, at_ms: number): FinalGrid {
 	return frame_of(built.module, built.api, leveled(run, tick), tick)
 }
 
-// The theme layer over `screen`'s base for the second `view` was laid out in.
-function theme_layer(run: ThemeRun, view: LayoutView): Layer {
+// The theme layer over `screen`'s base for the second `view` was laid out in, drawn `delay` behind the
+// moment — the sound output's delay, so the picture lands with the sounds started on time and every
+// effect's timing shifts together (joshuafolkken/kit#9087); none by default.
+function theme_layer(run: ThemeRun, view: LayoutView, delay: () => number = () => 0): Layer {
 	// One layer is drawn over one second's base, so what it built holds for the whole of its second.
 	const memo: Memo = { key: undefined, built: undefined }
 
 	return {
 		is_decor: true,
-		next_change_ms: (now_ms) => run_board_theme_run.next_tick_ms(run, now_ms),
+		next_change_ms: (now_ms) => {
+			const delay_ms = delay()
+
+			return run_board_theme_run.next_tick_ms(run, now_ms - delay_ms) + delay_ms
+		},
 		draw: (canvas, at_ms) => {
 			const built = built_of(memo, run, view, canvas)
 
 			if (built === undefined) return
-			run_board_theme_canvas.put_frame(canvas, frame_at(run, built, at_ms))
+			// A part starts in sound time, as its sound does; only the picture trails it.
+			if (run.part !== undefined) run.part.start_ms ??= at_ms
+			run_board_theme_canvas.put_frame(canvas, frame_at(run, built, at_ms - delay()))
 		},
 	}
 }
@@ -180,19 +188,16 @@ function sound_starts(
 	run_board_theme_notice_sound.sound_events(run, trill, at_ms)
 }
 
-// What a frame sounds: the trill of the typing on screen — the board's own, or in demo mode the demo's
-// (`run-board-theme-demo-sound.ts`) — and through a part the letters it types (joshuafolkken/kit#8917).
-function after_frame(
+type FrameTrill = Pick<TypingSound, 'set' | 'typed' | 'event' | 'part' | 'flush'>
+
+// The typing a frame sounds: the trill of the typing on screen — the board's own, or in demo mode the
+// demo's (`run-board-theme-demo-sound.ts`) — and through a part the letters it types.
+function sound_typing(
 	run: ThemeRun,
-	trill: Pick<TypingSound, 'set' | 'typed' | 'event' | 'part'> | undefined,
-	at_ms: number,
-	board: Typing,
+	trill: FrameTrill | undefined,
+	since: Since | undefined,
+	typing: ReturnType<typeof run_board_theme_demo_sound.heard>,
 ): void {
-	const typing = run_board_theme_demo_sound.heard(run, at_ms, board)
-	const since = part_since(run, at_ms)
-
-	sound_starts(run, trill, at_ms, since)
-
 	if (since === undefined) {
 		trill?.set(typing.is_on, typing.left_ms)
 
@@ -203,6 +208,23 @@ function after_frame(
 
 	run_board_theme_sound.sounded(trill, part_typing(run, since.name), at, typing)
 	run.sound_ms = since.since_ms
+}
+
+// What a frame sounds (joshuafolkken/kit#8917). Its event and part sounds are ranked first — a cut
+// hushes at once — then its typing starts, then the ranked sounds start with `flush`, so the typing is
+// never behind them in the same frame (joshuafolkken/kit#9087).
+function after_frame(
+	run: ThemeRun,
+	trill: FrameTrill | undefined,
+	at_ms: number,
+	board: Typing,
+): void {
+	const typing = run_board_theme_demo_sound.heard(run, at_ms, board)
+	const since = part_since(run, at_ms)
+
+	sound_starts(run, trill, at_ms, since)
+	sound_typing(run, trill, since, typing)
+	trill?.flush?.()
 }
 
 const run_board_theme_layer = { after_frame, theme_layer }

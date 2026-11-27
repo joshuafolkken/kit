@@ -2,12 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import type { KeyReading } from './run-board-keys'
 import { run_board_live_sound } from './run-board-live-sound'
 import { run_board_sound_player, type Playing } from './run-board-sound-player'
+import type { EventKind } from './run-board-sound-typing'
 import { run_board_theme_defs } from './run-board-theme-defs'
 
 // joshuafolkken/kit#8917: the live board's one-shot sounds. An event's sound stops every sound before
 // it, and a lower event stays silent while a higher one plays; a skipped opening ends every sound and
 // sounds the board appearing once; the NOTICE track is rendered ahead. No sound plays: the player is
-// stubbed and its calls kept.
+// stubbed and its calls kept. joshuafolkken/kit#9087: a ranked sound starts with the frame's flush.
 
 const { hush, heard, is_sounding, leave_with, scored, skipped, switched_end, warm } =
 	run_board_live_sound
@@ -76,12 +77,20 @@ function scores_files(): void {
 	vi.spyOn(score, 'appear').mockReturnValue(APPEAR_WAV)
 }
 
+// `kind`'s sound ranked, then the frame's ranked sounds started as its typing has.
+function sounded(sound: ReturnType<typeof scored>, kind: EventKind): void {
+	sound.event?.(kind, LETTERS)
+	sound.flush?.()
+}
+
 function files(test: Played): Array<string> {
 	return test.start.mock.calls.map(([file]) => file)
 }
 
 beforeEach(() => {
 	scores_files()
+	vi.spyOn(run_board_sound_player, 'prepare').mockImplementation(() => undefined)
+	vi.spyOn(run_board_sound_player, 'close').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
@@ -94,7 +103,10 @@ describe('run_board_live_sound.scored ranks', () => {
 	it('sounds the shown theme’s event, every sound before it stopped first', () => {
 		const test = played()
 
-		scored(keys_of(true), () => 'wopr').event?.('row', LETTERS)
+		sounded(
+			scored(keys_of(true), () => 'wopr'),
+			'row',
+		)
 
 		expect(files(test)).toStrictEqual([ROW_WAV_FILE])
 		expect(score.row).toHaveBeenCalledWith(LETTERS)
@@ -105,9 +117,9 @@ describe('run_board_live_sound.scored ranks', () => {
 		const test = played()
 		const sound = scored(keys_of(true), () => 'wopr')
 
-		sound.event?.('notice', LETTERS)
-		sound.event?.('row', LETTERS)
-		sound.event?.('progress', LETTERS)
+		sounded(sound, 'notice')
+		sounded(sound, 'row')
+		sounded(sound, 'progress')
 
 		expect(files(test)).toStrictEqual([NOTICE_WAV])
 	})
@@ -116,9 +128,9 @@ describe('run_board_live_sound.scored ranks', () => {
 		const test = played()
 		const sound = scored(keys_of(true), () => 'wopr')
 
-		sound.event?.('notice', LETTERS)
+		sounded(sound, 'notice')
 		test.started.at(0)?.exit()
-		sound.event?.('progress', LETTERS)
+		sounded(sound, 'progress')
 
 		expect(files(test)).toStrictEqual([NOTICE_WAV, PROGRESS_WAV])
 	})
@@ -129,9 +141,9 @@ describe('run_board_live_sound.scored cuts', () => {
 		const test = played()
 		const sound = scored(keys_of(true), () => 'wopr')
 
-		sound.event?.('row', LETTERS)
-		sound.event?.('row', LETTERS)
-		sound.event?.('notice', LETTERS)
+		sounded(sound, 'row')
+		sounded(sound, 'row')
+		sounded(sound, 'notice')
 
 		expect(files(test)).toStrictEqual([ROW_WAV_FILE, ROW_WAV_FILE, NOTICE_WAV])
 		expect(test.stop_all).toHaveBeenCalledTimes(3)
@@ -142,10 +154,63 @@ describe('run_board_live_sound.scored cuts', () => {
 		const sound = scored(keys_of(true), () => 'wopr')
 
 		sound.part?.('ending', PART_MS)
-		sound.event?.('notice', LETTERS)
+		sounded(sound, 'notice')
 
 		expect(files(test)).toStrictEqual([PART_WAV])
 		expect(score.part).toHaveBeenCalledWith('ending', PART_MS)
+	})
+})
+
+// joshuafolkken/kit#9087: a ranked sound waits for the frame's flush, after the frame's typing.
+describe('run_board_live_sound.scored defers', () => {
+	it('starts an event’s sound only on the frame’s flush', () => {
+		const test = played()
+		const sound = scored(keys_of(true), () => 'wopr')
+
+		sound.event?.('row', LETTERS)
+
+		expect(test.start).not.toHaveBeenCalled()
+
+		sound.flush?.()
+
+		expect(files(test)).toStrictEqual([ROW_WAV_FILE])
+	})
+
+	it('keeps a lower event silent under a higher one still pending', () => {
+		const test = played()
+		const sound = scored(keys_of(true), () => 'wopr')
+
+		sound.event?.('notice', LETTERS)
+		sound.event?.('progress', LETTERS)
+		sound.flush?.()
+
+		expect(files(test)).toStrictEqual([NOTICE_WAV])
+	})
+
+	it('drops a pending sound as every sound is hushed', () => {
+		const test = played()
+		const sound = scored(keys_of(true), () => 'wopr')
+
+		sound.event?.('notice', LETTERS)
+		hush()
+		sound.flush?.()
+
+		expect(test.start).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_board_live_sound.scored ahead', () => {
+	it('draws with no delay while the sound is off', () => {
+		expect(scored(keys_of(false), () => 'wopr').delay_ms?.()).toBe(0)
+	})
+
+	it('renders an event’s and a part’s sound ahead without starting it', () => {
+		const test = played()
+		const sound = scored(keys_of(true), () => 'wopr')
+
+		expect(sound.warm_event?.('row', LETTERS)).toBe(ROW_WAV_FILE)
+		expect(sound.warm_part?.('opening', PART_MS)).toBe(PART_WAV)
+		expect(test.start).not.toHaveBeenCalled()
 	})
 })
 
@@ -153,8 +218,14 @@ describe('run_board_live_sound.scored switch', () => {
 	it('sounds nothing with the sound off or no theme shown', () => {
 		const test = played()
 
-		scored(keys_of(false), () => 'wopr').event?.('notice', LETTERS)
-		scored(keys_of(true), () => undefined).event?.('notice', LETTERS)
+		sounded(
+			scored(keys_of(false), () => 'wopr'),
+			'notice',
+		)
+		sounded(
+			scored(keys_of(true), () => undefined),
+			'notice',
+		)
 
 		expect(test.start).not.toHaveBeenCalled()
 	})
@@ -176,9 +247,9 @@ describe('run_board_live_sound.hush', () => {
 		const test = played()
 		const sound = scored(keys_of(true), () => 'wopr')
 
-		sound.event?.('notice', LETTERS)
+		sounded(sound, 'notice')
 		hush()
-		sound.event?.('progress', LETTERS)
+		sounded(sound, 'progress')
 
 		expect(files(test)).toStrictEqual([NOTICE_WAV, PROGRESS_WAV])
 	})
@@ -222,11 +293,13 @@ describe('run_board_live_sound switches', () => {
 		expect(typed_end).toHaveBeenCalledOnce()
 	})
 
-	it('renders the theme’s NOTICE track ahead, nothing in no theme', () => {
+	it('renders the NOTICE track and the board appearing ahead, opening the resident player', () => {
 		warm('wopr')
 		warm(undefined)
 
 		expect(score.notice).toHaveBeenCalledOnce()
+		expect(score.appear).toHaveBeenCalledOnce()
+		expect(run_board_sound_player.prepare).toHaveBeenCalledOnce()
 	})
 })
 
@@ -256,13 +329,14 @@ describe('run_board_live_sound.leave_with', () => {
 		expect(ran).toStrictEqual(['trill', 'keys', 'flush', 'leave'])
 	})
 
-	it('leaves quietly where no step throws and no trill plays', () => {
+	it('leaves quietly where no step throws and no trill plays, the resident player closed', () => {
 		const test = played()
 		const leave = vi.fn<() => void>()
 
 		leave_with(undefined, [leave])
 
 		expect(test.stop_all).toHaveBeenCalledOnce()
+		expect(run_board_sound_player.close).toHaveBeenCalledOnce()
 		expect(leave).toHaveBeenCalledOnce()
 	})
 })
