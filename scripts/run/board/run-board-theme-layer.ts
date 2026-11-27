@@ -157,7 +157,19 @@ function part_since(run: ThemeRun, at_ms: number): Since | undefined {
 
 	if (part?.start_ms === undefined) return undefined
 
-	return { name: part.name, since_ms: at_ms - part.start_ms }
+	// A part rebased to its frame's write (`rebased`) starts after the frame's own moment: none into it yet.
+	return { name: part.name, since_ms: Math.max(0, at_ms - part.start_ms) }
+}
+
+// A part begun on the frame drawn at `at_ms` begins as that frame is written, `now_ms`: the frame's
+// sounds are rendered in between, and a process that has rendered none yet takes longer over a part's
+// whole track than a short opening's letters type — timed from before the render, they were typed
+// through, their trill never heard, by the part's second frame. A frame that rendered nothing moves
+// its part by no more than its own drawing.
+function rebased(run: ThemeRun, at_ms: number, now_ms: number): void {
+	const { part } = run
+
+	if (part?.start_ms === at_ms) part.start_ms = now_ms
 }
 
 // The letters the part `name` types: the opening's are its theme's intro's; the ending's its own
@@ -230,6 +242,6 @@ function after_frame(
 	trill?.flush?.()
 }
 
-const run_board_theme_layer = { after_frame, theme_layer }
+const run_board_theme_layer = { after_frame, rebased, theme_layer }
 
 export { run_board_theme_layer }
