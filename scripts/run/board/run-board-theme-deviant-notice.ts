@@ -81,7 +81,7 @@ const PROMPT = {
 
 // NOTICE in the header's first row: the machine gauges as analysis bars that step up at each hit.
 const GAUGES = {
-	labels: ['CPU', 'MEM', 'SWAP'],
+	words: ['CPU', 'MEM', 'SWAP'],
 	label_w: 5,
 	gap: 2,
 	base: 0.15,

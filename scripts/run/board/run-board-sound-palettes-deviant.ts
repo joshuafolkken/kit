@@ -129,7 +129,7 @@ const MENU_MS = OPEN.menu_from * TICK_MS
 const BARS_MS = (OPEN.menu_from + OPEN.ice_ticks) * TICK_MS
 const BAR_STEP_MS = ENTER.step * TICK_MS
 const PLATE_MS =
-	BARS_MS + MENU.labels.length * BAR_STEP_MS + (ENTER.pause + ENTER.fade * 2) * TICK_MS
+	BARS_MS + MENU.words.length * BAR_STEP_MS + (ENTER.pause + ENTER.fade * 2) * TICK_MS
 const CHAPTER_MS = OPEN.chapter_from * TICK_MS
 const CARD_MS = (OPEN.chapter_from + OPEN.slide) * TICK_MS
 const REVEAL_MS = OPEN.reveal_from * TICK_MS
@@ -143,7 +143,7 @@ const OPENING_CUES: ReadonlyArray<Cue> = [
 	{ at_ms: 0, sound: compound(0.03, [0, 1, swell(MENU_MS, [215, 1])]) },
 	...[MENU_MS, CHAPTER_MS, REVEAL_MS].map((at_ms) => ({ at_ms, sound: CHANGE })),
 	{ at_ms: MENU_MS, sound: compound(0.02, [0, 1, menu_pad(CHAPTER_MS - MENU_MS)]) },
-	...MENU.labels.map((_, index) => ({ at_ms: BARS_MS + index * BAR_STEP_MS, sound: BAR_CLICK })),
+	...MENU.words.map((_, index) => ({ at_ms: BARS_MS + index * BAR_STEP_MS, sound: BAR_CLICK })),
 	{ at_ms: PLATE_MS, sound: compound(0.08, [0, 1, PING]) },
 	{ at_ms: CARD_MS, sound: compound(0.08, [0, 1, CHIME_B]) },
 ]

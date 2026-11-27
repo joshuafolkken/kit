@@ -128,12 +128,12 @@ function card_of(api: ThemeApi): DateCard | undefined {
 	const found = CLOCK.exec(clock_text(api))?.groups
 
 	if (found === undefined) return undefined
-	const hour = Number(found.hour)
+	const hour = Number(found['hour'])
 
 	return {
-		date: date_of(found.month, found.day),
+		date: date_of(found['month'], found['day']),
 		half: hour < CARD.noon ? 'AM' : 'PM',
-		time: `${half_hour(hour)}:${found.minute ?? ''}`,
+		time: `${half_hour(hour)}:${found['minute'] ?? ''}`,
 	}
 }
 

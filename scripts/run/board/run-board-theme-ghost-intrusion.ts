@@ -143,6 +143,6 @@ function intrusion(draw: ThemeDraw): void {
 	header_bar(draw)
 }
 
-const run_board_theme_ghost_intrusion = { grown, intrusion, is_intruded, scrambled_share }
+const run_board_theme_ghost_intrusion = { intrusion, is_intruded, scrambled_share }
 
 export { run_board_theme_ghost_intrusion }

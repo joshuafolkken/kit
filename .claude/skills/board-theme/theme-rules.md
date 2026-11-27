@@ -31,7 +31,8 @@ themes already in kit (`run-board-theme-<value>-*.ts`) are the examples.
 
 ## Events and showiness
 
-The user's rules (2026-11-27); the seven released themes follow under #9071.
+The user's rules (2026-11-27); the seven released themes predate them and are brought in line
+separately.
 
 | Tier | When | Required |
 |---|---|---|
@@ -43,7 +44,7 @@ The user's rules (2026-11-27); the seven released themes follow under #9071.
 - NOTICE's header: its effect areas carry the theme's own content for at least half of the NOTICE;
   recommended all three areas together — everything but the notice message.
 - A whole-screen flash or wash over the header, or the clocks' digits and colors changing, does not
-  count. (nixie, trace and flux use none of the areas: #9071.)
+  count. (nixie, trace and flux use none of the areas yet.)
 - NOTICE has acts: something before the main effect (a choice, a call) and something after it (a new
   state, a stamp), not one idea alone.
 - Every effect is taken from the work's own screens; add no generic effect the work does not have.

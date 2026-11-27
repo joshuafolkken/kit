@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
 import { run_board_theme_deviant_parts, type Stage } from './run-board-theme-deviant-parts'
 import { run_board_theme_deviant_tables } from './run-board-theme-deviant-tables'
@@ -116,10 +117,13 @@ function lanes_of(api: ThemeApi): Array<{ label: string; y: number }> {
 	const { lane_rows, issue_x } = api.layout
 	const lanes = lane_rows.map((y) => ({
 		y,
-		label: `#${NUMBER.exec(api.plain(y).slice(Math.max(0, issue_x)))?.[0] ?? ''}`,
+		number: NUMBER.exec(api.plain(y).slice(Math.max(0, issue_x)))?.[0] ?? '',
 	}))
 
-	return lanes.filter((lane) => lane.label.length > 1).slice(0, CHAPTERS.max)
+	return lanes
+		.filter((lane) => lane.number !== '')
+		.slice(0, CHAPTERS.max)
+		.map((lane) => ({ y: lane.y, label: issue_cite.plain_for('terminal', lane.number) }))
 }
 
 // A plate's label for each lane the board runs; the board's own name where it runs none.

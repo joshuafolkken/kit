@@ -7,9 +7,8 @@ import { run_board_theme_host_sample, type DemoKey } from './run-board-theme-hos
 import type { ThemeTimeline } from './run-board-theme-host-types'
 import { run_board_theme_run, type ThemeRun, type ThemeValue } from './run-board-theme-run'
 
-// The footer a live board ends on in demo mode, in place of the legend and the footer under it: the
-// selector the throwaway theme demos draw above their board (`.claude/skills/board-theme/demo-template.md`
-// → `caption_rows`), with the live board's keys. Under a blank row, one row names the work picked and
+// The footer a live board ends on in demo mode, in place of the legend and the footer under it: a
+// selector of the works and what plays on them, with the live board's keys. Under a blank row, one row names the work picked and
 // what plays on it, and the rows after it every key, those two lit: the works' keys on one row, what
 // the other keys play and the exit on the next; either wraps, a key and its name whole, where the pane
 // is narrower. What plays is read off the run: the part playing, else the event demo mode's timeline

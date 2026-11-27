@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_board_theme_draw, type Pane, type ThemeDraw } from './run-board-theme-draw'
 import { run_board_theme_ghost_data } from './run-board-theme-ghost-data'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
@@ -51,7 +52,7 @@ function node_at(pane: Pane, share: Point): Point {
 	}
 }
 
-// A link's dots, a brighter one travelling along it.
+// A link's dots, a brighter one traveling along it.
 function link(pane: Pane, ends: { from: Point; to: Point }, tick: number): void {
 	const points = line_points(node_at(pane, ends.from), node_at(pane, ends.to))
 	const lit = points[Math.floor(tick / CLOAK.pulse_pace) % points.length]
@@ -78,7 +79,12 @@ function new_link(draw: ThemeDraw, pane: Pane): void {
 	for (const at of shown) put_in(pane, at, '·', INKS.PALE)
 
 	put_in(pane, to, s.row.is_typing ? '○' : '◉', lit)
-	put_in(pane, { x: to.x + CLOAK.gap, y: to.y }, `#${api.layout.new_lane}`, lit)
+	put_in(
+		pane,
+		{ x: to.x + CLOAK.gap, y: to.y },
+		issue_cite.plain_for('terminal', api.layout.new_lane),
+		lit,
+	)
 }
 
 // ROW: the data left of the panel gives way to the net graph; the panel keeps its ring.
@@ -93,6 +99,6 @@ function linking(draw: ThemeDraw): void {
 	put_in(pane, { x: CLOAK.label_x, y: 0 }, label, s.row.is_typing ? blink_ink(tick) : INKS.WHITE)
 }
 
-const run_board_theme_ghost_cloak = { decloak, is_linking, linking, node_at }
+const run_board_theme_ghost_cloak = { decloak, is_linking, linking }
 
 export { run_board_theme_ghost_cloak }

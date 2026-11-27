@@ -122,12 +122,12 @@ function gauge_level(index: number, age: number): number {
 }
 
 function gauge(pane: Pane, index: number, draw: ThemeDraw, age: number): void {
-	const segment = Math.floor(pane.box.w / GAUGES.labels.length)
+	const segment = Math.floor(pane.box.w / GAUGES.words.length)
 	const x = index * segment + GAUGES.label_w
 	const width = Math.max(0, segment - GAUGES.label_w - GAUGES.gap)
 	const lit = Math.round(gauge_level(index, age) * width)
 	const [bright, track] = age < PEAK_TICKS ? [RGB.red, RGB.track] : [RGB.blue, RGB.plate]
-	const label = word_of(GAUGES.labels[index] ?? '', draw, age, GAUGES.seed + index)
+	const label = word_of(GAUGES.words[index] ?? '', draw, age, GAUGES.seed + index)
 
 	put_in(pane, { x: index * segment, y: 0 }, label, bold(RGB.soft))
 	put_in(pane, { x, y: 0 }, repeated('━', lit), bold(bright))
@@ -207,7 +207,7 @@ function close(draw: ThemeDraw, age: number, kept: Kept): void {
 	order_prompt(draw, age)
 
 	if (is_walled(age)) {
-		for (const index of GAUGES.labels.keys()) gauge(block_pane(grid, head_top, 1), index, draw, age)
+		for (const index of GAUGES.words.keys()) gauge(block_pane(grid, head_top, 1), index, draw, age)
 
 		readout(block_pane(grid, head_right, WALL.header_rows), age)
 	}

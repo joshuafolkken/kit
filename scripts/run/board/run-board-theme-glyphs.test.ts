@@ -263,7 +263,7 @@ describe('run_board_theme_glyphs.textual in color', () => {
 			run_board_theme_tones.toned('human', String.raw`\O`),
 			run_board_theme_tones.toned('running', '>>'),
 			run_board_theme_tones.toned('idle', 'ZZ', BASE_LOOK.idle),
-			'<3|',
+			`${run_board_theme_tones.toned('info', '<3', BASE_LOOK.idle, BASE_LOOK.info)}|`,
 		]
 
 		expect(toned).toBe(expected.join(' '))

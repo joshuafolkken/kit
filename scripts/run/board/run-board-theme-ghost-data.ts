@@ -2,7 +2,7 @@ import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import type { EventKey, ThemeColors } from './run-board-theme-host-types'
 
 // The ghost theme's tables: a net dive — cyan and white with a little orange, a ring of text
-// travelling round an ellipse, a net graph of nodes and links, noise that resolves into text. Nothing
+// traveling round an ellipse, a net graph of nodes and links, noise that resolves into text. Nothing
 // falls in columns. Its words are generic, its look is color and motion alone.
 
 const { BOLD, bg, fg } = run_board_theme_host_grid

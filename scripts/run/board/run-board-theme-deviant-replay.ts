@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
 import { run_board_theme_deviant_parts } from './run-board-theme-deviant-parts'
 import { run_board_theme_deviant_scrub, type Scrub } from './run-board-theme-deviant-scrub'
@@ -70,7 +71,10 @@ function fields_of(draw: ThemeDraw): Array<Card> {
 	const { layout } = draw.api
 	const [mark = ''] = layout.row_text.trim().split(/\s+/u, 1)
 	const cards = [
-		{ title: layout.new_lane === '' ? '' : `#${layout.new_lane}`, line: CARDS.lane },
+		{
+			title: layout.new_lane === '' ? '' : issue_cite.plain_for('terminal', layout.new_lane),
+			line: CARDS.lane,
+		},
 		{ title: MARK.test(mark) ? mark : '', line: CARDS.state },
 		{ title: title_of(layout), line: '' },
 	]

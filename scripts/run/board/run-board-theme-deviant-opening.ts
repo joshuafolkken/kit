@@ -68,21 +68,21 @@ function title(draw: ThemeDraw, top: number, middle: number): void {
 
 // The plate on the menu's first label: it fades in last, and pulses twice as the label is confirmed.
 function menu_plate(grid: Grid, at: Point, age: number): void {
-	const shown = entrance(age - OPEN.ice_ticks, 0, MENU.labels.length).cursor
+	const shown = entrance(age - OPEN.ice_ticks, 0, MENU.words.length).cursor
 	const is_pulse = age > MENU.pulse_after && age % MENU.pulse_beat < MENU.pulse_lit
 	const corner = faded(RGB.steel, shown)
 	const ground = mix(RGB.ice_bright, is_pulse ? RGB.blue : RGB.steel, shown)
 
 	if (shown <= 0) return
 	on_ice(grid, at, '⌜', corner)
-	put(grid, { y: at.y, x: at.x + 1 }, `   ${MENU.labels[0] ?? ''}   `, on(RGB.white, ground))
+	put(grid, { y: at.y, x: at.x + 1 }, `   ${MENU.words[0] ?? ''}   `, on(RGB.white, ground))
 	on_ice(grid, { y: at.y, x: at.x + MENU.plate_end }, '⌟', corner)
 }
 
 // A label of the menu row as it enters: a bare bar, its label on it, then the label alone on the ice.
 function menu_item(draw: ThemeDraw, at: Point, index: number, age: number): void {
-	const label = MENU.labels[index] ?? ''
-	const enter = entrance(age - OPEN.ice_ticks, index, MENU.labels.length)
+	const label = MENU.words[index] ?? ''
+	const enter = entrance(age - OPEN.ice_ticks, index, MENU.words.length)
 	const x = at.x + 1 + index * MENU.label_step
 	const final = index === 0 ? RGB.ink : RGB.steel
 	const bar = `   ${label}`.padEnd(MENU.bar_w)
@@ -99,7 +99,7 @@ function menu_parts(draw: ThemeDraw, top: number, middle: number, age: number): 
 
 	title(draw, top, middle)
 
-	for (const index of MENU.labels.keys()) menu_item(draw, at, index, age)
+	for (const index of MENU.words.keys()) menu_item(draw, at, index, age)
 
 	menu_plate(draw.grid, at, age)
 }

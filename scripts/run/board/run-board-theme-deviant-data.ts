@@ -85,7 +85,7 @@ const MODEL = {
 	blink_lit: 3,
 	brand: 'CYBERLIFE',
 	brand_back: 10,
-	board: 'josh-detroit',
+	board: 'josh-rk800',
 }
 
 // IDLE: the choice list and its cursor, which holds a line, then fades to the next.
@@ -250,7 +250,7 @@ const OPEN = {
 	bar_salt: 5,
 }
 const MENU = {
-	labels: ['CONTINUE', 'NEW STORY', 'CHAPTERS', 'OPTIONS', 'EXTRAS'],
+	words: ['CONTINUE', 'NEW STORY', 'CHAPTERS', 'OPTIONS', 'EXTRAS'],
 	top: 0.22,
 	triangle_back: 4,
 	title: 'D E T R O I T',

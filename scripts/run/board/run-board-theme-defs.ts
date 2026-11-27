@@ -163,7 +163,7 @@ const THEME_DEFS = {
 	// Each of the three below types its own opening from the first tick, so its sound counts those letters:
 	// deviant's date card, two letters a tick.
 	deviant: {
-		name: 'josh-detroit',
+		name: 'josh-rk800',
 		...voiced(DEVIANT_VOICES, DEVIANT),
 		intro: { line: DEVIANT_OPEN.line, letter_ms: DEVIANT_OPEN.letter_ms },
 	},

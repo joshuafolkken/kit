@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_board_theme_draw, type Pane, type ThemeDraw } from './run-board-theme-draw'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
@@ -28,7 +29,7 @@ function activation_label(draw: ThemeDraw, pane: Pane): void {
 	put_in(
 		pane,
 		{ x: at.x + 1, y: at.y },
-		`◆ AGENT ACTIVATED #${api.layout.new_lane}`,
+		`◆ AGENT ACTIVATED ${issue_cite.plain_for('terminal', api.layout.new_lane)}`,
 		is_dark ? INKS.ORANGE : INKS.WHITE,
 	)
 }

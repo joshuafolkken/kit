@@ -91,6 +91,6 @@ function ending_of(api: ThemeApi): ThemePart {
 	}
 }
 
-const run_board_theme_isac_ending = { ending_of, ring_at }
+const run_board_theme_isac_ending = { ending_of }
 
 export { run_board_theme_isac_ending }

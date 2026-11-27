@@ -62,7 +62,7 @@ Read from `SKILL.md` → "2. Measure the original" (the user's workflow, 2026-11
 - A Mac plays every sound through one resident player; frames trail by its latency
   (`run-board-sound-resident.ts`, `run-board-sound-latency.ts`).
 - Every sound of every theme late against the screen → check the output device before the code: a
-  Bluetooth output adds its own delay; time `afplay` on a short silent file to see it (sync: #9087).
+  Bluetooth output adds its own delay; time `afplay` on a short silent file to see it.
 
 ## Tooling
 

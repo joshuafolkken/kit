@@ -109,6 +109,8 @@ const EMOJI_ROWS = String.raw`
 🟢,AC,done
 📁,EP,info,[+
 ▶,>,info
+◀,<,info
+▪,*,info
 ⏸,=,idle,║
 ⏭,>,info
 ⏱,T,info

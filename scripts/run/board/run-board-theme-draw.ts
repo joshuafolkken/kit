@@ -169,7 +169,6 @@ function rule_glint(draw: ThemeDraw, ink: string): void {
 const run_board_theme_draw = {
 	BLANK,
 	PAIR,
-	area_box,
 	area_pane,
 	clear_pane,
 	data_pane,

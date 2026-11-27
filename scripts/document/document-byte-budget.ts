@@ -59,13 +59,13 @@ function block_ceiling(size: number): number {
 const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The gate's golden replay check (joshuafolkken/kit#8766) crossed the 4096 block.
 	{ path: '.claude/skills/board-theme/SKILL.md', bytes: 8192 },
-	// The `DEMO_BEATS` / `DEMO_SEED` replay form (joshuafolkken/kit#8750) crossed the 8192 block.
-	{ path: '.claude/skills/board-theme/demo-template.md', bytes: 12_288 },
 	{ path: '.claude/skills/board-theme/render-cost.md', bytes: 4096 },
 	// The theme rules, sound and wiring split out of SKILL.md (joshuafolkken/kit#8917).
 	{ path: '.claude/skills/board-theme/theme-rules.md', bytes: 8192 },
 	{ path: '.claude/skills/board-theme/theme-sound.md', bytes: 4096 },
 	{ path: '.claude/skills/board-theme/theme-split.md', bytes: 4096 },
+	// Building a theme from a gameplay video (joshuafolkken/kit#9096).
+	{ path: '.claude/skills/board-theme/theme-video.md', bytes: 4096 },
 	{ path: '.claude/skills/board-theme/theme-wiring.md', bytes: 4096 },
 	{ path: '.claude/skills/dependency-update/SKILL.md', bytes: 4096 },
 	{ path: '.claude/skills/epic-commands/SKILL.md', bytes: 8192 },

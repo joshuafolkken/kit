@@ -1,12 +1,13 @@
 import { run_board_fit } from './run-board-fit'
 import { run_board_theme_defs } from './run-board-theme-defs'
 
-// joshuafolkken/kit#8003: a live board in a theme types each issue row that appears after its base frame
-// a letter at a time, at the opening line's pace, until the row is out. A row is known by its key — its
-// section and number (`run-board-row-key.ts`) — so a row that moves from the lanes to done types again in
-// done, and one whose times alone change types once. The theme layer draws the typing
-// (joshuafolkken/kit#8917, `run-board-theme-events.ts`); what is kept here is which rows type and when,
-// for its events and the trill. Only a row within one screen row types (`run-board-spin.ts`).
+// joshuafolkken/kit#8003: a live board's issue rows that appear after the base frame type a letter at a
+// time, until the row is out. A row is known by its key — its section and number (`run-board-row-key.ts`)
+// — so a row that moves from the lanes to done types again in done, and one whose times alone change types
+// once. In a theme the theme layer draws the typing (joshuafolkken/kit#8917, `run-board-theme-events.ts`)
+// and the typing sound follows the letters it draws (`run-board-theme-demo-sound.ts` → `shown_typing`);
+// this module's timing sounds only through an ending, never through an opening. Only a row within one
+// screen row types (`run-board-spin.ts`).
 
 // joshuafolkken/kit#8349: the rows type at the wargames opening's pace.
 const LETTER_MS = run_board_theme_defs.THEME_DEFS.wopr.intro.letter_ms

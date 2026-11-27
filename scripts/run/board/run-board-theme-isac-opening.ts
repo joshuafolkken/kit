@@ -111,6 +111,6 @@ function opening_of(api: ThemeApi): ThemePart {
 	}
 }
 
-const run_board_theme_isac_opening = { opening_of, rect_half }
+const run_board_theme_isac_opening = { opening_of }
 
 export { run_board_theme_isac_opening }

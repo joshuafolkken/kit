@@ -59,7 +59,7 @@ describe('board name place', () => {
 	})
 
 	// A two-column mark moved the base's name a column right: the theme's name drawn at the usual
-	// column left the mark touching it and the base's last letter after it (`!?josh-detroitt`).
+	// column left the mark touching it and the base's last letter after it (`!?josh-rk8000`).
 	it('draws the name a column further right after a two-column mark', () => {
 		expect(title_text(waiting_api(), LONG_NAME).startsWith(`!? ${LONG_NAME}`)).toBe(true)
 	})

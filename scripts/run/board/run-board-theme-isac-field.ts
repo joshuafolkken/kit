@@ -49,7 +49,7 @@ function hex_field(pane: Pane, field: Field): void {
 	for (let y = 0; y < pane.box.h; y++) field_row(pane, y, field)
 }
 
-const run_board_theme_isac_field = { field_distance, field_mark, hex_field, is_hex }
+const run_board_theme_isac_field = { field_distance, hex_field }
 
 export { run_board_theme_isac_field }
 export type { Field }

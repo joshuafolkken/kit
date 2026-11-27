@@ -6,7 +6,7 @@ import { run_board_theme_host_state } from './run-board-theme-host-state'
 import type { Point, ThemeState } from './run-board-theme-host-types'
 
 // The ghost theme's panel. Idle: the link, the barrier and a drifting sync reading on the left; on
-// the right a ring of text travelling round an ellipse with a small net graph inside it, and now and
+// the right a ring of text traveling round an ellipse with a small net graph inside it, and now and
 // then a camouflage ripple. PROGRESS: a dive — rectangles zoom to the ring's centre, hex pairs stream
 // sideways under the status, the ring spins faster.
 
@@ -167,15 +167,7 @@ function panel(draw: ThemeDraw): void {
 	if (!s.busy) ripple(draw)
 }
 
-const run_board_theme_ghost_panel = {
-	is_diving,
-	panel,
-	spin_of,
-	status_block,
-	stream_cell,
-	sync_text,
-	text_ring,
-}
+const run_board_theme_ghost_panel = { is_diving, panel, spin_of, status_block, text_ring }
 
 export { run_board_theme_ghost_panel }
 export type { TextRing }
