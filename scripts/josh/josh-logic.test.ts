@@ -43,6 +43,7 @@ const DETAIL_ONLY_COMMANDS: ReadonlyArray<string> = [
 	'eval',
 	'bump',
 	'followup',
+	'git:checkpoint',
 ]
 
 const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>(

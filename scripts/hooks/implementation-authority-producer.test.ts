@@ -254,7 +254,7 @@ describe('no-filing production authority — the producer’s worktree', () => {
 })
 
 // joshuafolkken/kit#9091: a granted producer checkpoints its own worktree's branch.
-const CHECKPOINT = 'git add -A && LEFTHOOK=0 git commit -m "WIP checkpoint: theme"'
+const CHECKPOINT = 'pnpm josh git:checkpoint theme "theme colors"'
 
 interface ShellCall {
 	readonly transcript_path: string
@@ -276,13 +276,12 @@ function shell_at({
 }
 
 describe('no-filing production authority — a checkpoint commit', () => {
-	it.each([
-		CHECKPOINT,
-		'git merge --ff-only wip/theme && git merge main',
-		'git branch -f wip/theme HEAD',
-	])('allows `%s` in the producer’s worktree', (command) => {
-		expect(shell_at({ transcript_path: asked(), command })).toBeUndefined()
-	})
+	it.each([CHECKPOINT, 'git merge --ff-only wip/theme && git merge main'])(
+		'allows `%s` in the producer’s worktree',
+		(command) => {
+			expect(shell_at({ transcript_path: asked(), command })).toBeUndefined()
+		},
+	)
 
 	it('allows it under a session declaration', () => {
 		const declared = declare(under(PLAIN))
@@ -291,10 +290,11 @@ describe('no-filing production authority — a checkpoint commit', () => {
 	})
 
 	it.each([
-		['a final commit subject', 'git commit -m "Add the theme"'],
+		['a raw checkpoint commit', 'git add -A && git commit -m "WIP checkpoint: x"'],
+		['a raw branch move', 'git branch -f wip/theme HEAD'],
 		['a push', `${CHECKPOINT} && git push`],
 		['a pull request', 'gh pr create --fill'],
-		['another tree', 'git -C ../other commit -m "WIP checkpoint: x"'],
+		['another tree', 'git -C ../other merge main'],
 		['a `cd` beside it', `cd .. && ${CHECKPOINT}`],
 		['a branch delete', 'git branch -D wip/theme'],
 	])('refuses the shell call with %s', (_name, command) => {
@@ -305,6 +305,7 @@ describe('no-filing production authority — a checkpoint commit', () => {
 		['outside a worktree', { transcript_path: asked(), cwd: ROOT }],
 		['with no grant', { transcript_path: under(PLAIN) }],
 		['from another subagent', { transcript_path: asked(), unit: { agent_id: PRODUCER.agent_id } }],
+		['from the main line', { transcript_path: asked(), unit: {} }],
 	])('refuses the checkpoint %s', (_name, call) => {
 		expect(shell_at({ command: CHECKPOINT, ...call })).toContain(REFUSED)
 	})

@@ -301,6 +301,16 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['git', 'network']],
 		usage: { examples: [{ arguments: '' }] },
 	},
+	// A no-filing producer's save point (joshuafolkken/kit#9091): the settings deny list and the
+	// index rule refuse a raw `git add` / `git commit`, so the checkpoint is one command the producer
+	// hook can name (`producer-checkpoint.ts`).
+	'git:checkpoint': {
+		script: 'scripts/git/git-checkpoint-main.ts',
+		description: 'Commit the worktree as a WIP checkpoint and point wip/<name> at it',
+		category: 'Workflow',
+		reference: ['<name> <what>', 'automation', ['git']],
+		usage: { examples: [{ arguments: 'theme "colors"' }] },
+	},
 }
 
 export { WORKFLOW_COMMANDS }

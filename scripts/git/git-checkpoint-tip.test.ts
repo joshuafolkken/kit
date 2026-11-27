@@ -37,6 +37,15 @@ describe('git_checkpoint_tip.problem', () => {
 	})
 })
 
+describe('git_checkpoint_tip.checkpoint_subject', () => {
+	it('prefixes what was saved so the subject reads back as a checkpoint', () => {
+		const subject = git_checkpoint_tip.checkpoint_subject('theme colors')
+
+		expect(subject).toBe(SUBJECT)
+		expect(git_checkpoint_tip.is_checkpoint_subject(subject)).toBe(true)
+	})
+})
+
 describe('git_checkpoint_tip.is_checkpoint_subject', () => {
 	it.each([
 		[SHORT_SUBJECT, true],

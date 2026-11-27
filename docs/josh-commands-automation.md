@@ -825,6 +825,20 @@ pnpm josh review:pair --issue 6902 --opus-agent a1b2 --sonnet-agent c3d4   # aft
 
 Ledger: `review-pairs.jsonl`, git common directory.
 
+### `josh git:checkpoint`
+
+<!-- usage: git:checkpoint -->
+
+Commit the worktree as a WIP checkpoint and point wip/<name> at it.
+
+```bash
+pnpm josh git:checkpoint theme "colors"
+```
+
+<!-- /usage -->
+
+**Behavior:** a no-filing producer's save point. Stages everything, commits `WIP checkpoint: <what>` with lefthook skipped, and points `wip/<name>` at the commit, so a replacement producer starts from that branch. Refuses outside a linked worktree and on the default branch. The ship refuses a checkpoint left on the tip (`scripts/git/git-checkpoint-tip.ts`).
+
 ## Versioning
 
 ### `josh bump`
