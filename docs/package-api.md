@@ -6,26 +6,26 @@ For code that imports kit directly: the config presets and libraries `@joshuafol
 
 The package exposes config presets for direct import:
 
-| Use                  | Reference                                                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| ESLint config        | `@joshuafolkken/kit/eslint/vanilla` (optional peers required)                                                                |
-| ESLint base          | `@joshuafolkken/kit/eslint/base` — the rule set `vanilla` builds on                                                          |
-| ESLint rule          | `@joshuafolkken/kit/eslint/test-filename` — the test-file name rule                                                          |
-| Prettier             | `@joshuafolkken/kit/prettier` (needs the three plugins in [manual-config.md](./manual-config.md))                            |
-| Prettier, no plugins | `@joshuafolkken/kit/prettier/basic` — what a `basic` project uses (`/prettier/static` is the same preset under its old name) |
-| cspell               | `node_modules/@joshuafolkken/kit/cspell/index.yaml` (`@joshuafolkken/kit/cspell`)                                            |
-| tsconfig             | `./node_modules/@joshuafolkken/kit/tsconfig/base.json`                                                                       |
-| Scripts              | `tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts`                                                          |
-| Prompts              | `node_modules/@joshuafolkken/kit/prompts/*.md`                                                                               |
-| Version library      | `@joshuafolkken/kit/version`                                                                                                 |
-| Config-merge         | `@joshuafolkken/kit/config-merge`                                                                                            |
-| Env flags            | `@joshuafolkken/kit/env`                                                                                                     |
-| webServer cmd        | `@joshuafolkken/kit/web-server`                                                                                              |
-| Dev / preview ports  | `@joshuafolkken/kit/ports` — the port pair derived from `PORT_SEED`                                                          |
-| Self-sync guard      | `@joshuafolkken/kit/self-sync-guard` — see [sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository)      |
-| Managed marker       | `@joshuafolkken/kit/managed-marker` — see [sync.md](./sync.md#ai-files-overwritten)                                          |
-| Scanner provisioning | `@joshuafolkken/kit/security-audit-provision` — `security_audit_provision_logic` and type `ScannerAsset`                     |
-| Audit pass cache     | `@joshuafolkken/kit/security-audit-cache` — `security_audit_cache` and type `AuditPorts`                                     |
+| Use                  | Reference                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ESLint config        | `@joshuafolkken/kit/eslint/vanilla` (optional peers required)                                                                                    |
+| ESLint base          | `@joshuafolkken/kit/eslint/base` — the rule set `vanilla` builds on                                                                              |
+| ESLint rule          | `@joshuafolkken/kit/eslint/test-filename` — the test-file name rule                                                                              |
+| Prettier             | `@joshuafolkken/kit/prettier` (needs the three plugins in [manual-config.md](./manual-config.md))                                                |
+| Prettier, no plugins | `@joshuafolkken/kit/prettier/basic` — what a `basic` project uses (`/prettier/static` is the same preset under its old name)                     |
+| cspell               | `node_modules/@joshuafolkken/kit/cspell/index.yaml` (`@joshuafolkken/kit/cspell`)                                                                |
+| tsconfig             | `./node_modules/@joshuafolkken/kit/tsconfig/base.json`                                                                                           |
+| Scripts              | `tsx node_modules/@joshuafolkken/kit/scripts/gh/fix-gh-packages.ts`                                                                              |
+| Prompts              | `node_modules/@joshuafolkken/kit/prompts/*.md`                                                                                                   |
+| Version library      | `@joshuafolkken/kit/version`                                                                                                                     |
+| Config-merge         | `@joshuafolkken/kit/config-merge`                                                                                                                |
+| Env flags            | `@joshuafolkken/kit/env`                                                                                                                         |
+| webServer cmd        | `@joshuafolkken/kit/web-server`                                                                                                                  |
+| Dev / preview ports  | `@joshuafolkken/kit/ports` — the port pair derived from `PORT_SEED`                                                                              |
+| Self-sync guard      | `@joshuafolkken/kit/self-sync-guard` — see [sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository)                          |
+| Managed marker       | `@joshuafolkken/kit/managed-marker` — see [sync.md](./sync.md#ai-files-overwritten)                                                              |
+| Scanner provisioning | `@joshuafolkken/kit/security-audit-provision` — `security_audit_provision_logic` and type `ScannerAsset`                                         |
+| Audit pass cache     | `@joshuafolkken/kit/security-audit-cache` — `security_audit_cache` and type `AuditPorts`; `reserved_audit` scans the start directory, not `root` |
 
 Prefer wiring up individual configs without `josh init`? See [manual-config.md](./manual-config.md).
 
