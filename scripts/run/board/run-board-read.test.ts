@@ -50,6 +50,18 @@ const LANE_ROOM = {
 	occupied_lanes: ['3432'],
 	earlier_occupied: [],
 }
+// No lane history in the ledger; joshuafolkken/kit#8954: no declared or size record, so every band is empty.
+const NO_HISTORY = {
+	usual: new Map(),
+	lane_totals: [],
+	lane_bands: {
+		of_issue: new Map(),
+		totals: new Map([
+			['small', []],
+			['large', []],
+		]),
+	},
+}
 // An ended run with no record to resume from and no wake stamp: no session and no process named.
 const UNRECORDED = {
 	resume: undefined,
@@ -119,8 +131,7 @@ describe('run_board_read.read_local', () => {
 			lane_states: { own: new Map(), earlier: new Map(), unknown: ['3432'], ended: new Map() },
 			idle_lanes: [],
 			...LANE_ROOM,
-			usual: new Map(),
-			lane_totals: [],
+			...NO_HISTORY,
 			is_memory_held: false,
 			launch_hold: undefined,
 			usage_reset_ms: undefined,

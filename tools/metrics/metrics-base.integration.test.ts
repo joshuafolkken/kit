@@ -1,10 +1,12 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
+import { josh_cli_fixture } from '#scripts/josh/josh-cli-fixture'
 import { josh_harness, type HarnessResult, type JoshEnvironment } from '#tools/test/josh-harness'
 import { josh_harness_fixture } from '#tools/test/josh-harness-fixture'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { metrics_base } from './metrics-base'
+import { metrics_base_cache } from './metrics-base-cache'
 import { metrics_ratchet } from './metrics-ratchet'
 import { prose_density } from './prose-density'
 
@@ -38,12 +40,17 @@ const APPROVAL_FILE = '7.json'
 const PARENT = 'HEAD^1'
 const RERECORDED = 'the growth re-recorded in'
 
-const opened: { kit?: JoshEnvironment } = {}
+const NODE_MODULES = 'node_modules'
+
+// One kit environment for the file, wound back to its first commit after each scenario: opening one
+// per scenario gave every scenario a new merge-base commit, so each measured that base afresh in a
+// throwaway tree (joshuafolkken/kit#9013). The shared base is measured once and read from the cache
+// after, which is how a ship's repeated checks meet it too.
+const environment = josh_harness_fixture.open_environments(['kit'])
+const start = { branch: '', commit: '' }
 
 function kit(): JoshEnvironment {
-	if (opened.kit === undefined) throw new Error('no kit environment was opened')
-
-	return opened.kit
+	return environment('kit')
 }
 
 async function git(arguments_: ReadonlyArray<string>): Promise<string> {
@@ -78,19 +85,33 @@ async function worktrees(): Promise<string> {
 	return await git(['worktree', 'list', '--porcelain'])
 }
 
-// The child inherits this process's environment, so a base named in the shell that runs the suite
-// would be the one every scenario measured from.
-beforeEach(async () => {
-	vi.stubEnv(metrics_base.BASE_VARIABLE, '')
-	opened.kit = await josh_harness.open_environment('kit')
+// A scenario that asserts on the throwaway tree must build one, never read the cached base.
+function forget_base_reading(): void {
+	rmSync(metrics_base_cache.cache_path(start.commit, josh_cli_fixture.REPO_ROOT), { force: true })
+}
+
+async function wind_back(): Promise<void> {
+	await git(['switch', '--force', start.branch])
+	await git(['reset', '--hard', start.commit])
+	await git(['clean', '-fdx', '--exclude', NODE_MODULES])
+	await git(['update-ref', '-d', `refs/heads/${ISSUE_BRANCH}`])
+}
+
+beforeAll(async () => {
+	start.branch = await git(['branch', '--show-current'])
+	start.commit = await git(['rev-parse', 'HEAD'])
 }, SETUP_TIMEOUT_MS)
 
-josh_harness_fixture.stop_leftovers_after_each()
-
-afterEach(() => {
-	vi.unstubAllEnvs()
-	if (opened.kit !== undefined) josh_harness.close_environment(opened.kit)
+// The child inherits this process's environment, so a base named in the shell that runs the suite
+// would be the one every scenario measured from.
+beforeEach(() => {
+	vi.stubEnv(metrics_base.BASE_VARIABLE, '')
 })
+
+afterEach(async () => {
+	vi.unstubAllEnvs()
+	await wind_back()
+}, SETUP_TIMEOUT_MS)
 
 describe('josh metrics --totals-only against the merge-base', () => {
 	it(
@@ -110,6 +131,7 @@ describe('josh metrics --totals-only against the merge-base', () => {
 			await git(['switch', '-c', ISSUE_BRANCH])
 			const before = await worktrees()
 
+			forget_base_reading()
 			grow_rules()
 
 			const result = await check()

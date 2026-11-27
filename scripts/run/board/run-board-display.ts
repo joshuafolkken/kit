@@ -81,6 +81,7 @@ type LocalHeader = Pick<
 	| 'operations'
 	| 'usual'
 	| 'lane_totals'
+	| 'lane_bands'
 	| 'lane_limit'
 	| 'occupied_count'
 	| 'lane_capacity'
@@ -99,6 +100,7 @@ function local_header(local: LocalRead): LocalHeader {
 		operations: local.operations,
 		usual: local.usual,
 		lane_totals: local.lane_totals,
+		lane_bands: local.lane_bands,
 		lane_limit: local.lane_limit,
 		occupied_count: local.occupied_count,
 		lane_capacity: local.lane_capacity,

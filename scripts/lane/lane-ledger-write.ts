@@ -26,7 +26,7 @@ import type {
 	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
 import type { DispatchRecord } from './lane-ledger-schema-dispatch'
-import type { EstimateRecord } from './lane-ledger-schema-estimate'
+import type { DeclaredRecord, EstimateRecord } from './lane-ledger-schema-estimate'
 import type { OfferRecord } from './lane-ledger-schema-offer'
 import type { ChainRecord, PreflightLedgerRecord } from './lane-ledger-schema-ship'
 
@@ -148,6 +148,10 @@ async function record_dispatch(dispatch: DispatchRecord, path?: string): Promise
 
 async function record_estimate(estimate: EstimateRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.ESTIMATE, at: now_iso(), ...estimate }, path)
+}
+
+async function record_declared(declared: DeclaredRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.DECLARED, at: now_iso(), ...declared }, path)
 }
 
 async function record_stage(stage: StageRecord, path?: string): Promise<void> {
@@ -278,6 +282,7 @@ const lane_ledger_write = {
 	record,
 	record_chain,
 	record_core_wait,
+	record_declared,
 	record_dispatch,
 	record_estimate,
 	record_gate,
