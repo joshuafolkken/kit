@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acceptance_map } from './acceptance-map'
+import { acceptance_map, type Criterion } from './acceptance-map'
 
 // joshuafolkken/kit#3954. Each acceptance criterion the Issue carries at the merge needs a row in the
 // pull request body — met with evidence, or deferred to a split-off issue — matched by an identifier
@@ -29,6 +29,11 @@ function id(text: string): string {
 	return acceptance_map.criterion_id(text)
 }
 
+// A criterion with no checkbox cannot be ticked, so only `issue_with`'s open checkboxes read as open.
+function read_as(text: string, is_open: boolean): Criterion {
+	return { id: id(text), text, is_open }
+}
+
 function pr_with(rows: ReadonlyArray<string>): string {
 	return ['closes #3954', '', acceptance_map.MAP_HEADING, '', ...rows].join('\n')
 }
@@ -51,13 +56,13 @@ describe('acceptance_map.criteria_of', () => {
 	it('reads the English heading too, and ignores nested items', () => {
 		const body = ['## Acceptance criteria', '', `- ${FIRST}`, '  - detail'].join('\n')
 
-		expect(acceptance_map.criteria_of(body)).toEqual([{ id: id(FIRST), text: FIRST }])
+		expect(acceptance_map.criteria_of(body)).toEqual([read_as(FIRST, false)])
 	})
 
 	it('ignores a list item inside a code fence', () => {
 		const body = ['## 受け入れ条件', '', `- ${FIRST}`, '```md', `- ${SECOND}`, '```'].join('\n')
 
-		expect(acceptance_map.criteria_of(body)).toEqual([{ id: id(FIRST), text: FIRST }])
+		expect(acceptance_map.criteria_of(body)).toEqual([read_as(FIRST, false)])
 	})
 
 	it('reads nothing from an issue with no acceptance section', () => {
@@ -124,7 +129,7 @@ describe('acceptance_map.compare', () => {
 	it('names a criterion with no row', () => {
 		const result = compare(issue_with([FIRST, SECOND]), pr_with([met(FIRST)]))
 
-		expect(result.missing).toEqual([{ id: id(SECOND), text: SECOND }])
+		expect(result.missing).toEqual([read_as(SECOND, true)])
 	})
 
 	it('refuses a criterion added after the body was written', () => {
@@ -138,7 +143,7 @@ describe('acceptance_map.compare', () => {
 		const result = compare(issue_with([reworded]), pr_with([met(FIRST)]))
 
 		expect(result).toEqual({
-			missing: [{ id: id(reworded), text: reworded }],
+			missing: [read_as(reworded, true)],
 			deferrals: [],
 			stale: [id(FIRST)],
 		})

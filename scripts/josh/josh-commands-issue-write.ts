@@ -23,6 +23,16 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '6233 ac-a1f32a2f ac-8647b0dd' }],
 		},
 	},
+	'issue:defer': {
+		script: 'scripts/issue/issue-defer-cli.ts',
+		description:
+			'Mark an acceptance criterion moved to another issue, which gains a reference to it',
+		category: 'AI tools',
+		reference: ['<issue> <ac-id> #<target> <reason>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '9103 ac-a1f32a2f 9104 split off' }],
+		},
+	},
 	'issue:consolidate': {
 		script: 'scripts/issue/issue-consolidate-cli.ts',
 		description:

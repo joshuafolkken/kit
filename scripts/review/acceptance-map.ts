@@ -28,6 +28,12 @@ const BACKTICK = '`'
 const CRITERION_PATTERN = /^(?:[-*+]|\d+\.)\s+(?:\[[ xX]\]\s+)?(?<text>\S.*)$/u
 // A list item, heading, table row or HTML comment opens a block of its own, never a wrapped line.
 const BLOCK_START_PATTERN = /^\s*(?:(?:[-*+]|\d+\.)\s|#|\||<!--)/u
+// `josh issue:defer`'s mark at the end of a criterion: where it moved. It is no part of the criterion's
+// text, so marking a criterion keeps its identifier (joshuafolkken/kit#9146).
+const DEFER_MARK_PATTERN = /\s→\s(?<target>(?:[\w.-]+\/[\w.-]+)?#\d+)$/u
+const UNCHECKED_PATTERN = /^(?:[-*+]|\d+\.)\s+\[ \]/u
+// A criterion only the merge can confirm — `/verify-ui`, a human review — needs no tick and no mark.
+const POST_MERGE_PREFIX = 'マージ後の確認:'
 // The criterion's text may sit between the identifier and the status for the reader, so the status is
 // the last status word on the line — a criterion quoting the row format stays text.
 const ROW_PATTERN = new RegExp(
@@ -45,11 +51,21 @@ const ROW_FORMAT = `under ${MAP_HEADING}, one line per acceptance criterion: \`-
 interface Criterion {
 	id: string
 	text: string
+	// Neither ticked, marked deferred, nor left to the merge: what the merge refuses.
+	is_open?: boolean
+	deferred_to?: string
 }
 
 interface CriterionLine {
 	text: string
 	index: number
+	end: number
+}
+
+interface Selection {
+	ids: ReadonlySet<string>
+	at: 'index' | 'end'
+	edit: (line: string) => string
 }
 
 interface Deferral {
@@ -75,8 +91,12 @@ interface MapComparison {
 	stale: ReadonlyArray<string>
 }
 
+function unmarked(text: string): string {
+	return text.replaceAll(/\s+/gu, ' ').trim().replace(DEFER_MARK_PATTERN, '')
+}
+
 function criterion_id(text: string): string {
-	const normalized = text.replaceAll(/\s+/gu, ' ').trim()
+	const normalized = unmarked(text)
 	const digest = createHash('sha256').update(normalized).digest('hex')
 
 	return `${ID_PREFIX}${digest.slice(0, ID_HEX_LENGTH)}`
@@ -91,8 +111,10 @@ function joins(last: string, line: string): boolean {
 function append_line(items: Array<CriterionLine>, line: string, index: number): void {
 	const last = items.at(-1)
 
-	if (last !== undefined && joins(last.text, line)) last.text += ` ${line.trim()}`
-	else items.push({ text: line, index })
+	if (last !== undefined && joins(last.text, line)) {
+		last.text += ` ${line.trim()}`
+		last.end = index
+	} else items.push({ text: line, index, end: index })
 }
 
 // A criterion wrapped onto continuation lines is one criterion, hashed whole — rewording any of its
@@ -107,19 +129,43 @@ function unwrapped(lines: ReadonlyArray<string>): ReadonlyArray<CriterionLine> {
 	return items
 }
 
+function criterion_text(line: string): string | undefined {
+	return CRITERION_PATTERN.exec(line)?.groups?.['text']
+}
+
+function deferral_target(text: string): string | undefined {
+	return DEFER_MARK_PATTERN.exec(text.trim())?.groups?.['target']
+}
+
+function is_left(text: string, deferred_to: string | undefined): boolean {
+	return deferred_to !== undefined || text.startsWith(POST_MERGE_PREFIX)
+}
+
+// Only an open checkbox is open: a criterion with no checkbox cannot be ticked, so it reads as before.
+function criterion_of(line: string): Criterion | undefined {
+	const raw = criterion_text(line)
+
+	if (raw === undefined) return undefined
+	const text = unmarked(raw)
+	const deferred_to = deferral_target(raw)
+	const is_open = UNCHECKED_PATTERN.test(line) && !is_left(text, deferred_to)
+	const criterion = { id: criterion_id(text), text, is_open }
+
+	return deferred_to === undefined ? criterion : { ...criterion, deferred_to }
+}
+
 function criteria_of(issue_body: string | undefined): ReadonlyArray<Criterion> {
 	// A list item inside a code fence is an example the Issue quotes, not a criterion. An indented line
 	// outside one is a wrapped criterion's continuation, so it is kept.
 	const lines = markdown_section.fence_free_lines(epic_audit_logic.acceptance_section(issue_body))
-	const texts = unwrapped(lines).map((line) => CRITERION_PATTERN.exec(line.text)?.groups?.['text'])
 
-	return texts
-		.filter((text): text is string => text !== undefined)
-		.map((text) => ({ id: criterion_id(text), text: text.trim() }))
+	return unwrapped(lines)
+		.map((line) => criterion_of(line.text))
+		.filter((criterion): criterion is Criterion => criterion !== undefined)
 }
 
 function selected_line(line: CriterionLine, ids: ReadonlySet<string>): boolean {
-	const text = CRITERION_PATTERN.exec(line.text)?.groups?.['text']
+	const text = criterion_text(line.text)
 
 	return text !== undefined && ids.has(criterion_id(text))
 }
@@ -132,31 +178,49 @@ function tick_line(line: string): string {
 	return line.replace(/^(?<prefix>(?:[-*+]|\d+\.)\s+)\[ \]/u, '$<prefix>[x]')
 }
 
-function tick_section(section: string, ids: ReadonlySet<string>): string {
+// A second deferral replaces the first mark rather than stacking a second.
+function marker(target: string): (line: string) => string {
+	return function mark_line(line: string): string {
+		return `${line.trimEnd().replace(DEFER_MARK_PATTERN, '')} → ${target}`
+	}
+}
+
+// Edits one line of each selected criterion: `at` picks its first line or, for a mark that must end
+// the wrapped text, its last.
+function edit_section(section: string, selection: Selection): string {
 	const visible = markdown_section.fence_free_lines(section)
 	const selected = new Set(
 		unwrapped(visible)
-			.filter((line) => selected_line(line, ids))
-			.map((line) => line.index),
+			.filter((line) => selected_line(line, selection.ids))
+			.map((line) => line[selection.at]),
 	)
 
 	return section
 		.split('\n')
-		.map((line, index) => (selected.has(index) ? tick_line(line) : line))
+		.map((line, index) => (selected.has(index) ? selection.edit(line) : line))
 		.join('\n')
 }
 
 // IDs come from the plan's acceptance map. Resolve every ID before editing, so a stale plan cannot
-// partially tick an Issue. Only checkbox markers in the canonical acceptance section are changed.
-function tick(body: string, ids: ReadonlyArray<string>): string {
+// partially edit an Issue. Only lines in the canonical acceptance section are changed.
+function edit_criteria(body: string, selection: Selection): string {
 	const criteria = criteria_of(body)
-	const unknown = ids.filter((id) => criteria.every((criterion) => criterion.id !== id))
+	const unknown = [...selection.ids].filter((id) => criteria.every((item) => item.id !== id))
 
 	if (unknown.length > 0) throw new Error(`Unknown acceptance criteria: ${unknown.join(', ')}`)
 
 	return markdown_section.map_section(body, epic_audit_logic.is_acceptance_heading, (section) =>
-		tick_section(section, new Set(ids)),
+		edit_section(section, selection),
 	)
+}
+
+function tick(body: string, ids: ReadonlyArray<string>): string {
+	return edit_criteria(body, { ids: new Set(ids), at: 'index', edit: tick_line })
+}
+
+// `josh issue:defer`'s edit: the criterion stays as written, its end marked with where it moved.
+function defer(body: string, id: string, target: string): string {
+	return edit_criteria(body, { ids: new Set([id]), at: 'end', edit: marker(target) })
 }
 
 // A deferral row with no issue or no reason is no row at all, so its criterion reads as unmapped.
@@ -265,19 +329,22 @@ function listed(title: string, lines: ReadonlyArray<string>): ReadonlyArray<stri
 	return lines.length === 0 ? [] : [title, ...lines.map((line) => `  ${line}`)]
 }
 
+// `resolution` is the Issue-side lines `acceptance_map_defer.resolution_lines` builds.
 function refusal_message(
 	issue: string,
 	comparison: MapComparison,
 	absent: ReadonlyArray<string>,
+	resolution: ReadonlyArray<string> = [],
 ): string {
 	return [
-		`The pull request body does not map every acceptance criterion of ${session_cite.issue(issue)} as it reads now, so the merge is refused.`,
+		`The pull request body and the Issue do not account for every acceptance criterion of ${session_cite.issue(issue)} as it reads now, so the merge is refused.`,
 		...listed(
 			'Criteria with no row (added or reworded since the body was written, or never mapped):',
 			comparison.missing.map((criterion) => `- \`${criterion.id}\` ${criterion.text}`),
 		),
 		...listed('Deferral rows naming an issue that could not be found:', absent),
 		...listed('Rows naming no current criterion:', comparison.stale),
+		...resolution,
 		`Write ${ROW_FORMAT} — format: ${report_format_reference.pointer(report_format_reference.ACCEPTANCE_MAP_HEADING)}`,
 		'Write it into the `--body-file` before `josh ship`, or update an open PR with `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<path>`, then re-run.',
 	].join('\n')
@@ -288,7 +355,9 @@ const acceptance_map = {
 	compare,
 	criteria_of,
 	criterion_id,
+	defer,
 	has_map,
+	listed,
 	refusal_message,
 	ROW_FORMAT,
 	rows_of,

@@ -27,7 +27,7 @@ answers `not-a-lane` outside a lane, so it is safe to issue unconditionally.
 ## Taking the cut
 
 `chain-rule.md` step 1 issues it before `pnpm josh run:chain <N>`, the scoped pair and the gate —
-**unconditionally** — first tick in #N's body the criteria this tree meets (`pnpm josh issue:tick <N> <ac-id>...`, using the plan's criterion IDs):
+**unconditionally** — first tick in #N's body the criteria this tree meets (`pnpm josh issue:tick <N> <ac-id>...`, using the plan's criterion IDs) and mark the ones moved to another issue (`pnpm josh issue:defer <N> <ac-id> #<M> <reason>`):
 
 ```bash
 pnpm josh run:cut <N>

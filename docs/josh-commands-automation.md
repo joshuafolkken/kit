@@ -592,6 +592,22 @@ pnpm josh issue:tick 6233 ac-a1f32a2f ac-8647b0dd
 
 Use the `ac-…` identifiers printed in the plan's acceptance map. Unknown identifiers refuse the whole update. Repeating a checked criterion is a no-op. Other sections, formatting and line endings are preserved.
 
+### `josh issue:defer`
+
+<!-- usage: issue:defer -->
+
+Mark an acceptance criterion moved to another issue, which gains a reference to it.
+
+```bash
+pnpm josh issue:defer 9103 ac-a1f32a2f 9104 split off
+```
+
+<!-- /usage -->
+
+Appends ` → #<target>` to the criterion's last line (its `ac-…` identifier is unchanged) and adds a `引き継ぎ:` line naming the identifier to a target that lacks it. An unknown identifier or an unreadable target refuses before any write.
+
+The merge refuses an open checkbox neither ticked nor marked (`マージ後の確認:` excepted) and a mark whose target lacks the identifier. Ticks are not fact-checked.
+
 ### `josh issue:consolidate`
 
 <!-- usage: issue:consolidate -->
