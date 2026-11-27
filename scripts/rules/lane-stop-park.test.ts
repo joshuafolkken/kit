@@ -74,6 +74,12 @@ describe('stop_rules.stop_outcome — a lane child ending unrecorded', () => {
 		expect(stop_rules.stop_outcome(ending).reason).toBeUndefined()
 	})
 
+	it('points at the one park body check rather than restating it', () => {
+		expect(lane_park.LANE_STOP_PARK_REASON).toContain('scripts/run/park/run-park-body.ts')
+	})
+})
+
+describe('stop_rules.stop_outcome — the park beside the other stop rules', () => {
 	it('still releases the hold on the stop the loop-breaker lets through', () => {
 		const ending = context({
 			lane_child: true,
@@ -87,12 +93,22 @@ describe('stop_rules.stop_outcome — a lane child ending unrecorded', () => {
 		expect(stop_rules.stop_outcome(ending).actions).toEqual([{ kind: 'release', issue: ISSUE }])
 	})
 
-	it('says nothing about a recorded lane child stop', () => {
-		expect(stop_rules.stop_outcome(context({ lane_child: true })).reason).toBeUndefined()
+	it('joins the park with a filing offer, so neither is lost to the loop-breaker', () => {
+		const offer = '起票するのが妥当だと考えます。起票してよければ言ってください。'
+		const ending = context({
+			lane_child: true,
+			lane_unrecorded: true,
+			session_lang: 'ja',
+			message: offer,
+		})
+		const { reason } = stop_rules.stop_outcome(ending)
+
+		expect(reason).toContain(lane_park.LANE_STOP_PARK_REASON)
+		expect(reason).toContain(stop_rules.FILING_OFFER_REASON)
 	})
 
-	it('points at the one park body check rather than restating it', () => {
-		expect(lane_park.LANE_STOP_PARK_REASON).toContain('scripts/run/park/run-park-body.ts')
+	it('says nothing about a recorded lane child stop', () => {
+		expect(stop_rules.stop_outcome(context({ lane_child: true })).reason).toBeUndefined()
 	})
 })
 
