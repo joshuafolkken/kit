@@ -40,6 +40,9 @@ const LEVEL_OF: Readonly<Record<ThemeValue, RegExp>> = {
 	wopr: /DEFCON(?: \[?\d\]?){5}/u,
 	...LEVELS,
 	flux: /$^/u,
+	deviant: /STRESS \d+%/u,
+	isac: /STATUS (?:ALERT|ACTIVE|SECURE)/u,
+	ghost: /BARRIER BREACH|LINK (?:DIVING|STABLE)/u,
 }
 // No level display while the board idles: flux has none, codec's CAUTION comes with a NOTICE.
 const EVENT_LEVEL: ReadonlySet<ThemeValue> = new Set(['flux', 'codec'])
@@ -53,6 +56,9 @@ const WORKS: ReadonlyArray<ThemeValue> = [
 	'nixie',
 	'skynet',
 	'magi',
+	'deviant',
+	'isac',
+	'ghost',
 ]
 // The lane rows' spinner column (0-based), past the lane's mark column.
 const LANE_SPIN_X = 2

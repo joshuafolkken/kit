@@ -5,12 +5,18 @@ import { run_board_sound_codec } from './run-board-sound-codec'
 import { run_board_sound_enter } from './run-board-sound-enter'
 import { run_board_sound_keypad } from './run-board-sound-keypad'
 import { run_board_sound_nixie } from './run-board-sound-nixie'
+import { run_board_sound_palettes_deviant } from './run-board-sound-palettes-deviant'
+import { run_board_sound_palettes_extra } from './run-board-sound-palettes-extra'
 import { run_board_sound_palettes_film } from './run-board-sound-palettes-film'
 import { run_board_sound_palettes_more } from './run-board-sound-palettes-more'
 import { run_board_sound_score, type Palette, type Score } from './run-board-sound-score'
 import { run_board_sound_skynet } from './run-board-sound-skynet'
 import { run_board_sound_typing } from './run-board-sound-typing'
+import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
+import { run_board_theme_ghost_data } from './run-board-theme-ghost-data'
+import { run_board_theme_isac_data } from './run-board-theme-isac-data'
 import { run_board_theme_magi_data } from './run-board-theme-magi-data'
+import { run_board_theme_tones } from './run-board-theme-tones'
 
 // joshuafolkken/kit#8349: what each theme carries, one row per theme — a theme is added by adding its
 // row, and the theme values the CLI and the worker accept are this table's keys. joshuafolkken/kit#8917:
@@ -51,23 +57,28 @@ interface ThemeDefinition {
 }
 
 // The look a themed board's base is drawn in: the green phosphor palette the confirmed demo's frame was
-// captured in, so each color names one role — the text, the rules' dashes and headings, the idle glyphs,
-// the alert field the throughput rule ends on (`run-board-header-defcon.ts` → `level_of`, 1 the worst)
+// captured in, so each color names one role — the text, the rules' dashes and headings, the idle and the
+// info marks, the alert field the throughput rule ends on (`run-board-header-defcon.ts` → `level_of`, 1 the worst)
 // and the spinner's glyphs.
 interface BaseLook {
 	paint: Paint
 	rule: { dash: Paint; text: Paint }
 	idle: Paint
+	info: Paint
 	alert: (level: number) => string | undefined
 	spinner: string
 }
 
 const { SHADES } = run_board_header_trace
+const { MARK_PAINTS } = run_board_theme_tones
 
+// The idle and the info marks each take a paint no other text of the base has
+// (`run-board-theme-tones.ts` → `MARK_PAINTS`), so the host reads them back as roles of their own.
 const BASE_LOOK: BaseLook = {
 	paint: SHADES.body,
 	rule: { dash: SHADES.dark, text: SHADES.mid },
-	idle: SHADES.mid,
+	idle: MARK_PAINTS.idle,
+	info: MARK_PAINTS.info,
 	alert: run_board_header_trace.field_of,
 	spinner: 'ｦｱｳｴｵｶｷｹｺｻ',
 }
@@ -78,6 +89,11 @@ function no_sound(): undefined {
 
 const { CODEC, MAGI, NIXIE, SKYNET } = run_board_sound_palettes_more
 const { FLUX, TRACE, WOPR } = run_board_sound_palettes_film
+const { DEVIANT, DEVIANT_VOICES } = run_board_sound_palettes_deviant
+const { GHOST, GHOST_VOICES, ISAC, ISAC_VOICES } = run_board_sound_palettes_extra
+const { OPEN: DEVIANT_OPEN } = run_board_theme_deviant_data
+const { OPEN: ISAC_OPEN } = run_board_theme_isac_data
+const { ASSEMBLE: GHOST_ASSEMBLE } = run_board_theme_ghost_data
 const { score_of } = run_board_sound_score
 
 // The teletype the wargames board types in.
@@ -144,6 +160,25 @@ const THEME_DEFS = {
 		),
 		intro: { line: run_board_theme_magi_data.MAGI_OPEN.title, letter_ms: TELETYPE.intro.letter_ms },
 	},
+	// Each of the three below types its own opening from the first tick, so its sound counts those letters:
+	// deviant's date card, two letters a tick.
+	deviant: {
+		name: 'josh-rk800',
+		...voiced(DEVIANT_VOICES, DEVIANT),
+		intro: { line: DEVIANT_OPEN.line, letter_ms: DEVIANT_OPEN.letter_ms },
+	},
+	// isac's title.
+	isac: {
+		name: 'josh-isac',
+		...voiced(ISAC_VOICES, ISAC),
+		intro: { line: ISAC_OPEN.title, letter_ms: ISAC_OPEN.letter_ms },
+	},
+	// ghost's wave of digits, a letter a tick for as long as the wave runs.
+	ghost: {
+		name: 'josh-ghost',
+		...voiced(GHOST_VOICES, GHOST),
+		intro: { line: GHOST_ASSEMBLE.line, letter_ms: GHOST_ASSEMBLE.letter_ms },
+	},
 } as const satisfies Readonly<Record<string, ThemeDefinition>>
 
 type Theme = keyof typeof THEME_DEFS
@@ -162,6 +197,12 @@ const THEME_ALIASES: ReadonlyMap<string, Theme> = new Map<string, Theme>([
 	['terminator', 'skynet'],
 	['evangelion', 'magi'],
 	['eva', 'magi'],
+	['detroit', 'deviant'],
+	['dbh', 'deviant'],
+	['division', 'isac'],
+	['shd', 'isac'],
+	['gits', 'ghost'],
+	['shell', 'ghost'],
 ])
 
 // A table's theme names, in its row order, as the non-empty list `z.enum` takes.

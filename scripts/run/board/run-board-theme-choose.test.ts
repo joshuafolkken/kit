@@ -58,7 +58,7 @@ describe('run_board_theme.choose an alias', () => {
 		const environment = { [run_board_theme.THEME_ENV]: 'nope' }
 
 		expect(run_board_theme.refusal([], environment)).toBe(
-			'JOSH_BOARD_THEME=nope names no theme (wopr, trace, flux, codec, nixie, skynet, magi)\n',
+			'JOSH_BOARD_THEME=nope names no theme (wopr, trace, flux, codec, nixie, skynet, magi, deviant, isac, ghost)\n',
 		)
 	})
 })

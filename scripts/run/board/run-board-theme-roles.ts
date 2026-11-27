@@ -1,5 +1,6 @@
 import { run_board_cells, type Cells } from './run-board-cells'
 import type { Cell, Grid } from './run-board-theme-host-types'
+import { run_board_theme_tones } from './run-board-theme-tones'
 
 // A board's cells read back as the theme host's roles (joshuafolkken/kit#8917). A themed live board
 // draws its base in the matrix theme's palette — the palette the confirmed demo's frame was captured
@@ -7,14 +8,20 @@ import type { Cell, Grid } from './run-board-theme-host-types'
 // paints every role in its own colors.
 
 const { CONTINUATION, char_text, style_of } = run_board_cells
+const { MARK_PAINTS, TONE_PAINTS } = run_board_theme_tones
 const ESC = '\u{1B}['
 const COLOR_PREFIX = '38;2;'.length
 // eslint-disable-next-line no-control-regex -- an SGR opens with ESC
 const COLOR_SGR = /\u{1B}\[(38;2;\d+;\d+;\d+|32)m/gu
 const NAMED_GREEN = '32'
 
-// The matrix theme's colors, read as roles.
+// The matrix theme's colors, read as roles; and the three tones of the marks that stand in for icons
+// which no color of the matrix theme tells apart (`run-board-theme-tones.ts`) — waiting on a person,
+// idle and info — each a role a theme may give a color (`ThemeColors`), its body's where it gives none.
 const ROLE_OF_COLOR: ReadonlyMap<string, string> = new Map([
+	[TONE_PAINTS.human.rgb, 'human'],
+	[MARK_PAINTS.idle.rgb, 'idle'],
+	[MARK_PAINTS.info.rgb, 'info'],
 	['0;215;60', 'body'],
 	['0;165;40', 'body'],
 	['0;100;22', 'rule'],

@@ -111,6 +111,10 @@ const COLORS: ThemeColors = {
 	hi: text_of(HI),
 	type: text_of(BODY),
 	notice: text_of(BODY),
+	// The marks' tones: info, idle, waiting on a person.
+	info: '130;190;255',
+	idle: '110;118;128',
+	human: '255;130;190',
 }
 
 // Numbers written as one line of text, space-separated: a gauge's column heights.

@@ -25,7 +25,7 @@ const OPTIONS = {
 	loose: { type: 'boolean', default: false },
 } as const
 const NO_BEATS =
-	'board:compare — the demo wrote no beat lines: it needs the DEMO_BEATS=1 form (.claude/skills/board-theme/demo-template.md)'
+	'board:compare — the demo wrote no beat lines: it needs the DEMO_BEATS=1 form (docs/josh-commands-board.md → "josh board:compare")'
 const COUNT = /^\d+$/u
 const ARGV_OFFSET = 2
 const DIVERGED_EXIT_CODE = 1

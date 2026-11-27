@@ -31,7 +31,7 @@ const INTENSITY_OFF = `${ESCAPE}[22m`
 const TABLE: Readonly<Record<Tone, ReadonlyArray<string>>> = {
 	alert: ['P1', 'FL', '[]', 'XX', '!!', 'XP', 'RL', '##', 'NO', 'HT', 'X'],
 	caution: ['P2', '??', 'JG', '[_', 'LC', 'T+', '!', '<<'],
-	human: [String.raw`\O`, 'HU', 'Q?'],
+	human: [String.raw`\O`, 'HU', '!?', 'Q?'],
 	done: ['OK', '|>', 'MG', 'SH', '^^', 'AC', '+', 'V'],
 	running: ['>>', 'IV', 'PL', 'BD', 'RV', 'CM', 'R2', 'RP'],
 	idle: ['ZZ', '..', '||', '>|', 'OF', '<X', 'OO', '<-', '>=', '║'],
@@ -60,6 +60,7 @@ const SHAPES: ReadonlyArray<readonly [string, string]> = [
 	['⏸', '║'],
 	['📅', '>='],
 	['🙋', String.raw`\O`],
+	['✋', '!?'],
 	['📁', '[+'],
 	['🔭', 'OO'],
 	['🔁', '<<'],
@@ -262,7 +263,7 @@ describe('run_board_theme_glyphs.textual in color', () => {
 			run_board_theme_tones.toned('human', String.raw`\O`),
 			run_board_theme_tones.toned('running', '>>'),
 			run_board_theme_tones.toned('idle', 'ZZ', BASE_LOOK.idle),
-			'<3|',
+			`${run_board_theme_tones.toned('info', '<3', BASE_LOOK.idle, BASE_LOOK.info)}|`,
 		]
 
 		expect(toned).toBe(expected.join(' '))

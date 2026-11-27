@@ -42,7 +42,27 @@ describe('run_board_theme_canvas.put_frame', () => {
 		expect(run_board_cells.style_of(cells.styles[0] ?? 0).link).toBe(LINK)
 		expect(run_board_cells.style_of(cells.styles[1] ?? 0).link).toBe('')
 	})
+})
 
+describe('run_board_theme_canvas.put_frame — a linked blank', () => {
+	it('keeps a linked blank while the words on both sides keep their link', () => {
+		const cells = canvas_of(`\u{1B}]8;;${LINK}\u{1B}\\a b\u{1B}]8;;\u{1B}\\`)
+
+		put_frame(cells, [[cell('a'), cell(' '), cell('b')]])
+
+		expect(run_board_cells.style_of(cells.styles[1] ?? 0).link).toBe(LINK)
+	})
+
+	it('drops a linked blank’s link once the theme blanked its words', () => {
+		const cells = canvas_of(`\u{1B}]8;;${LINK}\u{1B}\\a b\u{1B}]8;;\u{1B}\\`)
+
+		put_frame(cells, [[cell(' '), cell(' '), cell(' ')]])
+
+		expect(run_board_cells.style_of(cells.styles[1] ?? 0).link).toBe('')
+	})
+})
+
+describe('run_board_theme_canvas.put_frame — a wide character', () => {
 	it('keeps a wide character whole, and blanks one the theme split', () => {
 		const kept = canvas_of('🔊x')
 		const split = canvas_of('🔊x')

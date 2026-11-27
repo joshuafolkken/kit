@@ -1,7 +1,6 @@
 // A seeded random source for replaying the board's animations (joshuafolkken/kit#8750): mulberry32,
-// a 32-bit generator whose sequence one seed fixes. The board theme demo template
-// (`.claude/skills/board-theme/demo-template.md`) carries the same formula, so a demo and a test
-// drawing under one seed draw from one sequence.
+// a 32-bit generator whose sequence one seed fixes, so a demo and a test drawing under one seed draw
+// from one sequence.
 
 // A random source in [0, 1).
 type Random = () => number

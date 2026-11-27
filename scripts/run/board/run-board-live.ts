@@ -432,6 +432,7 @@ async function watch(board: BoardPorts, theme: Theme | undefined, failed?: Faile
 	ports.on_exit(leave)
 
 	try {
+		await run_board_live_sound.ready(themed, keys, shown_of(run))
 		await redraw_forever({ themed, plain: plain_of(themed) }, SCREEN, {
 			last: { text: undefined },
 			failed,

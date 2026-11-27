@@ -47,11 +47,28 @@ const ALIASES = [
 	['terminator', 'skynet'],
 	['evangelion', 'magi'],
 	['eva', 'magi'],
+	['detroit', 'deviant'],
+	['dbh', 'deviant'],
+	['division', 'isac'],
+	['shd', 'isac'],
+	['gits', 'ghost'],
+	['shell', 'ghost'],
 ] as const
 
 describe('run_board_theme_defs.THEMES', () => {
-	it('names the seven works by their board names after josh-, in the demo key order', () => {
-		expect(THEMES).toStrictEqual(['wopr', 'trace', 'flux', 'codec', 'nixie', 'skynet', 'magi'])
+	it('names the ten works by their board names after josh-, in the demo key order', () => {
+		expect(THEMES).toStrictEqual([
+			'wopr',
+			'trace',
+			'flux',
+			'codec',
+			'nixie',
+			'skynet',
+			'magi',
+			'deviant',
+			'isac',
+			'ghost',
+		])
 	})
 
 	it('names every row of the table, in its order', () => {
@@ -62,8 +79,12 @@ describe('run_board_theme_defs.THEMES', () => {
 		expect(run_board_theme.THEMES).toBe(THEMES)
 	})
 
-	it.each(THEMES)('names the %s board josh-%s', (theme) => {
+	it.each(THEMES.filter((theme) => theme !== 'deviant'))('names the %s board josh-%s', (theme) => {
 		expect(THEME_DEFS[theme].name).toBe(`josh-${theme}`)
+	})
+
+	it('names the deviant board after its model, josh-rk800', () => {
+		expect(THEME_DEFS.deviant.name).toBe('josh-rk800')
 	})
 })
 

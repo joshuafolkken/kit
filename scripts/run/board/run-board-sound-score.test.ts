@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { run_board_sound_score, type Palette } from './run-board-sound-score'
+import { run_board_sound_score, type Cue, type Palette, type Score } from './run-board-sound-score'
 import { run_board_sound_shape } from './run-board-sound-shape'
 import { run_board_sound_synth } from './run-board-sound-synth'
 import { run_board_sound_voice } from './run-board-sound-voice'
@@ -19,6 +19,8 @@ const HZ = 440
 const SOUND_MS = 60
 const PEAK = 0.2
 const LOUD_PEAK = 0.9
+// A cue under the track's loudest, so the WAV's scale is left as it was.
+const QUIET_PEAK = 0.05
 const TRACK_LIMIT = 0.3
 const LETTERS = 12
 const PART_MS = 2000
@@ -157,19 +159,29 @@ describe('run_board_sound_score.score_of tracks', () => {
 	})
 })
 
-// The samples a part's track renders, the writer stubbed.
-function part_pcm(palette: Palette, part: 'opening' | 'ending'): Array<number> {
+// The samples the first track `play` asks of the palette's score renders, the writer stubbed.
+function track_pcm(palette: Palette, play: (score: Score) => void): Array<number> {
 	const rendered: Array<Array<number>> = []
 
 	vi.spyOn(run_board_sound_wav, 'resolved_samples').mockImplementation((track) => {
 		rendered.push([...track.render()])
 
-		return '/sounds/part.wav'
+		return '/sounds/track.wav'
 	})
-	score_of(palette).part(part, PART_MS)
+	play(score_of(palette))
 	vi.restoreAllMocks()
 
 	return rendered[0] ?? []
+}
+
+// The samples a part's track renders, the writer stubbed.
+function part_pcm(palette: Palette, part: 'opening' | 'ending'): Array<number> {
+	return track_pcm(palette, (score) => score.part(part, PART_MS))
+}
+
+// The samples a ROW of `LETTERS` renders, the writer stubbed.
+function row_pcm(palette: Palette): Array<number> {
+	return track_pcm(palette, (score) => score.row(LETTERS))
 }
 
 describe('run_board_sound_score.score_of opening cues', () => {
@@ -195,6 +207,64 @@ describe('run_board_sound_score.score_of opening cues', () => {
 
 		expect(part_pcm(late, 'opening')).toStrictEqual(part_pcm({ ...plain, name: 'p2' }, 'opening'))
 		expect(part_pcm(late, 'ending')).toStrictEqual(part_pcm({ ...plain, name: 'p3' }, 'ending'))
+	})
+
+	it('mixes each ending cue into the ending from its time, the opening unchanged', () => {
+		const plain = palette_of()
+		const cued = { ...plain, ending_cues: [{ at_ms: CUE_MS, sound: sound() }] }
+		const ending = part_pcm(cued, 'ending')
+		const without = part_pcm({ ...plain, name: `${plain.name}-plain` }, 'ending')
+
+		expect(ending.slice(0, cue_at)).toStrictEqual(without.slice(0, cue_at))
+		expect(ending.slice(cue_at)).not.toStrictEqual(without.slice(cue_at))
+		expect(part_pcm(cued, 'opening')).toStrictEqual(
+			part_pcm({ ...plain, name: `${plain.name}-open` }, 'opening'),
+		)
+	})
+})
+
+describe('run_board_sound_score.score_of ROW beats and ring', () => {
+	const TYPING_MS = LETTERS * TICK_MS
+	const BEAT_MS = TYPING_MS / 2
+	const beat_at = (BEAT_MS * SAMPLE_RATE) / MS_PER_SECOND
+	const typed_at = (TYPING_MS * SAMPLE_RATE) / MS_PER_SECOND
+	const RING_MS = 1000
+
+	it('asks the beats of the ROW’s letters and mixes each from its time', () => {
+		const asked: Array<number> = []
+		const plain = palette_of()
+
+		function beats(letters: number): ReadonlyArray<Cue> {
+			asked.push(letters)
+
+			return [{ at_ms: BEAT_MS, sound: sound(QUIET_PEAK) }]
+		}
+
+		const beaten = row_pcm({ ...plain, row: { ...plain.row, beats } })
+		const without = row_pcm({ ...plain, name: `${plain.name}-plain` })
+
+		expect(asked).toStrictEqual([LETTERS])
+		expect(beaten.slice(0, beat_at)).toStrictEqual(without.slice(0, beat_at))
+		expect(beaten.slice(beat_at)).not.toStrictEqual(without.slice(beat_at))
+	})
+
+	it('leaves out a beat past the typing', () => {
+		const plain = palette_of()
+		const late = { ...plain.row, beats: () => [{ at_ms: TYPING_MS, sound: sound() }] }
+
+		expect(row_pcm({ ...plain, row: late })).toStrictEqual(
+			row_pcm({ ...plain, name: `${plain.name}-plain` }),
+		)
+	})
+
+	it('starts a ringing end as the letters finish and lays the track past them', () => {
+		const plain = palette_of()
+		const ringing = row_pcm({ ...plain, row: { ...plain.row, ring_ms: RING_MS } })
+		const end_at = typed_at + (SOUND_MS * SAMPLE_RATE) / MS_PER_SECOND
+
+		expect(ringing).toHaveLength(((TYPING_MS + RING_MS) * SAMPLE_RATE) / MS_PER_SECOND)
+		expect(loudest(ringing.slice(typed_at, end_at))).toBeGreaterThan(0)
+		expect(loudest(ringing.slice(end_at))).toBe(0)
 	})
 })
 

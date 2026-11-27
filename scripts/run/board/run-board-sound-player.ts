@@ -141,6 +141,11 @@ function close(): void {
 	RESIDENT.current = undefined
 }
 
+// The wait for the resident player's output to open: none with no resident, once open, or once gone.
+function opening(): Promise<void> | undefined {
+	return RESIDENT.current?.opening
+}
+
 // `file` started on the resident player; false where there is none or it cannot play it.
 function resident_started(file: string, is_loop: boolean, handlers: StartHandlers): boolean {
 	const child = RESIDENT.current && run_board_sound_resident.play(RESIDENT.current, file, is_loop)
@@ -307,6 +312,7 @@ const run_board_sound_player = {
 	play,
 	play_cue,
 	loop,
+	opening,
 	prepare,
 	start,
 	stop_all,

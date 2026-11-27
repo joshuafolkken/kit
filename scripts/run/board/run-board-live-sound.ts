@@ -3,6 +3,7 @@ import { run_board_sound_latency } from './run-board-sound-latency'
 import { run_board_sound_player, type Playing, type StartHandlers } from './run-board-sound-player'
 import type { Score } from './run-board-sound-score'
 import type { EventKind, TypingSound } from './run-board-sound-typing'
+import type { BoardPorts } from './run-board-state'
 import { run_board_theme_defs, type Theme } from './run-board-theme-defs'
 import type { PartName } from './run-board-theme-host-types'
 
@@ -40,6 +41,9 @@ const RANK: Readonly<Record<EventKind | PartName, number>> = {
 	opening: 3,
 	ending: 3,
 }
+// The longest a board's first frame waits for the resident player's output to open: a Bluetooth output
+// takes a second or more (`run-board-sound-resident.ts`), the player's own start on top.
+const READY_WAIT_MS = 2000
 const HELD = new Set<Held>()
 // Event and part sounds a frame ranked, started once the frame's typing has (joshuafolkken/kit#9087).
 const PENDING: Array<{ file: string; rank: number }> = []
@@ -179,11 +183,39 @@ function warm(theme: Theme | undefined): void {
 	run_board_sound_player.prepare()
 }
 
+// The wait a board's first frame owes the resident player, none where no sound of the opening would be
+// lost: no trill, no theme shown, the sound switch off, or no player still opening.
+function awaited(
+	board: Pick<BoardPorts, 'typing_sound'>,
+	keys: KeyReading,
+	shown: Shown | undefined,
+): Promise<void> | undefined {
+	if (board.typing_sound === undefined || shown?.() === undefined) return undefined
+
+	return is_sounding(keys) ? run_board_sound_player.opening() : undefined
+}
+
+// The board's first frame held until the resident player's output is open, so the opening's first
+// sounds are heard from their start: a `play` and its `stop` sent before then wait in the player's stdin
+// and are read together, the sound never heard. No longer than `READY_WAIT_MS`, so a slow or stuck
+// player never keeps the board; the clock is asked for no sleep where there is nothing to wait for.
+async function ready(
+	board: Pick<BoardPorts, 'sleep' | 'typing_sound'>,
+	keys: KeyReading,
+	shown: Shown | undefined,
+): Promise<void> {
+	const opening = awaited(board, keys, shown)
+
+	if (opening !== undefined) await Promise.race([opening, board.sleep(READY_WAIT_MS)])
+}
+
 const run_board_live_sound = {
+	READY_WAIT_MS,
 	heard,
 	hush,
 	is_sounding,
 	leave_with,
+	ready,
 	scored,
 	skipped,
 	switched_end,

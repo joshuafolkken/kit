@@ -157,7 +157,19 @@ function part_since(run: ThemeRun, at_ms: number): Since | undefined {
 
 	if (part?.start_ms === undefined) return undefined
 
-	return { name: part.name, since_ms: at_ms - part.start_ms }
+	// A part rebased to its frame's write (`rebased`) starts after the frame's own moment: none into it yet.
+	return { name: part.name, since_ms: Math.max(0, at_ms - part.start_ms) }
+}
+
+// A part begun on the frame drawn at `at_ms` begins as that frame is written, `now_ms`: the frame's
+// sounds are rendered in between, and a process that has rendered none yet takes longer over a part's
+// whole track than a short opening's letters type — timed from before the render, they were typed
+// through, their trill never heard, by the part's second frame. A frame that rendered nothing moves
+// its part by no more than its own drawing.
+function rebased(run: ThemeRun, at_ms: number, now_ms: number): void {
+	const { part } = run
+
+	if (part?.start_ms === at_ms) part.start_ms = now_ms
 }
 
 // The letters the part `name` types: the opening's are its theme's intro's; the ending's its own
@@ -191,7 +203,8 @@ function sound_starts(
 type FrameTrill = Pick<TypingSound, 'set' | 'typed' | 'event' | 'part' | 'flush'>
 
 // The typing a frame sounds: the trill of the typing on screen — the board's own, or in demo mode the
-// demo's (`run-board-theme-demo-sound.ts`) — and through a part the letters it types.
+// demo's (`run-board-theme-demo-sound.ts`) — and through a part the letters it types; an opening
+// sounds its own letters alone, an ending the board's with its own.
 function sound_typing(
 	run: ThemeRun,
 	trill: FrameTrill | undefined,
@@ -205,8 +218,10 @@ function sound_typing(
 	}
 
 	const at = { last_ms: run.sound_ms, since_ms: since.since_ms }
+	// The board is not on screen through the opening: its rows' typing sounds nothing under it.
+	const board = since.name === 'opening' ? run_board_theme_demo_sound.SILENT : typing
 
-	run_board_theme_sound.sounded(trill, part_typing(run, since.name), at, typing)
+	run_board_theme_sound.sounded(trill, part_typing(run, since.name), at, board)
 	run.sound_ms = since.since_ms
 }
 
@@ -227,6 +242,6 @@ function after_frame(
 	trill?.flush?.()
 }
 
-const run_board_theme_layer = { after_frame, theme_layer }
+const run_board_theme_layer = { after_frame, rebased, theme_layer }
 
 export { run_board_theme_layer }

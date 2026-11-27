@@ -19,6 +19,7 @@ const RATE = 8000
 const SAMPLES = 4000
 const HALF_SECOND_MS = 500
 const REPORTED_MS = 40
+const LATENCY_LINE = 'latency 0.04\n'
 const create_directory = temporary_directory()
 
 afterEach(() => {
@@ -106,6 +107,62 @@ describe('run_board_sound_resident.open', () => {
 	})
 })
 
+// The listener told as `resident`'s output opens.
+function awaiting(resident: Resident): ReturnType<typeof vi.fn> {
+	const opened = vi.fn()
+
+	async function wait(): Promise<void> {
+		await resident.opening
+		opened()
+	}
+
+	void wait()
+
+	return opened
+}
+
+// A real start asks for the opening's first sounds before the player has opened the output: `opening`
+// is what the board's first frame waits on.
+describe('run_board_sound_resident.open — opening', () => {
+	it('holds `opening` until the player’s first line, none to await after', async () => {
+		const { child, resident } = harness()
+		const opened = awaiting(resident)
+
+		await settled()
+		expect(opened).not.toHaveBeenCalled()
+		child.stdout.write(LATENCY_LINE)
+		await settled()
+
+		expect(opened).toHaveBeenCalledOnce()
+		expect(resident.opening).toBeUndefined()
+	})
+
+	it.each(['exit', 'error'] as const)(
+		'ends the wait as the player is gone on %s',
+		async (event) => {
+			const { child, resident } = harness()
+			const opened = awaiting(resident)
+
+			child.emit(event)
+			await settled()
+
+			expect(opened).toHaveBeenCalledOnce()
+			expect(resident.opening).toBeUndefined()
+		},
+	)
+
+	it('ends the wait as the board closes the player', async () => {
+		const { resident } = harness()
+		const opened = awaiting(resident)
+
+		run_board_sound_resident.close(resident)
+		await settled()
+
+		expect(opened).toHaveBeenCalledOnce()
+		expect(resident.opening).toBeUndefined()
+	})
+})
+
 describe('run_board_sound_resident.play', () => {
 	it('sends a play line per sound with its own id and loop flag', async () => {
 		const { resident, written } = harness()
@@ -174,7 +231,7 @@ describe('run_board_sound_resident.close', () => {
 		const { child, resident } = harness()
 		const exit = vi.fn()
 
-		child.stdout.write('latency 0.04\n')
+		child.stdout.write(LATENCY_LINE)
 		await settled()
 		run_board_sound_resident.play(resident, WAV, true)?.on('exit', exit)
 		child.emit('exit')

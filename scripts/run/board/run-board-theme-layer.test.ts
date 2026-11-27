@@ -110,18 +110,36 @@ describe('run_board_theme_layer.theme_layer over the base', () => {
 	})
 })
 
+// An opening that types its letters through its first second, the typed end after them.
+const OPENING_SOUND = { spans: [{ from_ms: 0, to_ms: 1000 }], typed_ms: 1000 }
+
+// A run whose opening started at the origin.
+function opening_run(): ReturnType<typeof ticking_run> {
+	const run = ticking_run(ORIGIN_MS)
+
+	run.opening_sound = () => OPENING_SOUND
+	run.part = { name: 'opening', start_ms: ORIGIN_MS }
+
+	return run
+}
+
+const ROW_TEXT = 'abcdefghij'
+// The board's rows typing by its own reckoning, whatever the theme shows.
+const BOARD_TYPING = { is_on: true, left_ms: 500 }
+
+// `run`'s theme built over the fixture's base — outside its part, which a draw would play — and the
+// board's row `key` typing from `at_ms`.
+function typing_row(run: ReturnType<typeof ticking_run>, key: string, at_ms: number): void {
+	const { part } = run
+	const line = { key, index: 14, row: 15, text: ROW_TEXT, prefix_columns: 0, start_ms: at_ms }
+
+	run.part = undefined
+	drawn_at(theme_layer(run, VIEW), ORIGIN_MS)
+	run.part = part
+	run_board_theme_run.observe(run, [line], at_ms)
+}
+
 describe('run_board_theme_layer.after_frame', () => {
-	const sound = { spans: [{ from_ms: 0, to_ms: 1000 }], typed_ms: 1000 }
-
-	function opening_run(): ReturnType<typeof ticking_run> {
-		const run = ticking_run(ORIGIN_MS)
-
-		run.opening_sound = () => sound
-		run.part = { name: 'opening', start_ms: ORIGIN_MS }
-
-		return run
-	}
-
 	it('sounds the typed end once on crossing its moment, frames skipped', () => {
 		const run = opening_run()
 		const trill = { set: vi.fn(), typed: vi.fn() }
@@ -147,14 +165,61 @@ describe('run_board_theme_layer.after_frame', () => {
 		expect(trill.set).toHaveBeenCalledWith(false, 0)
 	})
 
-	it('keeps the board typing trill outside the opening', () => {
+	// A done, queued, waiting or decision row starts no event: the theme draws it whole, no letter typed.
+	it('keeps a board row the theme types no letter of out of the trill', () => {
 		const run = ticking_run(ORIGIN_MS)
 		const trill = { set: vi.fn(), typed: vi.fn() }
 
-		after_frame(run, trill, ORIGIN_MS, { is_on: true, left_ms: 300 })
+		typing_row(run, 'done:8899', ORIGIN_MS)
+		after_frame(run, trill, ORIGIN_MS + TICK_MS, { is_on: true, left_ms: 300 })
+
+		expect(trill.set.mock.calls).toStrictEqual([[false, 0]])
+		expect(run_board_theme_sound.SILENT.typed_ms).toBeUndefined()
+	})
+})
+
+describe('run_board_theme_layer.after_frame with the board typing under a part', () => {
+	// The board is not on screen through the opening: rows a landing plan types under it sound nothing.
+	it('keeps the board’s typing out of the opening’s trill, off once its letters typed', () => {
+		const run = opening_run()
+		const trill = { set: vi.fn(), typed: vi.fn() }
+
+		for (const at of [400, 1200, 3000]) after_frame(run, trill, ORIGIN_MS + at, BOARD_TYPING)
+
+		expect(trill.set.mock.calls).toStrictEqual([
+			[true, undefined],
+			[false, 0],
+			[false, 0],
+		])
+		expect(trill.typed).toHaveBeenCalledOnce()
+	})
+
+	// The ROW starts on tick 24 and types a letter a tick: two are out on tick 25, all ten by tick 34.
+	it('sounds a lane row’s ROW from the frame the opening is over, timed by the theme’s letters', () => {
+		const run = opening_run()
+		const trill = { set: vi.fn(), typed: vi.fn() }
+
+		typing_row(run, 'lanes:8899', ORIGIN_MS + 1200)
+		after_frame(run, trill, ORIGIN_MS + 1200, BOARD_TYPING)
+		run_board_theme_run.end_part(run)
+		after_frame(run, trill, ORIGIN_MS + 1250, BOARD_TYPING)
+		after_frame(run, trill, ORIGIN_MS + 1700, BOARD_TYPING)
+
+		expect(trill.set.mock.calls).toStrictEqual([
+			[false, 0],
+			[true, (ROW_TEXT.length - 2) * TICK_MS],
+			[false, 0],
+		])
+	})
+
+	it('keeps sounding the board’s typing through the ending, as before', () => {
+		const run = ticking_run(ORIGIN_MS)
+		const trill = { set: vi.fn(), typed: vi.fn() }
+
+		run.part = { name: 'ending', start_ms: ORIGIN_MS }
+		after_frame(run, trill, ORIGIN_MS + 200, { is_on: true, left_ms: 300 })
 
 		expect(trill.set).toHaveBeenCalledWith(true, 300)
-		expect(run_board_theme_sound.SILENT.typed_ms).toBeUndefined()
 	})
 })
 

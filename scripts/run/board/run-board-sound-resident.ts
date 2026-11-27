@@ -91,6 +91,9 @@ interface Resident {
 	next_id: number
 	sounds: Map<number, Sound>
 	is_closed: boolean
+	// Settled as the output is open — the player wrote its first line — or as the player is gone; none after.
+	opening: Promise<void> | undefined
+	opened: (() => void) | undefined
 }
 
 // A mono 16-bit WAV's length from its size and its header's rate.
@@ -121,10 +124,18 @@ function ended(resident: Resident, sound: Sound): void {
 	for (const exit of sound.exits) exit(0)
 }
 
+// The wait for the output over: whoever awaits `opening` goes on, and there is none to await after.
+function opened(resident: Resident): void {
+	resident.opened?.()
+	resident.opening = undefined
+	resident.opened = undefined
+}
+
 // The player gone: no more sounds, every one playing ended, and its latency report forgotten.
 function closed(resident: Resident): void {
 	if (resident.is_closed) return
 	resident.is_closed = true
+	opened(resident)
 	run_board_sound_latency.report(undefined)
 	for (const sound of resident.sounds.values()) ended(resident, sound)
 }
@@ -151,7 +162,24 @@ function spawned(ports: ResidentPorts): ResidentChild | undefined {
 	}
 }
 
-// The player watched: gone as it fails or exits, and its first line kept as its latency report.
+// The player's first line — written once its engine has started, so the output is open — kept as its
+// latency report; a player with no stdout to read is taken as open at once.
+function listen(resident: Resident): void {
+	const { stdout } = resident.child
+
+	if (stdout === null) {
+		opened(resident)
+
+		return
+	}
+
+	createInterface({ input: stdout }).once('line', (line) => {
+		run_board_sound_latency.report(run_board_sound_latency.reported_of(line))
+		opened(resident)
+	})
+}
+
+// The player watched: gone as it fails or exits, and its first line heard.
 function watch(resident: Resident): void {
 	const { child } = resident
 
@@ -162,10 +190,26 @@ function watch(resident: Resident): void {
 	child.on('error', close_it)
 	child.on('exit', close_it)
 	child.stdin?.on('error', close_it)
-	if (child.stdout === null) return
-	createInterface({ input: child.stdout }).once('line', (line) => {
-		run_board_sound_latency.report(run_board_sound_latency.reported_of(line))
+	listen(resident)
+}
+
+// A resident around `child`, its output not yet open.
+function resident_of(child: ResidentChild, ports: ResidentPorts): Resident {
+	const resident: Resident = {
+		child,
+		ports,
+		next_id: 0,
+		sounds: new Map(),
+		is_closed: false,
+		opening: undefined,
+		opened: undefined,
+	}
+
+	resident.opening = new Promise<void>((resolve) => {
+		resident.opened = resolve
 	})
+
+	return resident
 }
 
 // The resident player started, its latency report kept as it arrives; none where it cannot spawn.
@@ -173,7 +217,7 @@ function open(ports: ResidentPorts = DEFAULT_PORTS): Resident | undefined {
 	const child = spawned(ports)
 
 	if (child === undefined) return undefined
-	const resident: Resident = { child, ports, next_id: 0, sounds: new Map(), is_closed: false }
+	const resident = resident_of(child, ports)
 
 	watch(resident)
 	child.unref()

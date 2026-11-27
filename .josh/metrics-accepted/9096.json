@@ -1,0 +1,8 @@
+{
+	"growth": {
+		"scripts.code_lines": 5340,
+		"ai_cost.resident_bytes": 45
+	},
+	"reason": "#9096 ships three run:board themes (deviant, isac, ghost) with their modules, sound palettes and tests; the board-theme skill description now names the live demo mode and video-measured themes in place of the JS demo",
+	"date": "2026-11-27"
+}

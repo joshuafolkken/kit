@@ -35,7 +35,7 @@ describe('run_board_theme_tones.toned idle', () => {
 	// joshuafolkken/kit#8917: a themed board's base draws idle in the base look's idle; the tones' own
 	// dim is the default.
 	it.each([
-		{ idle: 'base', force: '3', expected: rgb('0;165;40') },
+		{ idle: 'base', force: '3', expected: rgb('0;150;36') },
 		{ idle: 'default', force: '3', expected: rgb(IDLE_RGB) },
 		{ idle: 'base', force: '1', expected: `${ESCAPE}[32m${TEXT}${DEFAULT_FOREGROUND}` },
 		{ idle: 'default', force: '1', expected: `${ESCAPE}[2m${TEXT}${BOLD_OFF}` },

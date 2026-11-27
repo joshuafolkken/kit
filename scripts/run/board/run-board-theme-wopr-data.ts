@@ -23,6 +23,10 @@ const COLORS: ThemeColors = {
 	hi: WHITE,
 	type: CYAN,
 	notice: CYAN,
+	// The marks' tones: info, idle, waiting on a person.
+	info: '120;200;230',
+	idle: '45;150;145',
+	human: '190;170;255',
 }
 const NAVY = '6;12;38'
 const PALE = '200;220;255'

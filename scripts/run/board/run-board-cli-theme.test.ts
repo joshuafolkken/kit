@@ -97,7 +97,9 @@ async function refused(argv: Array<string>): Promise<{ code: number; stderr: str
 
 describe('run_board_cli.run --theme refused', () => {
 	it('names the theme values in the usage', () => {
-		expect(run_board_cli.USAGE).toContain('[--theme wopr|trace|flux|codec|nixie|skynet|magi]')
+		expect(run_board_cli.USAGE).toContain(
+			'[--theme wopr|trace|flux|codec|nixie|skynet|magi|deviant|isac|ghost]',
+		)
 	})
 
 	it('draws --chat and pushes --every whatever JOSH_BOARD_THEME holds', async () => {
@@ -115,7 +117,7 @@ describe('run_board_cli.run --theme refused', () => {
 
 		expect(await refused(['--once'])).toStrictEqual({
 			code: 1,
-			stderr: `JOSH_BOARD_THEME=nope names no theme (wopr, trace, flux, codec, nixie, skynet, magi)\n${run_board_cli.USAGE}\n`,
+			stderr: `JOSH_BOARD_THEME=nope names no theme (wopr, trace, flux, codec, nixie, skynet, magi, deviant, isac, ghost)\n${run_board_cli.USAGE}\n`,
 		})
 	})
 

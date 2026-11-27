@@ -65,7 +65,7 @@ const EMOJI_ROWS = String.raw`
 📴,OF,idle
 🔊,SN,info,<)
 🔇,MU,idle,<X
-✋,HU,human
+✋,HU,human,!?
 🙋,DC,human,\O
 🛑,ST,alert,[]
 🧳,ER,info
@@ -109,6 +109,8 @@ const EMOJI_ROWS = String.raw`
 🟢,AC,done
 📁,EP,info,[+
 ▶,>,info
+◀,<,info
+▪,*,info
 ⏸,=,idle,║
 ⏭,>,info
 ⏱,T,info

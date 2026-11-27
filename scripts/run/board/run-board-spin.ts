@@ -159,11 +159,14 @@ function sounded(turning: Turning, ports: SpinPorts, at_ms: number): void {
 	else run_board_theme_layer.after_frame(ports.theme_run, ports.typing_sound, at_ms, board)
 }
 
-// The sounds a themed frame may start rendered ahead, before it is written (joshuafolkken/kit#9087).
+// The sounds a themed frame may start rendered ahead, before it is written (joshuafolkken/kit#9087); a
+// part the frame begins then begins as the rendering is over, not before it.
 function warmed(ports: SpinPorts, at_ms: number): void {
 	const run = themed_run(ports)
 
-	if (run !== undefined) run_board_theme_notice_sound.warm_events(run, ports.typing_sound, at_ms)
+	if (run === undefined) return
+	run_board_theme_notice_sound.warm_events(run, ports.typing_sound, at_ms)
+	run_board_theme_layer.rebased(run, at_ms, ports.now())
 }
 
 // Draws the redraw on `screen`, then turns the spinners — or draws the theme — until the next second;

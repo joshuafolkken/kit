@@ -165,6 +165,10 @@ const COLORS = {
 	hi: PALE,
 	type: '255;235;200',
 	notice: PALE,
+	// The marks' tones: info, idle, waiting on a person.
+	info: '255;190;90',
+	idle: '170;95;15',
+	human: '120;200;255',
 }
 
 const NOTES = {
