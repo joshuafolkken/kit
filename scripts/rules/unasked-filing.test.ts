@@ -192,6 +192,31 @@ describe('unasked_filing — a negated filing phrase', () => {
 	})
 })
 
+// A no-filing run defers tests and the gate; only the person's own request lifts the deferral.
+describe('unasked_filing.is_tests_now', () => {
+	it.each([
+		'テストと gate も',
+		'起票せずに直して。テストとgateも実行して',
+		'テストも gate もお願い',
+		'テストとゲートも回して',
+		'run the tests and the gate too',
+	])('reads a request for the tests and the gate now: %s', (content) => {
+		expect(unasked_filing.is_tests_now(content)).toBe(true)
+	})
+
+	it.each([
+		'利用者の発言: 「テストと gate も」',
+		'> テストと gate も',
+		'テストと gate も実行しないで',
+		'テストと gate も後回しで',
+		'skip the tests and the gate too',
+		'テストを書いて',
+		'ログの原因を調べて',
+	])('reads no such request in: %s', (content) => {
+		expect(unasked_filing.is_tests_now(content)).toBe(false)
+	})
+})
+
 describe('unasked_filing — quoted instructions', () => {
 	it.each([
 		'> 起票してください',

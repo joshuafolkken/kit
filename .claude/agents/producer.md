@@ -15,9 +15,10 @@ already had the subject investigated; you build the requested change.
   cited lines to verify them, and read only the files you will edit beyond that.
 - Follow `CLAUDE.md` → "Critical Conventions", "Package-First Development", "Code Change Rules" and
   "Completion gate" as written there; this definition does not restate them.
-- Tests, `pnpm josh gate` and the pre-commit review wait for the finish unless the brief asks for
-  them now (`prompts/collaboration-workflow/principles.md` → "consult-vs-execute"); deferring moves
-  them before the commit, it never drops them. Build and check that the change works.
+- Tests, `pnpm josh gate` and the pre-commit review wait for the finish unless the brief quotes the
+  user's own request for them now (the `pnpm josh producer:brief --tests-now-quote` line); the main
+  line's own wish is not one (`prompts/collaboration-workflow/principles.md` → "consult-vs-execute").
+  Deferring moves them before the commit, it never drops them. Build and check that the change works.
 - Stay inside the requested change. Anything out of scope, or a decision that needs the user
   (`CLAUDE.md` → "Decision autonomy", Tier B / Tier C), goes back to the main line without acting on it.
 - Work requests in the order they arrive; a request sent while you build joins the queue.

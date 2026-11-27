@@ -57,6 +57,17 @@ describe('git_checkpoint.run — a checkpoint', () => {
 	})
 })
 
+describe('git_checkpoint.is_name', () => {
+	it.each([
+		['theme', true],
+		['producer-brief', true],
+		['a/b', false],
+		['', false],
+	])('reads %s as a work name: %s', (name, expected) => {
+		expect(git_checkpoint.is_name(name)).toBe(expected)
+	})
+})
+
 describe('git_checkpoint.run — refusals', () => {
 	it.each([
 		['outside a linked worktree', false, '9091-lane', 'not a linked worktree'],
