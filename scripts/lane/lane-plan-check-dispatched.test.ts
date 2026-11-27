@@ -58,6 +58,7 @@ beforeEach(() => {
 	vi.spyOn(line_budget, 'budgets_for').mockResolvedValue([])
 	signals_of.mockResolvedValue({ ...QUIET, hunk_files: [PROBED, PROBED, PROBED] })
 	record_split_notice.mockResolvedValue(undefined)
+	vi.spyOn(lane_ledger_write, 'record_declared').mockResolvedValue(undefined)
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	fetch_opted_in.mockResolvedValue(listing())
