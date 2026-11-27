@@ -7,8 +7,9 @@ import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import type { Point } from './run-board-theme-host-types'
 
 // The deviant theme's NOTICE from its peak: the spark; color returning as a ring that grows from
-// the wall's middle while the shards drift down and thin out; then the objective stamped across
-// THROUGHPUT and USAGE in two spaced lines beside a blue chip, wiped in from the left.
+// the wall's middle while the shards drift down and thin out; then the objective stamped in two
+// spaced lines beside a blue chip, wiped in from the left, over the data left of the panel — blanked
+// while it shows, so the shards fall over an empty pane and the objective's own box sits in front.
 
 const { repeated, restyle } = run_board_theme_host_grid
 const { PAIR, clear_pane, data_pane, put_in } = run_board_theme_draw
@@ -66,12 +67,23 @@ function objective_pane(pane: Pane): Pane {
 	}
 }
 
+// Whether the objective shows `since` ticks after the peak.
+function is_objective_shown(since: number): boolean {
+	return since > OBJECTIVE.from && since < OBJECTIVE.until
+}
+
+// The data left of the panel blanked while the objective shows, so that the shards fall over an
+// empty pane, not over THROUGHPUT and USAGE.
+function objective_ground(draw: ThemeDraw, since: number): void {
+	if (is_objective_shown(since)) clear_pane(data_pane(draw))
+}
+
 // The objective over the data left of the panel: a thin line, a bold line, a blue chip beside them.
 function objective(draw: ThemeDraw, since: number): void {
 	const shown = (since - OBJECTIVE.from) * OBJECTIVE.pace
 	const { chip_x: x, row: y } = OBJECTIVE
 
-	if (shown <= 0 || since >= OBJECTIVE.until) return
+	if (!is_objective_shown(since)) return
 	const pane = data_pane(draw)
 
 	clear_pane(objective_pane(pane))
@@ -89,6 +101,7 @@ function after(draw: ThemeDraw, since: number): void {
 	}
 
 	color_return(draw, since)
+	objective_ground(draw, since)
 	if (since < SHARDS.ticks) shards(draw, since)
 	objective(draw, since)
 }
