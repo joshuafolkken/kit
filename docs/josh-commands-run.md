@@ -796,7 +796,7 @@ It runs `git -y`, `followup` and `run:tail` in order, under one header per step.
 
 The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run, forwarded to `run:tail` after the closed issue.
 
-A `preflight` stage first asks every pull-request precondition, so a stop lands before review and gate. A pass is reused on an unchanged tree, base, title and body, except `prepared-children`, which publishes the lane's children; one unplanned refuses.
+A `preflight` stage first asks every pull-request precondition, so a stop lands before review and gate. A pass is reused on an unchanged tree, base, title and body, except `prepared-children`, which publishes the lane's children; one unplanned or in no epic refuses.
 
 A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …`. A `--review` ship still runs `test:pinned` there; the supervised preflight and gate run.
 
