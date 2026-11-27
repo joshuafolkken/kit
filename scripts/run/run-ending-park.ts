@@ -22,15 +22,16 @@ const ASK_PICK = '推奨なし — 子が拒否された問い合わせを残し
 const RETRY_NEXT = '親が選択肢 1 を採り、同じレーンを再投入する。'
 const ASK_NEXT = '人が理由にある問い合わせに答えてから、選択肢を選ぶ。'
 // Re-dispatching needs no permission: adopting the option is itself the requeue
-// (`backlog-triage-adopt.ts`), so a parent with no person takes it (`run_park_body.auto_pick`).
-const OPTIONS = [
-	'1. 同じレーンを再投入する',
-	'   - 層: A',
-	'   - 必要な権限: なし',
-	'2. 止めたままにして、人が終了記録を見る',
-	'   - 層: B',
-	'   - 必要な権限: 人',
-]
+// (`backlog-triage-adopt.ts`), so a parent with no person takes it (`run_park_body.auto_pick`). After a
+// refused ask it waits on a person's answer, so no option is narrowest and the after-merge driver
+// leaves the park for a person (`run_park_body.default_pick`).
+const RETRY_TIER = ['   - 層: A', '   - 必要な権限: なし']
+const ASK_TIER = ['   - 層: B', '   - 必要な権限: 人']
+const HOLD_OPTION = ['2. 止めたままにして、人が終了記録を見る', ...ASK_TIER]
+
+function options_of(has_ask: boolean): Array<string> {
+	return ['1. 同じレーンを再投入する', ...(has_ask ? ASK_TIER : RETRY_TIER), ...HOLD_OPTION]
+}
 
 function abandoned_body(park: AbandonedPark): string {
 	return [
@@ -39,7 +40,7 @@ function abandoned_body(park: AbandonedPark): string {
 		NEXT_HEADING,
 		park.has_ask ? ASK_NEXT : RETRY_NEXT,
 		OPTIONS_HEADING,
-		...OPTIONS,
+		...options_of(park.has_ask),
 		PICK_HEADING,
 		park.has_ask ? ASK_PICK : RETRY_PICK,
 	].join('\n')

@@ -38,4 +38,13 @@ describe('the abandoned park body', () => {
 		expect(run_park_body.problem_of(body)).toBeUndefined()
 		expect(run_park_body.summary_of(body)).toBe('推奨なし')
 	})
+
+	// The after-merge driver falls back to the narrowest option on a no-pick park; a refused ask leaves
+	// none, so the lane waits for the person's answer instead of being re-dispatched.
+	it('leaves no option the after-merge driver takes when the child left a refused ask', () => {
+		const body = run_ending_park.abandoned_body(park({ has_ask: true }))
+
+		expect(run_park_body.default_pick(body)).toBeUndefined()
+		expect(run_park_body.auto_pick(body)).toBeUndefined()
+	})
 })
