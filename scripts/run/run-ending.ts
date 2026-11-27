@@ -57,7 +57,6 @@ interface EndingTraces {
 	is_child_closed: boolean | undefined
 	is_cut_taken: boolean
 	is_tree_dirty: boolean
-	issue: string
 }
 
 interface EndingDecision {
@@ -130,7 +129,7 @@ function abandoned_evidence(traces: EndingTraces): string {
 	const basis = `${record};${ask} the Issue is OPEN and no cut was recorded (${tree}).`
 	const has_ask = traces.exit_record?.refused_ask !== undefined
 
-	return run_ending_park.abandoned_body({ basis, has_ask, issue: traces.issue })
+	return run_ending_park.abandoned_body({ basis, has_ask })
 }
 
 // The basis an outage verdict carries: the exit-record fields, and the transport-failure signature the
@@ -236,7 +235,6 @@ async function read_traces(request: EndingRequest): Promise<EndingTraces> {
 		is_child_closed,
 		is_cut_taken,
 		is_tree_dirty,
-		issue: request.issue,
 	}
 }
 

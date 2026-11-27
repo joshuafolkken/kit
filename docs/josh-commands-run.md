@@ -501,7 +501,7 @@ pnpm josh run:ending 2118 --output <path> --repo joshuafolkken/app-kit
 
 <!-- /usage -->
 
-**Output / exit codes:** stdout is one token; the reason and basis go to stderr. For `abandoned` the basis is a park body in the `josh run:park` schema — pass it to `run:park --body-file` unchanged. `merged`, `cut`, `outage` (the API was unreachable) and `abandoned` exit 0; `unreadable` exits 1. Completion is the CLOSED Issue, never `is_error: false`.
+**Output / exit codes:** stdout is one token; the reason and basis go to stderr. For `abandoned` the reason line is followed by a park body in the `josh run:park` schema — pass the stderr to `run:park --body-file` unchanged. `merged`, `cut`, `outage` (the API was unreachable) and `abandoned` exit 0; `unreadable` exits 1. Completion is the CLOSED Issue, never `is_error: false`.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:ending` in detail".
 

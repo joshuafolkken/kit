@@ -6,7 +6,7 @@ const BASIS =
 	'exit record: subtype=success, is_error=false, num_turns=53, permission_denials=3; the Issue is OPEN and no cut was recorded (uncommitted work remains).'
 
 function park(overrides: Partial<AbandonedPark> = {}): AbandonedPark {
-	return { basis: BASIS, has_ask: false, issue: '9064', ...overrides }
+	return { basis: BASIS, has_ask: false, ...overrides }
 }
 
 describe('the abandoned park body', () => {
@@ -25,11 +25,11 @@ describe('the abandoned park body', () => {
 		expect(body).toContain('uncommitted work remains')
 	})
 
-	it('recommends re-dispatching the same lane as the parent', () => {
+	it('recommends re-dispatching the same lane, which a parent adopts itself', () => {
 		const body = run_ending_park.abandoned_body(park())
 
-		expect(run_park_body.summary_of(body)).toBe('推奨: 1（層 A · 親の操作）')
-		expect(body).toContain('pnpm josh run:add 9064 --retry')
+		expect(run_park_body.summary_of(body)).toBe('推奨: 1（層 A）')
+		expect(run_park_body.auto_pick(body)).toBe(1)
 	})
 
 	it('recommends nothing when the child left a refused ask', () => {
