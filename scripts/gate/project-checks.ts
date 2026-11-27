@@ -205,6 +205,7 @@ const project_checks = {
 	has_config,
 	has_files,
 	is_basic,
+	is_declared,
 	is_kit_repository,
 	prettier_skip_reason,
 	prettier_targets,
