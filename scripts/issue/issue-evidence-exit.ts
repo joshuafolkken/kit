@@ -95,8 +95,14 @@ async function is_admitted(request: EvidenceRequest, exit: EvidenceExit): Promis
 
 async function run(argv: ReadonlyArray<string>, exit: EvidenceExit): Promise<number> {
 	const request = resolve_request(argv, exit.command)
-	if (request === undefined || !(await is_admitted(request, exit))) return FAILURE_EXIT_CODE
-	if (!(await write_exit(request, exit))) return FAILURE_EXIT_CODE
+
+	if (
+		request === undefined ||
+		!(await is_admitted(request, exit)) ||
+		!(await write_exit(request, exit))
+	) {
+		return FAILURE_EXIT_CODE
+	}
 
 	issue_measured_follow_up.print_filing_lines(request.evidence, request.issue_number)
 
