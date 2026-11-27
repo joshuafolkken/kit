@@ -20,18 +20,19 @@ function set_variable(name: string, value: string | undefined): void {
 	else process.env[name] = value
 }
 
-// Enters `root` with the child's variables and answers with the way back.
+// Enters `root` with the child's variables and answers with the way back. The directory is changed
+// first, so a `chdir` that throws has changed nothing yet.
 function enter(root: string): () => void {
 	const cwd = process.cwd()
 	const previous = Object.keys(josh_harness.CHILD_ENVIRONMENT).map(
 		(name) => [name, process.env[name]] as const,
 	)
 
+	process.chdir(root)
+
 	for (const [name, value] of Object.entries(josh_harness.CHILD_ENVIRONMENT)) {
 		set_variable(name, value)
 	}
-
-	process.chdir(root)
 
 	return function leave(): void {
 		process.chdir(cwd)
@@ -56,10 +57,12 @@ async function run_in_process(
 ): Promise<HarnessResult> {
 	const stdout: Array<string> = []
 	const stderr: Array<string> = []
-	const spies = [capture(process.stdout, stdout), capture(process.stderr, stderr)]
 	const leave = enter(root)
+	const spies: Array<WriteSpy> = []
 
 	try {
+		spies.push(capture(process.stdout, stdout), capture(process.stderr, stderr))
+
 		const exit_code = await run(argv)
 
 		return { exit_code, stdout: stdout.join(''), stderr: stderr.join(''), is_timed_out: false }
@@ -71,5 +74,4 @@ async function run_in_process(
 
 const josh_in_process = { run_in_process }
 
-export type { CommandRun }
 export { josh_in_process }

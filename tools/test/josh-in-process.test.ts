@@ -91,8 +91,10 @@ describe('josh_in_process.run_in_process', () => {
 		expect(process.env[LANE_MARK]).toBe(OUTSIDE_LANE_MARK)
 		expect(process.env[GIT_DIR]).toBe(OUTSIDE_GIT_DIR)
 	})
+})
 
-	it('puts the directory and the streams back when the run throws', async () => {
+describe('josh_in_process.run_in_process — a run that throws', () => {
+	it('puts the directory, the variables and the streams back when the run throws', async () => {
 		const cwd = process.cwd()
 		const { write } = process.stdout
 
@@ -100,6 +102,8 @@ describe('josh_in_process.run_in_process', () => {
 			'broke',
 		)
 		expect(process.cwd()).toBe(cwd)
+		expect(process.env[LANE_MARK]).toBe(OUTSIDE_LANE_MARK)
+		expect(process.env[GIT_DIR]).toBe(OUTSIDE_GIT_DIR)
 		expect(process.stdout.write).toBe(write)
 	})
 })
