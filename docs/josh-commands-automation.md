@@ -604,7 +604,7 @@ pnpm josh issue:defer 9103 ac-a1f32a2f 9104 split off
 
 <!-- /usage -->
 
-Appends ` → #<target>` to the criterion's last line (its `ac-…` identifier is unchanged) and adds a `引き継ぎ:` line naming the identifier to a target that lacks it. An unknown identifier or an unreadable target refuses before any write.
+Appends ` → <target>` to the criterion's last line (its `ac-…` identifier is unchanged) and adds a `引き継ぎ:` line naming the identifier to a target that lacks it. The target may be `owner/repo#N` in another repository. An unknown identifier or an unreadable target refuses before any write.
 
 The merge refuses an open checkbox neither ticked nor marked (`マージ後の確認:` excepted) and a mark whose target lacks the identifier. Ticks are not fact-checked.
 

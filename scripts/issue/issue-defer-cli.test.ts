@@ -4,14 +4,17 @@ import { issue_defer_cli } from './issue-defer-cli'
 
 // joshuafolkken/kit#9146.
 
-const { issue_get_body, issue_edit_body } = vi.hoisted(() => ({
-	issue_get_body: vi.fn<(issue: string) => Promise<string | undefined>>(),
-	issue_edit_body: vi.fn<(issue: string, body: string) => Promise<string>>(),
+const { issue_get_body, issue_edit_body, get_repo_name_with_owner } = vi.hoisted(() => ({
+	issue_get_body: vi.fn<(issue: string, repo?: string) => Promise<string | undefined>>(),
+	issue_edit_body: vi.fn<(issue: string, body: string, repo?: string) => Promise<string>>(),
+	get_repo_name_with_owner: vi.fn<() => string | undefined>(),
 }))
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_get_body, issue_edit_body },
 }))
+
+vi.mock('#scripts/gh/gh-spawn', () => ({ gh_spawn: { get_repo_name_with_owner } }))
 
 const ISSUE = '9103'
 const TARGET = '9104'
@@ -19,6 +22,8 @@ const BODY = '## 受け入れ条件\n- [ ] First\n- [ ] Second criterion\n  wrap
 const FIRST = acceptance_map.criterion_id('First')
 const WRAPPED = acceptance_map.criterion_id('Second criterion wrapped onto a line')
 const TARGET_BODY = '## 受け入れ条件\n- [ ] Rewritten'
+const CROSS_REPO = 'other/repo'
+const CROSS_NUMBER = '12'
 
 function answer(bodies: Readonly<Record<string, string>>): void {
 	issue_get_body.mockImplementation(async (issue) => bodies[issue])
@@ -33,6 +38,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	answer({ [ISSUE]: BODY, [TARGET]: TARGET_BODY })
 	issue_edit_body.mockResolvedValue('https://github.com/o/r/issues/1')
+	get_repo_name_with_owner.mockReturnValue('o/r')
 })
 
 afterEach(() => {
@@ -67,6 +73,19 @@ describe('issue_defer_cli.run', () => {
 		expect(await issue_defer_cli.run([ISSUE, FIRST, `#${TARGET}`, 'split'])).toBe(0)
 		expect(written(TARGET)).toBeUndefined()
 	})
+
+	it('defers to another repository, naming this one in the reference line', async () => {
+		answer({ [ISSUE]: BODY, [CROSS_NUMBER]: TARGET_BODY })
+
+		expect(await issue_defer_cli.run([ISSUE, FIRST, `${CROSS_REPO}#${CROSS_NUMBER}`, 'r'])).toBe(0)
+		expect(written(ISSUE)).toContain(`- [ ] First → ${CROSS_REPO}#${CROSS_NUMBER}\n`)
+		expect(issue_get_body).toHaveBeenCalledWith(CROSS_NUMBER, CROSS_REPO)
+		expect(issue_edit_body).toHaveBeenCalledWith(
+			CROSS_NUMBER,
+			`${TARGET_BODY}\n\n引き継ぎ: o/r#${ISSUE} \`${FIRST}\` r\n`,
+			CROSS_REPO,
+		)
+	})
 })
 
 describe('issue_defer_cli.run refusals', () => {
@@ -85,6 +104,14 @@ describe('issue_defer_cli.run refusals', () => {
 
 	it('refuses an unknown identifier before any write', async () => {
 		expect(await issue_defer_cli.run([ISSUE, 'ac-stale', TARGET, 'r'])).toBe(1)
+		expect(issue_edit_body).not.toHaveBeenCalled()
+	})
+
+	it('refuses a cross-repository target when this repository is unresolved, before any write', async () => {
+		answer({ [ISSUE]: BODY, [CROSS_NUMBER]: TARGET_BODY })
+		get_repo_name_with_owner.mockReturnValue(undefined)
+
+		expect(await issue_defer_cli.run([ISSUE, FIRST, `${CROSS_REPO}#${CROSS_NUMBER}`, 'r'])).toBe(1)
 		expect(issue_edit_body).not.toHaveBeenCalled()
 	})
 

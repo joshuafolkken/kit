@@ -38,8 +38,9 @@ function carries(target_body: string | undefined, id: string): boolean {
 	return target_body?.includes(id) === true
 }
 
-function reference_line(issue: string, id: string, reason: string): string {
-	return `${REFERENCE_LABEL} ${issue_cite.plain_for('github', issue)} \`${id}\` ${reason}`
+// `repo` qualifies the source issue when the line lands in another repository.
+function reference_line(issue: string, id: string, reason: string, repo = ''): string {
+	return `${REFERENCE_LABEL} ${issue_cite.plain_for('github', issue, repo)} \`${id}\` ${reason}`
 }
 
 function is_clear(resolution: Resolution): boolean {
