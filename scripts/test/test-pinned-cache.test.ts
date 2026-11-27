@@ -5,6 +5,7 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned } from './test-pinned'
 import { test_pinned_fixture, type Template } from './test-pinned-fixture'
+import { test_pinned_fixture_probe } from './test-pinned-fixture-probe'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_red } from './test-red'
 import { test_unit_guard } from './test-unit-guard'
@@ -70,6 +71,8 @@ function extra_test(title: string): string {
 type Report = Awaited<ReturnType<typeof test_pinned.run>>
 
 const fixture: { current?: FixtureWorkspace; template?: Template<Report> } = {}
+
+test_pinned_fixture_probe.use_in_process()
 
 async function run_report(): Promise<Report> {
 	return await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
