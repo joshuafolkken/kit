@@ -2,8 +2,10 @@ import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { require_pr_number } from '#scripts/gh/git-gh-pr-read'
+import { git_ancestor } from '#scripts/git/git-ancestor'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { issue_body_adopt_branch } from '#scripts/issue/issue-body-adopt-branch'
 import { REPOSITORY_LABELS } from '#scripts/issue/issue-label-definitions'
 import { NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
 import { json_value } from '#scripts/lib/json-value'
@@ -55,13 +57,29 @@ async function comparison_commits(
 async function read_paths(
 	branch: string,
 	expected_head: string | undefined,
-): Promise<Array<string>> {
+): Promise<{ paths: Array<string>; head: string }> {
 	const { base, head } = await comparison_commits(branch, expected_head)
 
 	await git_spawn.read_remote(['fetch', '--no-tags', 'origin', base, head])
 	const raw = await git_spawn.read([...DIFF_NAMES, `${base}...${head}`])
 
-	return raw.split('\0').filter((path) => path !== '')
+	return { paths: raw.split('\0').filter((path) => path !== ''), head }
+}
+
+// joshuafolkken/kit#9148: a PR whose head lacks the commit the Issue's adopt-branch row names is refused,
+// and so is one whose Issue body cannot be read or carries a malformed row.
+async function assert_adopted(issue: string | undefined, head: string): Promise<void> {
+	if (issue === undefined) return
+	const present = await issue_body_adopt_branch.read_issue(issue)
+
+	if (present.kind === 'malformed') throw new Error(`adopt-branch row: ${present.note}`)
+
+	if (present.kind === 'none' || (await git_ancestor.is_ancestor(present.row.sha, head))) return
+	const { sha, branch } = present.row
+
+	throw new Error(
+		`PR lacks the adopted wip commit ${sha} (${branch}); merge the branch into the lane first`,
+	)
 }
 
 async function mark_waiting(branch: string, issue: string | undefined): Promise<void> {
@@ -93,9 +111,10 @@ async function assert_allowed(
 	issue: string | undefined,
 	expected_head?: string,
 ): Promise<void> {
-	const paths = await read_paths(branch, expected_head)
+	const { paths, head } = await read_paths(branch, expected_head)
 
 	await assert_head(branch, expected_head)
+	await assert_adopted(issue, head)
 	if (!touches_workflow(paths)) return
 	const url = await git_gh_command.pr_get_url(branch)
 

@@ -1,3 +1,4 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#5211: a lane child probes the paths dispatch gated on at its entry, before any
@@ -33,6 +34,7 @@ vi.mock('#scripts/run/run-pr-return', () => ({
 }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/gh/git-gh-issue-read')
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: vi.fn() } }))
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: {
@@ -95,11 +97,13 @@ const UNDER = { code: OK, out: 'under' }
 const RED_BUILD = 'red required check: build'
 const GIVEN_BACK = 'lane given back at the entry'
 const PLANNED_LABELS = ['run:lane', 'run:planned']
+const EMPTY_BODY = { kind: 'read', text: '' } as const
 
 const info_lines: Array<string> = []
 
 beforeEach(() => {
 	open_pr_mock.mockResolvedValue(false)
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue(EMPTY_BODY)
 	josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(HELD).mockResolvedValue(UNDER)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {

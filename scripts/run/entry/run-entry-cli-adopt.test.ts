@@ -1,3 +1,4 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_command } from '#scripts/git/git-command'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_headless_keys } from '#scripts/run/run-headless-keys'
@@ -18,6 +19,7 @@ vi.mock('#scripts/run/run-step-progress', () => ({
 }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/gh/git-gh-issue-read')
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { read_plan: async () => undefined },
@@ -64,6 +66,7 @@ const UNDER = { code: OK, out: 'under' }
 const ADOPT_CALL = ['run:hold', '--adopt', ISSUE]
 const RELEASE_CALL = ['--release', ISSUE]
 const TRUSTED_READS = { content: { kind: 'ok', block: '', trust: { is_body_trusted: true } } }
+const EMPTY_BODY = { kind: 'read', text: '' } as const
 
 function calls(): ReadonlyArray<ReadonlyArray<string>> {
 	return josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)
@@ -76,6 +79,7 @@ beforeEach(() => {
 	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(OK)
 	mark_mock.mockReset().mockResolvedValue(true)
 	sync_mock.mockReset().mockResolvedValue(undefined)
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue(EMPTY_BODY)
 	record_step_mock.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)

@@ -113,6 +113,7 @@
 | `- 分割しない理由: <理由>`                                         | なし                                   | 目安・cap・予算を超える見積もりを 1 件のまま起票する（`split-assessment.md` → "The question"）                                                       |
 | `- 行を増やさない: <理由>`                                         | なし                                   | 実コード行が上限の 90% 以上のファイルを名指すが、行を足さない（`scripts/issue/issue-cap-files.ts`）                                                  |
 | `- 先行リファクタ: #<N>`                                           | なし                                   | 同じファイルを先に分割する Issue を待つ（`scripts/issue/issue-cap-files.ts`）                                                                        |
+| `- 取り込むブランチ: wip/<name> @ <sha>`                           | なし                                   | `wip/` ブランチの作業を引き継ぐ（`scripts/issue/issue-body-adopt-branch.ts`）                                                                        |
 
 名指すファイルが実コード行で上限の 90% 以上 → 先に分割のリファクタ Issue を起票し、依存に登録する（`issue:file` が拒否して手順を出す。`scripts/issue/issue-cap-files.ts`）。
 

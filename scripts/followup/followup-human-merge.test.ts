@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { require_pr_number } from '#scripts/gh/git-gh-pr-read'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
@@ -8,6 +9,7 @@ import { followup_human_merge, HumanMergeRequiredError } from './followup-human-
 
 vi.mock('#scripts/gh/git-gh-command')
 vi.mock('#scripts/gh/git-gh-exec')
+vi.mock('#scripts/gh/git-gh-issue-read')
 vi.mock('#scripts/gh/git-gh-pr-read')
 vi.mock('#scripts/git/git-spawn')
 
@@ -52,6 +54,10 @@ beforeEach(() => {
 	mock_paths([])
 	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(URL)
 	vi.mocked(git_gh_command.issue_add_label).mockResolvedValue(true)
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue({
+		kind: 'read',
+		text: '',
+	})
 })
 
 it.each([[[WORKFLOW]], [[SOURCE, WORKFLOW]], [[...many_sources(PAST_COMPARISON_LIMIT), WORKFLOW]]])(
@@ -168,3 +174,48 @@ it.each(['not JSON', '{}', '{"base":{"sha":""},"head":{"sha":""}}'])(
 		)
 	},
 )
+
+// joshuafolkken/kit#9148: the Issue's adopt-branch row names a wip commit the PR head must contain.
+const ADOPTED_SHA = 'abc1234'
+const ADOPT_ROW = `- 取り込むブランチ: wip/x @ ${ADOPTED_SHA}`
+const ANCESTOR_PROBE = ['merge-base', '--is-ancestor', ADOPTED_SHA, HEAD]
+
+function mock_ancestor(is_contained: boolean): void {
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue({
+		kind: 'read',
+		text: `## 背景\n\n${ADOPT_ROW}`,
+	})
+	vi.mocked(git_spawn.read).mockImplementation(async (arguments_) => {
+		if (is_contained || arguments_.join(' ') !== ANCESTOR_PROBE.join(' ')) return ''
+
+		throw new Error('exit 1')
+	})
+}
+
+it('refuses a PR whose head lacks the adopted wip commit', async () => {
+	mock_ancestor(false)
+
+	await expect(followup_human_merge.assert_allowed(BRANCH, ISSUE)).rejects.toThrow(
+		`PR lacks the adopted wip commit ${ADOPTED_SHA}`,
+	)
+	expect(git_spawn.read).toHaveBeenCalledWith(ANCESTOR_PROBE)
+})
+
+it('allows a PR whose head contains the adopted wip commit', async () => {
+	mock_ancestor(true)
+
+	await expect(followup_human_merge.assert_allowed(BRANCH, ISSUE)).resolves.toBeUndefined()
+	expect(git_spawn.read).toHaveBeenCalledWith(ANCESTOR_PROBE)
+})
+
+it('refuses a PR whose Issue body cannot be read rather than reading it as no row', async () => {
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue({
+		kind: 'unreadable',
+		reason: 'unreachable',
+		status: undefined,
+	})
+
+	await expect(followup_human_merge.assert_allowed(BRANCH, ISSUE)).rejects.toThrow(
+		`could not read #${ISSUE}'s body`,
+	)
+})

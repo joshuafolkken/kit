@@ -54,6 +54,8 @@ const QUIET_PORTS: Omit<HandoffPorts, RecordingKey> = {
 	read_text: () => FINAL,
 	is_retrospective_done: () => true,
 	release_filing: vi.fn<HandoffPorts['release_filing']>(),
+	resolve_commit: vi.fn<HandoffPorts['resolve_commit']>(),
+	write_adopt_row: vi.fn<HandoffPorts['write_adopt_row']>(),
 }
 
 function fake(overrides: Partial<HandoffPorts> = {}): Fake {

@@ -550,6 +550,8 @@ After `main:sync` and a clean `stash:pop`, the entry switches to the issue's bra
 
 A stop after the switch leaves a branch with no commits; `run:hold`'s preflight reads it as the default branch.
 
+A body row `- 取り込むブランチ: wip/<name> @ <sha>` → the entry merges that commit, not the branch tip, and `followup --merge` refuses a head lacking it (`scripts/run/entry/run-entry-adopt-branch.ts`).
+
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
 An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.

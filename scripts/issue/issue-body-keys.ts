@@ -49,6 +49,7 @@ const KEYS = {
 	constraint_source: { ja: '出所', en: 'Constraint source' },
 	constraint_reference: { ja: '参照', en: 'Constraint reference' },
 	constraint_instruction: { ja: '指示', en: 'Constraint instruction' },
+	adopt_branch: { ja: '取り込むブランチ', en: 'Adopt branch' },
 } as const satisfies Record<string, Row>
 
 const VALUES = {

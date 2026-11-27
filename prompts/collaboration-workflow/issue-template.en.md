@@ -27,6 +27,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 <the diff estimate: `- Size estimate: about <N> files / <M> lines (including tests)`, counting test changes, docs, snapshots and command listings>
 <one Issue past guide, cap or bar: `- No-split reason: <reason>`; a folded serial chain or past the lane target: `- No-split reason: <kind> — <reason>` (kinds: `split-assessment.md` → "The question")>
 <each figure a decision used: ``- Premise: `<command>` <comparison> <figure>`` (one figure per line)>
+<carrying a `wip/` branch: `- Adopt branch: wip/<name> @ <sha>` → `scripts/issue/issue-body-adopt-branch.ts`>
 
 <why it is needed>
 
@@ -114,6 +115,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 | key     | 出所                 | Constraint source              |
 | key     | 参照                 | Constraint reference           |
 | key     | 指示                 | Constraint instruction         |
+| key     | 取り込むブランチ     | Adopt branch                   |
 | value   | 不具合               | defect                         |
 | value   | 非不具合             | non-defect                     |
 | value   | 振る舞い変更         | behavior change                |

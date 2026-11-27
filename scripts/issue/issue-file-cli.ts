@@ -15,6 +15,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_hold_member } from '#scripts/run/hold/run-hold-member'
 import { split_direction } from '#scripts/split/split-direction'
 import { split_resolution } from '#scripts/split/split-resolution'
+import { issue_body_adopt_branch } from './issue-body-adopt-branch'
 import { issue_cite } from './issue-cite'
 import { issue_classification } from './issue-classification'
 import { issue_file, type FileArguments } from './issue-file'
@@ -327,19 +328,30 @@ async function check(filing: Filing): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
+// The body filed: the `run:handoff --wip` row put in (joshuafolkken/kit#9148), then the release
+// classification; a row it contradicts refuses the filing. A `--found-during` or `--route split` filing
+// never carries the row: the hand-off's wip belongs to the one Issue it files, not to these.
+function body_of(args: FileArguments, text: string): { body: string } | { problem: string } {
+	const adopted = issue_body_adopt_branch.with_handoff_row(text, args)
+
+	if ('problem' in adopted) return { problem: `--wip row: ${adopted.problem}` }
+	const labels = issue_file.labels_of(args, adopted.body)
+
+	return { body: issue_classification.with_release_classification(adopted.body, labels) }
+}
+
 async function filing_of(args: FileArguments): Promise<Filing | string> {
 	const read = cli_body.read_result(args.body_file)
 
 	if ('problem' in read) return `Could not read the body file ${args.body_file}: ${read.problem}`
-	const body = issue_classification.with_release_classification(
-		read.text,
-		issue_file.labels_of(args, read.text),
-	)
+	const shaped = body_of(args, read.text)
+
+	if ('problem' in shaped) return shaped.problem
 	const current = await git_gh_command.repo_get_name_with_owner()
 
 	if (current === undefined) return UNKNOWN_REPO_MESSAGE
 
-	return { args, body, target: args.repo ?? current, current }
+	return { args, body: shaped.body, target: args.repo ?? current, current }
 }
 
 // The filing `argv` names, or `undefined` once the usage or the body file refused it — printed.

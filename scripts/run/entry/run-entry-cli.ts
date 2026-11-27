@@ -25,13 +25,14 @@ import { run_step } from '#scripts/run/run-step'
 import { run_step_progress } from '#scripts/run/run-step-progress'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
+import { run_entry_adopt_branch } from './run-entry-adopt-branch'
 import { run_entry_children, type EntryRequest, type Resume } from './run-entry-children'
 import { run_entry_dispatch } from './run-entry-dispatch'
 import { run_entry_handoff_root } from './run-entry-handoff-root'
 import { run_entry_lane_plan } from './run-entry-lane-plan'
 import { run_entry_spill } from './run-entry-spill'
 import { run_entry_stop, type StopNotice } from './run-entry-stop'
-import { run_entry_sync, type EntryStop } from './run-entry-sync'
+import type { EntryStop } from './run-entry-sync'
 import { run_entry_trust, type TrustStop } from './run-entry-trust'
 
 // `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on. Rather than a round
@@ -395,7 +396,7 @@ async function claim_run(request: EntryRequest, state: StageState): Promise<numb
 	const stop =
 		cost === run_entry.COST_OVER
 			? COST_STOP
-			: await timed(STEP.SYNC, async () => await run_entry_sync.sync(request))
+			: await timed(STEP.SYNC, async () => await run_entry_adopt_branch.synced(request))
 
 	if (stop !== undefined) return await stop_claimed(request, { hold, cost }, stop)
 

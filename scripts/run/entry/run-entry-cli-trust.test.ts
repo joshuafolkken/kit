@@ -1,3 +1,4 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import type { ConfirmInput } from '#scripts/notify/telegram-notify'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +13,7 @@ const record_baseline_mock = vi.hoisted(() => vi.fn())
 const read_issue_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/gh/git-gh-issue-read')
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { read_plan: async () => undefined },
@@ -51,6 +53,7 @@ const OK = 0
 const ISSUE = '4663'
 const RELEASE = ['--release', ISSUE]
 const PLANNED = 'run:planned'
+const EMPTY_BODY = { kind: 'read', text: '' } as const
 
 const STOP_CASES: ReadonlyArray<[string, boolean, Array<string>]> = [
 	['no plan', false, []],
@@ -82,6 +85,7 @@ beforeEach(() => {
 	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(OK)
 	record_baseline_mock.mockReset().mockResolvedValue(true)
 	read_issue_mock.mockReset().mockResolvedValue(state_read([]))
+	vi.mocked(git_gh_issue_read.issue_get_body_classified).mockResolvedValue(EMPTY_BODY)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 

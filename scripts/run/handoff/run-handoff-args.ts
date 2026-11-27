@@ -8,6 +8,8 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 
 const BRIEF_FLAG = '--brief-file'
+const WIP_FLAG = '--wip'
+const WIP_PREFIX = 'wip/'
 const BACKLOG_KEYWORD = 'backlogrun'
 const NOT_FOUND = -1
 const FLAG_AND_VALUE = 2
@@ -33,7 +35,14 @@ interface WorkflowHandoff {
 	line: string
 	// `undefined` for `retrospective`, whose brief is generated rather than read.
 	brief_file: string | undefined
+	// The `wip/<name>` branch `--wip` names for the filed Issue to adopt; `undefined` without the flag.
+	wip?: string | undefined
 }
+
+type Taken =
+	| { kind: 'taken'; value: string | undefined; rest: ReadonlyArray<string> }
+	| { kind: 'missing' }
+	| { kind: 'twice' }
 
 type HandoffArguments =
 	| WorkflowHandoff
@@ -48,21 +57,53 @@ function refused(note: string): HandoffArguments {
 	return { kind: 'refused', note }
 }
 
+// `flag`'s value taken out of `rest`; `missing` when the flag has no value, `twice` when it repeats.
+function take_flag(rest: ReadonlyArray<string>, flag: string): Taken {
+	const at = rest.indexOf(flag)
+
+	if (at === NOT_FOUND) return { kind: 'taken', value: undefined, rest }
+
+	const value = rest[at + 1]
+
+	if (value === undefined || value.startsWith('-')) return { kind: 'missing' }
+
+	const left = [...rest.slice(0, at), ...rest.slice(at + FLAG_AND_VALUE)]
+
+	return left.includes(flag) ? { kind: 'twice' } : { kind: 'taken', value, rest: left }
+}
+
+function flag_note(
+	taken: Exclude<Taken, { kind: 'taken' }>,
+	flag: string,
+	missing: string,
+): string {
+	return taken.kind === 'twice' ? `${flag} is given more than once` : missing
+}
+
+// `--wip <name>` names the consultation's `wip/<name>` branch; the `wip/` prefix may be typed or not.
+function wip_branch(name: string | undefined): string | undefined {
+	if (name === undefined || name.startsWith(WIP_PREFIX)) return name
+
+	return `${WIP_PREFIX}${name}`
+}
+
 function workflow_of(keyword: WorkflowKeyword, rest: ReadonlyArray<string>): HandoffArguments {
-	const at = rest.indexOf(BRIEF_FLAG)
-	const brief_file = at === NOT_FOUND ? undefined : rest[at + 1]
+	const brief = take_flag(rest, BRIEF_FLAG)
+	const brief_missing = `${keyword} needs ${BRIEF_FLAG} <path>`
 
-	if (brief_file === undefined || brief_file.startsWith('-')) {
-		return refused(`${keyword} needs ${BRIEF_FLAG} <path>`)
-	}
+	if (brief.kind !== 'taken') return refused(flag_note(brief, BRIEF_FLAG, brief_missing))
 
-	const entry = [...rest.slice(0, at), ...rest.slice(at + FLAG_AND_VALUE)]
+	if (brief.value === undefined) return refused(brief_missing)
 
-	if (entry.includes(BRIEF_FLAG)) return refused(`${BRIEF_FLAG} is given more than once`)
+	const wip = take_flag(brief.rest, WIP_FLAG)
 
-	const line = [keyword, ...entry.map((token) => issue_number_shape.issue_token(token))].join(' ')
+	if (wip.kind !== 'taken') return refused(flag_note(wip, WIP_FLAG, `${WIP_FLAG} needs <name>`))
 
-	return { kind: 'workflow', keyword, line, brief_file }
+	const line = [keyword, ...wip.rest.map((token) => issue_number_shape.issue_token(token))].join(
+		' ',
+	)
+
+	return { kind: 'workflow', keyword, line, brief_file: brief.value, wip: wip_branch(wip.value) }
 }
 
 function retrospective_of(rest: ReadonlyArray<string>): HandoffArguments {

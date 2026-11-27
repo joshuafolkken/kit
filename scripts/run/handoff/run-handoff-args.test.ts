@@ -5,6 +5,8 @@ import { run_handoff_args } from './run-handoff-args'
 
 const BRIEF_FLAG = '--brief-file'
 const BRIEF = 'brief.md'
+const WIP_FLAG = '--wip'
+const WIP_BRANCH = 'wip/x'
 
 describe('run_handoff_args.parse', () => {
 	it('reads kickoff new with its brief, keeping the keyword line as typed', () => {
@@ -44,6 +46,25 @@ describe('run_handoff_args.parse', () => {
 		{ argv: ['prrun', BRIEF_FLAG, '--x'], why: 'a brief flag followed by a flag' },
 		{ argv: ['fullrun', BRIEF_FLAG, 'a', BRIEF_FLAG, 'b'], why: 'a repeated brief flag' },
 	])('refuses $why', ({ argv }) => {
+		expect(run_handoff_args.parse(argv)).toMatchObject({ kind: 'refused' })
+	})
+})
+
+// joshuafolkken/kit#9148: `--wip <name>` names the wip branch the filed Issue adopts.
+describe('run_handoff_args.parse --wip', () => {
+	it.each([
+		{ value: 'x', why: 'a bare name, prefixed' },
+		{ value: WIP_BRANCH, why: 'a prefixed name, as given' },
+	])('reads $why', ({ value }) => {
+		const parsed = run_handoff_args.parse(['fullrun', 'new', BRIEF_FLAG, BRIEF, WIP_FLAG, value])
+
+		expect(parsed).toMatchObject({ kind: 'workflow', line: 'fullrun new', wip: WIP_BRANCH })
+	})
+
+	it.each([
+		{ argv: ['fullrun', 'new', BRIEF_FLAG, BRIEF, WIP_FLAG], why: 'with no value' },
+		{ argv: ['fullrun', BRIEF_FLAG, BRIEF, WIP_FLAG, 'a', WIP_FLAG, 'b'], why: 'given twice' },
+	])('refuses a wip flag $why', ({ argv }) => {
 		expect(run_handoff_args.parse(argv)).toMatchObject({ kind: 'refused' })
 	})
 })

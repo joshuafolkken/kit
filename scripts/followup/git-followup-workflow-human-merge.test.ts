@@ -24,6 +24,12 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	},
 }))
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({ require_pr_number: vi.fn(async () => 42) }))
+// joshuafolkken/kit#9148: the merge check reads the Issue body for an adopt-branch row; this one has none.
+vi.mock('#scripts/gh/git-gh-issue-read', () => ({
+	git_gh_issue_read: {
+		issue_get_body_classified: vi.fn(async () => ({ kind: 'read', text: '## Summary\n' })),
+	},
+}))
 vi.mock('#scripts/gh/git-gh-exec', () => ({
 	git_gh_exec: {
 		exec_gh_api: vi.fn(async (input: { path: string }) => {
