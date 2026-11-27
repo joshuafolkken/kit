@@ -22,7 +22,7 @@ words:
   - WOPR
   # The Terminator's network, the theme value `skynet` a run:board draws its work after (#8917).
   - skynet
-  # The theme value `isac` and the aliases of the deviant, isac and ghost boards; a lane decloaks on
+  # The theme value `isac` and the aliases of the rk800, isac and ghost boards; a lane decloaks on
   # the ghost board's ROW.
   - isac
   - dbh
@@ -257,7 +257,7 @@ words:
   # "The section intro cites the same words unbolded" — the prompt-sync test comment contrasts the
   # bold header it matches against the plain (unbolded) mention nearby (joshuafolkken/kit#2255).
   - unbolded
-  # The deviant theme's header brand and its timeline that rewinds what it built (joshuafolkken/kit#9096).
+  # The rk800 theme's header brand and its timeline that rewinds what it built (joshuafolkken/kit#9096).
   - CYBERLIFE
   - unbuilds
   # Wrapped in backticks, as a past participle. `josh epic --add` writes the relation it replaced into

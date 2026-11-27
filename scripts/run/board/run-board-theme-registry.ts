@@ -28,7 +28,7 @@ const FACTORIES: ReadonlyMap<ThemeValue, ThemeFactory> = new Map<ThemeValue, The
 	['nixie', run_board_theme_nixie.theme],
 	['skynet', run_board_theme_skynet.theme],
 	['magi', run_board_theme_magi.theme],
-	['deviant', run_board_theme_deviant.theme],
+	['rk800', run_board_theme_deviant.theme],
 	['isac', run_board_theme_isac.theme],
 	['ghost', run_board_theme_ghost.theme],
 ])

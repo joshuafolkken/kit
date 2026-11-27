@@ -161,8 +161,8 @@ const THEME_DEFS = {
 		intro: { line: run_board_theme_magi_data.MAGI_OPEN.title, letter_ms: TELETYPE.intro.letter_ms },
 	},
 	// Each of the three below types its own opening from the first tick, so its sound counts those letters:
-	// deviant's date card, two letters a tick.
-	deviant: {
+	// rk800's date card, two letters a tick.
+	rk800: {
 		name: 'josh-rk800',
 		...voiced(DEVIANT_VOICES, DEVIANT),
 		intro: { line: DEVIANT_OPEN.line, letter_ms: DEVIANT_OPEN.letter_ms },
@@ -197,8 +197,8 @@ const THEME_ALIASES: ReadonlyMap<string, Theme> = new Map<string, Theme>([
 	['terminator', 'skynet'],
 	['evangelion', 'magi'],
 	['eva', 'magi'],
-	['detroit', 'deviant'],
-	['dbh', 'deviant'],
+	['detroit', 'rk800'],
+	['dbh', 'rk800'],
 	['division', 'isac'],
 	['shd', 'isac'],
 	['gits', 'ghost'],

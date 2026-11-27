@@ -26,7 +26,7 @@ const SELECTOR = [
 	'',
 	'  [0] none - [s] IDLE',
 	'  KEYS  0 none   1 wopr   2 trace   3 flux   4 codec   5 nixie   6 skynet',
-	'        7 magi   8 deviant   9 isac',
+	'        7 magi   8 rk800   9 isac',
 	'        Y ghost   s IDLE   a PROGRESS   d ROW   w NOTICE   q OPENING   e ENDING',
 	`        ${EXIT}`,
 ]
