@@ -21,7 +21,12 @@ const BRANCH = '3954-lane'
 const SPLIT_OFF = '4000'
 const CRITERION = 'The followup refuses an unmapped criterion'
 const ISSUE_BODY = `## 受け入れ条件\n\n- [ ] ${CRITERION}`
-const DEFERRED_ROW = `- \`${acceptance_map.criterion_id(CRITERION)}\` 見送り: #${SPLIT_OFF} split off`
+const CRITERION_ID = acceptance_map.criterion_id(CRITERION)
+const DEFERRED_ROW = `- \`${CRITERION_ID}\` 見送り: #${SPLIT_OFF} split off`
+const MARKED_READS: Readonly<Record<string, FieldRead>> = {
+	[ISSUE]: { kind: 'read', text: `${ISSUE_BODY} → #${SPLIT_OFF}` },
+	[SPLIT_OFF]: { kind: 'read', text: `引き継ぎ: #${ISSUE} \`${CRITERION_ID}\`` },
+}
 
 function answer(reads: Readonly<Record<string, FieldRead>>, pr_body: string): void {
 	body_read_mock.mockImplementation(async (issue) => reads[issue] ?? { kind: 'missing' })
@@ -47,11 +52,8 @@ describe('acceptance_map_check.refusal', () => {
 		)
 	})
 
-	it('passes a deferral to an issue that exists', async () => {
-		answer(
-			{ [ISSUE]: { kind: 'read', text: ISSUE_BODY }, [SPLIT_OFF]: { kind: 'read', text: '' } },
-			pr_with(DEFERRED_ROW),
-		)
+	it('passes a deferral marked on the Issue and carried by its issue (ac-4ae478ae)', async () => {
+		answer(MARKED_READS, pr_with(DEFERRED_ROW))
 
 		await expect(acceptance_map_check.refusal(ISSUE, BRANCH)).resolves.toBeUndefined()
 	})
