@@ -1,19 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_theme_deviant_after } from './run-board-theme-deviant-after'
+import { run_board_theme_deviant_break } from './run-board-theme-deviant-break'
 import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
 import { run_board_theme_deviant_notice } from './run-board-theme-deviant-notice'
 import { run_board_theme_deviant_parts } from './run-board-theme-deviant-parts'
-import type { ThemeDraw } from './run-board-theme-draw'
+import { run_board_theme_draw, type ThemeDraw } from './run-board-theme-draw'
 import { run_board_theme_host_fixture } from './run-board-theme-host-fixture'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import type { Cell, Grid, ThemeApi } from './run-board-theme-host-types'
 
 // joshuafolkken/kit#9096: the deviant theme's NOTICE after its peak — the spark, color returning
-// from the wall's middle, and the objective stamped across the data.
+// from the wall's middle, and the objective stamped over the blanked data, the shards behind it.
 
 const { HOST } = run_board_theme_host_fixture
 const { state_of } = run_board_theme_host_state
 const { after } = run_board_theme_deviant_after
+const { shards } = run_board_theme_deviant_break
+const { data_pane } = run_board_theme_draw
 const { RGB } = run_board_theme_deviant_data
 const { OBJECTIVE, RETURN, SHARDS } = run_board_theme_deviant_notice
 const { ink } = run_board_theme_deviant_parts
@@ -27,15 +30,24 @@ const NARROW_PX = 10
 const OBJECTIVE_ROWS = [0, 1, 2].map((row) => OBJECTIVE_ROW + row)
 const LEFT = Math.max(0, OBJECTIVE.chip_x - 1)
 const RIGHT = OBJECTIVE.text_x + Math.max(OBJECTIVE.bold.length, OBJECTIVE.rule_w) + 1
+// The objective typing while the shards still fall, and fully typed after them.
+const OBJECTIVE_TICKS = [OBJECTIVE.from + TYPING, SETTLED]
+// What the data pane may show behind the objective: blank, or a shard — never the board's own text.
+const GROUND_CHARS = new Set([' ', ...SHARDS.glyphs])
+
+// The untouched board as one frame being drawn, every cell its own copy.
+function draw_of(api: ThemeApi = HOST.api): ThemeDraw {
+	const grid = HOST.board.map((row) => row.map((cell): Cell => [cell[0], cell[1]]))
+
+	return { api, grid, s: state_of(HOST.layout, HOST.events.n, 0), tick: 0 }
+}
 
 function after_at(since: number, api: ThemeApi = HOST.api): Grid {
-	const grid = HOST.board.map((row) => row.map((cell): Cell => [cell[0], cell[1]]))
-	const state = state_of(HOST.layout, HOST.events.n, 0)
-	const draw: ThemeDraw = { api, grid, s: state, tick: 0 }
+	const draw = draw_of(api)
 
 	after(draw, since)
 
-	return grid
+	return draw.grid
 }
 
 function text_of(grid: Grid, y: number): string {
@@ -44,6 +56,25 @@ function text_of(grid: Grid, y: number): string {
 
 function is_inside(x: number, y: number): boolean {
 	return OBJECTIVE_ROWS.includes(y) && x >= LEFT && x < RIGHT
+}
+
+// The data left of the panel, on the demo's board.
+const PANE = data_pane(draw_of()).box
+
+function is_in_pane(x: number, y: number): boolean {
+	return x >= PANE.x && x < PANE.x + PANE.w && y >= PANE.y && y < PANE.y + PANE.h
+}
+
+// The characters of the data pane's cells behind the objective: all of it but the objective box.
+function ground_chars(grid: Grid): Array<string> {
+	return grid.flatMap((row, y) =>
+		row.filter((_, x) => is_in_pane(x, y) && !is_inside(x, y)).map(([ch]) => ch),
+	)
+}
+
+// Every row of `grid` without its data-pane cells.
+function outside_pane(grid: Grid): Grid {
+	return grid.map((row, y) => row.filter((_, x) => !is_in_pane(x, y)))
 }
 
 // The [x, y] of every cell of `grid` that differs from the board.
@@ -93,14 +124,43 @@ describe('run_board_theme_deviant_after.after', () => {
 	})
 })
 
-describe('run_board_theme_deviant_after.after objective box', () => {
-	it('changes no cell outside the objective box, and only to text or blank inside it', () => {
-		const grid = after_at(SETTLED)
+describe('run_board_theme_deviant_after.after objective layers', () => {
+	it.each(OBJECTIVE_TICKS)(
+		'hides the board text of the data pane behind the objective at %i',
+		(since) => {
+			const shown = new Set(ground_chars(after_at(since)))
 
-		expect(changed_cells(grid).filter(([x, y]) => !is_inside(x, y))).toStrictEqual([])
+			expect([...shown].filter((ch) => !GROUND_CHARS.has(ch))).toStrictEqual([])
+		},
+	)
+
+	it('lets the shards fall over the blanked data pane', () => {
+		const fallen = ground_chars(after_at(OBJECTIVE.from + TYPING)).filter((ch) => ch !== ' ')
+
+		expect(fallen.length).toBeGreaterThan(0)
+	})
+
+	it.each(OBJECTIVE_TICKS)('keeps the objective box to its text or blank at %i', (since) => {
+		const grid = after_at(since)
+
 		expect(OBJECTIVE_ROWS.map((y) => text_of(grid, y).slice(LEFT, RIGHT))).toSatisfy(
 			(rows: Array<string>) => rows.every((row) => /^[ ▌A-Z─]*$/u.test(row)),
 		)
+	})
+})
+
+describe('run_board_theme_deviant_after.after outside the data pane', () => {
+	it('draws only the shards outside the data pane while they fall', () => {
+		const since = OBJECTIVE.from + TYPING
+		const expected = draw_of()
+
+		shards(expected, since)
+
+		expect(outside_pane(after_at(since))).toStrictEqual(outside_pane(expected.grid))
+	})
+
+	it('leaves the board outside the data pane once the shards are gone', () => {
+		expect(outside_pane(after_at(SETTLED))).toStrictEqual(outside_pane(HOST.board))
 	})
 
 	it('cuts the objective at a narrow data pane as put_in does, leaving the rest', () => {
