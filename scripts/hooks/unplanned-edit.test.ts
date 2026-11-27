@@ -77,7 +77,7 @@ describe('unplanned_edit.notice — swallowed failures', () => {
 		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
 
 		refusal_to.mockRejectedValue(new Error('ask failed'))
-		vi.spyOn(file_reader, 'read_optional').mockImplementation(() => {
+		const read = vi.spyOn(file_reader, 'read_optional').mockImplementation(() => {
 			throw new Error('note unreadable')
 		})
 
@@ -86,6 +86,8 @@ describe('unplanned_edit.notice — swallowed failures', () => {
 			'unplanned_edit.was_asked',
 			'unplanned_edit.ask',
 		])
+		read.mockRestore()
+		trace.mockRestore()
 	})
 })
 
