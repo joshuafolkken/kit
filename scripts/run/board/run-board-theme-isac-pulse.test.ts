@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { run_board_theme_deviant_fixture } from './run-board-theme-deviant-fixture'
 import { run_board_theme_draw } from './run-board-theme-draw'
 import { run_board_theme_isac_data } from './run-board-theme-isac-data'
 import { run_board_theme_isac_pulse } from './run-board-theme-isac-pulse'
+import { run_board_theme_rk800_fixture } from './run-board-theme-rk800-fixture'
 
 // joshuafolkken/kit#9096: the isac theme's ROW — when the pulse sweeps, the label it leaves in the
 // area, and the lane's mark that turns white as a ring crosses it.
@@ -10,7 +10,7 @@ import { run_board_theme_isac_pulse } from './run-board-theme-isac-pulse'
 const { activation, is_activating, lane_mark } = run_board_theme_isac_pulse
 const { INKS, PULSE } = run_board_theme_isac_data
 const { area_pane } = run_board_theme_draw
-const { HOST, draw_at, fresh_grid, row_text, state_at } = run_board_theme_deviant_fixture
+const { HOST, draw_at, fresh_grid, row_text, state_at } = run_board_theme_rk800_fixture
 const STARTED = 10
 const SWEEPING = 40
 const BLINK_DARK = 18

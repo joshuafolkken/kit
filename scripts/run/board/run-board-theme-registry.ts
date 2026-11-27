@@ -1,13 +1,13 @@
 import { run_board_paint } from './run-board-paint'
 import { run_board_theme_codec } from './run-board-theme-codec'
 import type { Theme } from './run-board-theme-defs'
-import { run_board_theme_deviant } from './run-board-theme-deviant'
 import { run_board_theme_flux } from './run-board-theme-flux'
 import { run_board_theme_ghost } from './run-board-theme-ghost'
 import type { ThemeFactory } from './run-board-theme-host-types'
 import { run_board_theme_isac } from './run-board-theme-isac'
 import { run_board_theme_magi } from './run-board-theme-magi'
 import { run_board_theme_nixie } from './run-board-theme-nixie'
+import { run_board_theme_rk800 } from './run-board-theme-rk800'
 import { run_board_theme_run, type ThemeRun, type ThemeValue } from './run-board-theme-run'
 import { run_board_theme_skynet } from './run-board-theme-skynet'
 import { run_board_theme_sound, type OpeningSound } from './run-board-theme-sound'
@@ -28,7 +28,7 @@ const FACTORIES: ReadonlyMap<ThemeValue, ThemeFactory> = new Map<ThemeValue, The
 	['nixie', run_board_theme_nixie.theme],
 	['skynet', run_board_theme_skynet.theme],
 	['magi', run_board_theme_magi.theme],
-	['rk800', run_board_theme_deviant.theme],
+	['rk800', run_board_theme_rk800.theme],
 	['isac', run_board_theme_isac.theme],
 	['ghost', run_board_theme_ghost.theme],
 ])

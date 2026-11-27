@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { run_board_theme_deviant_fixture } from './run-board-theme-deviant-fixture'
 import { run_board_theme_host_grid } from './run-board-theme-host-grid'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import { run_board_theme_isac_alert } from './run-board-theme-isac-alert'
 import { run_board_theme_isac_data } from './run-board-theme-isac-data'
+import { run_board_theme_rk800_fixture } from './run-board-theme-rk800-fixture'
 
 // joshuafolkken/kit#9096: the isac theme's NOTICE — when it plays, how fast its pulses run, the
 // hazard stripes and the banner in the area, and every orange flipping to red from the peak.
@@ -12,7 +12,7 @@ const { alert_area, is_alert, pulse_phase, red_flip, reddened } = run_board_them
 const { ALERT, INKS, RED_OF, RGB } = run_board_theme_isac_data
 const { PEAK_TICKS } = run_board_theme_host_state
 const { ESC } = run_board_theme_host_grid
-const { HOST, draw_at, row_text, state_at } = run_board_theme_deviant_fixture
+const { HOST, draw_at, row_text, state_at } = run_board_theme_rk800_fixture
 const TYPING = 50
 const PEAKED = 100
 const AFTER_PLAY = 200
