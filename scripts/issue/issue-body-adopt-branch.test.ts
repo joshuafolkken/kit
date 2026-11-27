@@ -95,4 +95,15 @@ describe('issue_body_adopt_branch environment', () => {
 			issue_body_adopt_branch.with_handoff_row(BODY, { found_during: '9148', value }),
 		).toStrictEqual({ body: BODY })
 	})
+
+	it('leaves the row out of a --route split child of a several-deliverable kickoff new', () => {
+		const value = issue_body_adopt_branch.to_environment(ROW)
+
+		expect(
+			issue_body_adopt_branch.with_handoff_row(BODY, { route: 'route:split', value }),
+		).toStrictEqual({ body: BODY })
+		expect(
+			issue_body_adopt_branch.with_handoff_row(BODY, { route: 'route:tier-a', value }),
+		).toStrictEqual(issue_body_adopt_branch.with_row(BODY, ROW))
+	})
 })

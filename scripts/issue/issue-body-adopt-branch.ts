@@ -6,6 +6,7 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 
 const ROW_VALUE = /^(?<branch>wip\/\S+) @ (?<sha>[0-9a-f]{7,40})$/u
 const NEWLINE = '\n'
@@ -15,10 +16,11 @@ interface AdoptBranch {
 	sha: string
 }
 
-// `issue:file`'s filing as the row sees it: its `--found-during`, and the handed-down value (the
-// environment's when absent).
+// `issue:file`'s filing as the row sees it: its `--found-during`, its route label, and the handed-down
+// value (the environment's when absent).
 interface HandoffFiling {
 	found_during?: string | undefined
+	route?: string | undefined
 	value?: string | undefined
 }
 
@@ -120,15 +122,20 @@ function to_environment(row: AdoptBranch): string {
 
 const ENVIRONMENT_KEY = 'JOSH_HANDOFF_WIP'
 
-// `issue:file`'s body: carrying the row `run:handoff --wip` handed down in `value`, unchanged without one.
-// A filing naming `found_during` is a follow-up or a split of the run's own Issue, never the Issue the
-// hand-off files, so it never carries the row.
+// A follow-up (`--found-during`) or a split child (`--route split`, one of several `kickoff new`
+// deliverables) is never the one Issue the hand-off files, so the wip is not its to take in.
+function is_side_filing(filing: HandoffFiling): boolean {
+	return filing.found_during !== undefined || filing.route === SPLIT_ROUTE_LABEL
+}
+
+// `issue:file`'s body: carrying the row `run:handoff --wip` handed down in `value`, unchanged without one
+// or on a side filing.
 function with_handoff_row(
 	body: string,
 	filing: HandoffFiling = {},
 ): { body: string } | { problem: string } {
-	const { found_during, value = process.env[ENVIRONMENT_KEY] } = filing
-	const row = found_during === undefined ? from_environment(value) : undefined
+	const { value = process.env[ENVIRONMENT_KEY] } = filing
+	const row = is_side_filing(filing) ? undefined : from_environment(value)
 
 	return row === undefined ? { body } : with_row(body, row)
 }

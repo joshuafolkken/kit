@@ -329,12 +329,10 @@ async function check(filing: Filing): Promise<number> {
 }
 
 // The body filed: the `run:handoff --wip` row put in (joshuafolkken/kit#9148), then the release
-// classification; a row it contradicts refuses the filing. A `--found-during` filing (a follow-up or a
-// split child) never carries the row: the hand-off's wip belongs to the Issue it files, not to these.
+// classification; a row it contradicts refuses the filing. A `--found-during` or `--route split` filing
+// never carries the row: the hand-off's wip belongs to the one Issue it files, not to these.
 function body_of(args: FileArguments, text: string): { body: string } | { problem: string } {
-	const adopted = issue_body_adopt_branch.with_handoff_row(text, {
-		found_during: args.found_during,
-	})
+	const adopted = issue_body_adopt_branch.with_handoff_row(text, args)
 
 	if ('problem' in adopted) return { problem: `--wip row: ${adopted.problem}` }
 	const labels = issue_file.labels_of(args, adopted.body)
