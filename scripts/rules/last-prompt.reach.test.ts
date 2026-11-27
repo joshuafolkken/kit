@@ -78,3 +78,14 @@ describe('last_prompt.call_prompt_at — a call beyond the tail', () => {
 		expect(last_prompt.call_prompt_at(GROWN, 'toolu_absent')).toBeUndefined()
 	})
 })
+
+describe('last_prompt.call_prompt_at — the call on the last line, its prompt beyond the tail', () => {
+	const LAST = path.join(WORK_DIRECTORY, 'last.jsonl')
+
+	// Past the tail, within the reach; the call's line ends the file with no newline.
+	writeFileSync(LAST, [PROMPT_LINE, LATER_LINE, CALL_LINE].join('\n'))
+
+	it('reads the prompt before a final line with no newline', () => {
+		expect(last_prompt.call_prompt_at(LAST, CALL_ID)).toBe(PROMPT)
+	})
+})
