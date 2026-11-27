@@ -133,18 +133,25 @@ function shell_cwd(raw_payload: string, hook_cwd: string): string {
 	return parsed.data?.cwd ?? hook_cwd
 }
 
-// A granted producer's checkpoint in its own worktree (`producer-checkpoint.ts`); a shell running
-// outside a worktree is refused like any git write.
-function is_producer_checkpoint(raw_payload: string, cwd: string): boolean {
-	const payload = hook_tool_payload.parse(raw_payload)
-
-	if (payload?.tool_name !== 'Bash' || !is_in_worktree('.', shell_cwd(raw_payload, cwd))) {
+// **A granted producer's shell in its own worktree is the producer's work** (joshuafolkken/kit#9097):
+// `bash-revert.ts` leaves what it writes in place, and its checkpoint passes here. A shell running
+// outside a worktree is a consultation shell, and keeps both guards.
+function is_producer_worktree_shell(raw_payload: string, cwd: string): boolean {
+	if (
+		hook_tool_payload.parse(raw_payload)?.tool_name !== 'Bash' ||
+		!is_in_worktree('.', shell_cwd(raw_payload, cwd))
+	) {
 		return false
 	}
 
-	const command = time_shell.bash_command(payload.tool_input)
+	return is_no_filing_production(raw_payload)
+}
 
-	return producer_checkpoint.allows(command) && is_no_filing_production(raw_payload)
+// A granted producer's checkpoint in its own worktree (`producer-checkpoint.ts`).
+function is_producer_checkpoint(raw_payload: string, cwd: string): boolean {
+	const command = time_shell.bash_command(hook_tool_payload.parse(raw_payload)?.tool_input)
+
+	return producer_checkpoint.allows(command) && is_producer_worktree_shell(raw_payload, cwd)
 }
 
 function unverified_rule(raw_payload: string, cwd: string): string | undefined {
@@ -174,6 +181,6 @@ function reason(
 	return `${scope}${HANDOFF}${UNKNOWN}${MATCHED}${rule}.`
 }
 
-const implementation_authority = { reason }
+const implementation_authority = { is_producer_worktree_shell, reason }
 
 export { implementation_authority }
