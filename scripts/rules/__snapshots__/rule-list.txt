@@ -232,6 +232,10 @@
   - fires: `pnpm josh stop:guard` — a stop on a clean tree with the `run:hold` record still in place. Releases the hold itself; blocks only when that fails
   - silent: a dirty tree (a `halfrun` stop before the commit, a `needs-human-review` stop) or already released
   - not automated: the hook releases the hold itself; it blocks only when that release fails
+- **Lane child end without a park** (`lane-stop-park`, `.claude/skills/workflow-commands/backlogrun-park.md` → "park and continue")
+  - fires: `pnpm josh stop:guard` — a dispatched lane child ending its turn unparked, with no ship running or succeeded. Blocks the stop once
+  - silent: not a lane child, parked, a ship running or succeeded, or a pre-gate cut taken
+  - not automated: the reason, options and recommendation are known only to the model that stopped
 - **Offer to file** (`filing-offer`, `.claude/skills/workflow-commands/observation-filing.md`)
   - fires: `pnpm josh stop:guard` — an unattended run (a kit-launched headless session, a lane child, a `backlogrun` parent) whose last reply offers to file without filing. Blocks the stop
   - silent: an interactive session, already filed, inside a fence or quote, a named third-party `owner/repo`, or an unknown owner

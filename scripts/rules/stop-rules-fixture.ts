@@ -19,6 +19,7 @@ const BASE: StopContext = {
 	headless_waiting: false,
 	headless_refusals: 0,
 	lane_child: false,
+	lane_unrecorded: false,
 	background_pending: false,
 	agent_pending: false,
 	command_pending: false,
