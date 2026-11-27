@@ -85,13 +85,6 @@ async function contents_of(files: ReadonlyArray<string>): Promise<Map<string, st
 	return new Map(existing.map((file, index) => [file, texts[index] ?? '']))
 }
 
-// Every file in the work tree `is_kept` accepts, tracked or untracked but not ignored.
-async function work_tree_files(is_kept: (file: string) => boolean): Promise<Array<string>> {
-	const listed = await test_pinned_reach.work_tree_files()
-
-	return listed.filter((file) => is_kept(file))
-}
-
 // The digest of each named file the work tree still holds.
 async function digests_of(files: ReadonlyArray<string>): Promise<Map<string, string>> {
 	const contents = await contents_of(files)
@@ -101,15 +94,10 @@ async function digests_of(files: ReadonlyArray<string>): Promise<Map<string, str
 	)
 }
 
-// Each work tree file's content digest `is_kept` accepts, keyed by its path.
-async function kept_digests_of(is_kept: (file: string) => boolean): Promise<Map<string, string>> {
-	return await digests_of(await work_tree_files(is_kept))
-}
-
-// Each test runner configuration file and every local module it imports — where an `include` list may
-// sit, as `tools/test/vitest-include-globs.ts` does here — with its content digest.
-async function config_digests_of(): Promise<Map<string, string>> {
-	const configs = await work_tree_files((file) => test_runner_config.is_config(file))
+// Each test runner configuration file among `listed` and every local module it imports — where an
+// `include` list may sit, as `tools/test/vitest-include-globs.ts` does here — with its content digest.
+async function config_digests_of(listed: ReadonlyArray<string>): Promise<Map<string, string>> {
+	const configs = listed.filter((file) => test_runner_config.is_config(file))
 	const reached = config_fingerprint.list_reachable_modules(
 		configs.map((file) => path.resolve(file)),
 	)
@@ -128,9 +116,11 @@ function contents_digest(digests: ReadonlyMap<string, string>): string {
 // test file is left out — a `red` rests on the test files it failed in, not on every test — and so is
 // a run record, which no test reads, so one written after a probe keeps its `red`
 // (joshuafolkken/kit#4856, `run-record-path.ts`).
-async function code_change(base: string): Promise<CodeChange> {
+//
+// `resolved` is the commit `base` already resolved to in this run, read again only when absent.
+async function code_change(base: string, resolved?: string): Promise<CodeChange> {
 	const [commit, paths] = await Promise.all([
-		git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
+		resolved ?? git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
 		changed_paths.read_changed_since(base),
 	])
 	const code = paths.filter(
@@ -142,12 +132,15 @@ async function code_change(base: string): Promise<CodeChange> {
 
 // The work tree's tree-wide digests, with what they were read off. A test runner configuration change
 // can make a test run that never ran, so it moves `test_contents` as a test file would
-// (joshuafolkken/kit#7521).
-async function read_tree(base: string): Promise<TreeRead> {
-	const [test_digests, configs, code] = await Promise.all([
-		kept_digests_of((file) => test_declared_logic.is_test_file(file)),
-		config_digests_of(),
-		code_change(base),
+// (joshuafolkken/kit#7521). The test files and the configurations come off one listing of the tree.
+async function read_tree(base: string, commit?: string): Promise<TreeRead> {
+	const [listed, code] = await Promise.all([
+		test_pinned_reach.work_tree_files(),
+		code_change(base, commit),
+	])
+	const [test_digests, configs] = await Promise.all([
+		digests_of(listed.filter((file) => test_declared_logic.is_test_file(file))),
+		config_digests_of(listed),
 	])
 	const test_contents = contents_digest(new Map([...test_digests, ...configs]))
 	const change = test_pinned_cache_logic.change_of(code.commit, code.code, code.digests)
@@ -304,9 +297,12 @@ async function stored_basis(
 	return await basis_of(cache, { ...probe, failed }, file)
 }
 
-// Whether the tree still reads as it did at `load`.
+// Whether the tree still reads as it did at `load`. A `base` that is itself the commit `load` resolved
+// cannot name another commit, so that read is reused within the run; a ref name is read again, since
+// it can move.
 async function is_steady(cache: LoadedCache): Promise<boolean> {
-	const now = await read_tree(cache.base)
+	const commit = cache.code.commit === cache.base ? cache.base : undefined
+	const now = await read_tree(cache.base, commit)
 
 	return now.change === cache.change && now.test_contents === cache.test_contents
 }

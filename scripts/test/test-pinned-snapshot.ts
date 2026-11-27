@@ -8,6 +8,7 @@ import { git_spawn_sync, type GitSyncOptions } from '#scripts/git/git-spawn-sync
 
 const PREFIX = 'josh-pinned-snapshot-'
 const CACHE_NAME = 'josh-test-pinned-verdicts.json'
+const HEAD_AND_PATH_LINES = 2
 const IDENTITY = ['-c', 'user.name=Snapshot', '-c', 'user.email=snapshot@localhost']
 
 interface Snapshot {
@@ -87,14 +88,19 @@ function seal(root: string, head: string, index: string, cache_file: string): Sn
 	return { head, tree, tree_hash, cache_file }
 }
 
+// HEAD and the cache file's git path come off one `rev-parse`, one line each.
+function head_and_cache_file(root: string): [string, string] {
+	const [head = '', cache_path = ''] = read(['rev-parse', 'HEAD', '--git-path', CACHE_NAME], {
+		cwd: root,
+	}).split('\n', HEAD_AND_PATH_LINES)
+
+	return [head, path.resolve(root, cache_path)]
+}
+
 async function with_snapshot<T>(action: (snapshot: Snapshot) => Promise<T>): Promise<T> {
 	const root = process.cwd()
-	const head = read(['rev-parse', 'HEAD'], { cwd: root })
+	const [head, cache_file] = head_and_cache_file(root)
 	const index = read(['ls-files', '--stage', '-z'], { cwd: root })
-	const cache_file = path.resolve(
-		root,
-		read(['rev-parse', '--git-path', CACHE_NAME], { cwd: root }),
-	)
 
 	return await base_tree.with_tree(PREFIX, head, async (tree) => {
 		await copy_changes(tree.tree, head)
