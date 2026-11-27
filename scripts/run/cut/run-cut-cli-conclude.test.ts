@@ -25,6 +25,7 @@ const BODY = [
 	'- [x] done',
 ].join('\n')
 
+const CHANGED_A = 'scripts/a.ts\n'
 const WITH_DELIVERABLE = [ISSUE, '--deliverable', DELIVERABLE]
 
 const close_completed = vi.fn<typeof backlog_triage_close.close_completed>()
@@ -52,7 +53,7 @@ describe('run:cut --deliverable on a no-diff investigation lane', () => {
 	})
 
 	it('refuses unready without closing when the lane changed a file (ac-5424e7c4)', async () => {
-		changed.names = 'scripts/a.ts\n'
+		changed.names = CHANGED_A
 
 		const code = await run_cut_cli.run(WITH_DELIVERABLE)
 
@@ -94,6 +95,18 @@ describe('run:cut --deliverable where the no-diff close does not apply', () => {
 		expect(verdict()).toBe(run_cut_cli.UNREADY_VERDICT)
 		expect(close_completed).not.toHaveBeenCalled()
 		expect(printed_errors()).not.toContain('no-diff')
+	})
+
+	it('points an unmet close at a rerun of itself, never the gate (ac-452c2664)', async () => {
+		changed.names = CHANGED_A
+
+		await run_cut_cli.run(WITH_DELIVERABLE)
+
+		expect(verdict()).toBe(run_cut_cli.UNREADY_VERDICT)
+		expect(printed_errors()).toContain(
+			`next: meet the condition printed above, then rerun \`pnpm josh run:cut ${ISSUE} --deliverable ${DELIVERABLE}\`.`,
+		)
+		expect(printed_errors()).not.toContain('run:chain')
 	})
 
 	it('reports a failed close as a fault', async () => {
