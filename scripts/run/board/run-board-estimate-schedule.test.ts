@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_estimate, type EstimateRead } from './run-board-estimate'
+import type { LaneBands } from './run-board-lane-totals'
 import type { BoardLayout, BoardRow, QueuedEntry, RowReason } from './run-board-layout'
 
 // joshuafolkken/kit#4319: a waiting child starts no earlier than what it waits on ends — a running
@@ -152,5 +153,30 @@ describe('run_board_estimate.queued_finish_ms', () => {
 		const layout = { active: [running(1)], queued: queue(waiting(2, ['99'])) }
 
 		expect(finishes(layout, [1, 2])).toStrictEqual([undefined, undefined])
+	})
+})
+
+// joshuafolkken/kit#8954: each waiting child takes its declared size's band.
+describe('run_board_estimate.queued_finish_ms with a large child banded', () => {
+	const LARGE = 2 * PER_CHILD
+	const bands: LaneBands = {
+		totals: new Map([['large', Array.from({ length: 5 }, () => LARGE)]]),
+		of_issue: new Map([[2, 'large']]),
+	}
+
+	it('delays the child stacked after a large one on its lane', () => {
+		const layout = { queued: queue(waiting(2), waiting(3), waiting(4)) }
+		const read = { ...read_of(layout), lane_bands: bands }
+		const ends = [2, 3, 4].map((issue) => run_board_estimate.queued_finish_ms(read, issue))
+
+		// 2 runs 60′ on one lane; 3 ends at 30′ and 4 follows it on that lane.
+		expect(ends.map((end = 0) => end - NOW)).toStrictEqual([LARGE, PER_CHILD, 2 * PER_CHILD])
+	})
+
+	it('ends the run later than with every child at the whole median', () => {
+		const layout = { queued: queue(waiting(2), waiting(3), waiting(4), waiting(5)) }
+		const banded = run_board_estimate.left_ms({ ...read_of(layout), lane_bands: bands })
+
+		expect(banded).toBeGreaterThan(left(layout) ?? 0)
 	})
 })

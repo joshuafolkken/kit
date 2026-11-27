@@ -3,6 +3,7 @@ import { run_cut_next } from './run-cut-next'
 
 const error = vi.spyOn(console, 'error').mockReturnValue()
 const GATE = 'pnpm josh run:chain 6235'
+const DELIVERABLE = 'https://example.test/c'
 
 beforeEach(() => {
 	error.mockClear()
@@ -25,6 +26,20 @@ describe('the pre-gate cut next action', () => {
 		run_cut_next.print_next(verdict, '6235')
 
 		expect(error).toHaveBeenCalledExactlyOnceWith(`next: ${action}`)
+	})
+
+	it('points an unmet --deliverable close at a rerun first, the gate as the other way out', () => {
+		run_cut_next.print_next('unready', '6235', DELIVERABLE)
+
+		expect(error).toHaveBeenCalledExactlyOnceWith(
+			`next: meet the condition printed above, then rerun \`pnpm josh run:cut 6235 --deliverable ${DELIVERABLE}\`; if the lane is meant to ship its diff instead, run ${GATE}.`,
+		)
+	})
+
+	it('keeps the gate for a deliverable that was not refused as unready', () => {
+		run_cut_next.print_next('failed', '6235', DELIVERABLE)
+
+		expect(error).toHaveBeenCalledExactlyOnceWith(`next: ${GATE}`)
 	})
 
 	// joshuafolkken/kit#7010: `budget-over` is no verdict of the pre-gate cut any more, so it prints no spill.

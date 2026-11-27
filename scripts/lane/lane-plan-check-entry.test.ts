@@ -65,6 +65,7 @@ function listing(): Awaited<ReturnType<typeof auto_ok_cli.fetch_opted_in>> {
 
 function stub_writes(): void {
 	record_split_notice.mockResolvedValue(undefined)
+	vi.spyOn(lane_ledger_write, 'record_declared').mockResolvedValue(undefined)
 	issue_try_comment.mockResolvedValue(true)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
 		make_directory(path.join(ROOT, 'repository-')),
