@@ -48,6 +48,11 @@ function named_files(selection: ReadonlyArray<string>): Array<string> {
 		.filter((value, index, all) => !value.startsWith('-') && all[index - 1] !== EXCLUDE_FLAG)
 }
 
+// The `--exclude` values of a selection, the globs a related run leaves out.
+function excluded_globs(selection: ReadonlyArray<string>): Array<string> {
+	return selection.filter((_, index, all) => all[index - 1] === EXCLUDE_FLAG)
+}
+
 function resolved(from: string, specifier: string): string | undefined {
 	const base = path.join(path.dirname(from), specifier)
 
@@ -77,11 +82,12 @@ async function reaches(test: string, targets: ReadonlyArray<string>): Promise<bo
 	return targets.some((target) => closure.has(target))
 }
 
-async function tests_in(root: string): Promise<Array<string>> {
+async function tests_in(root: string, globs: ReadonlyArray<string>): Promise<Array<string>> {
 	const entries = await readdir(root, { recursive: true })
 
 	return entries
 		.filter((entry) => TEST_PATTERN.test(entry))
+		.filter((entry) => globs.every((glob) => !path.matchesGlob(entry, glob)))
 		.toSorted((left, right) => left.localeCompare(right))
 }
 
@@ -91,7 +97,7 @@ async function selected(root: string, selection: ReadonlyArray<string>): Promise
 	const absolute = files.map((file) => path.join(root, file))
 
 	if (selection[0] !== RELATED) return files.filter((file) => existsSync(path.join(root, file)))
-	const tests = await tests_in(root)
+	const tests = await tests_in(root, excluded_globs(selection))
 	const reaching = await Promise.all(
 		tests.map(async (test) => await reaches(path.join(root, test), absolute)),
 	)

@@ -75,3 +75,17 @@ describe('test_pinned_fixture_probe.probe_in', () => {
 		RUN_TIMEOUT,
 	)
 })
+
+describe('test_pinned_fixture_probe.probe_in — an excluded test', () => {
+	it(
+		'leaves an excluded test out of a related run, as the vitest probe does',
+		async () => {
+			const selection = [...RELATED_DRIVER, '--exclude', TEST_FILE]
+			const [in_process, real] = await both(PINNED_REVERTED, selection)
+
+			expect(in_process).toEqual(real)
+			expect(in_process).toEqual({ verdict: 'no-test', failed: [], ran: 0 })
+		},
+		RUN_TIMEOUT,
+	)
+})

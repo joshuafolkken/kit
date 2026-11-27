@@ -2,6 +2,6 @@
 	"reason": "In-process probe stand-in (scripts/test/test-pinned-fixture-probe.ts) and its parity test replace real vitest child probes in the test-pinned-* tests, cutting their run from 65.9s to 43.7s",
 	"date": "2026-11-27",
 	"growth": {
-		"scripts.code_lines": 146
+		"scripts.code_lines": 150
 	}
 }
