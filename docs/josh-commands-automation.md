@@ -855,6 +855,25 @@ pnpm josh git:checkpoint theme "colors"
 
 **Behavior:** a no-filing producer's save point. Stages everything, commits `WIP checkpoint: <what>` with lefthook skipped, and points `wip/<name>` at the commit, so a replacement producer starts from that branch. Refuses outside a linked worktree and on the default branch. The ship refuses a checkpoint left on the tip (`scripts/git/git-checkpoint-tip.ts`).
 
+### `josh producer:brief`
+
+<!-- usage: producer:brief -->
+
+Print the standing part of a no-filing producer brief for wip/<name>.
+
+```bash
+pnpm josh producer:brief theme                                   # tests, the gate and the review wait for the finish
+pnpm josh producer:brief theme --tests-now-quote "テストと gate も"   # the user asked for the tests and the gate now
+```
+
+**Options:**
+
+- `--tests-now-quote <words>` — the user's own words asking for the tests and the gate now; anything else is refused.
+
+<!-- /usage -->
+
+**Behavior:** the main line of a no-filing session appends the goal and the investigation conclusion to this output. A quote that is not the user's request for the tests and the gate now (`unasked_filing.is_tests_now`) exits 1 — the main line's own wish is not a request.
+
 ## Versioning
 
 ### `josh bump`

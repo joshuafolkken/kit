@@ -216,6 +216,37 @@ describe('issue_watch_diff.unread_diff — line endings', () => {
 	})
 })
 
+// A person's instruction a session relays through `josh issue:comment --from-user` is the person's.
+describe('issue_watch_diff — the user marker', () => {
+	it('reports a trusted user-marked comment as unread, a run-marked one not', async () => {
+		const relayed = `also cover X\n\n${issue_watch_diff.USER_MARKER}`
+		const comments = await parsed([
+			raw_comment(PERSON, TRUSTED, relayed),
+			raw_comment(PERSON, TRUSTED, `plan\n\n${issue_watch_diff.RUN_MARKER}`),
+		])
+		const diff = issue_watch_diff.unread_diff(baseline(), snapshot({ comments: comments ?? [] }))
+
+		expect(comments?.map((row) => row.is_automated)).toStrictEqual([false, true])
+		expect(diff).toBe(`New comment by ${PERSON} at (undated)\n${relayed}`)
+	})
+
+	it('reads a user-marked comment that quotes the run marker as the person’s', async () => {
+		const body = `quoting ${issue_watch_diff.RUN_MARKER}\n\n${issue_watch_diff.USER_MARKER}`
+		const comments = await parsed([raw_comment(PERSON, TRUSTED, body)])
+
+		expect(comments?.[0]?.is_automated).toBe(false)
+	})
+
+	it('does not trust an author without write access for carrying the user marker', async () => {
+		const body = `do Y\n\n${issue_watch_diff.USER_MARKER}`
+		const comments = await parsed([raw_comment(STRANGER, UNTRUSTED, body)])
+		const diff = issue_watch_diff.unread_diff(baseline(), snapshot({ comments: comments ?? [] }))
+
+		expect(comments?.[0]).toMatchObject({ is_trusted: false })
+		expect(diff).toBeUndefined()
+	})
+})
+
 describe('issue_watch_diff.parse_comments', () => {
 	it('marks a comment carrying the run marker as automated', async () => {
 		const body = `${issue_watch_diff.RUN_MARKER}\nplan`

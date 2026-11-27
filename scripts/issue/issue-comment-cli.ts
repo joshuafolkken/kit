@@ -15,12 +15,18 @@ import { issue_outcome } from './issue-outcome'
 // `gh` exits 0 with a URL either way. One command removes the choice: the body travels by path through
 // `cli-body.ts` (shared with `notify` / `followup`), so no shell evaluates it and the wrong-flag
 // misfire has nowhere left to happen.
+//
+// **`--from-user` marks the comment as a person's instruction this session relays**, so the run holding
+// the issue reads it as an update rather than as its own comment (`issue-watch-diff.ts` →
+// `USER_MARKER`). It is read in `run` and not in `OPTIONS`: `run:park` parses through
+// `resolve_request`, and a park is never a person's instruction.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const BODY_FLAG = '--body'
 const BODY_FILE_FLAG = '--body-file'
-const USAGE = `Usage: josh issue:comment <issue-number> ${BODY_FLAG} <text> | ${BODY_FILE_FLAG} <path>`
+const FROM_USER_FLAG = '--from-user'
+const USAGE = `Usage: josh issue:comment <issue-number> ${BODY_FLAG} <text> | ${BODY_FILE_FLAG} <path> [${FROM_USER_FLAG}]`
 
 interface CommentRequest {
 	issue_number: string
@@ -86,11 +92,14 @@ function resolve_request(
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const request = resolve_request(argv)
+	const request = resolve_request(argv.filter((argument) => argument !== FROM_USER_FLAG))
 
 	if (request === undefined) return FAILURE_EXIT_CODE
 
-	const url = await git_gh_command.issue_comment(request.issue_number, request.body)
+	const post = argv.includes(FROM_USER_FLAG)
+		? git_gh_command.issue_user_comment
+		: git_gh_command.issue_comment
+	const url = await post(request.issue_number, request.body)
 
 	console.info(url)
 

@@ -110,6 +110,9 @@ describe('agent_session_role.scope_line — producer checkpoints', () => {
 		'one `wip/<name>` branch named in every brief',
 		'commits a `WIP checkpoint:` when no request is left or before it stops',
 		'a replacement producer starts from that branch instead of copied files',
+		'every no-filing request of the session, however many, goes on one `wip/<name>` branch',
+		'another branch is opened only on the user’s instruction, never on this session’s own judgment',
+		'(its standing part: `pnpm josh producer:brief <name>`)',
 	])('names the checkpoint route outside a worker lane: %s', (phrase) => {
 		expect(agent_session_role.scope_line({}, linked)).toContain(phrase)
 	})

@@ -93,13 +93,14 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
 - 明示されたワークフローキーワード（`kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun`）は `workflow-commands` skill の既存手順へ渡す。主セッションが実装する根拠には読み替えない。`kickoff` は起票・計画で停止し、実装系の実行は実装レーンへ引き渡す
 - キーワードの無い命令形（「〜して」）には調査（`investigation` 行で委譲）→ 計画 → 起票計画（`observation-filing.md` → "The filing plan"）を返し、実装も起票もしない。GitHub 未連携なら起票計画を除く（`scope_line`）
 - 「起票せずに〜して」「起票せずに〜を作って」→ 調査 → 計画 → 起票計画によらず実行する。調査は `investigator`、制作は `producer` サブエージェントに渡し、主セッション自身は編集しない。作業前サマリと自動判断のログは返信に出す。コミット・マージなど共有状態への書き込みは明示の指示があるときだけ（`operating-rules.md` → "git-rules"。`producer` の作業ブランチへのチェックポイントは除く）。案内文は `scope_line`
-  - `producer` を渡す → `isolation: "worktree"` を付ける。編集先は `.claude/worktrees/<name>` だけ（`.claude/agents/producer.md`、外は `scripts/hooks/implementation-authority.ts` が拒否）
+  - `producer` を渡す → `isolation: "worktree"` を付ける。編集先は `.claude/worktrees/<name>` だけ（`.claude/agents/producer.md`、外は `scripts/hooks/implementation-authority.ts` が拒否）。brief の定型部分 → `pnpm josh producer:brief <name>` の出力を使い、目的と調査の結論だけを足す
   - worktree で `pnpm josh` を実行 → 依存は上位の `node_modules` から解決され、`run:board --theme <名前>` は稼働中のランを表示する（2026-11-26 実測）
   - 既定 → 実装と動作確認まで。テスト・`pnpm josh gate`・コミット前レビューは仕上げに回す（省略ではなく、コミットの前へ移す）。依頼に「テストと gate も」→ その場で実行する
+  - 後回しのテストやその成果物（golden 等）が赤・実行不能 → 仕上げの項目として報告し、その場で直さない
   - 後回しにした返信 → 締めで「テストと gate は未実行」と毎回明記する
   - 「このセッションは起票せずに」 → セッション単位の宣言。成立・取り消し・寿命・締めの表示は `scripts/hooks/no-filing-declaration.ts`
   - 依頼 → 1 件来たらすぐ `producer` に渡す。途中の依頼は同じ `producer` へ来た順に渡す
-  - 作業ブランチ → 作業 1 つに `wip/<作業の名前>` 1 つ。brief に書き、ユニットを替えても同じ名前で次の `producer` を起動する。取り込み・チェックポイントの手順は `.claude/agents/producer.md`（チェックポイントは `pnpm josh git:checkpoint <name> "<what>"`）、許す操作は `scripts/hooks/producer-checkpoint.ts`
+  - 作業ブランチ → 起票せずにの依頼は何件でも 1 本の `wip/<name>` に積む。分けるのは利用者が指示したときだけで、主セッションの判断では分けない。brief に書き、ユニットを替えても同じ名前で次の `producer` を起動する。取り込み・チェックポイントの手順は `.claude/agents/producer.md`（チェックポイントは `pnpm josh git:checkpoint <name> "<what>"`）、許す操作は `scripts/hooks/producer-checkpoint.ts`
   - チェックポイント（`WIP checkpoint:`）→ 仕上げではない。テスト・gate・コミット前レビュー・lefthook は仕上げのコミットの前に通す（`scripts/git/git-checkpoint-tip.ts`）
   - 宣言の有無 → その都度「起票せずに」と書く使い方でも同じ
   - 成果の返信 → worktree のパス、`wip/<name>` と最新のコミットを書く

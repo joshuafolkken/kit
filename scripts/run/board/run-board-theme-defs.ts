@@ -5,17 +5,17 @@ import { run_board_sound_codec } from './run-board-sound-codec'
 import { run_board_sound_enter } from './run-board-sound-enter'
 import { run_board_sound_keypad } from './run-board-sound-keypad'
 import { run_board_sound_nixie } from './run-board-sound-nixie'
-import { run_board_sound_palettes_deviant } from './run-board-sound-palettes-deviant'
 import { run_board_sound_palettes_extra } from './run-board-sound-palettes-extra'
 import { run_board_sound_palettes_film } from './run-board-sound-palettes-film'
 import { run_board_sound_palettes_more } from './run-board-sound-palettes-more'
+import { run_board_sound_palettes_rk800 } from './run-board-sound-palettes-rk800'
 import { run_board_sound_score, type Palette, type Score } from './run-board-sound-score'
 import { run_board_sound_skynet } from './run-board-sound-skynet'
 import { run_board_sound_typing } from './run-board-sound-typing'
-import { run_board_theme_deviant_data } from './run-board-theme-deviant-data'
 import { run_board_theme_ghost_data } from './run-board-theme-ghost-data'
 import { run_board_theme_isac_data } from './run-board-theme-isac-data'
 import { run_board_theme_magi_data } from './run-board-theme-magi-data'
+import { run_board_theme_rk800_data } from './run-board-theme-rk800-data'
 import { run_board_theme_tones } from './run-board-theme-tones'
 
 // joshuafolkken/kit#8349: what each theme carries, one row per theme — a theme is added by adding its
@@ -89,9 +89,9 @@ function no_sound(): undefined {
 
 const { CODEC, MAGI, NIXIE, SKYNET } = run_board_sound_palettes_more
 const { FLUX, TRACE, WOPR } = run_board_sound_palettes_film
-const { DEVIANT, DEVIANT_VOICES } = run_board_sound_palettes_deviant
+const { RK800, RK800_VOICES } = run_board_sound_palettes_rk800
 const { GHOST, GHOST_VOICES, ISAC, ISAC_VOICES } = run_board_sound_palettes_extra
-const { OPEN: DEVIANT_OPEN } = run_board_theme_deviant_data
+const { OPEN: RK800_OPEN } = run_board_theme_rk800_data
 const { OPEN: ISAC_OPEN } = run_board_theme_isac_data
 const { ASSEMBLE: GHOST_ASSEMBLE } = run_board_theme_ghost_data
 const { score_of } = run_board_sound_score
@@ -161,11 +161,11 @@ const THEME_DEFS = {
 		intro: { line: run_board_theme_magi_data.MAGI_OPEN.title, letter_ms: TELETYPE.intro.letter_ms },
 	},
 	// Each of the three below types its own opening from the first tick, so its sound counts those letters:
-	// deviant's date card, two letters a tick.
-	deviant: {
+	// rk800's date card, two letters a tick.
+	rk800: {
 		name: 'josh-rk800',
-		...voiced(DEVIANT_VOICES, DEVIANT),
-		intro: { line: DEVIANT_OPEN.line, letter_ms: DEVIANT_OPEN.letter_ms },
+		...voiced(RK800_VOICES, RK800),
+		intro: { line: RK800_OPEN.line, letter_ms: RK800_OPEN.letter_ms },
 	},
 	// isac's title.
 	isac: {
@@ -197,8 +197,8 @@ const THEME_ALIASES: ReadonlyMap<string, Theme> = new Map<string, Theme>([
 	['terminator', 'skynet'],
 	['evangelion', 'magi'],
 	['eva', 'magi'],
-	['detroit', 'deviant'],
-	['dbh', 'deviant'],
+	['detroit', 'rk800'],
+	['dbh', 'rk800'],
 	['division', 'isac'],
 	['shd', 'isac'],
 	['gits', 'ghost'],

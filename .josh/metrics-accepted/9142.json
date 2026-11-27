@@ -1,0 +1,10 @@
+{
+	"reason": "#9142 adds issue:comment --from-user, producer:brief and the no-filing declaration rule; the new code and its docs are the growth",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 126,
+		"rules.lines": 3,
+		"ai_cost.on_demand_bytes": 530,
+		"prose.excess_bold": 1
+	}
+}

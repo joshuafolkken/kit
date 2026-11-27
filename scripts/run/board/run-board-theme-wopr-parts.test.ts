@@ -21,6 +21,17 @@ describe('run_board_theme_wopr_parts.opening_of', () => {
 		expect(row_text(grid, 1).trim()).toBe('')
 	})
 
+	// joshuafolkken/kit#9137: the opening's lamps are out in their rows' own out shades.
+	it('draws the lamps out, a yellow row’s in yellow halved and a red row’s in red halved', () => {
+		const grid = board_grid()
+		const { x, top } = WOPR.lamps
+
+		opening.draw(grid, opening.ticks - 1, state_at('i', opening.ticks - 1))
+
+		expect(grid[top]?.[x]?.[1]).toContain('128;107;5')
+		expect(grid[top + 3]?.[x]?.[1]).toContain('128;38;40')
+	})
+
 	it('writes nothing past the rows it has reached', () => {
 		const grid = board_grid()
 

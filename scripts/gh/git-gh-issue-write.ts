@@ -104,12 +104,29 @@ async function issue_edit_title(
 // **Every comment josh posts carries `RUN_MARKER`**, an HTML comment GitHub does not render. A run
 // posts under the person's own `gh` login, so the marker is the only thing that tells the issue watch
 // (`issue-watch-diff.ts`) a run's comment from a person's update.
-async function issue_comment(issue_number: string, body: string, repo?: string): Promise<string> {
+interface CommentPost {
+	issue_number: string
+	body: string
+	marker: string
+	repo?: string | undefined
+}
+
+async function post_comment(post: CommentPost): Promise<string> {
 	return await write_api({
-		path: `${git_gh_api_path.issue_api_path(issue_number, repo)}${COMMENTS_SEGMENT}`,
-		body: JSON.stringify({ body: `${body}\n\n${issue_watch_diff.RUN_MARKER}` }),
+		path: `${git_gh_api_path.issue_api_path(post.issue_number, post.repo)}${COMMENTS_SEGMENT}`,
+		body: JSON.stringify({ body: `${post.body}\n\n${post.marker}` }),
 		jq_filter: HTML_URL_FILTER,
 	})
+}
+
+async function issue_comment(issue_number: string, body: string, repo?: string): Promise<string> {
+	return await post_comment({ issue_number, body, marker: issue_watch_diff.RUN_MARKER, repo })
+}
+
+// **A person's instruction relayed by a session carries `USER_MARKER` instead**, so the run holding
+// the issue reads it as the person's update it is (`josh issue:comment --from-user`).
+async function issue_user_comment(issue_number: string, body: string): Promise<string> {
+	return await post_comment({ issue_number, body, marker: issue_watch_diff.USER_MARKER })
 }
 
 // The same comment, counted rather than thrown. `josh epic --add --decision-file` posts one per child
@@ -443,6 +460,7 @@ const git_gh_issue_write = {
 	issue_edit_body,
 	issue_edit_title,
 	issue_comment,
+	issue_user_comment,
 	issue_try_comment,
 	issue_close,
 	label_ensure,

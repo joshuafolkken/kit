@@ -94,7 +94,7 @@ function row_event(wopr: Wopr, grid: Grid, state: ThemeState, tick: number): boo
 	return true
 }
 
-const run_board_theme_wopr_row = { flicker, row_event, scan, scan_over_codes }
+const run_board_theme_wopr_row = { ROW_MOVE_TICKS, flicker, row_event, scan, scan_over_codes }
 
 export { run_board_theme_wopr_row }
 export type { Flock }

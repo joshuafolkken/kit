@@ -40,7 +40,7 @@ const LEVEL_OF: Readonly<Record<ThemeValue, RegExp>> = {
 	wopr: /DEFCON(?: \[?\d\]?){5}/u,
 	...LEVELS,
 	flux: /$^/u,
-	deviant: /STRESS \d+%/u,
+	rk800: /STRESS \d+%/u,
 	isac: /STATUS (?:ALERT|ACTIVE|SECURE)/u,
 	ghost: /BARRIER BREACH|LINK (?:DIVING|STABLE)/u,
 }
@@ -56,7 +56,7 @@ const WORKS: ReadonlyArray<ThemeValue> = [
 	'nixie',
 	'skynet',
 	'magi',
-	'deviant',
+	'rk800',
 	'isac',
 	'ghost',
 ]

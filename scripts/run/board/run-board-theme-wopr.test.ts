@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_theme_demo_allowance_fixture } from './run-board-theme-demo-allowance-fixture'
 import { run_board_theme_host_fixture } from './run-board-theme-host-fixture'
 import { run_board_theme_host_snap_fixture } from './run-board-theme-host-snap-fixture'
 import { run_board_theme_wopr } from './run-board-theme-wopr'
@@ -7,11 +8,12 @@ const { HOST } = run_board_theme_host_fixture
 const { expect_demo_check, expect_demo_snaps } = run_board_theme_host_snap_fixture
 // joshuafolkken/kit#8917: WARGAMES is the confirmed demo's theme 1.
 const WARGAMES_KEY = 1
+const { ALLOWANCES } = run_board_theme_demo_allowance_fixture
 
 describe('run_board_theme_wopr', () => {
-	it('matches the demo', () => {
+	it('matches the demo but for the code running on every tick', () => {
 		expect(() => {
-			expect_demo_snaps(run_board_theme_wopr.theme, WARGAMES_KEY)
+			expect_demo_snaps(run_board_theme_wopr.theme, WARGAMES_KEY, ALLOWANCES.wopr)
 		}).not.toThrow()
 	})
 

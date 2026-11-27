@@ -14,8 +14,8 @@ import { run_board_theme_wopr_reveal } from './run-board-theme-wopr-reveal'
 const { put, repeated, rows_to, set_cell } = run_board_theme_host_grid
 const { hash } = run_board_theme_host_hash
 const { TICK_MS } = run_board_theme_host_state
-const { INK, INTRO, LAST_WORDS, SHADES } = run_board_theme_wopr_data
-const { paint_lamps, sweep_at } = run_board_theme_wopr_idle
+const { INTRO, LAST_WORDS, SHADES } = run_board_theme_wopr_data
+const { out_ink, paint_lamps, sweep_at } = run_board_theme_wopr_idle
 const { revealed_to } = run_board_theme_wopr_reveal
 
 // `SHALL WE PLAY A GAME?` types a letter a tick and holds forty ticks; then the first frame is
@@ -54,7 +54,7 @@ function reveal(wopr: Wopr, grid: Grid, tick: number): void {
 	const { sweep } = wopr
 	const ms = (tick - REVEAL_FROM) * TICK_MS
 
-	paint_lamps(wopr, grid, () => INK.out)
+	paint_lamps(wopr, grid, out_ink)
 	put(grid, { y: sweep.y, x: sweep.left }, repeated(' ', sweep.cells), 'body')
 
 	for (let y = 0; y < h; y++) {
@@ -87,7 +87,7 @@ function lamp_out(
 		hash(row, Math.floor(index / LAMP_GROUP), LAMP_SALT) * (LAMPS_OUT - LAMP_GROUP),
 	)
 
-	if (tick >= out_at) set_cell(grid, { y: top + row, x: x + PAIR * index }, ['■', INK.out])
+	if (tick >= out_at) set_cell(grid, { y: top + row, x: x + PAIR * index }, ['■', out_ink(row)])
 }
 
 // The lamps go out group by group and the sweep stops.

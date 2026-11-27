@@ -4,7 +4,7 @@ import { run_board_theme_layer_fixture } from './run-board-theme-layer-fixture'
 
 // A real start renders its part's whole track on the frame that begins the part, between the frame's
 // moment and its write; a process that has rendered none yet takes longer over it than a short opening's
-// letters type (the deviant theme's one short line). Timed from the frame's moment, the opening was past
+// letters type (the rk800 theme's one short line). Timed from the frame's moment, the opening was past
 // its letters by its second frame, and their trill was never heard; a replay in demo mode, its tracks
 // rendered already, sounded it. The part begins as its first frame is written.
 

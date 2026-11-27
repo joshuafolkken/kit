@@ -7,6 +7,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_area_label } from './issue-area-label'
 import { issue_backlinks } from './issue-backlinks'
 import { issue_classification } from './issue-classification'
+import { issue_handoff_filing } from './issue-handoff-filing'
 import { FILING_ROUTE_LABELS } from './issue-label-definitions'
 import { AUTO_OK_LABEL, has_label_name, RUN_LANE_LABEL, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_not_before_label } from './issue-not-before-label'
@@ -148,7 +149,7 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 			'every-run': values['every-run'],
 		},
 		...labelled,
-		labels: values.label ?? [],
+		labels: issue_handoff_filing.with_label(values.label ?? [], process.env),
 		repo: values.repo,
 		is_over_cap: values['over-cap'] === true,
 		is_auto_ok_opted_out: values['no-auto-ok'] === true,

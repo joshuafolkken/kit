@@ -98,7 +98,7 @@ async function refused(argv: Array<string>): Promise<{ code: number; stderr: str
 describe('run_board_cli.run --theme refused', () => {
 	it('names the theme values in the usage', () => {
 		expect(run_board_cli.USAGE).toContain(
-			'[--theme wopr|trace|flux|codec|nixie|skynet|magi|deviant|isac|ghost]',
+			'[--theme wopr|trace|flux|codec|nixie|skynet|magi|rk800|isac|ghost]',
 		)
 	})
 
@@ -117,12 +117,26 @@ describe('run_board_cli.run --theme refused', () => {
 
 		expect(await refused(['--once'])).toStrictEqual({
 			code: 1,
-			stderr: `JOSH_BOARD_THEME=nope names no theme (wopr, trace, flux, codec, nixie, skynet, magi, deviant, isac, ghost)\n${run_board_cli.USAGE}\n`,
+			stderr: `JOSH_BOARD_THEME=nope names no theme (wopr, trace, flux, codec, nixie, skynet, magi, rk800, isac, ghost)\n${run_board_cli.USAGE}\n`,
 		})
 	})
 
 	it('refuses a name no theme has with the usage', async () => {
 		expect(await refused(['--theme', NOPE, '--once'])).toStrictEqual({
+			code: 1,
+			stderr: `${run_board_cli.USAGE}\n`,
+		})
+	})
+})
+
+// The Detroit board's value is its board's name after `josh-`, `rk800`; `deviant` names no theme.
+describe('run_board_cli.run --theme rk800', () => {
+	it.each(['rk800', 'detroit', 'dbh'])('draws --once in --theme %s', async (theme) => {
+		expect(await frame_of(['--theme', theme, '--once'])).not.toContain(RULE)
+	})
+
+	it('refuses --theme deviant, no longer a value or an alias, with the usage', async () => {
+		expect(await refused(['--theme', 'deviant', '--once'])).toStrictEqual({
 			code: 1,
 			stderr: `${run_board_cli.USAGE}\n`,
 		})

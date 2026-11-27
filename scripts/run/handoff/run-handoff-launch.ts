@@ -11,6 +11,7 @@ import { durable_state } from '#scripts/josh/durable-state'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import type { LaunchRequest } from '#scripts/run/detached-launch'
 import { run_headless } from '#scripts/run/run-headless'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import type { WorkflowHandoff, WorkflowKeyword } from './run-handoff-args'
 import { run_handoff_route } from './run-handoff-route'
 
@@ -107,9 +108,13 @@ function log_path(git_directory: string, keyword: WorkflowKeyword, now: number):
 // The child's own `josh` commands resolve the provider it was handed, never a Codex session this was
 // typed in — the same environment `josh backlogrun` hands its parent. It is marked a hand-off child, so
 // a `backlogrun` parent that starts the retrospective unit is never driven or cut by the unit's hooks.
-function request_of(built: BuiltArgv, cwd: string, log: string): LaunchRequest {
+// The handed line goes with it, so the child's `issue:file` withholds `auto-ok` from the Issue a
+// handed-off implementing run files and implements itself (`issue-handoff-filing.ts`). A unit started
+// with no typed line (`backlog-drive-unit.ts`) clears an inherited one.
+function request_of(built: BuiltArgv, cwd: string, log: string, line?: string): LaunchRequest {
 	const environment = {
 		...run_headless.handoff_child_environment(),
+		[run_headless_keys.HANDOFF_LINE_KEY]: line,
 		[agent_role_profile.CODEX_SESSION_KEY]: undefined,
 		[agent_role_profile.HANDED_PROVIDER_KEY]: built.profile.provider,
 	}

@@ -108,6 +108,25 @@ describe('lane_phases.phases_of', () => {
 	})
 })
 
+describe('lane_phases.phases_of — concurrent stages', () => {
+	it('counts the overlap of check stages run together once (joshuafolkken/kit#9140)', () => {
+		const together: LedgerEntry = {
+			kind: 'chain',
+			at: at(12),
+			issue: ISSUE,
+			elapsed_ms: 2 * MS_PER_MINUTE,
+			join: false,
+			stages: [
+				{ name: 'exports:unused', at: at(10), elapsed_ms: MS_PER_MINUTE },
+				{ name: 'guard-tests', at: at(10), elapsed_ms: 2 * MS_PER_MINUTE },
+			],
+		}
+		const samples = lane_phases.phases_of([dispatch(0), together], [], ISSUE)
+
+		expect(minutes_of(samples)[PHASE.CHECK]).toBe(2)
+	})
+})
+
 describe('lane_phases.phases_of — missing records', () => {
 	it('leaves ship and CI out of an unmerged lane, and CI alone where no wait was recorded', () => {
 		const unmerged = LANE.filter((entry) => entry.kind !== 'merge')

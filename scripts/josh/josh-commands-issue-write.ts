@@ -92,7 +92,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/issue-comment-main.ts',
 		description: 'Post one comment to an issue from a file, so no shell expands the body',
 		category: 'AI tools',
-		reference: ['<issue> --body <text> | --body-file <path>', 'automation', ['network']],
+		reference: [
+			'<issue> --body <text> | --body-file <path> [--from-user]',
+			'automation',
+			['network'],
+		],
 		usage: {
 			examples: [
 				{
@@ -113,6 +117,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					names: [BODY_FILE],
 					description:
 						'read the body from a file, or from stdin with `-`. The safe form the rule steers every caller toward.',
+				},
+				{
+					names: ['--from-user'],
+					description:
+						"the comment relays a person's instruction: it carries the user marker in place of the run marker, so the run holding the issue reads it as an unread update.",
 				},
 			],
 		},

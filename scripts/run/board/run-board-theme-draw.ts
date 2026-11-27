@@ -11,7 +11,7 @@ import type {
 	ThemeState,
 } from './run-board-theme-host-types'
 
-// What the themes drawn without a demo share (deviant, isac, ghost): one frame being drawn, the panel
+// What the themes drawn without a demo share (rk800, isac, ghost): one frame being drawn, the panel
 // and the area as boxes, a write kept inside a box, and the small geometry their rings, links and
 // screen-wide parts are laid out by.
 

@@ -10,7 +10,7 @@ import { lane_stop_stats } from './lane-stop-stats'
 // - prep & investigation — the last dispatch before the first `run:chain` to the lane's first
 //   implementation marker (`plan` / `lane-phase … implement` run event, as `lane:breakdown` reads it);
 // - implement — that marker to the first `run:chain`'s start;
-// - local checks — every `run:chain` stage but the review stages and `ship`, summed;
+// - local checks — every `run:chain` stage but the review stages and `ship`, their overlap counted once;
 // - review — the review stages summed, plus the first review round's wait: the last pre-review
 //   `run:chain`'s end to the first `--join` run's start;
 // - push → merge — the first `ship` chain stage's start to the last merge, and apart under it the
@@ -137,13 +137,28 @@ function is_check(stage: ChainStage): boolean {
 	return stage.name !== SHIP_STAGE && !is_review(stage)
 }
 
+function stage_span(stage: ChainStage): Span {
+	return { from_ms: at_ms(stage), to_ms: at_ms(stage) + stage.elapsed_ms }
+}
+
+// The stages' wall time: `run:chain` runs some together (joshuafolkken/kit#9140), so an overlap
+// counts once rather than once per stage.
+function wall_ms(stages: ReadonlyArray<ChainStage>): number {
+	if (stages.length === 0) return 0
+	const spans = stages.map((stage) => stage_span(stage))
+	const whole = {
+		from_ms: Math.min(...spans.map((span) => span.from_ms)),
+		to_ms: Math.max(...spans.map((span) => span.to_ms)),
+	}
+
+	return lane_breakdown.covered_ms(whole, spans)
+}
+
 function check(chains: ReadonlyArray<ChainEntry>): Array<PhaseSample> {
 	const stages = stages_of(chains)
 	if (stages.length === 0) return []
 
-	const checks_ms = sum(stages.filter((stage) => is_check(stage)).map((stage) => stage.elapsed_ms))
-
-	return [{ phase: PHASE.CHECK, ms: checks_ms }]
+	return [{ phase: PHASE.CHECK, ms: wall_ms(stages.filter((stage) => is_check(stage))) }]
 }
 
 // The first review round's wait: the reviewer runs between the last pre-review run and the `--join`.

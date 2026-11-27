@@ -1,0 +1,8 @@
+{
+	"growth": {
+		"scripts.code_lines": 210,
+		"ai_cost.on_demand_bytes": 119
+	},
+	"reason": "wopr brush-up adds the lock notes and tic-tac-toe beeps synthesis (run-board-sound-wopr.ts), per-tick code spin and its tests; theme-sound.md documents notice.cues and notice.build #9144",
+	"date": "2026-11-27"
+}

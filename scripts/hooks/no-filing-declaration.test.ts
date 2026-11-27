@@ -7,6 +7,7 @@ const create_directory = temporary_directory('suite')
 
 const { DECLARE, END, is_declared, prompt_line, update } = no_filing_declaration
 const DECLARING = `${DECLARE}、Detroit のテーマを直す`
+const VARIANT = 'このセッションでは起票せずに'
 const PLAIN = 'ボタンの色を少し濃くして'
 
 function session(): string {
@@ -52,6 +53,8 @@ describe('no-filing declaration — who declares it', () => {
 	it.each([
 		['a quoted phrase', `「${DECLARE}」とはどういう意味？`],
 		['a code span', `\`${DECLARE}\` の仕組みを説明して`],
+		['a quoted particle variant', `「${VARIANT}」でも通る？`],
+		['an unrelated sentence on this session', 'このセッションではテーマの色を調べて'],
 		['a prompt without it', PLAIN],
 	])('does not declare from %s', (_name, prompt) => {
 		const transcript_path = session()
@@ -70,6 +73,19 @@ describe('no-filing declaration — who declares it', () => {
 			expect(is_declared(transcript_path)).toBe(false)
 		},
 	)
+})
+
+// 2026-11-28: the person wrote the phrase with one particle different and nothing was recorded.
+describe('no-filing declaration — the phrase', () => {
+	it.each([
+		['the canonical phrase', `${DECLARE}実装して`],
+		['the particle variant', `${VARIANT}実装して`],
+	])('declares from %s', (_name, prompt) => {
+		const transcript_path = session()
+
+		expect(update(submitted(transcript_path, prompt))).toBe(prompt)
+		expect(is_declared(transcript_path)).toBe(true)
+	})
 })
 
 describe('no-filing declaration — its life', () => {

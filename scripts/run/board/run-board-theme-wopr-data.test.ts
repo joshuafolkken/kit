@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { run_board_theme_wopr_data } from './run-board-theme-wopr-data'
 
-const { COLORS, GAMES, LEVEL_INKS, ORDER, SHADES, STRIP_RANK, THE_CODE, WORLD } =
-	run_board_theme_wopr_data
+const { COLORS, GAMES, LEVEL_INKS, ORDER, SHADES, SPARK } = run_board_theme_wopr_data
+const { STRIP_RANK, THE_CODE, WORLD } = run_board_theme_wopr_data
+// A style's background as 'r;g;b'.
+const BACKGROUND = /\[48;2;(\d+;\d+;\d+)m/u
+// The white frames' background, left as it was.
+const SPARK_WHITE = '255;255;235'
 
 function sorted(text: string): string {
 	return Array.from(text, (ch) => ch)
@@ -33,5 +37,32 @@ describe('run_board_theme_wopr_data', () => {
 		expect(SHADES).toHaveLength(7)
 		expect(LEVEL_INKS).toHaveLength(3)
 		expect(WORLD.map((line) => line.length)).toStrictEqual(filled(7, 57))
+	})
+})
+
+// joshuafolkken/kit#9137: the colors measured on the film.
+describe('run_board_theme_wopr_data — the film’s colors', () => {
+	it('lights the lamp rows yellow, yellow, yellow, red, red, yellow, red', () => {
+		const [yellow] = SHADES
+		const red = SHADES.at(-1)
+
+		expect(yellow).toStrictEqual({
+			lit: '\u{1B}[38;2;255;214;10m',
+			out: '\u{1B}[2m\u{1B}[38;2;128;107;5m',
+		})
+		expect(red).toStrictEqual({
+			lit: '\u{1B}[38;2;255;69;58m',
+			out: '\u{1B}[2m\u{1B}[38;2;128;38;40m',
+		})
+		expect(SHADES).toStrictEqual([yellow, yellow, yellow, red, red, yellow, red])
+	})
+
+	it('floods the spark white, white, lavender, dim lavender', () => {
+		expect(SPARK.map((style) => BACKGROUND.exec(style)?.[1])).toStrictEqual([
+			SPARK_WHITE,
+			SPARK_WHITE,
+			'228;227;255',
+			'148;148;166',
+		])
 	})
 })
