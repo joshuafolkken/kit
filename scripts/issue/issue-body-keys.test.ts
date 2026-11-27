@@ -35,6 +35,8 @@ const OTHER_BODY_TEXT: ReadonlySet<string> = new Set([
 	'### 検証方法',
 	'### 選択肢',
 	'### 推奨',
+	'### 理由',
+	'### 次の一手',
 	'### 影響を受ける既存の利用者',
 ])
 

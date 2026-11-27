@@ -1,5 +1,6 @@
 import type { ClaudeResultEvent } from '#scripts/agent/claude-result-event'
 import { describe, expect, it } from 'vitest'
+import { run_park_body } from './park/run-park-body'
 import {
 	ABANDONED_VERDICT,
 	CUT_VERDICT,
@@ -9,6 +10,8 @@ import {
 	UNREADABLE_VERDICT,
 	type EndingTraces,
 } from './run-ending'
+
+const REFUSED_ASK = 'Which library? [zod / valibot]'
 
 const OUTAGE_EXIT: ClaudeResultEvent = {
 	is_error: true,
@@ -110,6 +113,23 @@ describe('an API outage told apart from an ordinary mid-implementation stop', ()
 	})
 })
 
+// The parent passes the evidence to `run:park --body-file` (joshuafolkken/kit#9064).
+describe('the park body an abandoned verdict carries', () => {
+	it('is a park body run:park accepts, recommending the re-dispatch a parent takes itself', () => {
+		const { evidence } = run_ending.decide(traces())
+
+		expect(run_park_body.problem_of(evidence)).toBeUndefined()
+		expect(run_park_body.auto_pick(evidence)).toBe(1)
+	})
+
+	it('recommends nothing when the exit record preserved a refused ask', () => {
+		const exit_record = { ...SUCCESS_EXIT, refused_ask: REFUSED_ASK }
+		const { evidence } = run_ending.decide(traces({ exit_record }))
+
+		expect(run_park_body.summary_of(evidence)).toBe('推奨なし')
+	})
+})
+
 describe('the basis an abandoned verdict carries', () => {
 	it('names the exit-record fields it read and the permission-denial count', () => {
 		const { evidence } = run_ending.decide(traces())
@@ -132,10 +152,10 @@ describe('the basis an abandoned verdict carries', () => {
 	// its stranded question is lifted out of the exit record and into the park basis, so the parent does
 	// not open the JSONL by hand.
 	it('carries the refused interactive ask when the exit record preserved one', () => {
-		const exit_record = { ...SUCCESS_EXIT, refused_ask: 'Which library? [zod / valibot]' }
+		const exit_record = { ...SUCCESS_EXIT, refused_ask: REFUSED_ASK }
 
 		expect(run_ending.decide(traces({ exit_record })).evidence).toContain(
-			'the refused interactive ask was — Which library? [zod / valibot]',
+			`the refused interactive ask was — ${REFUSED_ASK}`,
 		)
 	})
 
