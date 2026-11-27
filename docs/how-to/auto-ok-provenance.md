@@ -31,6 +31,11 @@ structured body section. If none exists, no existing exclusion holds and the bod
 reading rather than inheriting the old decline as authority. An unreadable source is not permission
 to apply: report it for clarification.
 
+An issue a `run:handoff` `fullrun` / `halfrun` / `prrun new` child files carries
+`handoff:implementing`, an excluded label: that run implements it, so neither the filing nor a later
+judgement opts it in. Only the hand-off marks in the environment decide it; a `fullrun new` typed
+into a session directly leaves no mark and is judged as before.
+
 A body declaring `- 人の判断: 要` is never a candidate, and `--apply` refuses it, writing nothing —
 the same reading `issue:file` withholds `auto-ok` by. `backlog:triage --adopt` settles a park; it
 does not opt the issue in.

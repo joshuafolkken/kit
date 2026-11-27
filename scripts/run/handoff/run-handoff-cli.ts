@@ -263,7 +263,7 @@ function started_of(input: StartInput, directory: string, ports: HandoffPorts): 
 	if (built.kind === 'rejected') return { kind: 'refused', note: `could not start: ${built.note}` }
 
 	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, now)
-	const request = run_handoff_launch.request_of(built, directory, log)
+	const request = run_handoff_launch.request_of(built, directory, log, handoff.line)
 	const started = { handoff, built, request, log, scratch, git_directory, directory }
 
 	return { kind: 'started', started }

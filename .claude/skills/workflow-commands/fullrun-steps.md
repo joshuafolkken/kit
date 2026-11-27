@@ -39,7 +39,8 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 (2) Create Issue: `pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --over-cap`,
 with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
-that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
+that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`); a
+hand-off child's filing gets `handoff:implementing`, so no `auto-ok`. Capture
 `<N>`. (2a) Into the lane, the plan in the brief: `pnpm josh run:release`, then
 `pnpm josh run:handoff fullrun <N> --brief-file .josh/tmp/brief.md`, end (`run-handoff-tree.ts`); on a
 refusal, (3); a hand-off child ends (`run-entry-handoff-root.ts`). (3) `pnpm josh run:entry <N> --adopt` — the `#N` entry with the bare hold re-keyed to `<N>`

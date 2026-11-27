@@ -5,7 +5,7 @@ import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_handoff_launch, type HandoffChild } from './run-handoff-launch'
+import { run_handoff_launch, type BuiltArgv, type HandoffChild } from './run-handoff-launch'
 
 // joshuafolkken/kit#5352: the child `josh run:handoff` starts — its role, argv, log and environment.
 
@@ -187,21 +187,34 @@ describe('run_handoff_launch.argv_of — josh.handoff.route', () => {
 	})
 })
 
+const FULLRUN_NEW = 'fullrun new'
+
+function openai_argv(): BuiltArgv {
+	const built = run_handoff_launch.argv_of(child({ provider: 'openai' }), ENVIRONMENT)
+
+	if (built.kind !== 'argv') throw new Error('expected an argv')
+
+	return built
+}
+
 describe('run_handoff_launch.request_of', () => {
-	it('clears the Codex session key and the headless mark, marks the hand-off and hands the child its provider', () => {
-		const built = run_handoff_launch.argv_of(child({ provider: 'openai' }), ENVIRONMENT)
-
-		if (built.kind !== 'argv') throw new Error('expected an argv')
-
-		const request = run_handoff_launch.request_of(built, CWD, LOG)
+	it('clears the Codex session key and the headless mark, marks the hand-off and hands the child its provider and line', () => {
+		const request = run_handoff_launch.request_of(openai_argv(), CWD, LOG, FULLRUN_NEW)
 
 		expect(request).toMatchObject({ cwd: CWD, log_path: LOG })
 		expect(request.env).toEqual({
 			CODEX_THREAD_ID: undefined,
 			JOSH_AGENT_PROVIDER: 'openai',
 			JOSH_HANDOFF_CHILD: '1',
+			JOSH_HANDOFF_KEYWORD: FULLRUN_NEW,
 			JOSH_RUN_HEADLESS: undefined,
 		})
+	})
+
+	it('clears an inherited line for a unit started with none', () => {
+		const { env } = run_handoff_launch.request_of(openai_argv(), CWD, LOG)
+
+		expect(env).toHaveProperty('JOSH_HANDOFF_KEYWORD', undefined)
 	})
 })
 

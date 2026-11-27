@@ -21,6 +21,10 @@ const PLANNED_LABEL = 'run:planned'
 // than the working checkout's: that plan's estimate came from the wrong tree (joshuafolkken/kit#7733).
 // `issue-auto-ok.ts` excludes it; re-planning from the target's checkout removes it.
 const PLAN_UNVERIFIED_LABEL = 'plan:unverified'
+// Applied by `issue:file` in a `run:handoff fullrun new` / `halfrun new` / `prrun new` child: that run
+// implements the Issue itself, so `issue-auto-ok.ts` excludes it from `backlogrun`'s pool
+// (joshuafolkken/kit#9143). A person resumes a stopped one with `fullrun #N`.
+const HANDOFF_IMPLEMENTING_LABEL = 'handoff:implementing'
 // Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
 // forever.
@@ -243,6 +247,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	IN_PROGRESS_LABEL,
 	PLANNED_LABEL,
 	PLAN_UNVERIFIED_LABEL,
+	HANDOFF_IMPLEMENTING_LABEL,
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 	AUTO_OK_LABEL,
@@ -289,6 +294,7 @@ export {
 	ENHANCEMENT_LABEL,
 	EPIC_LABEL,
 	EXEMPT_FROM_PROVISIONING,
+	HANDOFF_IMPLEMENTING_LABEL,
 	has_any_label,
 	has_label_name,
 	has_parked_label,
