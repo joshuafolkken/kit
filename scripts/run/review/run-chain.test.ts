@@ -264,3 +264,74 @@ describe('run_chain — the ship refusals before the review', () => {
 		expect(runner).toHaveBeenLastCalledWith([RUN_REVIEW])
 	})
 })
+
+// joshuafolkken/kit#9140: the read-only pre-detach pair runs together after the tree-writing stages.
+const PAIR = [stage_named(EXPORTS_UNUSED), stage_named(GUARD_TESTS)]
+const COMMANDS = PAIR.map((stage) => stage.argv[0])
+const TEST_UNIT = 'test:unit'
+
+function failing(codes: Record<string, number>): StageRunner {
+	return async (argv) => ({ code: codes[argv[0] ?? ''] ?? 0, out: argv[0] ?? '' })
+}
+
+describe('run_chain — the concurrent stages', () => {
+	it('starts each stage of the pair before either ends', async () => {
+		const events: Array<string> = []
+		const runner = vi.fn<StageRunner>(async () => {
+			events.push('start')
+			await new Promise((resolve) => setTimeout(resolve, 1))
+			events.push('end')
+
+			return { code: 0, out: '' }
+		})
+		const chain = await run_chain.run_stages(PAIR, ISSUE, vi.fn(), runner)
+
+		expect(runner.mock.calls.map(([argv]) => argv[0])).toStrictEqual(COMMANDS)
+		expect(events).toStrictEqual(['start', 'start', 'end', 'end'])
+		expect(chain.stop).toBeUndefined()
+	})
+
+	it.each([
+		[{ [TEST_UNIT]: STOP_EXIT }, GUARD_TESTS],
+		[{ [EXPORTS_UNUSED]: STOP_EXIT, [TEST_UNIT]: 1 }, EXPORTS_UNUSED],
+	])('reports the first stopped stage in stage order with its exit code', async (codes, name) => {
+		const chain = await run_chain.run_stages(PAIR, ISSUE, vi.fn(), failing(codes))
+
+		expect(chain.stop?.stage.name).toBe(name)
+		expect(chain.stop?.code).toBe(STOP_EXIT)
+	})
+})
+
+describe('run_chain — the concurrent stages beside the serial ones', () => {
+	it('prints the outputs in stage order whatever order the stages end in', async () => {
+		const print = vi.fn()
+		const runner = vi.fn<StageRunner>(async (argv) => {
+			if (argv[0] === EXPORTS_UNUSED) await new Promise((resolve) => setTimeout(resolve, 1))
+
+			return { code: 0, out: argv[0] ?? '' }
+		})
+
+		await run_chain.run_stages(PAIR, ISSUE, print, runner)
+
+		expect(print.mock.calls.map(([text]) => text)).toStrictEqual(COMMANDS)
+	})
+
+	it('runs check:related alone and starts the pair only after it ends', async () => {
+		const order: Array<string> = []
+		const runner = vi.fn<StageRunner>(async (argv) => {
+			order.push(`start ${argv[0] ?? ''}`)
+			await Promise.resolve()
+			order.push(`end ${argv[0] ?? ''}`)
+
+			return { code: 0, out: '' }
+		})
+
+		expect(stage_named(CHECK_RELATED).concurrent).toBeUndefined()
+		await run_chain.run_stages([stage_named(CHECK_RELATED), ...PAIR], ISSUE, vi.fn(), runner)
+		expect(order.slice(0, 3)).toStrictEqual([
+			`start ${CHECK_RELATED}`,
+			`end ${CHECK_RELATED}`,
+			`start ${EXPORTS_UNUSED}`,
+		])
+	})
+})

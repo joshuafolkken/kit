@@ -57,8 +57,18 @@ function worker(half: Half): Worker {
 	return run_chain_background.worker_of(ISSUE, half)
 }
 
+// The concurrent pair starts in either order (joshuafolkken/kit#9140): its calls read in stage order.
+const PAIR = BEFORE_REVIEW.slice(1)
+
+function is_pair(argv: ReadonlyArray<string>): boolean {
+	return PAIR.some(([command]) => command === argv[0])
+}
+
 function ran(): ReadonlyArray<ReadonlyArray<string>> {
-	return josh_run_mock.mock.calls.map(([argv]) => argv)
+	const calls = josh_run_mock.mock.calls.map(([argv]) => argv)
+	const pair = PAIR.flatMap(([command]) => calls.filter((argv) => argv[0] === command))
+
+	return calls.map((argv) => (is_pair(argv) ? (pair.shift() ?? argv) : argv))
 }
 
 function stop_at(name: string): void {
