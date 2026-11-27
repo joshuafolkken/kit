@@ -2,7 +2,6 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import { run_review_steps } from '#scripts/run/review/run-review-steps'
 import { run_wait_cli, type WaitOptions } from '#scripts/run/run-wait-cli'
@@ -19,7 +18,6 @@ import { outer_command } from './outer-command'
 // writes its exit code there as it exits.
 
 const RESULT_KEY = 'JOSH_BOUNDED_RESULT'
-const RESULTS_DIRECTORY = 'bounded-check'
 
 type Dispatch = () => Promise<number>
 type Source = Readonly<Record<string, string | undefined>>
@@ -96,7 +94,7 @@ async function record(
 function result_directory(command: string, root: string): string {
 	const name = `${command.replaceAll(':', '-')}-${String(process.pid)}-${String(Date.now())}`
 
-	return path.join(root, JOSH_TMP_DIRECTORY, RESULTS_DIRECTORY, name)
+	return path.join(run_wait_cli.results_root(root), name)
 }
 
 // The result directory the detached check writes to, `undefined` when it could not start.
