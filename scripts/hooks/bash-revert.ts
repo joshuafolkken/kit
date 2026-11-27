@@ -8,6 +8,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { z } from 'zod'
+import { implementation_authority } from './implementation-authority'
 import { step_zero_notice } from './step-zero-notice'
 
 // **A consultation session's shell is judged by what it left in the tree, not by its text**
@@ -89,9 +90,17 @@ interface GuardedCall {
 	command: string
 }
 
+// A session that can implement, or a granted producer — which inherits the session's role but
+// builds in its own worktree (joshuafolkken/kit#9097) — writes what it was asked to.
+function is_implementer(raw_payload: string, root: string): boolean {
+	if (agent_session_role.can_implement()) return true
+
+	return implementation_authority.is_producer_worktree_shell(raw_payload, root)
+}
+
 // The transcript and command of a consultation session's `Bash` call, the only call this guards.
-function guarded_call(raw_payload: string): GuardedCall | undefined {
-	if (agent_session_role.can_implement()) return undefined
+function guarded_call(raw_payload: string, root: string): GuardedCall | undefined {
+	if (is_implementer(raw_payload, root)) return undefined
 
 	const payload = hook_decision.parse_hook_payload(raw_payload)
 
@@ -124,7 +133,7 @@ function save_dirty(before: Snapshot, root: string, saved: string): void {
 }
 
 function stamp(raw_payload: string, root: string = process.cwd()): void {
-	const transcript = guarded_call(raw_payload)?.transcript
+	const transcript = guarded_call(raw_payload, root)?.transcript
 
 	if (transcript === undefined) return
 
@@ -269,7 +278,7 @@ function block_reason(moved: Moved, backup: string): string {
 
 // The block a `PostToolUse` hook answers with, naming the moved paths, or nothing to say.
 function revert(raw_payload: string, root: string = process.cwd()): string | undefined {
-	const call = guarded_call(raw_payload)
+	const call = guarded_call(raw_payload, root)
 
 	if (call === undefined) return undefined
 
