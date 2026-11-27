@@ -5,6 +5,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { z } from 'zod'
 
 // The run markers that count the unit runs in flight, and the division of the machine by that count —
 // the part of the worker share `vitest.config.ts` reads (`vitest-config-workers.ts`).
@@ -23,9 +24,13 @@ const MIN_WORKERS = 1
 // One run in flight is this run alone, which is the case that changes nothing.
 const SOLO_RUNS = 1
 
-// A marker is the writing process's identity and nothing else; a pid-only marker has an answer of its
-// own below (`is_running`) rather than being rejected here.
-type RunMarker = ProcessOwner
+// A marker is the writing process's identity and the checkout it ran in; a pid-only marker has an
+// answer of its own below (`is_running`) rather than being rejected here. The checkout tells a run in a
+// lane from one outside every lane in the per-run record (`unit-run-record.ts`, joshuafolkken/kit#9109);
+// a marker written before the field existed simply has none.
+const run_marker_schema = process_owner_schema.extend({ checkout: z.string().optional() })
+
+type RunMarker = ProcessOwner & { checkout?: string | undefined }
 
 function marker_path(pid: number = process.pid): string {
 	return stamp_file.stamp_path(RUN_PREFIX, String(pid))
@@ -61,7 +66,7 @@ function read_marker(source: string): RunMarker | undefined {
 
 	if (raw === undefined) return undefined
 
-	const parsed = process_owner_schema.safeParse(json_value.parse_or_undefined(raw))
+	const parsed = run_marker_schema.safeParse(json_value.parse_or_undefined(raw))
 
 	return parsed.success ? parsed.data : undefined
 }
@@ -97,21 +102,26 @@ function sweep_marker(source: string): void {
 // `announce_gate_plan`: an unreadable file belonging to somebody else would abort the gate outright,
 // which is worse than the leak this sweep exists for. Unreadable therefore counts as not-live and is
 // left alone, exactly as it was before the sweep existed.
-function is_marker_live(source: string): boolean {
+function live_marker(source: string): RunMarker | undefined {
 	const marker = read_marker(source)
 
-	if (marker === undefined) return false
-	if (is_running(marker)) return true
+	if (marker === undefined) return undefined
+	if (is_running(marker)) return marker
 
 	sweep_marker(source)
 
-	return false
+	return undefined
 }
 
-// Every marker in the temp directory whose process is still alive. This run's own is deliberately not
-// among them: both callers count *before* writing theirs, so the `+ 1` at the call site adds it.
+// Every marker in the temp directory whose process is still alive.
+function live_markers(directory: string = PLATFORM_TEMP_ROOT): Array<RunMarker> {
+	return marker_files(directory).flatMap((name) => live_marker(path.join(directory, name)) ?? [])
+}
+
+// This run's own marker is deliberately not among them: both callers count *before* writing theirs,
+// so the `+ 1` at the call site adds it.
 function live_run_count(directory: string = PLATFORM_TEMP_ROOT): number {
-	return marker_files(directory).filter((name) => is_marker_live(path.join(directory, name))).length
+	return live_markers(directory).length
 }
 
 // **The gate claims its place before its unit step exists, and the child must not claim a second
@@ -148,7 +158,7 @@ function sharing_runs(runs: number, lanes: number): number {
 // error here would fail a unit suite over bookkeeping.
 function mark_run_started(target: string): void {
 	try {
-		stamp_file.write_stamp(target, process_identity.own_fields())
+		stamp_file.write_stamp(target, { ...process_identity.own_fields(), checkout: process.cwd() })
 	} catch {
 		/* a missing marker costs a wide share, never a wrong result */
 	}
@@ -161,6 +171,7 @@ const unit_run_marker = {
 	RUN_PREFIX,
 	SOLO_RUNS,
 	is_nested_run,
+	live_markers,
 	live_run_count,
 	mark_run_started,
 	marker_path,
@@ -169,4 +180,5 @@ const unit_run_marker = {
 	sharing_runs,
 }
 
+export type { RunMarker }
 export { unit_run_marker }

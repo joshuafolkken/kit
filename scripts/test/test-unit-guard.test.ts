@@ -9,6 +9,7 @@ import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_recording } from './test-read-recording'
 import { test_unit_guard } from './test-unit-guard'
+import { unit_run_record } from './unit-run-record'
 import { unit_share_fixture } from './unit-share-fixture'
 import { unit_worker_share } from './unit-worker-share'
 
@@ -327,8 +328,10 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 
 	// joshuafolkken/kit#3945: the share is bounded by the cores free of load outside the ledger.
 	// joshuafolkken/kit#6682: and the live lanes, read rather than assumed.
-	it('hands the free cores and the live lanes to the share', async () => {
+	// joshuafolkken/kit#9109: the free cores are their own sizing stage, so the record can name them.
+	it('hands the live lanes to the share and the free cores to the sizing stages', async () => {
 		const lanes = 3
+		const sizing = vi.spyOn(unit_run_record, 'bounded_sizing')
 
 		vi.spyOn(unit_worker_share, 'live_lane_count').mockReturnValue(lanes)
 		stub_free(FREE_CORES)
@@ -336,12 +339,9 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 
 		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
 
-		expect(unit_worker_share.current_share).toHaveBeenCalledWith(
-			expect.any(Number),
-			expect.any(Number),
-			{ cores: FREE_CORES, memory_workers: undefined },
-			lanes,
-		)
+		expect(vi.mocked(unit_worker_share.current_share).mock.lastCall?.[2]).toBeUndefined()
+		expect(vi.mocked(unit_worker_share.current_share).mock.lastCall?.[3]).toBe(lanes)
+		expect(sizing.mock.lastCall?.[0].free.cores).toBe(FREE_CORES)
 	})
 
 	// A typed count wins whatever the machine says, so the sample window is not waited out for it.
