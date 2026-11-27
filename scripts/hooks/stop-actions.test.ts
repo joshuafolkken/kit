@@ -1,6 +1,7 @@
 import os from 'node:os'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
+import { error_text } from '#scripts/lib/error-message'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import type { CliValues } from '#scripts/notify/telegram-test-logic'
 import { stop_rules, type StopAction, type StopOutcome } from '#scripts/rules/stop-rules'
@@ -192,10 +193,13 @@ describe('stop_actions.envelope_of — an action fails', () => {
 		expect(String(written[NOTICE_KEY])).toContain(NOTIFY_NOTICE)
 	})
 
-	it('treats a throwing send as a failure', async () => {
+	it('treats a throwing send as a failure, recording it once', async () => {
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+
 		vi.mocked(telegram_test.send_values).mockRejectedValue(new Error('telegram down'))
 
 		expect(await field_of([NOTIFY], 'reason')).toContain(stop_rules.STOP_NOTIFY_REASON)
+		expect(trace).toHaveBeenCalledOnce()
 	})
 
 	it('keeps a sent notify done when its stamp on the hold fails', async () => {
