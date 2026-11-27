@@ -350,7 +350,8 @@ async function collect_unfixed(
 			return eslint_unfixed(command, await runner(command, project_root))
 		} catch {
 			// One formatter failing to start is not a reason to skip the next: prettier runs last, and
-			// it is the one whose output the project's own lint step checks.
+			// it is the one whose output the project's own lint step checks. The failure is not recorded:
+			// that step reports a formatter that is broken, so a record per edit would only repeat it.
 			return ''
 		}
 	})

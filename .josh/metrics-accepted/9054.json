@@ -1,0 +1,7 @@
+{
+	"reason": "Each recorded swallowed hook failure adds a trace_swallowed call and its test support; return values and fail-open behavior are unchanged",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

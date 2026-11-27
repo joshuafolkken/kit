@@ -5,6 +5,7 @@ import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
 import { hook_decision, type GuardOutcome, type TranscriptGuard } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_phase } from '#scripts/lane/lane-phase'
+import { error_text } from '#scripts/lib/error-message'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
 import { rule_rewrite, type RuleRewrite } from '#scripts/rules/rule-rewrite'
@@ -92,7 +93,9 @@ function guarded_call(raw_payload: string): GuardedCall | undefined {
 		return payload === undefined
 			? undefined
 			: { name: payload.tool_name, input: payload.tool_input }
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('pretool_guard.guarded_call', error)
+
 		return undefined
 	}
 }

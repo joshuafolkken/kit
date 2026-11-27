@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { direct_launch, type LocalLaunch } from '#scripts/build/local-bin'
+import { error_text } from '#scripts/lib/error-message'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
@@ -137,7 +138,9 @@ async function spelling_diagnostics(
 
 	try {
 		return format_unknown_words(await runner({ file_path, project_root, text }))
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('edited_cspell.unknown_words', error)
+
 		return undefined
 	}
 }
