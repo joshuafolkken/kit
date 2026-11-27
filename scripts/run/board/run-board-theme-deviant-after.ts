@@ -49,6 +49,23 @@ function objective_lines(pane: Pane, shown: number): void {
 	put_in(pane, { x, y: y + PAIR }, repeated('─', Math.min(OBJECTIVE.rule_w, late)), ink(RGB.plate))
 }
 
+// The cells the objective's text takes in `pane`: from the chip's column (one cell of margin left of
+// it when there is room) to one cell past the longest of its two lines and the rule, over those
+// three rows; cut at the pane's edges as `put_in` cuts.
+function objective_pane(pane: Pane): Pane {
+	const { box } = pane
+	const left = Math.max(0, OBJECTIVE.chip_x - 1)
+	const longest = Math.max(OBJECTIVE.thin.length, OBJECTIVE.bold.length, OBJECTIVE.rule_w)
+	const right = OBJECTIVE.text_x + longest + 1
+	const width = Math.max(0, Math.min(right, box.w) - left)
+	const height = Math.max(0, Math.min(OBJECTIVE.row + PAIR + 1, box.h) - OBJECTIVE.row)
+
+	return {
+		grid: pane.grid,
+		box: { x: box.x + left, y: box.y + OBJECTIVE.row, w: width, h: height },
+	}
+}
+
 // The objective over the data left of the panel: a thin line, a bold line, a blue chip beside them.
 function objective(draw: ThemeDraw, since: number): void {
 	const shown = (since - OBJECTIVE.from) * OBJECTIVE.pace
@@ -57,7 +74,7 @@ function objective(draw: ThemeDraw, since: number): void {
 	if (shown <= 0 || since >= OBJECTIVE.until) return
 	const pane = data_pane(draw)
 
-	clear_pane(pane)
+	clear_pane(objective_pane(pane))
 	put_in(pane, { x, y }, '▌', bold(RGB.blue))
 	put_in(pane, { x, y: y + 1 }, '▌', bold(RGB.blue))
 	objective_lines(pane, shown)

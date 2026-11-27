@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 80
+	},
+	"reason": "wait's pending answer gains a vitest failure summary module and the --pid result-directory lookup (#9108)",
+	"date": "2026-11-27"
+}
