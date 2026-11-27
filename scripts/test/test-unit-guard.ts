@@ -51,13 +51,16 @@ const SKIP_NO_SCRIPT_ACTION = 'skip-no-test-script'
 const SKIP_REENTRANT_ACTION = 'skip-reentrant'
 const RUN_SCRIPT_ACTION = 'run-project-script'
 const FAIL_ACTION = 'fail-no-tests'
+const FAIL_MISSING_ACTION = 'fail-missing-package'
+const VITEST_NAME = 'vitest'
 
 type SkipAction =
 	| typeof SKIP_ACTION
 	| typeof SKIP_NO_TESTS_ACTION
 	| typeof SKIP_NO_SCRIPT_ACTION
 	| typeof SKIP_REENTRANT_ACTION
-type GuardAction = 'run' | typeof RUN_SCRIPT_ACTION | SkipAction | typeof FAIL_ACTION
+type FailAction = typeof FAIL_ACTION | typeof FAIL_MISSING_ACTION
+type GuardAction = 'run' | typeof RUN_SCRIPT_ACTION | SkipAction | FailAction
 
 // What each skip did not run, said in full: a basic project that declares no test script was not
 // skipped for lacking vitest alone, and the unit tests it skipped were never vitest's. The
@@ -81,8 +84,12 @@ const SKIP_NOTICES: Record<SkipAction, { reason: string; subject: string }> = {
 		subject: UNIT_SUBJECT,
 	},
 }
-const FAIL_REASON =
-	'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing'
+const FAIL_REASONS: Record<FailAction, string> = {
+	[FAIL_ACTION]:
+		'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing',
+	[FAIL_MISSING_ACTION]:
+		'package.json declares vitest but node_modules/vitest is missing — install the dependencies; refusing to report a unit check that ran nothing',
+}
 
 const BASIC_MISSING_PACKAGE_ACTIONS: Record<ProjectScriptState, GuardAction> = {
 	declared: RUN_SCRIPT_ACTION,
@@ -124,15 +131,26 @@ function has_unit_tests(project_directory: string): boolean {
 	return matches.length > 0
 }
 
+// **The young-project skip is for a project that never declared vitest.** One whose package.json
+// declares it but whose `node_modules/vitest` is absent — a checkout with no dependencies installed —
+// has a unit suite that could not run, and fails instead of passing on a skip (joshuafolkken/kit#9095).
+function declared_missing_action(project_directory: string): GuardAction {
+	return project_checks.is_declared(project_directory, VITEST_NAME)
+		? FAIL_MISSING_ACTION
+		: SKIP_ACTION
+}
+
 // The guard's decision for one project, asked here once so the run, the scoped record and the gate's
 // precondition can never disagree about whether this project's vitest runs.
 function guard_action(project_directory: string): GuardAction {
-	return resolve_guard_action(
+	const action = resolve_guard_action(
 		is_vitest_installed(project_directory),
 		has_unit_tests(project_directory),
 		project_checks.is_basic(project_directory),
 		project_test_script.state(project_directory),
 	)
+
+	return action === SKIP_ACTION ? declared_missing_action(project_directory) : action
 }
 
 function is_skip_action(action: GuardAction): action is SkipAction {
@@ -265,9 +283,9 @@ const UNIT_COMMAND_LABEL = 'test:unit'
 // they mean different things: one says the project has no unit suite yet, the other says it has one
 // that could not be found. Only the first keeps `SKIP_MARKER`, so the
 // gate's "passed without running" handling still means exactly what it did.
-function report_no_run(action: SkipAction | typeof FAIL_ACTION, command_label: string): number {
-	if (action === FAIL_ACTION) {
-		console.error(`josh ${command_label}: ${FAIL_REASON}.`)
+function report_no_run(action: SkipAction | FailAction, command_label: string): number {
+	if (!is_skip_action(action)) {
+		console.error(`josh ${command_label}: ${FAIL_REASONS[action]}.`)
 
 		return FAIL_EXIT_CODE
 	}
