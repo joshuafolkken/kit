@@ -383,7 +383,7 @@ function print_next(request: Request): void {
 		return
 	}
 
-	run_cut_next.print_next(last_verdict(), request.issue)
+	run_cut_next.print_next(last_verdict(), request.issue, request.deliverable_url)
 }
 
 // Every path out prints exactly one token, including the ones nobody planned: an empty standard
