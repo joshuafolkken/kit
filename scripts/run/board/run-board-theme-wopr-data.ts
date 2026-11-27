@@ -16,9 +16,6 @@ const GREEN = '48;209;88'
 const WHITE = '255;255;255'
 // The lavender of the film's caption, `#e4e3ff` (measured): the notice's letters, and the spark's flood.
 const LAVENDER = '228;227;255'
-// The roles text has at rest beyond the host's own (joshuafolkken/kit#9137), each a shade of the
-// phosphor (invented: the film's screen is one color): a heading on a rule, and a number.
-const REST_ROLES = { head: '45;164;179', num: '175;245;255' }
 const COLORS: ThemeColors = {
 	body: CYAN,
 	// The rule's dashes, the darkest shade of the phosphor (invented).
@@ -35,7 +32,10 @@ const COLORS: ThemeColors = {
 	info: '90;160;230',
 	idle: '32;117;128',
 	human: '190;170;255',
-	...REST_ROLES,
+	// The roles text has at rest beyond the host's own (joshuafolkken/kit#9137), each a shade of the
+	// phosphor (invented: the film's screen is one color): a heading on a rule, and a number.
+	head: '45;164;179',
+	num: '175;245;255',
 }
 const NAVY = '6;12;38'
 const PALE = '200;220;255'

@@ -130,7 +130,7 @@ function bed_voices(bed: Bed, ms: number): Array<number> {
 	return run_board_sound_shape.mixed(pulses, drone, share)
 }
 
-// A bed `ms` long: its drone under its pulses, swelling from `from_gain` to full.
+// A bed `ms` long: its voices (`bed_voices`), swelling from `from_gain` to full.
 function bed_samples(bed: Bed, ms: number): Array<number> {
 	const both = bed_voices(bed, ms)
 	const rise = 1 - bed.from_gain

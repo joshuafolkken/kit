@@ -76,6 +76,6 @@ function beacon_light(wopr: Wopr, grid: Grid, state: ThemeState, tick: number): 
 	)
 }
 
-const run_board_theme_wopr_alarm = { ALARM, beacon_bar, beacon_light, turn_share }
+const run_board_theme_wopr_alarm = { ALARM, WASHED, beacon_bar, beacon_light, turn_share }
 
 export { run_board_theme_wopr_alarm }

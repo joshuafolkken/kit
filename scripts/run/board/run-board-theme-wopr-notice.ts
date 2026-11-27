@@ -57,7 +57,7 @@ const SCENARIO_WIDTH = 3
 // The first game is played a move a tick, the next two two moves a tick, the rest three.
 const GAME_PACES = { first: 1, quick: 0.5, quick_games: 3, rest_moves: 3 }
 const ALL_MATCHED = 10
-const WASHED = '48;2;'
+const { WASHED } = run_board_theme_wopr_alarm
 const LAUNCH_CODE = 'WOPR · LAUNCH CODE'
 
 // The header's three lines: WOPR's name and work, its state, its clock.
