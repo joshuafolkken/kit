@@ -44,3 +44,37 @@ describe('last_prompt.prompt_reach', () => {
 		expect(last_prompt.prompt_reach(TOOL_RESULT_LINE, MISSING)).toBe(TOOL_RESULT_LINE)
 	})
 })
+
+// joshuafolkken/kit#9093: a call's prompt is read before the call's line, however far the transcript
+// has grown after it.
+const CALL_ID = 'toolu_call'
+const CALL_LINE = JSON.stringify({
+	type: 'assistant',
+	timestamp: TIMESTAMP,
+	message: { content: [{ type: 'tool_use', id: CALL_ID, name: 'Agent', input: {} }] },
+})
+// More than `PROMPT_REACH_BYTES` after the call.
+const LATER_LINES = 5
+const LATER_LINE_BYTES = 1_048_576
+const LATER_LINE = JSON.stringify({
+	type: 'assistant',
+	timestamp: TIMESTAMP,
+	message: { content: [{ type: 'text', text: 'x'.repeat(LATER_LINE_BYTES) }] },
+})
+
+describe('last_prompt.call_prompt_at — a call beyond the tail', () => {
+	const GROWN = path.join(WORK_DIRECTORY, 'grown.jsonl')
+
+	writeFileSync(
+		GROWN,
+		[PROMPT_LINE, CALL_LINE, ...Array.from({ length: LATER_LINES }, () => LATER_LINE)].join('\n'),
+	)
+
+	it('reads the prompt before the call’s line', () => {
+		expect(last_prompt.call_prompt_at(GROWN, CALL_ID)).toBe(PROMPT)
+	})
+
+	it('refuses a call that is nowhere in the transcript', () => {
+		expect(last_prompt.call_prompt_at(GROWN, 'toolu_absent')).toBeUndefined()
+	})
+})
