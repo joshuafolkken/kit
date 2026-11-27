@@ -37,28 +37,40 @@ async function digest_of(files: ReadonlyArray<string>): Promise<string> {
 	return createHash(DIGEST_ALGORITHM).update(stamps.join(SEPARATOR)).digest('hex')
 }
 
-interface FixHooks<T> {
+interface FixHooks<T, S> {
 	check: () => Promise<T>
 	time: (fix: () => Promise<number>) => Promise<number>
+	// Read the moment the fix pass ends — the last writer — and never after the checks, so an edit
+	// made while they run is left out of what they vouch for.
+	settled: () => Promise<S>
 }
 
-interface FixedRun<T> {
-	result: T
+interface Settled<S> {
 	fix_exit_code: number
+	settled: S
 }
 
-async function timed_fix<T>(
+interface FixedRun<T, S> extends Settled<S> {
+	result: T
+}
+
+async function settled_fix<T, S>(
 	scope: ChangedFileScope,
 	root: string,
-	hooks: FixHooks<T>,
-): Promise<number> {
-	return await hooks.time(async () => await format_steps.run_scoped(scope, root))
+	hooks: FixHooks<T, S>,
+): Promise<Settled<S>> {
+	const fix_exit_code = await hooks.time(async () => await format_steps.run_scoped(scope, root))
+
+	return { fix_exit_code, settled: await hooks.settled() }
 }
 
-async function serial<T>(fix: Promise<number>, hooks: FixHooks<T>): Promise<FixedRun<T>> {
-	const fix_exit_code = await fix
+async function serial<T, S>(
+	fix: Promise<Settled<S>>,
+	hooks: FixHooks<T, S>,
+): Promise<FixedRun<T, S>> {
+	const settled = await fix
 
-	return { result: await hooks.check(), fix_exit_code }
+	return { ...settled, result: await hooks.check() }
 }
 
 // The fix pass runs beside the checks, which read the tree as it was before it. A narrowed pass
@@ -68,21 +80,21 @@ async function serial<T>(fix: Promise<number>, hooks: FixHooks<T>): Promise<Fixe
 // whole-tree pass can write any file, so it still finishes before the checks start. Its exit code is
 // returned rather than dropped: it is the scoped run's only typed eslint, so a residual from a rule
 // the warm daemon turns off (`eslint/untyped.js`) is reported by it alone (joshuafolkken/kit#7825).
-async function beside<T>(
+async function beside<T, S>(
 	scope: ChangedFileScope,
 	root: string,
-	hooks: FixHooks<T>,
-): Promise<FixedRun<T>> {
-	if (scope.mode === 'all') return await serial(timed_fix(scope, root, hooks), hooks)
+	hooks: FixHooks<T, S>,
+): Promise<FixedRun<T, S>> {
+	if (scope.mode === 'all') return await serial(settled_fix(scope, root, hooks), hooks)
 	const before = await digest_of(scope.files)
-	const fix = timed_fix(scope, root, hooks)
+	const fix = settled_fix(scope, root, hooks)
 	const first = await hooks.check()
-	const fix_exit_code = await fix
+	const settled = await fix
 
-	if ((await digest_of(scope.files)) === before) return { result: first, fix_exit_code }
+	if ((await digest_of(scope.files)) === before) return { ...settled, result: first }
 	process.stdout.write(RECHECK_NOTICE)
 
-	return { result: await hooks.check(), fix_exit_code }
+	return { ...settled, result: await hooks.check() }
 }
 
 const lint_related_fix = { beside, report_scope }

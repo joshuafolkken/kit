@@ -273,14 +273,14 @@ async function checked_outcome(
 	if (refusal !== undefined) return { outcome: report_refused(refusal), before }
 
 	lint_related_fix.report_scope(command_arguments, scope, root)
-	const { result: outcome, fix_exit_code } = await lint_related_fix.beside(scope, root, {
+	// The verification snapshot is taken once the fix pass, the last writer, finishes.
+	const { result, fix_exit_code, settled } = await lint_related_fix.beside(scope, root, {
 		check: async () => await scoped_outcome(scope, root, stages),
 		time: async (fix) => await lint_related_record.timed(stages, 'fix_ms', fix),
+		settled: async () => await scoped_green.read_before(command_arguments),
 	})
-	// The verification snapshot is taken after every writer finishes; the checks read that tree.
-	const verified = await scoped_green.read_before(command_arguments)
 
-	return { outcome: with_fix_pass(outcome, fix_exit_code), before: verified }
+	return { outcome: with_fix_pass(result, fix_exit_code), before: settled }
 }
 
 // The run's last line names the stage that failed, or says it passed; the console is the only copy of
