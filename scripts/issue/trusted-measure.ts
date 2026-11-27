@@ -8,10 +8,10 @@ import { trusted_measure_source, type MeasureSource } from './trusted-measure-so
 
 // Shell measurements require a trusted author and editor. Execute only an explicit declaration in
 // that verified snapshot, and log its provenance before invoking the shell, even if it fails.
-// One command's budget — the same minute `josh-harness.ts` gives one command it spawns. A measurement
-// is a count or a digest that answers in seconds, so a command still running after a minute is stuck,
-// and without a bound it would hold the whole re-measurement open with nothing printed.
-const MEASURE_TIMEOUT_MS = 60_000
+// One command's budget. A measurement is a count or a digest that answers in seconds when idle, but
+// `lane:value` outran a minute while several lanes ran (joshuafolkken/kit#9125), so the bound sits well
+// above that; it still stops a stuck command from holding the whole re-measurement open with nothing printed.
+const MEASURE_TIMEOUT_MS = 300_000
 const DRAFT = 'draft'
 const LOCAL_FILER = 'local filer'
 
@@ -24,7 +24,10 @@ interface TrustedBody {
 }
 
 type BodyRead = TrustedBody | { kind: 'refused'; reason: string }
-type CommandRun = { kind: 'ok'; output: string } | { kind: 'failed'; message: string }
+// `timed_out` is a measurement error — the command never answered — as against a command that ran and
+// failed, which says something about the premise it measures (joshuafolkken/kit#9125).
+type CommandRun =
+	{ kind: 'ok'; output: string } | { kind: 'failed'; message: string; timed_out?: boolean }
 
 function declared_commands(body: string): Array<string> {
 	const baselines = baseline_measure.parse_baselines(body).map((baseline) => baseline.command)
@@ -48,6 +51,10 @@ function audit(command: string, source: TrustedBody): void {
 	)
 }
 
+function is_timeout(error: unknown): boolean {
+	return error instanceof Error && 'code' in error && error.code === 'ETIMEDOUT'
+}
+
 function run_command(command: string, source: TrustedBody): CommandRun {
 	if (!declared_commands(source.body).includes(command)) {
 		return { kind: 'failed', message: 'command is not declared in the verified issue body' }
@@ -61,7 +68,7 @@ function run_command(command: string, source: TrustedBody): CommandRun {
 			output: execSync(command, { encoding: 'utf8', timeout: MEASURE_TIMEOUT_MS }).trim(),
 		}
 	} catch (error) {
-		return { kind: 'failed', message: error_text.message_of(error) }
+		return { kind: 'failed', message: error_text.message_of(error), timed_out: is_timeout(error) }
 	}
 }
 

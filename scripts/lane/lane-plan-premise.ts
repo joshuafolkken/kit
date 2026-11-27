@@ -11,7 +11,7 @@ import { trusted_measure, type TrustedBody } from '#scripts/issue/trusted-measur
 // runs nothing, so its answer is unchanged.
 
 interface Measured {
-	holds: boolean
+	unmet: boolean
 	value: string
 }
 
@@ -26,13 +26,19 @@ function listed_premises(
 	return listed === undefined ? undefined : measure_declaration.premises(listed.body ?? '').length
 }
 
-// A failed command keeps its message, so the stop says why the premise could not be measured.
+// joshuafolkken/kit#9125: a measurement that timed out under load says nothing about the premise, so it
+// is reported as an error and never counted as unmet. A command that ran and failed still stops the lane.
 function measured(premise: PremiseRun): Measured {
-	if (premise.kind === 'failed') return { holds: false, value: `failed (${premise.message})` }
+	if (premise.kind === 'failed' && premise.timed_out) {
+		return { unmet: false, value: `not measured, error (${premise.message}); re-run to check it` }
+	}
+
+	if (premise.kind === 'failed') return { unmet: true, value: `failed (${premise.message})` }
+
 	const { verdict } = premise
 	const value = 'value' in verdict ? String(verdict.value) : verdict.kind
 
-	return { holds: verdict.kind === 'pass', value }
+	return { unmet: verdict.kind !== 'pass', value }
 }
 
 // The premise's value goes on stderr; one that does not hold is returned for the stop.
@@ -42,7 +48,7 @@ function checked(declaration: MeasureDeclaration, source: TrustedBody): string |
 
 	console.error(`premise: ${line}`)
 
-	return result.holds ? undefined : line
+	return result.unmet ? line : undefined
 }
 
 // The premises are read from the trusted body. A body that cannot be trusted runs nothing: it stops

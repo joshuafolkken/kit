@@ -4,20 +4,26 @@ import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
 import { josh_cli_fixture } from '#scripts/josh/josh-cli-fixture'
 import { josh_harness, type HarnessResult, type JoshEnvironment } from '#tools/test/josh-harness'
 import { josh_harness_fixture } from '#tools/test/josh-harness-fixture'
+import { josh_in_process } from '#tools/test/josh-in-process'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { metrics_base } from './metrics-base'
 import { metrics_base_cache } from './metrics-base-cache'
+import { metrics_command } from './metrics-command'
 import { metrics_ratchet } from './metrics-ratchet'
 import { prose_density } from './prose-density'
 
 // Runs the real `josh metrics` in a kit-shaped repository (joshuafolkken/kit#3644):
 // that the totals are held to the merge-base's, measured in a throwaway tree, is a property of the
-// command, git and the two trees together, which no mocked git can show.
+// command, git and the two trees together, which no mocked git can show. The command is called in
+// this process with the child's surroundings (joshuafolkken/kit#9116) — a child's startup was most
+// of each scenario — and the unknown-name scenario still spawns it, for how the CLI itself answers.
 
 const { SCENARIO_TIMEOUT_MS, SETUP_TIMEOUT_MS } = josh_harness_fixture
-const TOTALS_ONLY: ReadonlyArray<string> = ['metrics', '--totals-only']
+// The arguments past the command name, which `josh` takes off before `run_metrics` reads them.
+const COMMAND = 'metrics'
+const TOTALS_ONLY: ReadonlyArray<string> = ['--totals-only']
 const REASON = 'Fixture rules'
-const ACCEPT: ReadonlyArray<string> = ['metrics', '--accept', '--reason', REASON]
+const ACCEPT: ReadonlyArray<string> = ['--accept', '--reason', REASON]
 const RULES_FILE = 'prompts/README.md'
 const GROWN_RULES = 'A rule.\n\nAnother rule.\n'
 const ISSUE = 7
@@ -61,12 +67,16 @@ function grow_rules(): void {
 	appendFileSync(path.join(kit().root, RULES_FILE), GROWN_RULES)
 }
 
+async function metrics(argv: ReadonlyArray<string>): Promise<HarnessResult> {
+	return await josh_in_process.run_in_process(kit().root, metrics_command.run_metrics, argv)
+}
+
 async function check(): Promise<HarnessResult> {
-	return await josh_harness.run(kit(), TOTALS_ONLY)
+	return await metrics(TOTALS_ONLY)
 }
 
 async function rerecord(): Promise<HarnessResult> {
-	return await josh_harness.run(kit(), [...TOTALS_ONLY, '--rerecord'])
+	return await metrics([...TOTALS_ONLY, '--rerecord'])
 }
 
 function approval_texts(): ReadonlyMap<string, string> {
@@ -74,7 +84,7 @@ function approval_texts(): ReadonlyMap<string, string> {
 }
 
 async function accept(): Promise<HarnessResult> {
-	return await josh_harness.run(kit(), ACCEPT)
+	return await metrics(ACCEPT)
 }
 
 function approval_files(): ReadonlyArray<string> {
@@ -336,7 +346,7 @@ describe('josh metrics --totals-only with JOSH_METRICS_BASE', () => {
 		async () => {
 			vi.stubEnv(metrics_base.BASE_VARIABLE, 'no-such-ref')
 
-			const result = await check()
+			const result = await josh_harness.run(kit(), [COMMAND, ...TOTALS_ONLY])
 
 			expect(result.stderr).toContain(`${metrics_base.BASE_VARIABLE}=no-such-ref names no commit`)
 			expect(result.exit_code).not.toBe(0)
