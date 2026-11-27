@@ -13,6 +13,8 @@ const PUBLIC_LIBRARIES: ReadonlyArray<string> = [
 	'config-merge',
 	'managed-marker',
 	'self-sync-guard',
+	'security-audit-provision',
+	'security-audit-cache',
 ]
 
 interface LibraryPaths {

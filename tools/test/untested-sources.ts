@@ -114,6 +114,8 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/rules/test-declared-commit.ts',
 	'scripts/run/board/run-board-layout-types.ts',
 	'scripts/run/run-watcher-guard-cli.ts',
+	'scripts/security-audit-cache/index.ts',
+	'scripts/security-audit-provision/index.ts',
 	'scripts/self-sync-guard/index.ts',
 	'scripts/sonar/sonar-project.ts',
 	'scripts/split/split-assess-cli.ts',

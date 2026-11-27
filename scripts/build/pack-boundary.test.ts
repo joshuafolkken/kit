@@ -89,6 +89,8 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/source-location.ts',
 	'scripts/managed-marker/index.ts',
 	'scripts/self-sync-guard/index.ts',
+	'scripts/security-audit-provision/index.ts',
+	'scripts/security-audit-cache/index.ts',
 	'scripts/version/index.ts',
 	'scripts/version/effective-upstream.ts',
 	'scripts/package/verify-optional-eslint-install.ts',
