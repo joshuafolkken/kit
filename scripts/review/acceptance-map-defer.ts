@@ -48,7 +48,7 @@ function is_clear(resolution: Resolution): boolean {
 
 function resolution_lines(issue: string, resolution: Resolution): ReadonlyArray<string> {
 	const tick = `pnpm josh issue:tick ${issue} <ac-id>`
-	const defer = `pnpm josh issue:defer ${issue} <ac-id> #<M> <reason>`
+	const defer = `pnpm josh issue:defer ${issue} <ac-id> <M> <reason>`
 
 	return [
 		...acceptance_map.listed(

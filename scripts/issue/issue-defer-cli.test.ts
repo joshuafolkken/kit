@@ -71,9 +71,13 @@ describe('issue_defer_cli.run', () => {
 
 describe('issue_defer_cli.run refusals', () => {
 	it.each(
-		[[], [ISSUE, FIRST, `#${TARGET}`], ['0', FIRST, TARGET, 'r'], [ISSUE, FIRST, 'x', 'r']].map(
-			(args) => ({ args }),
-		),
+		[
+			[],
+			[ISSUE, FIRST, `#${TARGET}`],
+			['0', FIRST, TARGET, 'r'],
+			[ISSUE, FIRST, 'x', 'r'],
+			[ISSUE, FIRST, `#${ISSUE}`, 'self'],
+		].map((args) => ({ args })),
 	)('refuses invalid arguments $args without reading GitHub', async ({ args }) => {
 		expect(await issue_defer_cli.run(args)).toBe(1)
 		expect(issue_get_body).not.toHaveBeenCalled()

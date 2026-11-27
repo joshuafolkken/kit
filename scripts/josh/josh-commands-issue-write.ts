@@ -28,7 +28,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Mark an acceptance criterion moved to another issue, which gains a reference to it',
 		category: 'AI tools',
-		reference: ['<issue> <ac-id> #<target> <reason>', 'automation', ['network']],
+		reference: ['<issue> <ac-id> <target> <reason>', 'automation', ['network']],
 		usage: {
 			examples: [{ arguments: '9103 ac-a1f32a2f 9104 split off' }],
 		},

@@ -11,11 +11,11 @@ import { acceptance_map_defer } from '#scripts/review/acceptance-map-defer'
 // `josh issue:defer` marks a criterion moved to another issue of this repository, and makes that issue
 // carry the criterion's identifier so the merge can see it was taken over (joshuafolkken/kit#9146).
 
-const USAGE = 'Usage: josh issue:defer <issue-number> <ac-id> #<target> <reason...>'
+const USAGE = 'Usage: josh issue:defer <issue-number> <ac-id> <target> <reason...>'
 const FAILURE = 1
 const ARGV_OFFSET = 2
 const TARGET_PREFIX = '#'
-// <issue> <ac-id> #<target>, then at least one word of reason.
+// <issue> <ac-id> <target>, then at least one word of reason.
 const REASON_INDEX = 3
 
 interface DeferRequest {
@@ -25,10 +25,12 @@ interface DeferRequest {
 	reason: string
 }
 
-function target_number(raw: string): string {
+function target_number(raw: string, issue: string): string {
 	const number = raw.startsWith(TARGET_PREFIX) ? raw.slice(TARGET_PREFIX.length) : raw
 
 	if (!issue_number_shape.is_issue_number(number)) throw new Error(USAGE)
+	// A self-target would overwrite its own reference line with the mark, which the merge then refuses.
+	if (number === issue) throw new Error('josh issue:defer: the target must be another issue')
 
 	return number
 }
@@ -46,7 +48,7 @@ function request_of(argv: ReadonlyArray<string>): DeferRequest {
 
 	if (!issue_number_shape.is_issue_number(issue)) throw new Error(USAGE)
 
-	return { issue, id, target: target_number(target), reason: reason.join(' ') }
+	return { issue, id, target: target_number(target, issue), reason: reason.join(' ') }
 }
 
 async function read_body(issue: string): Promise<string> {

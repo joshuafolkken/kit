@@ -94,6 +94,14 @@ describe('acceptance_map.criteria_of', () => {
 	})
 })
 
+describe('acceptance_map.tick — a marked criterion', () => {
+	it('ticks a criterion already marked deferred, the mark no part of its identifier', () => {
+		const ticked = acceptance_map.tick(issue_with([`${FIRST} → #4000`]), [id(FIRST)])
+
+		expect(ticked).toContain(`- [x] ${FIRST} → #4000`)
+	})
+})
+
 describe('acceptance_map.criteria_of — line shapes', () => {
 	it('reads a CRLF body like an LF one', () => {
 		const crlf = issue_with([FIRST, SECOND]).replaceAll('\n', '\r\n')
