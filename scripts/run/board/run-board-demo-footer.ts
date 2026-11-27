@@ -17,7 +17,7 @@ import { run_board_theme_run, type ThemeRun, type ThemeValue } from './run-board
 // however short the pane
 // (`run-board-pinned-footer.ts`).
 
-const { DEMO_KEY, EVENT_OF_KEY, PART_OF_KEY } = run_board_demo_keys
+const { DEMO_KEY, EVENT_OF_KEY, PART_OF_KEY, THEME_KEYS } = run_board_demo_keys
 const { THEME_VALUES } = run_board_theme_run
 const { GAUGE_SHADES, painted } = run_board_labels
 const INDENT = '  '
@@ -48,9 +48,14 @@ function name_of(value: ThemeValue): string {
 	return value === '' ? NO_THEME : value
 }
 
-// A work's key and name, as its place among the values.
+// The works a digit picks: the first keys row holds them, the letters' works start the second.
+const DIGIT_COUNT = 10
+
+// A work's key and name: the key of its place among the values, a letter in capitals.
 function theme_item(value: ThemeValue): string {
-	return `${String(THEME_VALUES.indexOf(value))} ${name_of(value)}`
+	const key = THEME_KEYS.charAt(THEME_VALUES.indexOf(value)).toUpperCase()
+
+	return `${key} ${name_of(value)}`
 }
 
 // Each event's and each part's key and name.
@@ -61,11 +66,18 @@ const PART_ITEMS = new Map(
 	Array.from(PART_OF_KEY, ([key, part]) => [part, `${key} ${part.toUpperCase()}`] as const),
 )
 
-// Every key and what it does, in two groups, each starting a row of its own at every width: the works,
-// then what a key plays — the events, the parts — and the exit.
+const THEME_ITEMS = THEME_VALUES.map((value) => theme_item(value))
+
+// Every key and what it does, in two groups, each starting a row of its own at every width: the works
+// a digit picks, then the works a letter picks, what a key plays — the events, the parts — and the exit.
 const GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
-	THEME_VALUES.map((value) => theme_item(value)),
-	[...EVENT_ITEMS.values(), ...PART_ITEMS.values(), `${DEMO_KEY} ${EXIT_WORD}`],
+	THEME_ITEMS.slice(0, DIGIT_COUNT),
+	[
+		...THEME_ITEMS.slice(DIGIT_COUNT),
+		...EVENT_ITEMS.values(),
+		...PART_ITEMS.values(),
+		`${DEMO_KEY} ${EXIT_WORD}`,
+	],
 ]
 
 // The event a demo timeline is: the one whose channel it fills.
@@ -114,15 +126,21 @@ function dim(text: string): string {
 	return text === '' ? '' : run_board_faint.faint(text)
 }
 
-// A keys row faint, the one of `chosen` it holds — a row holds one group's — lit.
+// A keys row faint, those of `chosen` it holds lit, left to right — the second row may hold both a
+// work and what plays on it.
 function lit(row: string, chosen: ReadonlyArray<string>): string {
-	const span = chosen.find((item) => row.includes(item))
+	const held = chosen.filter((item) => row.includes(item))
+	const spans = held.toSorted((first, second) => row.indexOf(first) - row.indexOf(second))
+	let [out, rest] = ['', row]
 
-	if (span === undefined) return dim(row)
-	const at = row.indexOf(span)
-	const [before, after] = [row.slice(0, at), row.slice(at + span.length)]
+	for (const span of spans) {
+		const at = rest.indexOf(span)
 
-	return `${dim(before)}${painted(GAUGE_SHADES.yellow, span)}${dim(after)}`
+		out += `${dim(rest.slice(0, at))}${painted(GAUGE_SHADES.yellow, span)}`
+		rest = rest.slice(at + span.length)
+	}
+
+	return `${out}${dim(rest)}`
 }
 
 // A row kept within the pane: one wider than it would wrap and take two of the pane's rows.

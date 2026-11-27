@@ -48,13 +48,31 @@ interface Palette {
 		ms?: number
 		after_peak?: () => Array<number>
 	}
-	row: { start: Sound; during: Bed; end: Sound }
+	row: {
+		start: Sound
+		during: Bed
+		end: Sound
+		// One-shot sounds on the beats a ROW of `letters` shows as it types, each from its time since
+		// the start; a beat past the typing is left out.
+		beats?: (letters: number) => ReadonlyArray<Cue>
+		// The end sound starts as the letters finish and rings this long past them, in place of ending
+		// with them.
+		ring_ms?: number
+	}
 	progress_end?: Sound
 	appear: Sound
 	vanish: Sound
 	// One-shot sounds the OPENING plays on its way, each from its time since the start
 	// (joshuafolkken/kit#9087); a cue past the opening's end is left out.
-	opening_cues?: ReadonlyArray<{ at_ms: number; sound: Sound }>
+	opening_cues?: ReadonlyArray<Cue>
+	// The ENDING's, the same way.
+	ending_cues?: ReadonlyArray<Cue>
+}
+
+// A one-shot sound at its time on an event's or a part's time line.
+interface Cue {
+	at_ms: number
+	sound: Sound
 }
 
 // A timed part of a track: its samples from `at_ms`, at `gain`.
@@ -171,15 +189,25 @@ function letters_ms(letters: number): number {
 	return Math.max(1, letters) * TICK_MS
 }
 
-// A ROW's track over the letters typing, as long as they: its start, its bed, and its end ending as
-// they finish.
+// The cues that start within `ms`, each placed at its time.
+function cues_within(cues: ReadonlyArray<Cue> | undefined, ms: number): Array<Placed> {
+	const due = (cues ?? []).filter(({ at_ms }) => at_ms < ms)
+
+	return due.map(({ at_ms, sound }) => placed(sound, at_ms))
+}
+
+// A ROW's track over the letters typing, as long as they: its start, its bed, its beats, and its end
+// ending as they finish — or, for a row that rings, starting as they finish and ringing on.
 function row_track(palette: Palette, letters: number): Array<number> {
 	const { row } = palette
 	const typing_ms = letters_ms(letters)
+	const { ring_ms } = row
+	const end = ring_ms === undefined ? ending_at(row.end, typing_ms) : placed(row.end, typing_ms)
+	const beats = cues_within(row.beats?.(letters), typing_ms)
 
 	return fitted(
-		[placed(row.start, 0), bed_part(row.during, 0, typing_ms), ending_at(row.end, typing_ms)],
-		typing_ms,
+		[placed(row.start, 0), bed_part(row.during, 0, typing_ms), ...beats, end],
+		typing_ms + (ring_ms ?? 0),
 	)
 }
 
@@ -190,20 +218,13 @@ function progress_track(end: Sound, letters: number): Array<number> {
 	return fitted([ending_at(end, typing_ms)], typing_ms)
 }
 
-// The opening's cues that start within its `ms`, each placed at its time.
-function cues_of(palette: Palette, ms: number): Array<Placed> {
-	const cues = palette.opening_cues ?? []
-
-	return cues.filter(({ at_ms }) => at_ms < ms).map(({ at_ms, sound }) => placed(sound, at_ms))
-}
-
 // A part's track, as long as the part: the opening's quiet bed, its cues, then the board appearing; the
-// ending's sinking bed then the board gone, each ending with the part.
+// ending's sinking bed, its cues, then the board gone, each ending with the part.
 function part_track(palette: Palette, name: PartName, ms: number): Array<number> {
 	const is_opening = name === 'opening'
 	const bed = is_opening ? palette.notice.bed : sinking(palette.notice.bed)
 	const last = is_opening ? palette.appear : palette.vanish
-	const cues = is_opening ? cues_of(palette, ms) : []
+	const cues = cues_within(is_opening ? palette.opening_cues : palette.ending_cues, ms)
 
 	return fitted(
 		[bed_part(bed, 0, ms, is_opening ? OPENING_GAIN : HELD_GAIN), ...cues, ending_at(last, ms)],
@@ -255,4 +276,4 @@ function score_of(palette: Palette): Score {
 const run_board_sound_score = { PEAK_MS, laid, loudest, scaled, score_of }
 
 export { run_board_sound_score }
-export type { Palette, Placed, Score }
+export type { Cue, Palette, Placed, Score }

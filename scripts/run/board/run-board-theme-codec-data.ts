@@ -55,6 +55,10 @@ const COLORS: ThemeColors = {
 	hi: GREEN.pale,
 	type: GREEN.pale,
 	notice: '255;230;60',
+	// The marks' tones: info, idle, waiting on a person.
+	info: '110;190;170',
+	idle: '75;125;85',
+	human: '180;225;255',
 }
 
 const NOTES: Partial<Record<EventKey, string>> = {

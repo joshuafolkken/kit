@@ -1,11 +1,10 @@
-# Carry the render cost from the demo into the theme
+# Carry the render cost into the theme
 
 Read from `SKILL.md` → "5. File the Issue once the user decides" and "6. After the first merge",
 and from [split](theme-split.md).
 
-- A light demo is no evidence: it plays on one still frame in its own loop, while the real board
-  redraws every second, runs every effect at once, reads the workers and prepares the sound on the
-  same thread.
+- One effect played light in demo mode is no evidence: the real board redraws every second, runs
+  every effect at once, reads the workers and prepares the sound on the same thread.
 - Write no limit here; the limits are the budget test's and the baseline's.
 
 ## When filing
@@ -13,7 +12,8 @@ and from [split](theme-split.md).
 - Write both in the body and the acceptance criteria of every theme and effect Issue:
   - the all-layers budget test of #8825, `scripts/run/board/run-board-composite-budget.test.ts`,
     stays green;
-  - every theme (`wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`), each run on the real
+  - every theme (`wopr`, `trace`, `flux`, `codec`, `nixie`, `skynet`, `magi`, `deviant`, `isac`,
+    `ghost`), each run on the real
     board with its opening by
     `pnpm josh run:board --timing --theme <theme>`, stall and wake lag no worse than the
     `--timing` baseline recorded on #8904.

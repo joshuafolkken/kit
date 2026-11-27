@@ -158,6 +158,11 @@ const theme_colors: ThemeColors = {
 	hi: WHITE_RGB,
 	type: WHITE_RGB,
 	notice: WHITE_RGB,
+	// The marks' tones: info — kept clear of `red`, ten units off the value first chosen — idle,
+	// waiting on a person.
+	info: '255;185;175',
+	idle: '170;90;90',
+	human: '255;230;140',
 }
 
 const theme_notes: Partial<Record<EventKey, string>> = {

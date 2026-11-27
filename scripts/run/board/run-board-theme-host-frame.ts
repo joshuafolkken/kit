@@ -110,26 +110,37 @@ function is_blank(cell: Cell | undefined): boolean {
 	return cell === undefined || cell[0].trim() === ''
 }
 
-// The columns the base's own name holds: from its first cell to a blank before the clocks beside it,
-// at most the name field's width — none past the row's end.
-function name_room(row: ReadonlyArray<Cell>): number {
-	const field = Array.from({ length: NAME_AT.w }, (_, index) => is_blank(row[NAME_AT.x + index]))
+// The column the base's own name starts on: past the run's mark and the blank after it
+// (`run-board-header-names.ts` → `run_part`), so one further right after a mark two columns wide — ✋,
+// the run waiting on a person, which a theme draws as two letters.
+function name_x(row: ReadonlyArray<Cell>): number {
+	const is_wide_mark = is_blank(row[NAME_AT.x]) && !is_blank(row[NAME_AT.x + 1])
+
+	return is_wide_mark ? NAME_AT.x + 1 : NAME_AT.x
+}
+
+// The columns the base's own name holds from `x`: from its first cell to a blank before the clocks
+// beside it, at most the name field's width — none past the row's end.
+function name_room(row: ReadonlyArray<Cell>, x: number): number {
+	const field = Array.from({ length: NAME_AT.w }, (_, index) => is_blank(row[x + index]))
 	const gap = field.indexOf(true)
 	const next = gap === -1 ? -1 : field.indexOf(false, gap)
 
 	return next === -1 ? NAME_AT.w : next - 1
 }
 
-// The name blanked on to its field's width, kept within the header's left column (joshuafolkken/kit#8917)
-// so a narrow column — a single run's short name — never has it run over the clocks beside it.
+// The name over the base's own, blanked on to its field's width, kept within the header's left column
+// (joshuafolkken/kit#8917) so a narrow column — a single run's short name — never has it run over the
+// clocks beside it.
 function board_name(grid: Grid, theme: ThemeModule): void {
 	const name = theme.board ?? BOARD_NAMES.get(theme.name) ?? 'josh'
-	const width = Math.max(name.length, name_room(grid[NAME_AT.y] ?? []))
+	const row = grid[NAME_AT.y] ?? []
+	const x = name_x(row)
+	const width = Math.max(name.length, name_room(row, x))
+	const [, style] = cell_at(grid, NAME_AT.y, x)
 
-	const [, style] = cell_at(grid, NAME_AT.y, NAME_AT.x)
-
-	put(grid, { y: NAME_AT.y, x: NAME_AT.x }, name, style)
-	put(grid, { y: NAME_AT.y, x: NAME_AT.x + name.length }, ' '.repeat(width - name.length))
+	put(grid, { y: NAME_AT.y, x }, name, style)
+	put(grid, { y: NAME_AT.y, x: x + name.length }, ' '.repeat(width - name.length))
 }
 
 function spinner_frame(glyphs: string, tick: number): string {

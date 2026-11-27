@@ -164,11 +164,14 @@ interface ThemePart {
 
 type PartName = 'opening' | 'ending'
 
-// Each role's color as 'r;g;b'. A type alias, so the colors read as a table keyed by any role.
+// Each role's color as 'r;g;b'. A type alias, so the colors read as a table keyed by any role. The
+// marks that stand in for icons carry three roles more a theme may color — `human` (waiting on a
+// person), `idle` and `info` — each drawn in `body` where the theme gives it none.
 type ThemeColors = Record<
 	'body' | 'hi' | 'notice' | 'ok' | 'red' | 'rule' | 'type' | 'warn',
 	string
->
+> &
+	Partial<Record<'human' | 'idle' | 'info', string>>
 
 // The demo's event keys: idle, progress, row, notice, and every effect in turn.
 type EventKey = 'a' | 'i' | 'n' | 'p' | 'r'

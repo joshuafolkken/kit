@@ -1,9 +1,9 @@
-# Split a demo-backed theme into children
+# Split a theme into children
 
-Read from `SKILL.md` → "5. File the Issue once the user decides" when the user has decided a demo
-and asks to file the theme. The demo's effects are functions that take the board and the tick and
-draw; that shape is the split. Each child moves the demo's functions in unchanged in shape and places
-them by kit's layout ([wiring](theme-wiring.md)).
+Read from `SKILL.md` → "5. File the Issue once the user decides" when the user has decided a look
+built in a work tree and asks to file the theme. Its effects are functions that take the board and
+the tick and draw; that shape is the split. Each child takes those functions in unchanged in shape
+and places them by kit's layout ([wiring](theme-wiring.md)).
 
 ## First: one seam child
 
@@ -14,7 +14,7 @@ them by kit's layout ([wiring](theme-wiring.md)).
   - the colors;
   - the sound palette ([sound](theme-sound.md));
   - the signal each effect reads from the board;
-  - the draw order — the order the demo's frame function calls its `draw_*` functions;
+  - the draw order — the order the theme's `draw` calls its effects;
   - the shared timing constants the effects read (jump ticks, run-up length, lead times);
   - per effect, its own file holding a function that draws nothing;
   - the new theme in the budget test ([render cost](render-cost.md)).
@@ -40,7 +40,7 @@ them by kit's layout ([wiring](theme-wiring.md)).
   file, move that socket into the seam child and file again.
 - A missing socket sends an effect child to a shared file, and the lanes queue one by one again.
 
-## Compare with the demo after every effect child has merged
+## Compare with the decided look after every effect child has merged
 
 - Run the comparison of `SKILL.md` → "6. After the first merge" after every effect child has
   merged — the combined look exists only then — not after the seam child.

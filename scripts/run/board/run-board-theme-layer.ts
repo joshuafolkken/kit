@@ -191,7 +191,8 @@ function sound_starts(
 type FrameTrill = Pick<TypingSound, 'set' | 'typed' | 'event' | 'part' | 'flush'>
 
 // The typing a frame sounds: the trill of the typing on screen — the board's own, or in demo mode the
-// demo's (`run-board-theme-demo-sound.ts`) — and through a part the letters it types.
+// demo's (`run-board-theme-demo-sound.ts`) — and through a part the letters it types; an opening
+// sounds its own letters alone, an ending the board's with its own.
 function sound_typing(
 	run: ThemeRun,
 	trill: FrameTrill | undefined,
@@ -205,8 +206,10 @@ function sound_typing(
 	}
 
 	const at = { last_ms: run.sound_ms, since_ms: since.since_ms }
+	// The board is not on screen through the opening: its rows' typing sounds nothing under it.
+	const board = since.name === 'opening' ? run_board_theme_demo_sound.SILENT : typing
 
-	run_board_theme_sound.sounded(trill, part_typing(run, since.name), at, typing)
+	run_board_theme_sound.sounded(trill, part_typing(run, since.name), at, board)
 	run.sound_ms = since.since_ms
 }
 
