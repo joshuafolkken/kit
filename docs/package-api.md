@@ -24,6 +24,8 @@ The package exposes config presets for direct import:
 | Dev / preview ports  | `@joshuafolkken/kit/ports` — the port pair derived from `PORT_SEED`                                                          |
 | Self-sync guard      | `@joshuafolkken/kit/self-sync-guard` — see [sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository)      |
 | Managed marker       | `@joshuafolkken/kit/managed-marker` — see [sync.md](./sync.md#ai-files-overwritten)                                          |
+| Scanner provisioning | `@joshuafolkken/kit/security-audit-provision` — `security_audit_provision_logic` and type `ScannerAsset`                     |
+| Audit pass cache     | `@joshuafolkken/kit/security-audit-cache` — `security_audit_cache` and type `AuditPorts`                                     |
 
 Prefer wiring up individual configs without `josh init`? See [manual-config.md](./manual-config.md).
 

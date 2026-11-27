@@ -165,6 +165,14 @@
 		"./managed-marker": {
 			"types": "./dist/managed-marker/index.d.ts",
 			"default": "./dist/managed-marker/index.js"
+		},
+		"./security-audit-provision": {
+			"types": "./dist/security-audit-provision/index.d.ts",
+			"default": "./dist/security-audit-provision/index.js"
+		},
+		"./security-audit-cache": {
+			"types": "./dist/security-audit-cache/index.d.ts",
+			"default": "./dist/security-audit-cache/index.js"
 		}
 	},
 	"peerDependencies": {
