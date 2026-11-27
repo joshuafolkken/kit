@@ -2004,7 +2004,7 @@
 	"tools/hooks/hook-bundle-ready.test.ts": 237,
 	"tools/hooks/prompt-hooks.test.ts": 16,
 	"tools/metrics/metrics-base-cache.test.ts": 131,
-	"tools/metrics/metrics-base.integration.test.ts": 22988,
+	"tools/metrics/metrics-base.integration.test.ts": 35686,
 	"tools/metrics/metrics-base.test.ts": 110,
 	"tools/metrics/metrics-code-lines.integration.test.ts": 2198,
 	"tools/metrics/metrics-code-lines.test.ts": 917,
