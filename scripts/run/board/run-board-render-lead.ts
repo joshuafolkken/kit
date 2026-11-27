@@ -11,6 +11,7 @@ import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_waits } from './run-board-render-waits'
+import { run_board_root_layout } from './run-board-root-layout'
 
 // What a lane row draws before its usage cells (joshuafolkken/kit#4292): the progress column — the
 // spinner while it runs, 🚧 while its lane is held, blanks where it stopped — the phase's icon, how
@@ -40,20 +41,16 @@ const ELAPSED_START =
 // The column a lane row's usage cells start at, after the lead and one blank; the processes rows' too.
 const USAGE_START = ELAPSED_START + TIME_WIDTH + SPACE
 const LANES_LABEL = run_board_label_pair.pair(run_board_labels.LANES_ICON, 'lanes')
-// A single run's rule (joshuafolkken/kit#7523): it runs in the root checkout, not in a lane, so its
-// row stands under the command it runs rather than under the lanes.
-const SINGLE_RUN_ICON = '🏠'
+// The single runs' rule (joshuafolkken/kit#7523, joshuafolkken/kit#8993): they run beside the lanes,
+// not in them, so their rows stand under one heading and each row names its own command.
+const SINGLE_RUNS_LABEL = '🏠 runs'
 // An open head's ▾ and its blank, and the blank, rule and blank before the first column, so a lane
 // row's icon stands in `ROW_INDENT`'s column under a counted label (joshuafolkken/kit#8257); a chat's
 // two leading rules draw that column one further right.
 const RULE_ROOM = 5
 
-function root_label(run_name: string): string {
-	return `${SINGLE_RUN_ICON} ${run_name}`
-}
-
 function lane_label(header: BoardHeader): string {
-	if (header.run_name !== undefined) return root_label(header.run_name)
+	if (header.run_name !== undefined) return SINGLE_RUNS_LABEL
 	const seats = lane_capacity.seat_text(header.lane_capacity)
 	if (seats !== undefined) return `${run_board_labels.LANES_ICON} ${seats}`
 	if (header.occupied_count === undefined) return LANES_LABEL
@@ -85,7 +82,7 @@ function is_single_ended(header: BoardHeader): boolean {
 function is_stopped_single(row: BoardRow, header: BoardHeader): boolean {
 	if (row.state !== 'stopped') return false
 
-	return header.layout?.root?.row === row || is_single_ended(header)
+	return run_board_root_layout.is_single_row(row, header.layout) || is_single_ended(header)
 }
 
 function progress_of(row: BoardRow, header: BoardHeader): string {
@@ -136,6 +133,7 @@ const run_board_render_lead = {
 	ELAPSED_START,
 	LANES_LABEL,
 	LANE_INDENT,
+	SINGLE_RUNS_LABEL,
 	TIME_WIDTH,
 	USAGE_START,
 	column_offset,
@@ -143,7 +141,6 @@ const run_board_render_lead = {
 	indent_of,
 	lead_of,
 	lane_label,
-	root_label,
 	running_fresh,
 }
 

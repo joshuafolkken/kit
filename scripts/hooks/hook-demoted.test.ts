@@ -1,7 +1,8 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { error_text } from '#scripts/lib/error-message'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hook_demoted } from './hook-demoted'
 
 // joshuafolkken/kit#6591: the demoted-rules file and the notice a demoted refusal turns into.
@@ -15,6 +16,10 @@ function file_in(directory: string): string {
 	return path.join(directory, 'nested', 'hook-demoted.json')
 }
 
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
 describe('hook_demoted.read_rules / write_rules', () => {
 	it('reads back the rules it wrote', async () => {
 		const file = file_in(make_directory(PREFIX))
@@ -24,14 +29,37 @@ describe('hook_demoted.read_rules / write_rules', () => {
 		expect([...hook_demoted.read_rules(file)]).toStrictEqual(['batch', 'scope'])
 	})
 
-	it('reads a missing or malformed file as nothing demoted', () => {
-		const directory = make_directory(PREFIX)
-		const malformed = path.join(directory, 'malformed.json')
+	it('reads a missing file as nothing demoted, without a trace', () => {
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+		const missing = file_in(make_directory(PREFIX))
 
-		writeFileSync(malformed, '{"rules": "batch"}')
+		expect(hook_demoted.read_rules(missing).size).toBe(0)
+		expect(trace).not.toHaveBeenCalled()
+	})
 
-		expect(hook_demoted.read_rules(file_in(directory)).size).toBe(0)
-		expect(hook_demoted.read_rules(malformed).size).toBe(0)
+	// joshuafolkken/kit#9043: a broken ledger silently undoes every demotion, so it leaves a trace.
+	it.each(['{"rules": "batch"}', 'not json'])(
+		'reads a malformed file (%s) as nothing demoted, and traces once',
+		(body) => {
+			const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+			const malformed = path.join(make_directory(PREFIX), 'malformed.json')
+
+			writeFileSync(malformed, body)
+
+			expect(hook_demoted.read_rules(malformed).size).toBe(0)
+			expect(trace).toHaveBeenCalledOnce()
+			expect(trace).toHaveBeenCalledWith(
+				'hook_demoted.read_rules',
+				expect.objectContaining({ message: `malformed demoted-rules file: ${malformed}` }),
+			)
+		},
+	)
+
+	it('reads an unreadable path as nothing demoted, and traces once', () => {
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+
+		expect(hook_demoted.read_rules(make_directory(PREFIX)).size).toBe(0)
+		expect(trace).toHaveBeenCalledOnce()
 	})
 
 	it('demotes nothing under a test run, whatever the repository recorded', () => {

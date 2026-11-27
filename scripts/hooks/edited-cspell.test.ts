@@ -1,9 +1,10 @@
 import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
+import { error_text } from '#scripts/lib/error-message'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { edited_cspell, type CspellRequest } from './edited-cspell'
 
 // joshuafolkken/kit#2296: the edit hook reports the edited file's cspell unknown words as
@@ -15,6 +16,10 @@ const DIRECTORY = make_directory('edited-cspell-')
 const TEXT = 'content'
 // A real cspell start takes about a second, two of them more under a loaded machine.
 const LIVE_TIMEOUT_MS = 60_000
+
+async function exploding_runner(): Promise<string> {
+	throw new Error('cspell exploded')
+}
 
 function file_of(name: string): string {
 	const target = path.join(DIRECTORY, name)
@@ -82,10 +87,25 @@ describe('spelling_diagnostics', () => {
 		const source = file_of('broken.ts')
 
 		await expect(
-			edited_cspell.spelling_diagnostics(source, DIRECTORY, TEXT, async () => {
-				throw new Error('cspell exploded')
-			}),
+			edited_cspell.spelling_diagnostics(source, DIRECTORY, TEXT, exploding_runner),
 		).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#9054: a spell check that threw is recorded, not silent.
+describe('spelling_diagnostics — a throwing runner', () => {
+	it('returns nothing and records the failure once', async () => {
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+		const source = file_of('broken.ts')
+		const result = await edited_cspell.spelling_diagnostics(
+			source,
+			DIRECTORY,
+			TEXT,
+			exploding_runner,
+		)
+
+		expect(result).toBeUndefined()
+		expect(trace).toHaveBeenCalledOnce()
 	})
 })
 

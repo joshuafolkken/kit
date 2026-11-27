@@ -28,6 +28,7 @@ const GH_NOT_MODIFIED_PHASE = 'gh 304 during plan read (count)'
 interface PlanPorts {
 	fetch_open: () => Promise<OpenListing | undefined>
 	fetch_opted_in: () => Promise<OptedInRead>
+	fetch_relations: () => Promise<OpenListing | undefined>
 	classify: (
 		opted_in: OptedIn,
 		exclude: ReadonlyArray<number>,
@@ -65,14 +66,17 @@ async function fetch_open_or_reason(): Promise<OpenListing | undefined> {
 const LIVE_PORTS: PlanPorts = {
 	fetch_open: fetch_open_or_reason,
 	fetch_opted_in: auto_ok_cli.fetch_opted_in,
+	fetch_relations: backlog_plan_read.read_open_relations,
 	classify: classify_quietly,
 }
 
 // One classified plan, against the listing it was read with, and the opted-in pool read beside it —
-// `undefined` when the scope draws no pool.
+// `undefined` when the scope draws no pool. `relations` carries the named issues' blockers, which the
+// listing does not; `undefined` when the scope names none or it was not read.
 interface PlanRead {
 	listing: OpenListing
 	pool: OptedInRead | undefined
+	relations: OpenListing | undefined
 	ports: PlanPorts
 }
 
@@ -114,9 +118,22 @@ async function pool_board(
 	return pool?.kind === 'read' ? await board_of(pool, exclude, read) : undefined
 }
 
+// Each row with the blockers the relations listing read for it, so a blocked named issue leads its row
+// with 🔗 as a blocked pool issue does (joshuafolkken/kit#8966). A row the relations did not read keeps
+// what it had.
+function with_blockers(
+	rows: ReadonlyArray<OpenIssueData>,
+	relations: OpenListing | undefined,
+): Array<OpenIssueData> {
+	const blockers = new Map((relations?.rows ?? []).map((row) => [row.number, row.blockedBy]))
+
+	return rows.map((row) => ({ ...row, blockedBy: blockers.get(row.number) ?? row.blockedBy }))
+}
+
 // The named issues as the open listing holds them — a closed one is the stream's to show, not the plan's.
 async function named_board(named: NamedPlan, read: PlanRead): Promise<BoardPlan | undefined> {
-	const issues = read.listing.rows.filter((row) => named.issues.includes(row.number))
+	const rows = read.listing.rows.filter((row) => named.issues.includes(row.number))
+	const issues = with_blockers(rows, read.relations)
 
 	return await board_of({ kind: 'read', issues, cutoff: 'none' }, [], read)
 }
@@ -205,17 +222,29 @@ async function read_pool(named: NamedPlan, ports: PlanPorts): Promise<OptedInRea
 	return await launch_timing.timed('plan: pool', ports.fetch_opted_in)
 }
 
-// The open listing and the pool take nothing from each other, so they are read side by side
-// (joshuafolkken/kit#8220).
+// The named issues' blockers, read only when the scope names any: the open listing carries none, and an
+// `--only` run reads no pool that would (joshuafolkken/kit#8966).
+async function read_relations(
+	named: NamedPlan,
+	ports: PlanPorts,
+): Promise<OpenListing | undefined> {
+	if (named.issues.length === 0) return undefined
+
+	return await launch_timing.timed('plan: relations', ports.fetch_relations)
+}
+
+// The open listing, the pool and the relations take nothing from each other, so they are read side by
+// side (joshuafolkken/kit#8220).
 async function read_steps(named: NamedPlan, ports: PlanPorts): Promise<BoardPlan | undefined> {
-	const [listing, pool] = await Promise.all([
+	const [listing, pool, relations] = await Promise.all([
 		launch_timing.timed('plan: list', ports.fetch_open),
 		read_pool(named, ports),
+		read_relations(named, ports),
 	])
 
 	if (listing === undefined || listing.rows.length === 0) return undefined
 
-	const read = { listing, pool, ports }
+	const read = { listing, pool, relations, ports }
 
 	const is_bare = named.issues.length === 0 && !named.only
 	const plan = is_bare ? await pool_board([], read) : await scoped_board(named, read)

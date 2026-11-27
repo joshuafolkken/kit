@@ -97,7 +97,7 @@ describe('run_board_header.header_lines with a root checkout’s single run', ()
 	const ROOT_ISSUE = 12
 
 	function root_layout(state: BoardRow['state']): BoardLayout {
-		return { ...LAYOUT, root: { name: 'fullrun', row: row(ROOT_ISSUE, state) } }
+		return { ...LAYOUT, singles: [{ name: 'fullrun', row: row(ROOT_ISSUE, state) }] }
 	}
 
 	function with_root(age_ms: number): SessionOperations {

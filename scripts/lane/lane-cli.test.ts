@@ -34,6 +34,9 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 vi.mock('#scripts/epic/epic-busy', () => ({
 	epic_busy: { read_repository: vi.fn().mockResolvedValue({ kind: 'idle' }) },
 }))
+vi.mock('./lane-spent', () => ({
+	lane_spent: { is_issue_closed: vi.fn().mockResolvedValue(false) },
+}))
 vi.mock('./lane-output', () => ({
 	lane_output: {
 		NO_OUTPUT: 'no output path',

@@ -14,30 +14,16 @@
 // different files, so nothing conflicts and nothing waits.
 const OBSERVATION_LEDGER_DIRECTORY = '.josh/observations'
 
-// The directory's previous location, a migration source for the same reasons as
-// the single-file ledgers below: each `<name>.md` in it moves to the same name in the directory.
-const LEGACY_OBSERVATION_LEDGER_DIRECTORY = 'docs/maintainers/observations'
-
-const LEDGER_DIRECTORIES: ReadonlyArray<string> = [
-	OBSERVATION_LEDGER_DIRECTORY,
-	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
-]
-
 const LEDGER_FILE_EXTENSION = '.md'
 
 // The suffix of a closed issue's carried comment rounds, `<issue>-comment-rounds.md` — named here
 // because both the carry that writes it and the archive that moves it read it.
 const CARRIED_ROUNDS_SUFFIX = '-comment-rounds'
 
-// What the single-file ledgers held is moved here (`observation-ledger-migrate.ts`), so no line is
-// lost to the split.
-const LEGACY_LEDGER_FILE = `legacy${LEDGER_FILE_EXTENSION}`
-
-// The single-file ledger paths, `docs/observations.md` and `docs/maintainers/observations.md`, kept
-// as migration sources rather than forgotten: a run still on the old code, a stash cut before the
-// move and a consumer repository's existing ledger all write there, and `observation-ledger-migrate.ts` moves what it finds into the
-// directory. Every place that recognizes the ledger recognizes them, so a line on either path is never
-// staged into an ordinary commit. Remove them once every repository holding a ledger has migrated.
+// The single-file ledger paths, `docs/observations.md` and `docs/maintainers/observations.md`, from
+// before the ledger became a directory. Nothing reads or migrates them any more; a run still on an old
+// kit may write there, so `observation-ledger-legacy.ts` warns when one exists and every place that
+// recognizes the ledger recognizes them, keeping such a line out of an ordinary commit.
 const LEGACY_OBSERVATION_LEDGER_PATHS: ReadonlyArray<string> = [
 	'docs/maintainers/observations.md',
 	'docs/observations.md',
@@ -60,37 +46,14 @@ function is_ledger_file_name(name: string): boolean {
 	return name.endsWith(LEDGER_FILE_EXTENSION)
 }
 
-// The suffix of the file a migration renames an old ledger to while it copies it
-// (`observation-ledger-migrate.ts`): `docs/observations.md.<pid>.migrating`.
-const MIGRATION_CLAIM_SUFFIX = '.migrating'
-
-function is_legacy_directory_file(file_path: string): boolean {
-	return file_path.startsWith(`${LEGACY_OBSERVATION_LEDGER_DIRECTORY}/`)
-}
-
-// A claim left by a process killed mid-migration holds ledger lines, so it is the ledger too: never
-// staged by an ordinary commit, and absorbed by the next migration.
-function is_migration_claim(file_path: string): boolean {
-	if (!file_path.endsWith(MIGRATION_CLAIM_SUFFIX)) return false
-
-	return (
-		is_legacy_directory_file(file_path) ||
-		LEGACY_OBSERVATION_LEDGER_PATHS.some((legacy) => file_path.startsWith(`${legacy}.`))
-	)
-}
-
 // Porcelain status collapses an untracked directory to `.josh/observations/`, so the directory
-// itself, trailing slash and all, is the ledger as much as any file inside it — the old directory too.
+// itself, trailing slash and all, is the ledger as much as any file inside it.
 function is_in_directory(file_path: string): boolean {
-	return LEDGER_DIRECTORIES.some((directory) => file_path.startsWith(`${directory}/`))
+	return file_path.startsWith(`${OBSERVATION_LEDGER_DIRECTORY}/`)
 }
 
 function is_ledger_path(file_path: string): boolean {
-	return (
-		is_in_directory(file_path) ||
-		LEGACY_OBSERVATION_LEDGER_PATHS.includes(file_path) ||
-		is_migration_claim(file_path)
-	)
+	return is_in_directory(file_path) || LEGACY_OBSERVATION_LEDGER_PATHS.includes(file_path)
 }
 
 // The git pathspec of every path but the ledger — the same paths `is_ledger_path` answers, for a git
@@ -98,11 +61,8 @@ function is_ledger_path(file_path: string): boolean {
 // subdirectory still covers the whole tree and still leaves the root's ledger alone.
 const LEDGER_EXCLUSION_PATHSPEC: ReadonlyArray<string> = [
 	':/',
-	...LEDGER_DIRECTORIES.map((directory) => `:(top,exclude)${directory}`),
+	`:(top,exclude)${OBSERVATION_LEDGER_DIRECTORY}`,
 	...LEGACY_OBSERVATION_LEDGER_PATHS.map((legacy) => `:(top,exclude)${legacy}`),
-	...LEGACY_OBSERVATION_LEDGER_PATHS.map(
-		(legacy) => `:(top,exclude,glob)${legacy}.*${MIGRATION_CLAIM_SUFFIX}`,
-	),
 ]
 
 function is_ledger_line(line: string): boolean {
@@ -132,7 +92,6 @@ const observation_ledger = {
 	is_ledger_file_name,
 	is_ledger_line,
 	is_ledger_path,
-	is_migration_claim,
 	ledger_file,
 	ledger_paths,
 	status_path,
@@ -140,13 +99,9 @@ const observation_ledger = {
 
 export {
 	CARRIED_ROUNDS_SUFFIX,
-	LEDGER_DIRECTORIES,
 	LEDGER_EXCLUSION_PATHSPEC,
 	LEDGER_FILE_EXTENSION,
-	LEGACY_LEDGER_FILE,
-	LEGACY_OBSERVATION_LEDGER_DIRECTORY,
 	LEGACY_OBSERVATION_LEDGER_PATHS,
-	MIGRATION_CLAIM_SUFFIX,
 	OBSERVATION_LEDGER_DIRECTORY,
 	observation_ledger,
 }

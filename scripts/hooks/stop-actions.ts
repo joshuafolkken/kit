@@ -2,6 +2,7 @@ import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { error_text } from '#scripts/lib/error-message'
 import { home_tilde } from '#scripts/lib/home-tilde'
 import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { telegram_test } from '#scripts/notify/telegram-test'
@@ -126,7 +127,9 @@ async function run_action(action: StopAction): Promise<string | undefined> {
 async function attempt(action: StopAction): Promise<string | undefined> {
 	try {
 		return await run_action(action)
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('stop_actions.attempt', error)
+
 		return undefined
 	}
 }

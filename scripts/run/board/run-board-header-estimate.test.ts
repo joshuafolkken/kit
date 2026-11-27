@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { run_board_estimate } from './run-board-estimate'
 import { run_board_fit } from './run-board-fit'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
+import type { LaneBands } from './run-board-lane-totals'
 import type { BoardLayout, BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
@@ -110,6 +112,32 @@ describe('run_board_header.header_lines estimated finish', () => {
 
 		expect(lines[0]).toContain(UNKNOWN_FINISH)
 		expect(lines.join('\n')).not.toContain(LEGEND)
+	})
+})
+
+// joshuafolkken/kit#8954: a row's finish and the header's 🎯 read the one banded source.
+describe('run_board_header.header_lines estimated finish with a declared size', () => {
+	const LARGE = 60 * MINUTE
+	const bands: LaneBands = {
+		totals: new Map([['large', Array.from({ length: 5 }, () => LARGE)]]),
+		of_issue: new Map([[1, 'large']]),
+	}
+	const running_only: BoardLayout = { ...EMPTY_LAYOUT, active: LAYOUT.active }
+	const RUNNING = LAYOUT.active[0] ?? row(1, 'running')
+
+	it('draws the 🎯 the running row’s band foretells', () => {
+		const [first] = lines_with({ layout: running_only, lane_bands: bands })
+
+		// 55′ of the large band's 60′ left, not 15′ of the whole 20′.
+		expect(first).toContain(estimate_at(55))
+	})
+
+	it('draws the row’s finish at the header’s 🎯', () => {
+		const read = { now_ms: NOW, ended_ms: undefined, layout: running_only, lane_totals: TOTALS }
+		const banded = { ...read, lane_bands: bands, lane_limit: 1 }
+		const finish = run_board_estimate.row_finish(RUNNING, banded)
+
+		expect(finish?.finish_ms).toBe(NOW + (run_board_estimate.left_ms(banded) ?? 0))
 	})
 })
 

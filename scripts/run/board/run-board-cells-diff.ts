@@ -12,7 +12,14 @@ const { CONTINUATION, DEFAULT_STYLE, char_text, copy, style_of } = run_board_cel
 const ESC = '\u{1B}'
 const CSI = `${ESC}[`
 const RESET = `${CSI}0m`
-const OSC_LINK = '\u{1B}]8;;'
+// joshuafolkken/kit#8242, #9069: every link opens with the same `id=`, so a terminal keying links by
+// id and URL (xterm.js, VSCode's) keeps one record per URL however many frames redraw it — an id-less
+// one is a new record each frame, dropped at once on leaving the alternate screen, freezing it for
+// seconds. The id is written here, the last point before the terminal, as the cells keep the URL alone;
+// the board's own links (`run-board-gather-record.ts` → `link`) open with this same definition.
+const LINK_OPEN_WITH_ID = '8;id=josh-run-board;'
+const LINK_CLOSE = `${ESC}]8;;`
+const LINK_OPEN = `${ESC}]${LINK_OPEN_WITH_ID}`
 const ST = '\u{1B}\\'
 const UNKNOWN = -1
 const WIDE = 2
@@ -44,7 +51,7 @@ function move_to(cells: Cells, writer: Writer, index: number): void {
 
 function link_to(writer: Writer, link: string): void {
 	if (writer.link === link) return
-	writer.out.push(`${OSC_LINK}${link}${ST}`)
+	writer.out.push(link === '' ? `${LINK_CLOSE}${ST}` : `${LINK_OPEN}${link}${ST}`)
 	writer.link = link
 }
 
@@ -189,6 +196,6 @@ function diff(back: Cells, front: Cells): string {
 	return written(writer)
 }
 
-const run_board_cells_diff = { diff }
+const run_board_cells_diff = { LINK_OPEN_WITH_ID, diff }
 
 export { run_board_cells_diff }

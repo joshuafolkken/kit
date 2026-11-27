@@ -18,7 +18,7 @@ import { run_board_events_memo } from './run-board-events-memo'
 import type { FoundOf } from './run-board-found'
 import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
-import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
+import { run_board_lane_totals, type LaneBands, type LaneTotals } from './run-board-lane-totals'
 import type { ReviewStop } from './run-board-layout-types'
 import { run_board_ledger_window } from './run-board-ledger-window'
 import type { SessionOperations } from './run-board-operation-read'
@@ -45,8 +45,8 @@ interface LocalRead {
 	// The kit version the run's supervisor recorded as it started (`run-wake.ts`); `undefined` where no
 	// supervisor runs or an older one recorded none.
 	kit_version?: string | undefined
-	// The root checkout's single run beside a carried run, drawn above its lanes.
-	root?: RootRun | undefined
+	// The single runs beside the run, one per checkout that holds one, drawn above its lanes.
+	singles?: ReadonlyArray<RootRun> | undefined
 	// The root checkout's single runs a merge ended inside the run, drawn in `✅ done`.
 	ended_roots?: ReadonlyArray<EndedRoot> | undefined
 	// The board's own single run, where a stop ended it (joshuafolkken/kit#7710).
@@ -94,6 +94,8 @@ interface LocalRead {
 	usual?: UsualTimes | undefined
 	// How long lanes took from dispatch to merge, from the same ledger.
 	lane_totals?: LaneTotals | undefined
+	// Those totals banded by each issue's declared size (joshuafolkken/kit#8954).
+	lane_bands?: LaneBands | undefined
 	// The reset a Claude usage limit holds the running run's launches until (`run-merge-usage-limit.ts`);
 	// `undefined` once it has passed, where none was recorded, or where no run is carried.
 	usage_reset_ms?: number | undefined
@@ -236,7 +238,7 @@ async function lane_room_of(
 function ledger_here(
 	repository: string,
 	events: ReadonlyArray<RunEvent>,
-): Pick<LocalRead, 'usual' | 'lane_totals' | 'is_memory_held' | 'launch_hold'> {
+): Pick<LocalRead, 'usual' | 'lane_totals' | 'lane_bands' | 'is_memory_held' | 'launch_hold'> {
 	const now_ms = Date.now()
 	const entries = run_board_ledger_window.entries_of(lane_ledger.target_of(repository), now_ms)
 	const launch_hold = lane_held_stats.open_reason(entries, now_ms)
@@ -244,6 +246,7 @@ function ledger_here(
 	return {
 		usual: run_board_usual.usual_of(entries, now_ms, run_board_events_memo.host_gaps(events)),
 		lane_totals: run_board_lane_totals.totals_of(entries, now_ms),
+		lane_bands: run_board_lane_totals.bands_of(entries, now_ms),
 		is_memory_held: launch_hold === backlog_drive_memory.HOLD_REASON,
 		launch_hold,
 	}
@@ -292,12 +295,12 @@ async function run_read(
 	lanes: ReadonlyArray<LaneInfo>,
 	table: TableRead | undefined,
 ): Promise<LocalRead> {
-	const { span, root, carry } = read
+	const { span, singles, carry } = read
 	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
 	const roots = { repository, main: await main_root() }
 	const lane_read = lanes_here(lanes, roots, events, span.started_ms)
 	const [root_fields, span_events, room, records] = await Promise.all([
-		read_roots(span, root, events),
+		read_roots(span, singles, events),
 		read_span_events(events, span, table, carry),
 		read_room(lanes, lane_read.lane_states, table),
 		read_records(repository, events),

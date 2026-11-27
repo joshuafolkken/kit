@@ -442,7 +442,7 @@ async function run_ship_command(given: ShipArguments): Promise<number> {
 	const { sections, is_handed_over } = await ship(args)
 
 	// The successor carries the same launch record, so its result is the one written there.
-	if (!is_handed_over) await run_ship_supervised.record_result(args, sections)
+	if (!is_handed_over) await run_ship_supervised.finish(args, sections)
 	console.info(run_ship.format_report(sections))
 
 	return run_ship.exit_code(sections)

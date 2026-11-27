@@ -5,9 +5,10 @@ import {
 	type Placement,
 } from './run-board-estimate-schedule'
 import { run_board_labels } from './run-board-labels'
-import { run_board_lane_totals, type LaneTotals } from './run-board-lane-totals'
+import { run_board_lane_totals, type LaneBands, type LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_phase, type Phase } from './run-board-phase'
+import { run_board_root_layout, type SingleNamed } from './run-board-root-layout'
 import type { ItemState, ItemStatus } from './run-board-status'
 import type { UsualTimes } from './run-board-usual'
 
@@ -41,16 +42,15 @@ interface EstimateRead {
 	layout: BoardLayout | undefined
 	usual?: UsualTimes | undefined
 	lane_totals?: LaneTotals | undefined
+	lane_bands?: LaneBands | undefined
 	lane_limit?: number | undefined
 }
 
-// What says the run still moves, as the board's header carries it, with the run's name and the root
-// checkout's single run beside it.
-interface RunMotion {
+// What says the run still moves, as the board's header carries it, with the run's name and the single
+// runs beside it.
+interface RunMotion extends SingleNamed {
 	ended_ms: number | undefined
 	activity: { is_stopped: boolean }
-	run_name?: string | undefined
-	layout?: Pick<BoardLayout, 'root'> | undefined
 }
 
 interface RowFinish {
@@ -102,9 +102,26 @@ function launch_of(status: ItemStatus | undefined, now_ms: number): number {
 	return status?.launched_ms ?? status?.started_ms ?? now_ms
 }
 
+// Whether any lane total is measured — without one nothing is estimated.
+function has_totals(read: EstimateRead): boolean {
+	return (read.lane_totals ?? []).length > 0
+}
+
+// The lane totals a child's finish reads, narrowed to the band of the size its Issue declared
+// (joshuafolkken/kit#8954) — the one source its launch, its time left and its wait all read.
+function row_totals(issue: number, read: EstimateRead): LaneTotals {
+	return run_board_lane_totals.totals_for(read.lane_totals ?? [], read.lane_bands, issue)
+}
+
+// A waiting child's time: its band's median lane total.
+function waiting_of(issue: number, read: EstimateRead): number {
+	return run_board_lane_totals.waiting_ms(row_totals(issue, read)) ?? 0
+}
+
 // What a running child has left, from the time it has run in its lane.
-function running_left(row: BoardRow, read: EstimateRead, totals: LaneTotals): number {
+function running_left(row: BoardRow, read: EstimateRead): number {
 	const launched_ms = launch_of(row.status, read.now_ms)
+	const totals = row_totals(row.number, read)
 
 	return (
 		run_board_lane_totals.running_left_ms(totals, read.now_ms - launched_ms) ??
@@ -121,14 +138,18 @@ function waiting_rows(layout: BoardLayout): Array<BoardRow> {
 
 // The lanes as the running children leave them: each running child's end, the free lanes at zero, and
 // a running `run:solo` child's end as the floor no waiting child starts before.
-function lanes_of(running: ReadonlyArray<BoardRow>, read: EstimateRead, totals: LaneTotals): Lanes {
-	const ends = new Map(running.map((row) => [row.number, running_left(row, read, totals)]))
+function lanes_of(running: ReadonlyArray<BoardRow>, read: EstimateRead): Lanes {
+	const ends = new Map(running.map((row) => [row.number, running_left(row, read)]))
 	const count = Math.max(read.lane_limit ?? running.length, running.length, MIN_LANES)
 	const free = [...ends.values(), ...Array.from({ length: count - ends.size }, () => 0)]
 	const solo = running.filter((row) => row.is_solo === true).map((row) => ends.get(row.number) ?? 0)
-	const per_child = run_board_lane_totals.waiting_ms(totals) ?? 0
 
-	return { free, ends, floor: Math.max(0, ...solo), per_child }
+	return {
+		free,
+		ends,
+		floor: Math.max(0, ...solo),
+		per_child: (issue) => waiting_of(issue, read),
+	}
 }
 
 // Whether this run's lane totals foretell the row: not an earlier run's lane (🧳), nor one this run took
@@ -141,16 +162,15 @@ function is_foretold(row: BoardRow): boolean {
 // run or no lane total is measured.
 function placement_of(read: EstimateRead): Placement | undefined {
 	const { layout } = read
-	const totals = read.lane_totals ?? []
 
-	if (layout === undefined || totals.length === 0) return undefined
+	if (layout === undefined || !has_totals(read)) return undefined
 
 	const running = layout.active.filter((row) => row.state === 'running' && is_foretold(row))
 	const waiting = waiting_rows(layout)
 
 	if (running.length + waiting.length === 0) return undefined
 
-	return run_board_estimate_schedule.placed_of(waiting, lanes_of(running, read, totals))
+	return run_board_estimate_schedule.placed_of(waiting, lanes_of(running, read))
 }
 
 // How long the run has left, `undefined` where nothing is left to run or no lane total is measured.
@@ -171,34 +191,21 @@ function queued_finish_ms(read: EstimateRead, number: number): number | undefine
 // (joshuafolkken/kit#7920), and how far that has moved from what its launch alone foretold — the median
 // lane total after it. `undefined` where no lane total is measured.
 function row_finish(row: BoardRow, read: EstimateRead): RowFinish | undefined {
-	const totals = read.lane_totals ?? []
+	if (!has_totals(read)) return undefined
 
-	if (totals.length === 0) return undefined
-
-	const finish_ms = read.now_ms + running_left(row, read, totals)
-	const foretold_ms =
-		launch_of(row.status, read.now_ms) + (run_board_lane_totals.waiting_ms(totals) ?? 0)
+	const finish_ms = read.now_ms + running_left(row, read)
+	const foretold_ms = launch_of(row.status, read.now_ms) + waiting_of(row.number, read)
 
 	return { finish_ms, drift_ms: finish_ms - foretold_ms }
 }
 
-function is_root_row(row: BoardRow, run: RunMotion): boolean {
-	return run.layout?.root?.row === row
-}
-
-// The root checkout's single run moves on its own, beside a stopped or ended `backlogrun`
+// A single run beside the run moves on its own, beside a stopped or ended `backlogrun`
 // (joshuafolkken/kit#8946); its row stands `stopped` once a stop ends it. Every other row moves with
 // the run.
 function is_moving(row: BoardRow, run: RunMotion): boolean {
-	if (is_root_row(row, run)) return true
+	if (run_board_root_layout.is_single_row(row, run.layout)) return true
 
 	return run.ended_ms === undefined && !run.activity.is_stopped
-}
-
-// The single run a row is drawn under: the root checkout's, else the board's own; `undefined` under a
-// `backlogrun`.
-function single_name_of(row: BoardRow, run: RunMotion): string | undefined {
-	return is_root_row(row, run) ? run.layout?.root?.name : run.run_name
 }
 
 // Whether a row ends on its finish (joshuafolkken/kit#7920): a running row, and a parked one, while the
@@ -207,7 +214,7 @@ function single_name_of(row: BoardRow, run: RunMotion): string | undefined {
 // A `halfrun` draws none: the lane totals run to a merge, and it stops before its commit
 // (joshuafolkken/kit#8946).
 function is_finish_drawn(row: BoardRow, run: RunMotion): boolean {
-	const is_measured = single_name_of(row, run) !== HALFRUN && is_foretold(row)
+	const is_measured = run_board_root_layout.single_name_of(row, run) !== HALFRUN && is_foretold(row)
 
 	return is_moving(row, run) && is_measured && FINISH_STATES.has(row.state)
 }

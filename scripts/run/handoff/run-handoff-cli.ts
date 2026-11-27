@@ -7,6 +7,7 @@ import {
 	type AgentEnvironment,
 	type AgentProvider,
 } from '#scripts/agent/agent-provider'
+import { git_command } from '#scripts/git/git-command'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cli_body } from '#scripts/josh/cli-body'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -25,6 +26,7 @@ import { run_handoff_args, type WorkflowHandoff } from './run-handoff-args'
 import { run_handoff_final } from './run-handoff-final'
 import { run_handoff_launch, type BuiltArgv, type HandoffChild } from './run-handoff-launch'
 import { run_handoff_retrospective } from './run-handoff-retrospective'
+import { run_handoff_tree } from './run-handoff-tree'
 
 // `josh run:handoff <keyword> [N|new ...] --brief-file <path>` — hand a workflow keyword typed in a
 // consultation session to a child session on the kit role profile's model, on the main session's own
@@ -37,7 +39,6 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const AGENT_FLAG = '--agent'
 const LONE_FLAGS: ReadonlySet<string> = new Set(['--stop', '--restart'])
-const ISSUE_TOKEN = /#(\d+)/u
 // The line `kickoff new …` — `kickoff #N` plans an existing Issue instead.
 const KICKOFF_NEW_LINE = /^kickoff\s+new(?:\s|$)/u
 const USAGE =
@@ -53,7 +54,10 @@ interface HandoffPorts {
 	cwd: string
 	now: () => number
 	repository_directory: () => Promise<string | undefined>
-	tree_hold: () => Promise<HoldRead>
+	// The hold on the work tree at the directory, as `run:entry` would read it there.
+	tree_hold: (directory: string) => Promise<HoldRead>
+	branch_at: (directory: string) => Promise<string>
+	lane_directory: (issue: string) => Promise<string | undefined>
 	read_text: (target: string) => string | undefined
 	launch: (request: LaunchRequest) => LaunchResult
 	launch_attached: (request: LaunchRequest) => Promise<AttachedLaunchResult>
@@ -76,9 +80,11 @@ interface Started {
 	built: BuiltArgv
 	request: LaunchRequest
 	log: string
-	// The child's own scratch directory, relative to the checkout, which its prompt names.
+	// The child's own scratch directory, relative to its work tree, which its prompt names.
 	scratch: string
 	git_directory: string
+	// The work tree the child runs in (`run-handoff-tree.ts`).
+	directory: string
 }
 
 type StartResult = { kind: 'started'; started: Started } | { kind: 'refused'; note: string }
@@ -98,21 +104,14 @@ async function josh_backlogrun(argv: ReadonlyArray<string>): Promise<number> {
 	return result.exitCode ?? FAILURE_EXIT_CODE
 }
 
-// The hold `run:entry` claims for this working tree; an unknown tree reads as unreadable, never free.
-async function tree_hold(): Promise<HoldRead> {
-	const directory = await run_hold.worktree_directory()
-
-	if (directory === undefined) return { kind: 'unreadable' }
-
-	return run_hold.read_hold(run_hold.hold_path(directory))
-}
-
 const LIVE_PORTS: HandoffPorts = {
 	environment: process.env,
 	cwd: process.cwd(),
 	now: () => Date.now(),
 	repository_directory: run_carry.repository_directory,
-	tree_hold,
+	tree_hold: run_handoff_tree.tree_hold,
+	branch_at: git_command.branch_at,
+	lane_directory: run_handoff_tree.lane_directory,
 	read_text: (target) => stamp_file.read_stamp_text(target),
 	launch: (request) => detached_launch.launch(request, note_to_stderr),
 	launch_attached: async (request) =>
@@ -210,9 +209,7 @@ async function waited(started: Started, ports: HandoffPorts): Promise<number> {
 
 // The issue the child's `run:entry` claims under: the line's first `#N`, else an unnumbered run.
 function claimant_of(line: string): string {
-	const issue = ISSUE_TOKEN.exec(line)?.[1]
-
-	return issue ?? run_hold.UNNUMBERED_ISSUE
+	return run_handoff_tree.issue_of(line) ?? run_hold.UNNUMBERED_ISSUE
 }
 
 // The detached child's `run:entry` claims this tree and stops on `busy` where only its log would say so,
@@ -221,7 +218,7 @@ function claimant_of(line: string): string {
 async function hold_note(started: Started, ports: HandoffPorts): Promise<string | undefined> {
 	const claimant = claimant_of(started.handoff.line)
 
-	return await run_hold_block.blocking_message(await ports.tree_hold(), claimant)
+	return await run_hold_block.blocking_message(await ports.tree_hold(started.directory), claimant)
 }
 
 function detached(started: Started, ports: HandoffPorts): number {
@@ -240,8 +237,9 @@ async function launched(started: Started, ports: HandoffPorts): Promise<number> 
 
 	if (note !== undefined) return refuse(note, ports)
 
-	ports.make_directory(path.join(ports.cwd, started.scratch))
+	ports.make_directory(path.join(started.directory, started.scratch))
 	ports.write(started_line(started))
+	ports.write(`work tree: ${started.directory}`)
 	ports.write(`log: ${started.log}`)
 
 	return is_waited ? await waited(started, ports) : detached(started, ports)
@@ -256,18 +254,26 @@ function child_of(input: StartInput, scratch: string, cwd: string): HandoffChild
 }
 
 // One start time names both the log and the scratch directory, so each child's pair reads together.
-function started_of(input: StartInput, ports: HandoffPorts): StartResult {
+function started_of(input: StartInput, directory: string, ports: HandoffPorts): StartResult {
 	const { handoff, git_directory } = input
 	const now = ports.now()
 	const scratch = run_handoff_launch.scratch_directory(handoff.keyword, now)
-	const built = run_handoff_launch.argv_of(child_of(input, scratch, ports.cwd), ports.environment)
+	const built = run_handoff_launch.argv_of(child_of(input, scratch, directory), ports.environment)
 
 	if (built.kind === 'rejected') return { kind: 'refused', note: `could not start: ${built.note}` }
 
 	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, now)
-	const request = run_handoff_launch.request_of(built, ports.cwd, log)
+	const request = run_handoff_launch.request_of(built, directory, log)
+	const started = { handoff, built, request, log, scratch, git_directory, directory }
 
-	return { kind: 'started', started: { handoff, built, request, log, scratch, git_directory } }
+	return { kind: 'started', started }
+}
+
+// The child starts in the work tree its run belongs in — a lane for a numbered run that edits.
+async function tree_started(input: StartInput, ports: HandoffPorts): Promise<StartResult> {
+	const tree = await run_handoff_tree.work_tree(input.handoff, ports)
+
+	return tree.kind === 'refused' ? tree : started_of(input, tree.directory, ports)
 }
 
 // A brief file is read as written; none means the generated retrospective brief, whose close names
@@ -318,7 +324,7 @@ async function handed(
 		return refuse('the carry already marks the retrospective as run; nothing is owed', ports)
 	}
 
-	const result = started_of({ handoff, provider, brief, git_directory }, ports)
+	const result = await tree_started({ handoff, provider, brief, git_directory }, ports)
 
 	return result.kind === 'refused'
 		? refuse(result.note, ports)

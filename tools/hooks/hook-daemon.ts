@@ -211,6 +211,7 @@ function claim(directory: string): boolean {
 
 		return true
 	} catch {
+		// The rename fails when another daemon took the directory first: the answer, not a fault.
 		rmSync(staging, { recursive: true, force: true })
 
 		return false

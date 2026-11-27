@@ -1,7 +1,9 @@
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_plan } from '#scripts/lane/lane-plan'
+import { error_text } from '#scripts/lib/error-message'
+import { file_reader } from '#scripts/lib/read-file'
 import { run_review_unplanned } from '#scripts/run/review/run-review-unplanned'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 
@@ -34,8 +36,12 @@ function asked_path(issue: number, directory: string): string {
 
 function was_asked(relative: string, issue: number, directory: string): boolean {
 	try {
-		return readFileSync(asked_path(issue, directory), 'utf8').split('\n').includes(relative)
-	} catch {
+		const lines = file_reader.read_optional(asked_path(issue, directory))?.split('\n')
+
+		return lines?.includes(relative) === true
+	} catch (error) {
+		error_text.trace_swallowed('unplanned_edit.was_asked', error)
+
 		return false
 	}
 }
@@ -88,7 +94,9 @@ async function notice(
 
 	try {
 		return await ask(directory)
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('unplanned_edit.ask', error)
+
 		return undefined
 	}
 }

@@ -31,7 +31,7 @@ const EXTRA_TEST = 'extra.test.ts'
 const OUTSIDE_FILE = 'outside.ts'
 const APPROVAL_FILE = path.join('.josh', 'metrics-accepted', '1.json')
 const OBSERVATION_FILE = path.join('.josh', 'observations', '1.md')
-const LEGACY_LEDGER_FILE = path.join('docs', 'maintainers', 'observations', '1.md')
+const DOCS_FILE = path.join('docs', 'maintainers', 'notes', '1.md')
 const OBSERVATION_LINE = '- observed\n'
 // joshuafolkken/kit#4723: the module the test reaches the driver through, and the same module once it
 // stops importing the driver — a copy of its functions — so no test reaches the driver's hunks.
@@ -114,8 +114,8 @@ async function drop_cache(): Promise<void> {
 
 // A non-code file under `docs/`, which a test may read.
 async function write_ledger(): Promise<void> {
-	await mkdir(path.dirname(LEGACY_LEDGER_FILE), { recursive: true })
-	await write(LEGACY_LEDGER_FILE, OBSERVATION_LINE)
+	await mkdir(path.dirname(DOCS_FILE), { recursive: true })
+	await write(DOCS_FILE, OBSERVATION_LINE)
 }
 
 describe('test_pinned.run with a stored verdict', () => {

@@ -14,7 +14,7 @@ import { run_board_header_parts } from './run-board-header-parts'
 import { run_board_header_time } from './run-board-header-time'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
-import type { LaneTotals } from './run-board-lane-totals'
+import type { LaneBands, LaneTotals } from './run-board-lane-totals'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
 import { run_board_length } from './run-board-length'
 import type { BoardLinks } from './run-board-link'
@@ -122,6 +122,9 @@ interface BoardHeader
 	usual?: UsualTimes | undefined
 	// How long lanes took from dispatch to merge, which the estimated finish is drawn from.
 	lane_totals?: LaneTotals | undefined
+	// Those totals banded by each issue's declared size, which each row's finish narrows to
+	// (joshuafolkken/kit#8954).
+	lane_bands?: LaneBands | undefined
 	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
 	lane_limit?: number | undefined
 	// The slots occupied according to the same capacity read that supplies the limit.
@@ -312,10 +315,10 @@ function alert_part(header: BoardHeader): string | undefined {
 	return run_board_theme_defs.BASE_LOOK.alert(run_board_header_defcon.level_of(header))
 }
 
-// The children drawn as running, with the root checkout's single run beside them (joshuafolkken/kit#8482):
-// only their operations are the run's newest.
+// The children drawn as running, with the single runs beside them (joshuafolkken/kit#8482,
+// joshuafolkken/kit#8993): only their operations are the run's newest.
 function running_issues(layout: BoardLayout): ReadonlySet<number> {
-	const rows = layout.root === undefined ? layout.active : [...layout.active, layout.root.row]
+	const rows = [...layout.active, ...run_board_layout.single_rows(layout)]
 	const running = rows.filter((row) => row.state === 'running')
 
 	return new Set(running.map((row) => row.number))

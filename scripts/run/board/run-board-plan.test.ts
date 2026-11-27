@@ -72,6 +72,7 @@ function ports(): PlanPorts {
 			issues: POOL.map((number) => row(number)),
 			cutoff: 'none' as const,
 		})),
+		fetch_relations: vi.fn(async () => undefined),
 		classify: vi.fn(async (opted_in: OptedIn, exclude: ReadonlyArray<number>) =>
 			plan_of(opted_in, exclude),
 		),

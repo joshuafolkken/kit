@@ -76,10 +76,10 @@ interface Framings {
 	plain: Framing
 }
 
-// Every frame starts from the top of the alternate screen, erasing what the last one left below it, and
-// ends on the line that says closing the screen leaves the run going — only a screen a person can
-// close says it, and it is the first line to give way to a short pane. Nothing follows the last line,
-// so a frame that fills the pane never scrolls the header off the top.
+// The frame loop writes only the cells that changed from what it drew last (#8826), the first frame
+// from the top of the alternate screen; it ends on the line that says closing the screen leaves the
+// run going — only a screen a person can close says it, and it gives way first to a short pane.
+// Nothing follows the last line, so a frame that fills the pane never scrolls the header off the top.
 // The keys are named under it where a person can type them. What the tick would write over its frame
 // is left to the frame loop's layers, so the terminal gets one write per frame (joshuafolkken/kit#8826).
 function framed(ports: BoardPorts, framing: Framing): BoardPorts {
@@ -120,12 +120,18 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading, joint: Join
 	return () => {
 		if (has_left) return
 		has_left = true
-		keys.stop?.()
-		ports.typing_sound?.stop()
-		// Every player the board started ends with it: a detached one plays on otherwise (joshuafolkken/kit#8917).
-		run_board_live_sound.hush()
-		joint.flush()
-		ports.write(screen.leave)
+		// Every player the board started ends with it: a detached one plays on otherwise (joshuafolkken/kit#8917),
+		// even where a step fails, and the terminal takes what is left at once (joshuafolkken/kit#9027).
+		run_board_live_sound.leave_with(ports.typing_sound, [
+			() => keys.stop?.(),
+			() => {
+				ports.settle?.()
+				joint.flush()
+			},
+			() => {
+				ports.write(screen.leave)
+			},
+		])
 	}
 }
 

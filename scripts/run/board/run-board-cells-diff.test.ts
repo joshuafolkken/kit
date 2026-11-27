@@ -9,9 +9,11 @@ import { run_board_seeded, type Random } from './run-board-seeded-fixture'
 
 const { cells_of, copy } = run_board_cells
 const { paint } = run_board_cells_ansi
-const { diff } = run_board_cells_diff
+const { LINK_OPEN_WITH_ID, diff } = run_board_cells_diff
 const { seeded } = run_board_seeded
 const ESC = '\u{1B}'
+const BEL = '\u{7}'
+const LINK_MARK = new RegExp(String.raw`${ESC}\](8;[^${BEL}${ESC}]*)(?:${BEL}|${ESC}\\)`, 'gu')
 const RED = `${ESC}[31m`
 const GREEN = `${ESC}[32m`
 const NAVY = `${ESC}[48;2;1;2;3m`
@@ -128,6 +130,35 @@ describe('run_board_cells_diff.diff — runs', () => {
 
 	it('writes an unchanged wide character inside a run whole', () => {
 		expect(diff(painted('X日Y'), painted('a日c'))).toBe(`${ESC}[1;1H${RESET}X日Y`)
+	})
+})
+
+// joshuafolkken/kit#9069: the link openers in the bytes that reach the terminal, and its closers.
+function link_marks(bytes: string): Array<string> {
+	return [...bytes.matchAll(LINK_MARK)].map((match) => match[1] ?? '')
+}
+
+describe('run_board_cells_diff.diff — links', () => {
+	const url = 'https://example.com/a'
+	const linked = `${ESC}]${LINK_OPEN_WITH_ID}${url}${BEL}ab${ESC}]8;;${BEL}c`
+
+	it('opens every link with the stable id and closes it bare', () => {
+		const bytes = diff(painted(linked), painted(''))
+
+		expect(link_marks(bytes)).toStrictEqual([`${LINK_OPEN_WITH_ID}${url}`, '8;;'])
+	})
+
+	it('keeps the id on a later frame written as a diff', () => {
+		const front = painted(linked)
+		const bytes = diff(painted(`${ESC}]8;;${url}${ESC}\\aX`), front)
+
+		expect(link_marks(bytes)).toStrictEqual([`${LINK_OPEN_WITH_ID}${url}`, '8;;'])
+	})
+
+	it('writes the id for an id-less link read into the cells', () => {
+		const bytes = diff(painted(`${ESC}]8;;${url}${ESC}\\x`), painted(''))
+
+		expect(link_marks(bytes)[0]).toBe(`${LINK_OPEN_WITH_ID}${url}`)
 	})
 })
 

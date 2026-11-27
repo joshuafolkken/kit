@@ -33,6 +33,17 @@ const ROWS: ReadonlyArray<StopRule> = [
 		},
 	},
 	{
+		id: 'lane-stop-park',
+		about: {
+			title: 'Lane child end without a park',
+			topic: '`.claude/skills/workflow-commands/backlogrun-park.md` → "park and continue"',
+			entry: STOP_GUARD,
+			fires:
+				'a dispatched lane child ending its turn unparked, with no ship running or succeeded. Blocks the stop once',
+			quiet: 'not a lane child, parked, a ship running or succeeded, or a pre-gate cut taken',
+		},
+	},
+	{
 		id: 'filing-offer',
 		about: {
 			title: 'Offer to file',

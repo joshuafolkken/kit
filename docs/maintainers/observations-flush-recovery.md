@@ -5,7 +5,7 @@ For kit maintainers.
 Run `pnpm josh observations:flush` from the primary checkout on the default branch.
 The command refuses unrelated changes or staged changes without modifying them.
 
-It carries, migrates, archives, stages, commits and lands the PR in a dedicated worktree,
+It carries, archives, stages, commits and lands the PR in a dedicated worktree,
 without using the source index. Only index.lock conflicts are retried, up to five attempts
 at 250ms intervals. Another writer's lock is never deleted.
 

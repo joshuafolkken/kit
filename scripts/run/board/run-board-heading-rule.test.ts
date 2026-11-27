@@ -32,14 +32,16 @@ function carried(command: string): LocalRead {
 		occupied_count: 1,
 		lane_limit: LANE_LIMIT,
 		free_lanes: LANE_LIMIT - 1,
-		root: {
-			command,
-			issue: ROOT,
-			events: [
-				event(KIND.CHILD_LAUNCH, `#${String(ROOT)} ${command}`),
-				event(KIND.LANE_PHASE, `#${String(ROOT)} implement`),
-			],
-		},
+		singles: [
+			{
+				command,
+				issue: ROOT,
+				events: [
+					event(KIND.CHILD_LAUNCH, `#${String(ROOT)} ${command}`),
+					event(KIND.LANE_PHASE, `#${String(ROOT)} implement`),
+				],
+			},
+		],
 	}
 }
 
@@ -78,6 +80,6 @@ describe('the emoji-free board headings', () => {
 
 		expect(headings.length).toBeGreaterThan(1)
 		expect(headings.filter((line) => !line.startsWith(RULE_LEAD))).toStrictEqual([])
-		expect(headings.some((line) => line.startsWith(`${RULE_LEAD}${command}`))).toBe(true)
+		expect(headings.some((line) => line.startsWith(`${RULE_LEAD}runs`))).toBe(true)
 	})
 })

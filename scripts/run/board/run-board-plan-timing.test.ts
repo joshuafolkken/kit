@@ -24,6 +24,7 @@ function ports(rows: OpenListing['rows'] = [ROW]): PlanPorts {
 	return {
 		fetch_open: vi.fn(async () => ({ rows, is_capped: false })),
 		fetch_opted_in: vi.fn(async () => ({ kind: 'blockers_unreadable' as const })),
+		fetch_relations: vi.fn(async () => undefined),
 		classify: vi.fn(async () => undefined),
 	}
 }

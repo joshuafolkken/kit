@@ -29,6 +29,8 @@ const NO_RUN = "the call must not run at all, or only on a person's word — ref
 const STOP_NOTIFY = 'the hook sends the notify itself; it blocks only when the send fails'
 const HOLD_RELEASE = 'the hook releases the hold itself; it blocks only when that release fails'
 const FILING_OFFER = 'the filing needs a title and a body only the model can write'
+const LANE_STOP_PARK =
+	'the reason, options and recommendation are known only to the model that stopped'
 const CONCISE_REPLY = 'the shorter reply is prose only the model can write'
 const REPLY_CLOSE =
 	'whether anything is left, and what, is known only to the model that did the work'
@@ -119,6 +121,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	// The `Stop` rows: the hook judges a finished reply, so it has no call to rewrite.
 	'stop-notify': judgment(STOP_NOTIFY),
 	'filing-offer': judgment(FILING_OFFER),
+	'lane-stop-park': judgment(LANE_STOP_PARK),
 	'deferral-owner': judgment(DEFERRAL_OWNER),
 	'hold-release': judgment(HOLD_RELEASE),
 	'concise-reply': judgment(CONCISE_REPLY),

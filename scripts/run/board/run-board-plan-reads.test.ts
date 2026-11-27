@@ -17,6 +17,7 @@ function ports(overrides: Partial<PlanPorts> = {}): PlanPorts {
 	return {
 		fetch_open: vi.fn(async () => LISTING),
 		fetch_opted_in: vi.fn(async () => POOL),
+		fetch_relations: vi.fn(async () => undefined),
 		classify: vi.fn(async () => undefined),
 		...overrides,
 	}

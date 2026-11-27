@@ -35,6 +35,7 @@ const KIND = {
 	SIZE: 'size',
 	LIMIT: 'limit',
 	ESTIMATE: 'estimate',
+	DECLARED: 'declared',
 } as const
 
 const lane_ledger_kind = { KIND }

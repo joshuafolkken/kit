@@ -1,6 +1,7 @@
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
+import { run_ship_lane_close } from './run-ship-lane-close'
 import { run_ship_probe } from './run-ship-probe'
 import type { ShipArguments } from './run-ship-steps'
 
@@ -28,11 +29,23 @@ async function record_result(
 	await run_ship_detach.mark_result(repository, args.number, run_ship.exit_code(sections))
 }
 
+// The result first, then the lane: closing it first would remove the directory `record_result` reads
+// the repository from. Only a supervised ship that succeeded closes its lane.
+async function finish(args: ShipArguments, sections: ReadonlyArray<ShipSection>): Promise<void> {
+	await record_result(args, sections)
+
+	const is_merged = run_ship.exit_code(sections) === SUCCESS_EXIT_CODE
+
+	if (!is_merged || !run_ship_detach.is_supervised()) return
+
+	await run_ship_lane_close.close_merged(args.number)
+}
+
 // The section is printed to the session that typed the ship, never into a detached supervisor's log.
 function print_section(): number {
 	return run_ship_detach.is_supervised() ? SUCCESS_EXIT_CODE : run_step_section.print_once('ship')
 }
 
-const run_ship_supervised = { claim_identity, print_section, record_result }
+const run_ship_supervised = { claim_identity, finish, print_section, record_result }
 
 export { run_ship_supervised }

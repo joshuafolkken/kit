@@ -10,6 +10,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { error_text } from '#scripts/lib/error-message'
 import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
@@ -114,10 +115,14 @@ function session_lang(): string {
 // Which session this is — a headless parent, a lane child, a kit-launched agent, the `backlogrun`
 // parent — the facts that say whether a person is there to answer.
 async function session_role_facts(): Promise<
-	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'lane_child' | 'started_child'>
+	Pick<
+		StopContext,
+		'backlog_parent' | 'headless_agent' | 'lane_child' | 'lane_unrecorded' | 'started_child'
+	>
 > {
 	return {
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
+		lane_unrecorded: lane_park.is_unrecorded_end(),
 		started_child: run_headless.is_started_child(process.env),
 		headless_agent: agent_headless.is_headless(),
 		backlog_parent: await run_headless.is_backlog_parent(),
@@ -183,7 +188,9 @@ async function stop_outcome_for_payload(raw_payload: string): Promise<StopOutcom
 async function outcome_of(raw_payload: string): Promise<StopOutcome> {
 	try {
 		return await stop_outcome_for_payload(raw_payload)
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('stop_guard.outcome_of', error)
+
 		return stop_rules.NO_OUTCOME
 	}
 }
@@ -204,7 +211,9 @@ async function carried_owner_live(): Promise<boolean | undefined> {
 		const read = run_carry.read_carry(run_carry.carry_path(directory))
 
 		return read.kind === 'carried' ? run_carry.is_owner_live(read.carry) : undefined
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('stop_guard.carried_owner_live', error)
+
 		return undefined
 	}
 }

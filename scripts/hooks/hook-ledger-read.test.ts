@@ -1,7 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { error_text } from '#scripts/lib/error-message'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { hook_ledger_read, type LedgerLine } from './hook-ledger-read'
 
 // joshuafolkken/kit#6664: the period's day files are read, lines older than its start are cut, and the
@@ -52,6 +53,20 @@ describe('hook_ledger_read.read_lines', () => {
 		const directory = path.join(make_directory(PREFIX), 'none')
 
 		await expect(hook_ledger_read.read_lines(directory, 1, NOW)).resolves.toStrictEqual([])
+	})
+})
+
+describe('hook_ledger_read.read_lines — an unreadable day', () => {
+	it('reads as no lines and records the failure once', async () => {
+		const directory = ledger({ '2026-11-09': [] })
+		const day_file = path.join(directory, '2026-11-09.jsonl')
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+
+		rmSync(day_file)
+		mkdirSync(day_file)
+
+		await expect(hook_ledger_read.read_lines(directory, 1, NOW)).resolves.toStrictEqual([])
+		expect(trace).toHaveBeenCalledOnce()
 	})
 })
 

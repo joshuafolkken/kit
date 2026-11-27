@@ -1,0 +1,7 @@
+{
+	"reason": "Adds the detached in-progress removal retry (unmark worker mode and its launcher) so a refused release write is finished, #9042",
+	"date": "2026-11-26",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}

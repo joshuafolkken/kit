@@ -5,6 +5,7 @@ import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
 import { hook_decision, type GuardOutcome, type TranscriptGuard } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_phase } from '#scripts/lane/lane-phase'
+import { error_text } from '#scripts/lib/error-message'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
 import { rule_rewrite, type RuleRewrite } from '#scripts/rules/rule-rewrite'
@@ -92,7 +93,9 @@ function guarded_call(raw_payload: string): GuardedCall | undefined {
 		return payload === undefined
 			? undefined
 			: { name: payload.tool_name, input: payload.tool_input }
-	} catch {
+	} catch (error) {
+		error_text.trace_swallowed('pretool_guard.guarded_call', error)
+
 		return undefined
 	}
 }
@@ -198,8 +201,7 @@ async function async_reason(
 ): Promise<string | undefined> {
 	const watcher = await run_watcher_hook.watcher_hook_reason(raw_payload, context)
 	const state = run_parent_cut_hook.current_state(context)
-	const cut =
-		watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload, Date.now(), state))
+	const cut = watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload, state))
 	const poll = cut ?? (await run_poll_hook.safe_poll_reason(raw_payload, context))
 
 	return poll ?? (await issue_watch_hook.watch_reason(context))

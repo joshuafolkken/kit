@@ -84,9 +84,9 @@ function broken_ledger_lines(content: string): ReadonlyArray<BrokenLine> {
 }
 
 // The lines of `candidates` the ledger does not already hold, in their order. The ledger is
-// append-only and the digest counts repeats, so every path that moves lines into it — the stash carry
-// (`run-tidy.ts`) and the old-path migration (`observation-ledger-migrate.ts`) — asks this rather than
-// appending blind: the same line arriving twice would read as a recurrence.
+// append-only and the digest counts repeats, so a path that moves lines into it — the stash carry
+// (`run-tidy.ts`) — asks this rather than appending blind: the same line arriving twice would read as
+// a recurrence.
 function missing_lines(candidates: ReadonlyArray<string>, ledger: string): Array<string> {
 	const present = new Set(ledger.split('\n'))
 

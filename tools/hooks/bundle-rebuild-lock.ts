@@ -33,6 +33,7 @@ function claim(lock: string): boolean {
 
 		return true
 	} catch {
+		// `wx` fails when the lock exists: another launch holds it, which is the answer, not a fault.
 		return false
 	}
 }

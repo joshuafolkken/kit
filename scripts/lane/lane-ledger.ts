@@ -50,6 +50,7 @@ const lane_ledger = {
 	window_store,
 }
 
+export type { DeclaredEntry } from './lane-ledger-schema-estimate'
 export type { RecentWindow, TailStore, WindowStore } from './lane-ledger-tail'
 export type {
 	CoreWaitEntry,

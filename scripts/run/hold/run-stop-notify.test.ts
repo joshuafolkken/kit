@@ -24,6 +24,7 @@ const FULLRUN = 'fullrun #4135'
 const NEXT_LINE = 'Next: prrun #4135 | fullrun #4135'
 const RECOMMENDATION_TITLE = 'keeps the recommendation and the alternative the skill text named'
 const FACTS = { issue: ISSUE, title: TITLE, issue_url: ISSUE_URL }
+const LANE = '/lanes/4135'
 const scratch = make_directory('run-stop-notify-test-')
 const TARGET = run_hold.hold_path(scratch)
 
@@ -52,13 +53,14 @@ afterEach(() => {
 })
 
 describe('halfrun_values', () => {
-	it('puts the Next line first, then the commands that ship without an agent', () => {
-		const values = run_stop_notify.halfrun_values(FACTS)
+	it('puts the Next line first, then the work tree and the commands that ship without an agent', () => {
+		const values = run_stop_notify.halfrun_values(FACTS, LANE)
 
 		expect(values.body).toBe(
 			[
 				'halfrun ready for manual verification',
 				NEXT_LINE,
+				`Working tree: ${LANE}`,
 				`Without an agent: pnpm josh git -y ${QUOTED_TITLE} && pnpm josh followup ${QUOTED_TITLE}`,
 			].join('\n'),
 		)
@@ -66,7 +68,7 @@ describe('halfrun_values', () => {
 	})
 
 	it(RECOMMENDATION_TITLE, () => {
-		const values = run_stop_notify.halfrun_values(FACTS)
+		const values = run_stop_notify.halfrun_values(FACTS, LANE)
 
 		expect(values['task-type']).toBe('confirmation')
 		expect(values.recommended).toBe(HALFRUN_RECOMMENDED)
@@ -74,20 +76,27 @@ describe('halfrun_values', () => {
 	})
 
 	it('keeps a title carrying a quote one shell argument', () => {
-		const values = run_stop_notify.halfrun_values({
-			issue: ISSUE,
-			title: "Don't $(break)",
-			issue_url: undefined,
-		})
+		const values = run_stop_notify.halfrun_values(
+			{ issue: ISSUE, title: "Don't $(break)", issue_url: undefined },
+			LANE,
+		)
 
 		expect(values.body).toContain(String.raw`pnpm josh followup 'Don'\''t $(break) #4135'`)
 		expect(values).not.toHaveProperty('issue-url')
 	})
 })
 
-describe('human_review_values', () => {
-	const LANE = '/lanes/4135'
+describe('send_halfrun — the work tree (joshuafolkken/kit#8994)', () => {
+	it('names the repository root the halfrun stopped in as its work tree', async () => {
+		vi.spyOn(git_command, 'repository_root').mockResolvedValue(LANE)
 
+		await run_stop_notify.send_halfrun(TARGET, ISSUE)
+
+		expect(JSON.stringify(sent_values())).toContain(`Working tree: ${LANE}`)
+	})
+})
+
+describe('human_review_values', () => {
 	it('leads with halfrun’s Next line and names the lane holding the uncommitted work', () => {
 		const values = run_stop_notify.human_review_values(FACTS, LANE)
 

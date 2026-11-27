@@ -90,6 +90,11 @@ refused; park with the findings, options and recommendation (`backlogrun-park.md
 --evidence-file .josh/tmp/evidence.md` (per criterion, the result and its run), never a bare comment: an OPEN child is
 parked `run:stalled`. Invoking `fullrun` / `backlogrun` authorizes this close. `docs/josh-commands-backlog.md` → "`josh issue:measured`".
 
+It closes whichever way the result lands → criteria record the result, never branch on it
+(`scripts/issue/measure-declaration.ts`). A follow-up the result calls for → a `後続: <題>` evidence
+line the parent files. A scratch script under `.josh/tmp/` is no deliverable
+(`scripts/run/cut/run-cut-conclude.ts`).
+
 ## A long thread
 
 **The fetch is one call; what costs is carrying it** — hence the projection to author, timestamp and
