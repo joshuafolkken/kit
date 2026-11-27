@@ -33,8 +33,12 @@ describe('run_cut_conclude.missing_of', () => {
 		)
 	})
 
-	it('names a non-zero file estimate (ac-5424e7c4)', () => {
-		expect(run_cut_conclude.missing_of(body_of(1, CHECKED), NONE)).toContain('0-file size estimate')
+	it('closes a body whose estimate counted a one-off scratch script when nothing changed (ac-8a75444b)', () => {
+		expect(run_cut_conclude.missing_of(body_of(1, CHECKED), NONE)).toBeUndefined()
+	})
+
+	it('names the changed file even when the body declares a 0-file estimate (ac-8a75444b)', () => {
+		expect(run_cut_conclude.missing_of(body_of(0, CHECKED), ['a.ts'])).toBe('the lane changed a.ts')
 	})
 
 	it('names the files the lane changed (ac-5424e7c4)', () => {

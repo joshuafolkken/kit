@@ -1,0 +1,9 @@
+{
+	"reason": "#8955: issue:lint refuses a measurement Issue's branching criteria (new check + its pointer lines in issue-comments.md / issue-template.md)",
+	"date": "2026-11-27",
+	"growth": {
+		"scripts.code_lines": 11,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 462
+	}
+}
