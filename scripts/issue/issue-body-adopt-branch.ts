@@ -1,6 +1,6 @@
 // joshuafolkken/kit#9148: the Issue body's adopt-branch row (`- <key>: wip/<name> @ <sha>`) — the consultation
 // session's wip branch the lane takes in at its entry and the merge requires. `run:handoff --wip` writes
-// it through `issue:file`, `issue:lint` refuses a malformed one, and the lane entry and the pre-merge check
+// it through `issue:file`, `issue:wip` rewrites it after filing (joshuafolkken/kit#9153), `issue:lint` refuses a malformed one, and the lane entry and the pre-merge check
 // read it here; the key is `issue-body-keys.ts`'s `adopt_branch`.
 
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'

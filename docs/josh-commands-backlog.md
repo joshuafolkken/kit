@@ -344,7 +344,7 @@ pnpm josh issue:wip 9153 --wip review-fix
 
 <!-- /usage -->
 
-The one path that moves the `- 取り込むブランチ:` row after `run:handoff --wip` filed it; a running lane takes the new sha in at its next entry.
+The one path that moves the `- 取り込むブランチ:` row after `run:handoff --wip` filed it; a running lane takes the new sha in at its next entry. A rewritten wip history (the present row's commit not an ancestor of the new one) is written with a warning: a lane that already took the old commit in keeps its changes.
 
 ### `josh issue:plan`
 

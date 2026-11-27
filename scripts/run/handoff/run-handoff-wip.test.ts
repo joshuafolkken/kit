@@ -126,6 +126,23 @@ describe('run_handoff_wip.write_row', () => {
 	})
 })
 
+describe('run_handoff_wip.rewrite_row', () => {
+	beforeEach(() => {
+		vi.mocked(git_gh_issue_write.issue_edit_body).mockReset()
+	})
+
+	it('replaces the row the body names with the new one', async () => {
+		mock_body(`${BODY}\n- 取り込むブランチ: wip/y @ fff9999`)
+
+		await expect(run_handoff_wip.rewrite_row('42', ROW)).resolves.toBeUndefined()
+
+		const written = vi.mocked(git_gh_issue_write.issue_edit_body).mock.calls[0]?.[1]
+
+		expect(written).toContain(ROW_LINE)
+		expect(written).not.toContain('wip/y')
+	})
+})
+
 describe('run_handoff_wip.with_environment', () => {
 	it('adds the environment to the launch request', () => {
 		const request = { argv: { command: 'claude', args: [] }, cwd: '/repo', env: { A: '1' } }
