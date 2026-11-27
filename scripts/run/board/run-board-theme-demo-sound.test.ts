@@ -3,7 +3,7 @@ import { run_board_theme_demo_sound } from './run-board-theme-demo-sound'
 import { run_board_theme_host_state } from './run-board-theme-host-state'
 import { run_board_theme_layer } from './run-board-theme-layer'
 import { run_board_theme_layer_fixture } from './run-board-theme-layer-fixture'
-import type { ThemeRun } from './run-board-theme-run'
+import { run_board_theme_run, type ThemeRun } from './run-board-theme-run'
 
 // joshuafolkken/kit#8917: demo mode's sound follows the demo's timeline — the trill on while its text
 // types — and the board's real events, which the screen does not show, sound nothing; the board's cue
@@ -60,14 +60,43 @@ describe('run_board_theme_demo_sound.demo_typing', () => {
 	})
 })
 
+// A run built over the fixture's base, out of demo mode, the board's row `key` typing from tick 0.
+function live_run(key: string): ThemeRun {
+	const run = demo_run()
+	const line = { key, index: 14, row: 15, text: ROW_TEXT, prefix_columns: 0, start_ms: 0 }
+
+	run.demo = undefined
+	run_board_theme_run.observe(run, [line], 0)
+
+	return run
+}
+
 describe('run_board_theme_demo_sound.heard', () => {
-	it('hears the board’s own typing out of demo mode, the demo’s in it', () => {
-		const out = demo_run()
-
-		out.demo = undefined
-
-		expect(heard(out, 0, BOARD)).toBe(BOARD)
+	it('hears the demo’s typing in demo mode, not the board’s', () => {
 		expect(heard(demo_run(), ROW_TEXT.length * 2 * TICK_MS, BOARD)).toStrictEqual(SILENT)
+	})
+
+	it('hears a lane row’s ROW out of demo mode while the theme types it', () => {
+		const run = live_run('lanes:8899')
+
+		expect(heard(run, TYPED_TICKS * TICK_MS, BOARD)).toStrictEqual({
+			is_on: true,
+			left_ms: (ROW_TEXT.length - TYPED_TICKS - 1) * TICK_MS,
+		})
+		expect(heard(run, ROW_TEXT.length * 2 * TICK_MS, BOARD)).toStrictEqual(SILENT)
+	})
+
+	// A done, queued, waiting or decision row starts no event: the theme draws it whole.
+	it('hears nothing of a board row the theme types no letter of', () => {
+		expect(heard(live_run('done:8899'), TYPED_TICKS * TICK_MS, BOARD)).toStrictEqual(SILENT)
+	})
+
+	it('hears the board’s own typing through a part out of demo mode', () => {
+		const run = live_run('done:8899')
+
+		run.part = { name: 'ending', start_ms: 0 }
+
+		expect(heard(run, TYPED_TICKS * TICK_MS, BOARD)).toBe(BOARD)
 	})
 })
 
