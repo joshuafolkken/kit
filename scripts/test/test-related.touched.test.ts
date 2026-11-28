@@ -4,12 +4,13 @@ import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 import { test_related } from './test-related'
 import { test_related_claim } from './test-related-claim'
 import { test_related_record } from './test-related-record'
+import { test_related_run } from './test-related-run'
 import { test_related_verdict } from './test-related-verdict'
 import { test_unit_guard } from './test-unit-guard'
 
@@ -52,6 +53,8 @@ const SHARED_FIXTURE = 'scripts/run/cut/run-cut-cli-fixture.ts'
 const FIXTURE_CONSUMER = path.join(REPOSITORY_ROOT, 'scripts/run/cut/run-cut-cli.test.ts')
 
 const BASE = 'base-commit'
+// No base, so the verdict's own record skips its unmoved check.
+const GATE_TREE = { files: {}, base: undefined }
 const BOARD = 'scripts/run/board'
 const GLYPHS_TEST = `${BOARD}/run-board-theme-glyphs.test.ts`
 const BOARD_MAP: ReadMap = {
@@ -160,6 +163,37 @@ describe('test_related.run_related_tests — a --touched run', () => {
 
 		expect(changed_paths.read_changed_paths).not.toHaveBeenCalled()
 		expect(test_unit_guard.run_guarded_vitest).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#9163: a touched run's gate tree lets the full-reach run reuse its passes.
+describe('test_related.run_related_tests — a --touched run keeping its gate tree', () => {
+	const NARROWED = ['-t', 'x']
+
+	// The keep itself is stubbed: its real record reads this checkout's tree.
+	beforeEach(() => {
+		vi.mocked(scoped_green.read_before).mockResolvedValueOnce(GATE_TREE)
+		vi.spyOn(test_related_run, 'run_and_keep').mockResolvedValue(0)
+	})
+
+	afterEach(() => {
+		vi.mocked(test_related_run.run_and_keep).mockRestore()
+	})
+
+	it('keeps the gate tree for an unflagged run', async () => {
+		await test_related.run_related_tests([TOUCHED])
+
+		expect(test_related_run.run_and_keep).toHaveBeenCalledWith(expect.anything(), [], GATE_TREE)
+	})
+
+	it('keeps no gate tree when a vitest flag narrows the run', async () => {
+		await test_related.run_related_tests([TOUCHED, ...NARROWED])
+
+		expect(test_related_run.run_and_keep).toHaveBeenCalledWith(
+			expect.anything(),
+			NARROWED,
+			undefined,
+		)
 	})
 })
 

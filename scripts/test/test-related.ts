@@ -371,8 +371,14 @@ async function run_touched(
 	const changed = explicit.length > 0 ? explicit : await branch_change()
 	const scope = await test_related_touched.read_scope(root, changed)
 	const input = { scope, root, changed, synced: [], since_map: [], kind: TOUCHED_KIND }
+	// A vitest flag such as `-t` runs part of a file, so its pass digests no whole file.
+	const is_unflagged = changed_file_scope.flags_of(command_arguments).length === 0
 
-	return await test_related_run.run_and_keep(input, command_arguments, before)
+	return await test_related_run.run_and_keep(
+		input,
+		command_arguments,
+		is_unflagged ? before : undefined,
+	)
 }
 
 // A green run records the tree it was green on, a red one the files it failed on

@@ -2,7 +2,7 @@
 	"reason": "touched green per-file digest reuse for full-reach test:related (+56 code lines) and the once-per-edit-batch test:related instruction in chain-rule.md (+99 bytes), both planned in #9163",
 	"date": "2026-11-28",
 	"growth": {
-		"scripts.code_lines": 56,
+		"scripts.code_lines": 61,
 		"ai_cost.on_demand_bytes": 99
 	}
 }
