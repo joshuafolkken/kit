@@ -1,4 +1,3 @@
-import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
 import { split_assess } from '#scripts/split/split-assess'
 import { issue_body_keys, type IssueBodyValue } from './issue-body-keys'
 
@@ -8,7 +7,9 @@ import { issue_body_keys, type IssueBodyValue } from './issue-body-keys'
 // The "kind, separator, reason" judgment is shared with an epic's declared order (`epic-chain-kind.ts`),
 // which passes its own kinds.
 
-const { TARGET_MINUTES } = lane_stage_budget
+// The filing-time projection target: a merged lane is judged by pace (`lane-pace.ts`), but an Issue
+// projected past this many minutes still splits by default before it starts (joshuafolkken/kit#9164).
+const TARGET_MINUTES = 30
 const { REASON_PREFIX, QUESTION_SECTION } = split_assess
 const KIND_NAMES = ['cannot_split', 'better_unsplit', 'slower_overall'] as const
 const KINDS = KIND_NAMES.flatMap((name) => issue_body_keys.value_variants(name))

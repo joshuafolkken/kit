@@ -58,6 +58,16 @@ const RELATED: LedgerEntry = {
 	elapsed_ms: 1000,
 }
 
+// joshuafolkken/kit#9164: `--over` judges pace, so each lane records a size — the same small size
+// leaves #5953 slow for it and the short #5960 within its fixed cost.
+const RATE = 13.7
+
+function size_of(issue: number, clock: string, lines: number): LedgerEntry {
+	const counts = { files: 2, lines }
+
+	return { kind: 'size', at: at(clock), issue, declared: counts, actual: counts }
+}
+
 const ENTRIES: ReadonlyArray<LedgerEntry> = [
 	{ kind: 'dispatch', at: at('17:00'), issue: YIELDER },
 	...['17:10', '17:20', '17:30', '17:40'].map((clock) => split_notice(clock)),
@@ -66,8 +76,10 @@ const ENTRIES: ReadonlyArray<LedgerEntry> = [
 	{ kind: 'dispatch', at: at('18:33'), issue: YIELDER },
 	{ kind: 'round-one', at: at('19:00'), issue: YIELDER, verdict: 'blocking' },
 	RELATED,
+	size_of(YIELDER, '19:29', 50),
 	{ kind: 'merge', at: at('19:30'), issue: YIELDER },
 	{ kind: 'dispatch', at: at('20:00'), issue: SHORT },
+	size_of(SHORT, '20:09', 50),
 	{ kind: 'merge', at: at('20:10'), issue: SHORT },
 ]
 
@@ -178,8 +190,8 @@ describe('lane_over.over_budget_of', () => {
 })
 
 describe('lane_over.table', () => {
-	it('prints one row for #5953 alone, past the 40-minute threshold', () => {
-		const rows = lane_over.table(RECORDS, WINDOW, 40, []).split('\n')
+	it('prints one row for #5953 alone, slow for its size against the rate', () => {
+		const rows = lane_over.table(RECORDS, WINDOW, RATE, []).split('\n')
 
 		expect(rows).toHaveLength(5)
 		expect(rows[0]).toBe(
@@ -193,13 +205,13 @@ describe('lane_over.table', () => {
 
 	// joshuafolkken/kit#7785: the lanes are counted by their side of the pre-start estimate.
 	it('counts the lanes by estimate side under the rows', () => {
-		const rows = lane_over.table(RECORDS, WINDOW, 40, []).split('\n')
+		const rows = lane_over.table(RECORDS, WINDOW, RATE, []).split('\n')
 
 		expect(rows.at(-1)).toBe('estimate: over estimate 0 · to size 0 · no estimate 1')
 	})
 
 	it('reads the open issues unread when the listing failed', () => {
-		const rows = lane_over.table(RECORDS, WINDOW, 40, undefined).split('\n')
+		const rows = lane_over.table(RECORDS, WINDOW, RATE, undefined).split('\n')
 
 		expect(rows.at(2)).toMatch(/\| unread \|$/u)
 	})
@@ -221,7 +233,9 @@ function seeded_context(): { ledger_path: string; events_path: string; now_ms: n
 
 describe('lane_measure_cli.run — stats --over', () => {
 	it('names --over in the usage', () => {
-		expect(lane_measure_cli.USAGE).toContain('josh lane:stats --period <days> --over <minutes>')
+		expect(lane_measure_cli.USAGE).toContain(
+			'josh lane:stats --period <days> --over <min-per-100-lines>',
+		)
 	})
 
 	it('prints the over-time lane rows', async () => {
@@ -229,7 +243,7 @@ describe('lane_measure_cli.run — stats --over', () => {
 		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
 
 		await expect(
-			lane_measure_cli.run(['stats', '--period', '1', '--over', '40'], seeded_context()),
+			lane_measure_cli.run(['stats', '--period', '1', '--over', '13.7'], seeded_context()),
 		).resolves.toBe(0)
 		expect(String(info.mock.calls[0]?.[0])).toContain(SPLIT_FILED)
 	})

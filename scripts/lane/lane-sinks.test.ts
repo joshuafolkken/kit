@@ -24,6 +24,7 @@ const LONGER = 102
 const SHORT = 103
 const HUB_LANE = 104
 const THRESHOLD = 30
+const PACE_RATE = 13.7
 const FOLLOWUP_CI = 'followup CI'
 const SHIP_STAGE = 'ship-stage'
 
@@ -106,6 +107,40 @@ describe('lane_sinks.over_issues', () => {
 		const records = { entries: lane_entries(lane), events: [] }
 
 		expect(lane_sinks.over_issues(records, WINDOW, 30.5)).toStrictEqual([])
+	})
+})
+
+function sized(issue: number, lines: number, is_adopted = false): LedgerEntry {
+	const counts = { files: 2, lines }
+
+	return {
+		kind: 'size',
+		at: at(0),
+		issue,
+		declared: counts,
+		actual: counts,
+		...(is_adopted && { adopted: true }),
+	}
+}
+
+// joshuafolkken/kit#9164: the lanes slow for their size, not over a fixed number of minutes.
+describe('lane_sinks.slow_issues', () => {
+	it('lists a small slow lane and leaves a large efficient one out', () => {
+		const entries = [...RECORDS.entries, sized(LONG, 900), sized(LONGER, 90), sized(SHORT, 20)]
+
+		expect(lane_sinks.slow_issues({ ...RECORDS, entries }, WINDOW, PACE_RATE)).toStrictEqual([
+			LONGER,
+			SHORT,
+		])
+	})
+
+	it('never lists an unsized or adopted lane', () => {
+		const entries = [...RECORDS.entries, sized(LONGER, 20, true)]
+
+		const records = { ...RECORDS, entries }
+
+		expect(lane_sinks.slow_issues(records, WINDOW, PACE_RATE)).toStrictEqual([])
+		expect(lane_sinks.excess_minutes(records, LONGER, PACE_RATE)).toBeUndefined()
 	})
 })
 
@@ -215,11 +250,12 @@ describe('lane_sinks.table — the scoped pair row', () => {
 				...lane_entries(lane),
 				scoped_pair_lap(HUB_LANE, 351, 60),
 				test_related(HUB_LANE, 301, ALIASES_HUB),
+				sized(HUB_LANE, 20),
 			],
 			events: [...lane_events(lane), ...gate_events(HUB_LANE, 340, 351.5)],
 		}
 
-		expect(lane_over.table(lane_records, WINDOW, THRESHOLD, HUB_ISSUES)).toContain(
+		expect(lane_over.table(lane_records, WINDOW, PACE_RATE, HUB_ISSUES)).toContain(
 			'| scoped pair | #21 |',
 		)
 	})

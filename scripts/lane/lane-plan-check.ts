@@ -46,10 +46,9 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // (joshuafolkken/kit#5533, `lane-plan-size.ts`), ahead of the overlap check; so does one whose probed
 // hunks or projected lines outgrow it, the axis named in the refusal and noted on the ledger
 // (joshuafolkken/kit#5568). A plan declared one deliverable (`--single`) is recorded past the files axis,
-// its overrun noted on the ledger (joshuafolkken/kit#6647). **A dispatched lane answers `split` only
-// before its first edit, and only past the cap** (joshuafolkken/kit#7729, `lane-tree-edit.ts`): the
-// investigation's edit list can still be split with nothing to throw away. After the first edit it never
-// does (joshuafolkken/kit#7183): its overrun is warned once and the lane goes on to the end.
+// its overrun noted on the ledger (joshuafolkken/kit#6647). **A dispatched lane never answers `split`
+// for size** (joshuafolkken/kit#9164): past the cap it records the plan with a size warning, and the
+// merge judges it by pace; after the first edit its overrun is warned once (joshuafolkken/kit#7183).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -149,17 +148,17 @@ async function is_started(plan: LanePlan): Promise<boolean> {
 	return is_dispatched(plan) && (await lane_tree_edit.is_edited())
 }
 
-// Before its first edit a dispatched lane splits past the cap alone, unless `--single` gives a reason;
-// any other plan splits past its declaration unless waived.
+// A dispatched lane never splits on size alone: past its bar it gets a size warning, and its merge
+// judges it by pace (decision (a), epic joshuafolkken/kit#9127; joshuafolkken/kit#9164). Any other plan
+// splits past its declaration unless waived.
 function is_split(
 	plan: LanePlan,
 	over: Oversize | undefined,
 	is_lane_started: boolean,
 ): over is Oversize {
-	if (over === undefined || is_lane_started) return false
-	if (!is_dispatched(plan)) return !lane_plan_size.is_waived(plan, over)
+	if (over === undefined || is_lane_started || is_dispatched(plan)) return false
 
-	return plan.single !== true && lane_plan_size.is_past_cap(plan, over)
+	return !lane_plan_size.is_waived(plan, over)
 }
 
 async function judged(

@@ -21,7 +21,7 @@ Floor (also the unmeasured fallback):
 Past **the cap (1.5 × guide)** or the bar (2 × budget): split or say why.
 Merged lanes' median actual / declared ratios per axis, apart from speed; unmeasured: 2.
 First `lane:plan` answers `split` past declared files × files ratio (files, hunks), bar (lines);
-a lane child past the cap; `--single`, a re-plan or an edited lane → `size warning`.
+a lane child, `--single`, a re-plan or an edited lane → `size warning`; merge judges pace.
 
 Past the lane target (judged last) that default flips to split; one Issue needs reason kind `分けられない` / `分けない方が良い` / `全体が遅くなる` — `scripts/issue/size-estimate-target.ts`.
 

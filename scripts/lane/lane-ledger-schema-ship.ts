@@ -166,7 +166,9 @@ const ship_lap_schema = z.object({
 // measured diff, test files included (joshuafolkken/kit#8589), so `lane:stats` reads how far estimates miss the guide's
 // counting (joshuafolkken/kit#5384). Written before the merge, while the branch is still checked out.
 // `missed` marks a diff past the split cap (the notice bar before joshuafolkken/kit#7579): a size the pre-dispatch assessment let through, as
-// the started lane is never split (joshuafolkken/kit#7183).
+// the started lane is never split (joshuafolkken/kit#7183). `adopted` marks a theme lane whose body
+// carries an adopt-branch row: its size says nothing of its time, so `lane-pace.ts` leaves it unjudged
+// (joshuafolkken/kit#9164); absent on any other lane and on a line recorded before it had one.
 const counts_schema = z.object({ files: z.number(), lines: z.number() })
 const size_schema = z.object({
 	kind: z.literal(KIND.SIZE),
@@ -175,6 +177,7 @@ const size_schema = z.object({
 	declared: counts_schema,
 	actual: counts_schema,
 	missed: z.boolean().optional(),
+	adopted: z.boolean().optional(),
 })
 
 type ChainEntry = z.infer<typeof chain_schema>

@@ -547,10 +547,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print period lane throughput, stage, stop (by failed CI check, longest first), check, runnable-to-dispatch wait and machine-load statistics; the per-lane core-budget wait and pre-split miss tables show their first 10 rows and a count of the rest unless --all; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs',
+			'Print period lane throughput, stage, stop (by failed CI check, longest first), check, runnable-to-dispatch wait and machine-load statistics; the per-lane core-budget wait and pre-split miss tables show their first 10 rows and a count of the rest unless --all; --sinks shows stage totals, --over slow lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs',
 		category: 'AI tools',
 		reference: [
-			'(--period <days> | --since <instant>) [[--limit <lane-limit>] [--all] | --sinks [<minutes>] | --over <minutes> | --why <minutes> | --pairs]',
+			'(--period <days> | --since <instant>) [[--limit <lane-limit>] [--all] | --sinks [<minutes>] | --over <min-per-100-lines> | --why <minutes> | --pairs]',
 			'maintainer',
 			['none'],
 		],
@@ -560,7 +560,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" },
 				{ arguments: '--period 7 --all', note: 'the same with every per-lane table row' },
 				{ arguments: '--period 1 --sinks', note: 'stage totals of the lanes over 30 net min' },
-				{ arguments: '--period 1 --over 40', note: 'ledger chains of lanes over 40 net min' },
+				{
+					arguments: '--period 1 --over 13.7',
+					note: 'ledger chains of lanes slower than 13.7 min per 100 lines',
+				},
 				{ arguments: '--period 1 --why 40', note: 'cause groups of lanes over 40 net min' },
 				{ arguments: '--period 7 --pairs', note: "a 7-day period's scoped pair runs" },
 				{ arguments: '--since 2026-11-10T01:00Z --why 40', note: 'cause groups since an instant' },

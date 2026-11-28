@@ -38,7 +38,7 @@ interface StatsRequest {
 	limit: string | undefined
 	// The `--sinks` threshold in minutes, `undefined` for the period's row and tables.
 	sinks: number | undefined
-	// The `--over` threshold in minutes, `undefined` without the flag.
+	// The `--over` rate in min / 100 lines past the fixed cost, `undefined` without the flag.
 	over: number | undefined
 	why: number | undefined
 	// `--pairs`: the scoped pair table (`lane-pairs.ts`).
