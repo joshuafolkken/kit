@@ -1,0 +1,7 @@
+{
+	"reason": "is_shard_free_row splits the shard-only predicate from is_kept_row so free seat rows get shards (+4 code lines)",
+	"date": "2026-11-28",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}

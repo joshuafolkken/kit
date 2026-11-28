@@ -12,8 +12,17 @@ import { run_board_theme_rk800_notice } from './run-board-theme-rk800-notice'
 
 const { HOST } = run_board_theme_host_fixture
 const { state_of } = run_board_theme_host_state
-const { center_of, cracks, is_kept_row, is_seat, ray_glyph, shard_at, shards, spark } =
-	run_board_theme_rk800_break
+const {
+	center_of,
+	cracks,
+	is_kept_row,
+	is_seat,
+	is_shard_free_row,
+	ray_glyph,
+	shard_at,
+	shards,
+	spark,
+} = run_board_theme_rk800_break
 const { WALL } = run_board_theme_rk800_data
 const { CRACKS, SHARDS } = run_board_theme_rk800_notice
 const QUARTER = Math.PI / 4
@@ -81,6 +90,19 @@ describe('run_board_theme_rk800_break.is_kept_row', () => {
 	})
 })
 
+describe('run_board_theme_rk800_break.is_shard_free_row', () => {
+	it('keeps shards off the notice and the progress line, not a free seat or a lane', () => {
+		const { notice, progress } = HOST.layout
+
+		expect([notice.y, progress.y, 15, 14].map((y) => is_shard_free_row(SEATED, y))).toStrictEqual([
+			true,
+			true,
+			false,
+			false,
+		])
+	})
+})
+
 describe('run_board_theme_rk800_break.shard_at', () => {
 	it('drifts a shard straight down, never up', () => {
 		const sources = Array.from({ length: SAMPLE_COLUMNS }, (_, x) => ({ x, y: 5 }))
@@ -137,5 +159,12 @@ describe('run_board_theme_rk800_break.shards', () => {
 
 		expect(rows.length).toBeGreaterThan(0)
 		expect(rows.filter((y) => y === notice.y || y === progress.y)).toStrictEqual([])
+	})
+
+	it('lands shards on a free seat row', () => {
+		const grid = board_copy()
+
+		shards({ ...draw_of(grid), api: { ...HOST.api, layout: SEATED } }, SHARDS.spark)
+		expect(changed_rows(grid).filter((y) => is_seat(SEATED, y)).length).toBeGreaterThan(0)
 	})
 })

@@ -8,7 +8,7 @@ import { run_board_theme_rk800_parts } from './run-board-theme-rk800-parts'
 
 // The rk800 theme's wall breaking: cracks radiate from its middle over the last hits of the build;
 // at the peak the whole screen sparks, and the wall leaves as orange shards thinning out over the
-// board. A shard never lands on the notice's or the progress line's row, nor on a free seat row.
+// board, free seat rows included. A shard never lands on the notice's or the progress line's row.
 
 const { pick, restyle, set_cell } = run_board_theme_host_grid
 const { hash } = run_board_theme_host_hash
@@ -71,9 +71,14 @@ function is_seat(layout: ThemeLayout, y: number): boolean {
 	return y < (layout.gap_rows.find((gap) => gap > rule) ?? layout.h)
 }
 
-// A row no shard lands on: the notice's, the progress line's, a free seat's.
+// A row no shard lands on: the notice's, the progress line's.
+function is_shard_free_row(layout: ThemeLayout, y: number): boolean {
+	return y === layout.notice.y || y === layout.progress.y
+}
+
+// A row the aim and the scrub keep clear: a shard-free row, or a free seat's.
 function is_kept_row(layout: ThemeLayout, y: number): boolean {
-	return y === layout.notice.y || y === layout.progress.y || is_seat(layout, y)
+	return is_shard_free_row(layout, y) || is_seat(layout, y)
 }
 
 // Where the shard that broke off `source` has drifted `since` ticks after the peak, each at a pace
@@ -93,7 +98,7 @@ function shard(draw: ThemeDraw, source: Point, since: number): void {
 	const { layout } = draw.api
 	const at = shard_at(source, since)
 
-	if (at === undefined || at.y >= layout.h || is_kept_row(layout, at.y)) return
+	if (at === undefined || at.y >= layout.h || is_shard_free_row(layout, at.y)) return
 	const style = bold(mix(RGB.order, RGB.red, hash(source.x, source.y, SHARDS.ink_salt)))
 	const glyph = pick(SHARDS.glyphs, hash(source.x, source.y, SHARDS.glyph_salt))
 
@@ -123,6 +128,7 @@ const run_board_theme_rk800_break = {
 	cracks,
 	is_kept_row,
 	is_seat,
+	is_shard_free_row,
 	ray_glyph,
 	shard_at,
 	shards,
