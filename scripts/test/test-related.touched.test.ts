@@ -87,6 +87,11 @@ beforeEach(() => {
 	vi.mocked(changed_paths.read_held_at).mockResolvedValue([])
 })
 
+// A red touched run drops its record; the real one would remove this checkout's stamp.
+beforeEach(() => {
+	vi.spyOn(review_stamps.test_related_touched_stamp, 'remove').mockImplementation(() => undefined)
+})
+
 // joshuafolkken/kit#5237: the implementation loop's narrow re-check.
 describe('test_related.run_related_tests — a shared fixture touched run', () => {
 	it('fails early when a changed shared fixture breaks its consumer (ac-5467a9e8)', async () => {

@@ -15,6 +15,7 @@ vi.mock('./test-related-reuse', () => ({
 		blobs: vi.fn(),
 		retained: vi.fn(async () => []),
 		carried: vi.fn(async () => []),
+		touched: vi.fn(async () => []),
 	},
 }))
 vi.mock('./test-related-red', () => ({
