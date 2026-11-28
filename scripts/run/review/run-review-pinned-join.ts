@@ -173,8 +173,15 @@ function is_standing(root: string): boolean {
 	return run_review_pinned_steps.is_answered(root) || run_review_pinned_steps.is_live(root)
 }
 
-function is_kept(root: string, tree: string | undefined, reason: string | undefined): boolean {
+// A full launch on `tree`: a pre-detach's rest-of-range probe on it answers only the hunks after its stop.
+function is_full_launch_on(root: string, tree: string | undefined): boolean {
 	if (tree === undefined || run_review_pinned_steps.launched_tree(root) !== tree) return false
+
+	return !run_review_pinned_steps.is_remaining(root)
+}
+
+function is_kept(root: string, tree: string | undefined, reason: string | undefined): boolean {
+	if (!is_full_launch_on(root, tree)) return false
 
 	return run_review_pinned_steps.launched_reason(root) === reason && is_standing(root)
 }

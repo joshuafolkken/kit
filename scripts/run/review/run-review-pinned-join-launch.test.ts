@@ -130,6 +130,27 @@ describe('run_review_pinned_join.launch_kept', () => {
 	})
 })
 
+describe('run_review_pinned_join.launch_kept on an ended stamp', () => {
+	it('keeps a check that ended with its answer written', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+		vi.mocked(process_identity.is_same_process).mockReturnValue(false)
+
+		await run_review_pinned_join.launch_kept(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+	})
+
+	it("launches the full check over a pre-detach's rest-of-range stamp on the same tree", async () => {
+		run_review_pinned_steps.launch_remaining(ROOT, FIXED_TREE, REASON)
+
+		await run_review_pinned_join.launch_kept(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledTimes(2)
+		expect(run_review_pinned_steps.is_remaining(ROOT)).toBe(false)
+	})
+})
+
 // ac-0b9841e2 / ac-d3e42cae: the recheck and the ship's pre-detach each read the fixed tree's answer.
 describe('run_review_pinned_join — the recheck, then the ship, on one fixed tree', () => {
 	it.each([
