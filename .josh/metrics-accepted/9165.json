@@ -1,0 +1,7 @@
+{
+	"reason": "launch_kept and launch_at_cut start test:pinned at the pre-gate cut and keep it through round 1 (#9165)",
+	"date": "2026-11-28",
+	"growth": {
+		"scripts.code_lines": 34
+	}
+}

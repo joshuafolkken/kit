@@ -166,6 +166,36 @@ async function launch_on_tree(root: string = PROJECT_ROOT, reason?: string): Pro
 	}
 }
 
+type Launched = ReturnType<typeof run_review_pinned_steps.launch>
+
+// A launch that is still running, or already answered — not a stale stamp whose process died silent.
+function is_standing(root: string): boolean {
+	return run_review_pinned_steps.is_answered(root) || run_review_pinned_steps.is_live(root)
+}
+
+function is_kept(root: string, tree: string | undefined, reason: string | undefined): boolean {
+	if (tree === undefined || run_review_pinned_steps.launched_tree(root) !== tree) return false
+
+	return run_review_pinned_steps.launched_reason(root) === reason && is_standing(root)
+}
+
+// **A check already standing on this tree under the same reason is kept** (joshuafolkken/kit#9165):
+// `josh run:cut` starts it on the implementation's settled tree, and `josh run:review` round 1, on that
+// same tree, joins it instead of killing it and probing the same input again. Another tree or reason
+// stops the last check — never waits it out, so the caller does not block — and launches on this one,
+// whose probe reads every verdict the cache still holds. `undefined` when the check was kept.
+async function launch_kept(
+	root: string = PROJECT_ROOT,
+	reason?: string,
+): Promise<Launched | undefined> {
+	const tree = await run_review_pinned_tree.key()
+
+	if (is_kept(root, tree, reason)) return undefined
+	run_review_pinned_steps.clear(root)
+
+	return run_review_pinned_steps.launch(root, reason, tree)
+}
+
 // The answer of the check launched on this very tree, waited for; `undefined` when none was, or it left
 // none, so the caller runs its own.
 async function answer_on_tree(root: string = PROJECT_ROOT): Promise<PinnedSummary | undefined> {
@@ -226,6 +256,7 @@ async function settled_on_tree(
 const run_review_pinned_join = {
 	answer_on_tree,
 	finished_on_tree,
+	launch_kept,
 	launch_on_tree,
 	restart_if_moved,
 	settled_on_tree,

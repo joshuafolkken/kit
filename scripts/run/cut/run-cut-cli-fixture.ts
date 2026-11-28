@@ -13,6 +13,7 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { review_attest } from '#scripts/review/review-attest'
 import { review_record } from '#scripts/review/review-record'
+import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_step_section } from '#scripts/run/run-step-section'
@@ -90,6 +91,11 @@ const worktree_directory = vi.fn<typeof run_cut.worktree_directory>().mockResolv
 // reads the token, and so a case can pin which section followed it (joshuafolkken/kit#5953).
 const print_section = vi.fn<typeof run_step_section.print_once>().mockReturnValue(0)
 const info = vi.fn<typeof console.info>()
+// The cut before the gate starts the tree's `josh test:pinned` (joshuafolkken/kit#9165); spied so no
+// case launches a real probe from the lane checkout.
+const launch_at_cut = vi
+	.fn<typeof review_record_pinned.launch_at_cut>()
+	.mockResolvedValue(undefined)
 
 const errors = vi.fn<typeof console.error>()
 
@@ -121,6 +127,7 @@ function attach_review_spies(): void {
 	vi.spyOn(run_step_section, 'print_once').mockImplementation(print_section)
 	vi.spyOn(console, 'info').mockImplementation(info)
 	vi.spyOn(console, 'error').mockImplementation(errors)
+	vi.spyOn(review_record_pinned, 'launch_at_cut').mockImplementation(launch_at_cut)
 }
 
 function verdict(): string {
@@ -230,6 +237,7 @@ const run_cut_cli_fixture = {
 	find_open_lane,
 	is_reviewer,
 	launch,
+	launch_at_cut,
 	session_verdict,
 	is_attested_on,
 	record_check,
