@@ -374,8 +374,11 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 const lane_stats = {
 	COLUMNS,
 	MISSING,
+	cell,
+	gigabytes,
 	header,
 	in_window,
+	lowest,
 	mean,
 	median,
 	merge_minutes,

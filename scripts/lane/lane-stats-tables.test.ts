@@ -9,6 +9,8 @@ import { lane_table_rows } from './lane-table-rows'
 const NOW = Date.parse('2026-10-28T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
 const FIRST_HEADER_CELLS = [
+	'active lanes',
+	'filled limit',
 	'stage',
 	'ship step',
 	'followup critical path',

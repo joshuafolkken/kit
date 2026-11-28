@@ -130,6 +130,6 @@ function table(
 	].join('\n')
 }
 
-const lane_concurrency_stats = { table }
+const lane_concurrency_stats = { lanes_at, samples_of, table }
 
 export { lane_concurrency_stats }
