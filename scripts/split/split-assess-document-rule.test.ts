@@ -89,12 +89,12 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 	})
 
 	// joshuafolkken/kit#6647, joshuafolkken/kit#6602: `--single` waives every axis; a re-plan only warns.
-	// joshuafolkken/kit#7729: a lane child splits past the cap before its first edit.
+	// joshuafolkken/kit#9164: a lane child only warns on size; its merge judges it by pace.
 	it('points one deliverable past any axis at --single and a re-plan at a warning', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(document).toContain(
-			'a lane child past the cap; `--single`, a re-plan or an edited lane → `size warning`',
+			'a lane child, `--single`, a re-plan or an edited lane → `size warning`; merge judges pace.',
 		)
 	})
 })
