@@ -226,6 +226,21 @@ pnpm josh lane:stats --since 2026-11-10T01:00Z --why 40   # cause groups since a
 
 <!-- /usage -->
 
+The `active lanes` table splits the period by how many lanes were active, a load sample's `lanes`: time a limit of 6
+ran 4 lanes falls in the 4 row. The `filled limit` table keeps, per limit, only the time at least that many lanes
+were active, so two limits compare over filled time.
+
+Both tables give hours, merges, merges per hour, load mean and peak, the share of samples over the core count, and
+free memory mean and minimum.
+
+A sample's time runs to the next sample, up to an hour (`sampled_hours`). A merge counts under the latest load
+sample at or before it within that same hour, and the limit in force at it. One merge takes about 45 minutes, so a short row's merges per hour swings
+(`lane-active-lanes-stats.ts`):
+
+```sh
+pnpm josh lane:stats --since 2026-11-26T16:28:29Z   # both tables since an instant
+```
+
 The `concurrent lanes` table gives `lint:related` / `test:related` per lane count the runs, median seconds and
 median core wait: the call's own lane's `core_wait` records for it while it ran. No such record reads
 `not measured`, not 0 (`lane-concurrency-wait.ts`).

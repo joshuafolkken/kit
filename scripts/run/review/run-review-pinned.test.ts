@@ -41,7 +41,12 @@ vi.mock('#scripts/lane/lane-session-broker', () => ({
 }))
 vi.mock('./run-review-join-read', () => ({ run_review_join_read: { mark_due } }))
 vi.mock('./run-review-pinned-steps', () => ({
-	run_review_pinned_steps: { launch: launch_pinned, clear: clear_pinned, is_answered: () => false },
+	run_review_pinned_steps: {
+		launch: launch_pinned,
+		clear: clear_pinned,
+		is_answered: () => false,
+		launched_tree: () => undefined,
+	},
 }))
 vi.mock('#scripts/review/review-brief-cli', () => ({
 	review_brief_cli: { run: brief_run, run_to: brief_run, scoped_refusal: async () => undefined },

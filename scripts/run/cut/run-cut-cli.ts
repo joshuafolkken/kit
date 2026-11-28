@@ -8,6 +8,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
+import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
@@ -97,8 +98,11 @@ function verdict_answer(verdict: CostVerdict): number | undefined {
 // recorded at the merge as a pre-split miss. **Nor does an implementation past its budget**
 // (joshuafolkken/kit#7010): the overrun stays in `lane:stats` / `lane:breakdown` only, and a started
 // Issue is implemented to the end. Returns the answer given without cutting, or `undefined`.
-function pre_gate_answer(phase: string): number | undefined {
+// **The tree before the gate starts its `josh test:pinned`** either way (joshuafolkken/kit#9165), so
+// the probe runs beside `run:chain`'s open stages (`review-record-pinned.ts` → `launch_at_cut`).
+async function pre_gate_answer(phase: string): Promise<number | undefined> {
 	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
+	await review_record_pinned.launch_at_cut()
 
 	return verdict_answer(cost_cli.session_verdict())
 }
@@ -284,7 +288,7 @@ async function cut(target: string, request: CutCommand, phase: string): Promise<
 
 	if (await is_concluding(request, state)) return await answer_unready(request, phase, state)
 
-	const answered = pre_gate_answer(phase)
+	const answered = await pre_gate_answer(phase)
 
 	if (answered !== undefined) return answered
 

@@ -28,6 +28,7 @@ const GREEN_MISS = 'green-'
 const SCOPE_MISS = 'scope-'
 const NO_TREE = 'no-gate-tree'
 const FAILED_LAST_RUN = 'failed-last-run'
+const NO_INDIVIDUAL = 'no-individual-green'
 
 function digest_of(graph: ImportGraph, file: string): string | undefined {
 	const inputs = graph.test_inputs?.(file)
@@ -67,9 +68,8 @@ function select(
 async function select_scope(
 	root: string,
 	scope: RelatedScope,
+	recorded: Readonly<Record<string, string>>,
 ): Promise<Omit<TestReuse, 'elapsed_ms'>> {
-	const recorded = review_stamps.test_related_stamp.read()?.blobs ?? {}
-	if (Object.keys(recorded).length === 0) return empty('no-individual-green')
 	const graph = await import_graph.create(root)
 	if (graph === undefined) return empty('unknown-graph')
 
@@ -93,35 +93,22 @@ function carries_over(parts: MovedParts | undefined): boolean {
 	return parts?.synced.length === 0 && !moves_whole_suite(parts.changed)
 }
 
-// A comparable green is compared test by test with or without a main sync since it
-// (joshuafolkken/kit#8095): the closed-input digests, not the sync, decide what still holds.
-async function compare(
-	root: string,
-	scope: RelatedScope,
-	tree: GateTree,
-): Promise<Omit<TestReuse, 'elapsed_ms'>> {
-	const verdict = await since_green.read_verdict(
-		review_stamps.test_related_stamp,
-		gate_labels.UNIT_LABEL,
-		{ tree },
-	)
-	if ('fallback' in verdict) return empty(`${GREEN_MISS}${verdict.fallback}`)
+function individual(stamp: FileMapStampAccess): Readonly<Record<string, string>> | string {
+	const recorded = stamp.read()?.blobs ?? {}
 
-	if (moves_whole_suite(moved_paths.union_of(verdict.parts))) return empty('whole-suite-input')
-
-	return await select_scope(root, scope)
+	return Object.keys(recorded).length > 0 ? recorded : NO_INDIVIDUAL
 }
 
-// No gate tree to compare, or a scope that is not `related`, never reaches the green record.
-async function attempt(
-	root: string,
-	scope: RelatedScope,
-	tree: GateTree | undefined,
-): Promise<Omit<TestReuse, 'elapsed_ms'>> {
-	if (tree === undefined) return empty(NO_TREE)
-	if (scope.mode !== 'related') return empty(`${SCOPE_MISS}${scope.mode}`)
+// A comparable green is compared test by test with or without a main sync since it
+// (joshuafolkken/kit#8095): the closed-input digests, not the sync, decide what still holds.
+// A string is the reason the full-reach green offers no digest.
+async function full_green(tree: GateTree): Promise<Readonly<Record<string, string>> | string> {
+	const stamp = review_stamps.test_related_stamp
+	const verdict = await since_green.read_verdict(stamp, gate_labels.UNIT_LABEL, { tree })
+	if ('fallback' in verdict) return `${GREEN_MISS}${verdict.fallback}`
+	if (moves_whole_suite(moved_paths.union_of(verdict.parts))) return 'whole-suite-input'
 
-	return await compare(root, scope, tree)
+	return individual(stamp)
 }
 
 async function blobs(root: string, files: ReadonlyArray<string>): Promise<Record<string, string>> {
@@ -141,24 +128,6 @@ async function blobs(root: string, files: ReadonlyArray<string>): Promise<Record
 		)
 	} catch {
 		return {}
-	}
-}
-
-// This reads the existing scoped green, never a new cache. A failed run cannot mint that record.
-// Exclusions preserve vitest's own reach for unknown tests rather than replacing its graph with ours.
-async function read(
-	root: string,
-	scope: RelatedScope,
-	tree: GateTree | undefined,
-): Promise<TestReuse> {
-	const started = performance.now()
-
-	try {
-		const result = await attempt(root, scope, tree)
-
-		return { ...result, elapsed_ms: performance.now() - started }
-	} catch {
-		return { ...empty('unreadable-inputs'), elapsed_ms: performance.now() - started }
 	}
 }
 
@@ -183,6 +152,63 @@ async function still_passing(
 	if (!carries_over(parts)) return []
 
 	return await unchanged(root, stamp.read()?.blobs ?? {})
+}
+
+// **A touched green's still-passing files** (joshuafolkken/kit#9163): the hand run's tests, proven on
+// the inputs they hash to now, which the full-reach run need not run again.
+async function touched(root: string, tree: GateTree): Promise<ReadonlyArray<string>> {
+	return await still_passing(root, tree, review_stamps.test_related_touched_stamp)
+}
+
+async function touched_green(root: string, tree: GateTree): Promise<Record<string, string>> {
+	const recorded = review_stamps.test_related_touched_stamp.read()?.blobs ?? {}
+	const files = await touched(root, tree)
+
+	return Object.fromEntries(files.map((file) => [file, recorded[file] ?? '']))
+}
+
+// The full-reach green's digests joined by the touched green's: a test is reused when either
+// recorded it on the closed inputs it hashes to now.
+async function compare(
+	root: string,
+	scope: RelatedScope,
+	tree: GateTree,
+): Promise<Omit<TestReuse, 'elapsed_ms'>> {
+	const full = await full_green(tree)
+	const recorded = { ...(typeof full !== 'string' && full), ...(await touched_green(root, tree)) }
+	if (Object.keys(recorded).length > 0) return await select_scope(root, scope, recorded)
+
+	return empty(typeof full === 'string' ? full : NO_INDIVIDUAL)
+}
+
+// No gate tree to compare, or a scope that is not `related`, never reaches the green record.
+async function attempt(
+	root: string,
+	scope: RelatedScope,
+	tree: GateTree | undefined,
+): Promise<Omit<TestReuse, 'elapsed_ms'>> {
+	if (tree === undefined) return empty(NO_TREE)
+	if (scope.mode !== 'related') return empty(`${SCOPE_MISS}${scope.mode}`)
+
+	return await compare(root, scope, tree)
+}
+
+// This reads the existing scoped green, never a new cache. A failed run cannot mint that record.
+// Exclusions preserve vitest's own reach for unknown tests rather than replacing its graph with ours.
+async function read(
+	root: string,
+	scope: RelatedScope,
+	tree: GateTree | undefined,
+): Promise<TestReuse> {
+	const started = performance.now()
+
+	try {
+		const result = await attempt(root, scope, tree)
+
+		return { ...result, elapsed_ms: performance.now() - started }
+	} catch {
+		return { ...empty('unreadable-inputs'), elapsed_ms: performance.now() - started }
+	}
 }
 
 // **A green keeps the last green's still-passing files** (joshuafolkken/kit#8289): a green that
@@ -218,7 +244,7 @@ function keeping(root: string, reuse: TestReuse, failed: ReadonlyArray<string>):
 	}
 }
 
-const test_related_reuse = { blobs, carried, flags, keeping, read, retained }
+const test_related_reuse = { blobs, carried, flags, keeping, read, retained, touched }
 
 export type { TestReuse }
 export { test_related_reuse }

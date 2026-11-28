@@ -17,7 +17,6 @@ import { run_review_open_refusal } from './run-review-open-refusal'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
-import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
 
 // `josh run:review` — one call that runs `josh gate` and, once it is green, writes the `/code-review`
@@ -173,15 +172,13 @@ async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<numb
 	return code
 }
 
-// A fresh `josh test:pinned` on this tree in place of the last one; its reason is recorded for the
-// branch, so the ship carries it (`run-review-pinned-accepted.ts` → `keep_reason`).
+// `josh test:pinned` on this tree in place of the last one, or the one `josh run:cut` already started on
+// it (`run-review-pinned-join.ts` → `launch_kept`); its reason is recorded for the branch, so the ship
+// carries it (`run-review-pinned-accepted.ts` → `keep_reason`).
 async function launch_pinned(reason: string | undefined): Promise<void> {
-	const tree = await run_review_pinned_tree.key()
+	const launched = await run_review_pinned_join.launch_kept(PROJECT_ROOT, reason)
 
-	run_review_pinned_steps.clear()
-	const launched = run_review_pinned_steps.launch(PROJECT_ROOT, reason, tree)
-
-	if (launched.kind === 'failed') {
+	if (launched?.kind === 'failed') {
 		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
 	}
 

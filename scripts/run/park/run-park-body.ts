@@ -43,10 +43,8 @@ const PERMISSION = /^- 必要な権限: ?(\S.*)$/u
 const PICK = /^(\d+)[\s:：.、]+\S/u
 const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
-// The tier no parent takes, even on a person's behalf: trust settings, third parties, destructive acts.
-const PERSON_TIER = 'C'
-const { AUTO_PERMISSION, PARENT_PERMISSION, FILING_COMMAND, CLOSE_COMMAND, FOLD_COMMAND } =
-	run_park_permission
+const { AUTO_PERMISSION, PARENT_PERMISSION, PERSON_TIER } = run_park_permission
+const { FILING_COMMAND, CLOSE_COMMAND, FOLD_COMMAND } = run_park_permission
 const PARENT_ACTION_NOTE = ' · 親の操作'
 const PARENT_COMMANDS = [FILING_COMMAND, CLOSE_COMMAND, FOLD_COMMAND] as const
 
@@ -203,14 +201,12 @@ function serial_problem(park: ParkBody): string | undefined {
 
 function permission_problem(park: ParkBody): string | undefined {
 	return park.options
-		.map((option) =>
-			run_park_permission.problem_of(`option ${String(option.number)}`, option.permission ?? ''),
-		)
+		.map((option) => run_park_permission.option_problem(`option ${String(option.number)}`, option))
 		.find(Boolean)
 }
 
 // The first problem of a body, structure first, then a permission off the vocabulary
-// (joshuafolkken/kit#7818): what `run:park` refuses and an adopt refuses to take. `undefined` for none.
+// (joshuafolkken/kit#7818) or off its tier (joshuafolkken/kit#9172): what `run:park` refuses and an adopt refuses to take. `undefined` for none.
 function problem_of(body: string): string | undefined {
 	const park = parse(body)
 
