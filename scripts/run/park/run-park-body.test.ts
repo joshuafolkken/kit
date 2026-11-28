@@ -106,6 +106,26 @@ function single_option(tier: string, permission: string): string {
 	)
 }
 
+// joshuafolkken/kit#9172: the #9120 park, a tier C option naming the parent's close, which no parent
+// could adopt since `--adopt` leaves every tier C option to a person.
+describe('run_park_body.problem_of on the tier and permission pair', () => {
+	const PARENT_CLOSE = '親（issue:close）'
+
+	it('refuses tier C naming the parent permission, showing the person form (ac-5c70a7d8)', () => {
+		expect(run_park_body.problem_of(single_option('C', PARENT_CLOSE))).toContain(
+			`option 1 is tier C, a person's to take, but names "${PARENT_CLOSE}" as its permission; write "- 必要な権限: 人"`,
+		)
+	})
+
+	it.each([
+		['C', '人'],
+		['A', PARENT_CLOSE],
+		['B', PARENT_EDIT],
+	])('still accepts tier %s with %j (ac-d8048a63)', (tier, permission) => {
+		expect(run_park_body.problem_of(single_option(tier, permission))).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#7001: an option needing the parent's own action is taken before the lane resumes.
 describe('run_park_body.parent_action', () => {
 	it.each([
