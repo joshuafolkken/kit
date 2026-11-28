@@ -1,7 +1,8 @@
 {
-	"reason": "is_shard_free_row splits the shard-only predicate from is_kept_row so free seat rows get shards (+4 code lines)",
+	"reason": "is_shard_free_row (+4 code lines) lets free seat rows take shards; theme-rules.md notes that exception (+52 on-demand bytes)",
 	"date": "2026-11-28",
 	"growth": {
-		"scripts.code_lines": 4
+		"scripts.code_lines": 4,
+		"ai_cost.on_demand_bytes": 52
 	}
 }

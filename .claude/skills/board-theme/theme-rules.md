@@ -72,7 +72,7 @@ separately.
 | The whole screen (color, flash, glitch, rain) | During an event; in IDLE quiet effects only |
 | The header's effect areas | NOTICE (→ "Events and showiness") |
 | Header row 2's notice text and row 3's progress text | Recolor only; draw nothing over them |
-| The free seat rows under LANES | Never |
+| The free seat rows under LANES | Never (rk800's falling wall shards are the one exception) |
 
 - Show one piece of information in one place.
 - Draw no human figure in a few rows — it reads as a stick figure. Reconstruct the subject itself
