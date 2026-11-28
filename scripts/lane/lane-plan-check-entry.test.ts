@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan } from './lane-plan'
-import { lane_plan_check } from './lane-plan-check'
 import { lane_plan_cli } from './lane-plan-cli'
 import { lane_plan_signals } from './lane-plan-signals'
 import { lane_tree_edit } from './lane-tree-edit'
@@ -18,10 +17,10 @@ import { lane_tree_edit } from './lane-tree-edit'
 const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#7729: joshuafolkken/kit#7695 declared 6 files and its investigation listed 18, yet a
-// dispatched lane was never split, so it ran to the end. Before its first edit, a dispatched lane's plan
-// past the cap answers `split`; past its declaration but within the cap it is recorded with a warning;
-// `--single` keeps it whole with a reason that goes on the ledger and the Issue. After the first edit,
-// `lane-plan-check-dispatched.test.ts`.
+// dispatched lane was never split, so it ran to the end. joshuafolkken/kit#9164 (decision (a), epic
+// joshuafolkken/kit#9127): a dispatched lane never splits on size alone — past its bar, the cap
+// included, its plan is recorded with a size warning and its merge judges it by pace; `--single` keeps
+// its reason on the ledger and the Issue. After the first edit, `lane-plan-check-dispatched.test.ts`.
 
 const ROOT = make_directory('lane-plan-check-entry-')
 const LANE = 7695
@@ -84,21 +83,18 @@ beforeEach(() => {
 })
 
 describe('lane:plan in a dispatched lane before its first edit', () => {
-	it('answers `split` past the cap and records no plan', async () => {
-		expect(await lane_plan_cli.run(plan_of(PAST_CAP), directory)).toBe(
-			lane_plan_check.SPLIT_EXIT_CODE,
-		)
-		expect(info).toHaveBeenCalledWith('split')
-		expect(lane_plan.read(LANE, directory)).toBeUndefined()
+	it('records a plan past the cap with a size warning instead of answering `split`', async () => {
+		expect(await lane_plan_cli.run(plan_of(PAST_CAP), directory)).toBe(SUCCESS)
+		expect(info).not.toHaveBeenCalledWith('split')
+		expect(error).toHaveBeenCalledWith(expect.stringContaining(WARNING))
+		expect(lane_plan.read(LANE, directory)?.paths).toHaveLength(PAST_CAP)
 	})
 
-	it("answers `split` to the investigation's re-plan after `run:entry` recorded a smaller one", async () => {
+	it("records the investigation's re-plan past the cap after `run:entry` recorded a smaller one", async () => {
 		expect(await lane_plan_cli.run(plan_of(DECLARED_FILES), directory)).toBe(SUCCESS)
 
-		expect(await lane_plan_cli.run(plan_of(PAST_CAP), directory)).toBe(
-			lane_plan_check.SPLIT_EXIT_CODE,
-		)
-		expect(lane_plan.read(LANE, directory)?.paths).toHaveLength(DECLARED_FILES)
+		expect(await lane_plan_cli.run(plan_of(PAST_CAP), directory)).toBe(SUCCESS)
+		expect(lane_plan.read(LANE, directory)?.paths).toHaveLength(PAST_CAP)
 	})
 
 	it('records a plan past its declaration but within the cap, warning and noting it', async () => {
@@ -112,10 +108,9 @@ describe('lane:plan in a dispatched lane before its first edit', () => {
 		})
 	})
 
-	it('answers `split` to `--probe` past the cap, recording nothing', async () => {
-		expect(await lane_plan_cli.run([...plan_of(PAST_CAP), '--probe'], directory)).toBe(
-			lane_plan_check.SPLIT_EXIT_CODE,
-		)
+	it('does not answer `split` to `--probe` past the cap, recording nothing', async () => {
+		expect(await lane_plan_cli.run([...plan_of(PAST_CAP), '--probe'], directory)).toBe(SUCCESS)
+		expect(info).not.toHaveBeenCalledWith('split')
 		expect(record_split_notice).not.toHaveBeenCalled()
 	})
 })

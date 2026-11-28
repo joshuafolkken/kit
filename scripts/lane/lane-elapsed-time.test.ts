@@ -3,6 +3,7 @@ import { assert, describe, expect, it } from 'vitest'
 import { lane_elapsed_time } from './lane-elapsed-time'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
+import { lane_pace } from './lane-pace'
 import type { ToolCall } from './lane-transcript-calls'
 
 const ISSUE = 7356
@@ -47,14 +48,13 @@ function total(parts: ReturnType<typeof lane_elapsed_time.of>): number | undefin
 }
 
 describe('lane_elapsed_time — exclusive end-to-end accounting (#7379)', () => {
-	it('includes yield, followup and human wait in the 30-minute decision', () => {
+	it('includes yield, followup and human wait in the end-to-end wall clock', () => {
 		const events = [event(5, 'park', 'parked on a decision'), event(15, 'note', 'yield to #7333')]
 		const parts = lane_elapsed_time.of(entries(), events, ISSUE, [call(0, 10), call(3, 9)])
 
 		assert(parts)
 
 		expect(parts.total_ms).toBe(40 * MINUTE)
-		expect(parts.within_target).toBe(false)
 		expect(parts.human_ms).toBe(20 * MINUTE)
 		expect(total(parts)).toBe(parts.total_ms)
 		expect(parts.tool_ms).toBe(19 * MINUTE)
@@ -95,11 +95,11 @@ describe('lane_elapsed_time — split evidence', () => {
 })
 
 describe('lane_elapsed_time — bounds and retry evidence', () => {
-	it('clips calls to the dispatch/merge boundaries and keeps the target inclusive', () => {
+	it('clips calls to the dispatch/merge boundaries', () => {
 		const parts = lane_elapsed_time.of(entries(30), [], ISSUE, [call(-5, 10), call(28, 10)])
 
 		expect(parts?.automatic_ms).toBe(7 * MINUTE)
-		expect(parts?.within_target).toBe(true)
+		expect(parts?.total_ms).toBe(30 * MINUTE)
 		expect(parts?.tool_ms).toBe(7 * MINUTE)
 	})
 	it('reports CI retry intervals once and keeps the fix between them outside automatic wait', () => {
@@ -130,32 +130,49 @@ describe('lane_elapsed_time — bounds and retry evidence', () => {
 	})
 })
 
-function sized(files: number, lines: number): Array<LedgerEntry> {
-	const counts = { files, lines }
+function sized(lines: number, is_adopted = false): Array<LedgerEntry> {
+	const counts = { files: 3, lines }
 
 	return [
 		...entries(),
-		{ kind: 'size', issue: ISSUE, at: at(39), declared: counts, actual: counts },
+		{
+			kind: 'size',
+			issue: ISSUE,
+			at: at(39),
+			declared: counts,
+			actual: counts,
+			...(is_adopted && { adopted: true }),
+		},
 	]
 }
 
-describe('lane_elapsed_time — two-tier target by actual size (#8729)', () => {
-	it('judges a 40-minute lane past the split guide within the 60-minute target', () => {
-		const parts = lane_elapsed_time.of(sized(9, 300), [], ISSUE, [])
+function net_minutes(rows: ReadonlyArray<LedgerEntry>): number {
+	return (lane_net_time.net_ms(rows, [], ISSUE) ?? 0) / MINUTE
+}
 
-		expect(parts?.target_minutes).toBe(60)
-		expect(parts?.within_target).toBe(true)
-		expect(parts && lane_elapsed_time.text(parts)).toContain('(within the 60-min target)')
-	})
-	it('judges the same lane at or within the split guide against 30 minutes', () => {
-		const parts = lane_elapsed_time.of(sized(8, 200), [], ISSUE, [])
+describe('lane_elapsed_time — pace on net minutes per 100 actual lines (#9164)', () => {
+	it('judges the lane by its net-minute pace, the value lane:stats --over reads', () => {
+		const rows = sized(10)
+		const parts = lane_elapsed_time.of(rows, [], ISSUE, [])
 
-		expect(parts?.target_minutes).toBe(30)
-		expect(parts?.within_target).toBe(false)
-		expect(parts && lane_elapsed_time.text(parts)).toContain('(over the 30-min target)')
+		expect(parts?.pace).toStrictEqual(lane_pace.of(rows, ISSUE, net_minutes(rows)))
+		expect(parts?.pace.kind === 'judged' && parts.pace.is_slow).toBe(true)
+		expect(parts && lane_elapsed_time.text(parts)).toContain('over the 13.7-min pace')
 	})
-	it('keeps 30 minutes when no size is recorded', () => {
-		expect(lane_elapsed_time.of(entries(), [], ISSUE, [])?.target_minutes).toBe(30)
+	it('keeps a large lane of the same minutes within the pace', () => {
+		const parts = lane_elapsed_time.of(sized(2000), [], ISSUE, [])
+
+		expect(parts && lane_elapsed_time.text(parts)).toContain('within the 13.7-min pace')
+	})
+	it('leaves a lane with no recorded size or an adopted size unjudged', () => {
+		expect(lane_elapsed_time.of(entries(), [], ISSUE, [])?.pace).toStrictEqual({
+			kind: 'unjudged',
+			reason: 'unsized',
+		})
+		expect(lane_elapsed_time.of(sized(10, true), [], ISSUE, [])?.pace).toStrictEqual({
+			kind: 'unjudged',
+			reason: 'adopted',
+		})
 	})
 })
 

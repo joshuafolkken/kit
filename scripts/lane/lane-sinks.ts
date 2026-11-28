@@ -6,6 +6,7 @@ import { lane_breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_laps } from './lane-breakdown-laps'
 import { lane_ledger, type LedgerEntry, type TestRelatedEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
+import { lane_pace } from './lane-pace'
 import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -43,6 +44,21 @@ function over_issues(records: SinkRecords, window: StatsWindow, minutes: number)
 	return [...new Set(merged)].filter(
 		(issue) =>
 			(lane_net_time.net_ms(records.entries, records.events, issue) ?? 0) > minutes * MS_PER_MINUTE,
+	)
+}
+
+// The minutes `issue`'s net time runs past what `rate` allows its size (`lane_pace.excess_minutes`).
+function excess_minutes(records: SinkRecords, issue: number, rate: number): number | undefined {
+	const net_ms = lane_net_time.net_ms(records.entries, records.events, issue) ?? 0
+
+	return lane_pace.excess_minutes(records.entries, issue, net_ms / MS_PER_MINUTE, rate)
+}
+
+// Each issue merged inside `window` slow for its size: net minutes past the fixed cost per 100 actual
+// lines over `rate` (joshuafolkken/kit#9164). An unsized or adopted lane is never listed.
+function slow_issues(records: SinkRecords, window: StatsWindow, rate: number): Array<number> {
+	return over_issues(records, window, 0).filter(
+		(issue) => (excess_minutes(records, issue, rate) ?? 0) > 0,
 	)
 }
 
@@ -176,11 +192,13 @@ function table(
 const lane_sinks = {
 	DEFAULT_MINUTES,
 	base_name,
+	excess_minutes,
 	full_reach_of,
 	hubs_of,
 	issues_cell,
 	over_issues,
 	sinks_of,
+	slow_issues,
 	table,
 	total_ms,
 }

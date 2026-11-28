@@ -149,17 +149,17 @@ async function is_started(plan: LanePlan): Promise<boolean> {
 	return is_dispatched(plan) && (await lane_tree_edit.is_edited())
 }
 
-// Before its first edit a dispatched lane splits past the cap alone, unless `--single` gives a reason;
-// any other plan splits past its declaration unless waived.
+// A dispatched lane never splits on size alone: past its bar it gets a size warning, and its merge
+// judges it by pace (decision (a), epic joshuafolkken/kit#9127; joshuafolkken/kit#9164). Any other plan
+// splits past its declaration unless waived.
 function is_split(
 	plan: LanePlan,
 	over: Oversize | undefined,
 	is_lane_started: boolean,
 ): over is Oversize {
-	if (over === undefined || is_lane_started) return false
-	if (!is_dispatched(plan)) return !lane_plan_size.is_waived(plan, over)
+	if (over === undefined || is_lane_started || is_dispatched(plan)) return false
 
-	return plan.single !== true && lane_plan_size.is_past_cap(plan, over)
+	return !lane_plan_size.is_waived(plan, over)
 }
 
 async function judged(

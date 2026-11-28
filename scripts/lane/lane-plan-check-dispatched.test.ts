@@ -80,13 +80,11 @@ describe('lane:plan in a dispatched lane over its size bar', () => {
 		expect(record_split_notice).not.toHaveBeenCalled()
 	})
 
-	it('names the cap as what records a pre-split miss at the merge', async () => {
+	it('names pace, not size, as what the merge judges the lane by', async () => {
 		await lane_plan_cli.run(PLAN, directory)
 
 		expect(error).toHaveBeenCalledWith(
-			expect.stringContaining(
-				'an overrun past the cap at the merge is recorded as a pre-split miss',
-			),
+			expect.stringContaining('the merge judges the lane by its pace, not its size'),
 		)
 	})
 

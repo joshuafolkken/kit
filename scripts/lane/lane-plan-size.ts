@@ -326,8 +326,8 @@ function measured_of(plan: LanePlan, over: Oversize): { files: number; lines: nu
 	return { files, lines: over.reason === 'lines' ? over.measured : 0 }
 }
 
-// Whether `over` passes the cap (1.5 × the guide, `split-cap.ts`) — the line a lane splits on before its
-// first edit; past the declaration but within the cap it goes on (joshuafolkken/kit#7729).
+// Whether `over` passes the cap (1.5 × the guide, `split-cap.ts`) — the cap measure; a dispatched lane no
+// longer splits on it, its slowness is judged by pace after the run (joshuafolkken/kit#9164).
 function is_past_cap(plan: LanePlan, over: Oversize): boolean {
 	const { files, lines } = measured_of(plan, over)
 

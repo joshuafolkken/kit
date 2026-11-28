@@ -1,0 +1,8 @@
+{
+	"reason": "new lane-pace module shares the pace judgment across lane:breakdown, lane:stats --over and the board overrun note (#9164); on-demand bytes from the regenerated lane:stats description",
+	"date": "2026-11-28",
+	"growth": {
+		"scripts.code_lines": 65,
+		"ai_cost.on_demand_bytes": 6
+	}
+}

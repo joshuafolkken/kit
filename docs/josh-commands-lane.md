@@ -212,13 +212,13 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print period lane throughput, stage, stop (by failed CI check, longest first), check, runnable-to-dispatch wait and machine-load statistics; the per-lane core-budget wait and pre-split miss tables show their first 10 rows and a count of the rest unless --all; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
+Print period lane throughput, stage, stop (by failed CI check, longest first), check, runnable-to-dispatch wait and machine-load statistics; the per-lane core-budget wait and pre-split miss tables show their first 10 rows and a count of the rest unless --all; --sinks shows stage totals, --over slow lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7                           # a 7-day period's stage medians and maxima
 pnpm josh lane:stats --period 7 --all                     # the same with every per-lane table row
 pnpm josh lane:stats --period 1 --sinks                   # stage totals of the lanes over 30 net min
-pnpm josh lane:stats --period 1 --over 40                 # ledger chains of lanes over 40 net min
+pnpm josh lane:stats --period 1 --over 13.7               # ledger chains of lanes slower than 13.7 min per 100 lines
 pnpm josh lane:stats --period 1 --why 40                  # cause groups of lanes over 40 net min
 pnpm josh lane:stats --period 7 --pairs                   # a 7-day period's scoped pair runs
 pnpm josh lane:stats --since 2026-11-10T01:00Z --why 40   # cause groups since an instant
@@ -259,7 +259,7 @@ The `open issues` column lists each open Issue whose title contains the stage na
 none does, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scoped pair` row also matches the file
 name of each `over_cap_hub` those lanes' `test-related` runs recorded.
 
-`--over <minutes>`: per merged lane over that many net min, longest first, net/wait minutes, ledger chain,
+`--over <min-per-100-lines>`: per merged lane whose pace (net minutes less the 12-min fixed cost, per 100 recorded actual lines; `lane-pace.ts`) passes that rate — adopted theme lanes and lanes with no recorded size left out — longest first, net/wait minutes, ledger chain,
 stages past budget (`implement 58.8/9`), estimate, top stage, its `--sinks` open Issues (`lane-over.ts`).
 
 `estimate`: implement time against `lane:why`'s projection of the merge's recorded `- 規模見積もり:`, at the
@@ -415,9 +415,9 @@ pnpm josh lane:breakdown --period 14       # the split medians over two weeks
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
-Both forms print End-to-end from first dispatch to last merge, including verification, fixes, retries, CI, yield and human wait. The target decision includes human wait, also reported separately.
+Both forms print End-to-end from first dispatch to last merge, including verification, fixes, retries, CI, yield and human wait, the human wait also reported separately.
 
-The target is 30 minutes, or 60 minutes when the lane's recorded actual size is past the split guide (more than 8 files or 200 lines); a lane with no recorded size keeps 30 (`lane_stage_budget.target_minutes`). Legacy `net` has broader exclusions. Internal budgets stay 25 minutes (plan 3, implement 9, ship 8, followup 5), with 5 minutes of headroom; gates stay unchanged.
+The lane is judged by its pace against 13.7 (`lane_pace`), as `lane:stats --over` and the board's overrun note are; a lane with no recorded size, or an adopted theme lane, is not judged. Legacy `net` has broader exclusions. Internal budgets stay 25 minutes (plan 3, implement 9, ship 8, followup 5), with 5 minutes of headroom; gates stay unchanged.
 
 Exclusive wall-clock categories sum to End-to-end:
 
@@ -568,7 +568,7 @@ A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-r
 
 A `--single "<reason>"` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply. The reason goes on the ledger's split notice and as an Issue comment; a bare `--single` prints the usage, exit 1.
 
-A dispatched lane's plan (its child mark names the issue) before its first edit — its tree still at its base (`scripts/lane/lane-tree-edit.ts`) — is judged on each plan: past the cap (1.5 × the guide, `scripts/split/split-cap.ts`) it answers `split`, unless `--single`; past its declaration within the cap it prints a `size warning` and notes the measure on the ledger.
+A dispatched lane's plan (its child mark names the issue) before its first edit — its tree still at its base (`scripts/lane/lane-tree-edit.ts`) — never answers `split` on size alone: past its declaration, the cap included, it prints a `size warning` and notes the measure on the ledger; its merge judges it by pace.
 
 After its first edit it never answers `split`: its first plan past any axis prints one `size warning`, notes nothing on the ledger, and its re-plans print none.
 

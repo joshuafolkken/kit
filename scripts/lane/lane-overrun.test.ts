@@ -129,6 +129,18 @@ describe('lane_overrun.investigate — a lane at or under 40 minutes', () => {
 	})
 })
 
+// joshuafolkken/kit#9164: a long lane efficient for its size is judged within its pace.
+it('launches no investigation of a long lane efficient for its size', async () => {
+	const counts = { files: 2, lines: 900 }
+
+	mocks.read_entries.mockReturnValue([
+		...lane(41),
+		{ kind: 'size', at: at(41), issue: ISSUE, declared: counts, actual: counts },
+	])
+	await lane_overrun.investigate(ISSUE)
+	expect(notes()).toStrictEqual([`#${String(ISSUE)} net: 41 min`])
+})
+
 // joshuafolkken/kit#4818: a lane whose net time cannot be read was passed by with no trace.
 describe('lane_overrun.investigate — a lane with no net time', () => {
 	it('records the skip where no ledger is kept', async () => {
