@@ -12,13 +12,15 @@ import { run_board_theme_rk800_notice } from './run-board-theme-rk800-notice'
 
 const { HOST } = run_board_theme_host_fixture
 const { state_of } = run_board_theme_host_state
-const { center_of, cracks, is_kept_row, is_seat, ray_glyph, shard_at, shards, spark } =
+const { center_of, cracks, is_kept_row, ray_glyph, shard_at, shards, spark } =
 	run_board_theme_rk800_break
 const { WALL } = run_board_theme_rk800_data
 const { CRACKS, SHARDS } = run_board_theme_rk800_notice
 const QUARTER = Math.PI / 4
 // A LANES rule above the demo's lane rows 14 to 16, with only row 14 a lane: rows 15 and 16 are free.
-const SEATED: ThemeLayout = { ...HOST.layout, lanes_rule: 13, lane_rows: [14] }
+const LANE_ROW = 14
+const FREE_SEAT_ROW = 15
+const SEATED: ThemeLayout = { ...HOST.layout, lanes_rule: 13, lane_rows: [LANE_ROW] }
 const SAMPLE_COLUMNS = 40
 
 function board_copy(): Grid {
@@ -52,32 +54,12 @@ describe('run_board_theme_rk800_break.ray_glyph', () => {
 	})
 })
 
-describe('run_board_theme_rk800_break.is_seat', () => {
-	it('is a free row under the LANES rule and above the section gap', () => {
-		expect([13, 14, 15, 16, 17].map((y) => is_seat(SEATED, y))).toStrictEqual([
-			false,
-			false,
-			true,
-			true,
-			false,
-		])
-	})
-
-	it('finds no seat on a board with no LANES rule', () => {
-		expect(is_seat({ ...SEATED, lanes_rule: undefined }, 15)).toBe(false)
-	})
-})
-
 describe('run_board_theme_rk800_break.is_kept_row', () => {
-	it('keeps the notice, the progress line and a free seat', () => {
+	it('keeps the notice and the progress line, not a free seat or a lane', () => {
 		const { notice, progress } = HOST.layout
+		const rows = [notice.y, progress.y, FREE_SEAT_ROW, LANE_ROW]
 
-		expect([notice.y, progress.y, 15, 14].map((y) => is_kept_row(SEATED, y))).toStrictEqual([
-			true,
-			true,
-			true,
-			false,
-		])
+		expect(rows.map((y) => is_kept_row(SEATED, y))).toStrictEqual([true, true, false, false])
 	})
 })
 
@@ -137,5 +119,14 @@ describe('run_board_theme_rk800_break.shards', () => {
 
 		expect(rows.length).toBeGreaterThan(0)
 		expect(rows.filter((y) => y === notice.y || y === progress.y)).toStrictEqual([])
+	})
+
+	it('lands shards on a free seat row', () => {
+		const grid = board_copy()
+		const draw = draw_of(grid)
+
+		shards({ ...draw, api: { ...draw.api, layout: SEATED } }, SHARDS.spark)
+
+		expect(changed_rows(grid)).toContain(FREE_SEAT_ROW)
 	})
 })

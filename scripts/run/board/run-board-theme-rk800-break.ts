@@ -8,7 +8,7 @@ import { run_board_theme_rk800_parts } from './run-board-theme-rk800-parts'
 
 // The rk800 theme's wall breaking: cracks radiate from its middle over the last hits of the build;
 // at the peak the whole screen sparks, and the wall leaves as orange shards thinning out over the
-// board. A shard never lands on the notice's or the progress line's row, nor on a free seat row.
+// board, free seat rows included. A shard never lands on the notice's or the progress line's row.
 
 const { pick, restyle, set_cell } = run_board_theme_host_grid
 const { hash } = run_board_theme_host_hash
@@ -62,18 +62,9 @@ function cracks(draw: ThemeDraw, age: number): void {
 	for (let index = 0; index < CRACKS.rays; index++) ray(draw, index, reach)
 }
 
-// A free seat row: under the LANES rule, above the blank row that ends the section, and no lane's.
-function is_seat(layout: ThemeLayout, y: number): boolean {
-	const rule = layout.lanes_rule
-
-	if (rule === undefined || y <= rule || layout.lane_rows.includes(y)) return false
-
-	return y < (layout.gap_rows.find((gap) => gap > rule) ?? layout.h)
-}
-
-// A row no shard lands on: the notice's, the progress line's, a free seat's.
+// A row no shard lands on: the notice's, the progress line's.
 function is_kept_row(layout: ThemeLayout, y: number): boolean {
-	return y === layout.notice.y || y === layout.progress.y || is_seat(layout, y)
+	return y === layout.notice.y || y === layout.progress.y
 }
 
 // Where the shard that broke off `source` has drifted `since` ticks after the peak, each at a pace
@@ -122,7 +113,6 @@ const run_board_theme_rk800_break = {
 	center_of,
 	cracks,
 	is_kept_row,
-	is_seat,
 	ray_glyph,
 	shard_at,
 	shards,
