@@ -69,7 +69,8 @@ describe('agent_session_role.scope_line', () => {
 	// joshuafolkken/kit#8973: the producer builds in its own worktree, never in this checkout.
 	// joshuafolkken/kit#9076: the person may declare no-filing work once for the session.
 	it.each([
-		'hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`',
+		// joshuafolkken/kit#9166: the brief path comes from the command, never a shared fixed one.
+		'hand it to `pnpm josh run:handoff kickoff new --brief-file <path>`, `<path>` from `run:handoff brief-path`',
 		'imperative request with investigation, a plan and a filing plan',
 		'「起票せずに」',
 		'investigator and producer subagents, never edited by this session',

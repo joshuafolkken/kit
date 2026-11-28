@@ -317,7 +317,7 @@ describe('unasked_filing.ROW.decide', () => {
 describe('unasked_filing.ROW.reason', () => {
 	it('names run:handoff kickoff new as the route after the confirmation', () => {
 		expect(unasked_filing.ROW.reason).toContain(
-			'`pnpm josh run:handoff kickoff new --brief-file <brief>`',
+			'`pnpm josh run:handoff kickoff new --brief-file <path>`, `<path>` from `run:handoff brief-path`',
 		)
 	})
 })

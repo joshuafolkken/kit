@@ -41,7 +41,7 @@ const WORKER_LINE =
 	'Session scope: implementation lane; implementation is permitted by the launcher role.'
 const CONSULTATION_PREFIX = 'Session scope: consultation and operations only; '
 const LINKED_REQUEST =
-	'answer an imperative request with investigation, a plan and a filing plan; filing only on the user’s explicit instruction, and a filing instruction (「起票」, “file an issue”) is `kickoff new` — hand it to `pnpm josh run:handoff kickoff new --brief-file <brief>`; '
+	'answer an imperative request with investigation, a plan and a filing plan; filing only on the user’s explicit instruction, and a filing instruction (「起票」, “file an issue”) is `kickoff new` — hand it to `pnpm josh run:handoff kickoff new --brief-file <path>`, `<path>` from `run:handoff brief-path`; '
 // joshuafolkken/kit#7756: without GitHub nothing can be filed, so a filing plan could not be carried out.
 const UNLINKED_REQUEST =
 	'GitHub is not linked (gh, its sign-in or a GitHub origin is missing), so answer an imperative request with investigation and a plan only, without a filing plan; '

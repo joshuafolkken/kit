@@ -16,7 +16,9 @@ import { session_model_record } from './session-model-record'
 const LINE_PREFIX = 'Consultation model: hand'
 // `backlogrun` is handed to `josh backlogrun` whole, which takes no brief (`run-handoff-args.ts`).
 const { BACKLOG_KEYWORD } = run_handoff_args
-const BRIEF_ARGUMENT = ' --brief-file <brief>'
+// Each session takes its own brief path from the command, never a shared fixed one (joshuafolkken/kit#9166).
+const BRIEF_ARGUMENT = ' --brief-file <path>'
+const BRIEF_SOURCE = ', `<path>` from `run:handoff brief-path`'
 
 // `nullish`, as `hook-decision.ts` reads the same fields: a harness may send `null`.
 const payload_schema = z.object({
@@ -51,10 +53,12 @@ function tail_of(transcript_path: string | null | undefined): string {
 }
 
 function line_for(keyword: string): string {
-	const brief = keyword === BACKLOG_KEYWORD ? '' : BRIEF_ARGUMENT
+	const is_briefed = keyword !== BACKLOG_KEYWORD
+	const brief = is_briefed ? BRIEF_ARGUMENT : ''
+	const source = is_briefed ? BRIEF_SOURCE : ''
 
 	return (
-		`${LINE_PREFIX} \`${keyword}\` to a child: \`pnpm josh run:handoff ${keyword} …${brief}\`, ` +
+		`${LINE_PREFIX} \`${keyword}\` to a child: \`pnpm josh run:handoff ${keyword} …${brief}\`${source}, ` +
 		`not \`run:entry\` (${consultation_handoff.HANDOFF_DOC}).`
 	)
 }

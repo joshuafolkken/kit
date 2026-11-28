@@ -52,6 +52,15 @@ describe('run_entry_handoff_root.is_refused — a hand-off child outside the iss
 			expect.stringContaining('If run:handoff refuses, end with its note and the issue URL'),
 		)
 	})
+
+	// joshuafolkken/kit#9166: the hand-off it names takes its brief path from `run:handoff brief-path`.
+	it('names run:handoff brief-path as the source of the brief path', async () => {
+		await run_entry_handoff_root.is_refused(request(), ports())
+
+		expect(console.error).toHaveBeenCalledExactlyOnceWith(
+			expect.stringContaining('--brief-file <path>`,\n`<path>` from `run:handoff brief-path`.'),
+		)
+	})
 })
 
 describe('run_entry_handoff_root.is_refused — the entries that pass', () => {

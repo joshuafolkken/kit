@@ -1,8 +1,9 @@
 {
-	"reason": "#9166 adds the run:handoff brief ledger and brief-path subcommand (new code) and the docs now name where the brief path comes from",
+	"reason": "CLAUDE.md's consultation filing line now names run:handoff brief-path as the brief path source (+2 resident bytes after trimming the sentence)",
 	"date": "2026-11-28",
 	"growth": {
-		"scripts.code_lines": 138,
-		"ai_cost.on_demand_bytes": 60
+		"scripts.code_lines": 144,
+		"ai_cost.on_demand_bytes": 60,
+		"ai_cost.resident_bytes": 2
 	}
 }

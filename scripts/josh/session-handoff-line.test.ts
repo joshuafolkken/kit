@@ -18,6 +18,7 @@ const make_directory = temporary_directory('suite')
 const WORK_DIRECTORY = make_directory('session-handoff-line-')
 
 const FULLRUN = 'fullrun #1'
+const BRIEF_PATH_COMMAND = 'run:handoff brief-path'
 
 function transcript_on(model: string): string {
 	const file = path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`)
@@ -48,6 +49,14 @@ describe('handoff_line', () => {
 
 		expect(line).toContain('run:handoff backlogrun')
 		expect(line).not.toContain('--brief-file')
+		expect(line).not.toContain(BRIEF_PATH_COMMAND)
+	})
+
+	it('names run:handoff brief-path as the source of a briefed keyword path', () => {
+		const line = handoff_line(claude_payload(FABLE, FULLRUN))
+
+		expect(line).toContain('--brief-file <path>')
+		expect(line).toContain(BRIEF_PATH_COMMAND)
 	})
 
 	it('says nothing on Opus', () => {
