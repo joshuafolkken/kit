@@ -13,6 +13,9 @@ const LINT_RELATED_PREFIX = 'josh-lint-related-stamp-'
 const TEST_RELATED_PREFIX = 'josh-test-related-stamp-'
 // `josh test:related` ended red: the tree, and its failed files (`test-related-red.ts`). Never a green.
 const TEST_RELATED_RED_PREFIX = 'josh-test-related-red-'
+// `josh test:related --touched` ended green: the tree, and the digest of each test file it passed.
+// Never a full-reach green — only its files' digests reach the full-reach reuse (`test-related-reuse.ts`).
+const TEST_RELATED_TOUCHED_PREFIX = 'josh-test-related-touched-'
 // `josh test:e2e` answered green — a run or a printed skip — on this tree (`test-e2e-stamp.ts`).
 const E2E_PREFIX = 'josh-e2e-stamp-'
 
@@ -60,6 +63,11 @@ const test_related_red_stamp: FileMapStampAccess = file_map_stamp.create(
 	PROJECT_ROOT,
 	inputs_of([gate_labels.UNIT_LABEL]),
 )
+const test_related_touched_stamp: FileMapStampAccess = file_map_stamp.create(
+	TEST_RELATED_TOUCHED_PREFIX,
+	PROJECT_ROOT,
+	inputs_of([gate_labels.UNIT_LABEL]),
+)
 const e2e_stamp: FileMapStampAccess = file_map_stamp.create(E2E_PREFIX, PROJECT_ROOT)
 
 // Swallowed: a code record left behind only ever sits beside an older snapshot, which the next
@@ -101,6 +109,7 @@ const review_stamps = {
 	reviewed_stamp,
 	test_related_red_stamp,
 	test_related_stamp,
+	test_related_touched_stamp,
 }
 
 export { review_stamps }

@@ -89,6 +89,68 @@ describe('run_review_pinned_join.launch_on_tree', () => {
 	})
 })
 
+// joshuafolkken/kit#9165: the check `josh run:cut` started on the settled tree is kept by round 1.
+describe('run_review_pinned_join.launch_kept', () => {
+	it('keeps a check standing on the same tree under the same reason', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+
+		await expect(run_review_pinned_join.launch_kept(ROOT, REASON)).resolves.toBeUndefined()
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+		expect(process.kill).not.toHaveBeenCalled()
+	})
+
+	it("stops another tree's check and launches on the current tree, never reading the old answer", async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, BRIEFED_TREE)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+
+		await run_review_pinned_join.launch_kept(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledTimes(2)
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBe(FIXED_TREE)
+		await expect(run_review_pinned_join.finished_on_tree(ROOT)).resolves.toBeUndefined()
+	})
+
+	it('launches again under a different reason', async () => {
+		run_review_pinned_steps.launch(ROOT, undefined, FIXED_TREE)
+
+		await run_review_pinned_join.launch_kept(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledTimes(2)
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBe(REASON)
+	})
+
+	it('launches again over a stale stamp whose process died with no answer', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		vi.mocked(process_identity.is_same_process).mockReturnValue(false)
+
+		await run_review_pinned_join.launch_kept(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('run_review_pinned_join.launch_kept on an ended stamp', () => {
+	it('keeps a check that ended with its answer written', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+		vi.mocked(process_identity.is_same_process).mockReturnValue(false)
+
+		await run_review_pinned_join.launch_kept(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledOnce()
+	})
+
+	it("launches the full check over a pre-detach's rest-of-range stamp on the same tree", async () => {
+		run_review_pinned_steps.launch_remaining(ROOT, FIXED_TREE, REASON)
+
+		await run_review_pinned_join.launch_kept(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledTimes(2)
+		expect(run_review_pinned_steps.is_remaining(ROOT)).toBe(false)
+	})
+})
+
 // ac-0b9841e2 / ac-d3e42cae: the recheck and the ship's pre-detach each read the fixed tree's answer.
 describe('run_review_pinned_join — the recheck, then the ship, on one fixed tree', () => {
 	it.each([

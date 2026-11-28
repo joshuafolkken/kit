@@ -358,8 +358,12 @@ function report_unhanded(
 }
 
 // **A `--touched` run is the implementation loop's** (`test-related-touched.ts`): it reads its scope off
-// the change alone. Its separate review-fix record never answers the gate's full-reach reuse.
-async function run_touched(given: ReadonlyArray<string>): Promise<number> {
+// the change alone. Its green is no full-reach green, yet the digest of each test it passed lets the
+// full-reach run skip that test while its closed inputs hash the same (joshuafolkken/kit#9163).
+async function run_touched(
+	given: ReadonlyArray<string>,
+	before: GateTree | undefined,
+): Promise<number> {
 	const { TOUCHED_FLAG, TOUCHED_KIND } = test_related_touched
 	const command_arguments = given.filter((argument) => argument !== TOUCHED_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()
@@ -367,8 +371,14 @@ async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 	const changed = explicit.length > 0 ? explicit : await branch_change()
 	const scope = await test_related_touched.read_scope(root, changed)
 	const input = { scope, root, changed, synced: [], since_map: [], kind: TOUCHED_KIND }
+	// A vitest flag such as `-t` runs part of a file, so its pass digests no whole file.
+	const is_unflagged = changed_file_scope.flags_of(command_arguments).length === 0
 
-	return await test_related_run.run_and_record(input, command_arguments)
+	return await test_related_run.run_and_keep(
+		input,
+		command_arguments,
+		is_unflagged ? before : undefined,
+	)
 }
 
 // A green run records the tree it was green on, a red one the files it failed on
@@ -398,7 +408,7 @@ async function run_related_tests(given: ReadonlyArray<string>): Promise<number> 
 		unit_worker_share.without_worker_flags(given),
 		async (before) =>
 			given.includes(test_related_touched.TOUCHED_FLAG)
-				? await run_touched(given)
+				? await run_touched(given, before)
 				: await run_fresh(given, before),
 	)
 }

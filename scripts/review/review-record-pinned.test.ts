@@ -2,6 +2,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { run_review_join_read, type JoinVerdict } from '#scripts/run/review/run-review-join-read'
+import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
 import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
@@ -239,5 +240,50 @@ describe('review_record_pinned.read_skipped_join, then restart_if_moved on a mov
 		expect(wait).not.toHaveBeenCalled()
 		expect(run_review_pinned_steps.launch).toHaveBeenCalledOnce()
 		expect(console.info).toHaveBeenCalledExactlyOnceWith(review_record_pinned.started_line())
+	})
+})
+
+// joshuafolkken/kit#9165: the cut before the gate starts the settled tree's check under the branch's
+// recorded reason, behind `check:related`'s restart guard.
+describe('review_record_pinned.launch_at_cut', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+		vi.spyOn(lane_child_marker, 'marked_issue').mockReturnValue(undefined)
+		vi.spyOn(run_ship_detach, 'is_supervised').mockReturnValue(false)
+		vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(REASON)
+		vi.spyOn(run_review_pinned_join, 'launch_kept').mockResolvedValue(undefined)
+	})
+
+	it("launches the lane child's check with the recorded reason", async () => {
+		await review_record_pinned.launch_at_cut(ROOT)
+
+		expect(run_review_pinned_join.launch_kept).toHaveBeenCalledExactlyOnceWith(ROOT, REASON)
+	})
+
+	it.each([
+		['outside a lane child', true, false],
+		["under a ship's supervisor", false, true],
+	])('launches nothing %s', async (_label, is_lane_off, is_supervised) => {
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(!is_lane_off)
+		vi.mocked(run_ship_detach.is_supervised).mockReturnValue(is_supervised)
+
+		await review_record_pinned.launch_at_cut(ROOT)
+
+		expect(run_review_pinned_join.launch_kept).not.toHaveBeenCalled()
+	})
+
+	it('launches nothing when the round ledger cannot be read', async () => {
+		vi.mocked(lane_child_marker.marked_issue).mockReturnValue('9165')
+		vi.spyOn(observation_ledger_home, 'read').mockRejectedValue(new Error('unreadable'))
+
+		await expect(review_record_pinned.launch_at_cut(ROOT)).resolves.toBeUndefined()
+
+		expect(run_review_pinned_join.launch_kept).not.toHaveBeenCalled()
+	})
+
+	it('never fails the cut when the launch throws', async () => {
+		vi.mocked(run_review_pinned_join.launch_kept).mockRejectedValue(new Error('spawn failed'))
+
+		await expect(review_record_pinned.launch_at_cut(ROOT)).resolves.toBeUndefined()
 	})
 })

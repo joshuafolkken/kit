@@ -145,6 +145,44 @@ async function run_and_record(
 	return measured.exit_code
 }
 
+// **A touched green leaves the digest of each test it passed** (joshuafolkken/kit#9163), which the
+// full-reach run reuses file by file; a touched red drops the record, so a test that just failed on
+// unchanged inputs is never reused.
+async function record_touched(
+	input: RunInput,
+	tree: GateTree | undefined,
+	exit_code: number,
+): Promise<void> {
+	const stamp = review_stamps.test_related_touched_stamp
+
+	if (exit_code !== 0) {
+		stamp.remove()
+
+		return
+	}
+
+	const blobs =
+		tree === undefined ? {} : await test_related_reuse.blobs(input.root, input.passed ?? [])
+
+	await scoped_green.record_if_green(stamp, {
+		before: tree,
+		exit_code,
+		...(Object.keys(blobs).length > 0 && { blobs }),
+	})
+}
+
+async function run_and_keep(
+	input: RunInput,
+	command_arguments: ReadonlyArray<string>,
+	before: GateTree | undefined,
+): Promise<number> {
+	const exit_code = await run_and_record(input, command_arguments)
+
+	await record_touched(input, conclusive_tree(before), exit_code)
+
+	return exit_code
+}
+
 async function with_no_base_pass(
 	input: RelatedInput,
 	command_arguments: ReadonlyArray<string>,
@@ -175,8 +213,12 @@ async function record_green(
 		return
 	}
 
-	const { retained, carried } = test_related_reuse
-	const kept = [...(await retained(input.root, tree)), ...(await carried(input.root, tree))]
+	const { retained, carried, touched } = test_related_reuse
+	const kept = [
+		...(await retained(input.root, tree)),
+		...(await carried(input.root, tree)),
+		...(await touched(input.root, tree)),
+	]
 	const blobs = await test_related_reuse.blobs(input.root, [...proven_files(input), ...kept])
 
 	await scoped_green.record_if_green(review_stamps.test_related_stamp, {
@@ -212,6 +254,6 @@ async function run_and_vouch(
 	return exit_code
 }
 
-const test_related_run = { run_and_record, run_and_vouch }
+const test_related_run = { run_and_keep, run_and_record, run_and_vouch }
 
 export { test_related_run }
