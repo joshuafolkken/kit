@@ -1,4 +1,5 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { lane_active_lanes_stats } from './lane-active-lanes-stats'
 import { lane_catch_rate_stats } from './lane-catch-rate-stats'
 import { lane_chain_stop_stats } from './lane-chain-stop-stats'
 import { lane_check_stats } from './lane-check-stats'
@@ -134,6 +135,8 @@ function tables_of(
 	const { entries, events, calls, human_waits = [] } = records
 
 	return [
+		lane_active_lanes_stats.table(entries, window),
+		lane_active_lanes_stats.filled_table(entries, window),
 		lane_stage_stats.table(entries, window),
 		lane_ship_lap_stats.table(entries, window),
 		lane_ci_path_stats.table(entries, window),
