@@ -1,0 +1,7 @@
+{
+	"growth": {
+		"scripts.code_lines": 160
+	},
+	"reason": "New lane:stats by-active-lanes and filled-limit tables module (#9171)",
+	"date": "2026-11-28"
+}
