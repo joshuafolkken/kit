@@ -42,6 +42,7 @@ beforeEach(() => {
 	for (const file of [SOURCE, ...TESTS]) writeFileSync(file, 'before')
 	vi.spyOn(import_graph, 'create').mockResolvedValue(GRAPH)
 	vi.spyOn(test_pinned_reach, 'code_universe').mockResolvedValue(TESTS)
+	vi.spyOn(review_stamps.test_related_touched_stamp, 'read').mockReturnValue(undefined)
 	mock_moved({ changed: [], synced: ['main.ts'] })
 })
 
