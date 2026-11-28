@@ -52,12 +52,16 @@ function samples_of(entries: ReadonlyArray<LedgerEntry>): Array<LaneSample> {
 		.toSorted((left, right) => left.at_ms - right.at_ms)
 }
 
-function lanes_at(samples: ReadonlyArray<LaneSample>, started_ms: number): number | undefined {
+// `max_age_ms` lets a reader that counts a sample's whole gap as time (`lane_stats.sampled_hours`)
+// attribute an event over that same gap.
+function lanes_at(
+	samples: ReadonlyArray<LaneSample>,
+	started_ms: number,
+	max_age_ms = SAMPLE_MAX_AGE_MS,
+): number | undefined {
 	const sample = samples.findLast((candidate) => candidate.at_ms <= started_ms)
 
-	return sample !== undefined && started_ms - sample.at_ms <= SAMPLE_MAX_AGE_MS
-		? sample.lanes
-		: undefined
+	return sample !== undefined && started_ms - sample.at_ms <= max_age_ms ? sample.lanes : undefined
 }
 
 interface RunRecords {

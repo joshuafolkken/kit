@@ -9,8 +9,9 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // limit over the filled time only, when at least the limit's lanes were active.
 //
 // A sample's time is the stretch to the next sample (`lane_stats.sampled_hours`); a merge counts
-// under the latest load sample at or before it (`lane_concurrency_stats.lanes_at`, the concurrent-lanes
-// table's rule) and the limit in force at it (`lane_limit_table.limit_at`).
+// under the latest load sample at or before it (`lane_concurrency_stats.lanes_at`) within the gap
+// `sampled_hours` still counts as time (`lane_stats.ACTIVE_GAP_MS`), so a row's hours and merges
+// share one staleness rule, and the limit in force at it (`lane_limit_table.limit_at`).
 
 const PERCENT = 100
 const HOUR_DECIMALS = 2
@@ -61,7 +62,7 @@ function merge_points(
 		.filter((entry) => entry.kind === lane_ledger.KIND.MERGE)
 		.map((entry) => Date.parse(entry.at))
 		.map((at_ms) => ({
-			lanes: lane_concurrency_stats.lanes_at(lane_samples, at_ms) ?? 0,
+			lanes: lane_concurrency_stats.lanes_at(lane_samples, at_ms, lane_stats.ACTIVE_GAP_MS) ?? 0,
 			limit: lane_limit_table.limit_at(timeline, at_ms),
 		}))
 }

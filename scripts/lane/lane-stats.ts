@@ -372,6 +372,7 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 }
 
 const lane_stats = {
+	ACTIVE_GAP_MS,
 	COLUMNS,
 	MISSING,
 	cell,

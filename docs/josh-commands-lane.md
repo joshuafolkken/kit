@@ -233,9 +233,8 @@ were active, so two limits compare over filled time.
 Both tables give hours, merges, merges per hour, load mean and peak, the share of samples over the core count, and
 free memory mean and minimum.
 
-A sample's time runs to the next sample
-(`sampled_hours`). A merge counts under the latest load sample at or before it, as the `concurrent lanes` table
-does, and the limit in force at it. One merge takes about 45 minutes, so a short row's merges per hour swings
+A sample's time runs to the next sample, up to an hour (`sampled_hours`). A merge counts under the latest load
+sample at or before it within that same hour, and the limit in force at it. One merge takes about 45 minutes, so a short row's merges per hour swings
 (`lane-active-lanes-stats.ts`):
 
 ```sh

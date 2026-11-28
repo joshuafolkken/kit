@@ -75,6 +75,15 @@ describe('lane_active_lanes_stats.table', () => {
 		)
 	})
 
+	it('counts a merge in a sample gap the row’s hours count, past five minutes', () => {
+		const ledger = [limit(0, 6), sample(0, 4, 8), sample(30, 4, 8), merge(20, 1)]
+		const rows = rows_of(
+			lane_active_lanes_stats.table(ledger, lane_stats.window_of(1, START + 40 * MINUTE_MS)),
+		)
+
+		expect(rows.map((row) => row.slice(0, 3))).toStrictEqual([['4', '0.50', '1']])
+	})
+
 	it('reads load mean, peak, the share over cores and free memory per row', () => {
 		const rows = rows_of(lane_active_lanes_stats.table(LEDGER, WINDOW))
 
@@ -91,6 +100,17 @@ describe('lane_active_lanes_stats.filled_table', () => {
 		const rows = rows_of(lane_active_lanes_stats.filled_table(LEDGER, WINDOW))
 
 		expect(rows.map((row) => row.slice(0, 3))).toStrictEqual([['6', '0.05', '2']])
+	})
+
+	it('files a filled stretch under the limit in force, not a later one', () => {
+		const ledger = [...LEDGER, limit(9, 4), sample(12, 4, 8), sample(15, 4, 8)]
+		const window = lane_stats.window_of(1, START + 20 * MINUTE_MS)
+		const rows = rows_of(lane_active_lanes_stats.filled_table(ledger, window))
+
+		expect(rows.map((row) => row.slice(0, 2))).toStrictEqual([
+			['4', '0.10'],
+			['6', '0.05'],
+		])
 	})
 
 	it('leaves out samples written before any limit line', () => {
