@@ -4,6 +4,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { run_review_join_read, type JoinVerdict } from '#scripts/run/review/run-review-join-read'
+import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
@@ -110,8 +111,26 @@ async function restart_in_lane(root: string = PROJECT_ROOT): Promise<boolean> {
 	}
 }
 
+// **The implementation's settled tree starts its check at the cut before the gate**
+// (joshuafolkken/kit#9165): until then the first probe was `josh run:review`'s, after `run:chain`'s open
+// stages, and the recheck before the ship waited out the rest. Started here, under the reason this
+// branch recorded, it runs beside those stages; round 1 on the same tree keeps it
+// (`run-review-pinned-join.ts` → `launch_kept`). The guard is `check:related`'s restart's. A launch that
+// throws never fails the cut.
+async function launch_at_cut(root: string = PROJECT_ROOT): Promise<void> {
+	try {
+		if (!(await is_restartable_before_record(root))) return
+		const reason = await run_review_pinned_accepted.recorded_reason()
+
+		await run_review_pinned_join.launch_kept(root, reason)
+	} catch (error) {
+		error_text.trace_swallowed('review_record_pinned.launch_at_cut', error)
+	}
+}
+
 const review_record_pinned = {
 	CHOICE_LINE,
+	launch_at_cut,
 	read_skipped_join,
 	restart_if_moved,
 	restart_in_lane,
