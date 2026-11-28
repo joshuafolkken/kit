@@ -31,6 +31,10 @@ describe('lane_overrun.is_overran', () => {
 		expect(lane_overrun.is_overran(sized(20), ISSUE, 30)).toBe(true)
 	})
 
+	it('judges the unrounded minutes lane:breakdown reads, not the whole minutes it notes', () => {
+		expect(lane_overrun.is_overran(sized(100), ISSUE, 25.5)).toBe(false)
+	})
+
 	it('never overruns an adopted theme lane', () => {
 		expect(lane_overrun.is_overran(sized(20, true), ISSUE, 90)).toBe(false)
 	})

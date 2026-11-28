@@ -658,14 +658,14 @@ pnpm josh run:merge <N>                                                  # backl
 
 Confirms the child from GitHub and does its post-merge steps: a **merged**
 child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync` (skipped while another run holds it), is counted (resets the failure streak) and its `merge`
-logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
-(`lane:net`) comments its breakdown by stage (`lane:breakdown`) on the lane's Issue once and launches a detached session that searches the longest stages first and files its unfiled causes against the lane, recorded as a `note`
+logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane slow for its size (`lane:breakdown`'s pace; unsized, over 40 net
+minutes of `lane:net`; adopted, never) comments its breakdown by stage (`lane:breakdown`) on the lane's Issue once and launches a detached session that searches the longest stages first and files its unfiled causes against the lane, recorded as a `note`
 event (the start note carrying the longest stage, which the board draws after 🔍) (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
-a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; a launch that failed (`not investigated: <why>`) is launched once more at the next merge, whichever child merged; every 30th merge in the
+a lane within it notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; a launch that failed (`not investigated: <why>`) is launched once more at the next merge, whichever child merged; every 30th merge in the
 lane ledger launches one baseline investigation of the median lane — the stages and sub-stages that spend the most per merge
 in `lane:stats --period 3`, its causes filed by the overrun's rules (at most five, the largest reducible minutes first, each 1 minute or more) — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
 its wording `run-event-baseline.ts`), a finding on the board. Both investigations are off by default and run only while
-`JOSH_LANE_INVESTIGATION` is `on` ([environment variables](./environment-variables.md#runs)): off, a lane over 40 minutes notes
+`JOSH_LANE_INVESTIGATION` is `on` ([environment variables](./environment-variables.md#runs)): off, an overrun notes
 `#N overrun skipped: disabled (JOSH_LANE_INVESTIGATION is not on)` with no breakdown comment or launch, no failed launch is retried, the other notes are unchanged, and a due baseline launches and notes nothing. The board's
 merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
 and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
