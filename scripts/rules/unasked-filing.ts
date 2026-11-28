@@ -80,10 +80,9 @@ const QUOTED = /"[^"]*"|'[^']*'/gu
 const UNASKED_FILING_REASON =
 	'⛔ unasked filing: this interactive session files an Issue only on the person’s explicit ' +
 	'instruction (「起票」, “file an issue”, or a command whose procedure files, such as `kickoff new`). ' +
-	'Propose it in the reply; once confirmed, hand it to ' +
+	'Propose it; once confirmed, hand it to ' +
 	'`pnpm josh run:handoff kickoff new --brief-file <path>`, `<path>` from `run:handoff brief-path`. ' +
-	'It fires on every occurrence ' +
-	'(`.claude/skills/workflow-commands/observation-filing.md`).'
+	'Fires on every call (`.claude/skills/workflow-commands/observation-filing.md`).'
 
 // The person's own words — quotes, code spans and fenced blocks removed.
 function own_words(prompt: string): string {

@@ -352,10 +352,10 @@ pnpm josh run:handoff-lanes   # after each child’s merge; prints the verdict l
 Hand a workflow keyword typed in a consultation session to a child on the role profile model.
 
 ```bash
-pnpm josh run:handoff brief-path                        # a fresh path per call; write the brief there
-pnpm josh run:handoff kickoff new --brief-file <path>   # waits; prints its final message and URLs
-pnpm josh run:handoff fullrun <N> --brief-file <path>   # detached; a bare N is #N; check it with run:progress --once
-pnpm josh run:handoff backlogrun <E> --only             # josh backlogrun with this session’s --agent
+pnpm josh run:handoff brief-path                                   # a fresh path; write the brief there
+pnpm josh run:handoff kickoff new --brief-file .josh/tmp/<brief>   # waits; prints its final message and URLs
+pnpm josh run:handoff fullrun <N> --brief-file .josh/tmp/<brief>   # detached; a bare N is #N; check it with run:progress --once
+pnpm josh run:handoff backlogrun <E> --only                        # josh backlogrun with this session’s --agent
 ```
 
 <!-- /usage -->
@@ -366,9 +366,9 @@ Consultation main (Fable / Astra): its provider's role profile (`kickoff` / `ret
 
 A brief a child already got exits 1 naming when and its log; `--again` repeats it.
 
-`run:handoff retrospective` starts the end-of-run unit on a generated brief and waits; the brief's close names the calling session as `--owner`, since the carry is that session's. It exits 0 only once the carry holds the unit's `run:carry --retrospective` mark, and exits 1 without starting when the mark is already there.
+`run:handoff retrospective` starts the end-of-run unit on a generated brief and waits; its close names the calling session as `--owner`, whose carry it is. It exits 0 only once the carry holds the unit's `run:carry --retrospective` mark, and exits 1 without starting when the mark is already there.
 
-**Output / exit codes:** exits 0 once the child starts (`kickoff`: once it exits 0); `backlogrun` exits with `josh backlogrun`'s code. A bad argument, an unreadable brief, an unresolvable profile, no git repository, a failed start, or a tree hold that blocks the child's `run:entry` claim exits 1.
+**Output / exit codes:** exits 0 once the child starts (`kickoff`: once it exits 0); `backlogrun` exits with `josh backlogrun`'s code. A bad argument, unreadable brief, unresolvable profile, no git repository, failed start, or a tree hold blocking the child's `run:entry` claim exits 1.
 
 A hand-off still starting has not claimed yet, so `run:entry` stays the guard.
 

@@ -221,14 +221,14 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: 'brief-path',
-					note: 'a fresh path per call; write the brief there',
+					note: 'a fresh path; write the brief there',
 				},
 				{
-					arguments: 'kickoff new --brief-file <path>',
+					arguments: 'kickoff new --brief-file .josh/tmp/<brief>',
 					note: 'waits; prints its final message and URLs',
 				},
 				{
-					arguments: 'fullrun <N> --brief-file <path>',
+					arguments: 'fullrun <N> --brief-file .josh/tmp/<brief>',
 					note: 'detached; a bare N is #N; check it with run:progress --once',
 				},
 				{
