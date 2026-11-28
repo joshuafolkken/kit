@@ -19,13 +19,16 @@ const CLOSE_COMMAND = 'issue:close'
 // An option shipping this Issue in another Issue's pull request names `lane:fold` (joshuafolkken/kit#7985):
 // a child cannot fold its own lane, so the parent's adopt runs the fold instead of a requeue.
 const FOLD_COMMAND = 'lane:fold'
+// The tier no parent takes, even on a person's behalf: trust settings, third parties, destructive acts.
+const PERSON_TIER = 'C'
+const PERSON_PERMISSION = '人'
 const PERMISSION_VALUES: ReadonlyArray<string> = [
 	AUTO_PERMISSION,
 	PARENT_PERMISSION,
 	'owner コメント',
 	'epic 編集',
 	'信頼設定',
-	'人',
+	PERSON_PERMISSION,
 ]
 const NOTE_START = /[（(]/u
 const PARENT_CLOSE = `${PARENT_PERMISSION}（${CLOSE_COMMAND}）`
@@ -46,9 +49,30 @@ function problem_of(name: string, permission: string): string | undefined {
 	return `${name} names "${value}" as its permission; write one of: ${words} — a parent close is "${PARENT_CLOSE}", a parent filing "${PARENT_FILING}", a parent fold "${PARENT_FOLD}"`
 }
 
+interface TieredPermission {
+	tier?: string | undefined
+	permission?: string | undefined
+}
+
+// A tier C option naming the parent's permission (joshuafolkken/kit#9172): `backlog:triage --adopt`
+// refuses every tier C option as a person's, so no parent ever takes it. `undefined` for a consistent pair.
+function tier_problem(name: string, option: TieredPermission): string | undefined {
+	const permission = option.permission ?? ''
+
+	if (option.tier !== PERSON_TIER || !permission.startsWith(PARENT_PERMISSION)) return undefined
+
+	return `${name} is tier ${PERSON_TIER}, a person's to take, but names "${permission}" as its permission; write "- 必要な権限: ${PERSON_PERMISSION}" with a "person:" outcome, or tier A|B for the parent's action (a parent close is "${PARENT_CLOSE}")`
+}
+
+// The vocabulary problem of an option's permission, then its pairing with the tier.
+function option_problem(name: string, option: TieredPermission): string | undefined {
+	return problem_of(name, option.permission ?? '') ?? tier_problem(name, option)
+}
+
 function schema_lines(): ReadonlyArray<string> {
 	return [
 		`   - 必要な権限: ${PERMISSION_VALUES.join(' | ')}`,
+		`   (tier ${PERSON_TIER}: - 必要な権限: ${PERSON_PERMISSION}; a ${PARENT_PERMISSION}（…） action is tier A|B)`,
 		`   (closing without implementing: - 必要な権限: ${PARENT_CLOSE})`,
 		`   (filing an Issue: - 必要な権限: ${PARENT_FILING})`,
 		`   (shipping in another Issue's pull request: - 必要な権限: ${PARENT_FOLD})`,
@@ -61,8 +85,11 @@ const run_park_permission = {
 	FILING_COMMAND,
 	FOLD_COMMAND,
 	PARENT_PERMISSION,
+	PERSON_TIER,
+	option_problem,
 	problem_of,
 	schema_lines,
+	tier_problem,
 }
 
 export { run_park_permission }

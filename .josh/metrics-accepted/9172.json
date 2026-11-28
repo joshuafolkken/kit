@@ -1,0 +1,7 @@
+{
+	"reason": "tier/permission pairing check for run:park park bodies (#9172)",
+	"date": "2026-11-28",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}
