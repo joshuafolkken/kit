@@ -1,3 +1,4 @@
+import { test_pinned_ledger } from '#scripts/test/test-pinned-ledger'
 import { describe, expect, it } from 'vitest'
 import type { Breakdown } from './lane-breakdown'
 import { lane_implement_split } from './lane-implement-split'
@@ -60,11 +61,13 @@ function pinned(from: number, to: number, discarded = false): LedgerEntry {
 	}
 }
 
+const CHECK_RELATED = 'check:related'
+
 const ENTRIES: ReadonlyArray<LedgerEntry> = [
 	pinned(8, 20),
 	pinned(0, 30, true),
 	stage('recheck', 10, 20),
-	stage('check:related', 20, 24),
+	stage(CHECK_RELATED, 20, 24),
 	core_wait(21, 23),
 	core_wait(0, 40, OTHER_ISSUE),
 	stage('run:review', 30, 33),
@@ -114,6 +117,22 @@ describe('lane_implement_split.of', () => {
 
 	it('prints the order lane:breakdown names them in', () => {
 		expect(lane_implement_split.PRINTED[0]).toBe(SEGMENT.EDIT)
+	})
+})
+
+// joshuafolkken/kit#9165: the cut starts the check before the gate, so its run spans the gate.
+describe('lane_implement_split.of with a background check', () => {
+	it('counts it under what ran beside it, and its recheck as the pinned wait', () => {
+		const background = { ...pinned(0, 20), origin: test_pinned_ledger.BACKGROUND_ORIGIN }
+		const split = minutes_of([background, stage(CHECK_RELATED, 0, 10), stage('recheck', 15, 20)])
+
+		expect(split?.slice(1)).toStrictEqual([
+			[SEGMENT.CORE, 0],
+			[SEGMENT.PINNED, 5],
+			[SEGMENT.REVIEW, 0],
+			[SEGMENT.GATE, 10],
+			[SEGMENT.OTHER, 0],
+		])
 	})
 })
 
