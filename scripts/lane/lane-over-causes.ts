@@ -1,6 +1,5 @@
 import path from 'node:path'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
-import { lane_net_time } from './lane-net-time'
 import { lane_over } from './lane-over'
 import { lane_sinks, type SinkRecords } from './lane-sinks'
 import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
@@ -46,9 +45,9 @@ function add_lane(
 	groups: Map<string, OverCause>,
 	records: SinkRecords,
 	issue: number,
-	threshold_ms: number,
+	rate: number,
 ): void {
-	const over_ms = (lane_net_time.net_ms(records.entries, records.events, issue) ?? 0) - threshold_ms
+	const over_ms = (lane_sinks.excess_minutes(records, issue, rate) ?? 0) * MS_PER_MINUTE
 
 	for (const cause of lane_causes(records, issue)) {
 		const id = `${cause.kind}:${cause.key}`
@@ -60,12 +59,13 @@ function add_lane(
 	}
 }
 
-// The causes of the lanes of `window` over `minutes`, the largest summed overrun first.
-function causes_of(records: SinkRecords, window: StatsWindow, minutes: number): Array<OverCause> {
+// The causes of the lanes of `window` slow for their size against `rate`, the largest summed
+// overrun past the pace first.
+function causes_of(records: SinkRecords, window: StatsWindow, rate: number): Array<OverCause> {
 	const groups = new Map<string, OverCause>()
 
-	for (const issue of lane_sinks.over_issues(records, window, minutes)) {
-		add_lane(groups, records, issue, minutes * MS_PER_MINUTE)
+	for (const issue of lane_sinks.slow_issues(records, window, rate)) {
+		add_lane(groups, records, issue, rate)
 	}
 
 	return [...groups.values()].toSorted((left, right) => right.over_ms - left.over_ms)
@@ -98,10 +98,10 @@ function candidates_line(
 function table(
 	records: SinkRecords,
 	window: StatsWindow,
-	minutes: number,
+	rate: number,
 	issues: ReadonlyArray<OpenIssue> | undefined,
 ): string {
-	const causes = causes_of(records, window, minutes)
+	const causes = causes_of(records, window, rate)
 
 	return [
 		lane_stats.to_row(COLUMNS),
@@ -116,12 +116,12 @@ function table(
 function view(
 	records: SinkRecords,
 	window: StatsWindow,
-	minutes: number,
+	rate: number,
 	issues: ReadonlyArray<OpenIssue> | undefined,
 ): string {
 	return [
-		lane_over.table(records, window, minutes, issues),
-		table(records, window, minutes, issues),
+		lane_over.table(records, window, rate, issues),
+		table(records, window, rate, issues),
 	].join('\n\n')
 }
 

@@ -2,8 +2,8 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_breakdown } from './lane-breakdown'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
-import type { SizeEntry } from './lane-ledger-schema'
 import { lane_net_time, type LaneSpan } from './lane-net-time'
+import { lane_pace, type Pace } from './lane-pace'
 import { lane_stage_budget } from './lane-stage-budget'
 import type { ToolCall } from './lane-transcript-calls'
 
@@ -16,11 +16,10 @@ interface ElapsedTime {
 	work_ms: number
 	unclassified_ms: number
 	tool_ms: number
-	target_minutes: number
-	within_target: boolean
+	pace: Pace
 }
 
-type Partition = Omit<ElapsedTime, 'target_minutes' | 'within_target'>
+type Partition = Omit<ElapsedTime, 'pace'>
 
 const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write'])
 const AUTOMATIC_STAGES: ReadonlySet<string> = new Set([
@@ -87,18 +86,17 @@ function partition(
 	}
 }
 
-// The latest recorded actual size of `issue` picks the two-tier target (joshuafolkken/kit#8729).
-function judged(entries: ReadonlyArray<LedgerEntry>, issue: number, parts: Partition): ElapsedTime {
-	const size = entries.findLast(
-		(entry): entry is SizeEntry => entry.kind === 'size' && entry.issue === issue,
-	)
-	const target_minutes = lane_stage_budget.target_minutes(size?.actual)
+// The lane is judged by its pace on its net minutes against its recorded size (joshuafolkken/kit#9164),
+// the same value `lane:stats --over` and the board's overrun note judge on.
+function judged(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	parts: Partition,
+): ElapsedTime {
+	const net_ms = lane_net_time.net_ms(entries, events, issue) ?? parts.total_ms
 
-	return {
-		...parts,
-		target_minutes,
-		within_target: parts.total_ms <= target_minutes * MS_PER_MINUTE,
-	}
+	return { ...parts, pace: lane_pace.of(entries, issue, net_ms / MS_PER_MINUTE) }
 }
 
 function of(
@@ -116,16 +114,14 @@ function of(
 		...tool_spans(calls),
 	]
 
-	return judged(entries, issue, partition(span, human, automatic, calls))
+	return judged(entries, events, issue, partition(span, human, automatic, calls))
 }
 
 function text(timing: ElapsedTime): string {
 	const minutes = lane_breakdown.minutes_text
-	const target = `${String(timing.target_minutes)}-min target`
-	const status = timing.within_target ? `within the ${target}` : `over the ${target}`
 
 	return [
-		`End-to-end ${minutes(timing.total_ms)} (${status}); ${lane_stage_budget.DESCRIPTION}`,
+		`End-to-end ${minutes(timing.total_ms)} (${lane_pace.text(timing.pace)}); ${lane_stage_budget.DESCRIPTION}`,
 		`Exclusive wall clock: off-tool work ${minutes(timing.work_ms)}; automatic wait ${minutes(timing.automatic_ms)}; human wait ${minutes(timing.human_ms)}; unclassified (missing transcripts) ${minutes(timing.unclassified_ms)}`,
 		`Tool cumulative ${minutes(timing.tool_ms)} (parallel calls overlap; not additive to wall clock). Off-tool work includes unrecorded activity; automatic wait includes tool responses, gate, CI, yield, outage and sleep. Legacy net excludes more than human wait.`,
 	].join('\n')

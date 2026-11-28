@@ -108,7 +108,7 @@ describe('lane_breakdown_cli.run', () => {
 				'- implement 51.0 min, over budget +42 min (editing & thinking 51.0 min)',
 				'- start to plan 10.0 min, over budget +7 min',
 				'- waits taken out (park, outage, usage limit, yield, split run, host stop) 0.0 min, of which yield wait 0.0 min, of which host stop (sleep or network down) 0.0 min',
-				'End-to-end 61.0 min (over the 30-min target); target 30 min dispatch to merge, 60 min past the 8-file / 200-line split guide (human wait reported separately, included); internal stage budgets 25 min (plan 3 + implement 9 + ship 8 + followup 5)',
+				'End-to-end 61.0 min (pace not judged: no recorded size); internal stage budgets 25 min (plan 3 + implement 9 + ship 8 + followup 5)',
 				'Exclusive wall clock: off-tool work 0.0 min; automatic wait 0.0 min; human wait 0.0 min; unclassified (missing transcripts) 61.0 min',
 				'Tool cumulative 0.0 min (parallel calls overlap; not additive to wall clock). Off-tool work includes unrecorded activity; automatic wait includes tool responses, gate, CI, yield, outage and sleep. Legacy net excludes more than human wait.',
 				'- Largest time sinks (stages and laps overlap): implement 51.0 min; start to plan 10.0 min',
@@ -163,7 +163,7 @@ describe('lane_breakdown_cli.run — --timeline', () => {
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('ship gate'))
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('driver followup (CI wait)'))
 		expect(console.info).toHaveBeenCalledWith(
-			expect.stringContaining('End-to-end 61.0 min (over the 30-min target)'),
+			expect.stringContaining('End-to-end 61.0 min (pace not judged: no recorded size)'),
 		)
 	})
 

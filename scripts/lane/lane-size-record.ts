@@ -10,9 +10,12 @@ import { lane_ledger_write } from './lane-ledger-write'
 // A diff past the split cap is recorded `missed` — a pre-split miss, since the started lane was never
 // split (joshuafolkken/kit#7183). The notice bar (declared × measured ratio) stays a warning: a median
 // ratio puts about half of all lanes past it however good the estimates are (joshuafolkken/kit#7579).
+// `missed` stays a calibration count, not a slowness judgment: `lane-pace.ts` judges the lane's time by
+// its pace (joshuafolkken/kit#9164). A body with an adopt-branch row is recorded `adopted`, so the pace
+// leaves that theme lane unjudged.
 
 async function measure_and_record(issue: string): Promise<void> {
-	const declared = await issue_declared_size.read(issue)
+	const { declared, is_adopted } = await issue_declared_size.read_lane(issue)
 
 	if (declared === undefined) return
 	const measurement = await split_measure.read_branch()
@@ -22,6 +25,7 @@ async function measure_and_record(issue: string): Promise<void> {
 		declared,
 		actual: { files: measurement.files, lines: measurement.lines },
 		missed: split_assess.is_over_cap(measurement.files, measurement.lines, measurement.guide),
+		...(is_adopted && { adopted: true }),
 	})
 }
 

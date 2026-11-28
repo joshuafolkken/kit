@@ -3,9 +3,12 @@ import type { LedgerEntry } from './lane-ledger'
 import { lane_over_causes } from './lane-over-causes'
 import type { SinkRecords } from './lane-sinks'
 
-// joshuafolkken/kit#6985: two lanes over 40 net minutes share one over-cap hub and one CI job, and a
-// third lane under the threshold shares them too; each cause is one row, filed only when no open
-// Issue names it.
+// joshuafolkken/kit#6985: two lanes slow for their size share one over-cap hub and one CI job, and a
+// third lane within its pace shares them too; each cause is one row, filed only when no open Issue
+// names it. Each lane's overrun is its minutes past the fixed cost plus the rate's allowance for its
+// size (joshuafolkken/kit#9164), so the rate and size below allow each lane the same total.
+const RATE = 14
+const LINES = 200
 const MINUTE_MS = 60_000
 const START = Date.parse('2026-11-05T00:00:00Z')
 const WINDOW = { since_ms: START, until_ms: START + 120 * MINUTE_MS }
@@ -46,6 +49,13 @@ function lane_of(issue: number, minutes: number): Array<LedgerEntry> {
 			last_check: JOB,
 			check_ms: { [JOB]: 157_000 },
 		},
+		{
+			kind: 'size',
+			issue,
+			at: at(minutes),
+			declared: { files: 2, lines: LINES },
+			actual: { files: 2, lines: LINES },
+		},
 		{ kind: 'merge', issue, at: at(minutes) },
 	]
 }
@@ -56,7 +66,7 @@ const RECORDS: SinkRecords = {
 }
 
 function lines_of(issues: Parameters<typeof lane_over_causes.table>[3]): Array<string> {
-	return lane_over_causes.table(RECORDS, WINDOW, 40, issues).split('\n')
+	return lane_over_causes.table(RECORDS, WINDOW, RATE, issues).split('\n')
 }
 
 describe('lane_over_causes.table', () => {
@@ -93,7 +103,7 @@ describe('lane_over_causes.table', () => {
 
 describe('lane_over_causes.view', () => {
 	it('prints the per-lane chains, then the shared causes', () => {
-		const text = lane_over_causes.view(RECORDS, WINDOW, 40, [])
+		const text = lane_over_causes.view(RECORDS, WINDOW, RATE, [])
 
 		expect(text.indexOf('| lane |')).toBeLessThan(text.indexOf('| kind |'))
 		expect(text).toContain('filing candidates: ')

@@ -53,7 +53,7 @@ const USAGE = [
 	'Usage: josh lane:sample [--every <seconds>]',
 	'       josh lane:stats --period <days> [--limit <lane-limit>] [--all]',
 	'       josh lane:stats --period <days> --sinks [<minutes>]',
-	'       josh lane:stats --period <days> --over <minutes>',
+	'       josh lane:stats --period <days> --over <min-per-100-lines>',
 	'       josh lane:stats --period <days> --why <minutes>',
 	'       josh lane:stats --period <days> --pairs',
 	'       josh lane:stats --since <instant> … — any form above, the window opened at the instant',

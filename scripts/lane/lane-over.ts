@@ -14,7 +14,8 @@ import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_yield_split, type IssueYield } from './lane-yield-split'
 
-// `josh lane:stats --over` (joshuafolkken/kit#5988): one row per lane of the period over a threshold,
+// `josh lane:stats --over` (joshuafolkken/kit#5988): one row per lane of the period slow for its size
+// (min / 100 lines past the fixed cost over the given rate, joshuafolkken/kit#9164),
 // its net and waited minutes beside the ledger chain that explains it — the split notices and filed
 // children, a blocking round 1, the unplanned notices, each yield with its holder and redispatch gap,
 // the hub that put `test:related` past its cap and the files that kept their whole reach past it
@@ -202,17 +203,18 @@ function over_lane(records: SinkRecords, scale: EstimateScale, issue: number): O
 	return { issue, stages, estimate: lane_over_estimate.estimate_of(scale, issue, stages) }
 }
 
-// The table of the lanes of `window` over `minutes`, the longest net time first, then the count of
+// The table of the lanes of `window` slow for their size — net minutes past the fixed cost per 100
+// actual lines over `rate` (joshuafolkken/kit#9164) — the longest net time first, then the count of
 // each estimate side; `issues` is `undefined` when the open-Issue listing was unreadable.
 function table(
 	records: SinkRecords,
 	window: StatsWindow,
-	minutes: number,
+	rate: number,
 	issues: ReadonlyArray<OpenIssue> | undefined,
 ): string {
 	const scale = lane_over_estimate.scale_of(records.entries, window)
 	const lanes = lane_sinks
-		.over_issues(records, window, minutes)
+		.slow_issues(records, window, rate)
 		.toSorted((left, right) => net_of(records, right) - net_of(records, left))
 		.map((issue) => over_lane(records, scale, issue))
 

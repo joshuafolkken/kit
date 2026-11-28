@@ -18,10 +18,12 @@ import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_net_time } from './lane-net-time'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
+import { lane_pace } from './lane-pace'
 import { lane_tail_stats } from './lane-tail-stats'
 
-// A merged lane over the overrun threshold of net time is investigated for its causes
-// (joshuafolkken/kit#4751). `run:merge` asks at each merge: a lane at or under the threshold — its long
+// A merged lane slow for its size — or, unsized, over the overrun threshold of net time
+// (`is_overran`) — is investigated for its causes
+// (joshuafolkken/kit#4751). `run:merge` asks at each merge: a lane within it — its long
 // total spent waiting on a person or an outage included — stops here, before any record of it is read.
 // An overrun launches a detached worker session that reads the lane's records and files each unfiled
 // cause through `issue:file` — the causes one fix place shares as one issue, or folded into an open
@@ -37,6 +39,7 @@ const { DISABLED_REASON } = run_event_overrun
 const LOG_PREFIX = 'josh-lane-overrun-'
 const LOG_SUFFIX = '.log'
 const NO_LEDGER = 'no ledger'
+const MS_PER_MINUTE = 60_000
 
 // A lane's net minutes and their breakdown by stage, or why there are none (joshuafolkken/kit#4818).
 // `is_commented` says an earlier pass of the lane commented the breakdown on its Issue already;
@@ -46,6 +49,7 @@ type LaneNet =
 	| {
 			kind: 'minutes'
 			minutes: number
+			exact_minutes: number
 			breakdown: Breakdown
 			entries: ReadonlyArray<LedgerEntry>
 			events: ReadonlyArray<RunEvent>
@@ -106,16 +110,19 @@ function is_commented(events: ReadonlyArray<RunEvent>, issue: number): boolean {
 
 function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): LaneNet {
 	const entries = lane_ledger_archive.history_at(path)
-	const minutes = lane_net_time.net_minutes(entries, events, issue)
+	const net_ms = lane_net_time.net_ms(entries, events, issue)
 	const breakdown = lane_breakdown.of(entries, events, issue)
 
-	if (minutes === undefined || breakdown === undefined) {
+	if (net_ms === undefined || breakdown === undefined) {
 		return { kind: 'missing', reason: lane_net_time.missing_reason(entries, issue) }
 	}
 
+	const exact_minutes = net_ms / MS_PER_MINUTE
+
 	return {
 		kind: 'minutes',
-		minutes,
+		minutes: Math.ceil(exact_minutes),
+		exact_minutes,
 		breakdown,
 		entries,
 		events,
@@ -226,16 +233,33 @@ async function overran_text(issue: number, net: OverranNet): Promise<string> {
 	return run_event_overrun.started_text(issue, net.minutes, outcome, longest)
 }
 
-// The note every merged lane leaves: its net minutes at or under the threshold, why it has none, or the
-// launch of its overrun's investigation.
+// A sized lane overruns when its pace is slow for its size (joshuafolkken/kit#9164); an adopted theme
+// lane never does; an unsized one falls back to the net-minute threshold. The judgment sets no
+// priority: each filing is ranked by its causes' reducible minutes (joshuafolkken/kit#4928). The pace
+// reads the unrounded minutes `lane:breakdown` and `lane:stats --over` read; the threshold, the whole
+// minutes `lane:net` prints.
+function is_overran(
+	entries: ReadonlyArray<LedgerEntry>,
+	issue: number,
+	exact_minutes: number,
+): boolean {
+	const pace = lane_pace.of(entries, issue, exact_minutes)
+
+	if (pace.kind === 'judged') return pace.is_slow
+
+	return pace.reason !== 'adopted' && lane_tail_stats.is_overrun(Math.ceil(exact_minutes))
+}
+
+// The note every merged lane leaves: its net minutes within its pace, why it has none, or the launch of
+// its overrun's investigation.
 async function note_text(issue: number, net: LaneNet): Promise<string> {
 	if (net.kind === 'missing') return run_event_overrun.skipped_text(issue, net.reason)
-	// The threshold sets no priority: each filing is ranked by its causes' reducible minutes
-	// (joshuafolkken/kit#4928). `lane:stats` counts the lanes over it on dispatch-to-merge time, not
-	// on this net time.
-	const is_over = lane_tail_stats.is_overrun(net.minutes)
 
-	if (!is_over) return run_event_overrun.within_text(issue, net.minutes)
+	const { entries, exact_minutes, minutes } = net
+
+	if (!is_overran(entries, issue, exact_minutes)) {
+		return run_event_overrun.within_text(issue, minutes)
+	}
 
 	// The switch off, an overrun leaves its skip: no breakdown comment and no launch.
 	if (!lane_investigation_switch.is_on()) {
@@ -281,7 +305,7 @@ async function investigate(issue: number): Promise<void> {
 	await guarded(issue, pass)
 }
 
-const lane_overrun = { investigate, launch }
+const lane_overrun = { investigate, is_overran, launch }
 
 export type { Investigation }
 export { lane_overrun }
