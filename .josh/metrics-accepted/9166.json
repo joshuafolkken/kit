@@ -1,0 +1,8 @@
+{
+	"reason": "#9166 adds the run:handoff brief ledger and brief-path subcommand (new code) and the docs now name where the brief path comes from",
+	"date": "2026-11-28",
+	"growth": {
+		"scripts.code_lines": 138,
+		"ai_cost.on_demand_bytes": 60
+	}
+}

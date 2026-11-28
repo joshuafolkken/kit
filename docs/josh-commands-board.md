@@ -352,9 +352,10 @@ pnpm josh run:handoff-lanes   # after each child’s merge; prints the verdict l
 Hand a workflow keyword typed in a consultation session to a child on the role profile model.
 
 ```bash
-pnpm josh run:handoff kickoff new --brief-file .josh/tmp/brief.md   # waits; prints its final message and URLs
-pnpm josh run:handoff fullrun <N> --brief-file .josh/tmp/brief.md   # detached; a bare N is #N; check it with run:progress --once
-pnpm josh run:handoff backlogrun <E> --only                         # josh backlogrun with this session’s --agent
+pnpm josh run:handoff brief-path                        # a fresh path per call; write the brief there
+pnpm josh run:handoff kickoff new --brief-file <path>   # waits; prints its final message and URLs
+pnpm josh run:handoff fullrun <N> --brief-file <path>   # detached; a bare N is #N; check it with run:progress --once
+pnpm josh run:handoff backlogrun <E> --only             # josh backlogrun with this session’s --agent
 ```
 
 <!-- /usage -->
@@ -362,6 +363,8 @@ pnpm josh run:handoff backlogrun <E> --only                         # josh backl
 Consultation main (Fable / Astra): its provider's role profile (`kickoff` / `retrospective` scheduler, else worker); [`josh.handoff.route`](./package-settings.md) puts `kickoff` on Sonnet. Background `kickoff`. Lane children: exit 1 before launch; continue in the current session.
 
 `--wip <name>` pins `wip/<name>`'s tip into the Issue's `- 取り込むブランチ:` row: on `new` the child's `issue:file` writes it (a `--found-during` filing never does), on one `#N` it is written into #N's body before launch. Any other line, a missing branch or a row #N cannot take exits 1.
+
+A brief a child already got exits 1 naming when and its log; `--again` repeats it.
 
 `run:handoff retrospective` starts the end-of-run unit on a generated brief and waits; the brief's close names the calling session as `--owner`, since the carry is that session's. It exits 0 only once the carry holds the unit's `run:carry --retrospective` mark, and exits 1 without starting when the mark is already there.
 

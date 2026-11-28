@@ -213,18 +213,22 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			'Hand a workflow keyword typed in a consultation session to a child on the role profile model',
 		category: 'AI tools',
 		reference: [
-			'<keyword> [N|new ...] --brief-file <path> [--wip <name>]',
+			'<keyword> [N|new ...] --brief-file <path> [--wip <name>] [--again] | brief-path',
 			'automation',
 			['processes', 'files'],
 		],
 		usage: {
 			examples: [
 				{
-					arguments: 'kickoff new --brief-file .josh/tmp/brief.md',
+					arguments: 'brief-path',
+					note: 'a fresh path per call; write the brief there',
+				},
+				{
+					arguments: 'kickoff new --brief-file <path>',
 					note: 'waits; prints its final message and URLs',
 				},
 				{
-					arguments: 'fullrun <N> --brief-file .josh/tmp/brief.md',
+					arguments: 'fullrun <N> --brief-file <path>',
 					note: 'detached; a bare N is #N; check it with run:progress --once',
 				},
 				{
