@@ -17,7 +17,7 @@ alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".** A keyword selects the
 existing procedure below; it does not turn the consultation main session into an implementation lane.
 
-Instruction to file there → `pnpm josh run:handoff kickoff new --brief-file <path>`, `<path>` from `brief-path` (`CLAUDE.md` → "Explicit invocation required (MANDATORY)").
+Instruction to file there → `run:handoff kickoff new --brief-file <path>`, `<path>` from `brief-path` (`CLAUDE.md` → "Explicit invocation required (MANDATORY)").
 
 ## 1. Which file to read
 
