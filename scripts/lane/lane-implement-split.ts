@@ -1,3 +1,4 @@
+import { test_pinned_ledger } from '#scripts/test/test-pinned-ledger'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import type { LaneSpan } from './lane-net-time'
@@ -5,8 +6,8 @@ import type { LaneSpan } from './lane-net-time'
 // The implementation's net time split by what it waited on (joshuafolkken/kit#8998): the core budget,
 // the `test:pinned` check, the review, the gate's checks, and the rest of `run:chain`'s stages — each
 // read off the lane's ledger rows as the span `[at - elapsed, at]` — and what none of them covers, the
-// editing (writing the tests included). Spans overlap (a core wait inside `check:related`, the pinned
-// check under `recheck`), so each millisecond counts once, under the first segment in `ORDER` that
+// editing (writing the tests included). Spans overlap (a core wait inside `check:related`, a waited-on
+// pinned check under `recheck`), so each millisecond counts once, under the first segment in `ORDER` that
 // covers it. `lane:breakdown` prints the split and `lane:breakdown --period` takes its medians, both
 // from this one table.
 
@@ -77,10 +78,21 @@ function tagged(at: string, elapsed_ms: number, segment: SegmentName): TaggedSpa
 	return { from_ms: to_ms - elapsed_ms, to_ms, segment }
 }
 
-// A core wait or an answered `test:pinned` check; a discarded check was not waited on.
+type PinnedEntry = Extract<LedgerEntry, { kind: typeof KIND.TEST_PINNED }>
+
+// A `test:pinned` check the lane waited on. A discarded check was not; nor a background one
+// (joshuafolkken/kit#9165): `run:cut` starts it before the gate, so its run spans the gate and the
+// open stages, and the wait on it is the `recheck` stage's.
+function is_waited_pinned(entry: LedgerEntry): entry is PinnedEntry {
+	if (entry.kind !== KIND.TEST_PINNED) return false
+
+	return entry.discarded !== true && entry.origin !== test_pinned_ledger.BACKGROUND_ORIGIN
+}
+
+// A core wait or a `test:pinned` check the lane waited on.
 function wait_span(entry: LedgerEntry): TaggedSpan | undefined {
 	if (entry.kind === KIND.CORE_WAIT) return tagged(entry.at, entry.waited_ms, SEGMENT.CORE)
-	if (entry.kind !== KIND.TEST_PINNED || entry.discarded === true) return undefined
+	if (!is_waited_pinned(entry)) return undefined
 
 	return tagged(entry.at, entry.elapsed_ms, SEGMENT.PINNED)
 }

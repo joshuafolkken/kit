@@ -53,6 +53,7 @@ vi.mock('./run-review-pinned-steps', () => ({
 		launch: () => ({ kind: 'launched' }),
 		clear: vi.fn(),
 		is_answered: () => false,
+		launched_tree: () => undefined,
 	},
 }))
 vi.mock('./run-review-steps', () => ({
