@@ -9,6 +9,9 @@ const ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/5400'
 const FINAL = JSON.stringify({ type: 'result', result: `Filed ${ISSUE_URL}` })
 const CLAUDE_SESSION = { CLAUDE_CODE_SESSION_ID: 'session', HOME: '/home' }
 const PID = 42
+const BRIEF_PATH = '.josh/tmp/handoff-brief-x/brief.md'
+// No brief was handed off before.
+const NO_LEDGER: string | undefined = undefined
 
 interface Fake {
 	ports: HandoffPorts
@@ -31,8 +34,9 @@ function recording_ports(record: Omit<Fake, 'ports'>): Pick<HandoffPorts, Record
 
 			return { kind: 'launched', pid: PID }
 		},
-		launch_attached: async (request) => {
+		launch_attached: async (request, on_spawn) => {
 			record.requests.push(request)
+			on_spawn(PID)
 
 			return { kind: 'completed', pid: PID, exit_code: 0 }
 		},
@@ -52,6 +56,9 @@ const QUIET_PORTS: Omit<HandoffPorts, RecordingKey> = {
 	branch_at: async () => 'main',
 	lane_directory: async () => '/repo',
 	read_text: () => FINAL,
+	read_ledger: () => NO_LEDGER,
+	append_ledger: vi.fn<HandoffPorts['append_ledger']>(),
+	brief_path: () => BRIEF_PATH,
 	is_retrospective_done: () => true,
 	release_filing: vi.fn<HandoffPorts['release_filing']>(),
 	resolve_commit: vi.fn<HandoffPorts['resolve_commit']>(),
@@ -70,7 +77,7 @@ function fake(overrides: Partial<HandoffPorts> = {}): Fake {
 	return { ports, ...record }
 }
 
-const run_handoff_cli_fixture = { fake, ISSUE_URL, CLAUDE_SESSION, PID }
+const run_handoff_cli_fixture = { fake, BRIEF_PATH, ISSUE_URL, CLAUDE_SESSION, PID }
 
 export type { Fake }
 export { run_handoff_cli_fixture }

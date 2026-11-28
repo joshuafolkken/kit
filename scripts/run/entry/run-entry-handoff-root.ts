@@ -51,7 +51,8 @@ function refusal_text({ issue_number, command }: EntryRequest, cwd: string): str
 	return [
 		`run:entry ${issue_number}: a run:handoff child does not claim ${cwd} —`,
 		`it is neither ${session_cite.issue(issue_number)}'s lane nor on its branch.`,
-		`Hand the run into its lane and end: \`pnpm josh run:release\`, then \`${handoff}\`.`,
+		`Hand the run into its lane and end: \`pnpm josh run:release\`, then \`${handoff}\`,`,
+		'`<path>` from `run:handoff brief-path`.',
 		`${REFUSED_HANDOFF_NOTE} — the issue stays filed for its lane.`,
 		'(fullrun-steps.md → "The `fullrun new` step list").',
 	].join('\n')

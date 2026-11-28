@@ -310,6 +310,15 @@ describe('run_handoff_cli.run refusals', () => {
 		expect(lines.at(-1)).toContain('| retrospective |')
 	})
 
+	// joshuafolkken/kit#9166: the usage names `--again` and the `brief-path` subcommand.
+	it('names --again and brief-path in the usage it prints for a bad argument', async () => {
+		const { ports, lines } = fake()
+
+		await run_handoff_cli.run(['unknown'], ports)
+
+		expect(lines.at(-1)).toContain('[--again] | brief-path |')
+	})
+
 	// joshuafolkken/kit#6056: the brief read is `cli_body`'s, so a brief in the work tree is refused.
 	it('refuses a brief in the work tree that git does not ignore, naming why', async () => {
 		const repository = cli_body_repository.create(make_directory('josh-run-handoff-repository-'))

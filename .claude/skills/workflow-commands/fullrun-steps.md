@@ -42,7 +42,7 @@ with the labels `kickoff.md` → "Words typed after `new`" maps (per
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`); a
 hand-off child's filing gets `handoff:implementing`, so no `auto-ok`. Capture
 `<N>`. (2a) Into the lane, the plan in the brief: `pnpm josh run:release`, then
-`pnpm josh run:handoff fullrun <N> --brief-file .josh/tmp/brief.md` (work on a `wip/` branch: `--wip <name>`,
+`pnpm josh run:handoff fullrun <N> --brief-file <path>`, `<path>` from `run:handoff brief-path` (work on a `wip/` branch: `--wip <name>`,
 `scripts/run/handoff/run-handoff-wip.ts`), end (`run-handoff-tree.ts`); on a
 refusal, (3); a hand-off child ends, the label lifted (`run-handoff-release.ts`). (3) `pnpm josh run:entry <N> --adopt` — the `#N` entry with the bare hold re-keyed to `<N>`
 (`run:hold --adopt`) for its claim; before its reads it stashes pre-existing changes, synchronizes

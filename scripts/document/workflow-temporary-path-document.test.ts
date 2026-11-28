@@ -9,6 +9,14 @@ const DIRECTORY = '.claude/skills/workflow-commands'
 const SKILL = path.join(DIRECTORY, 'SKILL.md')
 const OPTIONAL_MARKUP = /[[\]]/gu
 const TEMP_PREFIX = '.josh/tmp/'
+// joshuafolkken/kit#9166: the brief path `run:handoff brief-path` prints, made under `.josh/tmp/`
+// (`run-handoff-brief.test.ts`); a procedure naming it names where that path comes from.
+const PRINTED_PATH = '<path>'
+const PRINTED_PATH_SOURCE = 'brief-path`'
+
+function is_session_path(value: string): boolean {
+	return value.startsWith(TEMP_PREFIX) || value === PRINTED_PATH
+}
 
 function is_file_flag(token: string): boolean {
 	return token.startsWith('--') && token.endsWith('-file')
@@ -44,13 +52,25 @@ function file_arguments(): Array<[string, string]> {
 	)
 }
 
+function printed_path_files(): Array<string> {
+	const names = file_arguments()
+		.filter(([, value]) => value === PRINTED_PATH)
+		.map(([name]) => name)
+
+	return [...new Set(names)]
+}
+
 describe('workflow-commands name .josh/tmp/ for the files they have a session write', () => {
 	it('finds the file arguments it checks', () => {
 		expect(file_arguments().length).toBeGreaterThan(0)
 	})
 
 	it.each(file_arguments())('%s passes "%s" under .josh/tmp/', (_name, value) => {
-		expect(value.startsWith(TEMP_PREFIX)).toBe(true)
+		expect(is_session_path(value)).toBe(true)
+	})
+
+	it.each(printed_path_files())('%s names where its "<path>" comes from', (name) => {
+		expect(readFileSync(path.join(DIRECTORY, name), 'utf8')).toContain(PRINTED_PATH_SOURCE)
 	})
 
 	it('reads a glued --x-file=<path> and a flag that ends its span', () => {

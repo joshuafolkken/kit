@@ -7,6 +7,7 @@ const BRIEF_FLAG = '--brief-file'
 const BRIEF = 'brief.md'
 const WIP_FLAG = '--wip'
 const WIP_BRANCH = 'wip/x'
+const BRIEF_PATH = 'brief-path'
 
 describe('run_handoff_args.parse', () => {
 	it('reads kickoff new with its brief, keeping the keyword line as typed', () => {
@@ -15,6 +16,7 @@ describe('run_handoff_args.parse', () => {
 			keyword: 'kickoff',
 			line: 'kickoff new',
 			brief_file: BRIEF,
+			again: false,
 		})
 	})
 
@@ -28,13 +30,6 @@ describe('run_handoff_args.parse', () => {
 		const parsed = run_handoff_args.parse(['fullrun', '12', 'new', BRIEF_FLAG, BRIEF])
 
 		expect(parsed).toMatchObject({ kind: 'workflow', line: 'fullrun #12 new' })
-	})
-
-	it('passes backlogrun through whole, without a brief', () => {
-		expect(run_handoff_args.parse(['backlogrun', '#7', '--only'])).toEqual({
-			kind: 'backlogrun',
-			rest: ['#7', '--only'],
-		})
 	})
 
 	it.each([
@@ -66,6 +61,30 @@ describe('run_handoff_args.parse --wip', () => {
 		{ argv: ['fullrun', BRIEF_FLAG, BRIEF, WIP_FLAG, 'a', WIP_FLAG, 'b'], why: 'given twice' },
 	])('refuses a wip flag $why', ({ argv }) => {
 		expect(run_handoff_args.parse(argv)).toMatchObject({ kind: 'refused' })
+	})
+})
+
+// joshuafolkken/kit#9166: `--again` hands a recorded brief off on purpose; `brief-path` prints a path.
+describe('run_handoff_args.parse --again and the untyped commands', () => {
+	it('reads --again as the flag and keeps it out of the child line', () => {
+		const parsed = run_handoff_args.parse(['fullrun', '#12', '--again', BRIEF_FLAG, BRIEF])
+
+		expect(parsed).toMatchObject({ kind: 'workflow', line: 'fullrun #12', again: true })
+	})
+
+	it('passes backlogrun through whole, without a brief', () => {
+		expect(run_handoff_args.parse(['backlogrun', '#7', '--only'])).toEqual({
+			kind: 'backlogrun',
+			rest: ['#7', '--only'],
+		})
+	})
+
+	it('reads brief-path alone', () => {
+		expect(run_handoff_args.parse([BRIEF_PATH])).toEqual({ kind: BRIEF_PATH })
+	})
+
+	it('refuses brief-path with another argument', () => {
+		expect(run_handoff_args.parse([BRIEF_PATH, 'x'])).toMatchObject({ kind: 'refused' })
 	})
 })
 

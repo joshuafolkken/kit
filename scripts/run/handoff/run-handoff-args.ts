@@ -5,12 +5,24 @@
 // **A bare number is an issue.** A shell reads an unquoted `#12` as a comment, so `12` in the entry is
 // handed to the child as `#12`, as `josh backlogrun` reads it (`backlogrun-args.ts`).
 
+import type { AgentProvider } from '#scripts/agent/agent-provider'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 
 const BRIEF_FLAG = '--brief-file'
 const WIP_FLAG = '--wip'
+// Hands off a brief the ledger already holds — a repeat meant, never one a shared path caused.
+const AGAIN_FLAG = '--again'
 const WIP_PREFIX = 'wip/'
 const BACKLOG_KEYWORD = 'backlogrun'
+// Not a workflow keyword: it prints a fresh brief path for the session to write its brief to.
+const BRIEF_PATH_COMMAND = 'brief-path'
+const AGENT_FLAG = '--agent'
+const LONE_FLAGS: ReadonlySet<string> = new Set(['--stop', '--restart'])
+// `josh backlogrun --agent` names a provider by its CLI.
+const AGENT_NAMES: Readonly<Record<AgentProvider, string>> = {
+	anthropic: 'claude',
+	openai: 'codex',
+}
 const NOT_FOUND = -1
 const FLAG_AND_VALUE = 2
 
@@ -37,6 +49,8 @@ interface WorkflowHandoff {
 	brief_file: string | undefined
 	// The `wip/<name>` branch `--wip` names for the filed Issue to adopt; `undefined` without the flag.
 	wip?: string | undefined
+	// `--again`: the brief is handed off even when the ledger holds it (`run-handoff-brief.ts`).
+	again?: boolean
 }
 
 type Taken =
@@ -47,6 +61,7 @@ type Taken =
 type HandoffArguments =
 	| WorkflowHandoff
 	| { kind: 'backlogrun'; rest: ReadonlyArray<string> }
+	| { kind: typeof BRIEF_PATH_COMMAND }
 	| { kind: 'refused'; note: string }
 
 function is_workflow_keyword(token: string | undefined): token is WorkflowKeyword {
@@ -99,11 +114,18 @@ function workflow_of(keyword: WorkflowKeyword, rest: ReadonlyArray<string>): Han
 
 	if (wip.kind !== 'taken') return refused(flag_note(wip, WIP_FLAG, `${WIP_FLAG} needs <name>`))
 
-	const line = [keyword, ...wip.rest.map((token) => issue_number_shape.issue_token(token))].join(
-		' ',
-	)
+	const entry = wip.rest.filter((token) => token !== AGAIN_FLAG)
+	const line = [keyword, ...entry.map((token) => issue_number_shape.issue_token(token))].join(' ')
+	const is_again = entry.length < wip.rest.length
 
-	return { kind: 'workflow', keyword, line, brief_file: brief.value, wip: wip_branch(wip.value) }
+	return {
+		kind: 'workflow',
+		keyword,
+		line,
+		brief_file: brief.value,
+		wip: wip_branch(wip.value),
+		again: is_again,
+	}
 }
 
 function retrospective_of(rest: ReadonlyArray<string>): HandoffArguments {
@@ -114,12 +136,29 @@ function retrospective_of(rest: ReadonlyArray<string>): HandoffArguments {
 	return { kind: 'workflow', keyword, line: keyword, brief_file: undefined }
 }
 
-function parse(argv: ReadonlyArray<string>): HandoffArguments {
-	const [keyword, ...rest] = argv
+function brief_path_of(rest: ReadonlyArray<string>): HandoffArguments {
+	if (rest.length > 0) return refused(`${BRIEF_PATH_COMMAND} takes no other argument`)
 
+	return { kind: BRIEF_PATH_COMMAND }
+}
+
+// The commands read apart from a typed workflow keyword; `undefined` for any other.
+function untyped_of(
+	keyword: string | undefined,
+	rest: ReadonlyArray<string>,
+): HandoffArguments | undefined {
 	if (keyword === BACKLOG_KEYWORD) return { kind: 'backlogrun', rest }
 
 	if (keyword === RETROSPECTIVE_KEYWORD) return retrospective_of(rest)
+
+	return keyword === BRIEF_PATH_COMMAND ? brief_path_of(rest) : undefined
+}
+
+function parse(argv: ReadonlyArray<string>): HandoffArguments {
+	const [keyword, ...rest] = argv
+	const untyped = untyped_of(keyword, rest)
+
+	if (untyped !== undefined) return untyped
 
 	if (!is_workflow_keyword(keyword)) {
 		return refused(`expected one of ${WORKFLOW_KEYWORDS.join(', ')}, ${BACKLOG_KEYWORD}`)
@@ -128,13 +167,23 @@ function parse(argv: ReadonlyArray<string>): HandoffArguments {
 	return workflow_of(keyword, rest)
 }
 
+// `backlogrun`'s arguments with the main session's provider as `--agent`, unless one is typed;
+// `--stop` / `--restart` stand alone in `josh backlogrun` (`backlogrun-args.ts`), so they take none.
+function with_agent(rest: ReadonlyArray<string>, provider: AgentProvider): ReadonlyArray<string> {
+	const is_kept = rest.includes(AGENT_FLAG) || rest.some((token) => LONE_FLAGS.has(token))
+
+	return is_kept ? rest : [...rest, AGENT_FLAG, AGENT_NAMES[provider]]
+}
+
 const run_handoff_args = {
+	AGAIN_FLAG,
 	BACKLOG_KEYWORD,
 	KEYWORDS,
 	RETROSPECTIVE_KEYWORD,
 	WORKFLOW_KEYWORDS,
 	parse,
 	wip_branch,
+	with_agent,
 }
 
 export type { HandoffArguments, WorkflowHandoff, WorkflowKeyword }

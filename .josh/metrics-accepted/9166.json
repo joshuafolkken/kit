@@ -1,0 +1,9 @@
+{
+	"reason": "CLAUDE.md's consultation filing line now names run:handoff brief-path as the brief path source (+2 resident bytes after trimming the sentence)",
+	"date": "2026-11-28",
+	"growth": {
+		"scripts.code_lines": 144,
+		"ai_cost.on_demand_bytes": 60,
+		"ai_cost.resident_bytes": 2
+	}
+}

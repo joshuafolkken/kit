@@ -9,8 +9,6 @@ import {
 } from '#scripts/agent/agent-provider'
 import { git_command } from '#scripts/git/git-command'
 import type { AdoptBranch } from '#scripts/issue/issue-body-adopt-branch'
-import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { cli_body } from '#scripts/josh/cli-body'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -24,10 +22,10 @@ import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 import { run_hold_block } from '#scripts/run/hold/run-hold-block'
 import { execa } from 'execa'
 import { run_handoff_args, type WorkflowHandoff } from './run-handoff-args'
+import { run_handoff_brief, type LedgerPorts } from './run-handoff-brief'
 import { run_handoff_final } from './run-handoff-final'
 import { run_handoff_launch, type BuiltArgv, type HandoffChild } from './run-handoff-launch'
 import { run_handoff_release } from './run-handoff-release'
-import { run_handoff_retrospective } from './run-handoff-retrospective'
 import { run_handoff_tree } from './run-handoff-tree'
 import { run_handoff_wip } from './run-handoff-wip'
 
@@ -40,19 +38,12 @@ import { run_handoff_wip } from './run-handoff-wip'
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const AGENT_FLAG = '--agent'
-const LONE_FLAGS: ReadonlySet<string> = new Set(['--stop', '--restart'])
 // The line `kickoff new …` — `kickoff #N` plans an existing Issue instead.
 const KICKOFF_NEW_LINE = /^kickoff\s+new(?:\s|$)/u
 const USAGE =
-	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> [--wip <name>] | retrospective | backlogrun [...]'
-// `josh backlogrun --agent` names a provider by its CLI.
-const AGENT_NAMES: Readonly<Record<AgentProvider, string>> = {
-	anthropic: 'claude',
-	openai: 'codex',
-}
+	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> [--wip <name>] [--again] | brief-path | retrospective | backlogrun [...]'
 
-interface HandoffPorts {
+interface HandoffPorts extends LedgerPorts {
 	environment: AgentEnvironment
 	cwd: string
 	now: () => number
@@ -63,8 +54,13 @@ interface HandoffPorts {
 	lane_directory: (issue: string) => Promise<string | undefined>
 	read_text: (target: string) => string | undefined
 	launch: (request: LaunchRequest) => LaunchResult
-	launch_attached: (request: LaunchRequest) => Promise<AttachedLaunchResult>
+	launch_attached: (
+		request: LaunchRequest,
+		on_spawn: (pid: number) => void,
+	) => Promise<AttachedLaunchResult>
 	make_directory: (target: string) => void
+	// A fresh brief path for this session (`run-handoff-brief.ts`).
+	brief_path: () => string
 	backlogrun: (argv: ReadonlyArray<string>) => Promise<number>
 	// Whether the carry record under this git directory marks the retrospective as run.
 	is_retrospective_done: (git_directory: string) => boolean
@@ -84,6 +80,8 @@ interface StartInput {
 	handoff: WorkflowHandoff
 	provider: AgentProvider
 	brief: string
+	// The brief's digest the ledger records once the child starts; `undefined` for a generated brief.
+	digest: string | undefined
 	git_directory: string
 	// The child's extra environment: `--wip`'s resolved branch for its `issue:file` to write.
 	wip_environment: Readonly<Record<string, string>>
@@ -96,6 +94,7 @@ interface Started {
 	log: string
 	// The child's own scratch directory, relative to its work tree, which its prompt names.
 	scratch: string
+	digest: string | undefined
 	git_directory: string
 	// The work tree the child runs in (`run-handoff-tree.ts`).
 	directory: string
@@ -128,11 +127,14 @@ const LIVE_PORTS: HandoffPorts = {
 	lane_directory: run_handoff_tree.lane_directory,
 	read_text: (target) => stamp_file.read_stamp_text(target),
 	launch: (request) => detached_launch.launch(request, note_to_stderr),
-	launch_attached: async (request) =>
-		await detached_launch.launch_attached(request, note_to_stderr),
+	launch_attached: async (request, on_spawn) =>
+		await detached_launch.launch_attached(request, note_to_stderr, on_spawn),
 	make_directory: (target) => {
 		mkdirSync(target, { recursive: true })
 	},
+	brief_path: () => run_handoff_brief.brief_path(process.cwd()),
+	read_ledger: (target) => stamp_file.read_stamp_text(target),
+	append_ledger: run_handoff_brief.append_ledger,
 	backlogrun: josh_backlogrun,
 	is_retrospective_done: (git_directory) =>
 		run_carry.retrospective_done_of(run_carry.read_carry(run_carry.carry_path(git_directory))),
@@ -146,13 +148,6 @@ function refuse(note: string, ports: HandoffPorts): number {
 	ports.write(`run:handoff: ${note}`)
 
 	return FAILURE_EXIT_CODE
-}
-
-// `--stop` / `--restart` stand alone in `josh backlogrun` (`backlogrun-args.ts`), so they take no `--agent`.
-function with_agent(rest: ReadonlyArray<string>, provider: AgentProvider): ReadonlyArray<string> {
-	const is_kept = rest.includes(AGENT_FLAG) || rest.some((token) => LONE_FLAGS.has(token))
-
-	return is_kept ? rest : [...rest, AGENT_FLAG, AGENT_NAMES[provider]]
 }
 
 function started_line({ handoff, built }: Started): string {
@@ -210,8 +205,15 @@ function waited_exit(
 		: SUCCESS_EXIT_CODE
 }
 
+// The brief goes on the ledger once its child starts, so a start that failed can be handed off again.
+function recorded(started: Started, ports: HandoffPorts): void {
+	run_handoff_brief.record(started, ports.now(), ports.append_ledger)
+}
+
 async function waited(started: Started, ports: HandoffPorts): Promise<number> {
-	const result = await ports.launch_attached(started.request)
+	const result = await ports.launch_attached(started.request, () => {
+		recorded(started, ports)
+	})
 
 	if (result.kind === 'failed') return refuse(`could not start: ${result.note}`, ports)
 
@@ -243,6 +245,7 @@ function detached(started: Started, ports: HandoffPorts): number {
 
 	if (result.kind === 'failed') return refuse(`could not start: ${result.note}`, ports)
 
+	recorded(started, ports)
 	ports.write(`started (pid ${String(result.pid)}); check it with: pnpm josh run:progress --once`)
 
 	return SUCCESS_EXIT_CODE
@@ -272,7 +275,7 @@ function child_of(input: StartInput, scratch: string, cwd: string): HandoffChild
 
 // One start time names both the log and the scratch directory, so each child's pair reads together.
 function started_of(input: StartInput, directory: string, ports: HandoffPorts): StartResult {
-	const { handoff, git_directory } = input
+	const { handoff, git_directory, digest } = input
 	const now = ports.now()
 	const scratch = run_handoff_launch.scratch_directory(handoff.keyword, now)
 	const built = run_handoff_launch.argv_of(child_of(input, scratch, directory), ports.environment)
@@ -284,7 +287,7 @@ function started_of(input: StartInput, directory: string, ports: HandoffPorts): 
 		run_handoff_launch.request_of(built, directory, log, handoff.line),
 		input.wip_environment,
 	)
-	const started = { handoff, built, request, log, scratch, git_directory, directory }
+	const started = { handoff, built, request, log, scratch, digest, git_directory, directory }
 
 	return { kind: 'started', started }
 }
@@ -294,23 +297,6 @@ async function tree_started(input: StartInput, ports: HandoffPorts): Promise<Sta
 	const tree = await run_handoff_tree.work_tree(input.handoff, ports)
 
 	return tree.kind === 'refused' ? tree : started_of(input, tree.directory, ports)
-}
-
-// A brief file is read as written; none means the generated retrospective brief, whose close names
-// this session — the backlogrun parent that owns the carry — as the mark's owner.
-function brief_of(
-	brief_file: string | undefined,
-	ports: HandoffPorts,
-): { text: string } | { problem: string } {
-	if (brief_file === undefined) {
-		const owner = agent_session_environment.own_session_pid(ports.environment)
-
-		return { text: run_handoff_retrospective.brief(owner) }
-	}
-
-	const read = cli_body.read_result(brief_file)
-
-	return 'problem' in read ? { problem: `could not read ${brief_file}: ${read.problem}` } : read
 }
 
 // A mark already on the record would read as the unit's own close after it ends, so a retrospective
@@ -338,15 +324,13 @@ async function handed(
 	provider: AgentProvider,
 	ports: HandoffPorts,
 ): Promise<number> {
-	const read = brief_of(handoff.brief_file, ports)
-
-	if ('problem' in read) return refuse(read.problem, ports)
-
-	const brief = read.text
-
 	const git_directory = await ports.repository_directory()
 
 	if (git_directory === undefined) return refuse('not inside a git repository', ports)
+
+	const read = run_handoff_brief.brief_of(handoff, { ...ports, git_directory })
+
+	if (read.kind === 'problem') return refuse(read.problem, ports)
 
 	if (is_already_closed(handoff, git_directory, ports)) {
 		return refuse('the carry already marks the retrospective as run; nothing is owed', ports)
@@ -359,8 +343,10 @@ async function handed(
 
 	if ('problem' in wip) return refuse(wip.problem, ports)
 
+	const { text: brief, digest } = read
+
 	return await from_input(
-		{ handoff, provider, brief, git_directory, wip_environment: wip.environment },
+		{ handoff, provider, brief, digest, git_directory, wip_environment: wip.environment },
 		ports,
 	)
 }
@@ -385,12 +371,18 @@ async function dispatch(argv: ReadonlyArray<string>, ports: HandoffPorts): Promi
 
 	if (parsed.kind === 'refused') return refuse(`${parsed.note}\n${USAGE}`, ports)
 
+	if (parsed.kind === 'brief-path') {
+		ports.write(ports.brief_path())
+
+		return SUCCESS_EXIT_CODE
+	}
+
 	const selected = agent_provider.resolve_provider(ports.environment)
 
 	if (selected.kind === 'rejected') return refuse(selected.note, ports)
 
 	if (parsed.kind === 'backlogrun') {
-		return await ports.backlogrun(with_agent(parsed.rest, selected.provider))
+		return await ports.backlogrun(run_handoff_args.with_agent(parsed.rest, selected.provider))
 	}
 
 	return await released(parsed, await handed(parsed, selected.provider, ports), ports)

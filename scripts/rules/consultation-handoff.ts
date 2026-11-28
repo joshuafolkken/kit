@@ -20,7 +20,8 @@ const HANDOFF_DOC = '`docs/josh-commands-board.md` → "josh run:handoff"'
 
 const REASON =
 	'⛔ consultation handoff: a consultation-model main line does not enter a run itself. Run ' +
-	'`pnpm josh run:handoff <keyword> … --brief-file <brief>` instead of `run:entry` / `run:hold`; ' +
+	'`pnpm josh run:handoff <keyword> … --brief-file <path>` (`<path>` from `run:handoff brief-path`) ' +
+	'not `run:entry` / `run:hold`; ' +
 	'a filing instruction goes to `run:handoff kickoff new`; operating (`issue:plan`, `epic`) stays here. ' +
 	`Fires on every occurrence (${HANDOFF_DOC}).`
 
